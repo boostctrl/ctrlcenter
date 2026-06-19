@@ -1,6 +1,9 @@
 services:
   homepage:
-    build: .
+    # Pull the published image. To build locally from source instead, comment
+    # out `image:` and uncomment `build: .`.
+    image: ghcr.io/boostctrl/homepage-app:latest
+    # build: .
     container_name: homepage
     restart: unless-stopped
     ports:

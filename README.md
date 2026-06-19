@@ -22,10 +22,15 @@ Features:
    cp .env.example .env
    # edit .env and set ADMIN_PASSWORD (and, recommended, SESSION_SECRET)
    ```
-2. Build and run:
+2. Pull the published image and run:
    ```bash
-   docker compose up -d --build
+   docker compose pull
+   docker compose up -d
    ```
+   The bundled [docker-compose.yml](docker-compose.yml) uses the prebuilt image
+   `ghcr.io/boostctrl/homepage-app:latest`. To build from source instead,
+   comment out `image:` and uncomment `build: .`, then run
+   `docker compose up -d --build`.
 3. Open `http://localhost:3000` for the dashboard, `http://localhost:3000/admin`
    to manage apps/bookmarks/settings (sign in with `ADMIN_PASSWORD`).
 
@@ -114,3 +119,28 @@ npm run test:watch
 - `app/api/` — CRUD + reorder (`PATCH`) routes backing the admin UI, plus
   `app/api/health`
 - `app/manifest.ts` — generated web app manifest
+- `.github/workflows/` — CI (lint + test + build) and the release pipeline
+
+## Releasing
+
+Branching model: day-to-day work lands on `develop`; `main` tracks released
+code. Every push/PR to either branch runs CI
+([`.github/workflows/ci.yml`](.github/workflows/ci.yml): lint, tests, build).
+
+To cut a release:
+
+1. Merge `develop` into `main`.
+2. Tag the release and push the tag:
+   ```bash
+   git tag v0.1.0
+   git push origin v0.1.0
+   ```
+
+Pushing a `v*` tag triggers
+[`.github/workflows/release.yml`](.github/workflows/release.yml), which re-runs
+the tests, then builds a multi-arch (`linux/amd64`, `linux/arm64`) image and
+publishes it to `ghcr.io/boostctrl/homepage-app` tagged `X.Y.Z`, `X.Y`, and
+`latest`. Keep `package.json`'s `version` in step with the tag.
+
+> The GHCR package is private until you set it to public in the repository's
+> Packages settings — do this once if you want others to pull without auth.

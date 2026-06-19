@@ -1,6 +1,10 @@
 import type { MetadataRoute } from "next";
 import { getSettings } from "@/lib/config";
 
+// Generated per-request so the app name reflects the current settings rather
+// than whatever was on disk at build time.
+export const dynamic = "force-dynamic";
+
 export default async function manifest(): Promise<MetadataRoute.Manifest> {
   const settings = await getSettings();
   const name = settings.title || "Home";
