@@ -13,6 +13,17 @@ function clientKey(request: NextRequest): string {
   return `login:${ip}`;
 }
 
+// Mark the session cookie Secure only when the request actually arrived over
+// HTTPS (directly or via a TLS-terminating proxy). Keying this off NODE_ENV
+// instead would set Secure in the production container even on plain-HTTP
+// deployments, where browsers silently drop the cookie on non-localhost
+// origins — so the login would succeed but never stick.
+function isHttps(request: NextRequest): boolean {
+  const proto = request.headers.get("x-forwarded-proto");
+  if (proto) return proto.split(",")[0]?.trim() === "https";
+  return request.nextUrl.protocol === "https:";
+}
+
 export async function POST(request: NextRequest) {
   pruneRateLimit();
   const limit = rateLimit(clientKey(request), MAX_ATTEMPTS, WINDOW_MS);
@@ -37,7 +48,7 @@ export async function POST(request: NextRequest) {
   const response = NextResponse.json({ ok: true });
   response.cookies.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isHttps(request),
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
