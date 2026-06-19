@@ -129,18 +129,28 @@ code. Every push/PR to either branch runs CI
 
 To cut a release:
 
-1. Merge `develop` into `main`.
-2. Tag the release and push the tag:
+1. On `develop`, update [`CHANGELOG.md`](CHANGELOG.md): rename the
+   `[Unreleased]` heading to the new version with today's date (keeping the
+   [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) sections), add a
+   fresh empty `[Unreleased]` section above it, and update the link
+   references at the bottom. Bump `version` in `package.json` to match.
+2. Merge `develop` into `main`.
+3. Tag the release and push the tag:
    ```bash
-   git tag v0.1.0
-   git push origin v0.1.0
+   git tag vX.Y.Z
+   git push origin vX.Y.Z
+   ```
+4. Publish the GitHub release with notes mirroring that version's changelog
+   section:
+   ```bash
+   gh release create vX.Y.Z --title vX.Y.Z --notes-file <notes-from-changelog>
    ```
 
 Pushing a `v*` tag triggers
 [`.github/workflows/release.yml`](.github/workflows/release.yml), which re-runs
 the tests, then builds a multi-arch (`linux/amd64`, `linux/arm64`) image and
 publishes it to `ghcr.io/boostctrl/homepage-app` tagged `X.Y.Z`, `X.Y`, and
-`latest`. Keep `package.json`'s `version` in step with the tag.
+`latest`.
 
 > The GHCR package is private until you set it to public in the repository's
 > Packages settings — do this once if you want others to pull without auth.
