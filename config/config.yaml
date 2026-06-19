@@ -1,0 +1,81 @@
+settings:
+  title: Home
+  greetingName: ''
+  timezone: America/Chicago
+  weather:
+    enabled: true
+    latitude: 38.9072
+    longitude: -77.0369
+    units: imperial
+apps:
+  - id: 85b49535-e829-4356-8685-fef57bbeab56
+    name: Cloud Drive
+    subtitle: Nextcloud
+    url: https://cloud.example.com
+    icon: nextcloud
+  - id: 0079e6d2-da5d-406f-a206-08b422d5e7f6
+    name: Password Manager
+    subtitle: Vaultwarden
+    url: https://vault.example.com
+    icon: vaultwarden
+  - id: a3632b22-c60b-4651-9854-6e80842da9a2
+    name: Plex Requests
+    subtitle: Seer
+    url: https://requests.example.com
+    icon: overseerr
+  - id: 8fc903c5-aab5-436b-8bf2-4235f38475bd
+    name: Potato Flix
+    subtitle: Plex - Movies & TV
+    url: https://plex.example.com
+    icon: plex
+  - id: 3dea3dc7-89db-44e9-a32d-54392e94b8a8
+    name: Reddit Reader
+    subtitle: Redlib
+    url: https://redlib.example.com
+    icon: reddit
+  - id: a5bb1c52-fedd-45e7-a99e-d837cc467d14
+    name: Service Status
+    subtitle: Uptime Kuma
+    url: https://status.example.com
+    icon: uptime-kuma
+  - id: e4bf8034-ce59-4828-8170-7eb79e5b878a
+    name: Utilities
+    subtitle: IT Tools
+    url: https://tools.example.com
+    icon: it-tools
+  - id: 5ec3677f-7811-4d14-9b87-92010a689ef4
+    name: Web Search
+    subtitle: SearXNG
+    url: https://search.example.com
+    icon: searxng
+bookmarks:
+  - id: edbe5a4d-d2ca-432b-884f-36594d426452
+    category: Shopping
+    name: Amazon
+    url: https://amazon.com
+    icon: amazon
+  - id: 4b0b809b-66ce-4565-b498-59a71372bdcf
+    category: Shopping
+    name: eBay
+    url: https://ebay.com
+    icon: ebay
+  - id: 1468e9d1-0ced-40e6-9317-021fe0022b96
+    category: Social Media
+    name: Youtube
+    url: https://youtube.com
+    icon: youtube
+  - id: 1eae279f-70a2-4f5c-8534-175e7c5042f6
+    category: Social Media
+    name: Twitch
+    url: https://twitch.tv
+    icon: twitch
+  - id: 6c1b6f0a-2e4b-4f3d-9a1a-8c2d6f0e9b3a
+    category: Utilities
+    name: ChatGPT
+    url: https://chatgpt.com
+    icon: chatgpt
+  - id: 7d2c7a1b-3f5c-4e4e-8b2b-9d3e7f1a0c4b
+    category: Utilities
+    name: Proton
+    url: https://proton.me
+    icon: proton
