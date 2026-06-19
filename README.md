@@ -140,17 +140,17 @@ To cut a release:
    git tag vX.Y.Z
    git push origin vX.Y.Z
    ```
-4. Publish the GitHub release with notes mirroring that version's changelog
-   section:
-   ```bash
-   gh release create vX.Y.Z --title vX.Y.Z --notes-file <notes-from-changelog>
-   ```
 
 Pushing a `v*` tag triggers
-[`.github/workflows/release.yml`](.github/workflows/release.yml), which re-runs
-the tests, then builds a multi-arch (`linux/amd64`, `linux/arm64`) image and
-publishes it to `ghcr.io/boostctrl/homepage-app` tagged `X.Y.Z`, `X.Y`, and
-`latest`.
+[`.github/workflows/release.yml`](.github/workflows/release.yml), which:
+
+1. re-runs the tests;
+2. builds a multi-arch (`linux/amd64`, `linux/arm64`) image and publishes it
+   to `ghcr.io/boostctrl/homepage-app` tagged `X.Y.Z`, `X.Y`, and `latest`; and
+3. creates the GitHub release, with notes extracted from the matching
+   `CHANGELOG.md` section (so the release will fail if that section is
+   missing — keep step 1 above honest). Tags containing a hyphen
+   (e.g. `v1.0.0-rc1`) are published as pre-releases.
 
 > The GHCR package is private until you set it to public in the repository's
 > Packages settings — do this once if you want others to pull without auth.
