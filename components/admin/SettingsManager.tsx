@@ -25,7 +25,12 @@ export default function SettingsManager({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(settings),
       });
-      if (!res.ok) throw new Error("Failed to save settings");
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(
+          err?.error ? JSON.stringify(err.error) : "Failed to save settings"
+        );
+      }
       const data: Settings = await res.json();
       setSettings(data);
       setSaved(true);
@@ -77,25 +82,37 @@ export default function SettingsManager({
           label="Latitude"
           type="number"
           step="any"
+          min={-90}
+          max={90}
           value={settings.weather.latitude}
-          onChange={(e) =>
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
             setSettings({
               ...settings,
-              weather: { ...settings.weather, latitude: parseFloat(e.target.value) || 0 },
-            })
-          }
+              weather: {
+                ...settings.weather,
+                latitude: Number.isNaN(v) ? settings.weather.latitude : v,
+              },
+            });
+          }}
         />
         <TextField
           label="Longitude"
           type="number"
           step="any"
+          min={-180}
+          max={180}
           value={settings.weather.longitude}
-          onChange={(e) =>
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
             setSettings({
               ...settings,
-              weather: { ...settings.weather, longitude: parseFloat(e.target.value) || 0 },
-            })
-          }
+              weather: {
+                ...settings.weather,
+                longitude: Number.isNaN(v) ? settings.weather.longitude : v,
+              },
+            });
+          }}
         />
       </div>
 

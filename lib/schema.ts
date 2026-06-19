@@ -68,8 +68,8 @@ export const bookmarkInputSchema = z.object({
 // and default-free is what makes "only send the fields you're changing" work.
 export const weatherUpdateSchema = z.object({
   enabled: z.boolean().optional(),
-  latitude: z.number().optional(),
-  longitude: z.number().optional(),
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
   units: z.enum(["imperial", "metric"]).optional(),
 });
 
@@ -93,4 +93,9 @@ export const bookmarkUpdateSchema = z.object({
   name: z.string().min(1).optional(),
   url: z.string().url().optional(),
   icon: z.string().optional(),
+});
+
+// Reorder (PATCH): an ordered list of existing ids.
+export const reorderSchema = z.object({
+  ids: z.array(z.string()),
 });

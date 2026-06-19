@@ -5,8 +5,13 @@ const SESSION_DURATION = "7d";
 
 // Edge middleware can't use Node's `crypto` module, so we derive the JWT
 // signing key with Web Crypto (available in both Node and the Edge runtime).
+//
+// Prefer a dedicated SESSION_SECRET so session signing isn't coupled to the
+// (human-chosen, possibly weak) admin password. Fall back to deriving the key
+// from ADMIN_PASSWORD for backward compatibility with existing deployments —
+// in that mode, changing the password also invalidates outstanding sessions.
 async function getSecretKey(): Promise<Uint8Array> {
-  const base = process.env.ADMIN_PASSWORD ?? "";
+  const base = process.env.SESSION_SECRET || process.env.ADMIN_PASSWORD || "";
   const data = new TextEncoder().encode(base);
   const hash = await crypto.subtle.digest("SHA-256", data);
   return new Uint8Array(hash);

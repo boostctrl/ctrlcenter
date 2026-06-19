@@ -1,0 +1,150 @@
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import fs from "fs/promises";
+import os from "os";
+import path from "path";
+import YAML from "js-yaml";
+
+// config.ts captures CONFIG_PATH at module load, so the env var has to be set
+// before the module is imported — hence the dynamic import in beforeAll.
+let config: typeof import("./config");
+let configPath: string;
+
+beforeAll(async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "homepage-test-"));
+  configPath = path.join(dir, "config.yaml");
+  process.env.CONFIG_PATH = configPath;
+  config = await import("./config");
+});
+
+beforeEach(async () => {
+  // Start each test from a clean slate; readConfig recreates defaults on miss.
+  await fs.rm(configPath, { force: true });
+});
+
+describe("readConfig", () => {
+  it("creates a default config when the file is missing", async () => {
+    const result = await config.readConfig();
+    expect(result.apps).toEqual([]);
+    expect(result.settings.title).toBe("Home");
+    // The file should now exist on disk.
+    const onDisk = YAML.load(await fs.readFile(configPath, "utf8"));
+    expect(onDisk).toBeTruthy();
+  });
+});
+
+describe("apps CRUD", () => {
+  it("creates an app with a generated id and persists it", async () => {
+    const created = await config.createApp({
+      name: "Plex",
+      subtitle: "Movies",
+      url: "https://plex.example.com",
+      icon: "plex",
+    });
+    expect(created.id).toBeTruthy();
+
+    const apps = await config.listApps();
+    expect(apps).toHaveLength(1);
+    expect(apps[0]).toMatchObject({ name: "Plex", id: created.id });
+  });
+
+  it("partially updates an app, leaving other fields untouched", async () => {
+    const created = await config.createApp({
+      name: "Plex",
+      subtitle: "Movies",
+      url: "https://plex.example.com",
+      icon: "plex",
+    });
+
+    const updated = await config.updateApp(created.id, { name: "Plex TV" });
+    expect(updated).toMatchObject({
+      name: "Plex TV",
+      subtitle: "Movies",
+      url: "https://plex.example.com",
+      icon: "plex",
+    });
+  });
+
+  it("throws when updating a non-existent app", async () => {
+    await expect(config.updateApp("missing", { name: "x" })).rejects.toThrow();
+  });
+
+  it("deletes an app", async () => {
+    const created = await config.createApp({
+      name: "Plex",
+      subtitle: "",
+      url: "https://plex.example.com",
+      icon: "",
+    });
+    await config.deleteApp(created.id);
+    expect(await config.listApps()).toHaveLength(0);
+  });
+});
+
+describe("updateSettings partial merge", () => {
+  it("updates a top-level field without clobbering the others", async () => {
+    await config.updateSettings({ greetingName: "Eric", timezone: "America/Chicago" });
+    const settings = await config.updateSettings({ title: "Dash" });
+
+    expect(settings.title).toBe("Dash");
+    expect(settings.greetingName).toBe("Eric");
+    expect(settings.timezone).toBe("America/Chicago");
+  });
+
+  it("merges nested weather fields without dropping siblings", async () => {
+    await config.updateSettings({
+      weather: { latitude: 40, longitude: -75 },
+    });
+    const settings = await config.updateSettings({
+      weather: { units: "metric" },
+    });
+
+    expect(settings.weather.units).toBe("metric");
+    expect(settings.weather.latitude).toBe(40);
+    expect(settings.weather.longitude).toBe(-75);
+  });
+});
+
+describe("reorderApps", () => {
+  async function seedThree() {
+    const a = await config.createApp({ name: "A", subtitle: "", url: "https://a.com", icon: "" });
+    const b = await config.createApp({ name: "B", subtitle: "", url: "https://b.com", icon: "" });
+    const c = await config.createApp({ name: "C", subtitle: "", url: "https://c.com", icon: "" });
+    return { a, b, c };
+  }
+
+  it("reorders apps to match the given id order", async () => {
+    const { a, b, c } = await seedThree();
+    const result = await config.reorderApps([c.id, a.id, b.id]);
+    expect(result.map((x) => x.name)).toEqual(["C", "A", "B"]);
+  });
+
+  it("appends unlisted items and ignores unknown ids", async () => {
+    const { b } = await seedThree();
+    // Only mention b (plus a bogus id); a and c should be kept, appended in order.
+    const result = await config.reorderApps([b.id, "does-not-exist"]);
+    expect(result.map((x) => x.name)).toEqual(["B", "A", "C"]);
+    expect(result).toHaveLength(3);
+  });
+});
+
+describe("write queue serialization", () => {
+  it("does not lose writes under concurrent mutations", async () => {
+    // Fire many creates without awaiting between them. Without the serializing
+    // write queue these read-modify-write cycles would clobber each other and
+    // only the last write would survive.
+    const creates = Array.from({ length: 10 }, (_, i) =>
+      config.createApp({
+        name: `App ${i}`,
+        subtitle: "",
+        url: `https://app${i}.example.com`,
+        icon: "",
+      })
+    );
+    await Promise.all(creates);
+
+    const apps = await config.listApps();
+    expect(apps).toHaveLength(10);
+    // All ids should be unique.
+    expect(new Set(apps.map((a) => a.id)).size).toBe(10);
+  });
+});

@@ -111,6 +111,30 @@ export async function deleteApp(id: string): Promise<void> {
   });
 }
 
+// Reorders `items` to match the order of `ids`. Ids not present in `items`
+// are ignored; items whose id isn't listed are kept and appended in their
+// existing order, so a stale or partial id list can never drop data.
+function applyOrder<T extends { id: string }>(items: T[], ids: string[]): T[] {
+  const byId = new Map(items.map((item) => [item.id, item]));
+  const ordered: T[] = [];
+  for (const id of ids) {
+    const item = byId.get(id);
+    if (item) {
+      ordered.push(item);
+      byId.delete(id);
+    }
+  }
+  for (const remaining of byId.values()) ordered.push(remaining);
+  return ordered;
+}
+
+export async function reorderApps(ids: string[]): Promise<AppItem[]> {
+  return mutate((config) => {
+    config.apps = applyOrder(config.apps, ids);
+    return config.apps;
+  });
+}
+
 export async function listBookmarks(): Promise<BookmarkItem[]> {
   return (await readConfig()).bookmarks;
 }
@@ -140,5 +164,12 @@ export async function updateBookmark(
 export async function deleteBookmark(id: string): Promise<void> {
   await mutate((config) => {
     config.bookmarks = config.bookmarks.filter((b) => b.id !== id);
+  });
+}
+
+export async function reorderBookmarks(ids: string[]): Promise<BookmarkItem[]> {
+  return mutate((config) => {
+    config.bookmarks = applyOrder(config.bookmarks, ids);
+    return config.bookmarks;
   });
 }

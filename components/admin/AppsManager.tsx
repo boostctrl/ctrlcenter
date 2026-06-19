@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import type { AppItem } from "@/lib/schema";
 import Icon from "@/components/Icon";
 import { TextField, Button } from "./ui";
+import { useReorder } from "./useReorder";
 
 type FormState = { name: string; subtitle: string; url: string; icon: string };
 const emptyForm: FormState = { name: "", subtitle: "", url: "", icon: "" };
@@ -60,18 +61,46 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
     if (editingId === id) resetForm();
   }
 
+  async function persistOrder(next: AppItem[]) {
+    const previous = apps;
+    setApps(next); // optimistic
+    const res = await fetch("/api/apps", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: next.map((a) => a.id) }),
+    });
+    if (!res.ok) {
+      setApps(previous);
+      setError("Failed to save new order");
+    }
+  }
+
+  const { handlers, dragIndex, overIndex } = useReorder(apps, persistOrder);
+
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
       <div className="space-y-3">
         {apps.length === 0 && (
           <p className="text-sm text-white/40">No applications yet. Add your first one.</p>
         )}
-        {apps.map((app) => (
+        {apps.map((app, index) => (
           <div
             key={app.id}
-            className="flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3"
+            {...handlers(index)}
+            className={`flex items-center justify-between gap-4 rounded-xl border bg-white/[0.03] px-4 py-3 transition-colors ${
+              overIndex === index && dragIndex !== index
+                ? "border-violet-400/60"
+                : "border-white/10"
+            } ${dragIndex === index ? "opacity-50" : ""}`}
           >
             <div className="flex min-w-0 items-center gap-3">
+              <span
+                className="cursor-grab text-white/30 select-none active:cursor-grabbing"
+                aria-hidden
+                title="Drag to reorder"
+              >
+                ⠿
+              </span>
               <Icon icon={app.icon} name={app.name} size={24} />
               <div className="min-w-0">
                 <p className="truncate font-medium">{app.name}</p>

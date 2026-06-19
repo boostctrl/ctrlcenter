@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import type { BookmarkItem } from "@/lib/schema";
 import Icon from "@/components/Icon";
 import { TextField, Button } from "./ui";
+import { useReorder } from "./useReorder";
 
 type FormState = { name: string; category: string; url: string; icon: string };
 const emptyForm: FormState = { name: "", category: "", url: "", icon: "" };
@@ -69,6 +70,22 @@ export default function BookmarksManager({
     if (editingId === id) resetForm();
   }
 
+  async function persistOrder(next: BookmarkItem[]) {
+    const previous = bookmarks;
+    setBookmarks(next); // optimistic
+    const res = await fetch("/api/bookmarks", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: next.map((b) => b.id) }),
+    });
+    if (!res.ok) {
+      setBookmarks(previous);
+      setError("Failed to save new order");
+    }
+  }
+
+  const { handlers, dragIndex, overIndex } = useReorder(bookmarks, persistOrder);
+
   const categories = Array.from(new Set(bookmarks.map((b) => b.category))).sort();
 
   return (
@@ -77,12 +94,24 @@ export default function BookmarksManager({
         {bookmarks.length === 0 && (
           <p className="text-sm text-white/40">No bookmarks yet. Add your first one.</p>
         )}
-        {bookmarks.map((bookmark) => (
+        {bookmarks.map((bookmark, index) => (
           <div
             key={bookmark.id}
-            className="flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3"
+            {...handlers(index)}
+            className={`flex items-center justify-between gap-4 rounded-xl border bg-white/[0.03] px-4 py-3 transition-colors ${
+              overIndex === index && dragIndex !== index
+                ? "border-violet-400/60"
+                : "border-white/10"
+            } ${dragIndex === index ? "opacity-50" : ""}`}
           >
             <div className="flex min-w-0 items-center gap-3">
+              <span
+                className="cursor-grab text-white/30 select-none active:cursor-grabbing"
+                aria-hidden
+                title="Drag to reorder"
+              >
+                ⠿
+              </span>
               <Icon icon={bookmark.icon} name={bookmark.name} size={24} />
               <div className="min-w-0">
                 <p className="truncate font-medium">{bookmark.name}</p>

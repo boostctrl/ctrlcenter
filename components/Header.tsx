@@ -1,4 +1,5 @@
 import WeatherWidget from "./WeatherWidget";
+import LiveClock from "./LiveClock";
 import type { Settings } from "@/lib/schema";
 
 function getGreeting(hour: number): string {
@@ -37,6 +38,7 @@ export default function Header({ settings }: { settings: Settings }) {
     <header className="flex flex-col items-start justify-between gap-8 sm:flex-row sm:items-center">
       <div>
         <p className="text-sm font-medium tracking-widest text-white/40">{dateStr}</p>
+        <LiveClock timeZone={timeZone} />
         <h1 className="mt-2 text-5xl font-bold tracking-tight sm:text-6xl">
           {greeting}
           {settings.greetingName ? `, ${settings.greetingName}` : ""}

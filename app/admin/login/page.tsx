@@ -22,7 +22,8 @@ function LoginForm() {
     });
     setLoading(false);
     if (!res.ok) {
-      setError("Incorrect password");
+      const data = await res.json().catch(() => null);
+      setError(data?.error || "Incorrect password");
       return;
     }
     router.push(searchParams.get("next") || "/admin");

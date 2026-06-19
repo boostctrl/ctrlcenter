@@ -7,5 +7,14 @@ services:
       - "3000:3000"
     volumes:
       - ./config:/config
+    healthcheck:
+      test:
+        ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     environment:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+      # Optional: dedicated cookie-signing secret (falls back to ADMIN_PASSWORD).
+      - SESSION_SECRET=${SESSION_SECRET:-}
