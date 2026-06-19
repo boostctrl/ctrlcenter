@@ -12,6 +12,20 @@ here.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-06-19
+
+### Added
+
+- Automated release notes: the release workflow now publishes the GitHub
+  release from the matching `CHANGELOG.md` section.
+
+### Fixed
+
+- Admin login on plain-HTTP deployments. The session cookie is now marked
+  `Secure` based on the request protocol (honoring `X-Forwarded-Proto`)
+  rather than `NODE_ENV`, so browsers no longer drop it on non-HTTPS,
+  non-localhost origins such as `http://<nas-ip>:3000`.
+
 ## [0.1.0] - 2026-06-19
 
 Initial release.
@@ -42,5 +56,6 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/homepage-app/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/boostctrl/homepage-app/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/boostctrl/homepage-app/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/boostctrl/homepage-app/releases/tag/v0.1.0
