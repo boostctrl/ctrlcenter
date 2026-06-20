@@ -12,6 +12,21 @@ here.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-06-20
+
+### Security
+
+- App and bookmark URLs are now restricted to `http(s)`. `javascript:`, `data:`,
+  and `vbscript:` schemes were previously accepted and, rendered as links on the
+  public dashboard, could have been stored XSS.
+- Session signing now fails closed: if neither `SESSION_SECRET` nor
+  `ADMIN_PASSWORD` is set, the app refuses to sign or verify sessions rather than
+  deriving a key from an empty string (a known value that could forge sessions).
+- Added security response headers — Content-Security-Policy, `X-Frame-Options`,
+  `X-Content-Type-Options`, `Referrer-Policy`, and `Permissions-Policy`.
+- The public `/api/status` endpoint now caches results briefly so it can't be
+  hammered to amplify outbound pings.
+
 ## [0.2.0] - 2026-06-20
 
 ### Added
@@ -104,7 +119,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/homepage-app/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/boostctrl/homepage-app/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/boostctrl/homepage-app/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/boostctrl/homepage-app/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/boostctrl/homepage-app/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/boostctrl/homepage-app/compare/v0.1.1...v0.1.2
