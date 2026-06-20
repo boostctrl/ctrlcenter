@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ACCENT_KEYS } from "./theme";
+import { SEARCH_ENGINE_KEYS, isValidCustomUrl } from "./search";
 
 // z.string().url() accepts any valid URL — including `javascript:`, `data:`,
 // and `vbscript:` schemes. App/bookmark URLs are rendered as <a href> on the
@@ -20,6 +21,13 @@ export const weatherSchema = z.object({
   units: z.enum(["imperial", "metric"]).default("imperial"),
 });
 
+// Stored search config is lenient (so a hand-edited file always parses); the
+// custom URL is validated on the admin-input path and at use time instead.
+export const searchSchema = z.object({
+  engine: z.enum(SEARCH_ENGINE_KEYS).default("duckduckgo"),
+  customUrl: z.string().default(""),
+});
+
 export const settingsSchema = z.object({
   title: z.string().default("Home"),
   greetingName: z.string().default(""),
@@ -28,6 +36,7 @@ export const settingsSchema = z.object({
   // When on, the dashboard polls /api/status to show per-app online/offline
   // dots. Off by default since it makes the server ping every app URL.
   statusChecks: z.boolean().default(false),
+  search: searchSchema.default(searchSchema.parse({})),
   weather: weatherSchema.default(weatherSchema.parse({})),
 });
 
@@ -88,12 +97,25 @@ export const weatherUpdateSchema = z.object({
   units: z.enum(["imperial", "metric"]).optional(),
 });
 
+// Admin sends the full search object; reject a "custom" engine without a valid
+// http(s) `%s` template so a broken search bar can't be saved.
+export const searchUpdateSchema = z
+  .object({
+    engine: z.enum(SEARCH_ENGINE_KEYS),
+    customUrl: z.string(),
+  })
+  .refine((s) => s.engine !== "custom" || isValidCustomUrl(s.customUrl), {
+    message: "Custom search URL must start with http(s) and contain %s",
+    path: ["customUrl"],
+  });
+
 export const settingsInputSchema = z.object({
   title: z.string().optional(),
   greetingName: z.string().optional(),
   timezone: z.string().optional(),
   accent: z.enum(ACCENT_KEYS).optional(),
   statusChecks: z.boolean().optional(),
+  search: searchUpdateSchema.optional(),
   weather: weatherUpdateSchema.optional(),
 });
 export type SettingsInput = z.infer<typeof settingsInputSchema>;

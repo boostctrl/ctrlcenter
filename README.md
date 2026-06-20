@@ -63,6 +63,9 @@ settings:
   timezone: America/Chicago # IANA timezone, used for date + greeting
   accent: violet           # violet | blue | emerald | rose | amber | cyan
   statusChecks: false      # ping app URLs and show online/offline dots
+  search:
+    engine: duckduckgo     # duckduckgo | google | bing | brave | custom
+    customUrl: ""          # used when engine: custom; must contain %s
   weather:
     enabled: true
     latitude: 38.9072

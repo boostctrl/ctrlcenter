@@ -3,6 +3,11 @@
 import { useState, type FormEvent } from "react";
 import type { Settings } from "@/lib/schema";
 import { ACCENTS, ACCENT_KEYS } from "@/lib/theme";
+import {
+  SEARCH_ENGINES,
+  SEARCH_ENGINE_KEYS,
+  type SearchEngine,
+} from "@/lib/search";
 import { TextField, Button } from "./ui";
 import { useToast } from "./Toast";
 import { apiErrorMessage } from "./apiError";
@@ -101,6 +106,43 @@ export default function SettingsManager({
           />
           Enabled
         </label>
+      </div>
+
+      <div className="flex flex-col gap-2 border-t border-white/10 pt-4">
+        <span className="text-sm text-white/50">Search bar engine</span>
+        <select
+          value={settings.search.engine}
+          onChange={(e) =>
+            setSettings({
+              ...settings,
+              search: { ...settings.search, engine: e.target.value as SearchEngine },
+            })
+          }
+          className="accent-focus rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white outline-none transition-colors"
+        >
+          {SEARCH_ENGINE_KEYS.map((key) => (
+            <option key={key} value={key}>
+              {key === "custom" ? "Custom…" : SEARCH_ENGINES[key].label}
+            </option>
+          ))}
+        </select>
+        {settings.search.engine === "custom" && (
+          <TextField
+            label="Custom search URL (use %s for the query)"
+            placeholder="https://example.com/search?q=%s"
+            value={settings.search.customUrl}
+            onChange={(e) =>
+              setSettings({
+                ...settings,
+                search: { ...settings.search, customUrl: e.target.value },
+              })
+            }
+          />
+        )}
+        <p className="text-xs text-white/40">
+          Pressing Enter in the search bar opens the top match, or searches here
+          when nothing matches.
+        </p>
       </div>
 
       <div className="flex items-center justify-between border-t border-white/10 pt-4">

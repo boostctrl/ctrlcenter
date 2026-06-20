@@ -17,6 +17,7 @@ export default async function HomePage() {
         apps={apps}
         bookmarks={bookmarks}
         statusEnabled={settings.statusChecks}
+        search={settings.search}
       />
 
       <footer className="mt-auto pt-8 text-center text-xs text-white/30">

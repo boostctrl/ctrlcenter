@@ -81,13 +81,17 @@ export async function updateSettings(
   partial: SettingsInput
 ): Promise<Settings> {
   return mutate((config) => {
-    const { weather: weatherPartial, ...rest } = partial;
+    const { weather: weatherPartial, search: searchPartial, ...rest } = partial;
     config.settings = {
       ...config.settings,
       ...withoutUndefined(rest),
       weather: {
         ...config.settings.weather,
         ...withoutUndefined(weatherPartial ?? {}),
+      },
+      search: {
+        ...config.settings.search,
+        ...withoutUndefined(searchPartial ?? {}),
       },
     };
     return config.settings;

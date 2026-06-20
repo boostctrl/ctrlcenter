@@ -5,6 +5,7 @@ import Link from "next/link";
 import AppCard from "./AppCard";
 import BookmarkGroup from "./BookmarkGroup";
 import { StatusProvider } from "./StatusProvider";
+import { buildSearchUrl, engineLabel, type SearchConfig } from "@/lib/search";
 import type { AppItem, BookmarkItem } from "@/lib/schema";
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -29,10 +30,12 @@ export default function Dashboard({
   apps,
   bookmarks,
   statusEnabled = false,
+  search,
 }: {
   apps: AppItem[];
   bookmarks: BookmarkItem[];
   statusEnabled?: boolean;
+  search: SearchConfig;
 }) {
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -79,6 +82,28 @@ export default function Dashboard({
   const hasContent = apps.length > 0 || bookmarks.length > 0;
   const hasResults = filteredApps.length > 0 || filteredGroups.length > 0;
 
+  function topResultUrl(): string | null {
+    if (filteredApps.length > 0) return filteredApps[0].url;
+    const firstGroup = filteredGroups[0];
+    return firstGroup?.[1][0]?.url ?? null;
+  }
+
+  function webSearch() {
+    const url = buildSearchUrl(search, query);
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  // Enter opens the top match if there is one, otherwise searches the web.
+  function onSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== "Enter" || !q) return;
+    const top = topResultUrl();
+    if (top) {
+      window.open(top, "_blank", "noopener,noreferrer");
+    } else {
+      webSearch();
+    }
+  }
+
   const content = (
     <>
       {hasContent && (
@@ -88,6 +113,7 @@ export default function Dashboard({
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={onSearchKeyDown}
             placeholder="Search applications and bookmarks…"
             aria-label="Search applications and bookmarks"
             className="accent-focus w-full rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3.5 text-white placeholder-white/30 outline-none backdrop-blur-xl transition-colors"
@@ -123,7 +149,18 @@ export default function Dashboard({
       )}
 
       {hasContent && !hasResults && (
-        <p className="text-white/40">No matches for “{query}”.</p>
+        <p className="text-white/40">
+          No matches for “{query}”.{" "}
+          {buildSearchUrl(search, query) && (
+            <button
+              type="button"
+              onClick={webSearch}
+              className="text-white/60 underline transition-colors hover:text-white/90"
+            >
+              Search {engineLabel(search)} for “{query}” →
+            </button>
+          )}
+        </p>
       )}
 
       {!hasContent && (

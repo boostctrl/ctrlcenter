@@ -14,6 +14,10 @@ here.
 
 ### Added
 
+- Custom search engine for the search bar (Settings → Search bar engine):
+  choose DuckDuckGo, Google, Bing, Brave, or a custom `%s` URL template.
+  Pressing Enter opens the top match, or searches the web when nothing matches;
+  the no-results state offers an explicit "Search … for …" link.
 - Auto-detected, per-visitor location and time zone. The header detects each
   visitor's time zone automatically and (when the weather widget is on) their
   approximate location by IP, with a discreet editor — click the time/location
