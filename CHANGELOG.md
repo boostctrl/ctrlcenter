@@ -12,6 +12,13 @@ here.
 
 ## [Unreleased]
 
+### Security
+
+- Resolved the transitive `postcss` advisory (GHSA-qx2v-qp2m-jg93) by pinning
+  `postcss` to a patched version (`^8.5.10`) via an npm `overrides`, deduping
+  the vulnerable copy bundled under `next`. `npm audit` is now clean. (postcss
+  is build-time tooling, so this never affected the running app.)
+
 ### Added
 
 - Admin: searchable time-zone picker, and a city search (Open-Meteo geocoding)
