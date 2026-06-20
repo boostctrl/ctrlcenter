@@ -104,5 +104,16 @@ describe("settingsInputSchema partial merge semantics", () => {
     expect("greetingName" in parsed).toBe(false);
     expect("timezone" in parsed).toBe(false);
     expect("weather" in parsed).toBe(false);
+    expect("accent" in parsed).toBe(false);
+    expect("statusChecks" in parsed).toBe(false);
+  });
+
+  it("accepts a known accent and rejects an unknown one", () => {
+    expect(settingsInputSchema.safeParse({ accent: "emerald" }).success).toBe(
+      true
+    );
+    expect(settingsInputSchema.safeParse({ accent: "chartreuse" }).success).toBe(
+      false
+    );
   });
 });
