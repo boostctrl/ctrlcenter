@@ -12,6 +12,15 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- Auto-detected, per-visitor location and time zone. The header detects each
+  visitor's time zone automatically and (when the weather widget is on) their
+  approximate location by IP, with a discreet editor — click the time/location
+  line — to correct the time zone, switch units, or use precise device
+  location. Preferences are stored per-browser and never change the shared site
+  config, so any visitor can fix their own view.
+
 ## [0.2.1] - 2026-06-20
 
 ### Security

@@ -17,7 +17,9 @@ const csp = [
   "font-src 'self'",
   "style-src 'self' 'unsafe-inline'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
-  "connect-src 'self'",
+  // Client-side weather (Open-Meteo) and per-visitor location auto-detection
+  // (IP lookup + reverse geocoding) for the header's location/time controls.
+  "connect-src 'self' https://api.open-meteo.com https://ipwho.is https://api.bigdatacloud.net",
 ]
   .join("; ")
   .concat(isDev ? "" : "; upgrade-insecure-requests");

@@ -1,60 +1,67 @@
-import type { Settings } from "@/lib/schema";
+"use client";
 
-type WeatherSettings = Settings["weather"];
+import { useEffect, useState } from "react";
+import { useVisitorPrefs } from "./PrefsProvider";
+import {
+  fetchWeather,
+  unitSymbol,
+  weatherCodeToIcon,
+  type CurrentWeather,
+  type Units,
+} from "@/lib/weather";
 
-type CurrentWeather = {
-  temperature_2m: number;
-  relative_humidity_2m: number;
-  weather_code: number;
-};
+// Seeded with the server-rendered default-location weather (so there's no empty
+// flash), then re-fetches client-side when the visitor's effective location or
+// units differ from the admin default.
+export default function WeatherWidget({
+  initial,
+  defaultLat,
+  defaultLon,
+  defaultUnits,
+}: {
+  initial: CurrentWeather | null;
+  defaultLat: number;
+  defaultLon: number;
+  defaultUnits: Units;
+}) {
+  const { location, units } = useVisitorPrefs();
+  const [fetched, setFetched] = useState<CurrentWeather | null>(null);
 
-async function fetchWeather(weather: WeatherSettings): Promise<CurrentWeather | null> {
-  const params = new URLSearchParams({
-    latitude: String(weather.latitude),
-    longitude: String(weather.longitude),
-    current: "temperature_2m,relative_humidity_2m,weather_code",
-    temperature_unit: weather.units === "metric" ? "celsius" : "fahrenheit",
-    timezone: "auto",
-  });
+  // The default location/units are already rendered server-side as `initial`,
+  // so only fetch when the effective values differ. Deriving this in render
+  // (rather than syncing it into state) avoids a setState-in-effect.
+  const usesDefault =
+    Math.abs(location.latitude - defaultLat) < 1e-4 &&
+    Math.abs(location.longitude - defaultLon) < 1e-4 &&
+    units === defaultUnits;
 
-  const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, {
-    next: { revalidate: 1800 },
-  });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data.current as CurrentWeather;
-}
+  useEffect(() => {
+    if (usesDefault) return;
+    let active = true;
+    fetchWeather(location.latitude, location.longitude, units).then((w) => {
+      if (active) setFetched(w);
+    });
+    return () => {
+      active = false;
+    };
+  }, [usesDefault, location.latitude, location.longitude, units]);
 
-function weatherCodeToIcon(code: number): string {
-  if (code === 0) return "☀️";
-  if (code === 1 || code === 2) return "🌤️";
-  if (code === 3) return "☁️";
-  if (code === 45 || code === 48) return "🌫️";
-  if ([51, 53, 55, 56, 57].includes(code)) return "🌦️";
-  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return "🌧️";
-  if ([71, 73, 75, 77, 85, 86].includes(code)) return "❄️";
-  if ([95, 96, 99].includes(code)) return "⛈️";
-  return "🌡️";
-}
-
-export default async function WeatherWidget({ weather }: { weather: WeatherSettings }) {
-  const current = await fetchWeather(weather).catch(() => null);
-  if (!current) return null;
-
-  const unitSymbol = weather.units === "metric" ? "°C" : "°F";
+  // While an override is loading, keep showing the default rather than blanking.
+  const weather = usesDefault ? initial : (fetched ?? initial);
+  if (!weather) return null;
 
   return (
     <div className="glass-card flex items-center gap-4 px-6 py-4">
       <span className="text-4xl" aria-hidden>
-        {weatherCodeToIcon(current.weather_code)}
+        {weatherCodeToIcon(weather.code)}
       </span>
       <div>
         <p className="text-2xl leading-tight font-semibold">
-          {Math.round(current.temperature_2m)}
-          {unitSymbol}
+          {Math.round(weather.temperature)}
+          {unitSymbol(units)}
         </p>
         <p className="text-sm text-white/50">
-          {Math.round(current.relative_humidity_2m)}% humidity
+          {Math.round(weather.humidity)}% humidity
         </p>
       </div>
     </div>
