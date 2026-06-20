@@ -21,8 +21,11 @@ const csp = [
   // lookup + reverse geocoding), and the admin icon browser's index fetch.
   "connect-src 'self' https://api.open-meteo.com https://ipwho.is https://api.bigdatacloud.net https://cdn.jsdelivr.net",
 ]
-  .join("; ")
-  .concat(isDev ? "" : "; upgrade-insecure-requests");
+  // NOTE: intentionally no `upgrade-insecure-requests`. This app is commonly
+  // self-hosted over plain HTTP on a LAN (http://<host>:3000); that directive
+  // would upgrade same-origin asset/API requests to HTTPS, which has no
+  // listener, breaking styling and login on non-localhost HTTP origins.
+  .join("; ");
 
 const securityHeaders = [
   { key: "Content-Security-Policy", value: csp },

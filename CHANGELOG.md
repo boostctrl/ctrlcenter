@@ -12,6 +12,19 @@ here.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-06-20
+
+### Fixed
+
+- Plain-HTTP LAN deployments were broken by the `upgrade-insecure-requests` CSP
+  directive added in 0.2.1. On a non-localhost HTTP origin (e.g.
+  `http://<nas-ip>:3000`) it upgraded same-origin asset and API requests to
+  HTTPS — which has no listener — so styles failed to load (the page looked
+  unthemed) and the admin login/portal became unreachable. The directive has
+  been removed; HTTPS deployments should rely on their reverse proxy/HSTS for
+  upgrades. (Localhost was exempt from the upgrade, which is why it wasn't
+  caught earlier.)
+
 ## [0.3.0] - 2026-06-20
 
 ### Added
@@ -149,7 +162,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/homepage-app/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/boostctrl/homepage-app/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/boostctrl/homepage-app/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/boostctrl/homepage-app/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/boostctrl/homepage-app/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/boostctrl/homepage-app/compare/v0.1.3...v0.2.0
