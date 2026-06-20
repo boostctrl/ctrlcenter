@@ -13,6 +13,10 @@ FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
+# Docker auto-sets HOSTNAME to the container ID; without this the Next.js
+# standalone server binds to that hostname's private IP instead of all
+# interfaces, so the published port and the healthcheck can't reach it.
+ENV HOSTNAME=0.0.0.0
 ENV CONFIG_PATH=/config/config.yaml
 
 RUN addgroup --system --gid 1001 nodejs \

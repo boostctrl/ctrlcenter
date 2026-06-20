@@ -47,6 +47,14 @@ You can edit it by hand (changes are picked up on the next page load — no
 rebuild needed) or through the `/admin` UI, which writes back to the same
 file.
 
+The container runs as a non-root user (uid/gid `1001`), so the bind-mounted
+`./config` directory must be writable by that user or saving from `/admin`
+will fail. Grant it once after cloning:
+
+```bash
+sudo chown -R 1001:1001 ./config
+```
+
 ## Configuration
 
 `config/config.yaml` has three sections:

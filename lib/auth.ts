@@ -3,8 +3,9 @@ import { SignJWT, jwtVerify } from "jose";
 export const SESSION_COOKIE_NAME = "homepage_admin_session";
 const SESSION_DURATION = "7d";
 
-// Edge middleware can't use Node's `crypto` module, so we derive the JWT
-// signing key with Web Crypto (available in both Node and the Edge runtime).
+// Derive the JWT signing key with Web Crypto rather than Node's `crypto`
+// module so this code stays runtime-agnostic — it works unchanged from the
+// Node server, the proxy, or an Edge deployment.
 //
 // Prefer a dedicated SESSION_SECRET so session signing isn't coupled to the
 // (human-chosen, possibly weak) admin password. Fall back to deriving the key
