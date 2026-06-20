@@ -5,6 +5,8 @@ import type { BookmarkItem } from "@/lib/schema";
 import Icon from "@/components/Icon";
 import { TextField, Button, MoveButtons } from "./ui";
 import { useReorder } from "./useReorder";
+import { useToast } from "./Toast";
+import { apiErrorMessage } from "./apiError";
 
 type FormState = { name: string; category: string; url: string; icon: string };
 const emptyForm: FormState = { name: "", category: "", url: "", icon: "" };
@@ -17,8 +19,8 @@ export default function BookmarksManager({
   const [bookmarks, setBookmarks] = useState(initialBookmarks);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const toast = useToast();
 
   function startEdit(bookmark: BookmarkItem) {
     setEditingId(bookmark.id);
@@ -28,19 +30,16 @@ export default function BookmarksManager({
       url: bookmark.url,
       icon: bookmark.icon,
     });
-    setError(null);
   }
 
   function resetForm() {
     setEditingId(null);
     setForm(emptyForm);
-    setError(null);
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
-    setError(null);
     try {
       const res = await fetch(editingId ? `/api/bookmarks/${editingId}` : "/api/bookmarks", {
         method: editingId ? "PUT" : "POST",
@@ -49,15 +48,18 @@ export default function BookmarksManager({
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        throw new Error(data?.error ? JSON.stringify(data.error) : "Failed to save");
+        toast(apiErrorMessage(data, "Failed to save"), "error");
+        return;
       }
       const saved: BookmarkItem = await res.json();
+      const wasEditing = editingId;
       setBookmarks((prev) =>
-        editingId ? prev.map((b) => (b.id === editingId ? saved : b)) : [...prev, saved]
+        wasEditing ? prev.map((b) => (b.id === wasEditing ? saved : b)) : [...prev, saved]
       );
       resetForm();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save");
+      toast(wasEditing ? "Bookmark updated" : "Bookmark added");
+    } catch {
+      toast("Failed to save", "error");
     } finally {
       setSaving(false);
     }
@@ -68,6 +70,7 @@ export default function BookmarksManager({
     await fetch(`/api/bookmarks/${id}`, { method: "DELETE" });
     setBookmarks((prev) => prev.filter((b) => b.id !== id));
     if (editingId === id) resetForm();
+    toast("Bookmark deleted");
   }
 
   async function persistOrder(next: BookmarkItem[]) {
@@ -80,7 +83,7 @@ export default function BookmarksManager({
     });
     if (!res.ok) {
       setBookmarks(previous);
-      setError("Failed to save new order");
+      toast("Couldn't save the new order", "error");
     }
   }
 
@@ -183,7 +186,6 @@ export default function BookmarksManager({
             <Icon icon={form.icon} name={form.name || "?"} size={22} />
           </div>
         </div>
-        {error && <p className="text-sm text-red-400">{error}</p>}
         <div className="flex gap-2">
           <Button type="submit" disabled={saving}>
             {editingId ? "Save changes" : "Add"}

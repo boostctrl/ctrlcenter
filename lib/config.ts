@@ -51,6 +51,19 @@ async function mutate<T>(fn: (config: Config) => T): Promise<T> {
   return result;
 }
 
+// Validate and write a whole config, replacing what's on disk (used by import).
+// Goes through the same serialized write queue as mutate() so it can't race
+// with concurrent edits.
+export async function replaceConfig(input: unknown): Promise<Config> {
+  const validated = configSchema.parse(input);
+  const result = writeQueue.then(async () => {
+    await writeConfig(validated);
+    return validated;
+  });
+  writeQueue = result.catch(() => undefined);
+  return result;
+}
+
 export async function getSettings(): Promise<Settings> {
   return (await readConfig()).settings;
 }

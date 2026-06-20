@@ -5,6 +5,8 @@ import type { AppItem } from "@/lib/schema";
 import Icon from "@/components/Icon";
 import { TextField, Button, MoveButtons } from "./ui";
 import { useReorder } from "./useReorder";
+import { useToast } from "./Toast";
+import { apiErrorMessage } from "./apiError";
 
 type FormState = { name: string; subtitle: string; url: string; icon: string };
 const emptyForm: FormState = { name: "", subtitle: "", url: "", icon: "" };
@@ -13,25 +15,22 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
   const [apps, setApps] = useState(initialApps);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const toast = useToast();
 
   function startEdit(app: AppItem) {
     setEditingId(app.id);
     setForm({ name: app.name, subtitle: app.subtitle, url: app.url, icon: app.icon });
-    setError(null);
   }
 
   function resetForm() {
     setEditingId(null);
     setForm(emptyForm);
-    setError(null);
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
-    setError(null);
     try {
       const res = await fetch(editingId ? `/api/apps/${editingId}` : "/api/apps", {
         method: editingId ? "PUT" : "POST",
@@ -40,15 +39,18 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        throw new Error(data?.error ? JSON.stringify(data.error) : "Failed to save");
+        toast(apiErrorMessage(data, "Failed to save"), "error");
+        return;
       }
       const saved: AppItem = await res.json();
+      const wasEditing = editingId;
       setApps((prev) =>
-        editingId ? prev.map((a) => (a.id === editingId ? saved : a)) : [...prev, saved]
+        wasEditing ? prev.map((a) => (a.id === wasEditing ? saved : a)) : [...prev, saved]
       );
       resetForm();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save");
+      toast(wasEditing ? "Application updated" : "Application added");
+    } catch {
+      toast("Failed to save", "error");
     } finally {
       setSaving(false);
     }
@@ -59,6 +61,7 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
     await fetch(`/api/apps/${id}`, { method: "DELETE" });
     setApps((prev) => prev.filter((a) => a.id !== id));
     if (editingId === id) resetForm();
+    toast("Application deleted");
   }
 
   async function persistOrder(next: AppItem[]) {
@@ -71,7 +74,7 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
     });
     if (!res.ok) {
       setApps(previous);
-      setError("Failed to save new order");
+      toast("Couldn't save the new order", "error");
     }
   }
 
@@ -157,7 +160,6 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
             <Icon icon={form.icon} name={form.name || "?"} size={22} />
           </div>
         </div>
-        {error && <p className="text-sm text-red-400">{error}</p>}
         <div className="flex gap-2">
           <Button type="submit" disabled={saving}>
             {editingId ? "Save changes" : "Add"}

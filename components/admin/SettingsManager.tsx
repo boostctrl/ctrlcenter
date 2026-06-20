@@ -4,6 +4,8 @@ import { useState, type FormEvent } from "react";
 import type { Settings } from "@/lib/schema";
 import { ACCENTS, ACCENT_KEYS } from "@/lib/theme";
 import { TextField, Button } from "./ui";
+import { useToast } from "./Toast";
+import { apiErrorMessage } from "./apiError";
 
 export default function SettingsManager({
   initialSettings,
@@ -12,14 +14,11 @@ export default function SettingsManager({
 }) {
   const [settings, setSettings] = useState(initialSettings);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
-    setError(null);
-    setSaved(false);
     try {
       const res = await fetch("/api/settings", {
         method: "PUT",
@@ -27,16 +26,15 @@ export default function SettingsManager({
         body: JSON.stringify(settings),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(
-          err?.error ? JSON.stringify(err.error) : "Failed to save settings"
-        );
+        const data = await res.json().catch(() => null);
+        toast(apiErrorMessage(data, "Failed to save settings"), "error");
+        return;
       }
       const data: Settings = await res.json();
       setSettings(data);
-      setSaved(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save");
+      toast("Settings saved");
+    } catch {
+      toast("Failed to save", "error");
     } finally {
       setSaving(false);
     }
@@ -181,12 +179,10 @@ export default function SettingsManager({
         </select>
       </label>
 
-      {error && <p className="text-sm text-red-400">{error}</p>}
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={saving}>
           Save settings
         </Button>
-        {saved && <span className="text-sm text-emerald-400">Saved</span>}
       </div>
     </form>
   );

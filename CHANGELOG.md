@@ -20,11 +20,16 @@ here.
 - Service status indicators: an optional setting that shows an online/offline
   dot on each application card, backed by a server-side `/api/status` check
   that pings the configured app URLs.
+- Config import/export in the admin header: download the whole configuration
+  as JSON for backup, and restore it by importing a file (validated before it
+  replaces the current config).
 
 ### Changed
 
 - Reordering apps and bookmarks now works on touch and via the keyboard, using
   accessible up/down buttons alongside the existing mouse drag-and-drop.
+- Admin feedback now uses toast notifications instead of inline text, and
+  validation errors are shown as readable messages rather than raw JSON.
 
 ## [0.1.3] - 2026-06-20
 

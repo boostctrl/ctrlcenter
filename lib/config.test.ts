@@ -127,6 +127,29 @@ describe("reorderApps", () => {
   });
 });
 
+describe("replaceConfig", () => {
+  it("validates and replaces the whole config", async () => {
+    await config.createApp({ name: "Old", subtitle: "", url: "https://old.com", icon: "" });
+    const replaced = await config.replaceConfig({
+      settings: { title: "Imported" },
+      apps: [{ id: "x1", name: "New", subtitle: "", url: "https://new.com", icon: "" }],
+      bookmarks: [],
+    });
+    expect(replaced.settings.title).toBe("Imported");
+    expect(replaced.apps.map((a) => a.name)).toEqual(["New"]);
+
+    // Persisted to disk and readable back.
+    const reread = await config.readConfig();
+    expect(reread.apps.map((a) => a.name)).toEqual(["New"]);
+  });
+
+  it("rejects an invalid config", async () => {
+    await expect(
+      config.replaceConfig({ apps: [{ id: "x", name: "" }] })
+    ).rejects.toBeTruthy();
+  });
+});
+
 describe("write queue serialization", () => {
   it("does not lose writes under concurrent mutations", async () => {
     // Fire many creates without awaiting between them. Without the serializing

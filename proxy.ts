@@ -7,6 +7,7 @@ export const config = {
     "/api/apps/:path*",
     "/api/bookmarks/:path*",
     "/api/settings/:path*",
+    "/api/config/:path*",
   ],
 };
 

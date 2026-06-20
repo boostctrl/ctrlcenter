@@ -45,7 +45,8 @@ Features:
 Your data lives in `./config/config.yaml`, bind-mounted into the container.
 You can edit it by hand (changes are picked up on the next page load — no
 rebuild needed) or through the `/admin` UI, which writes back to the same
-file.
+file. The admin header also has **Export**/**Import** buttons to download a
+JSON backup of the whole config and restore it later.
 
 The container fixes ownership of the bind-mounted `./config` directory on
 startup and runs the app as a non-root user, so this works no matter who owns
@@ -60,6 +61,8 @@ settings:
   title: Home              # browser tab title
   greetingName: ""         # optional, "Good evening, <name>!"
   timezone: America/Chicago # IANA timezone, used for date + greeting
+  accent: violet           # violet | blue | emerald | rose | amber | cyan
+  statusChecks: false      # ping app URLs and show online/offline dots
   weather:
     enabled: true
     latitude: 38.9072
