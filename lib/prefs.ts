@@ -109,3 +109,88 @@ export function supportedTimezones(): string[] {
     return [];
   }
 }
+
+// --- Custom themes (the theme builder) ---
+// A custom theme is four colors that drive the CSS variables: page background,
+// the "ink" color (text + surfaces/borders via opacity), and the accent
+// gradient endpoints. Per-visitor, stored in localStorage.
+export type ThemeColors = {
+  background: string;
+  foreground: string;
+  accentFrom: string;
+  accentTo: string;
+};
+
+export type CustomTheme = ThemeColors & { id: string; name: string };
+
+// The active custom theme's colors (overrides light/dark mode when present).
+export const ACTIVE_THEME_KEY = "homepage:activeTheme";
+// The visitor's saved, named themes.
+export const THEMES_KEY = "homepage:themes";
+
+const HEX = /^#[0-9a-fA-F]{6}$/;
+
+export function sanitizeColors(input: unknown): ThemeColors | null {
+  if (!input || typeof input !== "object") return null;
+  const c = input as Record<string, unknown>;
+  const ok = (v: unknown): v is string => typeof v === "string" && HEX.test(v);
+  if (ok(c.background) && ok(c.foreground) && ok(c.accentFrom) && ok(c.accentTo)) {
+    return {
+      background: c.background,
+      foreground: c.foreground,
+      accentFrom: c.accentFrom,
+      accentTo: c.accentTo,
+    };
+  }
+  return null;
+}
+
+export function loadActiveTheme(): ThemeColors | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(ACTIVE_THEME_KEY);
+    return raw ? sanitizeColors(JSON.parse(raw)) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveActiveTheme(colors: ThemeColors | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (colors) {
+      window.localStorage.setItem(ACTIVE_THEME_KEY, JSON.stringify(colors));
+    } else {
+      window.localStorage.removeItem(ACTIVE_THEME_KEY);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+export function loadThemes(): CustomTheme[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(THEMES_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(arr)) return [];
+    return arr.flatMap((t): CustomTheme[] => {
+      const colors = sanitizeColors(t);
+      if (colors && t && typeof t.id === "string" && typeof t.name === "string") {
+        return [{ id: t.id, name: t.name.slice(0, 40), ...colors }];
+      }
+      return [];
+    });
+  } catch {
+    return [];
+  }
+}
+
+export function saveThemes(themes: CustomTheme[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(THEMES_KEY, JSON.stringify(themes));
+  } catch {
+    // ignore
+  }
+}

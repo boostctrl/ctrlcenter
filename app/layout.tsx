@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import type { CSSProperties } from "react";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { getSettings } from "@/lib/config";
 import { accentColors } from "@/lib/theme";
@@ -20,10 +19,6 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-// Applies the visitor's saved theme before first paint to avoid a flash. Mirrors
-// applyTheme() in PrefsProvider; runs from localStorage since theme is per-visitor.
-const themeScript = `(function(){try{var t=localStorage.getItem('homepage:theme')||'system';var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(!d)document.documentElement.classList.add('theme-light');}catch(e){}})();`;
-
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -31,14 +26,20 @@ export default async function RootLayout({
 }>) {
   const settings = await getSettings();
   const { from, to } = accentColors(settings.accent);
-  const accentVars = {
-    "--accent-from": from,
-    "--accent-to": to,
-  } as CSSProperties;
   const weather = settings.weather;
 
+  // Set the admin accent and apply the visitor's saved theme (a custom theme's
+  // colors, or the light/dark mode class) before first paint — all imperatively,
+  // so React never controls the <html> color variables (which would otherwise
+  // clobber a custom theme on hydration). Runs as the first node in <body>.
+  const themeScript = `(function(){try{var s=document.documentElement.style;s.setProperty('--accent-from',${JSON.stringify(
+    from
+  )});s.setProperty('--accent-to',${JSON.stringify(
+    to
+  )});var ct=localStorage.getItem('homepage:activeTheme');if(ct){var c=JSON.parse(ct);if(c&&c.background){s.setProperty('--background',c.background);s.setProperty('--foreground',c.foreground);s.setProperty('--fg',c.foreground);s.setProperty('--accent-from',c.accentFrom);s.setProperty('--accent-to',c.accentTo);return;}}var t=localStorage.getItem('homepage:theme')||'system';var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(!d)document.documentElement.classList.add('theme-light');}catch(e){}})();`;
+
   return (
-    <html lang="en" className={`${jakarta.variable} h-full`} style={accentVars}>
+    <html lang="en" className={`${jakarta.variable} h-full`}>
       <body className="relative min-h-full overflow-x-hidden antialiased">
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <div
@@ -60,6 +61,7 @@ export default async function RootLayout({
         </div>
         <PrefsProvider
           weatherEnabled={weather.enabled}
+          accent={{ from, to }}
           defaults={{
             timezone: settings.timezone || "UTC",
             latitude: weather.latitude,

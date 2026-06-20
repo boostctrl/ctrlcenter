@@ -1,5 +1,31 @@
 import { describe, it, expect } from "vitest";
-import { sanitizePrefs } from "./prefs";
+import { sanitizePrefs, sanitizeColors } from "./prefs";
+
+describe("sanitizeColors", () => {
+  const valid = {
+    background: "#06070d",
+    foreground: "#ffffff",
+    accentFrom: "#a78bfa",
+    accentTo: "#22d3ee",
+  };
+
+  it("accepts four valid 6-digit hex colors", () => {
+    expect(sanitizeColors(valid)).toEqual(valid);
+  });
+
+  it("rejects non-objects and missing fields", () => {
+    expect(sanitizeColors(null)).toBeNull();
+    expect(sanitizeColors({ background: "#fff" })).toBeNull();
+  });
+
+  it("rejects non-hex or short-hex values", () => {
+    expect(sanitizeColors({ ...valid, background: "red" })).toBeNull();
+    expect(sanitizeColors({ ...valid, accentTo: "#fff" })).toBeNull();
+    expect(
+      sanitizeColors({ ...valid, foreground: "#12345g" })
+    ).toBeNull();
+  });
+});
 
 describe("sanitizePrefs", () => {
   it("returns empty for non-objects", () => {

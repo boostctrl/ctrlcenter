@@ -13,13 +13,21 @@ import {
   detectTimezone,
   loadPrefs,
   savePrefs,
+  loadActiveTheme,
+  saveActiveTheme,
+  loadThemes,
+  saveThemes,
   type Units,
   type VisitorLocation,
   type VisitorPrefs,
+  type ThemeColors,
+  type CustomTheme,
 } from "@/lib/prefs";
 
 export type Theme = "system" | "light" | "dark";
 export const THEME_KEY = "homepage:theme";
+
+type Accent = { from: string; to: string };
 
 // Apply the theme by toggling `.theme-light` on <html>. Kept in sync with the
 // no-flash inline script in app/layout.tsx (which runs this same logic before
@@ -29,6 +37,32 @@ function applyTheme(theme: Theme): void {
   const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
   const dark = theme === "dark" || (theme === "system" && prefersDark);
   document.documentElement.classList.toggle("theme-light", !dark);
+}
+
+// A custom theme sets every color variable directly (so light/dark mode no
+// longer applies); `--fg` reuses the foreground "ink" color.
+function applyColors(colors: ThemeColors): void {
+  if (typeof document === "undefined") return;
+  const s = document.documentElement.style;
+  s.setProperty("--background", colors.background);
+  s.setProperty("--foreground", colors.foreground);
+  s.setProperty("--fg", colors.foreground);
+  s.setProperty("--accent-from", colors.accentFrom);
+  s.setProperty("--accent-to", colors.accentTo);
+  document.documentElement.classList.remove("theme-light");
+}
+
+// Drop the custom color overrides and fall back to the mode (light/dark),
+// restoring the admin-configured accent.
+function clearColors(accent: Accent, theme: Theme): void {
+  if (typeof document === "undefined") return;
+  const s = document.documentElement.style;
+  s.removeProperty("--background");
+  s.removeProperty("--foreground");
+  s.removeProperty("--fg");
+  s.setProperty("--accent-from", accent.from);
+  s.setProperty("--accent-to", accent.to);
+  applyTheme(theme);
 }
 
 type EffectiveLocation = {
@@ -45,10 +79,17 @@ type PrefsValue = {
   detecting: boolean;
   weatherEnabled: boolean;
   theme: Theme;
+  customThemes: CustomTheme[];
+  activeColors: ThemeColors | null;
   setTimezone: (tz: string) => void;
   setUnits: (units: Units) => void;
   useMyLocation: () => void;
   setTheme: (theme: Theme) => void;
+  setCustomColors: (colors: ThemeColors) => void;
+  saveNamedTheme: (name: string, colors: ThemeColors) => void;
+  applyNamedTheme: (id: string) => void;
+  deleteNamedTheme: (id: string) => void;
+  clearCustomTheme: () => void;
   reset: () => void;
 };
 
@@ -70,10 +111,12 @@ type Defaults = {
 export function PrefsProvider({
   defaults,
   weatherEnabled,
+  accent,
   children,
 }: {
   defaults: Defaults;
   weatherEnabled: boolean;
+  accent: Accent;
   children: ReactNode;
 }) {
   // Start empty so the first client render matches the server (which only knows
@@ -82,23 +125,81 @@ export function PrefsProvider({
   const [detectedTz, setDetectedTz] = useState<string | undefined>();
   const [detecting, setDetecting] = useState(false);
   const [theme, setThemeState] = useState<Theme>("system");
+  const [customThemes, setCustomThemes] = useState<CustomTheme[]>([]);
+  const [activeColors, setActiveColors] = useState<ThemeColors | null>(null);
 
   const persist = useCallback((next: VisitorPrefs) => {
     setPrefs(next);
     savePrefs(next);
   }, []);
 
-  const setTheme = useCallback((next: Theme) => {
-    setThemeState(next);
-    try {
-      window.localStorage.setItem(THEME_KEY, next);
-    } catch {
-      // Private mode / quota — theme just won't persist.
-    }
-    applyTheme(next);
+  const setTheme = useCallback(
+    (next: Theme) => {
+      setThemeState(next);
+      try {
+        window.localStorage.setItem(THEME_KEY, next);
+      } catch {
+        // Private mode / quota — theme just won't persist.
+      }
+      // Selecting a mode exits any custom theme.
+      setActiveColors(null);
+      saveActiveTheme(null);
+      clearColors(accent, next);
+    },
+    [accent]
+  );
+
+  // Apply (and persist as active) a set of custom colors — the live preview as
+  // you edit in the theme builder.
+  const setCustomColors = useCallback((colors: ThemeColors) => {
+    applyColors(colors);
+    setActiveColors(colors);
+    saveActiveTheme(colors);
   }, []);
 
-  // Load the stored theme on mount and keep "system" in sync with OS changes.
+  const saveNamedTheme = useCallback((name: string, colors: ThemeColors) => {
+    const entry: CustomTheme = {
+      id: crypto.randomUUID(),
+      name: name.trim().slice(0, 40) || "Custom",
+      ...colors,
+    };
+    setCustomThemes((prev) => {
+      const next = [...prev, entry];
+      saveThemes(next);
+      return next;
+    });
+  }, []);
+
+  const applyNamedTheme = useCallback(
+    (id: string) => {
+      const t = customThemes.find((x) => x.id === id);
+      if (!t) return;
+      setCustomColors({
+        background: t.background,
+        foreground: t.foreground,
+        accentFrom: t.accentFrom,
+        accentTo: t.accentTo,
+      });
+    },
+    [customThemes, setCustomColors]
+  );
+
+  const deleteNamedTheme = useCallback((id: string) => {
+    setCustomThemes((prev) => {
+      const next = prev.filter((t) => t.id !== id);
+      saveThemes(next);
+      return next;
+    });
+  }, []);
+
+  const clearCustomTheme = useCallback(() => {
+    setActiveColors(null);
+    saveActiveTheme(null);
+    clearColors(accent, theme);
+  }, [accent, theme]);
+
+  // Load the stored theme + custom themes on mount and keep "system" in sync
+  // with OS changes.
   useEffect(() => {
     let stored: Theme = "system";
     try {
@@ -107,13 +208,21 @@ export function PrefsProvider({
     } catch {
       // ignore
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    const active = loadActiveTheme();
+    /* eslint-disable react-hooks/set-state-in-effect */
     setThemeState(stored);
-    applyTheme(stored);
+    setActiveColors(active);
+    setCustomThemes(loadThemes());
+    /* eslint-enable react-hooks/set-state-in-effect */
+    // The inline script already applied this; re-apply for consistency.
+    if (active) applyColors(active);
+    else applyTheme(stored);
 
-    // Re-apply on OS scheme change (only "system" actually tracks it).
+    // Re-apply on OS scheme change (only "system" mode tracks it; a custom
+    // theme defines its own colors and ignores the OS).
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => {
+      if (loadActiveTheme()) return;
       let t: Theme = "system";
       try {
         const raw = window.localStorage.getItem(THEME_KEY);
@@ -231,13 +340,39 @@ export function PrefsProvider({
       detecting,
       weatherEnabled,
       theme,
+      customThemes,
+      activeColors,
       setTimezone,
       setUnits,
       useMyLocation,
       setTheme,
+      setCustomColors,
+      saveNamedTheme,
+      applyNamedTheme,
+      deleteNamedTheme,
+      clearCustomTheme,
       reset,
     };
-  }, [prefs, detectedTz, defaults, detecting, weatherEnabled, theme, setTimezone, setUnits, useMyLocation, setTheme, reset]);
+  }, [
+    prefs,
+    detectedTz,
+    defaults,
+    detecting,
+    weatherEnabled,
+    theme,
+    customThemes,
+    activeColors,
+    setTimezone,
+    setUnits,
+    useMyLocation,
+    setTheme,
+    setCustomColors,
+    saveNamedTheme,
+    applyNamedTheme,
+    deleteNamedTheme,
+    clearCustomTheme,
+    reset,
+  ]);
 
   return <PrefsContext.Provider value={value}>{children}</PrefsContext.Provider>;
 }

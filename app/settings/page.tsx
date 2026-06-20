@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import SettingsControls from "@/components/SettingsControls";
+import ThemeBuilder from "@/components/ThemeBuilder";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -22,6 +23,10 @@ export default function SettingsPage() {
 
       <div className="glass-card p-6">
         <SettingsControls />
+      </div>
+
+      <div className="glass-card p-6">
+        <ThemeBuilder />
       </div>
 
       <Link

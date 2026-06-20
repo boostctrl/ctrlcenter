@@ -14,6 +14,10 @@ here.
 
 ### Added
 
+- **Theme builder** (Settings → Theme builder): craft a custom theme from color
+  pickers (background, text/surfaces, accent gradient) with a live preview, save
+  named themes, and switch between them. Per-visitor and applied before first
+  paint (no flash). (#11)
 - A dedicated **/settings** page for per-visitor preferences (theme, time zone,
   weather location, units), reached from a floating settings button pinned to
   the bottom-right corner — replacing the header gear popover. (#8, #9)
