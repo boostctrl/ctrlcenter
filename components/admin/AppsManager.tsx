@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import type { AppItem } from "@/lib/schema";
 import Icon from "@/components/Icon";
 import { TextField, Button, MoveButtons } from "./ui";
+import IconField from "./IconField";
 import { useReorder } from "./useReorder";
 import { useToast } from "./Toast";
 import { apiErrorMessage } from "./apiError";
@@ -108,7 +109,9 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
               <Icon icon={app.icon} name={app.name} size={24} />
               <div className="min-w-0">
                 <p className="truncate font-medium">{app.name}</p>
-                <p className="truncate text-xs text-white/40">{app.url}</p>
+                <p className="truncate text-xs text-white/40">
+                  {app.subtitle ? `${app.subtitle} · ${app.url}` : app.url}
+                </p>
               </div>
             </div>
             <div className="flex shrink-0 gap-2">
@@ -147,19 +150,11 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
           value={form.url}
           onChange={(e) => setForm({ ...form, url: e.target.value })}
         />
-        <div className="flex items-end gap-3">
-          <div className="flex-1">
-            <TextField
-              label="Icon (slug or image URL)"
-              placeholder="e.g. nextcloud"
-              value={form.icon}
-              onChange={(e) => setForm({ ...form, icon: e.target.value })}
-            />
-          </div>
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/5 ring-1 ring-white/10">
-            <Icon icon={form.icon} name={form.name || "?"} size={22} />
-          </div>
-        </div>
+        <IconField
+          value={form.icon}
+          onChange={(v) => setForm({ ...form, icon: v })}
+          name={form.name}
+        />
         <div className="flex gap-2">
           <Button type="submit" disabled={saving}>
             {editingId ? "Save changes" : "Add"}

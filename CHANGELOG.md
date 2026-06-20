@@ -14,6 +14,9 @@ here.
 
 ### Added
 
+- Icon browser: a "Browse icons" button in the app and bookmark forms opens a
+  searchable grid of the dashboard-icons set, so you can pick an icon by sight
+  instead of having to know its slug.
 - Change the admin password from the UI (Settings → Change password). The new
   password is stored hashed (PBKDF2-SHA-256, per-password salt) in the config;
   `ADMIN_PASSWORD` becomes the bootstrap/fallback credential. Changing it
@@ -22,7 +25,11 @@ here.
   choose DuckDuckGo, Google, Bing, Brave, or a custom `%s` URL template.
   Pressing Enter opens the top match, or searches the web when nothing matches;
   the no-results state offers an explicit "Search … for …" link.
-- Auto-detected, per-visitor location and time zone. The header detects each
+- Auto-detected, per-visitor location and time zone.
+
+### Changed
+
+- The admin applications list now shows each app's subtitle alongside its URL. The header detects each
   visitor's time zone automatically and (when the weather widget is on) their
   approximate location by IP, with a discreet editor — click the time/location
   line — to correct the time zone, switch units, or use precise device
