@@ -13,6 +13,9 @@ export const settingsSchema = z.object({
   title: z.string().default("Home"),
   greetingName: z.string().default(""),
   timezone: z.string().default("UTC"),
+  // When on, the dashboard polls /api/status to show per-app online/offline
+  // dots. Off by default since it makes the server ping every app URL.
+  statusChecks: z.boolean().default(false),
   weather: weatherSchema.default(weatherSchema.parse({})),
 });
 
@@ -77,6 +80,7 @@ export const settingsInputSchema = z.object({
   title: z.string().optional(),
   greetingName: z.string().optional(),
   timezone: z.string().optional(),
+  statusChecks: z.boolean().optional(),
   weather: weatherUpdateSchema.optional(),
 });
 export type SettingsInput = z.infer<typeof settingsInputSchema>;

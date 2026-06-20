@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import AppCard from "./AppCard";
 import BookmarkGroup from "./BookmarkGroup";
+import { StatusProvider } from "./StatusProvider";
 import type { AppItem, BookmarkItem } from "@/lib/schema";
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -27,9 +28,11 @@ function groupBookmarks(bookmarks: BookmarkItem[]): [string, BookmarkItem[]][] {
 export default function Dashboard({
   apps,
   bookmarks,
+  statusEnabled = false,
 }: {
   apps: AppItem[];
   bookmarks: BookmarkItem[];
+  statusEnabled?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -76,7 +79,7 @@ export default function Dashboard({
   const hasContent = apps.length > 0 || bookmarks.length > 0;
   const hasResults = filteredApps.length > 0 || filteredGroups.length > 0;
 
-  return (
+  const content = (
     <>
       {hasContent && (
         <div className="relative">
@@ -133,5 +136,13 @@ export default function Dashboard({
         </p>
       )}
     </>
+  );
+
+  // Mount the status poller once (independent of search filtering) whenever the
+  // feature is on and there are apps to check.
+  return statusEnabled && apps.length > 0 ? (
+    <StatusProvider>{content}</StatusProvider>
+  ) : (
+    content
   );
 }

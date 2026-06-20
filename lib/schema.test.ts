@@ -14,6 +14,7 @@ describe("configSchema defaults", () => {
     expect(config.apps).toEqual([]);
     expect(config.bookmarks).toEqual([]);
     expect(config.settings.title).toBe("Home");
+    expect(config.settings.statusChecks).toBe(false);
     expect(config.settings.weather.enabled).toBe(true);
     expect(config.settings.weather.units).toBe("imperial");
   });

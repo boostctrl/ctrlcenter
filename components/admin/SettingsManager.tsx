@@ -60,6 +60,26 @@ export default function SettingsManager({
         onChange={(e) => setSettings({ ...settings, timezone: e.target.value })}
       />
 
+      <div className="flex items-center justify-between gap-4 border-t border-white/10 pt-4">
+        <div>
+          <span className="text-sm text-white/70">Service status indicators</span>
+          <p className="text-xs text-white/40">
+            Show an online/offline dot on each app. The server pings every app
+            URL, so leave off if your apps aren&apos;t reachable from it.
+          </p>
+        </div>
+        <label className="flex shrink-0 items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={settings.statusChecks}
+            onChange={(e) =>
+              setSettings({ ...settings, statusChecks: e.target.checked })
+            }
+          />
+          Enabled
+        </label>
+      </div>
+
       <div className="flex items-center justify-between border-t border-white/10 pt-4">
         <span className="text-sm text-white/50">Weather widget</span>
         <label className="flex items-center gap-2 text-sm">

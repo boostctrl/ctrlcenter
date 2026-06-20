@@ -12,6 +12,17 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- Service status indicators: an optional setting that shows an online/offline
+  dot on each application card, backed by a server-side `/api/status` check
+  that pings the configured app URLs.
+
+### Changed
+
+- Reordering apps and bookmarks now works on touch and via the keyboard, using
+  accessible up/down buttons alongside the existing mouse drag-and-drop.
+
 ## [0.1.3] - 2026-06-20
 
 ### Changed

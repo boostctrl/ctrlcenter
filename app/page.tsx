@@ -13,7 +13,11 @@ export default async function HomePage() {
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-12 px-6 py-12 sm:px-10 lg:py-16">
       <Header settings={settings} />
 
-      <Dashboard apps={apps} bookmarks={bookmarks} />
+      <Dashboard
+        apps={apps}
+        bookmarks={bookmarks}
+        statusEnabled={settings.statusChecks}
+      />
 
       <footer className="mt-auto pt-8 text-center text-xs text-white/30">
         <Link href="/admin" className="transition-colors hover:text-white/60">
