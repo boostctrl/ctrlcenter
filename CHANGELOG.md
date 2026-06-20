@@ -12,6 +12,16 @@ here.
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-06-20
+
+### Changed
+
+- The container now fixes ownership of the bind-mounted `/config` volume on
+  startup (via an entrypoint that chowns the mount, then drops from root to the
+  non-root app user with `su-exec`). Self-hosters no longer need to `chown`
+  `./config` to uid `1001` by hand — read/write works regardless of the host
+  directory's original owner.
+
 ## [0.1.2] - 2026-06-19
 
 ### Fixed
@@ -73,7 +83,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/homepage-app/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/boostctrl/homepage-app/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/boostctrl/homepage-app/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/boostctrl/homepage-app/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/boostctrl/homepage-app/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/boostctrl/homepage-app/releases/tag/v0.1.0

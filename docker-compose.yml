@@ -9,10 +9,9 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      # The container runs as uid/gid 1001 (the non-root `nextjs` user) and
-      # writes config.yaml here when you save in /admin. If this host dir is
-      # owned by a different user the writes fail (the UI errors on save), so
-      # give 1001 ownership once: `sudo chown -R 1001:1001 ./config`.
+      # config.yaml lives here and is written when you save in /admin. The
+      # container's entrypoint fixes ownership of this mount on startup, so it
+      # works regardless of the host directory's original uid/gid.
       - ./config:/config
     healthcheck:
       test:
