@@ -1,5 +1,6 @@
 import WeatherWidget from "./WeatherWidget";
 import HeaderTime from "./HeaderTime";
+import UserSettings from "./UserSettings";
 import { PrefsProvider } from "./PrefsProvider";
 import { fetchWeather } from "@/lib/weather";
 import { greetingFor } from "@/lib/greeting";
@@ -51,14 +52,17 @@ export default async function Header({ settings }: { settings: Settings }) {
           initialGreeting={initialGreeting}
           greetingName={settings.greetingName}
         />
-        {weather.enabled && (
-          <WeatherWidget
-            initial={initialWeather}
-            defaultLat={weather.latitude}
-            defaultLon={weather.longitude}
-            defaultUnits={weather.units}
-          />
-        )}
+        <div className="flex items-center gap-3">
+          {weather.enabled && (
+            <WeatherWidget
+              initial={initialWeather}
+              defaultLat={weather.latitude}
+              defaultLon={weather.longitude}
+              defaultUnits={weather.units}
+            />
+          )}
+          <UserSettings />
+        </div>
       </header>
     </PrefsProvider>
   );

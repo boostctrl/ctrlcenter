@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useVisitorPrefs } from "./PrefsProvider";
 import { greetingFor } from "@/lib/greeting";
-import LocationTimeEditor from "./LocationTimeEditor";
 
 function formatDate(date: Date, timeZone: string): string {
   return new Intl.DateTimeFormat("en-US", {
@@ -52,7 +51,6 @@ export default function HeaderTime({
 }) {
   const { timezone, location, weatherEnabled } = useVisitorPrefs();
   const [now, setNow] = useState<Date | null>(null);
-  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
@@ -78,14 +76,7 @@ export default function HeaderTime({
         {date}
       </p>
 
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        title="Set your time zone and location"
-        className="mt-1 flex items-center gap-2 rounded text-sm font-medium tracking-wide text-fg/40 transition-colors hover:text-fg/70 focus-visible:text-fg/70 focus-visible:outline-none"
-      >
+      <p className="mt-1 flex items-center gap-2 text-sm font-medium tracking-wide text-fg/40">
         <span className="tabular-nums" suppressHydrationWarning>
           {time}
         </span>
@@ -95,17 +86,7 @@ export default function HeaderTime({
             <span className="max-w-[12rem] truncate">{label}</span>
           </>
         )}
-        <svg
-          aria-hidden
-          viewBox="0 0 20 20"
-          className="h-3 w-3 opacity-50"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <path d="M5 7.5L10 12.5L15 7.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
+      </p>
 
       <h1
         className="mt-2 text-5xl font-bold tracking-tight sm:text-6xl"
@@ -115,8 +96,6 @@ export default function HeaderTime({
         {greetingName ? `, ${greetingName}` : ""}
         <span className="gradient-text">!</span>
       </h1>
-
-      {open && <LocationTimeEditor onClose={() => setOpen(false)} />}
     </div>
   );
 }

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { readConfig } from "@/lib/config";
 import Header from "@/components/Header";
 import Dashboard from "@/components/Dashboard";
@@ -19,12 +18,6 @@ export default async function HomePage() {
         statusEnabled={settings.statusChecks}
         search={settings.search}
       />
-
-      <footer className="mt-auto pt-8 text-center text-xs text-fg/30">
-        <Link href="/admin" className="transition-colors hover:text-fg/60">
-          Manage
-        </Link>
-      </footer>
     </main>
   );
 }

@@ -12,6 +12,14 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- Per-visitor preferences are now grouped into a **Settings** panel opened from
+  a gear button in the header. It holds everything a visitor can change without
+  admin rights — theme, time zone, and (with weather on) location and units —
+  plus the link to the admin portal. Replaces the clock-click popover and the
+  "Manage" footer link.
+
 ## [0.3.1] - 2026-06-20
 
 ### Fixed
