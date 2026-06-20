@@ -7,6 +7,7 @@ import { TextField, Button, MoveButtons } from "./ui";
 import IconField from "./IconField";
 import { useReorder } from "./useReorder";
 import { useToast } from "./Toast";
+import { useConfirm } from "./Confirm";
 import { apiErrorMessage } from "./apiError";
 
 type FormState = { name: string; subtitle: string; url: string; icon: string };
@@ -18,6 +19,7 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const toast = useToast();
+  const confirm = useConfirm();
 
   function startEdit(app: AppItem) {
     setEditingId(app.id);
@@ -58,7 +60,12 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this application?")) return;
+    const ok = await confirm({
+      title: "Delete this application?",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
     await fetch(`/api/apps/${id}`, { method: "DELETE" });
     setApps((prev) => prev.filter((a) => a.id !== id));
     if (editingId === id) resetForm();

@@ -19,7 +19,7 @@ const csp = [
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   // Client-side weather (Open-Meteo), per-visitor location auto-detection (IP
   // lookup + reverse geocoding), and the admin icon browser's index fetch.
-  "connect-src 'self' https://api.open-meteo.com https://ipwho.is https://api.bigdatacloud.net https://cdn.jsdelivr.net",
+  "connect-src 'self' https://api.open-meteo.com https://geocoding-api.open-meteo.com https://ipwho.is https://api.bigdatacloud.net https://cdn.jsdelivr.net",
 ]
   // NOTE: intentionally no `upgrade-insecure-requests`. This app is commonly
   // self-hosted over plain HTTP on a LAN (http://<host>:3000); that directive

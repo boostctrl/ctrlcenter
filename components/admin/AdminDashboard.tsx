@@ -9,6 +9,7 @@ import SettingsManager from "./SettingsManager";
 import ChangePassword from "./ChangePassword";
 import { Button } from "./ui";
 import { ToastProvider, useToast } from "./Toast";
+import { ConfirmProvider } from "./Confirm";
 import { apiErrorMessage } from "./apiError";
 
 type Tab = "apps" | "bookmarks" | "settings";
@@ -30,7 +31,9 @@ export default function AdminDashboard(props: Props) {
   // useToast(); the body itself must live inside it to do the same.
   return (
     <ToastProvider>
-      <AdminBody {...props} />
+      <ConfirmProvider>
+        <AdminBody {...props} />
+      </ConfirmProvider>
     </ToastProvider>
   );
 }

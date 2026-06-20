@@ -12,6 +12,11 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- Admin: searchable time-zone picker, and a city search (Open-Meteo geocoding)
+  to set the default weather location by name instead of typing coordinates.
+
 ### Changed
 
 - Per-visitor preferences are now grouped into a **Settings** panel opened from
@@ -19,6 +24,12 @@ here.
   admin rights — theme, time zone, and (with weather on) location and units —
   plus the link to the admin portal. Replaces the clock-click popover and the
   "Manage" footer link.
+- Admin bookmarks are now grouped by category, each reorderable within its
+  group, matching how they appear on the dashboard.
+- The admin Settings tab is organized into labeled sections (General,
+  Appearance, Dashboard, Weather).
+- Admin delete actions use a styled confirmation dialog instead of the
+  browser's native prompt.
 
 ## [0.3.1] - 2026-06-20
 

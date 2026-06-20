@@ -5,12 +5,22 @@ import type { BookmarkItem } from "@/lib/schema";
 import Icon from "@/components/Icon";
 import { TextField, Button, MoveButtons } from "./ui";
 import IconField from "./IconField";
-import { useReorder } from "./useReorder";
 import { useToast } from "./Toast";
+import { useConfirm } from "./Confirm";
 import { apiErrorMessage } from "./apiError";
 
 type FormState = { name: string; category: string; url: string; icon: string };
 const emptyForm: FormState = { name: "", category: "", url: "", icon: "" };
+
+function groupByCategory(items: BookmarkItem[]): [string, BookmarkItem[]][] {
+  const map = new Map<string, BookmarkItem[]>();
+  for (const b of items) {
+    const list = map.get(b.category) ?? [];
+    list.push(b);
+    map.set(b.category, list);
+  }
+  return Array.from(map.entries());
+}
 
 export default function BookmarksManager({
   initialBookmarks,
@@ -22,6 +32,7 @@ export default function BookmarksManager({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const toast = useToast();
+  const confirm = useConfirm();
 
   function startEdit(bookmark: BookmarkItem) {
     setEditingId(bookmark.id);
@@ -67,7 +78,12 @@ export default function BookmarksManager({
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this bookmark?")) return;
+    const ok = await confirm({
+      title: "Delete this bookmark?",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
     await fetch(`/api/bookmarks/${id}`, { method: "DELETE" });
     setBookmarks((prev) => prev.filter((b) => b.id !== id));
     if (editingId === id) resetForm();
@@ -88,56 +104,66 @@ export default function BookmarksManager({
     }
   }
 
-  const { handlers, dragIndex, overIndex, move } = useReorder(bookmarks, persistOrder);
+  // Reorder within a single category, rebuilding the flat list while leaving
+  // other categories' positions untouched.
+  function moveWithinCategory(category: string, from: number, to: number) {
+    const group = bookmarks.filter((b) => b.category === category);
+    if (to < 0 || to >= group.length) return;
+    const reordered = [...group];
+    const [moved] = reordered.splice(from, 1);
+    reordered.splice(to, 0, moved);
+    let gi = 0;
+    persistOrder(
+      bookmarks.map((b) => (b.category === category ? reordered[gi++] : b))
+    );
+  }
 
+  const groups = groupByCategory(bookmarks);
   const categories = Array.from(new Set(bookmarks.map((b) => b.category))).sort();
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
-      <div className="space-y-3">
+      <div className="space-y-6">
         {bookmarks.length === 0 && (
           <p className="text-sm text-fg/40">No bookmarks yet. Add your first one.</p>
         )}
-        {bookmarks.map((bookmark, index) => (
-          <div
-            key={bookmark.id}
-            {...handlers(index)}
-            className={`flex items-center justify-between gap-4 rounded-xl border bg-fg/[0.03] px-4 py-3 transition-colors ${
-              overIndex === index && dragIndex !== index
-                ? "border-violet-400/60"
-                : "border-fg/10"
-            } ${dragIndex === index ? "opacity-50" : ""}`}
-          >
-            <div className="flex min-w-0 items-center gap-3">
-              <MoveButtons
-                index={index}
-                count={bookmarks.length}
-                label={bookmark.name}
-                onMove={move}
-              />
-              <span
-                className="hidden cursor-grab text-fg/30 select-none active:cursor-grabbing sm:inline"
-                aria-hidden
-                title="Drag to reorder"
+        {groups.map(([category, items]) => (
+          <div key={category} className="space-y-2">
+            <h3 className="text-xs font-semibold tracking-[0.18em] text-fg/50 uppercase">
+              {category}
+            </h3>
+            {items.map((bookmark, index) => (
+              <div
+                key={bookmark.id}
+                className="flex items-center justify-between gap-4 rounded-xl border border-fg/10 bg-fg/[0.03] px-4 py-3"
               >
-                ⠿
-              </span>
-              <Icon icon={bookmark.icon} name={bookmark.name} size={24} />
-              <div className="min-w-0">
-                <p className="truncate font-medium">{bookmark.name}</p>
-                <p className="truncate text-xs text-fg/40">
-                  {bookmark.category} &middot; {bookmark.url}
-                </p>
+                <div className="flex min-w-0 items-center gap-3">
+                  <MoveButtons
+                    index={index}
+                    count={items.length}
+                    label={bookmark.name}
+                    onMove={(from, to) => moveWithinCategory(category, from, to)}
+                  />
+                  <Icon icon={bookmark.icon} name={bookmark.name} size={24} />
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{bookmark.name}</p>
+                    <p className="truncate text-xs text-fg/40">{bookmark.url}</p>
+                  </div>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <Button variant="ghost" type="button" onClick={() => startEdit(bookmark)}>
+                    Edit
+                  </Button>
+                  <Button
+                    variant="danger"
+                    type="button"
+                    onClick={() => handleDelete(bookmark.id)}
+                  >
+                    Delete
+                  </Button>
+                </div>
               </div>
-            </div>
-            <div className="flex shrink-0 gap-2">
-              <Button variant="ghost" type="button" onClick={() => startEdit(bookmark)}>
-                Edit
-              </Button>
-              <Button variant="danger" type="button" onClick={() => handleDelete(bookmark.id)}>
-                Delete
-              </Button>
-            </div>
+            ))}
           </div>
         ))}
       </div>
