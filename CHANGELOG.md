@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-20
+
 ### Added
 
 - Light/dark mode: a per-visitor theme switch (System / Light / Dark) in the
@@ -29,16 +31,16 @@ here.
   choose DuckDuckGo, Google, Bing, Brave, or a custom `%s` URL template.
   Pressing Enter opens the top match, or searches the web when nothing matches;
   the no-results state offers an explicit "Search … for …" link.
-- Auto-detected, per-visitor location and time zone.
-
-### Changed
-
-- The admin applications list now shows each app's subtitle alongside its URL. The header detects each
+- Auto-detected, per-visitor location and time zone: the header detects each
   visitor's time zone automatically and (when the weather widget is on) their
   approximate location by IP, with a discreet editor — click the time/location
   line — to correct the time zone, switch units, or use precise device
   location. Preferences are stored per-browser and never change the shared site
   config, so any visitor can fix their own view.
+
+### Changed
+
+- The admin applications list now shows each app's subtitle alongside its URL.
 
 ## [0.2.1] - 2026-06-20
 
@@ -147,7 +149,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/homepage-app/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/boostctrl/homepage-app/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/boostctrl/homepage-app/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/boostctrl/homepage-app/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/boostctrl/homepage-app/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/boostctrl/homepage-app/compare/v0.1.2...v0.1.3
