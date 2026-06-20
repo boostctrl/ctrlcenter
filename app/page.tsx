@@ -1,6 +1,7 @@
 import { readConfig } from "@/lib/config";
 import Header from "@/components/Header";
 import Dashboard from "@/components/Dashboard";
+import FloatingSettings from "@/components/FloatingSettings";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,8 @@ export default async function HomePage() {
         statusEnabled={settings.statusChecks}
         search={settings.search}
       />
+
+      <FloatingSettings />
     </main>
   );
 }

@@ -12,6 +12,20 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- A dedicated **/settings** page for per-visitor preferences (theme, time zone,
+  weather location, units), reached from a floating settings button pinned to
+  the bottom-right corner — replacing the header gear popover. (#8, #9)
+
+### Changed
+
+- The header now shows the live date and clock inside the weather widget; the
+  greeting stands on its own. (#7)
+- The default `config.yaml` ships generic example apps (Media Server, Photos,
+  …) instead of personally-named services. Existing deployments are unaffected
+  (they use their own bind-mounted config). (#12)
+
 ## [0.4.0] - 2026-06-20
 
 ### Security

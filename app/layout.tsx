@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { getSettings } from "@/lib/config";
 import { accentColors } from "@/lib/theme";
+import { PrefsProvider } from "@/components/PrefsProvider";
 import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -28,12 +29,13 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { accent } = await getSettings();
-  const { from, to } = accentColors(accent);
+  const settings = await getSettings();
+  const { from, to } = accentColors(settings.accent);
   const accentVars = {
     "--accent-from": from,
     "--accent-to": to,
   } as CSSProperties;
+  const weather = settings.weather;
 
   return (
     <html lang="en" className={`${jakarta.variable} h-full`} style={accentVars}>
@@ -56,7 +58,17 @@ export default async function RootLayout({
             style={{ backgroundColor: "var(--accent-from)", animationDelay: "8s" }}
           />
         </div>
-        {children}
+        <PrefsProvider
+          weatherEnabled={weather.enabled}
+          defaults={{
+            timezone: settings.timezone || "UTC",
+            latitude: weather.latitude,
+            longitude: weather.longitude,
+            units: weather.units,
+          }}
+        >
+          {children}
+        </PrefsProvider>
       </body>
     </html>
   );

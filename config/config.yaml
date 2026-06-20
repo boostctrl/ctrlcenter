@@ -9,9 +9,9 @@ settings:
     units: imperial
 apps:
   - id: 85b49535-e829-4356-8685-fef57bbeab56
-    name: Cloud Drive
+    name: File Storage
     subtitle: Nextcloud
-    url: https://cloud.example.com
+    url: https://files.example.com
     icon: nextcloud
   - id: 0079e6d2-da5d-406f-a206-08b422d5e7f6
     name: Password Manager
@@ -19,20 +19,20 @@ apps:
     url: https://vault.example.com
     icon: vaultwarden
   - id: a3632b22-c60b-4651-9854-6e80842da9a2
-    name: Plex Requests
-    subtitle: Seer
+    name: Media Requests
+    subtitle: Jellyseerr
     url: https://requests.example.com
-    icon: overseerr
+    icon: jellyseerr
   - id: 8fc903c5-aab5-436b-8bf2-4235f38475bd
-    name: Potato Flix
-    subtitle: Plex - Movies & TV
-    url: https://plex.example.com
-    icon: plex
+    name: Media Server
+    subtitle: Jellyfin
+    url: https://media.example.com
+    icon: jellyfin
   - id: 3dea3dc7-89db-44e9-a32d-54392e94b8a8
-    name: Reddit Reader
-    subtitle: Redlib
-    url: https://redlib.example.com
-    icon: reddit
+    name: Photos
+    subtitle: Immich
+    url: https://photos.example.com
+    icon: immich
   - id: a5bb1c52-fedd-45e7-a99e-d837cc467d14
     name: Service Status
     subtitle: Uptime Kuma
