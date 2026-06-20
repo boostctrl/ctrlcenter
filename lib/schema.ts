@@ -1,6 +1,16 @@
 import { z } from "zod";
 import { ACCENT_KEYS } from "./theme";
 
+// z.string().url() accepts any valid URL — including `javascript:`, `data:`,
+// and `vbscript:` schemes. App/bookmark URLs are rendered as <a href> on the
+// public homepage, so an unsafe scheme would be stored XSS. Restrict to http(s).
+const httpUrl = z
+  .string()
+  .url()
+  .refine((value) => /^https?:\/\//i.test(value.trim()), {
+    message: "URL must start with http:// or https://",
+  });
+
 // "Stored" schemas (used to read config.yaml): every field has a default so
 // a hand-edited or partially-filled YAML file still parses successfully.
 export const weatherSchema = z.object({
@@ -25,7 +35,7 @@ export const appItemSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
   subtitle: z.string().default(""),
-  url: z.string().url(),
+  url: httpUrl,
   icon: z.string().default(""),
 });
 
@@ -33,7 +43,7 @@ export const bookmarkItemSchema = z.object({
   id: z.string(),
   category: z.string().min(1),
   name: z.string().min(1),
-  url: z.string().url(),
+  url: httpUrl,
   icon: z.string().default(""),
 });
 
@@ -54,14 +64,14 @@ export type BookmarkItem = z.infer<typeof bookmarkItemSchema>;
 export const appInputSchema = z.object({
   name: z.string().min(1),
   subtitle: z.string().optional().default(""),
-  url: z.string().url(),
+  url: httpUrl,
   icon: z.string().optional().default(""),
 });
 
 export const bookmarkInputSchema = z.object({
   category: z.string().min(1),
   name: z.string().min(1),
-  url: z.string().url(),
+  url: httpUrl,
   icon: z.string().optional().default(""),
 });
 
@@ -91,14 +101,14 @@ export type SettingsInput = z.infer<typeof settingsInputSchema>;
 export const appUpdateSchema = z.object({
   name: z.string().min(1).optional(),
   subtitle: z.string().optional(),
-  url: z.string().url().optional(),
+  url: httpUrl.optional(),
   icon: z.string().optional(),
 });
 
 export const bookmarkUpdateSchema = z.object({
   category: z.string().min(1).optional(),
   name: z.string().min(1).optional(),
-  url: z.string().url().optional(),
+  url: httpUrl.optional(),
   icon: z.string().optional(),
 });
 

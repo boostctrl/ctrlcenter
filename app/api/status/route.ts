@@ -9,7 +9,15 @@ export const dynamic = "force-dynamic";
 
 const TIMEOUT_MS = 5000;
 
+// This endpoint is public and fans out to every app URL, so cache the result
+// briefly. Repeated/abusive calls within the window are served from cache
+// instead of re-pinging, capping the outbound amplification.
+const CACHE_MS = 30_000;
+
 type AppStatus = { up: boolean; status: number | null; ms: number };
+type StatusResult = AppStatus & { id: string };
+
+let cache: { at: number; data: StatusResult[] } | null = null;
 
 async function check(url: string): Promise<AppStatus> {
   const controller = new AbortController();
@@ -43,8 +51,13 @@ export async function GET() {
   const { settings, apps } = await readConfig();
   if (!settings.statusChecks) return NextResponse.json([]);
 
-  const results = await Promise.all(
+  if (cache && Date.now() - cache.at < CACHE_MS) {
+    return NextResponse.json(cache.data);
+  }
+
+  const results: StatusResult[] = await Promise.all(
     apps.map(async (app) => ({ id: app.id, ...(await check(app.url)) }))
   );
+  cache = { at: Date.now(), data: results };
   return NextResponse.json(results);
 }

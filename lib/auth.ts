@@ -13,6 +13,14 @@ const SESSION_DURATION = "7d";
 // in that mode, changing the password also invalidates outstanding sessions.
 async function getSecretKey(): Promise<Uint8Array> {
   const base = process.env.SESSION_SECRET || process.env.ADMIN_PASSWORD || "";
+  // Fail closed: with no secret the key would derive from an empty string — a
+  // publicly known value anyone could use to forge an admin session. Refuse to
+  // sign or verify rather than operate with a guessable key.
+  if (!base) {
+    throw new Error(
+      "SESSION_SECRET or ADMIN_PASSWORD must be set to sign admin sessions"
+    );
+  }
   const data = new TextEncoder().encode(base);
   const hash = await crypto.subtle.digest("SHA-256", data);
   return new Uint8Array(hash);

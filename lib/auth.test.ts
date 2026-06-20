@@ -62,6 +62,15 @@ describe("session tokens", () => {
     expect(await verifySessionToken(token)).toBe(true);
   });
 
+  it("fails closed when no secret is configured", async () => {
+    vi.stubEnv("SESSION_SECRET", "");
+    vi.stubEnv("ADMIN_PASSWORD", "");
+    // Signing must refuse rather than derive a guessable empty-string key...
+    await expect(createSessionToken()).rejects.toThrow();
+    // ...and verification of any token returns false (never accepts a forgery).
+    expect(await verifySessionToken("anything")).toBe(false);
+  });
+
   it("prefers SESSION_SECRET over ADMIN_PASSWORD for signing", async () => {
     // Sign with a SESSION_SECRET in place...
     vi.stubEnv("SESSION_SECRET", "the-real-secret");

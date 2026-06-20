@@ -94,6 +94,32 @@ describe("weatherUpdateSchema range validation", () => {
   });
 });
 
+describe("URL scheme validation", () => {
+  const valid = { name: "X", category: "C", url: "https://ok.example.com" };
+
+  it("accepts http and https URLs", () => {
+    expect(
+      appInputSchema.safeParse({ ...valid, url: "https://a.com" }).success
+    ).toBe(true);
+    expect(
+      bookmarkInputSchema.safeParse({ ...valid, url: "http://a.com" }).success
+    ).toBe(true);
+  });
+
+  it("rejects javascript:, data:, and vbscript: URLs", () => {
+    for (const url of [
+      "javascript:alert(1)",
+      "data:text/html,<script>alert(1)</script>",
+      "vbscript:msgbox(1)",
+    ]) {
+      expect(appInputSchema.safeParse({ ...valid, url }).success).toBe(false);
+      expect(bookmarkInputSchema.safeParse({ ...valid, url }).success).toBe(
+        false
+      );
+    }
+  });
+});
+
 describe("settingsInputSchema partial merge semantics", () => {
   // This guards the documented footgun: update schemas must NOT carry
   // `.default()`, so omitted fields stay absent rather than being silently
