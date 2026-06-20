@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import type { BookmarkItem } from "@/lib/schema";
 import Icon from "@/components/Icon";
-import { TextField, Button } from "./ui";
+import { TextField, Button, MoveButtons } from "./ui";
 import { useReorder } from "./useReorder";
 
 type FormState = { name: string; category: string; url: string; icon: string };
@@ -84,7 +84,7 @@ export default function BookmarksManager({
     }
   }
 
-  const { handlers, dragIndex, overIndex } = useReorder(bookmarks, persistOrder);
+  const { handlers, dragIndex, overIndex, move } = useReorder(bookmarks, persistOrder);
 
   const categories = Array.from(new Set(bookmarks.map((b) => b.category))).sort();
 
@@ -105,8 +105,14 @@ export default function BookmarksManager({
             } ${dragIndex === index ? "opacity-50" : ""}`}
           >
             <div className="flex min-w-0 items-center gap-3">
+              <MoveButtons
+                index={index}
+                count={bookmarks.length}
+                label={bookmark.name}
+                onMove={move}
+              />
               <span
-                className="cursor-grab text-white/30 select-none active:cursor-grabbing"
+                className="hidden cursor-grab text-white/30 select-none active:cursor-grabbing sm:inline"
                 aria-hidden
                 title="Drag to reorder"
               >

@@ -33,3 +33,43 @@ export function Button({
   };
   return <button {...props} className={`${base} ${variants[variant]} ${className}`} />;
 }
+
+// Keyboard- and touch-accessible reorder controls. HTML5 drag-and-drop doesn't
+// work on touch and isn't reachable by keyboard, so these buttons (which call
+// the same reorder logic) are the primary, universal way to reorder a list.
+export function MoveButtons({
+  index,
+  count,
+  label,
+  onMove,
+}: {
+  index: number;
+  count: number;
+  label: string;
+  onMove: (from: number, to: number) => void;
+}) {
+  const btn =
+    "flex h-4 w-5 items-center justify-center rounded text-[10px] leading-none text-white/40 hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-20";
+  return (
+    <div className="flex shrink-0 flex-col gap-0.5">
+      <button
+        type="button"
+        aria-label={`Move ${label} up`}
+        disabled={index === 0}
+        onClick={() => onMove(index, index - 1)}
+        className={btn}
+      >
+        ▲
+      </button>
+      <button
+        type="button"
+        aria-label={`Move ${label} down`}
+        disabled={index === count - 1}
+        onClick={() => onMove(index, index + 1)}
+        className={btn}
+      >
+        ▼
+      </button>
+    </div>
+  );
+}

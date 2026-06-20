@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import type { AppItem } from "@/lib/schema";
 import Icon from "@/components/Icon";
-import { TextField, Button } from "./ui";
+import { TextField, Button, MoveButtons } from "./ui";
 import { useReorder } from "./useReorder";
 
 type FormState = { name: string; subtitle: string; url: string; icon: string };
@@ -75,7 +75,7 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
     }
   }
 
-  const { handlers, dragIndex, overIndex } = useReorder(apps, persistOrder);
+  const { handlers, dragIndex, overIndex, move } = useReorder(apps, persistOrder);
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
@@ -94,8 +94,9 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
             } ${dragIndex === index ? "opacity-50" : ""}`}
           >
             <div className="flex min-w-0 items-center gap-3">
+              <MoveButtons index={index} count={apps.length} label={app.name} onMove={move} />
               <span
-                className="cursor-grab text-white/30 select-none active:cursor-grabbing"
+                className="hidden cursor-grab text-white/30 select-none active:cursor-grabbing sm:inline"
                 aria-hidden
                 title="Drag to reorder"
               >

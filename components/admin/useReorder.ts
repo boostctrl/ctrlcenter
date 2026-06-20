@@ -6,6 +6,9 @@ import { useState } from "react";
 // `handlers(index)` onto each draggable row and uses `dragIndex`/`overIndex`
 // for visual feedback. On a successful drop, `onCommit` receives the reordered
 // array (the caller persists it).
+//
+// Drag-and-drop is mouse-only, so `move(from, to)` is also exposed for the
+// keyboard- and touch-accessible up/down buttons that wrap it.
 export function useReorder<T>(items: T[], onCommit: (next: T[]) => void) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
@@ -13,6 +16,14 @@ export function useReorder<T>(items: T[], onCommit: (next: T[]) => void) {
   function reset() {
     setDragIndex(null);
     setOverIndex(null);
+  }
+
+  function move(from: number, to: number) {
+    if (from === to || to < 0 || to >= items.length) return;
+    const next = [...items];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    onCommit(next);
   }
 
   function handlers(index: number) {
@@ -39,5 +50,5 @@ export function useReorder<T>(items: T[], onCommit: (next: T[]) => void) {
     };
   }
 
-  return { handlers, dragIndex, overIndex };
+  return { handlers, dragIndex, overIndex, move };
 }
