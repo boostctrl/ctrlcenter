@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import type { Settings } from "@/lib/schema";
+import { ACCENTS, ACCENT_KEYS } from "@/lib/theme";
 import { TextField, Button } from "./ui";
 
 export default function SettingsManager({
@@ -59,6 +60,30 @@ export default function SettingsManager({
         value={settings.timezone}
         onChange={(e) => setSettings({ ...settings, timezone: e.target.value })}
       />
+
+      <div className="flex flex-col gap-2">
+        <span className="text-sm text-white/50">Accent</span>
+        <div className="flex flex-wrap gap-2">
+          {ACCENT_KEYS.map((key) => {
+            const { from, to } = ACCENTS[key];
+            const selected = settings.accent === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                aria-label={key}
+                aria-pressed={selected}
+                title={key}
+                onClick={() => setSettings({ ...settings, accent: key })}
+                className={`h-8 w-8 rounded-full ring-2 ring-offset-2 ring-offset-[#06070d] transition ${
+                  selected ? "ring-white/80" : "ring-transparent hover:ring-white/30"
+                }`}
+                style={{ backgroundImage: `linear-gradient(135deg, ${from}, ${to})` }}
+              />
+            );
+          })}
+        </div>
+      </div>
 
       <div className="flex items-center justify-between gap-4 border-t border-white/10 pt-4">
         <div>
@@ -149,7 +174,7 @@ export default function SettingsManager({
               },
             })
           }
-          className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white outline-none transition-colors focus:border-violet-400/60"
+          className="accent-focus rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white outline-none transition-colors"
         >
           <option value="imperial">Imperial (°F)</option>
           <option value="metric">Metric (°C)</option>

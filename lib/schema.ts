@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ACCENT_KEYS } from "./theme";
 
 // "Stored" schemas (used to read config.yaml): every field has a default so
 // a hand-edited or partially-filled YAML file still parses successfully.
@@ -13,6 +14,7 @@ export const settingsSchema = z.object({
   title: z.string().default("Home"),
   greetingName: z.string().default(""),
   timezone: z.string().default("UTC"),
+  accent: z.enum(ACCENT_KEYS).default("violet"),
   // When on, the dashboard polls /api/status to show per-app online/offline
   // dots. Off by default since it makes the server ping every app URL.
   statusChecks: z.boolean().default(false),
@@ -80,6 +82,7 @@ export const settingsInputSchema = z.object({
   title: z.string().optional(),
   greetingName: z.string().optional(),
   timezone: z.string().optional(),
+  accent: z.enum(ACCENT_KEYS).optional(),
   statusChecks: z.boolean().optional(),
   weather: weatherUpdateSchema.optional(),
 });

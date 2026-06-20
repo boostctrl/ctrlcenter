@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import type { CSSProperties } from "react";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { getSettings } from "@/lib/config";
+import { accentColors } from "@/lib/theme";
 import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -17,26 +19,36 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const { accent } = await getSettings();
+  const { from, to } = accentColors(accent);
+  const accentVars = {
+    "--accent-from": from,
+    "--accent-to": to,
+  } as CSSProperties;
+
   return (
-    <html lang="en" className={`${jakarta.variable} h-full`}>
+    <html lang="en" className={`${jakarta.variable} h-full`} style={accentVars}>
       <body className="relative min-h-full overflow-x-hidden antialiased">
         <div
           aria-hidden
           className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
         >
-          <div className="animate-float absolute -top-32 -left-32 h-96 w-96 rounded-full bg-violet-600/30 blur-3xl" />
           <div
-            className="animate-float absolute top-1/3 -right-32 h-[28rem] w-[28rem] rounded-full bg-cyan-500/20 blur-3xl"
-            style={{ animationDelay: "4s" }}
+            className="animate-float absolute -top-32 -left-32 h-96 w-96 rounded-full opacity-30 blur-3xl"
+            style={{ backgroundColor: "var(--accent-from)" }}
           />
           <div
-            className="animate-float absolute bottom-0 left-1/4 h-80 w-80 rounded-full bg-fuchsia-500/15 blur-3xl"
-            style={{ animationDelay: "8s" }}
+            className="animate-float absolute top-1/3 -right-32 h-[28rem] w-[28rem] rounded-full opacity-20 blur-3xl"
+            style={{ backgroundColor: "var(--accent-to)", animationDelay: "4s" }}
+          />
+          <div
+            className="animate-float absolute bottom-0 left-1/4 h-80 w-80 rounded-full opacity-[0.15] blur-3xl"
+            style={{ backgroundColor: "var(--accent-from)", animationDelay: "8s" }}
           />
         </div>
         {children}

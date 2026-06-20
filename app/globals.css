@@ -37,6 +37,14 @@ body {
     -webkit-background-clip: text;
     color: transparent;
   }
+  /* Accent-driven surfaces: kept as plain CSS so they follow the configurable
+     --accent-from / --accent-to variables instead of fixed Tailwind colors. */
+  .btn-accent {
+    background-image: linear-gradient(to right, var(--accent-from), var(--accent-to));
+  }
+  .accent-focus:focus {
+    border-color: var(--accent-to);
+  }
 }
 
 @keyframes float {

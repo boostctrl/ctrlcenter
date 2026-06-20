@@ -11,7 +11,7 @@ export function TextField({
       <span className="text-white/50">{label}</span>
       <input
         {...props}
-        className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white placeholder-white/30 outline-none transition-colors focus:border-violet-400/60"
+        className="accent-focus rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white placeholder-white/30 outline-none transition-colors"
       />
     </label>
   );
@@ -27,7 +27,7 @@ export function Button({
   const base =
     "rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
   const variants: Record<ButtonVariant, string> = {
-    primary: "bg-gradient-to-r from-violet-500 to-cyan-400 text-black hover:opacity-90",
+    primary: "btn-accent text-black hover:opacity-90",
     ghost: "border border-white/10 bg-white/5 text-white/80 hover:bg-white/10",
     danger: "border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20",
   };

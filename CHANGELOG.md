@@ -14,6 +14,9 @@ here.
 
 ### Added
 
+- Configurable accent color (Settings → Accent): pick from a set of presets
+  that recolor the gradient heading, primary buttons, focus rings, and
+  background glow via CSS variables, applied server-side (no flash).
 - Service status indicators: an optional setting that shows an online/offline
   dot on each application card, backed by a server-side `/api/status` check
   that pings the configured app URLs.

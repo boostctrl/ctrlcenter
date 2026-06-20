@@ -90,7 +90,7 @@ export default function Dashboard({
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search applications and bookmarks…"
             aria-label="Search applications and bookmarks"
-            className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3.5 text-white placeholder-white/30 outline-none backdrop-blur-xl transition-colors focus:border-violet-400/60"
+            className="accent-focus w-full rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3.5 text-white placeholder-white/30 outline-none backdrop-blur-xl transition-colors"
           />
           {!query && (
             <kbd className="pointer-events-none absolute top-1/2 right-5 -translate-y-1/2 rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-white/40">
