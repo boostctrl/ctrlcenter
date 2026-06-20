@@ -85,22 +85,22 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
     <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
       <div className="space-y-3">
         {apps.length === 0 && (
-          <p className="text-sm text-white/40">No applications yet. Add your first one.</p>
+          <p className="text-sm text-fg/40">No applications yet. Add your first one.</p>
         )}
         {apps.map((app, index) => (
           <div
             key={app.id}
             {...handlers(index)}
-            className={`flex items-center justify-between gap-4 rounded-xl border bg-white/[0.03] px-4 py-3 transition-colors ${
+            className={`flex items-center justify-between gap-4 rounded-xl border bg-fg/[0.03] px-4 py-3 transition-colors ${
               overIndex === index && dragIndex !== index
                 ? "border-violet-400/60"
-                : "border-white/10"
+                : "border-fg/10"
             } ${dragIndex === index ? "opacity-50" : ""}`}
           >
             <div className="flex min-w-0 items-center gap-3">
               <MoveButtons index={index} count={apps.length} label={app.name} onMove={move} />
               <span
-                className="hidden cursor-grab text-white/30 select-none active:cursor-grabbing sm:inline"
+                className="hidden cursor-grab text-fg/30 select-none active:cursor-grabbing sm:inline"
                 aria-hidden
                 title="Drag to reorder"
               >
@@ -109,7 +109,7 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
               <Icon icon={app.icon} name={app.name} size={24} />
               <div className="min-w-0">
                 <p className="truncate font-medium">{app.name}</p>
-                <p className="truncate text-xs text-white/40">
+                <p className="truncate text-xs text-fg/40">
                   {app.subtitle ? `${app.subtitle} · ${app.url}` : app.url}
                 </p>
               </div>

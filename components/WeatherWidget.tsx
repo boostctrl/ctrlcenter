@@ -60,7 +60,7 @@ export default function WeatherWidget({
           {Math.round(weather.temperature)}
           {unitSymbol(units)}
         </p>
-        <p className="text-sm text-white/50">
+        <p className="text-sm text-fg/50">
           {Math.round(weather.humidity)}% humidity
         </p>
       </div>

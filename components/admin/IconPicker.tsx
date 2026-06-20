@@ -61,7 +61,7 @@ export default function IconPicker({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="text-white/50 transition-colors hover:text-white"
+            className="text-fg/50 transition-colors hover:text-fg"
           >
             ✕
           </button>
@@ -72,18 +72,18 @@ export default function IconPicker({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search icons…"
-          className="accent-focus w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white outline-none transition-colors"
+          className="accent-focus w-full rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-fg outline-none transition-colors"
         />
 
         {error ? (
-          <p className="text-sm text-white/50">
+          <p className="text-sm text-fg/50">
             Couldn&apos;t load the icon list. You can still type a slug or image
             URL directly.
           </p>
         ) : !slugs ? (
-          <p className="text-sm text-white/50">Loading icons…</p>
+          <p className="text-sm text-fg/50">Loading icons…</p>
         ) : results.length === 0 ? (
-          <p className="text-sm text-white/50">No icons match “{query}”.</p>
+          <p className="text-sm text-fg/50">No icons match “{query}”.</p>
         ) : (
           <>
             <div className="grid min-h-0 flex-1 grid-cols-3 gap-2 overflow-y-auto sm:grid-cols-4 md:grid-cols-6">
@@ -96,16 +96,16 @@ export default function IconPicker({
                     onPick(slug);
                     onClose();
                   }}
-                  className="flex flex-col items-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] p-2 transition-colors hover:border-white/30 hover:bg-white/[0.06]"
+                  className="flex flex-col items-center gap-1 rounded-lg border border-fg/10 bg-fg/[0.03] p-2 transition-colors hover:border-fg/30 hover:bg-fg/[0.06]"
                 >
                   <Icon icon={slug} name={slug} size={28} />
-                  <span className="w-full truncate text-center text-[10px] text-white/50">
+                  <span className="w-full truncate text-center text-[10px] text-fg/50">
                     {slug}
                   </span>
                 </button>
               ))}
             </div>
-            <p className="text-xs text-white/40">
+            <p className="text-xs text-fg/40">
               Showing {shown.length} of {results.length}
               {results.length > MAX_RESULTS
                 ? " — refine your search to narrow it down"

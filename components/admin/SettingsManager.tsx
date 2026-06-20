@@ -65,7 +65,7 @@ export default function SettingsManager({
       />
 
       <div className="flex flex-col gap-2">
-        <span className="text-sm text-white/50">Accent</span>
+        <span className="text-sm text-fg/50">Accent</span>
         <div className="flex flex-wrap gap-2">
           {ACCENT_KEYS.map((key) => {
             const { from, to } = ACCENTS[key];
@@ -78,8 +78,8 @@ export default function SettingsManager({
                 aria-pressed={selected}
                 title={key}
                 onClick={() => setSettings({ ...settings, accent: key })}
-                className={`h-8 w-8 rounded-full ring-2 ring-offset-2 ring-offset-[#06070d] transition ${
-                  selected ? "ring-white/80" : "ring-transparent hover:ring-white/30"
+                className={`h-8 w-8 rounded-full ring-2 ring-offset-2 ring-offset-[var(--background)] transition ${
+                  selected ? "ring-fg/80" : "ring-transparent hover:ring-fg/30"
                 }`}
                 style={{ backgroundImage: `linear-gradient(135deg, ${from}, ${to})` }}
               />
@@ -88,10 +88,10 @@ export default function SettingsManager({
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-4 border-t border-white/10 pt-4">
+      <div className="flex items-center justify-between gap-4 border-t border-fg/10 pt-4">
         <div>
-          <span className="text-sm text-white/70">Service status indicators</span>
-          <p className="text-xs text-white/40">
+          <span className="text-sm text-fg/70">Service status indicators</span>
+          <p className="text-xs text-fg/40">
             Show an online/offline dot on each app. The server pings every app
             URL, so leave off if your apps aren&apos;t reachable from it.
           </p>
@@ -108,8 +108,8 @@ export default function SettingsManager({
         </label>
       </div>
 
-      <div className="flex flex-col gap-2 border-t border-white/10 pt-4">
-        <span className="text-sm text-white/50">Search bar engine</span>
+      <div className="flex flex-col gap-2 border-t border-fg/10 pt-4">
+        <span className="text-sm text-fg/50">Search bar engine</span>
         <select
           value={settings.search.engine}
           onChange={(e) =>
@@ -118,7 +118,7 @@ export default function SettingsManager({
               search: { ...settings.search, engine: e.target.value as SearchEngine },
             })
           }
-          className="accent-focus rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white outline-none transition-colors"
+          className="accent-focus rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-fg outline-none transition-colors"
         >
           {SEARCH_ENGINE_KEYS.map((key) => (
             <option key={key} value={key}>
@@ -139,14 +139,14 @@ export default function SettingsManager({
             }
           />
         )}
-        <p className="text-xs text-white/40">
+        <p className="text-xs text-fg/40">
           Pressing Enter in the search bar opens the top match, or searches here
           when nothing matches.
         </p>
       </div>
 
-      <div className="flex items-center justify-between border-t border-white/10 pt-4">
-        <span className="text-sm text-white/50">Weather widget</span>
+      <div className="flex items-center justify-between border-t border-fg/10 pt-4">
+        <span className="text-sm text-fg/50">Weather widget</span>
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
@@ -202,7 +202,7 @@ export default function SettingsManager({
       </div>
 
       <label className="flex flex-col gap-1 text-sm">
-        <span className="text-white/50">Units</span>
+        <span className="text-fg/50">Units</span>
         <select
           value={settings.weather.units}
           onChange={(e) =>
@@ -214,7 +214,7 @@ export default function SettingsManager({
               },
             })
           }
-          className="accent-focus rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white outline-none transition-colors"
+          className="accent-focus rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-fg outline-none transition-colors"
         >
           <option value="imperial">Imperial (°F)</option>
           <option value="metric">Metric (°C)</option>

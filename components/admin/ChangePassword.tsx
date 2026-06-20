@@ -48,9 +48,9 @@ export default function ChangePassword() {
     >
       <div>
         <h3 className="font-semibold">Change password</h3>
-        <p className="text-xs text-white/40">
+        <p className="text-xs text-fg/40">
           Sets a password stored with the app. Until you set one, the
-          <code className="mx-1 rounded bg-white/10 px-1">ADMIN_PASSWORD</code>
+          <code className="mx-1 rounded bg-fg/10 px-1">ADMIN_PASSWORD</code>
           environment variable is used.
         </p>
       </div>

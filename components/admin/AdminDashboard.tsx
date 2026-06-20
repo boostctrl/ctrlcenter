@@ -94,7 +94,7 @@ function AdminBody({ initialApps, initialBookmarks, initialSettings }: Props) {
         <div className="flex flex-wrap items-center gap-3">
           <Link
             href="/"
-            className="text-sm text-white/50 transition-colors hover:text-white/80"
+            className="text-sm text-fg/50 transition-colors hover:text-fg/80"
           >
             View site
           </Link>
@@ -121,14 +121,14 @@ function AdminBody({ initialApps, initialBookmarks, initialSettings }: Props) {
         </div>
       </div>
 
-      <div className="flex gap-2 border-b border-white/10 pb-2">
+      <div className="flex gap-2 border-b border-fg/10 pb-2">
         {TABS.map((t) => (
           <button
             key={t.key}
             type="button"
             onClick={() => setTab(t.key)}
             className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-              tab === t.key ? "bg-white/10 text-white" : "text-white/50 hover:text-white/80"
+              tab === t.key ? "bg-fg/10 text-fg" : "text-fg/50 hover:text-fg/80"
             }`}
           >
             {t.label}

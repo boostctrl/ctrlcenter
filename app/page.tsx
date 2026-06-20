@@ -20,8 +20,8 @@ export default async function HomePage() {
         search={settings.search}
       />
 
-      <footer className="mt-auto pt-8 text-center text-xs text-white/30">
-        <Link href="/admin" className="transition-colors hover:text-white/60">
+      <footer className="mt-auto pt-8 text-center text-xs text-fg/30">
+        <Link href="/admin" className="transition-colors hover:text-fg/60">
           Manage
         </Link>
       </footer>

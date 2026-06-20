@@ -10,7 +10,7 @@ import type { AppItem, BookmarkItem } from "@/lib/schema";
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="mb-5 text-sm font-semibold tracking-[0.2em] text-white/50 uppercase">
+    <h2 className="mb-5 text-sm font-semibold tracking-[0.2em] text-fg/50 uppercase">
       {children}
     </h2>
   );
@@ -116,10 +116,10 @@ export default function Dashboard({
             onKeyDown={onSearchKeyDown}
             placeholder="Search applications and bookmarks…"
             aria-label="Search applications and bookmarks"
-            className="accent-focus w-full rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3.5 text-white placeholder-white/30 outline-none backdrop-blur-xl transition-colors"
+            className="accent-focus w-full rounded-2xl border border-fg/10 bg-fg/[0.04] px-5 py-3.5 text-fg placeholder-fg/30 outline-none backdrop-blur-xl transition-colors"
           />
           {!query && (
-            <kbd className="pointer-events-none absolute top-1/2 right-5 -translate-y-1/2 rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-white/40">
+            <kbd className="pointer-events-none absolute top-1/2 right-5 -translate-y-1/2 rounded-md border border-fg/10 bg-fg/5 px-2 py-0.5 text-xs text-fg/40">
               /
             </kbd>
           )}
@@ -149,13 +149,13 @@ export default function Dashboard({
       )}
 
       {hasContent && !hasResults && (
-        <p className="text-white/40">
+        <p className="text-fg/40">
           No matches for “{query}”.{" "}
           {buildSearchUrl(search, query) && (
             <button
               type="button"
               onClick={webSearch}
-              className="text-white/60 underline transition-colors hover:text-white/90"
+              className="text-fg/60 underline transition-colors hover:text-fg/90"
             >
               Search {engineLabel(search)} for “{query}” →
             </button>
@@ -164,9 +164,9 @@ export default function Dashboard({
       )}
 
       {!hasContent && (
-        <p className="text-white/40">
+        <p className="text-fg/40">
           Nothing here yet.{" "}
-          <Link href="/admin" className="underline hover:text-white/70">
+          <Link href="/admin" className="underline hover:text-fg/70">
             Add your first app or bookmark
           </Link>
           .

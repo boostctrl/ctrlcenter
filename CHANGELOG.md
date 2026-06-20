@@ -14,6 +14,10 @@ here.
 
 ### Added
 
+- Light/dark mode: a per-visitor theme switch (System / Light / Dark) in the
+  time/location popover. Defaults to following the OS, persists per browser, and
+  is applied before first paint (no flash). Implemented via a themeable color
+  token so the whole UI flips cleanly.
 - Icon browser: a "Browse icons" button in the app and bookmark forms opens a
   searchable grid of the dashboard-icons set, so you can pick an icon by sight
   instead of having to know its slug.

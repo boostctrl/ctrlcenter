@@ -18,6 +18,19 @@ import {
   type VisitorPrefs,
 } from "@/lib/prefs";
 
+export type Theme = "system" | "light" | "dark";
+export const THEME_KEY = "homepage:theme";
+
+// Apply the theme by toggling `.theme-light` on <html>. Kept in sync with the
+// no-flash inline script in app/layout.tsx (which runs this same logic before
+// React mounts).
+function applyTheme(theme: Theme): void {
+  if (typeof document === "undefined") return;
+  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const dark = theme === "dark" || (theme === "system" && prefersDark);
+  document.documentElement.classList.toggle("theme-light", !dark);
+}
+
 type EffectiveLocation = {
   latitude: number;
   longitude: number;
@@ -31,9 +44,11 @@ type PrefsValue = {
   location: EffectiveLocation;
   detecting: boolean;
   weatherEnabled: boolean;
+  theme: Theme;
   setTimezone: (tz: string) => void;
   setUnits: (units: Units) => void;
   useMyLocation: () => void;
+  setTheme: (theme: Theme) => void;
   reset: () => void;
 };
 
@@ -66,10 +81,50 @@ export function PrefsProvider({
   const [prefs, setPrefs] = useState<VisitorPrefs>({});
   const [detectedTz, setDetectedTz] = useState<string | undefined>();
   const [detecting, setDetecting] = useState(false);
+  const [theme, setThemeState] = useState<Theme>("system");
 
   const persist = useCallback((next: VisitorPrefs) => {
     setPrefs(next);
     savePrefs(next);
+  }, []);
+
+  const setTheme = useCallback((next: Theme) => {
+    setThemeState(next);
+    try {
+      window.localStorage.setItem(THEME_KEY, next);
+    } catch {
+      // Private mode / quota — theme just won't persist.
+    }
+    applyTheme(next);
+  }, []);
+
+  // Load the stored theme on mount and keep "system" in sync with OS changes.
+  useEffect(() => {
+    let stored: Theme = "system";
+    try {
+      const raw = window.localStorage.getItem(THEME_KEY);
+      if (raw === "light" || raw === "dark" || raw === "system") stored = raw;
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setThemeState(stored);
+    applyTheme(stored);
+
+    // Re-apply on OS scheme change (only "system" actually tracks it).
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => {
+      let t: Theme = "system";
+      try {
+        const raw = window.localStorage.getItem(THEME_KEY);
+        if (raw === "light" || raw === "dark" || raw === "system") t = raw;
+      } catch {
+        // ignore
+      }
+      applyTheme(t);
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
   }, []);
 
   // On mount: load stored prefs, silently detect timezone, and IP-detect the
@@ -175,12 +230,14 @@ export function PrefsProvider({
       location,
       detecting,
       weatherEnabled,
+      theme,
       setTimezone,
       setUnits,
       useMyLocation,
+      setTheme,
       reset,
     };
-  }, [prefs, detectedTz, defaults, detecting, weatherEnabled, setTimezone, setUnits, useMyLocation, reset]);
+  }, [prefs, detectedTz, defaults, detecting, weatherEnabled, theme, setTimezone, setUnits, useMyLocation, setTheme, reset]);
 
   return <PrefsContext.Provider value={value}>{children}</PrefsContext.Provider>;
 }

@@ -8,10 +8,10 @@ export function TextField({
 }: { label: string } & InputHTMLAttributes<HTMLInputElement>) {
   return (
     <label className="flex flex-col gap-1 text-sm">
-      <span className="text-white/50">{label}</span>
+      <span className="text-fg/50">{label}</span>
       <input
         {...props}
-        className="accent-focus rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white placeholder-white/30 outline-none transition-colors"
+        className="accent-focus rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-fg placeholder-fg/30 outline-none transition-colors"
       />
     </label>
   );
@@ -28,7 +28,7 @@ export function Button({
     "rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
   const variants: Record<ButtonVariant, string> = {
     primary: "btn-accent text-black hover:opacity-90",
-    ghost: "border border-white/10 bg-white/5 text-white/80 hover:bg-white/10",
+    ghost: "border border-fg/10 bg-fg/5 text-fg/80 hover:bg-fg/10",
     danger: "border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20",
   };
   return <button {...props} className={`${base} ${variants[variant]} ${className}`} />;
@@ -49,7 +49,7 @@ export function MoveButtons({
   onMove: (from: number, to: number) => void;
 }) {
   const btn =
-    "flex h-4 w-5 items-center justify-center rounded text-[10px] leading-none text-white/40 hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-20";
+    "flex h-4 w-5 items-center justify-center rounded text-[10px] leading-none text-fg/40 hover:bg-fg/10 hover:text-fg disabled:pointer-events-none disabled:opacity-20";
   return (
     <div className="flex shrink-0 flex-col gap-0.5">
       <button

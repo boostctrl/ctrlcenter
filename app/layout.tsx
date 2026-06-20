@@ -19,6 +19,10 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+// Applies the visitor's saved theme before first paint to avoid a flash. Mirrors
+// applyTheme() in PrefsProvider; runs from localStorage since theme is per-visitor.
+const themeScript = `(function(){try{var t=localStorage.getItem('homepage:theme')||'system';var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(!d)document.documentElement.classList.add('theme-light');}catch(e){}})();`;
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -34,6 +38,7 @@ export default async function RootLayout({
   return (
     <html lang="en" className={`${jakarta.variable} h-full`} style={accentVars}>
       <body className="relative min-h-full overflow-x-hidden antialiased">
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <div
           aria-hidden
           className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"

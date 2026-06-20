@@ -29,14 +29,14 @@ export default function IconField({
             onChange={(e) => onChange(e.target.value)}
           />
         </div>
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/5 ring-1 ring-white/10">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-fg/5 ring-1 ring-fg/10">
           <Icon icon={value} name={name || "?"} size={22} />
         </div>
       </div>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="self-start text-xs text-white/50 underline transition-colors hover:text-white/80"
+        className="self-start text-xs text-fg/50 underline transition-colors hover:text-fg/80"
       >
         Browse icons
       </button>

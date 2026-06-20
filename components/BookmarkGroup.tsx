@@ -20,7 +20,7 @@ export default function BookmarkGroup({
               href={b.url}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm text-white/70 transition-colors hover:bg-white/5 hover:text-white"
+              className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm text-fg/70 transition-colors hover:bg-fg/5 hover:text-fg"
             >
               <Icon icon={b.icon} name={b.name} size={18} />
               <span className="truncate">{b.name}</span>

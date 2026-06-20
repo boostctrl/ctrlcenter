@@ -17,9 +17,11 @@ export default function LocationTimeEditor({
     location,
     detecting,
     weatherEnabled,
+    theme,
     setTimezone,
     setUnits,
     useMyLocation,
+    setTheme,
     reset,
   } = useVisitorPrefs();
   const ref = useRef<HTMLDivElement>(null);
@@ -53,8 +55,28 @@ export default function LocationTimeEditor({
       aria-label="Location and time settings"
       className="glass-card absolute top-full left-0 z-30 mt-3 w-72 space-y-4 p-4 text-sm"
     >
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-fg/50">Theme</span>
+        <div className="flex overflow-hidden rounded-lg border border-fg/10">
+          {(["system", "light", "dark"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTheme(t)}
+              className={`px-2.5 py-1.5 text-xs capitalize transition-colors ${
+                theme === t
+                  ? "bg-fg/15 text-fg"
+                  : "text-fg/50 hover:text-fg/80"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="space-y-1.5">
-        <label htmlFor="tz-input" className="text-white/50">
+        <label htmlFor="tz-input" className="text-fg/50">
           Time zone
         </label>
         <input
@@ -62,7 +84,7 @@ export default function LocationTimeEditor({
           list="tz-options"
           value={timezone}
           onChange={(e) => setTimezone(e.target.value)}
-          className="accent-focus w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white outline-none transition-colors"
+          className="accent-focus w-full rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-fg outline-none transition-colors"
         />
         <datalist id="tz-options">
           {zones.map((z) => (
@@ -74,14 +96,14 @@ export default function LocationTimeEditor({
       {weatherEnabled && (
         <>
           <div className="space-y-1.5">
-            <span className="text-white/50">Location</span>
+            <span className="text-fg/50">Location</span>
             <div className="flex items-center justify-between gap-2">
-              <span className="truncate text-white/70">{locationText}</span>
+              <span className="truncate text-fg/70">{locationText}</span>
               <button
                 type="button"
                 onClick={useMyLocation}
                 disabled={detecting}
-                className="shrink-0 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-white/80 transition-colors hover:bg-white/10 disabled:opacity-50"
+                className="shrink-0 rounded-lg border border-fg/10 bg-fg/5 px-2.5 py-1.5 text-xs text-fg/80 transition-colors hover:bg-fg/10 disabled:opacity-50"
               >
                 {detecting ? "Locating…" : "Use my location"}
               </button>
@@ -89,8 +111,8 @@ export default function LocationTimeEditor({
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="text-white/50">Units</span>
-            <div className="flex overflow-hidden rounded-lg border border-white/10">
+            <span className="text-fg/50">Units</span>
+            <div className="flex overflow-hidden rounded-lg border border-fg/10">
               {(["imperial", "metric"] as const).map((u) => (
                 <button
                   key={u}
@@ -98,8 +120,8 @@ export default function LocationTimeEditor({
                   onClick={() => setUnits(u)}
                   className={`px-3 py-1.5 text-xs transition-colors ${
                     units === u
-                      ? "bg-white/15 text-white"
-                      : "text-white/50 hover:text-white/80"
+                      ? "bg-fg/15 text-fg"
+                      : "text-fg/50 hover:text-fg/80"
                   }`}
                 >
                   {u === "imperial" ? "°F" : "°C"}
@@ -116,7 +138,7 @@ export default function LocationTimeEditor({
           reset();
           onClose();
         }}
-        className="text-xs text-white/40 underline transition-colors hover:text-white/70"
+        className="text-xs text-fg/40 underline transition-colors hover:text-fg/70"
       >
         Reset to site default
       </button>

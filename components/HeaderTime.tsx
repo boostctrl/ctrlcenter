@@ -72,7 +72,7 @@ export default function HeaderTime({
   return (
     <div className="relative">
       <p
-        className="text-sm font-medium tracking-widest text-white/40"
+        className="text-sm font-medium tracking-widest text-fg/40"
         suppressHydrationWarning
       >
         {date}
@@ -84,7 +84,7 @@ export default function HeaderTime({
         aria-haspopup="dialog"
         aria-expanded={open}
         title="Set your time zone and location"
-        className="mt-1 flex items-center gap-2 rounded text-sm font-medium tracking-wide text-white/40 transition-colors hover:text-white/70 focus-visible:text-white/70 focus-visible:outline-none"
+        className="mt-1 flex items-center gap-2 rounded text-sm font-medium tracking-wide text-fg/40 transition-colors hover:text-fg/70 focus-visible:text-fg/70 focus-visible:outline-none"
       >
         <span className="tabular-nums" suppressHydrationWarning>
           {time}

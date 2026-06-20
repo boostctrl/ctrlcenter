@@ -17,7 +17,7 @@ export default function Icon({ icon, name, size = 28, className = "" }: IconProp
   if (!url || failed) {
     return (
       <div
-        className={`flex items-center justify-center rounded-lg bg-white/10 text-white/70 ${className}`}
+        className={`flex items-center justify-center rounded-lg bg-fg/10 text-fg/70 ${className}`}
         style={{ width: size, height: size, fontSize: size * 0.5 }}
         aria-hidden
       >
