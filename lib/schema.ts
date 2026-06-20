@@ -56,10 +56,19 @@ export const bookmarkItemSchema = z.object({
   icon: z.string().default(""),
 });
 
+// Optional stored admin credential (PBKDF2). Empty means "no UI password set"
+// — login falls back to the ADMIN_PASSWORD env var. Kept as a top-level key
+// (not under settings) so it's never rendered into public pages.
+export const authSchema = z.object({
+  passwordHash: z.string().default(""),
+  passwordSalt: z.string().default(""),
+});
+
 export const configSchema = z.object({
   settings: settingsSchema.default(settingsSchema.parse({})),
   apps: z.array(appItemSchema).default([]),
   bookmarks: z.array(bookmarkItemSchema).default([]),
+  auth: authSchema.default(authSchema.parse({})),
 });
 
 export type Config = z.infer<typeof configSchema>;
@@ -137,4 +146,10 @@ export const bookmarkUpdateSchema = z.object({
 // Reorder (PATCH): an ordered list of existing ids.
 export const reorderSchema = z.object({
   ids: z.array(z.string()),
+});
+
+// Change-password (POST /api/password).
+export const passwordChangeSchema = z.object({
+  current: z.string(),
+  next: z.string().min(8, "New password must be at least 8 characters"),
 });

@@ -26,7 +26,9 @@ async function getSecretKey(): Promise<Uint8Array> {
   return new Uint8Array(hash);
 }
 
-export function verifyPassword(password: string): boolean {
+// Verify against the ADMIN_PASSWORD env var (the bootstrap / fallback credential
+// when no password has been set through the UI).
+export function verifyEnvPassword(password: string): boolean {
   const expected = process.env.ADMIN_PASSWORD ?? "";
   if (!expected || typeof password !== "string") return false;
   const a = new TextEncoder().encode(password);
@@ -35,6 +37,67 @@ export function verifyPassword(password: string): boolean {
   let diff = 0;
   for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
   return diff === 0;
+}
+
+// --- Stored password hashing (PBKDF2 via Web Crypto, no native deps) ---
+const PBKDF2_ITERATIONS = 210000;
+const KEY_BYTES = 32;
+const SALT_BYTES = 16;
+
+function toHex(bytes: Uint8Array): string {
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function fromHex(hex: string): Uint8Array<ArrayBuffer> {
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  }
+  return out;
+}
+
+async function pbkdf2(password: string, salt: BufferSource): Promise<string> {
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(password) as BufferSource,
+    "PBKDF2",
+    false,
+    ["deriveBits"]
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", salt, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
+    keyMaterial,
+    KEY_BYTES * 8
+  );
+  return toHex(new Uint8Array(bits));
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+export async function hashPassword(
+  password: string
+): Promise<{ hash: string; salt: string }> {
+  const salt = crypto.getRandomValues(new Uint8Array(SALT_BYTES));
+  const hash = await pbkdf2(password, salt);
+  return { hash, salt: toHex(salt) };
+}
+
+export async function verifyPasswordHash(
+  password: string,
+  hash: string,
+  salt: string
+): Promise<boolean> {
+  if (!hash || !salt || typeof password !== "string") return false;
+  try {
+    return timingSafeEqual(await pbkdf2(password, fromHex(salt)), hash);
+  } catch {
+    return false;
+  }
 }
 
 export async function createSessionToken(): Promise<string> {

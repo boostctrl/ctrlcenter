@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyPassword, createSessionToken, SESSION_COOKIE_NAME } from "@/lib/auth";
+import {
+  verifyEnvPassword,
+  verifyPasswordHash,
+  createSessionToken,
+  SESSION_COOKIE_NAME,
+} from "@/lib/auth";
+import { readConfig } from "@/lib/config";
 import { rateLimit, pruneRateLimit } from "@/lib/rate-limit";
 
 // Allow a small burst of attempts, then lock the source out for the window.
@@ -40,7 +46,18 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const password = body?.password;
 
-  if (typeof password !== "string" || !verifyPassword(password)) {
+  if (typeof password !== "string") {
+    return NextResponse.json({ error: "Invalid password" }, { status: 401 });
+  }
+
+  // Prefer a password set through the UI (stored hash); otherwise fall back to
+  // the ADMIN_PASSWORD env var.
+  const { auth } = await readConfig();
+  const ok = auth.passwordHash
+    ? await verifyPasswordHash(password, auth.passwordHash, auth.passwordSalt)
+    : verifyEnvPassword(password);
+
+  if (!ok) {
     return NextResponse.json({ error: "Invalid password" }, { status: 401 });
   }
 

@@ -14,6 +14,10 @@ here.
 
 ### Added
 
+- Change the admin password from the UI (Settings → Change password). The new
+  password is stored hashed (PBKDF2-SHA-256, per-password salt) in the config;
+  `ADMIN_PASSWORD` becomes the bootstrap/fallback credential. Changing it
+  requires the current password even with a valid session.
 - Custom search engine for the search bar (Settings → Search bar engine):
   choose DuckDuckGo, Google, Bing, Brave, or a custom `%s` URL template.
   Pressing Enter opens the top match, or searches the web when nothing matches;

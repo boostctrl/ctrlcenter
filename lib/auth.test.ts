@@ -1,6 +1,8 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import {
-  verifyPassword,
+  verifyEnvPassword,
+  hashPassword,
+  verifyPasswordHash,
   createSessionToken,
   verifySessionToken,
 } from "./auth";
@@ -9,26 +11,48 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-describe("verifyPassword", () => {
+describe("verifyEnvPassword", () => {
   it("accepts the configured password", () => {
     vi.stubEnv("ADMIN_PASSWORD", "s3cret");
-    expect(verifyPassword("s3cret")).toBe(true);
+    expect(verifyEnvPassword("s3cret")).toBe(true);
   });
 
   it("rejects a wrong password", () => {
     vi.stubEnv("ADMIN_PASSWORD", "s3cret");
-    expect(verifyPassword("nope")).toBe(false);
+    expect(verifyEnvPassword("nope")).toBe(false);
   });
 
   it("rejects a password of a different length", () => {
     vi.stubEnv("ADMIN_PASSWORD", "s3cret");
-    expect(verifyPassword("s3cre")).toBe(false);
+    expect(verifyEnvPassword("s3cre")).toBe(false);
   });
 
   it("rejects everything when no password is configured", () => {
     vi.stubEnv("ADMIN_PASSWORD", "");
-    expect(verifyPassword("")).toBe(false);
-    expect(verifyPassword("anything")).toBe(false);
+    expect(verifyEnvPassword("")).toBe(false);
+    expect(verifyEnvPassword("anything")).toBe(false);
+  });
+});
+
+describe("password hashing", () => {
+  it("verifies a correct password and rejects a wrong one", async () => {
+    const { hash, salt } = await hashPassword("correct horse");
+    expect(await verifyPasswordHash("correct horse", hash, salt)).toBe(true);
+    expect(await verifyPasswordHash("wrong horse", hash, salt)).toBe(false);
+  });
+
+  it("uses a random salt so identical passwords hash differently", async () => {
+    const a = await hashPassword("same");
+    const b = await hashPassword("same");
+    expect(a.salt).not.toBe(b.salt);
+    expect(a.hash).not.toBe(b.hash);
+    // Both still verify against their own salt.
+    expect(await verifyPasswordHash("same", a.hash, a.salt)).toBe(true);
+    expect(await verifyPasswordHash("same", b.hash, b.salt)).toBe(true);
+  });
+
+  it("returns false for empty hash or salt", async () => {
+    expect(await verifyPasswordHash("x", "", "")).toBe(false);
   });
 });
 

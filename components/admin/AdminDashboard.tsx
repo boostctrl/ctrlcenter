@@ -6,6 +6,7 @@ import type { AppItem, BookmarkItem, Settings } from "@/lib/schema";
 import AppsManager from "./AppsManager";
 import BookmarksManager from "./BookmarksManager";
 import SettingsManager from "./SettingsManager";
+import ChangePassword from "./ChangePassword";
 import { Button } from "./ui";
 import { ToastProvider, useToast } from "./Toast";
 import { apiErrorMessage } from "./apiError";
@@ -137,7 +138,12 @@ function AdminBody({ initialApps, initialBookmarks, initialSettings }: Props) {
 
       {tab === "apps" && <AppsManager initialApps={initialApps} />}
       {tab === "bookmarks" && <BookmarksManager initialBookmarks={initialBookmarks} />}
-      {tab === "settings" && <SettingsManager initialSettings={initialSettings} />}
+      {tab === "settings" && (
+        <div className="space-y-8">
+          <SettingsManager initialSettings={initialSettings} />
+          <ChangePassword />
+        </div>
+      )}
     </div>
   );
 }

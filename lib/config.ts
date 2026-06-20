@@ -64,6 +64,15 @@ export async function replaceConfig(input: unknown): Promise<Config> {
   return result;
 }
 
+export async function setPasswordHash(
+  passwordHash: string,
+  passwordSalt: string
+): Promise<void> {
+  await mutate((config) => {
+    config.auth = { passwordHash, passwordSalt };
+  });
+}
+
 export async function getSettings(): Promise<Settings> {
   return (await readConfig()).settings;
 }

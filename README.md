@@ -38,8 +38,8 @@ Features:
 
 | Variable         | Required | Description                                                                                                                                      |
 | ---------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `ADMIN_PASSWORD` | yes      | Password for the `/admin` UI.                                                                                                                     |
-| `SESSION_SECRET` | no       | Secret used to sign session cookies. If unset, the key is derived from `ADMIN_PASSWORD`, so changing the password logs everyone out. Generate one with `openssl rand -base64 32`. |
+| `ADMIN_PASSWORD` | yes      | Bootstrap password for the `/admin` UI. Once you set a password from **Settings → Change password**, login uses that instead — but keep this set (or set `SESSION_SECRET`), as it's also used to sign sessions. |
+| `SESSION_SECRET` | no       | Secret used to sign session cookies. If unset, the key is derived from `ADMIN_PASSWORD`. Recommended so sessions don't depend on the password. Generate one with `openssl rand -base64 32`. |
 | `CONFIG_PATH`    | no       | Path to the config file (defaults to `./config/config.yaml`; the container sets `/config/config.yaml`).                                           |
 
 Your data lives in `./config/config.yaml`, bind-mounted into the container.
