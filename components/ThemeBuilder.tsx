@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useVisitorPrefs } from "./PrefsProvider";
-import { BASE_THEMES, DESIGNS } from "@/lib/theme";
+import { BASE_THEMES, DESIGNS, SCENES, THEME_PACKS } from "@/lib/theme";
 import type { DesignId } from "@/lib/theme";
 import type { ThemeColors } from "@/lib/prefs";
 
@@ -41,6 +41,9 @@ export default function ThemeBuilder() {
     setTheme,
     design,
     setDesign,
+    scene,
+    setScene,
+    applyPack,
     customThemes,
     activeColors,
     accentOverride,
@@ -151,6 +154,76 @@ export default function ThemeBuilder() {
           })}
         </div>
       </div>
+
+      <div className="space-y-2">
+        <span className="text-xs text-fg/50">Scene</span>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {SCENES.map((s) => {
+            const selected = scene === s.id;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setScene(s.id)}
+                aria-pressed={selected}
+                className={`group flex flex-col gap-1.5 rounded-lg border p-2 text-left transition-colors ${
+                  selected ? "border-fg/40" : "border-fg/10 hover:border-fg/30"
+                }`}
+                title={s.description}
+              >
+                <span
+                  className="block h-9 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
+                  style={{
+                    background:
+                      s.id === "abyss"
+                        ? `radial-gradient(120% 90% at 50% -10%, ${activeAccent.from}, transparent 60%), linear-gradient(to bottom, #02060a, #0a2230)`
+                        : `radial-gradient(60% 70% at 30% 20%, ${activeAccent.from}, transparent 60%), radial-gradient(60% 70% at 75% 80%, ${activeAccent.to}, transparent 60%)`,
+                  }}
+                  aria-hidden
+                />
+                <span
+                  className={`truncate text-xs ${
+                    selected ? "text-fg/90" : "text-fg/60 group-hover:text-fg/90"
+                  }`}
+                >
+                  {s.name}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {THEME_PACKS.length > 0 && (
+        <div className="space-y-2">
+          <span className="text-xs text-fg/50">Packs</span>
+          <p className="text-xs text-fg/40">
+            Curated looks — palette, design, and scene in one tap.
+          </p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {THEME_PACKS.map((p) => (
+              <button
+                key={p.name}
+                type="button"
+                onClick={() => applyPack(p)}
+                className="group flex flex-col gap-1.5 rounded-lg border border-fg/10 p-2 text-left transition-colors hover:border-fg/30"
+                title={`${p.name} — applies its palette, design & scene`}
+              >
+                <span
+                  className="h-9 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
+                  style={{
+                    background: `radial-gradient(120% 100% at 50% -10%, ${p.accentFrom}, transparent 60%), ${p.background}`,
+                  }}
+                  aria-hidden
+                />
+                <span className="truncate text-xs text-fg/60 group-hover:text-fg/90">
+                  {p.name}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="space-y-2">
         <span className="text-xs text-fg/50">Palettes</span>

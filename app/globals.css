@@ -275,3 +275,29 @@ body::before {
 .animate-float {
   animation: float 20s ease-in-out infinite;
 }
+
+/* The Abyss scene's bioluminescent halo (components/scenes/Abyss.tsx). */
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.08);
+  }
+}
+
+.animate-breathe {
+  animation: breathe 7s ease-in-out infinite;
+}
+
+/* Scenes manage their own JS-driven motion (e.g. the Abyss canvas draws a
+   single static frame), but the CSS animations must be quieted here too. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-float,
+  .animate-breathe {
+    animation: none;
+  }
+}

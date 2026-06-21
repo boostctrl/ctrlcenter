@@ -16,6 +16,7 @@ describe("configSchema defaults", () => {
     expect(config.settings.title).toBe("Home");
     expect(config.settings.theme.mode).toBe("system");
     expect(config.settings.theme.design).toBe("glass");
+    expect(config.settings.theme.scene).toBe("aurora");
     expect(config.settings.theme.accentFrom).toBe("#a78bfa");
     expect(config.settings.statusChecks).toBe(false);
     expect(config.settings.weather.enabled).toBe(true);
@@ -141,6 +142,7 @@ describe("settingsInputSchema partial merge semantics", () => {
         theme: {
           mode: "dark",
           design: "cyber",
+          scene: "abyss",
           accentFrom: "#a78bfa",
           accentTo: "#22d3ee",
         },
@@ -152,6 +154,19 @@ describe("settingsInputSchema partial merge semantics", () => {
         theme: {
           mode: "dark",
           design: "hologram",
+          scene: "aurora",
+          accentFrom: "#a78bfa",
+          accentTo: "#22d3ee",
+        },
+      }).success
+    ).toBe(false);
+    // Unknown scene.
+    expect(
+      settingsInputSchema.safeParse({
+        theme: {
+          mode: "dark",
+          design: "glass",
+          scene: "nebula",
           accentFrom: "#a78bfa",
           accentTo: "#22d3ee",
         },
@@ -163,6 +178,7 @@ describe("settingsInputSchema partial merge semantics", () => {
         theme: {
           mode: "dark",
           design: "glass",
+          scene: "aurora",
           accentFrom: "violet",
           accentTo: "#22d3ee",
         },

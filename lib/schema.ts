@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DESIGN_IDS } from "./theme";
+import { DESIGN_IDS, SCENE_IDS } from "./theme";
 import { SEARCH_ENGINE_KEYS, isValidCustomUrl } from "./search";
 
 // 6-digit hex color (matches what <input type="color"> produces and the
@@ -39,6 +39,7 @@ export const searchSchema = z.object({
 export const themeSchema = z.object({
   mode: z.enum(["system", "light", "dark"]).default("system"),
   design: z.enum(DESIGN_IDS).default("glass"),
+  scene: z.enum(SCENE_IDS).default("aurora"),
   accentFrom: hexColor.default("#a78bfa"),
   accentTo: hexColor.default("#22d3ee"),
   background: hexColor.optional(),
@@ -144,6 +145,7 @@ export const searchUpdateSchema = z
 export const themeInputSchema = z.object({
   mode: z.enum(["system", "light", "dark"]),
   design: z.enum(DESIGN_IDS),
+  scene: z.enum(SCENE_IDS),
   accentFrom: hexColor,
   accentTo: hexColor,
   background: hexColor.optional(),

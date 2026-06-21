@@ -2,7 +2,14 @@
 // defaults (timezone, weather location/units) for a single visitor's browser
 // only — nothing is written to the server, so any visitor can correct their own
 // view without auth and without affecting anyone else.
-import { DEFAULT_DESIGN, isDesignId, type DesignId } from "./theme";
+import {
+  DEFAULT_DESIGN,
+  DEFAULT_SCENE,
+  isDesignId,
+  isSceneId,
+  type DesignId,
+  type SceneId,
+} from "./theme";
 
 export type Units = "imperial" | "metric";
 
@@ -129,12 +136,13 @@ export type ThemeColors = {
   accentTo: string;
 };
 
-// A saved theme bundles the colors with the look-and-feel design it was saved
-// with, so applying it restores both.
+// A saved theme bundles the colors with the look-and-feel design and scene it
+// was saved with, so applying it restores all three.
 export type CustomTheme = ThemeColors & {
   id: string;
   name: string;
   design: DesignId;
+  scene: SceneId;
 };
 
 // The active custom theme's colors (overrides light/dark mode when present).
@@ -191,9 +199,10 @@ export function loadThemes(): CustomTheme[] {
     return arr.flatMap((t): CustomTheme[] => {
       const colors = sanitizeColors(t);
       if (colors && t && typeof t.id === "string" && typeof t.name === "string") {
-        // Themes saved before designs existed default to the Glass design.
+        // Themes saved before designs/scenes existed default to Glass/Aurora.
         const design = isDesignId(t.design) ? t.design : DEFAULT_DESIGN;
-        return [{ id: t.id, name: t.name.slice(0, 40), design, ...colors }];
+        const scene = isSceneId(t.scene) ? t.scene : DEFAULT_SCENE;
+        return [{ id: t.id, name: t.name.slice(0, 40), design, scene, ...colors }];
       }
       return [];
     });
@@ -274,6 +283,36 @@ export function saveDesign(design: DesignId | null): void {
       window.localStorage.setItem(DESIGN_KEY, design);
     } else {
       window.localStorage.removeItem(DESIGN_KEY);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+// --- Scene ---
+// The backdrop + ornament preset (Aurora, Abyss, …). Per-visitor; applied as a
+// `scene-<id>` class on <html> and rendered by <SceneLayer>. See lib/theme.ts.
+export const SCENE_KEY = "homepage:scene";
+
+// Returns null when the visitor hasn't chosen a scene, so callers can fall back
+// to the admin-configured default.
+export function loadScene(): SceneId | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(SCENE_KEY);
+    return isSceneId(raw) ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveScene(scene: SceneId | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (scene) {
+      window.localStorage.setItem(SCENE_KEY, scene);
+    } else {
+      window.localStorage.removeItem(SCENE_KEY);
     }
   } catch {
     // ignore

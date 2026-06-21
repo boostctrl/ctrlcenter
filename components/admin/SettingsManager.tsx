@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import type { Settings } from "@/lib/schema";
-import { DESIGNS, type DesignId } from "@/lib/theme";
+import { DESIGNS, SCENES, type DesignId, type SceneId } from "@/lib/theme";
 import {
   SEARCH_ENGINES,
   SEARCH_ENGINE_KEYS,
@@ -144,6 +144,23 @@ export default function SettingsManager({
             {DESIGNS.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.name} — {d.description}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-fg/50">Default scene</span>
+          <select
+            value={theme.scene}
+            onChange={(e) =>
+              updateTheme({ scene: e.target.value as SceneId })
+            }
+            className={selectClass}
+          >
+            {SCENES.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name} — {s.description}
               </option>
             ))}
           </select>

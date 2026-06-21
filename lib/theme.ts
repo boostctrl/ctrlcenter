@@ -34,6 +34,26 @@ export function isDesignId(v: unknown): v is DesignId {
   return typeof v === "string" && (DESIGN_IDS as string[]).includes(v);
 }
 
+// Scenes own the background composition + motion + an optional signature
+// ornament — the parts a "design" (card surface) doesn't touch. Each is a React
+// component bundle (see components/scenes) selected by a `scene-<id>` class on
+// <html>; the components read the color CSS vars, so any scene works with any
+// palette. "aurora" is the default — the floating accent glow blobs.
+export type SceneId = "aurora" | "abyss";
+
+export const SCENES: { id: SceneId; name: string; description: string }[] = [
+  { id: "aurora", name: "Aurora", description: "Floating accent glow (default)" },
+  { id: "abyss", name: "Abyss", description: "Deep sea — drifting snow & depth gauge" },
+];
+
+export const SCENE_IDS = SCENES.map((s) => s.id) as [SceneId, ...SceneId[]];
+
+export const DEFAULT_SCENE: SceneId = "aurora";
+
+export function isSceneId(v: unknown): v is SceneId {
+  return typeof v === "string" && (SCENE_IDS as string[]).includes(v);
+}
+
 // Preset full themes for the theme builder — starting points a visitor can
 // apply with one tap and then tweak. Each is the four colors that drive the
 // custom-theme CSS variables (page background, ink/foreground, accent pair).
@@ -54,4 +74,28 @@ export const BASE_THEMES: PresetTheme[] = [
   { name: "Slate", background: "#0f1115", foreground: "#e6e8ec", accentFrom: "#60a5fa", accentTo: "#a78bfa" },
   { name: "Rosé", background: "#1a1016", foreground: "#f5e9f0", accentFrom: "#fb7185", accentTo: "#f472b6" },
   { name: "Sand", background: "#f4ecdf", foreground: "#2b2418", accentFrom: "#d97706", accentTo: "#f59e0b" },
+];
+
+// A theme pack is a curated, art-directed look applied in one tap: a palette
+// bundled with the design (card surface) and scene (backdrop + ornament) that
+// were composed to go with it. Unlike a bare palette, applying a pack sets all
+// three at once — but the visitor can still tweak each part afterward.
+export type ThemePack = PresetTheme & {
+  design: DesignId;
+  scene: SceneId;
+};
+
+export const THEME_PACKS: ThemePack[] = [
+  {
+    // The headline curated look built on the Abyss scene; named distinctly from
+    // the scene (deepest ocean trench) so the two "Abyss"-flavored entries in the
+    // theme builder don't collide.
+    name: "Mariana",
+    background: "#02060a",
+    foreground: "#c7d6db",
+    accentFrom: "#5fe3d6",
+    accentTo: "#2f8f9d",
+    design: "glass",
+    scene: "abyss",
+  },
 ];

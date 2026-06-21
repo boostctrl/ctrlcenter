@@ -86,6 +86,7 @@ describe("updateSettings partial merge", () => {
       theme: {
         mode: "dark",
         design: "cyber",
+        scene: "abyss",
         accentFrom: "#a78bfa",
         accentTo: "#22d3ee",
       },
@@ -96,6 +97,7 @@ describe("updateSettings partial merge", () => {
     expect(settings.title).toBe("Dash");
     expect(settings.theme.mode).toBe("dark");
     expect(settings.theme.design).toBe("cyber");
+    expect(settings.theme.scene).toBe("abyss");
     expect(settings.timezone).toBe("America/Chicago");
   });
 
@@ -117,6 +119,7 @@ describe("updateSettings partial merge", () => {
       theme: {
         mode: "dark",
         design: "glass",
+        scene: "aurora",
         accentFrom: "#a78bfa",
         accentTo: "#22d3ee",
         background: "#101010",
@@ -128,6 +131,7 @@ describe("updateSettings partial merge", () => {
       theme: {
         mode: "light",
         design: "flat",
+        scene: "aurora",
         accentFrom: "#a78bfa",
         accentTo: "#22d3ee",
       },

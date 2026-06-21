@@ -21,6 +21,8 @@ import {
   saveAccentOverride,
   loadDesign,
   saveDesign,
+  loadScene,
+  saveScene,
   type Units,
   type VisitorLocation,
   type VisitorPrefs,
@@ -28,7 +30,13 @@ import {
   type CustomTheme,
   type AccentColors,
 } from "@/lib/prefs";
-import { DESIGN_IDS, type DesignId } from "@/lib/theme";
+import {
+  DESIGN_IDS,
+  SCENE_IDS,
+  type DesignId,
+  type SceneId,
+  type ThemePack,
+} from "@/lib/theme";
 
 export type Theme = "system" | "light" | "dark";
 export const THEME_KEY = "homepage:theme";
@@ -59,6 +67,16 @@ function applyDesign(design: DesignId): void {
   const el = document.documentElement;
   DESIGN_IDS.forEach((d) => el.classList.remove(`design-${d}`));
   if (design !== "glass") el.classList.add(`design-${design}`);
+}
+
+// Swap the active scene class on <html>. <SceneLayer> renders the matching
+// backdrop/ornament components; the class lets any pure-CSS scene styling apply
+// before hydration. The default ("aurora") carries no class.
+function applyScene(scene: SceneId): void {
+  if (typeof document === "undefined") return;
+  const el = document.documentElement;
+  SCENE_IDS.forEach((s) => el.classList.remove(`scene-${s}`));
+  if (scene !== "aurora") el.classList.add(`scene-${scene}`);
 }
 
 // Perceived luminance of a #rrggbb color — used to decide whether the current
@@ -128,6 +146,7 @@ type PrefsValue = {
   greetingName: string;
   theme: Theme;
   design: DesignId;
+  scene: SceneId;
   // Whether the effective background reads as light (for theme-aware icons).
   surfaceIsLight: boolean;
   customThemes: CustomTheme[];
@@ -140,6 +159,8 @@ type PrefsValue = {
   useMyLocation: () => void;
   setTheme: (theme: Theme) => void;
   setDesign: (design: DesignId) => void;
+  setScene: (scene: SceneId) => void;
+  applyPack: (pack: ThemePack) => void;
   applyThemeColors: (colors: ThemeColors) => void;
   setBaseColors: (background: string, foreground: string) => void;
   setAccentOverride: (accent: AccentColors | null) => void;
@@ -171,6 +192,7 @@ type Defaults = {
 export type DefaultTheme = {
   mode: Theme;
   design: DesignId;
+  scene: SceneId;
   accentFrom: string;
   accentTo: string;
   background?: string;
@@ -219,6 +241,7 @@ export function PrefsProvider({
   const [locationError, setLocationError] = useState<string | null>(null);
   const [theme, setThemeState] = useState<Theme>(defaultTheme.mode);
   const [design, setDesignState] = useState<DesignId>(defaultTheme.design);
+  const [scene, setSceneState] = useState<SceneId>(defaultTheme.scene);
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([]);
   const [activeColors, setActiveColors] = useState<ThemeColors | null>(null);
   const [accentOverride, setAccentOverrideState] =
@@ -267,6 +290,12 @@ export function PrefsProvider({
     applyDesign(next);
   }, []);
 
+  const setScene = useCallback((next: SceneId) => {
+    setSceneState(next);
+    saveScene(next);
+    applyScene(next);
+  }, []);
+
   // Apply (and persist) a full custom theme — base presets and saved themes.
   // The theme carries its own accent, so any standalone accent override is
   // dropped in favor of it.
@@ -279,6 +308,23 @@ export function PrefsProvider({
       applyAll({ theme, colors, accentOverride: null, defaultAccent });
     },
     [theme, defaultAccent]
+  );
+
+  // Apply a curated pack in one tap: its design + scene + full color set. The
+  // colors carry the pack's accent, so applyThemeColors drops any standalone
+  // accent override in favor of it.
+  const applyPack = useCallback(
+    (pack: ThemePack) => {
+      setDesign(pack.design);
+      setScene(pack.scene);
+      applyThemeColors({
+        background: pack.background,
+        foreground: pack.foreground,
+        accentFrom: pack.accentFrom,
+        accentTo: pack.accentTo,
+      });
+    },
+    [setDesign, setScene, applyThemeColors]
   );
 
   // Update only the background/foreground, leaving the accent as-is (live edit
@@ -320,6 +366,7 @@ export function PrefsProvider({
         id: crypto.randomUUID(),
         name: name.trim().slice(0, 40) || "Custom",
         design,
+        scene,
         ...colors,
       };
       setCustomThemes((prev) => {
@@ -328,7 +375,7 @@ export function PrefsProvider({
         return next;
       });
     },
-    [design]
+    [design, scene]
   );
 
   const applyNamedTheme = useCallback(
@@ -336,6 +383,7 @@ export function PrefsProvider({
       const t = customThemes.find((x) => x.id === id);
       if (!t) return;
       setDesign(t.design);
+      setScene(t.scene);
       applyThemeColors({
         background: t.background,
         foreground: t.foreground,
@@ -343,7 +391,7 @@ export function PrefsProvider({
         accentTo: t.accentTo,
       });
     },
-    [customThemes, applyThemeColors, setDesign]
+    [customThemes, applyThemeColors, setDesign, setScene]
   );
 
   const deleteNamedTheme = useCallback((id: string) => {
@@ -385,10 +433,12 @@ export function PrefsProvider({
     const active = loadActiveTheme();
     const overrideAccent = loadAccentOverride();
     const storedDesign = loadDesign() ?? defaultTheme.design;
+    const storedScene = loadScene() ?? defaultTheme.scene;
     /* eslint-disable react-hooks/set-state-in-effect */
     setThemeState(stored);
     setModeChosen(chosen);
     setDesignState(storedDesign);
+    setSceneState(storedScene);
     setActiveColors(active);
     setAccentOverrideState(overrideAccent);
     setCustomThemes(loadThemes());
@@ -404,6 +454,7 @@ export function PrefsProvider({
       defaultAccent,
     });
     applyDesign(storedDesign);
+    applyScene(storedScene);
 
     // Re-apply on OS scheme change (only "system" mode tracks it; custom colors,
     // from the visitor or the admin default, define their own and ignore the OS).
@@ -499,11 +550,13 @@ export function PrefsProvider({
     saveActiveTheme(null);
     saveAccentOverride(null);
     saveDesign(null);
+    saveScene(null);
     setActiveColors(null);
     setAccentOverrideState(null);
     setModeChosen(false);
     setThemeState(defaultTheme.mode);
     setDesignState(defaultTheme.design);
+    setSceneState(defaultTheme.scene);
     applyAll({
       theme: defaultTheme.mode,
       colors: adminColors,
@@ -511,7 +564,15 @@ export function PrefsProvider({
       defaultAccent,
     });
     applyDesign(defaultTheme.design);
-  }, [persist, defaultTheme.mode, defaultTheme.design, adminColors, defaultAccent]);
+    applyScene(defaultTheme.scene);
+  }, [
+    persist,
+    defaultTheme.mode,
+    defaultTheme.design,
+    defaultTheme.scene,
+    adminColors,
+    defaultAccent,
+  ]);
 
   const useMyLocation = useCallback(() => {
     setLocationError(null);
@@ -593,6 +654,7 @@ export function PrefsProvider({
       greetingName: prefs.greetingName ?? "",
       theme,
       design,
+      scene,
       surfaceIsLight,
       customThemes,
       activeColors,
@@ -604,6 +666,8 @@ export function PrefsProvider({
       useMyLocation,
       setTheme,
       setDesign,
+      setScene,
+      applyPack,
       applyThemeColors,
       setBaseColors,
       setAccentOverride,
@@ -624,6 +688,7 @@ export function PrefsProvider({
     adminColors,
     theme,
     design,
+    scene,
     systemDark,
     modeChosen,
     customThemes,
@@ -635,6 +700,8 @@ export function PrefsProvider({
     useMyLocation,
     setTheme,
     setDesign,
+    setScene,
+    applyPack,
     applyThemeColors,
     setBaseColors,
     setAccentOverride,
