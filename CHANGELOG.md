@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-06-21
+
 ### Added
 
 - **Designs** in the theme builder: choose a look-and-feel — **Glass** (default),
@@ -252,7 +254,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/homepage-app/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/boostctrl/homepage-app/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/boostctrl/homepage-app/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/boostctrl/homepage-app/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/boostctrl/homepage-app/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/boostctrl/homepage-app/compare/v0.3.1...v0.4.0
