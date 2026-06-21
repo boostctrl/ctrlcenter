@@ -90,7 +90,12 @@ export async function updateSettings(
   partial: SettingsInput
 ): Promise<Settings> {
   return mutate((config) => {
-    const { weather: weatherPartial, search: searchPartial, ...rest } = partial;
+    const {
+      weather: weatherPartial,
+      search: searchPartial,
+      theme: themePartial,
+      ...rest
+    } = partial;
     config.settings = {
       ...config.settings,
       ...withoutUndefined(rest),
@@ -102,6 +107,9 @@ export async function updateSettings(
         ...config.settings.search,
         ...withoutUndefined(searchPartial ?? {}),
       },
+      // Theme is sent whole, so replace it (this is how clearing the optional
+      // custom colors works); keep the existing one when not provided.
+      theme: themePartial ?? config.settings.theme,
     };
     return config.settings;
   });

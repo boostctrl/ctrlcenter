@@ -255,23 +255,25 @@ export function saveAccentOverride(accent: AccentColors | null): void {
 // `design-<id>` class on <html>. See lib/theme.ts for the catalog.
 export const DESIGN_KEY = "homepage:design";
 
-export function loadDesign(): DesignId {
-  if (typeof window === "undefined") return DEFAULT_DESIGN;
+// Returns null when the visitor hasn't chosen a design, so callers can fall
+// back to the admin-configured default.
+export function loadDesign(): DesignId | null {
+  if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(DESIGN_KEY);
-    return isDesignId(raw) ? raw : DEFAULT_DESIGN;
+    return isDesignId(raw) ? raw : null;
   } catch {
-    return DEFAULT_DESIGN;
+    return null;
   }
 }
 
-export function saveDesign(design: DesignId): void {
+export function saveDesign(design: DesignId | null): void {
   if (typeof window === "undefined") return;
   try {
-    if (design === DEFAULT_DESIGN) {
-      window.localStorage.removeItem(DESIGN_KEY);
-    } else {
+    if (design) {
       window.localStorage.setItem(DESIGN_KEY, design);
+    } else {
+      window.localStorage.removeItem(DESIGN_KEY);
     }
   } catch {
     // ignore

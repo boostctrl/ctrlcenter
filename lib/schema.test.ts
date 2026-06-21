@@ -14,7 +14,9 @@ describe("configSchema defaults", () => {
     expect(config.apps).toEqual([]);
     expect(config.bookmarks).toEqual([]);
     expect(config.settings.title).toBe("Home");
-    expect(config.settings.accent).toBe("violet");
+    expect(config.settings.theme.mode).toBe("system");
+    expect(config.settings.theme.design).toBe("glass");
+    expect(config.settings.theme.accentFrom).toBe("#a78bfa");
     expect(config.settings.statusChecks).toBe(false);
     expect(config.settings.weather.enabled).toBe(true);
     expect(config.settings.weather.units).toBe("imperial");
@@ -129,16 +131,42 @@ describe("settingsInputSchema partial merge semantics", () => {
     expect(parsed.title).toBe("Only Title");
     expect("timezone" in parsed).toBe(false);
     expect("weather" in parsed).toBe(false);
-    expect("accent" in parsed).toBe(false);
+    expect("theme" in parsed).toBe(false);
     expect("statusChecks" in parsed).toBe(false);
   });
 
-  it("accepts a known accent and rejects an unknown one", () => {
-    expect(settingsInputSchema.safeParse({ accent: "emerald" }).success).toBe(
-      true
-    );
-    expect(settingsInputSchema.safeParse({ accent: "chartreuse" }).success).toBe(
-      false
-    );
+  it("accepts a valid theme and rejects an invalid one", () => {
+    expect(
+      settingsInputSchema.safeParse({
+        theme: {
+          mode: "dark",
+          design: "cyber",
+          accentFrom: "#a78bfa",
+          accentTo: "#22d3ee",
+        },
+      }).success
+    ).toBe(true);
+    // Unknown design.
+    expect(
+      settingsInputSchema.safeParse({
+        theme: {
+          mode: "dark",
+          design: "hologram",
+          accentFrom: "#a78bfa",
+          accentTo: "#22d3ee",
+        },
+      }).success
+    ).toBe(false);
+    // Bad hex color.
+    expect(
+      settingsInputSchema.safeParse({
+        theme: {
+          mode: "dark",
+          design: "glass",
+          accentFrom: "violet",
+          accentTo: "#22d3ee",
+        },
+      }).success
+    ).toBe(false);
   });
 });

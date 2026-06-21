@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import type { Settings } from "@/lib/schema";
+import { DESIGNS, type DesignId } from "@/lib/theme";
 import {
   SEARCH_ENGINES,
   SEARCH_ENGINE_KEYS,
@@ -60,6 +61,13 @@ export default function SettingsManager({
 
   const selectClass =
     "accent-focus rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-fg outline-none transition-colors";
+  const colorClass =
+    "h-8 w-8 shrink-0 cursor-pointer rounded border border-fg/10 bg-transparent";
+
+  const theme = settings.theme;
+  const updateTheme = (patch: Partial<Settings["theme"]>) =>
+    setSettings((s) => ({ ...s, theme: { ...s.theme, ...patch } }));
+  const customColors = Boolean(theme.background && theme.foreground);
 
   return (
     <form
@@ -89,6 +97,135 @@ export default function SettingsManager({
             ))}
           </datalist>
         </label>
+      </Section>
+
+      <Section title="Appearance">
+        <p className="-mt-1 text-xs text-fg/40">
+          The site-wide default theme. Visitors can override any of this in their
+          own browser from the settings page.
+        </p>
+
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm text-fg/50">Default mode</span>
+          <div className="flex overflow-hidden rounded-lg border border-fg/10">
+            {(["system", "light", "dark"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => updateTheme({ mode: m })}
+                className={`px-3 py-1.5 text-xs capitalize transition-colors ${
+                  theme.mode === m
+                    ? "bg-fg/15 text-fg"
+                    : "text-fg/50 hover:text-fg/80"
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-fg/50">Default design</span>
+          <select
+            value={theme.design}
+            onChange={(e) =>
+              updateTheme({ design: e.target.value as DesignId })
+            }
+            className={selectClass}
+          >
+            {DESIGNS.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name} — {d.description}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className="flex flex-col gap-2">
+          <span className="text-sm text-fg/50">Default accent</span>
+          <div
+            className="h-8 w-full rounded-lg ring-1 ring-fg/10"
+            style={{
+              backgroundImage: `linear-gradient(to right, ${theme.accentFrom}, ${theme.accentTo})`,
+            }}
+            aria-hidden
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="color"
+                value={theme.accentFrom}
+                onChange={(e) => updateTheme({ accentFrom: e.target.value })}
+                aria-label="Accent start"
+                className={colorClass}
+              />
+              <span className="text-fg/60">Start</span>
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="color"
+                value={theme.accentTo}
+                onChange={(e) => updateTheme({ accentTo: e.target.value })}
+                aria-label="Accent end"
+                className={colorClass}
+              />
+              <span className="text-fg/60">End</span>
+            </label>
+          </div>
+          <p className="text-xs text-fg/40">
+            Set both ends to the same color for a solid accent.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label className="flex items-center justify-between gap-4 text-sm">
+            <span>
+              <span className="text-fg/70">Custom default colors</span>
+              <span className="block text-xs text-fg/40">
+                Override the light/dark background and text with fixed colors.
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              checked={customColors}
+              onChange={(e) =>
+                updateTheme(
+                  e.target.checked
+                    ? {
+                        background: theme.background ?? "#06070d",
+                        foreground: theme.foreground ?? "#f4f4f6",
+                      }
+                    : { background: undefined, foreground: undefined }
+                )
+              }
+            />
+          </label>
+          {customColors && (
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="color"
+                  value={theme.background ?? "#06070d"}
+                  onChange={(e) => updateTheme({ background: e.target.value })}
+                  aria-label="Background"
+                  className={colorClass}
+                />
+                <span className="text-fg/60">Background</span>
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="color"
+                  value={theme.foreground ?? "#f4f4f6"}
+                  onChange={(e) => updateTheme({ foreground: e.target.value })}
+                  aria-label="Text & surfaces"
+                  className={colorClass}
+                />
+                <span className="text-fg/60">Text &amp; surfaces</span>
+              </label>
+            </div>
+          )}
+        </div>
       </Section>
 
       <Section title="Dashboard">

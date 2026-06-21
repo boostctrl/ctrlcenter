@@ -82,11 +82,20 @@ describe("apps CRUD", () => {
 
 describe("updateSettings partial merge", () => {
   it("updates a top-level field without clobbering the others", async () => {
-    await config.updateSettings({ accent: "emerald", timezone: "America/Chicago" });
+    await config.updateSettings({
+      theme: {
+        mode: "dark",
+        design: "cyber",
+        accentFrom: "#a78bfa",
+        accentTo: "#22d3ee",
+      },
+      timezone: "America/Chicago",
+    });
     const settings = await config.updateSettings({ title: "Dash" });
 
     expect(settings.title).toBe("Dash");
-    expect(settings.accent).toBe("emerald");
+    expect(settings.theme.mode).toBe("dark");
+    expect(settings.theme.design).toBe("cyber");
     expect(settings.timezone).toBe("America/Chicago");
   });
 
@@ -101,6 +110,33 @@ describe("updateSettings partial merge", () => {
     expect(settings.weather.units).toBe("metric");
     expect(settings.weather.latitude).toBe(40);
     expect(settings.weather.longitude).toBe(-75);
+  });
+
+  it("replaces the theme wholesale so custom colors can be cleared", async () => {
+    await config.updateSettings({
+      theme: {
+        mode: "dark",
+        design: "glass",
+        accentFrom: "#a78bfa",
+        accentTo: "#22d3ee",
+        background: "#101010",
+        foreground: "#fafafa",
+      },
+    });
+    // Re-saving without the colors drops them rather than merging them back in.
+    const settings = await config.updateSettings({
+      theme: {
+        mode: "light",
+        design: "flat",
+        accentFrom: "#a78bfa",
+        accentTo: "#22d3ee",
+      },
+    });
+
+    expect(settings.theme.mode).toBe("light");
+    expect(settings.theme.design).toBe("flat");
+    expect(settings.theme.background).toBeUndefined();
+    expect(settings.theme.foreground).toBeUndefined();
   });
 });
 

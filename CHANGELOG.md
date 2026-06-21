@@ -12,11 +12,22 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Admin default theme** (Admin → Settings → Appearance): set the site-wide
+  default mode (light/dark/system), design, accent gradient, and optional custom
+  background/text colors. It's the baseline an un-customized visitor sees, and
+  every part is still overridable per-browser from the settings page.
+  "Reset to site default" now also reverts a visitor's theme to this default.
+
 ### Changed
 
 - The theme builder's accent preset swatches were removed — the gradient preview
   bar and the Start / End color pickers now cover everything. For a solid accent,
   set both ends to the same color.
+- The server `accent` setting (a fixed named preset) is replaced by the richer
+  `theme` block above. **Note:** existing `accent` values in `config.yaml` are
+  dropped; set the accent under `settings.theme` instead.
 
 ## [0.5.2] - 2026-06-21
 

@@ -60,7 +60,13 @@ the host directory — no manual `chown` required.
 settings:
   title: Home              # browser tab title
   timezone: America/Chicago # IANA timezone, used for date + greeting
-  accent: violet           # violet | blue | emerald | rose | amber | cyan
+  theme:                   # site-wide default theme (visitors can override)
+    mode: system           # system | light | dark
+    design: glass          # glass | aero | flat | soft | minimal | bold | cyber
+    accentFrom: '#a78bfa'  # accent gradient start (#rrggbb)
+    accentTo: '#22d3ee'    # accent gradient end (same as start = solid)
+    # background: '#06070d' # optional: custom default colors (overrides mode)
+    # foreground: '#f4f4f6'
   statusChecks: false      # ping app URLs and show online/offline dots
   search:
     engine: duckduckgo     # duckduckgo | google | bing | brave | custom

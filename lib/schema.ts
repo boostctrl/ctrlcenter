@@ -1,6 +1,10 @@
 import { z } from "zod";
-import { ACCENT_KEYS } from "./theme";
+import { DESIGN_IDS } from "./theme";
 import { SEARCH_ENGINE_KEYS, isValidCustomUrl } from "./search";
+
+// 6-digit hex color (matches what <input type="color"> produces and the
+// client-side theme sanitizers accept).
+const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Must be a #rrggbb color");
 
 // z.string().url() accepts any valid URL — including `javascript:`, `data:`,
 // and `vbscript:` schemes. App/bookmark URLs are rendered as <a href> on the
@@ -28,10 +32,23 @@ export const searchSchema = z.object({
   customUrl: z.string().default(""),
 });
 
+// The site-wide default theme. Visitors can override every part of this in
+// their own browser (the theme builder / settings page); these values are the
+// baseline an un-customized visitor sees. `background`/`foreground` are optional
+// custom default colors — when both are set they override the light/dark mode.
+export const themeSchema = z.object({
+  mode: z.enum(["system", "light", "dark"]).default("system"),
+  design: z.enum(DESIGN_IDS).default("glass"),
+  accentFrom: hexColor.default("#a78bfa"),
+  accentTo: hexColor.default("#22d3ee"),
+  background: hexColor.optional(),
+  foreground: hexColor.optional(),
+});
+
 export const settingsSchema = z.object({
   title: z.string().default("Home"),
   timezone: z.string().default("UTC"),
-  accent: z.enum(ACCENT_KEYS).default("violet"),
+  theme: themeSchema.default(themeSchema.parse({})),
   // When on, the dashboard polls /api/status to show per-app online/offline
   // dots. Off by default since it makes the server ping every app URL.
   statusChecks: z.boolean().default(false),
@@ -117,10 +134,22 @@ export const searchUpdateSchema = z
     path: ["customUrl"],
   });
 
+// The admin sends the whole theme object (not a partial), so updateSettings
+// replaces it wholesale — that's how clearing the optional custom colors works
+// (omit them and they're gone). Required fields keep a saved theme well-formed.
+export const themeInputSchema = z.object({
+  mode: z.enum(["system", "light", "dark"]),
+  design: z.enum(DESIGN_IDS),
+  accentFrom: hexColor,
+  accentTo: hexColor,
+  background: hexColor.optional(),
+  foreground: hexColor.optional(),
+});
+
 export const settingsInputSchema = z.object({
   title: z.string().optional(),
   timezone: z.string().optional(),
-  accent: z.enum(ACCENT_KEYS).optional(),
+  theme: themeInputSchema.optional(),
   statusChecks: z.boolean().optional(),
   search: searchUpdateSchema.optional(),
   weather: weatherUpdateSchema.optional(),

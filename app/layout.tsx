@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { getSettings } from "@/lib/config";
-import { accentColors } from "@/lib/theme";
 import { PrefsProvider } from "@/components/PrefsProvider";
 import "./globals.css";
 
@@ -25,19 +24,18 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const settings = await getSettings();
-  const { from, to } = accentColors(settings.accent);
   const weather = settings.weather;
+  const defaultTheme = settings.theme;
 
-  // Set the admin accent and apply the visitor's saved theme (a custom theme's
-  // colors, or the light/dark mode class) before first paint — all imperatively,
-  // so React never controls the <html> color variables (which would otherwise
-  // clobber a custom theme on hydration). A standalone accent override is applied
-  // last so it wins over the theme/default. Runs as the first node in <body>.
-  const themeScript = `(function(){try{var s=document.documentElement.style;s.setProperty('--accent-from',${JSON.stringify(
-    from
-  )});s.setProperty('--accent-to',${JSON.stringify(
-    to
-  )});var ct=localStorage.getItem('homepage:activeTheme');var c=null;if(ct){try{c=JSON.parse(ct);}catch(e){}}if(c&&c.background){s.setProperty('--background',c.background);s.setProperty('--foreground',c.foreground);s.setProperty('--fg',c.foreground);s.setProperty('--accent-from',c.accentFrom);s.setProperty('--accent-to',c.accentTo);}else{var t=localStorage.getItem('homepage:theme')||'system';var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(!d)document.documentElement.classList.add('theme-light');}var ao=localStorage.getItem('homepage:accent');if(ao){var a=JSON.parse(ao);if(a&&a.from){s.setProperty('--accent-from',a.from);s.setProperty('--accent-to',a.to);}}var dz=localStorage.getItem('homepage:design');if(['aero','flat','soft','minimal','bold','cyber'].indexOf(dz)>=0){document.documentElement.classList.add('design-'+dz);}}catch(e){}})();`;
+  // Apply the effective theme before first paint — imperatively, so React never
+  // controls the <html> color variables (which would otherwise clobber it on
+  // hydration). Precedence (visitor wins, then the admin default theme): a saved
+  // custom theme → an explicit light/dark mode → admin custom default colors →
+  // admin default mode; accent override and design are layered on last. Runs as
+  // the first node in <body>. Mirrors the resolution in PrefsProvider.
+  const themeScript = `(function(){try{var dt=${JSON.stringify(
+    defaultTheme
+  )};var s=document.documentElement.style;s.setProperty('--accent-from',dt.accentFrom);s.setProperty('--accent-to',dt.accentTo);function setMode(m){var d=m==='dark'||(m==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('theme-light',!d);}function setColors(bg,fg){s.setProperty('--background',bg);s.setProperty('--foreground',fg);s.setProperty('--fg',fg);}var ct=localStorage.getItem('homepage:activeTheme');var c=null;if(ct){try{c=JSON.parse(ct);}catch(e){}}if(c&&c.background){setColors(c.background,c.foreground);s.setProperty('--accent-from',c.accentFrom);s.setProperty('--accent-to',c.accentTo);}else{var m=localStorage.getItem('homepage:theme');if(m==='light'||m==='dark'||m==='system'){setMode(m);}else if(dt.background&&dt.foreground){setColors(dt.background,dt.foreground);}else{setMode(dt.mode);}}var ao=localStorage.getItem('homepage:accent');if(ao){var a=JSON.parse(ao);if(a&&a.from){s.setProperty('--accent-from',a.from);s.setProperty('--accent-to',a.to);}}var dz=localStorage.getItem('homepage:design');var design=['glass','aero','flat','soft','minimal','bold','cyber'].indexOf(dz)>=0?dz:dt.design;if(design!=='glass'){document.documentElement.classList.add('design-'+design);}}catch(e){}})();`;
 
   return (
     <html lang="en" className={`${jakarta.variable} h-full`}>
@@ -63,7 +61,7 @@ export default async function RootLayout({
         </div>
         <PrefsProvider
           weatherEnabled={weather.enabled}
-          accent={{ from, to }}
+          defaultTheme={defaultTheme}
           defaults={{
             timezone: settings.timezone || "UTC",
             latitude: weather.latitude,
