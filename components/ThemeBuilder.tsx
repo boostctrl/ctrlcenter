@@ -37,6 +37,8 @@ function readVar(name: string, fallback: string): string {
 
 export default function ThemeBuilder() {
   const {
+    theme,
+    setTheme,
     design,
     setDesign,
     customThemes,
@@ -88,6 +90,24 @@ export default function ThemeBuilder() {
           Pick a design and a palette, then tweak the colors — changes apply
           live. Pick an accent on its own to recolor without touching the rest.
         </p>
+      </div>
+
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-fg/50">Mode</span>
+        <div className="flex overflow-hidden rounded-lg border border-fg/10">
+          {(["system", "light", "dark"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTheme(t)}
+              className={`px-3 py-1.5 text-xs capitalize transition-colors ${
+                theme === t ? "bg-fg/15 text-fg" : "text-fg/50 hover:text-fg/80"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="space-y-2">

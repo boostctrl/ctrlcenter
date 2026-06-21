@@ -12,6 +12,13 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- The light/dark/system **mode** selector moved into the theme builder, next to
+  the design and color controls. (#17)
+- The **admin portal** link moved into the settings panel footer instead of a
+  separate card below it. (#16)
+
 ### Fixed
 
 - **"Use my location"** now works: the `Permissions-Policy` header was disabling

@@ -30,14 +30,6 @@ export default function SettingsPage() {
           <ThemeBuilder />
         </div>
       </div>
-
-      <Link
-        href="/admin"
-        className="glass-card flex items-center justify-between p-4 text-sm text-fg/70 transition-colors hover:text-fg"
-      >
-        Admin portal
-        <span aria-hidden>→</span>
-      </Link>
     </main>
   );
 }

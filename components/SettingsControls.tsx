@@ -1,11 +1,13 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import { useVisitorPrefs } from "./PrefsProvider";
 import { supportedTimezones } from "@/lib/prefs";
 
-// The per-visitor preference controls (theme, time zone, weather location/units,
-// reset). Rendered on the /settings page; reads/writes the shared PrefsProvider.
+// The per-visitor preference controls (greeting name, time zone, weather
+// location/units, reset) plus the admin link. Theme/design live in the theme
+// builder. Rendered on the /settings page; reads/writes the shared PrefsProvider.
 export default function SettingsControls() {
   const {
     timezone,
@@ -15,12 +17,10 @@ export default function SettingsControls() {
     locationError,
     weatherEnabled,
     greetingName,
-    theme,
     setTimezone,
     setUnits,
     setGreetingName,
     useMyLocation,
-    setTheme,
     reset,
   } = useVisitorPrefs();
   const zones = useMemo(() => supportedTimezones(), []);
@@ -46,24 +46,6 @@ export default function SettingsControls() {
           className="accent-focus w-full rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-fg outline-none transition-colors"
         />
         <p className="text-xs text-fg/40">Shown as “Good evening, {greetingName || "…"}!”</p>
-      </div>
-
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-fg/50">Theme</span>
-        <div className="flex overflow-hidden rounded-lg border border-fg/10">
-          {(["system", "light", "dark"] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTheme(t)}
-              className={`px-3 py-1.5 text-xs capitalize transition-colors ${
-                theme === t ? "bg-fg/15 text-fg" : "text-fg/50 hover:text-fg/80"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
       </div>
 
       <div className="space-y-1.5">
@@ -124,13 +106,21 @@ export default function SettingsControls() {
         </>
       )}
 
-      <button
-        type="button"
-        onClick={reset}
-        className="text-xs text-fg/40 underline transition-colors hover:text-fg/70"
-      >
-        Reset to site default
-      </button>
+      <div className="flex items-center justify-between gap-2 border-t border-fg/10 pt-4">
+        <button
+          type="button"
+          onClick={reset}
+          className="text-xs text-fg/40 underline transition-colors hover:text-fg/70"
+        >
+          Reset to site default
+        </button>
+        <Link
+          href="/admin"
+          className="text-sm text-fg/60 transition-colors hover:text-fg"
+        >
+          Admin portal <span aria-hidden>→</span>
+        </Link>
+      </div>
     </div>
   );
 }
