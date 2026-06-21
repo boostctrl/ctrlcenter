@@ -241,21 +241,48 @@ export default function SettingsManager({
           </label>
           {customColors && (
             <>
-              <div className="flex overflow-hidden self-start rounded-lg border border-fg/10">
-                {(["dark", "light"] as const).map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => setColorMode(m)}
-                    className={`px-3 py-1 text-xs capitalize transition-colors ${
-                      colorMode === m
-                        ? "bg-fg/15 text-fg"
-                        : "text-fg/50 hover:text-fg/80"
-                    }`}
-                  >
-                    {m}
-                  </button>
-                ))}
+              {/* Live preview chips: each shows that mode's surface + text, so
+                  both pairs are visible at a glance and it's clear which one the
+                  pickers below edit. */}
+              <div className="grid grid-cols-2 gap-2">
+                {(["dark", "light"] as const).map((m) => {
+                  const bg =
+                    m === "light"
+                      ? theme.backgroundLight ?? "#eceef3"
+                      : theme.background ?? "#06070d";
+                  const fg =
+                    m === "light"
+                      ? theme.foregroundLight ?? "#181b24"
+                      : theme.foreground ?? "#f4f4f6";
+                  const selected = colorMode === m;
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setColorMode(m)}
+                      aria-pressed={selected}
+                      className={`flex items-center gap-2 rounded-lg border p-1.5 text-left transition-colors ${
+                        selected
+                          ? "border-fg/40"
+                          : "border-fg/10 hover:border-fg/25"
+                      }`}
+                    >
+                      <span
+                        className="flex h-8 w-10 items-center justify-center rounded-md ring-1 ring-fg/10"
+                        style={{ background: bg, color: fg }}
+                      >
+                        <span className="text-xs font-semibold">Aa</span>
+                      </span>
+                      <span
+                        className={`text-xs capitalize ${
+                          selected ? "text-fg/90" : "text-fg/55"
+                        }`}
+                      >
+                        {m}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <label className="flex items-center gap-2 text-sm">
@@ -279,6 +306,10 @@ export default function SettingsManager({
                   <span className="text-fg/60">Text &amp; surfaces</span>
                 </label>
               </div>
+              <p className="text-xs text-fg/40">
+                Editing the <span className="text-fg/60">{colorMode}</span> pair —
+                the accent above is shared across both.
+              </p>
             </>
           )}
         </div>
