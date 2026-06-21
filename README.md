@@ -41,6 +41,7 @@ Features:
 | `ADMIN_PASSWORD` | yes      | Bootstrap password for the `/admin` UI. Once you set a password from **Settings → Change password**, login uses that instead — but keep this set (or set `SESSION_SECRET`), as it's also used to sign sessions. |
 | `SESSION_SECRET` | no       | Secret used to sign session cookies. If unset, the key is derived from `ADMIN_PASSWORD`. Recommended so sessions don't depend on the password. Generate one with `openssl rand -base64 32`. |
 | `CONFIG_PATH`    | no       | Path to the config file (defaults to `./config/config.yaml`; the container sets `/config/config.yaml`).                                           |
+| `TRUSTED_PROXY_HOPS` | no   | Number of trusted reverse proxies in front of the app, used to find the real client IP in `X-Forwarded-For` for login throttling. Defaults to `1` (one proxy). Set to `0` if the app is exposed directly so a forged header can't bypass the limit. |
 
 Your data lives in `./config/config.yaml`, bind-mounted into the container.
 You can edit it by hand (changes are picked up on the next page load — no
