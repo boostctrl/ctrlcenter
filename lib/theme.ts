@@ -20,6 +20,37 @@ export function accentColors(accent: Accent) {
   return ACCENTS[accent] ?? ACCENTS.violet;
 }
 
+// Designs change the look-and-feel of the shared surface (rounding, blur,
+// borders, shadows, background glow) via CSS tokens — see app/globals.css. They
+// are independent of the colors, so any design works with any palette. "glass"
+// is the default and has no class (the :root tokens).
+export type DesignId =
+  | "glass"
+  | "aero"
+  | "flat"
+  | "soft"
+  | "minimal"
+  | "bold"
+  | "cyber";
+
+export const DESIGNS: { id: DesignId; name: string; description: string }[] = [
+  { id: "glass", name: "Glass", description: "Frosted and blurred (default)" },
+  { id: "aero", name: "Aero", description: "Glossy translucent sheen" },
+  { id: "flat", name: "Flat", description: "Solid surfaces, clean edges" },
+  { id: "soft", name: "Soft", description: "Rounded, softly elevated" },
+  { id: "minimal", name: "Minimal", description: "Barely-there hairlines" },
+  { id: "bold", name: "Bold", description: "Sharp, high-contrast" },
+  { id: "cyber", name: "Cyber", description: "Neon, techy glow" },
+];
+
+export const DESIGN_IDS = DESIGNS.map((d) => d.id) as DesignId[];
+
+export const DEFAULT_DESIGN: DesignId = "glass";
+
+export function isDesignId(v: unknown): v is DesignId {
+  return typeof v === "string" && (DESIGN_IDS as string[]).includes(v);
+}
+
 // Preset full themes for the theme builder — starting points a visitor can
 // apply with one tap and then tweak. Each is the four colors that drive the
 // custom-theme CSS variables (page background, ink/foreground, accent pair).

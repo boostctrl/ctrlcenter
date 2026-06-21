@@ -2,6 +2,8 @@
 // defaults (timezone, weather location/units) for a single visitor's browser
 // only — nothing is written to the server, so any visitor can correct their own
 // view without auth and without affecting anyone else.
+import { DEFAULT_DESIGN, isDesignId, type DesignId } from "./theme";
+
 export type Units = "imperial" | "metric";
 
 export type VisitorLocation = {
@@ -234,6 +236,34 @@ export function saveAccentOverride(accent: AccentColors | null): void {
       window.localStorage.setItem(ACCENT_KEY, JSON.stringify(accent));
     } else {
       window.localStorage.removeItem(ACCENT_KEY);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+// --- Design ---
+// The look-and-feel preset (Glass, Flat, Bold, …). Per-visitor; applied as a
+// `design-<id>` class on <html>. See lib/theme.ts for the catalog.
+export const DESIGN_KEY = "homepage:design";
+
+export function loadDesign(): DesignId {
+  if (typeof window === "undefined") return DEFAULT_DESIGN;
+  try {
+    const raw = window.localStorage.getItem(DESIGN_KEY);
+    return isDesignId(raw) ? raw : DEFAULT_DESIGN;
+  } catch {
+    return DEFAULT_DESIGN;
+  }
+}
+
+export function saveDesign(design: DesignId): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (design === DEFAULT_DESIGN) {
+      window.localStorage.removeItem(DESIGN_KEY);
+    } else {
+      window.localStorage.setItem(DESIGN_KEY, design);
     }
   } catch {
     // ignore

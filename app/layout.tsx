@@ -37,7 +37,7 @@ export default async function RootLayout({
     from
   )});s.setProperty('--accent-to',${JSON.stringify(
     to
-  )});var ct=localStorage.getItem('homepage:activeTheme');var c=null;if(ct){try{c=JSON.parse(ct);}catch(e){}}if(c&&c.background){s.setProperty('--background',c.background);s.setProperty('--foreground',c.foreground);s.setProperty('--fg',c.foreground);s.setProperty('--accent-from',c.accentFrom);s.setProperty('--accent-to',c.accentTo);}else{var t=localStorage.getItem('homepage:theme')||'system';var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(!d)document.documentElement.classList.add('theme-light');}var ao=localStorage.getItem('homepage:accent');if(ao){var a=JSON.parse(ao);if(a&&a.from){s.setProperty('--accent-from',a.from);s.setProperty('--accent-to',a.to);}}}catch(e){}})();`;
+  )});var ct=localStorage.getItem('homepage:activeTheme');var c=null;if(ct){try{c=JSON.parse(ct);}catch(e){}}if(c&&c.background){s.setProperty('--background',c.background);s.setProperty('--foreground',c.foreground);s.setProperty('--fg',c.foreground);s.setProperty('--accent-from',c.accentFrom);s.setProperty('--accent-to',c.accentTo);}else{var t=localStorage.getItem('homepage:theme')||'system';var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(!d)document.documentElement.classList.add('theme-light');}var ao=localStorage.getItem('homepage:accent');if(ao){var a=JSON.parse(ao);if(a&&a.from){s.setProperty('--accent-from',a.from);s.setProperty('--accent-to',a.to);}}var dz=localStorage.getItem('homepage:design');if(['aero','flat','soft','minimal','bold','cyber'].indexOf(dz)>=0){document.documentElement.classList.add('design-'+dz);}}catch(e){}})();`;
 
   return (
     <html lang="en" className={`${jakarta.variable} h-full`}>
@@ -46,6 +46,7 @@ export default async function RootLayout({
         <div
           aria-hidden
           className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
+          style={{ opacity: "var(--glow-opacity, 1)" }}
         >
           <div
             className="animate-float absolute -top-32 -left-32 h-96 w-96 rounded-full opacity-30 blur-3xl"

@@ -9,6 +9,126 @@
   --fg: #ffffff;
   --accent-from: #a78bfa;
   --accent-to: #22d3ee;
+
+  /* Design tokens — the `glass-card` surface and the background glow read these,
+     so a "design" (Glass, Flat, Bold, …) is just a different set of values while
+     the colors above stay in control. The defaults here are the Glass design. */
+  --surface-radius: 1rem;
+  --surface-border-width: 1px;
+  --surface-border: color-mix(in srgb, var(--fg) 10%, transparent);
+  --surface-border-hover: color-mix(in srgb, var(--fg) 20%, transparent);
+  --surface-bg: color-mix(in srgb, var(--fg) 4%, transparent);
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 7%, transparent);
+  --surface-bg-image: none;
+  --surface-blur: 24px;
+  --surface-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  --surface-shadow-hover: 0 12px 40px
+    color-mix(in srgb, var(--accent-from) 25%, transparent);
+  --surface-lift: -2px;
+  --glow-opacity: 1;
+}
+
+/* --- Designs: each overrides the surface tokens above (applied as a class on
+   <html>, or on a wrapper for the theme-builder previews). Colors are inherited,
+   so every design works with any palette. --- */
+.design-flat {
+  --surface-radius: 0.75rem;
+  --surface-border: color-mix(in srgb, var(--fg) 12%, transparent);
+  --surface-border-hover: color-mix(in srgb, var(--fg) 22%, transparent);
+  --surface-bg: color-mix(in srgb, var(--fg) 5%, var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 9%, var(--background));
+  --surface-bg-image: none;
+  --surface-blur: 0px;
+  --surface-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --surface-shadow-hover: 0 2px 6px rgba(0, 0, 0, 0.25);
+  --surface-lift: -1px;
+  --glow-opacity: 0;
+}
+
+.design-minimal {
+  --surface-radius: 0.5rem;
+  --surface-border-width: 1px;
+  --surface-border: color-mix(in srgb, var(--fg) 8%, transparent);
+  --surface-border-hover: color-mix(in srgb, var(--fg) 14%, transparent);
+  --surface-bg: transparent;
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 3%, transparent);
+  --surface-bg-image: none;
+  --surface-blur: 0px;
+  --surface-shadow: none;
+  --surface-shadow-hover: none;
+  --surface-lift: 0px;
+  --glow-opacity: 0;
+}
+
+.design-bold {
+  --surface-radius: 0px;
+  --surface-border-width: 2px;
+  --surface-border: color-mix(in srgb, var(--fg) 85%, transparent);
+  --surface-border-hover: var(--accent-from);
+  --surface-bg: color-mix(in srgb, var(--fg) 5%, var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 8%, var(--background));
+  --surface-bg-image: none;
+  --surface-blur: 0px;
+  --surface-shadow: 5px 5px 0 0 var(--accent-from);
+  --surface-shadow-hover: 7px 7px 0 0 var(--accent-from);
+  --surface-lift: -1px;
+  --glow-opacity: 0;
+}
+
+.design-soft {
+  --surface-radius: 1.5rem;
+  --surface-border-width: 0px;
+  --surface-border: transparent;
+  --surface-border-hover: transparent;
+  --surface-bg: color-mix(in srgb, var(--fg) 6%, var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 9%, var(--background));
+  --surface-bg-image: none;
+  --surface-blur: 0px;
+  --surface-shadow: 0 10px 30px rgba(0, 0, 0, 0.22), 0 2px 8px rgba(0, 0, 0, 0.14);
+  --surface-shadow-hover: 0 16px 40px rgba(0, 0, 0, 0.28),
+    0 4px 12px rgba(0, 0, 0, 0.18);
+  --surface-lift: -3px;
+  --glow-opacity: 0.4;
+}
+
+.design-cyber {
+  --surface-radius: 0.25rem;
+  --surface-border-width: 1px;
+  --surface-border: color-mix(in srgb, var(--accent-from) 45%, transparent);
+  --surface-border-hover: color-mix(in srgb, var(--accent-to) 70%, transparent);
+  --surface-bg: color-mix(in srgb, var(--accent-from) 7%, var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--accent-from) 11%, var(--background));
+  --surface-bg-image: none;
+  --surface-blur: 0px;
+  --surface-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-from) 15%, transparent),
+    0 0 18px color-mix(in srgb, var(--accent-from) 18%, transparent);
+  --surface-shadow-hover: 0 0 0 1px
+      color-mix(in srgb, var(--accent-to) 25%, transparent),
+    0 0 26px color-mix(in srgb, var(--accent-to) 28%, transparent);
+  --surface-lift: 0px;
+  --glow-opacity: 0.8;
+}
+
+.design-aero {
+  --surface-radius: 0.75rem;
+  --surface-border-width: 1px;
+  --surface-border: color-mix(in srgb, var(--fg) 30%, transparent);
+  --surface-border-hover: color-mix(in srgb, var(--fg) 45%, transparent);
+  --surface-bg: color-mix(in srgb, var(--fg) 6%, transparent);
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 9%, transparent);
+  --surface-bg-image: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--fg) 16%, transparent),
+    color-mix(in srgb, var(--fg) 2%, transparent) 55%,
+    color-mix(in srgb, var(--fg) 6%, transparent)
+  );
+  --surface-blur: 16px;
+  --surface-shadow: 0 8px 24px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 color-mix(in srgb, var(--fg) 45%, transparent);
+  --surface-shadow-hover: 0 10px 28px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 color-mix(in srgb, var(--fg) 55%, transparent);
+  --surface-lift: -2px;
+  --glow-opacity: 0.7;
 }
 
 /* Light theme: toggled by adding `.theme-light` to <html>. */
@@ -37,11 +157,25 @@ body {
 }
 
 @layer utilities {
+  /* The shared surface. Every visual value is a design token (see :root and the
+     .design-* classes) so the active design restyles it without touching the
+     colors. */
   .glass-card {
-    @apply relative rounded-2xl border border-fg/10 bg-fg/[0.04] shadow-[0_8px_30px_rgba(0,0,0,0.35)] backdrop-blur-xl transition-all duration-300;
+    position: relative;
+    border-radius: var(--surface-radius);
+    border: var(--surface-border-width) solid var(--surface-border);
+    background-color: var(--surface-bg);
+    background-image: var(--surface-bg-image);
+    box-shadow: var(--surface-shadow);
+    -webkit-backdrop-filter: blur(var(--surface-blur));
+    backdrop-filter: blur(var(--surface-blur));
+    transition: all 0.3s ease;
   }
   .glass-card:hover {
-    @apply -translate-y-0.5 border-fg/20 bg-fg/[0.07] shadow-[0_12px_40px_rgba(139,92,246,0.25)];
+    transform: translateY(var(--surface-lift));
+    border-color: var(--surface-border-hover);
+    background-color: var(--surface-bg-hover);
+    box-shadow: var(--surface-shadow-hover);
   }
   .gradient-text {
     background-image: linear-gradient(135deg, var(--accent-from), var(--accent-to));

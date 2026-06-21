@@ -19,6 +19,8 @@ import {
   saveThemes,
   loadAccentOverride,
   saveAccentOverride,
+  loadDesign,
+  saveDesign,
   type Units,
   type VisitorLocation,
   type VisitorPrefs,
@@ -26,6 +28,7 @@ import {
   type CustomTheme,
   type AccentColors,
 } from "@/lib/prefs";
+import { DESIGN_IDS, type DesignId } from "@/lib/theme";
 
 export type Theme = "system" | "light" | "dark";
 export const THEME_KEY = "homepage:theme";
@@ -47,6 +50,15 @@ function applyAccent(accent: Accent): void {
   const s = document.documentElement.style;
   s.setProperty("--accent-from", accent.from);
   s.setProperty("--accent-to", accent.to);
+}
+
+// Swap the active design class on <html>. The default ("glass") uses the :root
+// tokens and carries no class.
+function applyDesign(design: DesignId): void {
+  if (typeof document === "undefined") return;
+  const el = document.documentElement;
+  DESIGN_IDS.forEach((d) => el.classList.remove(`design-${d}`));
+  if (design !== "glass") el.classList.add(`design-${design}`);
 }
 
 // Resolve the effective accent: an explicit per-visitor override wins, then a
@@ -102,6 +114,7 @@ type PrefsValue = {
   weatherEnabled: boolean;
   greetingName: string;
   theme: Theme;
+  design: DesignId;
   customThemes: CustomTheme[];
   activeColors: ThemeColors | null;
   accentOverride: AccentColors | null;
@@ -111,6 +124,7 @@ type PrefsValue = {
   setGreetingName: (name: string) => void;
   useMyLocation: () => void;
   setTheme: (theme: Theme) => void;
+  setDesign: (design: DesignId) => void;
   applyThemeColors: (colors: ThemeColors) => void;
   setBaseColors: (background: string, foreground: string) => void;
   setAccentOverride: (accent: AccentColors | null) => void;
@@ -153,6 +167,7 @@ export function PrefsProvider({
   const [detectedTz, setDetectedTz] = useState<string | undefined>();
   const [detecting, setDetecting] = useState(false);
   const [theme, setThemeState] = useState<Theme>("system");
+  const [design, setDesignState] = useState<DesignId>("glass");
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([]);
   const [activeColors, setActiveColors] = useState<ThemeColors | null>(null);
   const [accentOverride, setAccentOverrideState] =
@@ -179,6 +194,12 @@ export function PrefsProvider({
     },
     [accent, accentOverride]
   );
+
+  const setDesign = useCallback((next: DesignId) => {
+    setDesignState(next);
+    saveDesign(next);
+    applyDesign(next);
+  }, []);
 
   // Apply (and persist) a full custom theme — base presets and saved themes.
   // The theme carries its own accent, so any standalone accent override is
@@ -277,19 +298,22 @@ export function PrefsProvider({
     }
     const active = loadActiveTheme();
     const overrideAccent = loadAccentOverride();
+    const storedDesign = loadDesign();
     /* eslint-disable react-hooks/set-state-in-effect */
     setThemeState(stored);
+    setDesignState(storedDesign);
     setActiveColors(active);
     setAccentOverrideState(overrideAccent);
     setCustomThemes(loadThemes());
     /* eslint-enable react-hooks/set-state-in-effect */
-    // The inline script already applied this; re-apply for consistency.
+    // The inline script already applied these; re-apply for consistency.
     applyAll({
       theme: stored,
       colors: active,
       accentOverride: overrideAccent,
       defaultAccent: accent,
     });
+    applyDesign(storedDesign);
 
     // Re-apply on OS scheme change (only "system" mode tracks it; a custom
     // theme defines its own colors and ignores the OS).
@@ -423,6 +447,7 @@ export function PrefsProvider({
       weatherEnabled,
       greetingName: prefs.greetingName ?? "",
       theme,
+      design,
       customThemes,
       activeColors,
       accentOverride,
@@ -432,6 +457,7 @@ export function PrefsProvider({
       setGreetingName,
       useMyLocation,
       setTheme,
+      setDesign,
       applyThemeColors,
       setBaseColors,
       setAccentOverride,
@@ -449,6 +475,7 @@ export function PrefsProvider({
     weatherEnabled,
     accent,
     theme,
+    design,
     customThemes,
     activeColors,
     accentOverride,
@@ -457,6 +484,7 @@ export function PrefsProvider({
     setGreetingName,
     useMyLocation,
     setTheme,
+    setDesign,
     applyThemeColors,
     setBaseColors,
     setAccentOverride,

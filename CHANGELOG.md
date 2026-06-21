@@ -12,8 +12,18 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Designs** in the theme builder: choose a look-and-feel — **Glass** (default),
+  **Aero**, **Flat**, **Soft**, **Minimal**, **Bold**, or **Cyber**. A design
+  restyles every surface (rounding, blur, borders, shadows, background glow)
+  while your colors keep applying on top, and it's applied before first paint
+  (no flash). Per-visitor.
+
 ### Changed
 
+- The theme builder's color presets (Midnight, Paper, Nord, …) are now a
+  separate **Palettes** row, distinct from the new design picker.
 - **Accent is now controlled only in the theme builder** (per-visitor), with a
   clearer UI: a live gradient preview bar, the curated preset swatches, and
   plainly labelled **Start** / **End** custom color pickers. The admin accent

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useVisitorPrefs } from "./PrefsProvider";
-import { ACCENTS, ACCENT_KEYS, BASE_THEMES } from "@/lib/theme";
+import { ACCENTS, ACCENT_KEYS, BASE_THEMES, DESIGNS } from "@/lib/theme";
 import type { ThemeColors } from "@/lib/prefs";
 
 const DEFAULT_DRAFT: ThemeColors = {
@@ -32,6 +32,8 @@ function readVar(name: string, fallback: string): string {
 
 export default function ThemeBuilder() {
   const {
+    design,
+    setDesign,
     customThemes,
     activeColors,
     accentOverride,
@@ -78,13 +80,55 @@ export default function ThemeBuilder() {
       <div>
         <h2 className="font-semibold">Theme builder</h2>
         <p className="text-xs text-fg/50">
-          Start from a base theme, then tweak the colors — changes apply live.
-          Pick an accent on its own to recolor without touching the rest.
+          Pick a design and a palette, then tweak the colors — changes apply
+          live. Pick an accent on its own to recolor without touching the rest.
         </p>
       </div>
 
       <div className="space-y-2">
-        <span className="text-xs text-fg/50">Base themes</span>
+        <span className="text-xs text-fg/50">Design</span>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {DESIGNS.map((d) => {
+            const selected = design === d.id;
+            return (
+              <button
+                key={d.id}
+                type="button"
+                onClick={() => setDesign(d.id)}
+                aria-pressed={selected}
+                className={`group flex flex-col gap-1.5 rounded-lg border p-2 text-left transition-colors ${
+                  selected ? "border-fg/40" : "border-fg/10 hover:border-fg/30"
+                }`}
+                title={d.description}
+              >
+                <span
+                  className={`block ${d.id === "glass" ? "" : `design-${d.id}`}`}
+                >
+                  <span className="glass-card flex h-9 w-full items-center justify-center">
+                    <span
+                      className="h-1.5 w-9 rounded-full"
+                      style={{
+                        backgroundImage: `linear-gradient(to right, ${activeAccent.from}, ${activeAccent.to})`,
+                      }}
+                      aria-hidden
+                    />
+                  </span>
+                </span>
+                <span
+                  className={`truncate text-xs ${
+                    selected ? "text-fg/90" : "text-fg/60 group-hover:text-fg/90"
+                  }`}
+                >
+                  {d.name}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <span className="text-xs text-fg/50">Palettes</span>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {BASE_THEMES.map((t) => (
             <button
