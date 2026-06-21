@@ -53,6 +53,9 @@ export const settingsSchema = z.object({
   // When on, the dashboard polls /api/status to show per-app online/offline
   // dots. Off by default since it makes the server ping every app URL.
   statusChecks: z.boolean().default(false),
+  // Explicit display order for bookmark categories; categories not listed fall
+  // back to first-seen order. Stale names are ignored at render time.
+  bookmarkCategoryOrder: z.array(z.string()).default([]),
   search: searchSchema.default(searchSchema.parse({})),
   weather: weatherSchema.default(weatherSchema.parse({})),
 });
@@ -153,6 +156,7 @@ export const settingsInputSchema = z.object({
   timezone: z.string().optional(),
   theme: themeInputSchema.optional(),
   statusChecks: z.boolean().optional(),
+  bookmarkCategoryOrder: z.array(z.string()).optional(),
   search: searchUpdateSchema.optional(),
   weather: weatherUpdateSchema.optional(),
 });

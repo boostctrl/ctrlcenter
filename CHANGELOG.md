@@ -17,6 +17,8 @@ here.
 - **Admin-configurable favicon** (Admin → Settings → General): set the
   browser-tab icon to a dashboard-icons slug, a bundled local icon, or an image
   URL — using the same icon picker as apps/bookmarks. (#15)
+- **Sortable bookmark categories**: reorder categories from the admin Bookmarks
+  tab (move buttons on each category); the dashboard honors the saved order. (#20)
 
 ### Changed
 

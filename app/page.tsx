@@ -18,6 +18,7 @@ export default async function HomePage() {
         bookmarks={bookmarks}
         statusEnabled={settings.statusChecks}
         search={settings.search}
+        categoryOrder={settings.bookmarkCategoryOrder}
       />
 
       <FloatingSettings />

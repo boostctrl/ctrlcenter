@@ -140,7 +140,12 @@ function AdminBody({ initialApps, initialBookmarks, initialSettings }: Props) {
       </div>
 
       {tab === "apps" && <AppsManager initialApps={initialApps} />}
-      {tab === "bookmarks" && <BookmarksManager initialBookmarks={initialBookmarks} />}
+      {tab === "bookmarks" && (
+        <BookmarksManager
+          initialBookmarks={initialBookmarks}
+          initialCategoryOrder={initialSettings.bookmarkCategoryOrder}
+        />
+      )}
       {tab === "settings" && (
         <div className="space-y-8">
           <SettingsManager initialSettings={initialSettings} />

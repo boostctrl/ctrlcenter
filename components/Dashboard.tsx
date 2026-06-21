@@ -6,6 +6,7 @@ import AppCard from "./AppCard";
 import BookmarkGroup from "./BookmarkGroup";
 import { StatusProvider } from "./StatusProvider";
 import { buildSearchUrl, engineLabel, type SearchConfig } from "@/lib/search";
+import { orderCategories } from "@/lib/bookmarks";
 import type { AppItem, BookmarkItem } from "@/lib/schema";
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -16,14 +17,20 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-function groupBookmarks(bookmarks: BookmarkItem[]): [string, BookmarkItem[]][] {
+function groupBookmarks(
+  bookmarks: BookmarkItem[],
+  categoryOrder: string[]
+): [string, BookmarkItem[]][] {
   const map = new Map<string, BookmarkItem[]>();
   for (const bookmark of bookmarks) {
     const list = map.get(bookmark.category) ?? [];
     list.push(bookmark);
     map.set(bookmark.category, list);
   }
-  return Array.from(map.entries());
+  return orderCategories(Array.from(map.keys()), categoryOrder).map((c) => [
+    c,
+    map.get(c)!,
+  ]);
 }
 
 export default function Dashboard({
@@ -31,11 +38,13 @@ export default function Dashboard({
   bookmarks,
   statusEnabled = false,
   search,
+  categoryOrder = [],
 }: {
   apps: AppItem[];
   bookmarks: BookmarkItem[];
   statusEnabled?: boolean;
   search: SearchConfig;
+  categoryOrder?: string[];
 }) {
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -76,8 +85,8 @@ export default function Dashboard({
       : bookmarks.filter((b) =>
           [b.name, b.category, b.url].some((f) => f.toLowerCase().includes(q))
         );
-    return groupBookmarks(matches);
-  }, [bookmarks, q]);
+    return groupBookmarks(matches, categoryOrder);
+  }, [bookmarks, q, categoryOrder]);
 
   const hasContent = apps.length > 0 || bookmarks.length > 0;
   const hasResults = filteredApps.length > 0 || filteredGroups.length > 0;

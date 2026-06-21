@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import type { BookmarkItem } from "@/lib/schema";
+import { orderCategories } from "@/lib/bookmarks";
 import Icon from "@/components/Icon";
 import { TextField, Button, MoveButtons } from "./ui";
 import IconField from "./IconField";
@@ -12,22 +13,15 @@ import { apiErrorMessage } from "./apiError";
 type FormState = { name: string; category: string; url: string; icon: string };
 const emptyForm: FormState = { name: "", category: "", url: "", icon: "" };
 
-function groupByCategory(items: BookmarkItem[]): [string, BookmarkItem[]][] {
-  const map = new Map<string, BookmarkItem[]>();
-  for (const b of items) {
-    const list = map.get(b.category) ?? [];
-    list.push(b);
-    map.set(b.category, list);
-  }
-  return Array.from(map.entries());
-}
-
 export default function BookmarksManager({
   initialBookmarks,
+  initialCategoryOrder,
 }: {
   initialBookmarks: BookmarkItem[];
+  initialCategoryOrder: string[];
 }) {
   const [bookmarks, setBookmarks] = useState(initialBookmarks);
+  const [categoryOrder, setCategoryOrder] = useState(initialCategoryOrder);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -118,8 +112,43 @@ export default function BookmarksManager({
     );
   }
 
-  const groups = groupByCategory(bookmarks);
-  const categories = Array.from(new Set(bookmarks.map((b) => b.category))).sort();
+  async function persistCategoryOrder(next: string[]) {
+    const previous = categoryOrder;
+    setCategoryOrder(next); // optimistic
+    const res = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookmarkCategoryOrder: next }),
+    });
+    if (!res.ok) {
+      setCategoryOrder(previous);
+      toast("Couldn't save the category order", "error");
+    }
+  }
+
+  // First-seen categories, then ordered by the saved order.
+  const present: string[] = [];
+  const seenCat = new Set<string>();
+  for (const b of bookmarks) {
+    if (!seenCat.has(b.category)) {
+      present.push(b.category);
+      seenCat.add(b.category);
+    }
+  }
+  const orderedCategories = orderCategories(present, categoryOrder);
+  const groups: [string, BookmarkItem[]][] = orderedCategories.map((c) => [
+    c,
+    bookmarks.filter((b) => b.category === c),
+  ]);
+  const categories = [...present].sort();
+
+  function moveCategory(from: number, to: number) {
+    if (to < 0 || to >= orderedCategories.length) return;
+    const next = [...orderedCategories];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    persistCategoryOrder(next);
+  }
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_minmax(320px,380px)]">
@@ -127,11 +156,19 @@ export default function BookmarksManager({
         {bookmarks.length === 0 && (
           <p className="text-sm text-fg/40">No bookmarks yet. Add your first one.</p>
         )}
-        {groups.map(([category, items]) => (
+        {groups.map(([category, items], catIndex) => (
           <div key={category} className="space-y-2">
-            <h3 className="text-xs font-semibold tracking-[0.18em] text-fg/50 uppercase">
-              {category}
-            </h3>
+            <div className="flex items-center gap-2">
+              <MoveButtons
+                index={catIndex}
+                count={groups.length}
+                label={`category ${category}`}
+                onMove={moveCategory}
+              />
+              <h3 className="text-xs font-semibold tracking-[0.18em] text-fg/50 uppercase">
+                {category}
+              </h3>
+            </div>
             {items.map((bookmark, index) => (
               <div
                 key={bookmark.id}
