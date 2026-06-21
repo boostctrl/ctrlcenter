@@ -93,10 +93,16 @@ bookmarks:
 ### Icons
 
 Set `icon` to a slug from the [dashboard-icons](https://github.com/homarr-labs/dashboard-icons)
-set (e.g. `plex`, `nextcloud`, `youtube`) and it's resolved automatically. If
-a slug isn't in that set, paste a direct image URL instead — anything
-starting with `http://` or `https://` is used as-is. The admin UI shows a
-live icon preview as you type.
+set (e.g. `plex`, `nextcloud`, `youtube`) and it's resolved automatically;
+icons that ship light/dark variants automatically use the legible one for the
+active theme. If a slug isn't in that set, paste a direct image URL instead —
+anything starting with `http://` or `https://` is used as-is. The admin UI
+shows a live icon preview as you type.
+
+A few logos the CDN doesn't carry (e.g. `rockauto`, plus `car`, `tire`,
+`car-battery`, `steering-wheel`) are **bundled with the app** and selectable
+like any other. To add your own: drop `<slug>.svg` into `public/icons/` and add
+the slug to `LOCAL_ICONS` in `lib/icons.ts`.
 
 ## Local development
 

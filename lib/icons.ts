@@ -7,6 +7,24 @@
 const ICON_CDN_BASE =
   "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@main/svg";
 
+// Icons bundled with the app (served from /public/icons), for logos the CDN
+// doesn't carry — e.g. automotive sites. To add one: drop `<slug>.svg` in
+// public/icons and add its slug here so it resolves and shows in the picker.
+// These are self-contained (own colors) so they read on any theme.
+export const LOCAL_ICONS = [
+  "rockauto",
+  "car",
+  "tire",
+  "car-battery",
+  "steering-wheel",
+] as const;
+
+const LOCAL_ICON_BASE = "/icons";
+
+function isLocalIcon(slug: string): boolean {
+  return (LOCAL_ICONS as readonly string[]).includes(slug);
+}
+
 // Lightweight index of every available icon slug (the repo's tree.json lists
 // the svg filenames). Fetched once and cached for the admin icon browser.
 const ICON_TREE_URL =
@@ -41,14 +59,14 @@ export async function fetchIconSlugs(): Promise<string[]> {
   if (!res.ok) throw new Error("Failed to load icon list");
   const tree = await res.json();
   const svg: unknown = tree?.svg;
-  const slugs = Array.isArray(svg)
+  const cdn = Array.isArray(svg)
     ? svg
         .filter((f): f is string => typeof f === "string")
         .map((f) => f.replace(/\.svg$/, ""))
-        .sort()
     : [];
-  cachedSlugs = slugs;
-  return slugs;
+  // Bundled local icons sit alongside the CDN set in the picker.
+  cachedSlugs = Array.from(new Set([...LOCAL_ICONS, ...cdn])).sort();
+  return cachedSlugs;
 }
 
 export function isCustomIconUrl(icon: string): boolean {
@@ -59,7 +77,9 @@ export function resolveIconUrl(icon: string): string | null {
   const trimmed = icon.trim();
   if (!trimmed) return null;
   if (isCustomIconUrl(trimmed)) return trimmed;
-  return `${ICON_CDN_BASE}/${slugify(trimmed)}.svg`;
+  const slug = slugify(trimmed);
+  if (isLocalIcon(slug)) return `${LOCAL_ICON_BASE}/${slug}.svg`;
+  return `${ICON_CDN_BASE}/${slug}.svg`;
 }
 
 // Like resolveIconUrl, but picks the icon's themed variant for the current
@@ -76,6 +96,7 @@ export function resolveThemedIconUrl(
   if (!trimmed) return null;
   if (isCustomIconUrl(trimmed)) return trimmed;
   const slug = slugify(trimmed);
+  if (isLocalIcon(slug)) return `${LOCAL_ICON_BASE}/${slug}.svg`;
   const variant = metadata[slug]?.colors?.[surfaceIsLight ? "dark" : "light"];
   return `${ICON_CDN_BASE}/${variant || slug}.svg`;
 }

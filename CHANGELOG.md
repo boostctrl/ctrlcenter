@@ -14,6 +14,10 @@ here.
 
 ### Added
 
+- **Bundled local icons** for logos the dashboard-icons CDN doesn't carry —
+  `rockauto` plus `car`, `tire`, `car-battery`, and `steering-wheel`. They're
+  selectable like any other icon; add more by dropping an SVG in `public/icons/`
+  and listing its slug in `LOCAL_ICONS`.
 - **Theme-aware icons**: app/bookmark icons that ship light/dark variants now
   use the one that stays legible on the current surface (so a near-white logo no
   longer disappears on a light theme, and vice-versa), including custom themes

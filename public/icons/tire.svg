@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="Tire">
+  <rect width="48" height="48" rx="10" fill="#475569"/>
+  <circle cx="24" cy="24" r="13" fill="#ffffff"/>
+  <circle cx="24" cy="24" r="7" fill="#475569"/>
+  <circle cx="24" cy="24" r="2.5" fill="#ffffff"/>
+  <g fill="#475569">
+    <rect x="23" y="9.5" width="2" height="3"/>
+    <rect x="23" y="35.5" width="2" height="3"/>
+    <rect x="9.5" y="23" width="3" height="2"/>
+    <rect x="35.5" y="23" width="3" height="2"/>
+  </g>
+</svg>
