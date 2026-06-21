@@ -12,6 +12,21 @@ here.
 
 ## [Unreleased]
 
+### Security
+
+- **Login rate limit** no longer trusts the client-supplied (leftmost)
+  `X-Forwarded-For`; it derives the client from the trusted-proxy hop count
+  (`TRUSTED_PROXY_HOPS`, default 1) and adds a global attempt cap so a spoofed-IP
+  flood can't bypass throttling or exhaust CPU on PBKDF2. (#4)
+- **Nonce-based CSP**: `script-src` now uses a per-request nonce +
+  `'strict-dynamic'` instead of `'unsafe-inline'`, tightening XSS protection.
+  (#5)
+- **Open redirect** after login fixed: the `?next=` target is only followed when
+  it's a same-site path. (#23)
+- **Revocable sessions**: changing the admin password now invalidates all
+  existing session tokens (even with a dedicated `SESSION_SECRET`); the admin who
+  changes it is reissued a fresh session. (#24)
+
 ## [0.5.3] - 2026-06-21
 
 ### Added
