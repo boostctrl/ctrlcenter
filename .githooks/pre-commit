@@ -1,0 +1,20 @@
+#!/bin/sh
+# Guard the release branch. Work happens on `develop`; `main` (the release
+# branch) should only ever advance by fast-forward at release time — never via a
+# direct commit. A fast-forward merge doesn't run this hook, so this only fires
+# when someone is about to commit straight onto main/master.
+#
+# Override for a genuine exception (e.g. an emergency hotfix):
+#   git commit --no-verify
+
+branch=$(git symbolic-ref --short HEAD 2>/dev/null)
+
+if [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
+  echo "✋ Refusing to commit directly to '$branch'."
+  echo "   This is the release branch — commit to 'develop' instead, and let"
+  echo "   'main' fast-forward at release time."
+  echo "   If this is intentional, re-run with:  git commit --no-verify"
+  exit 1
+fi
+
+exit 0
