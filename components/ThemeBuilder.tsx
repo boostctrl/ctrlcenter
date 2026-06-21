@@ -18,8 +18,8 @@ const BASE_FIELDS: { key: "background" | "foreground"; label: string }[] = [
 ];
 
 const ACCENT_FIELDS: { key: "accentFrom" | "accentTo"; label: string }[] = [
-  { key: "accentFrom", label: "Accent start" },
-  { key: "accentTo", label: "Accent end" },
+  { key: "accentFrom", label: "Start" },
+  { key: "accentTo", label: "End" },
 ];
 
 function readVar(name: string, fallback: string): string {
@@ -124,8 +124,15 @@ export default function ThemeBuilder() {
         ))}
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         <span className="text-xs text-fg/50">Accent</span>
+        <div
+          className="h-9 w-full rounded-lg ring-1 ring-fg/10"
+          style={{
+            backgroundImage: `linear-gradient(to right, ${activeAccent.from}, ${activeAccent.to})`,
+          }}
+          aria-hidden
+        />
         <div className="flex flex-wrap gap-2">
           {ACCENT_KEYS.map((key) => {
             const { from, to } = ACCENTS[key];
@@ -154,7 +161,7 @@ export default function ThemeBuilder() {
                 type="color"
                 value={draft[key]}
                 onChange={(e) => updateAccent(key, e.target.value)}
-                aria-label={label}
+                aria-label={`Accent ${label.toLowerCase()}`}
                 className="h-8 w-8 shrink-0 cursor-pointer rounded border border-fg/10 bg-transparent"
               />
               <span className="text-fg/60">{label}</span>

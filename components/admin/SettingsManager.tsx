@@ -2,7 +2,6 @@
 
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import type { Settings } from "@/lib/schema";
-import { ACCENTS, ACCENT_KEYS } from "@/lib/theme";
 import {
   SEARCH_ENGINES,
   SEARCH_ENGINE_KEYS,
@@ -90,32 +89,6 @@ export default function SettingsManager({
             ))}
           </datalist>
         </label>
-      </Section>
-
-      <Section title="Appearance">
-        <div className="flex flex-col gap-2">
-          <span className="text-sm text-fg/50">Accent</span>
-          <div className="flex flex-wrap gap-2">
-            {ACCENT_KEYS.map((key) => {
-              const { from, to } = ACCENTS[key];
-              const selected = settings.accent === key;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  aria-label={key}
-                  aria-pressed={selected}
-                  title={key}
-                  onClick={() => setSettings({ ...settings, accent: key })}
-                  className={`h-8 w-8 rounded-full ring-2 ring-offset-2 ring-offset-[var(--background)] transition ${
-                    selected ? "ring-fg/80" : "ring-transparent hover:ring-fg/30"
-                  }`}
-                  style={{ backgroundImage: `linear-gradient(135deg, ${from}, ${to})` }}
-                />
-              );
-            })}
-          </div>
-        </div>
       </Section>
 
       <Section title="Dashboard">

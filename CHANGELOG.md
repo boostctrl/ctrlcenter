@@ -12,6 +12,13 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **Accent is now controlled only in the theme builder** (per-visitor), with a
+  clearer UI: a live gradient preview bar, the curated preset swatches, and
+  plainly labelled **Start** / **End** custom color pickers. The admin accent
+  picker was removed; the configured `accent` remains the site-wide default.
+
 ## [0.5.1] - 2026-06-21
 
 ### Added
