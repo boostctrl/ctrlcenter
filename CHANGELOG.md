@@ -25,6 +25,11 @@ here.
 
 ### Changed
 
+- **Designs now have distinct backdrops** that reinforce each look: Glass/Aero
+  keep the accent glow (Aero adds a top light wash), Soft a gentle ambient
+  radial, Flat a faint top wash, Bold a monochrome grid, Cyber a neon-accent
+  grid, Minimal stays clean — all driven by tokens so any palette still works.
+  (#19)
 - The light/dark/system **mode** selector moved into the theme builder, next to
   the design and color controls. (#17)
 - The **admin portal** link moved into the settings panel footer instead of a
