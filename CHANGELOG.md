@@ -14,6 +14,10 @@ here.
 
 ### Added
 
+- **Theme-aware icons**: app/bookmark icons that ship light/dark variants now
+  use the one that stays legible on the current surface (so a near-white logo no
+  longer disappears on a light theme, and vice-versa), including custom themes
+  via background luminance. Icons without variants are unchanged. (#10)
 - **Admin default theme** (Admin → Settings → Appearance): set the site-wide
   default mode (light/dark/system), design, accent gradient, and optional custom
   background/text colors. It's the baseline an un-customized visitor sees, and

@@ -1,7 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { resolveIconUrl } from "@/lib/icons";
+import { useEffect, useState } from "react";
+import {
+  loadIconMetadata,
+  resolveIconUrl,
+  resolveThemedIconUrl,
+  type IconMetadata,
+} from "@/lib/icons";
+import { useVisitorPrefs } from "./PrefsProvider";
 
 type IconProps = {
   icon: string;
@@ -10,9 +16,32 @@ type IconProps = {
   className?: string;
 };
 
+// Icon metadata (light/dark variants) is fetched once for the whole page; share
+// it across every Icon so they don't each refetch.
+let sharedMetadata: IconMetadata | null = null;
+
 export default function Icon({ icon, name, size = 28, className = "" }: IconProps) {
+  const { surfaceIsLight } = useVisitorPrefs();
+  const [metadata, setMetadata] = useState<IconMetadata | null>(sharedMetadata);
   const [failed, setFailed] = useState(false);
-  const url = resolveIconUrl(icon);
+
+  useEffect(() => {
+    if (sharedMetadata) return;
+    let active = true;
+    loadIconMetadata().then((m) => {
+      sharedMetadata = m;
+      if (active) setMetadata(m);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Prefer the variant that suits the current surface; before metadata loads (or
+  // on failure) fall back to the base icon.
+  const url = metadata
+    ? resolveThemedIconUrl(icon, metadata, surfaceIsLight)
+    : resolveIconUrl(icon);
 
   if (!url || failed) {
     return (

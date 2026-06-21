@@ -61,6 +61,18 @@ function applyDesign(design: DesignId): void {
   if (design !== "glass") el.classList.add(`design-${design}`);
 }
 
+// Perceived luminance of a #rrggbb color — used to decide whether the current
+// surface reads as light (so themed icons can pick a legible variant).
+function isLightColor(hex: string): boolean {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex.trim());
+  if (!m) return false;
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.5;
+}
+
 // Resolve the effective accent: an explicit per-visitor override wins, then a
 // full custom theme's own accent, then the admin-configured default.
 function resolveAccent(
@@ -115,6 +127,8 @@ type PrefsValue = {
   greetingName: string;
   theme: Theme;
   design: DesignId;
+  // Whether the effective background reads as light (for theme-aware icons).
+  surfaceIsLight: boolean;
   customThemes: CustomTheme[];
   activeColors: ThemeColors | null;
   accentOverride: AccentColors | null;
@@ -210,6 +224,8 @@ export function PrefsProvider({
   // Whether the visitor has explicitly picked a light/dark mode. Until they do,
   // the admin custom default colors (if any) are the baseline.
   const [modeChosen, setModeChosen] = useState(false);
+  // Tracks the OS color scheme so "system" mode resolves its surface lightness.
+  const [systemDark, setSystemDark] = useState(false);
 
   // The background/foreground layer to apply: a per-visitor custom theme wins,
   // then the admin custom default colors (only while the visitor hasn't picked a
@@ -374,6 +390,9 @@ export function PrefsProvider({
     setActiveColors(active);
     setAccentOverrideState(overrideAccent);
     setCustomThemes(loadThemes());
+    setSystemDark(
+      window.matchMedia("(prefers-color-scheme: dark)").matches
+    );
     /* eslint-enable react-hooks/set-state-in-effect */
     // The inline script already applied these; re-apply for consistency.
     applyAll({
@@ -388,6 +407,7 @@ export function PrefsProvider({
     // from the visitor or the admin default, define their own and ignore the OS).
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => {
+      setSystemDark(mq.matches);
       if (loadActiveTheme()) return;
       let raw: string | null = null;
       try {
@@ -521,6 +541,12 @@ export function PrefsProvider({
   const value = useMemo<PrefsValue>(() => {
     const timezone = prefs.timezone || detectedTz || defaults.timezone;
     const units = prefs.units || defaults.units;
+    // The effective background: a custom theme / admin custom colors define it
+    // directly; otherwise it follows the light/dark mode.
+    const baseColors = activeColors ?? (modeChosen ? null : adminColors);
+    const surfaceIsLight = baseColors
+      ? isLightColor(baseColors.background)
+      : theme === "light" || (theme === "system" && !systemDark);
     const location: EffectiveLocation = prefs.location
       ? {
           latitude: prefs.location.latitude,
@@ -542,6 +568,7 @@ export function PrefsProvider({
       greetingName: prefs.greetingName ?? "",
       theme,
       design,
+      surfaceIsLight,
       customThemes,
       activeColors,
       accentOverride,
@@ -568,8 +595,11 @@ export function PrefsProvider({
     detecting,
     weatherEnabled,
     defaultAccent,
+    adminColors,
     theme,
     design,
+    systemDark,
+    modeChosen,
     customThemes,
     activeColors,
     accentOverride,
