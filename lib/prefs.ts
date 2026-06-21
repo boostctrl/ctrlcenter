@@ -15,6 +15,9 @@ export type VisitorPrefs = {
   timezone?: string;
   units?: Units;
   location?: VisitorLocation;
+  // The "Good evening, <name>!" greeting name. Per-visitor (there is no shared
+  // server default) so each browser personalizes its own greeting.
+  greetingName?: string;
   // Set once the visitor explicitly reset to defaults, so we don't re-run the
   // automatic IP detection on subsequent loads.
   dismissedAuto?: boolean;
@@ -35,6 +38,9 @@ export function sanitizePrefs(input: unknown): VisitorPrefs {
 
   if (typeof raw.timezone === "string" && raw.timezone.length <= 100) {
     prefs.timezone = raw.timezone;
+  }
+  if (typeof raw.greetingName === "string" && raw.greetingName.trim()) {
+    prefs.greetingName = raw.greetingName.slice(0, 60);
   }
   if (raw.units === "imperial" || raw.units === "metric") {
     prefs.units = raw.units;
@@ -190,6 +196,45 @@ export function saveThemes(themes: CustomTheme[]): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(THEMES_KEY, JSON.stringify(themes));
+  } catch {
+    // ignore
+  }
+}
+
+// --- Accent override ---
+// The accent gradient can be changed on its own, independently of a full custom
+// theme: picking an accent leaves the background/foreground as-is (following the
+// light/dark mode, or a custom theme's colors). Per-visitor; overrides the
+// admin-configured default accent when present.
+export type AccentColors = { from: string; to: string };
+
+export const ACCENT_KEY = "homepage:accent";
+
+export function sanitizeAccent(input: unknown): AccentColors | null {
+  if (!input || typeof input !== "object") return null;
+  const c = input as Record<string, unknown>;
+  const ok = (v: unknown): v is string => typeof v === "string" && HEX.test(v);
+  return ok(c.from) && ok(c.to) ? { from: c.from, to: c.to } : null;
+}
+
+export function loadAccentOverride(): AccentColors | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(ACCENT_KEY);
+    return raw ? sanitizeAccent(JSON.parse(raw)) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveAccentOverride(accent: AccentColors | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (accent) {
+      window.localStorage.setItem(ACCENT_KEY, JSON.stringify(accent));
+    } else {
+      window.localStorage.removeItem(ACCENT_KEY);
+    }
   } catch {
     // ignore
   }

@@ -65,21 +65,13 @@ export default function SettingsManager({
   return (
     <form
       onSubmit={handleSubmit}
-      className="glass-card flex max-w-xl flex-col gap-6 p-6"
+      className="glass-card flex max-w-3xl flex-col gap-6 p-6"
     >
       <Section title="General">
         <TextField
           label="Page title"
           value={settings.title}
           onChange={(e) => setSettings({ ...settings, title: e.target.value })}
-        />
-        <TextField
-          label="Greeting name (optional)"
-          placeholder="e.g. Eric"
-          value={settings.greetingName}
-          onChange={(e) =>
-            setSettings({ ...settings, greetingName: e.target.value })
-          }
         />
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-fg/50">Default time zone</span>

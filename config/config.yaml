@@ -1,6 +1,5 @@
 settings:
   title: Home
-  greetingName: ''
   timezone: America/Chicago
   weather:
     enabled: true

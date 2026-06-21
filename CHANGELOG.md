@@ -12,6 +12,28 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Base themes** in the theme builder: a gallery of preset starting points
+  (Midnight, Paper, Nord, Forest, Ember, Slate, Rosé, Sand) to apply with one
+  tap and then tweak.
+- **Accent picker** in the theme builder: choose a preset or custom accent on
+  its own — the background and text colors are left as-is, so you can recolor
+  without committing to a full custom theme.
+- **Greeting name** is now a per-visitor preference, set on the **/settings**
+  page so each browser personalizes its own "Good evening, …" greeting.
+
+### Changed
+
+- The **/settings** page lays its panels out in two columns on large screens
+  (and a single column on smaller ones) instead of a narrow fixed-width column.
+- The admin **Settings** form is wider, matching the other admin sections.
+
+### Removed
+
+- The admin **Greeting name** field — the greeting name is now per-visitor (see
+  Added). Existing config values are ignored.
+
 ## [0.5.0] - 2026-06-20
 
 ### Added

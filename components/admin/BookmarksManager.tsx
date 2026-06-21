@@ -122,7 +122,7 @@ export default function BookmarksManager({
   const categories = Array.from(new Set(bookmarks.map((b) => b.category))).sort();
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
+    <div className="grid gap-8 lg:grid-cols-[1fr_minmax(320px,380px)]">
       <div className="space-y-6">
         {bookmarks.length === 0 && (
           <p className="text-sm text-fg/40">No bookmarks yet. Add your first one.</p>

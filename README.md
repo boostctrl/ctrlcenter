@@ -59,7 +59,6 @@ the host directory — no manual `chown` required.
 ```yaml
 settings:
   title: Home              # browser tab title
-  greetingName: ""         # optional, "Good evening, <name>!"
   timezone: America/Chicago # IANA timezone, used for date + greeting
   accent: violet           # violet | blue | emerald | rose | amber | cyan
   statusChecks: false      # ping app URLs and show online/offline dots

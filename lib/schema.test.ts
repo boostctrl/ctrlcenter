@@ -127,7 +127,6 @@ describe("settingsInputSchema partial merge semantics", () => {
   it("leaves omitted fields absent instead of substituting defaults", () => {
     const parsed = settingsInputSchema.parse({ title: "Only Title" });
     expect(parsed.title).toBe("Only Title");
-    expect("greetingName" in parsed).toBe(false);
     expect("timezone" in parsed).toBe(false);
     expect("weather" in parsed).toBe(false);
     expect("accent" in parsed).toBe(false);

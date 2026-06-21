@@ -20,10 +20,7 @@ export default async function Header({ settings }: { settings: Settings }) {
 
   return (
     <header className="flex flex-col items-start justify-between gap-8 sm:flex-row sm:items-center">
-      <Greeting
-        initialGreeting={initialGreeting}
-        greetingName={settings.greetingName}
-      />
+      <Greeting initialGreeting={initialGreeting} />
       <TimeWeather
         initialDate={initialDate}
         weatherEnabled={weather.enabled}

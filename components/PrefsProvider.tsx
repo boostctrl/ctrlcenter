@@ -17,17 +17,20 @@ import {
   saveActiveTheme,
   loadThemes,
   saveThemes,
+  loadAccentOverride,
+  saveAccentOverride,
   type Units,
   type VisitorLocation,
   type VisitorPrefs,
   type ThemeColors,
   type CustomTheme,
+  type AccentColors,
 } from "@/lib/prefs";
 
 export type Theme = "system" | "light" | "dark";
 export const THEME_KEY = "homepage:theme";
 
-type Accent = { from: string; to: string };
+type Accent = AccentColors;
 
 // Apply the theme by toggling `.theme-light` on <html>. Kept in sync with the
 // no-flash inline script in app/layout.tsx (which runs this same logic before
@@ -39,30 +42,49 @@ function applyTheme(theme: Theme): void {
   document.documentElement.classList.toggle("theme-light", !dark);
 }
 
-// A custom theme sets every color variable directly (so light/dark mode no
-// longer applies); `--fg` reuses the foreground "ink" color.
-function applyColors(colors: ThemeColors): void {
+function applyAccent(accent: Accent): void {
   if (typeof document === "undefined") return;
   const s = document.documentElement.style;
-  s.setProperty("--background", colors.background);
-  s.setProperty("--foreground", colors.foreground);
-  s.setProperty("--fg", colors.foreground);
-  s.setProperty("--accent-from", colors.accentFrom);
-  s.setProperty("--accent-to", colors.accentTo);
-  document.documentElement.classList.remove("theme-light");
-}
-
-// Drop the custom color overrides and fall back to the mode (light/dark),
-// restoring the admin-configured accent.
-function clearColors(accent: Accent, theme: Theme): void {
-  if (typeof document === "undefined") return;
-  const s = document.documentElement.style;
-  s.removeProperty("--background");
-  s.removeProperty("--foreground");
-  s.removeProperty("--fg");
   s.setProperty("--accent-from", accent.from);
   s.setProperty("--accent-to", accent.to);
-  applyTheme(theme);
+}
+
+// Resolve the effective accent: an explicit per-visitor override wins, then a
+// full custom theme's own accent, then the admin-configured default.
+function resolveAccent(
+  override: AccentColors | null,
+  colors: ThemeColors | null,
+  fallback: Accent
+): Accent {
+  if (override) return override;
+  if (colors) return { from: colors.accentFrom, to: colors.accentTo };
+  return fallback;
+}
+
+// Apply the whole theme state in one place. A full custom theme sets the
+// background/foreground variables (light/dark mode no longer applies);
+// otherwise we fall back to the mode. The accent is layered on top last, so an
+// accent-only override leaves the background/foreground as-is.
+function applyAll(opts: {
+  theme: Theme;
+  colors: ThemeColors | null;
+  accentOverride: AccentColors | null;
+  defaultAccent: Accent;
+}): void {
+  if (typeof document === "undefined") return;
+  const s = document.documentElement.style;
+  if (opts.colors) {
+    s.setProperty("--background", opts.colors.background);
+    s.setProperty("--foreground", opts.colors.foreground);
+    s.setProperty("--fg", opts.colors.foreground);
+    document.documentElement.classList.remove("theme-light");
+  } else {
+    s.removeProperty("--background");
+    s.removeProperty("--foreground");
+    s.removeProperty("--fg");
+    applyTheme(opts.theme);
+  }
+  applyAccent(resolveAccent(opts.accentOverride, opts.colors, opts.defaultAccent));
 }
 
 type EffectiveLocation = {
@@ -78,14 +100,20 @@ type PrefsValue = {
   location: EffectiveLocation;
   detecting: boolean;
   weatherEnabled: boolean;
+  greetingName: string;
   theme: Theme;
   customThemes: CustomTheme[];
   activeColors: ThemeColors | null;
+  accentOverride: AccentColors | null;
+  activeAccent: AccentColors;
   setTimezone: (tz: string) => void;
   setUnits: (units: Units) => void;
+  setGreetingName: (name: string) => void;
   useMyLocation: () => void;
   setTheme: (theme: Theme) => void;
-  setCustomColors: (colors: ThemeColors) => void;
+  applyThemeColors: (colors: ThemeColors) => void;
+  setBaseColors: (background: string, foreground: string) => void;
+  setAccentOverride: (accent: AccentColors | null) => void;
   saveNamedTheme: (name: string, colors: ThemeColors) => void;
   applyNamedTheme: (id: string) => void;
   deleteNamedTheme: (id: string) => void;
@@ -127,6 +155,8 @@ export function PrefsProvider({
   const [theme, setThemeState] = useState<Theme>("system");
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([]);
   const [activeColors, setActiveColors] = useState<ThemeColors | null>(null);
+  const [accentOverride, setAccentOverrideState] =
+    useState<AccentColors | null>(null);
 
   const persist = useCallback((next: VisitorPrefs) => {
     setPrefs(next);
@@ -141,21 +171,56 @@ export function PrefsProvider({
       } catch {
         // Private mode / quota — theme just won't persist.
       }
-      // Selecting a mode exits any custom theme.
+      // Selecting a mode exits any full custom theme, but keeps the visitor's
+      // accent override (it layers on top of light/dark).
       setActiveColors(null);
       saveActiveTheme(null);
-      clearColors(accent, next);
+      applyAll({ theme: next, colors: null, accentOverride, defaultAccent: accent });
     },
-    [accent]
+    [accent, accentOverride]
   );
 
-  // Apply (and persist as active) a set of custom colors — the live preview as
-  // you edit in the theme builder.
-  const setCustomColors = useCallback((colors: ThemeColors) => {
-    applyColors(colors);
-    setActiveColors(colors);
-    saveActiveTheme(colors);
-  }, []);
+  // Apply (and persist) a full custom theme — base presets and saved themes.
+  // The theme carries its own accent, so any standalone accent override is
+  // dropped in favor of it.
+  const applyThemeColors = useCallback(
+    (colors: ThemeColors) => {
+      setActiveColors(colors);
+      saveActiveTheme(colors);
+      setAccentOverrideState(null);
+      saveAccentOverride(null);
+      applyAll({ theme, colors, accentOverride: null, defaultAccent: accent });
+    },
+    [theme, accent]
+  );
+
+  // Update only the background/foreground, leaving the accent as-is (live edit
+  // from the theme builder's base-color pickers).
+  const setBaseColors = useCallback(
+    (background: string, foreground: string) => {
+      const current = resolveAccent(accentOverride, activeColors, accent);
+      const next: ThemeColors = {
+        background,
+        foreground,
+        accentFrom: current.from,
+        accentTo: current.to,
+      };
+      setActiveColors(next);
+      saveActiveTheme(next);
+      applyAll({ theme, colors: next, accentOverride, defaultAccent: accent });
+    },
+    [theme, accent, accentOverride, activeColors]
+  );
+
+  // Set or clear the accent on its own, leaving the background/foreground as-is.
+  const setAccentOverride = useCallback(
+    (next: AccentColors | null) => {
+      setAccentOverrideState(next);
+      saveAccentOverride(next);
+      applyAll({ theme, colors: activeColors, accentOverride: next, defaultAccent: accent });
+    },
+    [theme, accent, activeColors]
+  );
 
   const saveNamedTheme = useCallback((name: string, colors: ThemeColors) => {
     const entry: CustomTheme = {
@@ -174,14 +239,14 @@ export function PrefsProvider({
     (id: string) => {
       const t = customThemes.find((x) => x.id === id);
       if (!t) return;
-      setCustomColors({
+      applyThemeColors({
         background: t.background,
         foreground: t.foreground,
         accentFrom: t.accentFrom,
         accentTo: t.accentTo,
       });
     },
-    [customThemes, setCustomColors]
+    [customThemes, applyThemeColors]
   );
 
   const deleteNamedTheme = useCallback((id: string) => {
@@ -195,7 +260,9 @@ export function PrefsProvider({
   const clearCustomTheme = useCallback(() => {
     setActiveColors(null);
     saveActiveTheme(null);
-    clearColors(accent, theme);
+    setAccentOverrideState(null);
+    saveAccentOverride(null);
+    applyAll({ theme, colors: null, accentOverride: null, defaultAccent: accent });
   }, [accent, theme]);
 
   // Load the stored theme + custom themes on mount and keep "system" in sync
@@ -209,14 +276,20 @@ export function PrefsProvider({
       // ignore
     }
     const active = loadActiveTheme();
+    const overrideAccent = loadAccentOverride();
     /* eslint-disable react-hooks/set-state-in-effect */
     setThemeState(stored);
     setActiveColors(active);
+    setAccentOverrideState(overrideAccent);
     setCustomThemes(loadThemes());
     /* eslint-enable react-hooks/set-state-in-effect */
     // The inline script already applied this; re-apply for consistency.
-    if (active) applyColors(active);
-    else applyTheme(stored);
+    applyAll({
+      theme: stored,
+      colors: active,
+      accentOverride: overrideAccent,
+      defaultAccent: accent,
+    });
 
     // Re-apply on OS scheme change (only "system" mode tracks it; a custom
     // theme defines its own colors and ignores the OS).
@@ -234,6 +307,9 @@ export function PrefsProvider({
     };
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
+    // Mount-only: `accent` is a stable, server-provided default; re-running this
+    // on a new prop identity would clobber the visitor's live theme state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // On mount: load stored prefs, silently detect timezone, and IP-detect the
@@ -283,6 +359,12 @@ export function PrefsProvider({
 
   const setUnits = useCallback(
     (units: Units) => persist({ ...prefs, units }),
+    [prefs, persist]
+  );
+
+  const setGreetingName = useCallback(
+    (name: string) =>
+      persist({ ...prefs, greetingName: name.trim() ? name.slice(0, 60) : undefined }),
     [prefs, persist]
   );
 
@@ -339,14 +421,20 @@ export function PrefsProvider({
       location,
       detecting,
       weatherEnabled,
+      greetingName: prefs.greetingName ?? "",
       theme,
       customThemes,
       activeColors,
+      accentOverride,
+      activeAccent: resolveAccent(accentOverride, activeColors, accent),
       setTimezone,
       setUnits,
+      setGreetingName,
       useMyLocation,
       setTheme,
-      setCustomColors,
+      applyThemeColors,
+      setBaseColors,
+      setAccentOverride,
       saveNamedTheme,
       applyNamedTheme,
       deleteNamedTheme,
@@ -359,14 +447,19 @@ export function PrefsProvider({
     defaults,
     detecting,
     weatherEnabled,
+    accent,
     theme,
     customThemes,
     activeColors,
+    accentOverride,
     setTimezone,
     setUnits,
+    setGreetingName,
     useMyLocation,
     setTheme,
-    setCustomColors,
+    applyThemeColors,
+    setBaseColors,
+    setAccentOverride,
     saveNamedTheme,
     applyNamedTheme,
     deleteNamedTheme,

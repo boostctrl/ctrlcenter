@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useVisitorPrefs } from "./PrefsProvider";
+import { ACCENTS, ACCENT_KEYS, BASE_THEMES } from "@/lib/theme";
 import type { ThemeColors } from "@/lib/prefs";
 
 const DEFAULT_DRAFT: ThemeColors = {
@@ -11,9 +12,12 @@ const DEFAULT_DRAFT: ThemeColors = {
   accentTo: "#22d3ee",
 };
 
-const FIELDS: { key: keyof ThemeColors; label: string }[] = [
+const BASE_FIELDS: { key: "background" | "foreground"; label: string }[] = [
   { key: "background", label: "Background" },
   { key: "foreground", label: "Text & surfaces" },
+];
+
+const ACCENT_FIELDS: { key: "accentFrom" | "accentTo"; label: string }[] = [
   { key: "accentFrom", label: "Accent start" },
   { key: "accentTo", label: "Accent end" },
 ];
@@ -30,7 +34,11 @@ export default function ThemeBuilder() {
   const {
     customThemes,
     activeColors,
-    setCustomColors,
+    accentOverride,
+    activeAccent,
+    applyThemeColors,
+    setBaseColors,
+    setAccentOverride,
     saveNamedTheme,
     applyNamedTheme,
     deleteNamedTheme,
@@ -40,22 +48,29 @@ export default function ThemeBuilder() {
   const [draft, setDraft] = useState<ThemeColors>(DEFAULT_DRAFT);
   const [name, setName] = useState("");
 
-  // Seed the pickers from the active custom theme, or the current mode's colors.
+  // Keep the pickers in sync with the active theme/accent. Background and text
+  // come from the active custom theme (or the current mode's colors); the accent
+  // pickers follow the resolved accent (override → theme → admin default).
   useEffect(() => {
-    const seed = activeColors ?? {
-      background: readVar("--background", DEFAULT_DRAFT.background),
-      foreground: readVar("--foreground", DEFAULT_DRAFT.foreground),
-      accentFrom: readVar("--accent-from", DEFAULT_DRAFT.accentFrom),
-      accentTo: readVar("--accent-to", DEFAULT_DRAFT.accentTo),
-    };
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setDraft(seed);
-  }, [activeColors]);
+    setDraft({
+      background: activeColors?.background ?? readVar("--background", DEFAULT_DRAFT.background),
+      foreground: activeColors?.foreground ?? readVar("--foreground", DEFAULT_DRAFT.foreground),
+      accentFrom: activeAccent.from,
+      accentTo: activeAccent.to,
+    });
+  }, [activeColors, activeAccent]);
 
-  function update(key: keyof ThemeColors, value: string) {
+  function updateBase(key: "background" | "foreground", value: string) {
     const next = { ...draft, [key]: value };
     setDraft(next);
-    setCustomColors(next);
+    setBaseColors(next.background, next.foreground);
+  }
+
+  function updateAccent(key: "accentFrom" | "accentTo", value: string) {
+    const next = { ...draft, [key]: value };
+    setDraft(next);
+    setAccentOverride({ from: next.accentFrom, to: next.accentTo });
   }
 
   return (
@@ -63,24 +78,89 @@ export default function ThemeBuilder() {
       <div>
         <h2 className="font-semibold">Theme builder</h2>
         <p className="text-xs text-fg/50">
-          Pick colors to build a custom theme — changes apply live. Choosing a
-          light/dark theme above clears it.
+          Start from a base theme, then tweak the colors — changes apply live.
+          Pick an accent on its own to recolor without touching the rest.
         </p>
       </div>
 
+      <div className="space-y-2">
+        <span className="text-xs text-fg/50">Base themes</span>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {BASE_THEMES.map((t) => (
+            <button
+              key={t.name}
+              type="button"
+              onClick={() => applyThemeColors(t)}
+              className="group flex flex-col gap-1.5 rounded-lg border border-fg/10 p-2 text-left transition-colors hover:border-fg/30"
+              title={t.name}
+            >
+              <span
+                className="h-9 w-full rounded-md ring-1 ring-fg/10"
+                style={{
+                  background: `linear-gradient(135deg, ${t.accentFrom}, ${t.accentTo})`,
+                }}
+                aria-hidden
+              />
+              <span className="truncate text-xs text-fg/60 group-hover:text-fg/90">
+                {t.name}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-3">
-        {FIELDS.map(({ key, label }) => (
+        {BASE_FIELDS.map(({ key, label }) => (
           <label key={key} className="flex items-center gap-2">
             <input
               type="color"
               value={draft[key]}
-              onChange={(e) => update(key, e.target.value)}
+              onChange={(e) => updateBase(key, e.target.value)}
               aria-label={label}
               className="h-8 w-8 shrink-0 cursor-pointer rounded border border-fg/10 bg-transparent"
             />
             <span className="text-fg/60">{label}</span>
           </label>
         ))}
+      </div>
+
+      <div className="space-y-2">
+        <span className="text-xs text-fg/50">Accent</span>
+        <div className="flex flex-wrap gap-2">
+          {ACCENT_KEYS.map((key) => {
+            const { from, to } = ACCENTS[key];
+            const selected =
+              activeAccent.from === from && activeAccent.to === to;
+            return (
+              <button
+                key={key}
+                type="button"
+                aria-label={key}
+                aria-pressed={selected}
+                title={key}
+                onClick={() => setAccentOverride({ from, to })}
+                className={`h-8 w-8 rounded-full ring-2 ring-offset-2 ring-offset-[var(--background)] transition ${
+                  selected ? "ring-fg/80" : "ring-transparent hover:ring-fg/30"
+                }`}
+                style={{ backgroundImage: `linear-gradient(135deg, ${from}, ${to})` }}
+              />
+            );
+          })}
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          {ACCENT_FIELDS.map(({ key, label }) => (
+            <label key={key} className="flex items-center gap-2">
+              <input
+                type="color"
+                value={draft[key]}
+                onChange={(e) => updateAccent(key, e.target.value)}
+                aria-label={label}
+                className="h-8 w-8 shrink-0 cursor-pointer rounded border border-fg/10 bg-transparent"
+              />
+              <span className="text-fg/60">{label}</span>
+            </label>
+          ))}
+        </div>
       </div>
 
       <div className="flex items-center gap-2">
@@ -93,7 +173,12 @@ export default function ThemeBuilder() {
         <button
           type="button"
           onClick={() => {
-            saveNamedTheme(name, draft);
+            saveNamedTheme(name, {
+              background: draft.background,
+              foreground: draft.foreground,
+              accentFrom: activeAccent.from,
+              accentTo: activeAccent.to,
+            });
             setName("");
           }}
           className="btn-accent shrink-0 rounded-lg px-4 py-2 text-sm font-medium text-black hover:opacity-90"
@@ -138,7 +223,7 @@ export default function ThemeBuilder() {
         </div>
       )}
 
-      {activeColors && (
+      {(activeColors || accentOverride) && (
         <button
           type="button"
           onClick={clearCustomTheme}

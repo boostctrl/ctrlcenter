@@ -89,7 +89,7 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
   const { handlers, dragIndex, overIndex, move } = useReorder(apps, persistOrder);
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
+    <div className="grid gap-8 lg:grid-cols-[1fr_minmax(320px,380px)]">
       <div className="space-y-3">
         {apps.length === 0 && (
           <p className="text-sm text-fg/40">No applications yet. Add your first one.</p>

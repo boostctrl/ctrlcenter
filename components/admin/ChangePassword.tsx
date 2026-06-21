@@ -44,7 +44,7 @@ export default function ChangePassword() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="glass-card flex max-w-xl flex-col gap-4 p-6"
+      className="glass-card flex max-w-3xl flex-col gap-4 p-6"
     >
       <div>
         <h3 className="font-semibold">Change password</h3>

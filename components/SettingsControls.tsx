@@ -13,9 +13,11 @@ export default function SettingsControls() {
     location,
     detecting,
     weatherEnabled,
+    greetingName,
     theme,
     setTimezone,
     setUnits,
+    setGreetingName,
     useMyLocation,
     setTheme,
     reset,
@@ -30,6 +32,21 @@ export default function SettingsControls() {
 
   return (
     <div className="space-y-6 text-sm">
+      <div className="space-y-1.5">
+        <label htmlFor="greeting-name" className="text-fg/50">
+          Greeting name
+        </label>
+        <input
+          id="greeting-name"
+          value={greetingName}
+          onChange={(e) => setGreetingName(e.target.value)}
+          placeholder="e.g. Eric"
+          maxLength={60}
+          className="accent-focus w-full rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-fg outline-none transition-colors"
+        />
+        <p className="text-xs text-fg/40">Shown as “Good evening, {greetingName || "…"}!”</p>
+      </div>
+
       <div className="flex items-center justify-between gap-2">
         <span className="text-fg/50">Theme</span>
         <div className="flex overflow-hidden rounded-lg border border-fg/10">

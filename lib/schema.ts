@@ -30,7 +30,6 @@ export const searchSchema = z.object({
 
 export const settingsSchema = z.object({
   title: z.string().default("Home"),
-  greetingName: z.string().default(""),
   timezone: z.string().default("UTC"),
   accent: z.enum(ACCENT_KEYS).default("violet"),
   // When on, the dashboard polls /api/status to show per-app online/offline
@@ -120,7 +119,6 @@ export const searchUpdateSchema = z
 
 export const settingsInputSchema = z.object({
   title: z.string().optional(),
-  greetingName: z.string().optional(),
   timezone: z.string().optional(),
   accent: z.enum(ACCENT_KEYS).optional(),
   statusChecks: z.boolean().optional(),

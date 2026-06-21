@@ -82,11 +82,11 @@ describe("apps CRUD", () => {
 
 describe("updateSettings partial merge", () => {
   it("updates a top-level field without clobbering the others", async () => {
-    await config.updateSettings({ greetingName: "Eric", timezone: "America/Chicago" });
+    await config.updateSettings({ accent: "emerald", timezone: "America/Chicago" });
     const settings = await config.updateSettings({ title: "Dash" });
 
     expect(settings.title).toBe("Dash");
-    expect(settings.greetingName).toBe("Eric");
+    expect(settings.accent).toBe("emerald");
     expect(settings.timezone).toBe("America/Chicago");
   });
 
