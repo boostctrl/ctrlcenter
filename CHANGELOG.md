@@ -12,6 +12,12 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Admin-configurable favicon** (Admin → Settings → General): set the
+  browser-tab icon to a dashboard-icons slug, a bundled local icon, or an image
+  URL — using the same icon picker as apps/bookmarks. (#15)
+
 ### Changed
 
 - The light/dark/system **mode** selector moved into the theme builder, next to

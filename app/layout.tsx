@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { getSettings } from "@/lib/config";
+import { resolveIconUrl } from "@/lib/icons";
 import { PrefsProvider } from "@/components/PrefsProvider";
 import "./globals.css";
 
@@ -13,9 +14,13 @@ const jakarta = Plus_Jakarta_Sans({
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSettings();
+  // A configured favicon (icon slug, bundled local icon, or URL) overrides the
+  // default app/icon.svg; otherwise fall back to that convention.
+  const favicon = settings.favicon ? resolveIconUrl(settings.favicon) : null;
   return {
     title: settings.title || "Home",
     description: "Personal dashboard",
+    ...(favicon ? { icons: { icon: favicon } } : {}),
   };
 }
 

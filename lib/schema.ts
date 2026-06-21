@@ -47,6 +47,7 @@ export const themeSchema = z.object({
 
 export const settingsSchema = z.object({
   title: z.string().default("Home"),
+  favicon: z.string().default(""),
   timezone: z.string().default("UTC"),
   theme: themeSchema.default(themeSchema.parse({})),
   // When on, the dashboard polls /api/status to show per-app online/offline
@@ -148,6 +149,7 @@ export const themeInputSchema = z.object({
 
 export const settingsInputSchema = z.object({
   title: z.string().optional(),
+  favicon: z.string().optional(),
   timezone: z.string().optional(),
   theme: themeInputSchema.optional(),
   statusChecks: z.boolean().optional(),

@@ -10,6 +10,7 @@ import {
 } from "@/lib/search";
 import { supportedTimezones } from "@/lib/prefs";
 import { TextField, Button } from "./ui";
+import IconField from "./IconField";
 import CitySearch from "./CitySearch";
 import { useToast } from "./Toast";
 import { apiErrorMessage } from "./apiError";
@@ -79,6 +80,12 @@ export default function SettingsManager({
           label="Page title"
           value={settings.title}
           onChange={(e) => setSettings({ ...settings, title: e.target.value })}
+        />
+        <IconField
+          label="Favicon (slug or image URL)"
+          name={settings.title || "favicon"}
+          value={settings.favicon}
+          onChange={(favicon) => setSettings({ ...settings, favicon })}
         />
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-fg/50">Default time zone</span>

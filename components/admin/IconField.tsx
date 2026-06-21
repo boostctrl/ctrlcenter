@@ -11,10 +11,12 @@ export default function IconField({
   value,
   onChange,
   name,
+  label = "Icon (slug or image URL)",
 }: {
   value: string;
   onChange: (value: string) => void;
   name: string;
+  label?: string;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -23,7 +25,7 @@ export default function IconField({
       <div className="flex items-end gap-3">
         <div className="flex-1">
           <TextField
-            label="Icon (slug or image URL)"
+            label={label}
             placeholder="e.g. nextcloud"
             value={value}
             onChange={(e) => onChange(e.target.value)}
