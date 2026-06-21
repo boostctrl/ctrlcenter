@@ -4,6 +4,15 @@ import { useState, Suspense, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { TextField, Button } from "@/components/admin/ui";
 
+// Only follow `next` when it's a same-site, same-origin path: a single leading
+// slash, not "//" or "/\" (protocol-relative URLs the browser would treat as
+// external). Anything else falls back to /admin, so a crafted
+// ?next=https://evil.example can't turn login into an open redirect.
+function safeNext(next: string | null): string {
+  if (next && /^\/(?![/\\])/.test(next)) return next;
+  return "/admin";
+}
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -26,7 +35,7 @@ function LoginForm() {
       setError(data?.error || "Incorrect password");
       return;
     }
-    router.push(searchParams.get("next") || "/admin");
+    router.push(safeNext(searchParams.get("next")));
     router.refresh();
   }
 
