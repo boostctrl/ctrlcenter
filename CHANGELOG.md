@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-06-21
+
 ### Added
 
 - **Base themes** in the theme builder: a gallery of preset starting points
@@ -232,7 +234,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/homepage-app/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/boostctrl/homepage-app/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/boostctrl/homepage-app/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/boostctrl/homepage-app/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/boostctrl/homepage-app/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/boostctrl/homepage-app/compare/v0.3.0...v0.3.1
