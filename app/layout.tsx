@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { getSettings } from "@/lib/config";
 import { PrefsProvider } from "@/components/PrefsProvider";
@@ -26,6 +27,10 @@ export default async function RootLayout({
   const settings = await getSettings();
   const weather = settings.weather;
   const defaultTheme = settings.theme;
+  // Per-request CSP nonce from the proxy, so our inline theme script is allowed
+  // without script-src 'unsafe-inline'. Reading headers() also opts pages into
+  // dynamic rendering, which is required for a per-request nonce to match.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
 
   // Apply the effective theme before first paint — imperatively, so React never
   // controls the <html> color variables (which would otherwise clobber it on
@@ -40,7 +45,7 @@ export default async function RootLayout({
   return (
     <html lang="en" className={`${jakarta.variable} h-full`}>
       <body className="relative min-h-full overflow-x-hidden antialiased">
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeScript }} />
         <div
           aria-hidden
           className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
