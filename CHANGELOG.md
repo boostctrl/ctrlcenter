@@ -12,6 +12,12 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- The theme builder's accent preset swatches were removed — the gradient preview
+  bar and the Start / End color pickers now cover everything. For a solid accent,
+  set both ends to the same color.
+
 ## [0.5.2] - 2026-06-21
 
 ### Added

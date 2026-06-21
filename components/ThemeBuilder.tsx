@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useVisitorPrefs } from "./PrefsProvider";
-import { ACCENTS, ACCENT_KEYS, BASE_THEMES, DESIGNS } from "@/lib/theme";
+import { BASE_THEMES, DESIGNS } from "@/lib/theme";
 import type { DesignId } from "@/lib/theme";
 import type { ThemeColors } from "@/lib/prefs";
 
@@ -182,27 +182,9 @@ export default function ThemeBuilder() {
           }}
           aria-hidden
         />
-        <div className="flex flex-wrap gap-2">
-          {ACCENT_KEYS.map((key) => {
-            const { from, to } = ACCENTS[key];
-            const selected =
-              activeAccent.from === from && activeAccent.to === to;
-            return (
-              <button
-                key={key}
-                type="button"
-                aria-label={key}
-                aria-pressed={selected}
-                title={key}
-                onClick={() => setAccentOverride({ from, to })}
-                className={`h-8 w-8 rounded-full ring-2 ring-offset-2 ring-offset-[var(--background)] transition ${
-                  selected ? "ring-fg/80" : "ring-transparent hover:ring-fg/30"
-                }`}
-                style={{ backgroundImage: `linear-gradient(135deg, ${from}, ${to})` }}
-              />
-            );
-          })}
-        </div>
+        <p className="text-xs text-fg/40">
+          Set both ends to the same color for a solid accent.
+        </p>
         <div className="grid grid-cols-2 gap-3">
           {ACCENT_FIELDS.map(({ key, label }) => (
             <label key={key} className="flex items-center gap-2">
