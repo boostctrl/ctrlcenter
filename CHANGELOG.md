@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-21
+
 ### Added
 
 - **Admin-configurable favicon** (Admin → Settings → General): set the
@@ -327,7 +329,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/homepage-app/compare/v0.5.3...HEAD
+[Unreleased]: https://github.com/boostctrl/homepage-app/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/boostctrl/homepage-app/compare/v0.5.3...v0.6.0
 [0.5.3]: https://github.com/boostctrl/homepage-app/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/boostctrl/homepage-app/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/boostctrl/homepage-app/compare/v0.5.0...v0.5.1
