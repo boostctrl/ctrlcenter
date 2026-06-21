@@ -1,15 +1,17 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import type { SceneProps } from "./index";
 
-// Abyss — a deep-sea scene: a bioluminescent halo + depth tint layered over the
-// page background, drifting "marine snow" on a canvas, and a depth-gauge
-// ornament. Everything is built from the accent / background CSS vars so it
+// Abyss — a deep-sea scene. Dark = the trench: a bioluminescent halo + depth
+// tint, drifting "marine snow", a depth-gauge ornament. Light = sunlit shallows:
+// the same family re-themed — a bright wash from above, brighter drifting motes,
+// deep-teal ink. Everything is built from the accent / background CSS vars so it
 // recolors with the active palette, and all motion is disabled under
 // prefers-reduced-motion. Ported from the reference 404 page.
 
 // Read a #rrggbb CSS var as an "r, g, b" string for canvas fills; falls back to
-// a teal so the snow is always visible even mid-theme-edit.
+// a teal so the motes are always visible even mid-theme-edit.
 function readAccentRgb(): string {
   const fallback = "150, 230, 222";
   if (typeof document === "undefined") return fallback;
@@ -22,7 +24,7 @@ function readAccentRgb(): string {
   return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
 }
 
-export function AbyssBackdrop() {
+export function AbyssBackdrop({ light }: SceneProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -56,7 +58,9 @@ export function AbyssBackdrop() {
       vy: (Math.random() * 0.25 + 0.08) * dpr,
       drift: Math.random() * 0.4 - 0.2,
       phase: Math.random() * Math.PI * 2,
-      a: Math.random() * 0.4 + 0.1,
+      // Brighter, slightly denser motes in the shallows so they read on a pale
+      // wash; fainter glints in the trench.
+      a: light ? Math.random() * 0.3 + 0.15 : Math.random() * 0.4 + 0.1,
     });
 
     const resize = () => {
@@ -105,25 +109,23 @@ export function AbyssBackdrop() {
       window.removeEventListener("resize", resize);
       cancelAnimationFrame(raf);
     };
-  }, []);
+  }, [light]);
+
+  // Depth tint (trench) vs. a sunlight wash from above (shallows).
+  const tint = light
+    ? "radial-gradient(140% 80% at 50% -25%, color-mix(in srgb, var(--accent-from) 28%, transparent) 0%, color-mix(in srgb, var(--accent-from) 8%, transparent) 30%, transparent 58%)," +
+      "radial-gradient(100% 70% at 50% 120%, color-mix(in srgb, var(--accent-from) 14%, transparent) 0%, transparent 72%)"
+    : "radial-gradient(120% 90% at 50% -10%, color-mix(in srgb, var(--accent-from) 12%, transparent) 0%, color-mix(in srgb, var(--accent-from) 3%, transparent) 24%, transparent 50%)," +
+      "radial-gradient(140% 120% at 50% 120%, color-mix(in srgb, var(--accent-from) 16%, transparent) 0%, transparent 70%)";
+  const haloPct = light ? "24%" : "18%";
 
   return (
     <div aria-hidden className="pointer-events-none fixed inset-0 -z-10">
-      {/* Bioluminescent depth tint, layered over the page background. */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(120% 90% at 50% -10%, color-mix(in srgb, var(--accent-from) 12%, transparent) 0%, color-mix(in srgb, var(--accent-from) 3%, transparent) 24%, transparent 50%)," +
-            "radial-gradient(140% 120% at 50% 120%, color-mix(in srgb, var(--accent-from) 16%, transparent) 0%, transparent 70%)",
-        }}
-      />
-      {/* The breathing halo behind where the content sits. */}
+      <div className="absolute inset-0" style={{ background: tint }} />
       <div
         className="animate-breathe absolute left-1/2 top-[38%] h-[360px] w-[360px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-md"
         style={{
-          background:
-            "radial-gradient(circle, color-mix(in srgb, var(--accent-from) 18%, transparent) 0%, color-mix(in srgb, var(--accent-from) 5%, transparent) 38%, transparent 66%)",
+          background: `radial-gradient(circle, color-mix(in srgb, var(--accent-from) ${haloPct}, transparent) 0%, color-mix(in srgb, var(--accent-from) 5%, transparent) 38%, transparent 66%)`,
         }}
       />
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
@@ -133,8 +135,11 @@ export function AbyssBackdrop() {
 
 // The depth gauge — Abyss's signature ornament. A hairline rail with depth ticks
 // and a glowing "you are here" marker, pinned to the left margin. Decorative
-// only: behind content, non-interactive, and hidden on narrow screens.
-export function AbyssOrnament() {
+// only: behind content, non-interactive, and hidden on narrow screens. Reads the
+// accent/foreground vars, so it stays legible in both the trench and the
+// shallows; the rail is firmed up slightly on light surfaces.
+export function AbyssOrnament({ light }: SceneProps) {
+  const railPct = light ? "26%" : "16%";
   const ticks = [
     { top: "0%", label: "0 m — surface" },
     { top: "25%", label: "100 m" },
@@ -154,8 +159,7 @@ export function AbyssOrnament() {
       <div
         className="relative ml-3.5 h-full w-px"
         style={{
-          background:
-            "linear-gradient(to bottom, transparent, color-mix(in srgb, var(--accent-from) 16%, transparent) 12%, color-mix(in srgb, var(--accent-from) 16%, transparent) 88%, transparent)",
+          background: `linear-gradient(to bottom, transparent, color-mix(in srgb, var(--accent-from) ${railPct}, transparent) 12%, color-mix(in srgb, var(--accent-from) ${railPct}, transparent) 88%, transparent)`,
         }}
       >
         {ticks.map((t) => (
@@ -164,14 +168,14 @@ export function AbyssOrnament() {
             className="absolute left-0 h-px w-2.5"
             style={{
               top: t.top,
-              background: "color-mix(in srgb, var(--accent-from) 16%, transparent)",
+              background: `color-mix(in srgb, var(--accent-from) ${railPct}, transparent)`,
             }}
           >
             <span
               className="absolute left-4 whitespace-nowrap text-[10px] tracking-wider"
               style={{
                 top: "-7px",
-                color: "color-mix(in srgb, var(--foreground) 45%, transparent)",
+                color: "color-mix(in srgb, var(--foreground) 50%, transparent)",
               }}
             >
               {t.label}

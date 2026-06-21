@@ -42,8 +42,14 @@ export const themeSchema = z.object({
   scene: z.enum(SCENE_IDS).default("aurora"),
   accentFrom: hexColor.default("#a78bfa"),
   accentTo: hexColor.default("#22d3ee"),
+  // Optional custom default surface colors. `background`/`foreground` are the
+  // dark-mode pair; `backgroundLight`/`foregroundLight` the light-mode pair (the
+  // accent above is shared). Set together so the default look reads cohesively
+  // in both modes; light falls back to the dark pair if omitted.
   background: hexColor.optional(),
   foreground: hexColor.optional(),
+  backgroundLight: hexColor.optional(),
+  foregroundLight: hexColor.optional(),
 });
 
 export const settingsSchema = z.object({
@@ -150,6 +156,8 @@ export const themeInputSchema = z.object({
   accentTo: hexColor,
   background: hexColor.optional(),
   foreground: hexColor.optional(),
+  backgroundLight: hexColor.optional(),
+  foregroundLight: hexColor.optional(),
 });
 
 export const settingsInputSchema = z.object({

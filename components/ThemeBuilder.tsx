@@ -45,6 +45,7 @@ export default function ThemeBuilder() {
     setScene,
     applyPack,
     customThemes,
+    activeLook,
     activeColors,
     accentOverride,
     activeAccent,
@@ -91,7 +92,8 @@ export default function ThemeBuilder() {
         <h2 className="font-semibold">Theme builder</h2>
         <p className="text-xs text-fg/50">
           Pick a design and a palette, then tweak the colors — changes apply
-          live. Pick an accent on its own to recolor without touching the rest.
+          live. Every look has a matching light and dark; the Mode toggle
+          switches between them, and the color pickers edit the current mode.
         </p>
       </div>
 
@@ -212,7 +214,7 @@ export default function ThemeBuilder() {
                 <span
                   className="h-9 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
                   style={{
-                    background: `radial-gradient(120% 100% at 50% -10%, ${p.accentFrom}, transparent 60%), ${p.background}`,
+                    background: `radial-gradient(120% 100% at 50% -10%, ${p.dark.accentFrom}, transparent 60%), ${p.dark.background}`,
                   }}
                   aria-hidden
                 />
@@ -239,7 +241,7 @@ export default function ThemeBuilder() {
               <span
                 className="h-9 w-full rounded-md ring-1 ring-fg/10"
                 style={{
-                  background: `linear-gradient(135deg, ${t.accentFrom}, ${t.accentTo})`,
+                  background: `linear-gradient(135deg, ${t.dark.accentFrom}, ${t.dark.accentTo})`,
                 }}
                 aria-hidden
               />
@@ -304,11 +306,20 @@ export default function ThemeBuilder() {
         <button
           type="button"
           onClick={() => {
-            saveNamedTheme(name, {
+            // Save the active look's full light+dark pair (so it restores in
+            // both modes), with the current accent applied to both variants. If
+            // there's no active look yet, seed both modes from the live draft.
+            const draftCS = {
               background: draft.background,
               foreground: draft.foreground,
               accentFrom: activeAccent.from,
               accentTo: activeAccent.to,
+            };
+            const look = activeLook ?? { dark: draftCS, light: draftCS };
+            const accent = { accentFrom: activeAccent.from, accentTo: activeAccent.to };
+            saveNamedTheme(name, {
+              dark: { ...look.dark, ...accent },
+              light: { ...look.light, ...accent },
             });
             setName("");
           }}
@@ -329,7 +340,7 @@ export default function ThemeBuilder() {
               <span
                 className="h-5 w-5 shrink-0 rounded-full ring-1 ring-fg/10"
                 style={{
-                  background: `linear-gradient(135deg, ${t.accentFrom}, ${t.accentTo})`,
+                  background: `linear-gradient(135deg, ${t.dark.accentFrom}, ${t.dark.accentTo})`,
                 }}
                 aria-hidden
               />

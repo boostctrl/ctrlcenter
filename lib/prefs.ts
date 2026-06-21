@@ -7,7 +7,9 @@ import {
   DEFAULT_SCENE,
   isDesignId,
   isSceneId,
+  type ColorSet,
   type DesignId,
+  type ModeColors,
   type SceneId,
 } from "./theme";
 
@@ -126,33 +128,28 @@ export function supportedTimezones(): string[] {
 }
 
 // --- Custom themes (the theme builder) ---
-// A custom theme is four colors that drive the CSS variables: page background,
-// the "ink" color (text + surfaces/borders via opacity), and the accent
-// gradient endpoints. Per-visitor, stored in localStorage.
-export type ThemeColors = {
-  background: string;
-  foreground: string;
-  accentFrom: string;
-  accentTo: string;
-};
+// A single color set: page background, the "ink" color (text + surfaces/borders
+// via opacity), and the accent gradient endpoints. Re-exported from lib/theme.
+export type ThemeColors = ColorSet;
 
-// A saved theme bundles the colors with the look-and-feel design and scene it
-// was saved with, so applying it restores all three.
-export type CustomTheme = ThemeColors & {
+// A saved theme bundles a cohesive light+dark color pair with the design and
+// scene it was saved with, so applying it restores all of them.
+export type CustomTheme = ModeColors & {
   id: string;
   name: string;
   design: DesignId;
   scene: SceneId;
 };
 
-// The active custom theme's colors (overrides light/dark mode when present).
+// The active custom look's light+dark colors (the resolved mode selects which
+// is applied). Per-visitor, stored in localStorage.
 export const ACTIVE_THEME_KEY = "homepage:activeTheme";
 // The visitor's saved, named themes.
 export const THEMES_KEY = "homepage:themes";
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
-export function sanitizeColors(input: unknown): ThemeColors | null {
+export function sanitizeColors(input: unknown): ColorSet | null {
   if (!input || typeof input !== "object") return null;
   const c = input as Record<string, unknown>;
   const ok = (v: unknown): v is string => typeof v === "string" && HEX.test(v);
@@ -167,17 +164,30 @@ export function sanitizeColors(input: unknown): ThemeColors | null {
   return null;
 }
 
-export function loadActiveTheme(): ThemeColors | null {
+// Parse a light+dark pair. Back-compat: a value saved before looks were
+// mode-aware is a single color set — wrap it as both modes so the look still
+// applies (it just looks the same in light and dark until re-saved).
+export function sanitizeModeColors(input: unknown): ModeColors | null {
+  if (!input || typeof input !== "object") return null;
+  const c = input as Record<string, unknown>;
+  const dark = sanitizeColors(c.dark);
+  const light = sanitizeColors(c.light);
+  if (dark && light) return { dark, light };
+  const flat = sanitizeColors(input);
+  return flat ? { dark: flat, light: flat } : null;
+}
+
+export function loadActiveTheme(): ModeColors | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(ACTIVE_THEME_KEY);
-    return raw ? sanitizeColors(JSON.parse(raw)) : null;
+    return raw ? sanitizeModeColors(JSON.parse(raw)) : null;
   } catch {
     return null;
   }
 }
 
-export function saveActiveTheme(colors: ThemeColors | null): void {
+export function saveActiveTheme(colors: ModeColors | null): void {
   if (typeof window === "undefined") return;
   try {
     if (colors) {
@@ -197,7 +207,7 @@ export function loadThemes(): CustomTheme[] {
     const arr = raw ? JSON.parse(raw) : [];
     if (!Array.isArray(arr)) return [];
     return arr.flatMap((t): CustomTheme[] => {
-      const colors = sanitizeColors(t);
+      const colors = sanitizeModeColors(t);
       if (colors && t && typeof t.id === "string" && typeof t.name === "string") {
         // Themes saved before designs/scenes existed default to Glass/Aurora.
         const design = isDesignId(t.design) ? t.design : DEFAULT_DESIGN;

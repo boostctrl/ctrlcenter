@@ -69,6 +69,13 @@ export default function SettingsManager({
   const updateTheme = (patch: Partial<Settings["theme"]>) =>
     setSettings((s) => ({ ...s, theme: { ...s.theme, ...patch } }));
   const customColors = Boolean(theme.background && theme.foreground);
+  // Which mode's custom default colors the pickers below edit (the accent is
+  // shared across both). Dark = background/foreground; light = the *Light pair.
+  const [colorMode, setColorMode] = useState<"dark" | "light">("dark");
+  const bgKey = colorMode === "light" ? "backgroundLight" : "background";
+  const fgKey = colorMode === "light" ? "foregroundLight" : "foreground";
+  const bgFallback = colorMode === "light" ? "#eceef3" : "#06070d";
+  const fgFallback = colorMode === "light" ? "#181b24" : "#f4f4f6";
 
   return (
     <form
@@ -219,35 +226,60 @@ export default function SettingsManager({
                     ? {
                         background: theme.background ?? "#06070d",
                         foreground: theme.foreground ?? "#f4f4f6",
+                        backgroundLight: theme.backgroundLight ?? "#eceef3",
+                        foregroundLight: theme.foregroundLight ?? "#181b24",
                       }
-                    : { background: undefined, foreground: undefined }
+                    : {
+                        background: undefined,
+                        foreground: undefined,
+                        backgroundLight: undefined,
+                        foregroundLight: undefined,
+                      }
                 )
               }
             />
           </label>
           {customColors && (
-            <div className="grid grid-cols-2 gap-3">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="color"
-                  value={theme.background ?? "#06070d"}
-                  onChange={(e) => updateTheme({ background: e.target.value })}
-                  aria-label="Background"
-                  className={colorClass}
-                />
-                <span className="text-fg/60">Background</span>
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="color"
-                  value={theme.foreground ?? "#f4f4f6"}
-                  onChange={(e) => updateTheme({ foreground: e.target.value })}
-                  aria-label="Text & surfaces"
-                  className={colorClass}
-                />
-                <span className="text-fg/60">Text &amp; surfaces</span>
-              </label>
-            </div>
+            <>
+              <div className="flex overflow-hidden self-start rounded-lg border border-fg/10">
+                {(["dark", "light"] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setColorMode(m)}
+                    className={`px-3 py-1 text-xs capitalize transition-colors ${
+                      colorMode === m
+                        ? "bg-fg/15 text-fg"
+                        : "text-fg/50 hover:text-fg/80"
+                    }`}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="color"
+                    value={theme[bgKey] ?? bgFallback}
+                    onChange={(e) => updateTheme({ [bgKey]: e.target.value })}
+                    aria-label={`${colorMode} background`}
+                    className={colorClass}
+                  />
+                  <span className="text-fg/60">Background</span>
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="color"
+                    value={theme[fgKey] ?? fgFallback}
+                    onChange={(e) => updateTheme({ [fgKey]: e.target.value })}
+                    aria-label={`${colorMode} text & surfaces`}
+                    className={colorClass}
+                  />
+                  <span className="text-fg/60">Text &amp; surfaces</span>
+                </label>
+              </div>
+            </>
           )}
         </div>
       </Section>

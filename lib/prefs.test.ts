@@ -1,14 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { sanitizePrefs, sanitizeColors } from "./prefs";
+import { sanitizePrefs, sanitizeColors, sanitizeModeColors } from "./prefs";
+
+const valid = {
+  background: "#06070d",
+  foreground: "#ffffff",
+  accentFrom: "#a78bfa",
+  accentTo: "#22d3ee",
+};
 
 describe("sanitizeColors", () => {
-  const valid = {
-    background: "#06070d",
-    foreground: "#ffffff",
-    accentFrom: "#a78bfa",
-    accentTo: "#22d3ee",
-  };
-
   it("accepts four valid 6-digit hex colors", () => {
     expect(sanitizeColors(valid)).toEqual(valid);
   });
@@ -24,6 +24,28 @@ describe("sanitizeColors", () => {
     expect(
       sanitizeColors({ ...valid, foreground: "#12345g" })
     ).toBeNull();
+  });
+});
+
+describe("sanitizeModeColors", () => {
+  const light = { ...valid, background: "#eceef3", foreground: "#181b24" };
+
+  it("accepts a {dark, light} pair", () => {
+    expect(sanitizeModeColors({ dark: valid, light })).toEqual({
+      dark: valid,
+      light,
+    });
+  });
+
+  it("migrates an old single color set to both modes", () => {
+    // Back-compat: a value saved before looks were mode-aware was one flat set.
+    expect(sanitizeModeColors(valid)).toEqual({ dark: valid, light: valid });
+  });
+
+  it("rejects junk and partial pairs", () => {
+    expect(sanitizeModeColors(null)).toBeNull();
+    expect(sanitizeModeColors({ dark: valid })).toBeNull();
+    expect(sanitizeModeColors({ dark: valid, light: { background: "#fff" } })).toBeNull();
   });
 });
 

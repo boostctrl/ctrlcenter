@@ -54,48 +54,83 @@ export function isSceneId(v: unknown): v is SceneId {
   return typeof v === "string" && (SCENE_IDS as string[]).includes(v);
 }
 
-// Preset full themes for the theme builder — starting points a visitor can
-// apply with one tap and then tweak. Each is the four colors that drive the
-// custom-theme CSS variables (page background, ink/foreground, accent pair).
-export type PresetTheme = {
-  name: string;
+// The four colors that drive the custom-theme CSS variables: page background,
+// ink/foreground, and the accent gradient pair.
+export type ColorSet = {
   background: string;
   foreground: string;
   accentFrom: string;
   accentTo: string;
 };
 
+// Every look (palette, pack, saved theme, active theme) carries a cohesive
+// light AND dark color set; the resolved light/dark mode selects which one is
+// applied, so toggling mode never breaks a look. The accent pair is kept the
+// same across a look's two modes for continuity — only the surface colors flip.
+export type ModeColors = { dark: ColorSet; light: ColorSet };
+
+// Preset full themes for the theme builder — starting points a visitor can
+// apply with one tap and then tweak.
+export type PresetTheme = { name: string } & ModeColors;
+
 export const BASE_THEMES: PresetTheme[] = [
-  { name: "Midnight", background: "#06070d", foreground: "#f4f4f6", accentFrom: "#a78bfa", accentTo: "#22d3ee" },
-  { name: "Paper", background: "#f6f5f1", foreground: "#1c1b18", accentFrom: "#6366f1", accentTo: "#0ea5e9" },
-  { name: "Nord", background: "#2e3440", foreground: "#e5e9f0", accentFrom: "#88c0d0", accentTo: "#81a1c1" },
-  { name: "Forest", background: "#0c1410", foreground: "#e7f0e9", accentFrom: "#34d399", accentTo: "#2dd4bf" },
-  { name: "Ember", background: "#140b0a", foreground: "#f6ece8", accentFrom: "#fb7185", accentTo: "#fbbf24" },
-  { name: "Slate", background: "#0f1115", foreground: "#e6e8ec", accentFrom: "#60a5fa", accentTo: "#a78bfa" },
-  { name: "Rosé", background: "#1a1016", foreground: "#f5e9f0", accentFrom: "#fb7185", accentTo: "#f472b6" },
-  { name: "Sand", background: "#f4ecdf", foreground: "#2b2418", accentFrom: "#d97706", accentTo: "#f59e0b" },
+  {
+    name: "Midnight",
+    dark: { background: "#06070d", foreground: "#f4f4f6", accentFrom: "#a78bfa", accentTo: "#22d3ee" },
+    light: { background: "#edeef5", foreground: "#181b28", accentFrom: "#a78bfa", accentTo: "#22d3ee" },
+  },
+  {
+    name: "Paper",
+    dark: { background: "#14130e", foreground: "#ece9e0", accentFrom: "#6366f1", accentTo: "#0ea5e9" },
+    light: { background: "#f6f5f1", foreground: "#1c1b18", accentFrom: "#6366f1", accentTo: "#0ea5e9" },
+  },
+  {
+    name: "Nord",
+    dark: { background: "#2e3440", foreground: "#e5e9f0", accentFrom: "#88c0d0", accentTo: "#81a1c1" },
+    light: { background: "#eceff4", foreground: "#2e3440", accentFrom: "#5e81ac", accentTo: "#81a1c1" },
+  },
+  {
+    name: "Forest",
+    dark: { background: "#0c1410", foreground: "#e7f0e9", accentFrom: "#34d399", accentTo: "#2dd4bf" },
+    light: { background: "#eef4ee", foreground: "#14241b", accentFrom: "#0d9488", accentTo: "#15a394" },
+  },
+  {
+    name: "Ember",
+    dark: { background: "#140b0a", foreground: "#f6ece8", accentFrom: "#fb7185", accentTo: "#fbbf24" },
+    light: { background: "#f8efe9", foreground: "#2a1714", accentFrom: "#e11d48", accentTo: "#d97706" },
+  },
+  {
+    name: "Slate",
+    dark: { background: "#0f1115", foreground: "#e6e8ec", accentFrom: "#60a5fa", accentTo: "#a78bfa" },
+    light: { background: "#eef0f3", foreground: "#1a1d24", accentFrom: "#3b82f6", accentTo: "#8b5cf6" },
+  },
+  {
+    name: "Rosé",
+    dark: { background: "#1a1016", foreground: "#f5e9f0", accentFrom: "#fb7185", accentTo: "#f472b6" },
+    light: { background: "#f8eef3", foreground: "#2a121f", accentFrom: "#e11d48", accentTo: "#db2777" },
+  },
+  {
+    name: "Sand",
+    dark: { background: "#161109", foreground: "#efe6d4", accentFrom: "#d97706", accentTo: "#f59e0b" },
+    light: { background: "#f4ecdf", foreground: "#2b2418", accentFrom: "#b45309", accentTo: "#d97706" },
+  },
 ];
 
 // A theme pack is a curated, art-directed look applied in one tap: a palette
 // bundled with the design (card surface) and scene (backdrop + ornament) that
 // were composed to go with it. Unlike a bare palette, applying a pack sets all
 // three at once — but the visitor can still tweak each part afterward.
-export type ThemePack = PresetTheme & {
-  design: DesignId;
-  scene: SceneId;
-};
+export type ThemePack = { name: string; design: DesignId; scene: SceneId } & ModeColors;
 
 export const THEME_PACKS: ThemePack[] = [
   {
     // The headline curated look built on the Abyss scene; named distinctly from
     // the scene (deepest ocean trench) so the two "Abyss"-flavored entries in the
-    // theme builder don't collide.
+    // theme builder don't collide. Dark = deep trench; light = sunlit shallows.
     name: "Mariana",
-    background: "#02060a",
-    foreground: "#c7d6db",
-    accentFrom: "#5fe3d6",
-    accentTo: "#2f8f9d",
     design: "glass",
     scene: "abyss",
+    dark: { background: "#02060a", foreground: "#c7d6db", accentFrom: "#5fe3d6", accentTo: "#2f8f9d" },
+    light: { background: "#e7f4f5", foreground: "#0c3a40", accentFrom: "#0e9aa7", accentTo: "#2f8f9d" },
   },
 ];

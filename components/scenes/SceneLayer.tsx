@@ -8,12 +8,12 @@ import { SCENE_REGISTRY } from "./index";
 // the first paint matches the server (the canvas/ornament just start animating
 // after hydration). Falls back to Aurora for any unknown stored value.
 export default function SceneLayer() {
-  const { scene } = useVisitorPrefs();
+  const { scene, surfaceIsLight } = useVisitorPrefs();
   const { Backdrop, Ornament } = SCENE_REGISTRY[scene] ?? SCENE_REGISTRY.aurora;
   return (
     <>
-      <Backdrop />
-      {Ornament ? <Ornament /> : null}
+      <Backdrop light={surfaceIsLight} />
+      {Ornament ? <Ornament light={surfaceIsLight} /> : null}
     </>
   );
 }

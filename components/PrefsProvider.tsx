@@ -26,14 +26,15 @@ import {
   type Units,
   type VisitorLocation,
   type VisitorPrefs,
-  type ThemeColors,
   type CustomTheme,
   type AccentColors,
 } from "@/lib/prefs";
 import {
   DESIGN_IDS,
   SCENE_IDS,
+  type ColorSet,
   type DesignId,
+  type ModeColors,
   type SceneId,
   type ThemePack,
 } from "@/lib/theme";
@@ -43,14 +44,12 @@ export const THEME_KEY = "homepage:theme";
 
 type Accent = AccentColors;
 
-// Apply the theme by toggling `.theme-light` on <html>. Kept in sync with the
-// no-flash inline script in app/layout.tsx (which runs this same logic before
-// React mounts).
-function applyTheme(theme: Theme): void {
-  if (typeof document === "undefined") return;
+// Resolve whether the given mode renders dark right now ("system" follows the
+// OS). Kept in sync with the no-flash inline script in app/layout.tsx.
+function resolveDark(theme: Theme): boolean {
+  if (typeof window === "undefined") return true;
   const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  const dark = theme === "dark" || (theme === "system" && prefersDark);
-  document.documentElement.classList.toggle("theme-light", !dark);
+  return theme === "dark" || (theme === "system" && prefersDark);
 }
 
 function applyAccent(accent: Accent): void {
@@ -91,11 +90,11 @@ function isLightColor(hex: string): boolean {
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.5;
 }
 
-// Resolve the effective accent: an explicit per-visitor override wins, then a
-// full custom theme's own accent, then the admin-configured default.
+// Resolve the effective accent: an explicit per-visitor override wins, then the
+// active look's own accent, then the admin-configured default.
 function resolveAccent(
   override: AccentColors | null,
-  colors: ThemeColors | null,
+  colors: ColorSet | null,
   fallback: Accent
 ): Accent {
   if (override) return override;
@@ -103,30 +102,39 @@ function resolveAccent(
   return fallback;
 }
 
-// Apply the whole theme state in one place. A full custom theme sets the
-// background/foreground variables (light/dark mode no longer applies);
-// otherwise we fall back to the mode. The accent is layered on top last, so an
-// accent-only override leaves the background/foreground as-is.
+// The color set a look contributes for the resolved mode.
+function variantFor(look: ModeColors | null, dark: boolean): ColorSet | null {
+  if (!look) return null;
+  return dark ? look.dark : look.light;
+}
+
+// Apply the whole theme state in one place. `.theme-light` ALWAYS tracks the
+// resolved mode, so the light/dark toggle is always live. A look (visitor
+// custom or admin default) contributes the surface colors for that mode;
+// without one, the CSS defaults (`:root` dark / `.theme-light` light) apply. The
+// accent is layered on last, so an accent-only override leaves the rest as-is.
 function applyAll(opts: {
   theme: Theme;
-  colors: ThemeColors | null;
+  look: ModeColors | null;
   accentOverride: AccentColors | null;
   defaultAccent: Accent;
 }): void {
   if (typeof document === "undefined") return;
-  const s = document.documentElement.style;
-  if (opts.colors) {
-    s.setProperty("--background", opts.colors.background);
-    s.setProperty("--foreground", opts.colors.foreground);
-    s.setProperty("--fg", opts.colors.foreground);
-    document.documentElement.classList.remove("theme-light");
+  const el = document.documentElement;
+  const s = el.style;
+  const dark = resolveDark(opts.theme);
+  el.classList.toggle("theme-light", !dark);
+  const cs = variantFor(opts.look, dark);
+  if (cs) {
+    s.setProperty("--background", cs.background);
+    s.setProperty("--foreground", cs.foreground);
+    s.setProperty("--fg", cs.foreground);
   } else {
     s.removeProperty("--background");
     s.removeProperty("--foreground");
     s.removeProperty("--fg");
-    applyTheme(opts.theme);
   }
-  applyAccent(resolveAccent(opts.accentOverride, opts.colors, opts.defaultAccent));
+  applyAccent(resolveAccent(opts.accentOverride, cs, opts.defaultAccent));
 }
 
 type EffectiveLocation = {
@@ -150,7 +158,10 @@ type PrefsValue = {
   // Whether the effective background reads as light (for theme-aware icons).
   surfaceIsLight: boolean;
   customThemes: CustomTheme[];
-  activeColors: ThemeColors | null;
+  // The active look's full light+dark pair, and the color set resolved for the
+  // current mode (what the builder's pickers show).
+  activeLook: ModeColors | null;
+  activeColors: ColorSet | null;
   accentOverride: AccentColors | null;
   activeAccent: AccentColors;
   setTimezone: (tz: string) => void;
@@ -161,10 +172,10 @@ type PrefsValue = {
   setDesign: (design: DesignId) => void;
   setScene: (scene: SceneId) => void;
   applyPack: (pack: ThemePack) => void;
-  applyThemeColors: (colors: ThemeColors) => void;
+  applyThemeColors: (colors: ModeColors) => void;
   setBaseColors: (background: string, foreground: string) => void;
   setAccentOverride: (accent: AccentColors | null) => void;
-  saveNamedTheme: (name: string, colors: ThemeColors) => void;
+  saveNamedTheme: (name: string, colors: ModeColors) => void;
   applyNamedTheme: (id: string) => void;
   deleteNamedTheme: (id: string) => void;
   clearCustomTheme: () => void;
@@ -186,9 +197,11 @@ type Defaults = {
   units: Units;
 };
 
-// The admin-configured site default theme. Visitor choices override each part;
-// `background`/`foreground` (when both set) are custom default colors that
-// override the light/dark mode for un-customized visitors.
+// The admin-configured site default theme. Visitor choices override each part.
+// The optional custom default colors are a cohesive light+dark pair (dark =
+// `background`/`foreground`, light = `backgroundLight`/`foregroundLight`); when
+// set they seed the surface for un-customized visitors in each mode. The accent
+// pair is shared across both modes.
 export type DefaultTheme = {
   mode: Theme;
   design: DesignId;
@@ -197,6 +210,8 @@ export type DefaultTheme = {
   accentTo: string;
   background?: string;
   foreground?: string;
+  backgroundLight?: string;
+  foregroundLight?: string;
 };
 
 export function PrefsProvider({
@@ -216,23 +231,34 @@ export function PrefsProvider({
     () => ({ from: defaultTheme.accentFrom, to: defaultTheme.accentTo }),
     [defaultTheme.accentFrom, defaultTheme.accentTo]
   );
-  const adminColors: ThemeColors | null = useMemo(
-    () =>
-      defaultTheme.background && defaultTheme.foreground
-        ? {
-            background: defaultTheme.background,
-            foreground: defaultTheme.foreground,
-            accentFrom: defaultTheme.accentFrom,
-            accentTo: defaultTheme.accentTo,
-          }
-        : null,
-    [
-      defaultTheme.background,
-      defaultTheme.foreground,
-      defaultTheme.accentFrom,
-      defaultTheme.accentTo,
-    ]
-  );
+  // The admin custom default colors as a light+dark pair (accent shared). Light
+  // falls back to the dark surface colors if the admin only set one mode.
+  const adminLook: ModeColors | null = useMemo(() => {
+    if (!defaultTheme.background || !defaultTheme.foreground) return null;
+    const accentFrom = defaultTheme.accentFrom;
+    const accentTo = defaultTheme.accentTo;
+    return {
+      dark: {
+        background: defaultTheme.background,
+        foreground: defaultTheme.foreground,
+        accentFrom,
+        accentTo,
+      },
+      light: {
+        background: defaultTheme.backgroundLight ?? defaultTheme.background,
+        foreground: defaultTheme.foregroundLight ?? defaultTheme.foreground,
+        accentFrom,
+        accentTo,
+      },
+    };
+  }, [
+    defaultTheme.background,
+    defaultTheme.foreground,
+    defaultTheme.backgroundLight,
+    defaultTheme.foregroundLight,
+    defaultTheme.accentFrom,
+    defaultTheme.accentTo,
+  ]);
   // Start empty so the first client render matches the server (which only knows
   // the admin defaults); detection/overrides are applied after mount.
   const [prefs, setPrefs] = useState<VisitorPrefs>({});
@@ -243,7 +269,7 @@ export function PrefsProvider({
   const [design, setDesignState] = useState<DesignId>(defaultTheme.design);
   const [scene, setSceneState] = useState<SceneId>(defaultTheme.scene);
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([]);
-  const [activeColors, setActiveColors] = useState<ThemeColors | null>(null);
+  const [activeLook, setActiveLook] = useState<ModeColors | null>(null);
   const [accentOverride, setAccentOverrideState] =
     useState<AccentColors | null>(null);
   // Whether the visitor has explicitly picked a light/dark mode. Until they do,
@@ -252,13 +278,13 @@ export function PrefsProvider({
   // Tracks the OS color scheme so "system" mode resolves its surface lightness.
   const [systemDark, setSystemDark] = useState(false);
 
-  // The background/foreground layer to apply: a per-visitor custom theme wins,
-  // then the admin custom default colors (only while the visitor hasn't picked a
-  // mode), otherwise null = follow the light/dark mode.
-  const resolveBase = useCallback(
-    (active: ThemeColors | null, chosen: boolean): ThemeColors | null =>
-      active ?? (chosen ? null : adminColors),
-    [adminColors]
+  // The look to apply: a per-visitor custom look wins, then the admin custom
+  // default colors (only while the visitor hasn't picked a mode), otherwise null
+  // = follow the built-in light/dark CSS defaults.
+  const resolveLook = useCallback(
+    (active: ModeColors | null, chosen: boolean): ModeColors | null =>
+      active ?? (chosen ? null : adminLook),
+    [adminLook]
   );
 
   const persist = useCallback((next: VisitorPrefs) => {
@@ -275,13 +301,12 @@ export function PrefsProvider({
       } catch {
         // Private mode / quota — theme just won't persist.
       }
-      // Picking a mode exits any full custom theme (and the admin custom default
-      // colors), but keeps the visitor's accent override.
-      setActiveColors(null);
-      saveActiveTheme(null);
-      applyAll({ theme: next, colors: null, accentOverride, defaultAccent });
+      // Picking a mode keeps the active look; it just re-resolves to that look's
+      // matching light/dark variant (the admin default colors stop applying once
+      // a mode is chosen, so resolve against the visitor look only).
+      applyAll({ theme: next, look: activeLook, accentOverride, defaultAccent });
     },
-    [accentOverride, defaultAccent]
+    [activeLook, accentOverride, defaultAccent]
   );
 
   const setDesign = useCallback((next: DesignId) => {
@@ -296,53 +321,55 @@ export function PrefsProvider({
     applyScene(next);
   }, []);
 
-  // Apply (and persist) a full custom theme — base presets and saved themes.
-  // The theme carries its own accent, so any standalone accent override is
-  // dropped in favor of it.
+  // Apply (and persist) a full custom look — base presets and saved themes. The
+  // look carries its own accent, so any standalone accent override is dropped in
+  // favor of it. The resolved mode picks which variant is applied.
   const applyThemeColors = useCallback(
-    (colors: ThemeColors) => {
-      setActiveColors(colors);
-      saveActiveTheme(colors);
+    (look: ModeColors) => {
+      setActiveLook(look);
+      saveActiveTheme(look);
       setAccentOverrideState(null);
       saveAccentOverride(null);
-      applyAll({ theme, colors, accentOverride: null, defaultAccent });
+      applyAll({ theme, look, accentOverride: null, defaultAccent });
     },
     [theme, defaultAccent]
   );
 
-  // Apply a curated pack in one tap: its design + scene + full color set. The
-  // colors carry the pack's accent, so applyThemeColors drops any standalone
-  // accent override in favor of it.
+  // Apply a curated pack in one tap: its design + scene + light/dark color pair.
   const applyPack = useCallback(
     (pack: ThemePack) => {
       setDesign(pack.design);
       setScene(pack.scene);
-      applyThemeColors({
-        background: pack.background,
-        foreground: pack.foreground,
-        accentFrom: pack.accentFrom,
-        accentTo: pack.accentTo,
-      });
+      applyThemeColors({ dark: pack.dark, light: pack.light });
     },
     [setDesign, setScene, applyThemeColors]
   );
 
-  // Update only the background/foreground, leaving the accent as-is (live edit
-  // from the theme builder's base-color pickers).
+  // Update only the background/foreground for the CURRENT mode's variant,
+  // leaving the accent and the other mode's variant as-is (live edit from the
+  // theme builder's base-color pickers). With no active look yet, seed both
+  // modes from the edit so the new look still has both.
   const setBaseColors = useCallback(
     (background: string, foreground: string) => {
-      const current = resolveAccent(accentOverride, activeColors, defaultAccent);
-      const next: ThemeColors = {
+      const dark = resolveDark(theme);
+      const accent = resolveAccent(
+        accentOverride,
+        variantFor(activeLook, dark),
+        defaultAccent
+      );
+      const cs: ColorSet = {
         background,
         foreground,
-        accentFrom: current.from,
-        accentTo: current.to,
+        accentFrom: accent.from,
+        accentTo: accent.to,
       };
-      setActiveColors(next);
+      const base = activeLook ?? { dark: cs, light: cs };
+      const next: ModeColors = dark ? { ...base, dark: cs } : { ...base, light: cs };
+      setActiveLook(next);
       saveActiveTheme(next);
-      applyAll({ theme, colors: next, accentOverride, defaultAccent });
+      applyAll({ theme, look: next, accentOverride, defaultAccent });
     },
-    [theme, defaultAccent, accentOverride, activeColors]
+    [theme, defaultAccent, accentOverride, activeLook]
   );
 
   // Set or clear the accent on its own, leaving the background/foreground as-is.
@@ -352,16 +379,16 @@ export function PrefsProvider({
       saveAccentOverride(next);
       applyAll({
         theme,
-        colors: resolveBase(activeColors, modeChosen),
+        look: resolveLook(activeLook, modeChosen),
         accentOverride: next,
         defaultAccent,
       });
     },
-    [theme, defaultAccent, activeColors, modeChosen, resolveBase]
+    [theme, defaultAccent, activeLook, modeChosen, resolveLook]
   );
 
   const saveNamedTheme = useCallback(
-    (name: string, colors: ThemeColors) => {
+    (name: string, colors: ModeColors) => {
       const entry: CustomTheme = {
         id: crypto.randomUUID(),
         name: name.trim().slice(0, 40) || "Custom",
@@ -384,12 +411,7 @@ export function PrefsProvider({
       if (!t) return;
       setDesign(t.design);
       setScene(t.scene);
-      applyThemeColors({
-        background: t.background,
-        foreground: t.foreground,
-        accentFrom: t.accentFrom,
-        accentTo: t.accentTo,
-      });
+      applyThemeColors({ dark: t.dark, light: t.light });
     },
     [customThemes, applyThemeColors, setDesign, setScene]
   );
@@ -403,17 +425,17 @@ export function PrefsProvider({
   }, []);
 
   const clearCustomTheme = useCallback(() => {
-    setActiveColors(null);
+    setActiveLook(null);
     saveActiveTheme(null);
     setAccentOverrideState(null);
     saveAccentOverride(null);
     applyAll({
       theme,
-      colors: resolveBase(null, modeChosen),
+      look: resolveLook(null, modeChosen),
       accentOverride: null,
       defaultAccent,
     });
-  }, [defaultAccent, theme, modeChosen, resolveBase]);
+  }, [defaultAccent, theme, modeChosen, resolveLook]);
 
   // Load the stored theme + custom themes on mount and keep "system" in sync
   // with OS changes. Anything the visitor hasn't set falls back to the admin
@@ -439,7 +461,7 @@ export function PrefsProvider({
     setModeChosen(chosen);
     setDesignState(storedDesign);
     setSceneState(storedScene);
-    setActiveColors(active);
+    setActiveLook(active);
     setAccentOverrideState(overrideAccent);
     setCustomThemes(loadThemes());
     setSystemDark(
@@ -449,30 +471,34 @@ export function PrefsProvider({
     // The inline script already applied these; re-apply for consistency.
     applyAll({
       theme: stored,
-      colors: resolveBase(active, chosen),
+      look: resolveLook(active, chosen),
       accentOverride: overrideAccent,
       defaultAccent,
     });
     applyDesign(storedDesign);
     applyScene(storedScene);
 
-    // Re-apply on OS scheme change (only "system" mode tracks it; custom colors,
-    // from the visitor or the admin default, define their own and ignore the OS).
+    // Re-apply on OS scheme change. Only "system" mode tracks the OS — but a look
+    // is now mode-aware, so "system" must re-resolve the look's variant too.
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => {
       setSystemDark(mq.matches);
-      if (loadActiveTheme()) return;
       let raw: string | null = null;
       try {
         raw = window.localStorage.getItem(THEME_KEY);
       } catch {
         // ignore
       }
-      if (raw === "light" || raw === "dark" || raw === "system") {
-        applyTheme(raw);
-      } else if (!adminColors) {
-        applyTheme(defaultTheme.mode);
-      }
+      const isMode = raw === "light" || raw === "dark" || raw === "system";
+      const mode: Theme = isMode ? (raw as Theme) : defaultTheme.mode;
+      if (mode !== "system") return;
+      const look = resolveLook(loadActiveTheme(), isMode);
+      applyAll({
+        theme: "system",
+        look,
+        accentOverride: loadAccentOverride(),
+        defaultAccent,
+      });
     };
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
@@ -551,7 +577,7 @@ export function PrefsProvider({
     saveAccentOverride(null);
     saveDesign(null);
     saveScene(null);
-    setActiveColors(null);
+    setActiveLook(null);
     setAccentOverrideState(null);
     setModeChosen(false);
     setThemeState(defaultTheme.mode);
@@ -559,7 +585,7 @@ export function PrefsProvider({
     setSceneState(defaultTheme.scene);
     applyAll({
       theme: defaultTheme.mode,
-      colors: adminColors,
+      look: adminLook,
       accentOverride: null,
       defaultAccent,
     });
@@ -570,7 +596,7 @@ export function PrefsProvider({
     defaultTheme.mode,
     defaultTheme.design,
     defaultTheme.scene,
-    adminColors,
+    adminLook,
     defaultAccent,
   ]);
 
@@ -626,12 +652,19 @@ export function PrefsProvider({
   const value = useMemo<PrefsValue>(() => {
     const timezone = prefs.timezone || detectedTz || defaults.timezone;
     const units = prefs.units || defaults.units;
-    // The effective background: a custom theme / admin custom colors define it
-    // directly; otherwise it follows the light/dark mode.
-    const baseColors = activeColors ?? (modeChosen ? null : adminColors);
-    const surfaceIsLight = baseColors
-      ? isLightColor(baseColors.background)
-      : theme === "light" || (theme === "system" && !systemDark);
+    // Resolve the current mode to a lightness, then pick the effective look's
+    // matching variant (visitor look, else admin default colors). That variant's
+    // background drives the surface-lightness used by theme-aware icons/scenes.
+    const isLight = theme === "light" || (theme === "system" && !systemDark);
+    const effectiveLook = activeLook ?? (modeChosen ? null : adminLook);
+    const activeColors: ColorSet | null = effectiveLook
+      ? isLight
+        ? effectiveLook.light
+        : effectiveLook.dark
+      : null;
+    const surfaceIsLight = activeColors
+      ? isLightColor(activeColors.background)
+      : isLight;
     const location: EffectiveLocation = prefs.location
       ? {
           latitude: prefs.location.latitude,
@@ -657,6 +690,7 @@ export function PrefsProvider({
       scene,
       surfaceIsLight,
       customThemes,
+      activeLook,
       activeColors,
       accentOverride,
       activeAccent: resolveAccent(accentOverride, activeColors, defaultAccent),
@@ -685,14 +719,14 @@ export function PrefsProvider({
     locationError,
     weatherEnabled,
     defaultAccent,
-    adminColors,
+    adminLook,
     theme,
     design,
     scene,
     systemDark,
     modeChosen,
     customThemes,
-    activeColors,
+    activeLook,
     accentOverride,
     setTimezone,
     setUnits,
