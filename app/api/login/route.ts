@@ -3,6 +3,7 @@ import {
   verifyEnvPassword,
   verifyPasswordHash,
   createSessionToken,
+  sessionCookieOptions,
   SESSION_COOKIE_NAME,
 } from "@/lib/auth";
 import { readConfig } from "@/lib/config";
@@ -34,17 +35,6 @@ function clientKey(request: NextRequest): string {
     .filter(Boolean);
   const idx = parts.length - TRUSTED_PROXY_HOPS;
   return `login:${idx >= 0 ? parts[idx] : "unknown"}`;
-}
-
-// Mark the session cookie Secure only when the request actually arrived over
-// HTTPS (directly or via a TLS-terminating proxy). Keying this off NODE_ENV
-// instead would set Secure in the production container even on plain-HTTP
-// deployments, where browsers silently drop the cookie on non-localhost
-// origins — so the login would succeed but never stick.
-function isHttps(request: NextRequest): boolean {
-  const proto = request.headers.get("x-forwarded-proto");
-  if (proto) return proto.split(",")[0]?.trim() === "https";
-  return request.nextUrl.protocol === "https:";
 }
 
 export async function POST(request: NextRequest) {
@@ -87,14 +77,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid password" }, { status: 401 });
   }
 
-  const token = await createSessionToken();
+  // Bind the token to the current password hash so a later password change
+  // revokes it (see proxy.ts / verifySessionToken).
+  const token = await createSessionToken(auth.passwordHash);
   const response = NextResponse.json({ ok: true });
-  response.cookies.set(SESSION_COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: isHttps(request),
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 7,
-  });
+  response.cookies.set(
+    SESSION_COOKIE_NAME,
+    token,
+    sessionCookieOptions(request)
+  );
   return response;
 }

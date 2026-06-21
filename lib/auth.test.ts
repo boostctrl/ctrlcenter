@@ -86,6 +86,16 @@ describe("session tokens", () => {
     expect(await verifySessionToken(token)).toBe(true);
   });
 
+  it("invalidates a token when the mixed-in key material (password hash) changes", async () => {
+    vi.stubEnv("SESSION_SECRET", "dedicated-secret");
+    const token = await createSessionToken("password-hash-A");
+    // Same material still verifies...
+    expect(await verifySessionToken(token, "password-hash-A")).toBe(true);
+    // ...but a changed password hash (e.g. after a password change) does not,
+    // even though SESSION_SECRET is unchanged.
+    expect(await verifySessionToken(token, "password-hash-B")).toBe(false);
+  });
+
   it("fails closed when no secret is configured", async () => {
     vi.stubEnv("SESSION_SECRET", "");
     vi.stubEnv("ADMIN_PASSWORD", "");

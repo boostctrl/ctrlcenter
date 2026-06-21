@@ -3,6 +3,9 @@ import {
   verifyEnvPassword,
   verifyPasswordHash,
   hashPassword,
+  createSessionToken,
+  sessionCookieOptions,
+  SESSION_COOKIE_NAME,
 } from "@/lib/auth";
 import { readConfig, setPasswordHash } from "@/lib/config";
 import { passwordChangeSchema } from "@/lib/schema";
@@ -32,5 +35,16 @@ export async function POST(request: NextRequest) {
 
   const { hash, salt } = await hashPassword(next);
   await setPasswordHash(hash, salt);
-  return NextResponse.json({ ok: true });
+
+  // Changing the password revokes every existing session (the key mixes in the
+  // hash). Reissue this admin a fresh cookie bound to the new hash so they stay
+  // signed in while any other sessions are invalidated.
+  const token = await createSessionToken(hash);
+  const response = NextResponse.json({ ok: true });
+  response.cookies.set(
+    SESSION_COOKIE_NAME,
+    token,
+    sessionCookieOptions(request)
+  );
+  return response;
 }

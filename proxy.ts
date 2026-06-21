@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySessionToken, SESSION_COOKIE_NAME } from "@/lib/auth";
+import { readConfig } from "@/lib/config";
 
 export const config = {
   matcher: [
@@ -20,7 +21,10 @@ export async function proxy(request: NextRequest) {
   }
 
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
-  const isAuthed = await verifySessionToken(token);
+  // Mix the stored password hash into the key so a password change invalidates
+  // outstanding sessions (proxy runs in the Node runtime, so it can read config).
+  const { auth } = await readConfig();
+  const isAuthed = await verifySessionToken(token, auth.passwordHash);
 
   if (isAuthed) {
     return NextResponse.next();
