@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useVisitorPrefs } from "./PrefsProvider";
 import { shortDate, timeString } from "@/lib/datetime";
 import {
@@ -64,8 +65,8 @@ export default function TimeWeather({
   const date = now ? shortDate(now, timezone) : initialDate;
   const showWeather = weatherEnabled && weather;
 
-  return (
-    <div className="glass-card flex items-center gap-5 px-6 py-4">
+  const inner = (
+    <>
       {showWeather && (
         <>
           <div className="flex items-center gap-3">
@@ -97,6 +98,19 @@ export default function TimeWeather({
           {weatherEnabled && location.label ? ` · ${location.label}` : ""}
         </p>
       </div>
-    </div>
+    </>
+  );
+
+  // When weather is on, the widget links to the full forecast.
+  return weatherEnabled ? (
+    <Link
+      href="/weather"
+      title="View forecast"
+      className="glass-card flex items-center gap-5 px-6 py-4"
+    >
+      {inner}
+    </Link>
+  ) : (
+    <div className="glass-card flex items-center gap-5 px-6 py-4">{inner}</div>
   );
 }

@@ -19,6 +19,9 @@ here.
   URL — using the same icon picker as apps/bookmarks. (#15)
 - **Sortable bookmark categories**: reorder categories from the admin Bookmarks
   tab (move buttons on each category); the dashboard honors the saved order. (#20)
+- **Weather forecast page**: the weather widget now links to a `/weather` page
+  with current conditions, a next-24-hours hourly strip, and a 7-day outlook for
+  the visitor's location/units. (#21)
 
 ### Changed
 
