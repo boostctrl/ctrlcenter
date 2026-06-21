@@ -3,7 +3,12 @@
 import { useEffect, useState } from "react";
 import { useVisitorPrefs } from "./PrefsProvider";
 import { ACCENTS, ACCENT_KEYS, BASE_THEMES, DESIGNS } from "@/lib/theme";
+import type { DesignId } from "@/lib/theme";
 import type { ThemeColors } from "@/lib/prefs";
+
+const DESIGN_NAMES = Object.fromEntries(
+  DESIGNS.map((d) => [d.id, d.name])
+) as Record<DesignId, string>;
 
 const DEFAULT_DRAFT: ThemeColors = {
   background: "#06070d",
@@ -253,7 +258,10 @@ export default function ThemeBuilder() {
                 }}
                 aria-hidden
               />
-              <span className="min-w-0 flex-1 truncate">{t.name}</span>
+              <span className="min-w-0 flex-1 truncate">
+                {t.name}
+                <span className="text-fg/40"> · {DESIGN_NAMES[t.design]}</span>
+              </span>
               <button
                 type="button"
                 onClick={() => applyNamedTheme(t.id)}

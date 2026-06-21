@@ -18,7 +18,8 @@ here.
   **Aero**, **Flat**, **Soft**, **Minimal**, **Bold**, or **Cyber**. A design
   restyles every surface (rounding, blur, borders, shadows, background glow)
   while your colors keep applying on top, and it's applied before first paint
-  (no flash). Per-visitor.
+  (no flash). Per-visitor. Saved themes capture the chosen design too, so
+  applying one restores its look-and-feel.
 
 ### Changed
 

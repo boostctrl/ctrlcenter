@@ -129,7 +129,13 @@ export type ThemeColors = {
   accentTo: string;
 };
 
-export type CustomTheme = ThemeColors & { id: string; name: string };
+// A saved theme bundles the colors with the look-and-feel design it was saved
+// with, so applying it restores both.
+export type CustomTheme = ThemeColors & {
+  id: string;
+  name: string;
+  design: DesignId;
+};
 
 // The active custom theme's colors (overrides light/dark mode when present).
 export const ACTIVE_THEME_KEY = "homepage:activeTheme";
@@ -185,7 +191,9 @@ export function loadThemes(): CustomTheme[] {
     return arr.flatMap((t): CustomTheme[] => {
       const colors = sanitizeColors(t);
       if (colors && t && typeof t.id === "string" && typeof t.name === "string") {
-        return [{ id: t.id, name: t.name.slice(0, 40), ...colors }];
+        // Themes saved before designs existed default to the Glass design.
+        const design = isDesignId(t.design) ? t.design : DEFAULT_DESIGN;
+        return [{ id: t.id, name: t.name.slice(0, 40), design, ...colors }];
       }
       return [];
     });

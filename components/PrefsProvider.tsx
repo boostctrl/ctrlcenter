@@ -243,23 +243,28 @@ export function PrefsProvider({
     [theme, accent, activeColors]
   );
 
-  const saveNamedTheme = useCallback((name: string, colors: ThemeColors) => {
-    const entry: CustomTheme = {
-      id: crypto.randomUUID(),
-      name: name.trim().slice(0, 40) || "Custom",
-      ...colors,
-    };
-    setCustomThemes((prev) => {
-      const next = [...prev, entry];
-      saveThemes(next);
-      return next;
-    });
-  }, []);
+  const saveNamedTheme = useCallback(
+    (name: string, colors: ThemeColors) => {
+      const entry: CustomTheme = {
+        id: crypto.randomUUID(),
+        name: name.trim().slice(0, 40) || "Custom",
+        design,
+        ...colors,
+      };
+      setCustomThemes((prev) => {
+        const next = [...prev, entry];
+        saveThemes(next);
+        return next;
+      });
+    },
+    [design]
+  );
 
   const applyNamedTheme = useCallback(
     (id: string) => {
       const t = customThemes.find((x) => x.id === id);
       if (!t) return;
+      setDesign(t.design);
       applyThemeColors({
         background: t.background,
         foreground: t.foreground,
@@ -267,7 +272,7 @@ export function PrefsProvider({
         accentTo: t.accentTo,
       });
     },
-    [customThemes, applyThemeColors]
+    [customThemes, applyThemeColors, setDesign]
   );
 
   const deleteNamedTheme = useCallback((id: string) => {
