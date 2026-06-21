@@ -12,6 +12,7 @@ export default function SettingsControls() {
     units,
     location,
     detecting,
+    locationError,
     weatherEnabled,
     greetingName,
     theme,
@@ -98,6 +99,9 @@ export default function SettingsControls() {
                 {detecting ? "Locating…" : "Use my location"}
               </button>
             </div>
+            {locationError && (
+              <p className="text-xs text-red-400">{locationError}</p>
+            )}
           </div>
 
           <div className="flex items-center justify-between">

@@ -12,6 +12,14 @@ here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **"Use my location"** now works: the `Permissions-Policy` header was disabling
+  geolocation for all origins (`geolocation=()`); it's now allowed for the app's
+  own origin. The button also reports a clear reason when it can't get a fix
+  (insecure/non-HTTPS origin, denied permission, or timeout) instead of failing
+  silently. (#18)
+
 ### Security
 
 - **Login rate limit** no longer trusts the client-supplied (leftmost)

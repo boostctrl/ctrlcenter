@@ -123,6 +123,7 @@ type PrefsValue = {
   units: Units;
   location: EffectiveLocation;
   detecting: boolean;
+  locationError: string | null;
   weatherEnabled: boolean;
   greetingName: string;
   theme: Theme;
@@ -215,6 +216,7 @@ export function PrefsProvider({
   const [prefs, setPrefs] = useState<VisitorPrefs>({});
   const [detectedTz, setDetectedTz] = useState<string | undefined>();
   const [detecting, setDetecting] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [theme, setThemeState] = useState<Theme>(defaultTheme.mode);
   const [design, setDesignState] = useState<DesignId>(defaultTheme.design);
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([]);
@@ -512,7 +514,20 @@ export function PrefsProvider({
   }, [persist, defaultTheme.mode, defaultTheme.design, adminColors, defaultAccent]);
 
   const useMyLocation = useCallback(() => {
-    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+    setLocationError(null);
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setLocationError("This browser doesn't support location.");
+      return;
+    }
+    // Geolocation only works in a secure context (HTTPS or localhost). This app
+    // is often self-hosted over plain HTTP on a LAN, where the call fails
+    // silently — so say so up front rather than spin forever.
+    if (!window.isSecureContext) {
+      setLocationError(
+        "Location needs a secure (HTTPS) connection. Set it manually instead."
+      );
+      return;
+    }
     setDetecting(true);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
@@ -533,7 +548,16 @@ export function PrefsProvider({
         });
         setDetecting(false);
       },
-      () => setDetecting(false),
+      (err) => {
+        setDetecting(false);
+        setLocationError(
+          err.code === err.PERMISSION_DENIED
+            ? "Location permission denied."
+            : err.code === err.TIMEOUT
+              ? "Location request timed out."
+              : "Couldn't get your location."
+        );
+      },
       { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }
     );
   }, [prefs, persist]);
@@ -564,6 +588,7 @@ export function PrefsProvider({
       units,
       location,
       detecting,
+      locationError,
       weatherEnabled,
       greetingName: prefs.greetingName ?? "",
       theme,
@@ -593,6 +618,7 @@ export function PrefsProvider({
     detectedTz,
     defaults,
     detecting,
+    locationError,
     weatherEnabled,
     defaultAccent,
     adminColors,
