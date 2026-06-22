@@ -12,6 +12,35 @@ here.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-06-22
+
+### Added
+
+- **Four new scenes** in the theme builder: _Nebula_ (drifting clouds of accent
+  light), _Grid_ (a perspective grid to the horizon — synthwave on dark, a clean
+  blueprint on light), _Starfield_ (twinkling, drifting stars), and _Waves_
+  (layered waves along the base). Each has a cohesive light and dark treatment
+  and honors `prefers-reduced-motion`.
+- **Four new themes** showcasing them: _Nebula_, _Outrun_, _Observatory_, and
+  _Tide_.
+
+### Changed
+
+- **"Packs" are now "Themes," and built-in and saved themes share one list.** A
+  Theme is a scene + design + palette tailored for both light and dark; saving
+  the current look adds a Theme alongside the built-ins, and saved ones can be
+  removed inline.
+- Removed the Abyss scene's depth-gauge ornament (it crowded the dashboard);
+  Abyss keeps its bioluminescent backdrop and drifting marine snow.
+
+### Fixed
+
+- Light-mode legibility of faint text: bookmark category labels (previously a
+  fixed light violet that washed out) now follow the theme accent and stay
+  readable in both modes; app subtitles, section titles, and status-page hosts
+  are no longer too pale on light backgrounds; and admin toasts read clearly on
+  light pages.
+
 ## [0.7.0] - 2026-06-21
 
 ### Added
@@ -357,7 +386,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/homepage-app/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/boostctrl/homepage-app/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/boostctrl/homepage-app/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/boostctrl/homepage-app/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/boostctrl/homepage-app/compare/v0.5.3...v0.6.0
 [0.5.3]: https://github.com/boostctrl/homepage-app/compare/v0.5.2...v0.5.3
