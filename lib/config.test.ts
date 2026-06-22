@@ -10,7 +10,7 @@ let config: typeof import("./config");
 let configPath: string;
 
 beforeAll(async () => {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "homepage-test-"));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "ctrlcenter-test-"));
   configPath = path.join(dir, "config.yaml");
   process.env.CONFIG_PATH = configPath;
   config = await import("./config");

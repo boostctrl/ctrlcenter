@@ -1,10 +1,10 @@
 services:
-  homepage:
+  ctrlcenter:
     # Pull the published image. To build locally from source instead, comment
     # out `image:` and uncomment `build: .`.
-    image: ghcr.io/boostctrl/homepage-app:latest
+    image: ghcr.io/boostctrl/ctrlcenter:latest
     # build: .
-    container_name: homepage
+    container_name: ctrlcenter
     restart: unless-stopped
     ports:
       - "3000:3000"

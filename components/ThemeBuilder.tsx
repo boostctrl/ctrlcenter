@@ -138,6 +138,65 @@ export default function ThemeBuilder() {
       </div>
 
       <div className="space-y-2">
+        <span className="text-xs text-fg/50">Themes</span>
+        <p className="text-xs text-fg/40">
+          Full looks — palette, design, and scene (light &amp; dark) in one tap.
+          Save your own with the field below.
+        </p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {THEME_PACKS.map((p) => (
+            <button
+              key={`builtin:${p.name}`}
+              type="button"
+              onClick={() => applyPack(p)}
+              className="group flex flex-col gap-1.5 rounded-lg border border-fg/10 p-2 text-left transition-colors hover:border-fg/30"
+              title={`${p.name} · ${DESIGN_NAMES[p.design]}`}
+            >
+              <span
+                className="h-9 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
+                style={{
+                  background: `radial-gradient(120% 100% at 50% -10%, ${p.dark.accentFrom}, transparent 60%), ${p.dark.background}`,
+                }}
+                aria-hidden
+              />
+              <span className="truncate text-xs text-fg/60 group-hover:text-fg/90">
+                {p.name}
+              </span>
+            </button>
+          ))}
+          {customThemes.map((t) => (
+            <div key={t.id} className="group relative">
+              <button
+                type="button"
+                onClick={() => applyNamedTheme(t.id)}
+                className="flex w-full flex-col gap-1.5 rounded-lg border border-fg/10 p-2 text-left transition-colors hover:border-fg/30"
+                title={`${t.name} · ${DESIGN_NAMES[t.design]}`}
+              >
+                <span
+                  className="h-9 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
+                  style={{
+                    background: `radial-gradient(120% 100% at 50% -10%, ${t.dark.accentFrom}, transparent 60%), ${t.dark.background}`,
+                  }}
+                  aria-hidden
+                />
+                <span className="truncate text-xs text-fg/60 group-hover:text-fg/90">
+                  {t.name}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => deleteNamedTheme(t.id)}
+                aria-label={`Delete ${t.name}`}
+                className="absolute top-1 right-1 rounded-md bg-background/70 px-1 text-xs text-fg/50 opacity-0 transition-opacity hover:text-red-400 group-hover:opacity-100"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
         <span className="text-xs text-fg/50">Design</span>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {DESIGNS.map((d) => {
@@ -212,65 +271,6 @@ export default function ThemeBuilder() {
               </button>
             );
           })}
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <span className="text-xs text-fg/50">Themes</span>
-        <p className="text-xs text-fg/40">
-          Full looks — palette, design, and scene (light &amp; dark) in one tap.
-          Save your own with the field below.
-        </p>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {THEME_PACKS.map((p) => (
-            <button
-              key={`builtin:${p.name}`}
-              type="button"
-              onClick={() => applyPack(p)}
-              className="group flex flex-col gap-1.5 rounded-lg border border-fg/10 p-2 text-left transition-colors hover:border-fg/30"
-              title={`${p.name} · ${DESIGN_NAMES[p.design]}`}
-            >
-              <span
-                className="h-9 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
-                style={{
-                  background: `radial-gradient(120% 100% at 50% -10%, ${p.dark.accentFrom}, transparent 60%), ${p.dark.background}`,
-                }}
-                aria-hidden
-              />
-              <span className="truncate text-xs text-fg/60 group-hover:text-fg/90">
-                {p.name}
-              </span>
-            </button>
-          ))}
-          {customThemes.map((t) => (
-            <div key={t.id} className="group relative">
-              <button
-                type="button"
-                onClick={() => applyNamedTheme(t.id)}
-                className="flex w-full flex-col gap-1.5 rounded-lg border border-fg/10 p-2 text-left transition-colors hover:border-fg/30"
-                title={`${t.name} · ${DESIGN_NAMES[t.design]}`}
-              >
-                <span
-                  className="h-9 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
-                  style={{
-                    background: `radial-gradient(120% 100% at 50% -10%, ${t.dark.accentFrom}, transparent 60%), ${t.dark.background}`,
-                  }}
-                  aria-hidden
-                />
-                <span className="truncate text-xs text-fg/60 group-hover:text-fg/90">
-                  {t.name}
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => deleteNamedTheme(t.id)}
-                aria-label={`Delete ${t.name}`}
-                className="absolute top-1 right-1 rounded-md bg-background/70 px-1 text-xs text-fg/50 opacity-0 transition-opacity hover:text-red-400 group-hover:opacity-100"
-              >
-                ✕
-              </button>
-            </div>
-          ))}
         </div>
       </div>
 

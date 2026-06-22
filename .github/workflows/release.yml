@@ -9,7 +9,7 @@ permissions:
   packages: write
 
 env:
-  IMAGE: ghcr.io/boostctrl/homepage-app
+  IMAGE: ghcr.io/boostctrl/ctrlcenter
 
 jobs:
   # Re-run the quality gate before publishing so a slow multi-arch build can

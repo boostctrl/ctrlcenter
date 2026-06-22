@@ -30,11 +30,6 @@
     color-mix(in srgb, var(--accent-from) 25%, transparent);
   --surface-lift: -2px;
   --glow-opacity: 1;
-  /* The page backdrop (a fixed layer behind everything; see body::before). Each
-     design sets its own so the background reinforces the look — Glass leans on
-     the accent glow blobs, others add a wash or grid. */
-  --backdrop: none;
-  --backdrop-size: 100% 100%;
 }
 
 /* --- Designs: each overrides the surface tokens above (applied as a class on
@@ -140,58 +135,6 @@
   --glow-opacity: 0.7;
 }
 
-/* --- Per-design backdrops (rendered by body::before). Designed to reinforce
-   each look rather than decorate: Glass/Aero/Soft lean on light + the accent
-   glow blobs; Flat gets a faint top wash; Bold/Cyber get a grid (monochrome vs
-   neon-accent); Minimal stays clean. --- */
-.design-flat {
-  --backdrop: radial-gradient(
-    ellipse 100% 60% at 50% -20%,
-    color-mix(in srgb, var(--fg) 6%, transparent),
-    transparent 70%
-  );
-}
-.design-soft {
-  --backdrop: radial-gradient(
-    70% 60% at 50% -10%,
-    color-mix(in srgb, var(--accent-from) 14%, transparent),
-    transparent 75%
-  );
-}
-.design-aero {
-  --backdrop: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--fg) 10%, transparent),
-    transparent 45%
-  );
-}
-.design-bold {
-  --backdrop: linear-gradient(
-      to right,
-      color-mix(in srgb, var(--fg) 7%, transparent) 1px,
-      transparent 1px
-    ),
-    linear-gradient(
-      to bottom,
-      color-mix(in srgb, var(--fg) 7%, transparent) 1px,
-      transparent 1px
-    );
-  --backdrop-size: 44px 44px;
-}
-.design-cyber {
-  --backdrop: linear-gradient(
-      to right,
-      color-mix(in srgb, var(--accent-from) 12%, transparent) 1px,
-      transparent 1px
-    ),
-    linear-gradient(
-      to bottom,
-      color-mix(in srgb, var(--accent-from) 12%, transparent) 1px,
-      transparent 1px
-    );
-  --backdrop-size: 38px 38px;
-}
-
 /* Light theme: toggled by adding `.theme-light` to <html>. */
 .theme-light {
   --background: #eceef3;
@@ -227,18 +170,6 @@ body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
-}
-
-/* The design backdrop: a fixed layer behind the content (and behind the accent
-   glow blobs), driven by the --backdrop / --backdrop-size design tokens. */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -10;
-  pointer-events: none;
-  background-image: var(--backdrop, none);
-  background-size: var(--backdrop-size, 100% 100%);
 }
 
 @layer utilities {

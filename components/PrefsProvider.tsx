@@ -40,7 +40,7 @@ import {
 } from "@/lib/theme";
 
 export type Theme = "system" | "light" | "dark";
-export const THEME_KEY = "homepage:theme";
+export const THEME_KEY = "ctrlcenter:theme";
 
 type Accent = AccentColors;
 

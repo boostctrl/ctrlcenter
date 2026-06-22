@@ -34,7 +34,7 @@ export type VisitorPrefs = {
   dismissedAuto?: boolean;
 };
 
-export const PREFS_KEY = "homepage:prefs";
+export const PREFS_KEY = "ctrlcenter:prefs";
 
 function isFiniteNumber(v: unknown): v is number {
   return typeof v === "number" && Number.isFinite(v);
@@ -143,9 +143,9 @@ export type CustomTheme = ModeColors & {
 
 // The active custom look's light+dark colors (the resolved mode selects which
 // is applied). Per-visitor, stored in localStorage.
-export const ACTIVE_THEME_KEY = "homepage:activeTheme";
+export const ACTIVE_THEME_KEY = "ctrlcenter:activeTheme";
 // The visitor's saved, named themes.
-export const THEMES_KEY = "homepage:themes";
+export const THEMES_KEY = "ctrlcenter:themes";
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
@@ -237,7 +237,7 @@ export function saveThemes(themes: CustomTheme[]): void {
 // admin-configured default accent when present.
 export type AccentColors = { from: string; to: string };
 
-export const ACCENT_KEY = "homepage:accent";
+export const ACCENT_KEY = "ctrlcenter:accent";
 
 export function sanitizeAccent(input: unknown): AccentColors | null {
   if (!input || typeof input !== "object") return null;
@@ -272,7 +272,7 @@ export function saveAccentOverride(accent: AccentColors | null): void {
 // --- Design ---
 // The look-and-feel preset (Glass, Flat, Bold, …). Per-visitor; applied as a
 // `design-<id>` class on <html>. See lib/theme.ts for the catalog.
-export const DESIGN_KEY = "homepage:design";
+export const DESIGN_KEY = "ctrlcenter:design";
 
 // Returns null when the visitor hasn't chosen a design, so callers can fall
 // back to the admin-configured default.
@@ -302,7 +302,7 @@ export function saveDesign(design: DesignId | null): void {
 // --- Scene ---
 // The backdrop + ornament preset (Aurora, Abyss, …). Per-visitor; applied as a
 // `scene-<id>` class on <html> and rendered by <SceneLayer>. See lib/theme.ts.
-export const SCENE_KEY = "homepage:scene";
+export const SCENE_KEY = "ctrlcenter:scene";
 
 // Returns null when the visitor hasn't chosen a scene, so callers can fall back
 // to the admin-configured default.

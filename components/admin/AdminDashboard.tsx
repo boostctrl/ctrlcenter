@@ -59,7 +59,7 @@ function AdminBody({ initialApps, initialBookmarks, initialSettings }: Props) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "homepage-config.json";
+      a.download = "ctrlcenter-config.json";
       a.click();
       URL.revokeObjectURL(url);
     } catch {
@@ -93,7 +93,7 @@ function AdminBody({ initialApps, initialBookmarks, initialSettings }: Props) {
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 py-12 sm:px-10">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-3xl font-bold">Manage your homepage</h1>
+        <h1 className="text-3xl font-bold">Manage your dashboard</h1>
         <div className="flex flex-wrap items-center gap-3">
           <Link
             href="/"

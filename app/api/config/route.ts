@@ -10,7 +10,7 @@ export async function GET() {
   const config = await readConfig();
   return NextResponse.json(config, {
     headers: {
-      "Content-Disposition": 'attachment; filename="homepage-config.json"',
+      "Content-Disposition": 'attachment; filename="ctrlcenter-config.json"',
     },
   });
 }
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
   const parsed = configSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "That doesn't look like a valid homepage config file." },
+      { error: "That doesn't look like a valid ctrlcenter config file." },
       { status: 400 }
     );
   }

@@ -8,7 +8,7 @@ const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Must be a #rrggbb color"
 
 // z.string().url() accepts any valid URL — including `javascript:`, `data:`,
 // and `vbscript:` schemes. App/bookmark URLs are rendered as <a href> on the
-// public homepage, so an unsafe scheme would be stored XSS. Restrict to http(s).
+// public dashboard, so an unsafe scheme would be stored XSS. Restrict to http(s).
 const httpUrl = z
   .string()
   .url()

@@ -1,6 +1,6 @@
-# Homepage
+# ctrlcenter
 
-A self-hosted homepage dashboard: applications grid, categorized bookmarks,
+A self-hosted dashboard: applications grid, categorized bookmarks,
 a live date/greeting header with a ticking clock, and a weather widget. Built
 with Next.js + Tailwind, configured through a single YAML file, with a built-in
 admin UI for adding/editing apps and bookmarks without touching the file by
@@ -28,7 +28,7 @@ Features:
    docker compose up -d
    ```
    The bundled [docker-compose.yml](docker-compose.yml) uses the prebuilt image
-   `ghcr.io/boostctrl/homepage-app:latest`. To build from source instead,
+   `ghcr.io/boostctrl/ctrlcenter:latest`. To build from source instead,
    comment out `image:` and uncomment `build: .`, then run
    `docker compose up -d --build`.
 3. Open `http://localhost:3000` for the dashboard, `http://localhost:3000/admin`
@@ -168,7 +168,7 @@ Pushing a `v*` tag triggers
 
 1. re-runs the tests;
 2. builds a multi-arch (`linux/amd64`, `linux/arm64`) image and publishes it
-   to `ghcr.io/boostctrl/homepage-app` tagged `X.Y.Z`, `X.Y`, and `latest`; and
+   to `ghcr.io/boostctrl/ctrlcenter` tagged `X.Y.Z`, `X.Y`, and `latest`; and
 3. creates the GitHub release, with notes extracted from the matching
    `CHANGELOG.md` section (so the release will fail if that section is
    missing — keep step 1 above honest). Tags containing a hyphen

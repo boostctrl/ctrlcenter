@@ -3,14 +3,28 @@ import type { SceneProps } from "./index";
 
 const SIZE = 48;
 
-// Grid — a perspective grid receding to the horizon. Dark = a glowing synthwave
-// grid; light = a clean flat blueprint grid (no glow). The plane scrolls toward
-// the viewer (animate-grid), recolored from the accent var. Motion stops under
-// prefers-reduced-motion.
+// Grid — a full-page grid background plus a perspective floor receding to the
+// horizon. A faint flat grid covers the whole viewport (the general grid
+// backdrop that the Bold/Cyber designs used to bake in), and the scrolling
+// perspective plane (animate-grid) adds depth. Dark = glowing synthwave; light =
+// a clean blueprint grid (no glow). Recolored from the accent var; motion stops
+// under prefers-reduced-motion.
 export default function Grid({ light }: SceneProps) {
   const line = light
     ? "color-mix(in srgb, var(--accent-from) 22%, transparent)"
     : "color-mix(in srgb, var(--accent-from) 42%, transparent)";
+  const flatLine = light
+    ? "color-mix(in srgb, var(--accent-from) 13%, transparent)"
+    : "color-mix(in srgb, var(--accent-from) 16%, transparent)";
+  const flatMask =
+    "linear-gradient(to bottom, transparent, black 28%, black 68%, transparent)";
+
+  const flat: CSSProperties = {
+    backgroundImage: `linear-gradient(to right, ${flatLine} 1px, transparent 1px), linear-gradient(to bottom, ${flatLine} 1px, transparent 1px)`,
+    backgroundSize: `${SIZE}px ${SIZE}px`,
+    maskImage: flatMask,
+    WebkitMaskImage: flatMask,
+  };
 
   const plane: CSSProperties = {
     ["--grid-size" as string]: `${SIZE}px`,
@@ -30,6 +44,7 @@ export default function Grid({ light }: SceneProps) {
       aria-hidden
       className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
     >
+      <div className="absolute inset-0" style={flat} />
       {!light && (
         <div
           className="absolute inset-x-0"
