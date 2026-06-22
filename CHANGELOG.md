@@ -12,6 +12,34 @@ here.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-06-21
+
+### Added
+
+- **Theme scenes**: a new backdrop-and-ornament layer chosen in the theme
+  builder, independent of the palette and design. _Aurora_ (the floating accent
+  glow, default) and _Abyss_ — a deep-sea scene with a bioluminescent backdrop,
+  drifting marine snow, and a depth-gauge ornament. All motion respects
+  `prefers-reduced-motion`.
+- **Theme packs**: one-tap curated looks that set a palette, design, and scene
+  together (still tweakable afterward), starting with _Mariana_.
+- **Uptime status page** at `/status`: every app with its up/down state, HTTP
+  code, response time, and a live "last checked" time, plus an overall health
+  summary and a manual refresh. A health pill by the dashboard's "Applications"
+  heading links to it. Gated by the existing status-checks setting; 30-day
+  uptime history is tracked in #26.
+
+### Changed
+
+- **Every look now has a cohesive light _and_ dark variant**, and the
+  light/dark/system toggle is always live: switching modes keeps the active look
+  (palette, pack, scene) and swaps its colors instead of dropping it. Palettes
+  and the Mariana pack ship hand-tuned light and dark; scenes adapt (Abyss
+  becomes "sunlit shallows" in light); designs use mode-aware shadows. Admin
+  custom default colors are now a light/dark pair.
+- The app reachability **dot** is now backed by the full `/status` page; the
+  per-card dots remain.
+
 ## [0.6.0] - 2026-06-21
 
 ### Added
@@ -329,7 +357,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/homepage-app/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/boostctrl/homepage-app/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/boostctrl/homepage-app/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/boostctrl/homepage-app/compare/v0.5.3...v0.6.0
 [0.5.3]: https://github.com/boostctrl/homepage-app/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/boostctrl/homepage-app/compare/v0.5.1...v0.5.2
