@@ -41,7 +41,7 @@ export default function SettingsControls() {
           id="greeting-name"
           value={greetingName}
           onChange={(e) => setGreetingName(e.target.value)}
-          placeholder="e.g. Eric"
+          placeholder="e.g. Elliott"
           maxLength={60}
           className="accent-focus w-full rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-fg outline-none transition-colors"
         />
