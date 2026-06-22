@@ -8,7 +8,6 @@ import {
   weatherCodeToIcon,
   weatherCodeLabel,
   type Forecast,
-  type Units,
 } from "@/lib/weather";
 
 // Times come back in the location's own timezone as "YYYY-MM-DDTHH:MM", so format
@@ -31,35 +30,30 @@ function dayLabel(d: string, i: number): string {
 // header widget).
 export default function WeatherDetails({
   initial,
-  defaultLat,
-  defaultLon,
-  defaultUnits,
 }: {
   initial: Forecast | null;
-  defaultLat: number;
-  defaultLon: number;
-  defaultUnits: Units;
 }) {
   const { location, units } = useVisitorPrefs();
   const [fetched, setFetched] = useState<Forecast | null>(null);
 
-  const usesDefault =
-    Math.abs(location.latitude - defaultLat) < 1e-4 &&
-    Math.abs(location.longitude - defaultLon) < 1e-4 &&
-    units === defaultUnits;
-
+  // Always refetch live on mount (and every 10 min) so the page stays current
+  // and in sync with the header widget, which refetches the same way — rather
+  // than serving a drifted 30-min server-cached snapshot.
   useEffect(() => {
-    if (usesDefault) return;
     let active = true;
-    fetchForecast(location.latitude, location.longitude, units).then((f) => {
-      if (active) setFetched(f);
-    });
+    const load = () =>
+      fetchForecast(location.latitude, location.longitude, units).then((f) => {
+        if (active && f) setFetched(f);
+      });
+    load();
+    const timer = setInterval(load, 10 * 60 * 1000);
     return () => {
       active = false;
+      clearInterval(timer);
     };
-  }, [usesDefault, location.latitude, location.longitude, units]);
+  }, [location.latitude, location.longitude, units]);
 
-  const forecast = usesDefault ? initial : (fetched ?? initial);
+  const forecast = fetched ?? initial;
   if (!forecast) {
     return <p className="text-fg/50">Couldn&apos;t load the forecast.</p>;
   }

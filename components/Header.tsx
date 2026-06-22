@@ -25,9 +25,6 @@ export default async function Header({ settings }: { settings: Settings }) {
         initialDate={initialDate}
         weatherEnabled={weather.enabled}
         initial={initialWeather}
-        defaultLat={weather.latitude}
-        defaultLon={weather.longitude}
-        defaultUnits={weather.units}
       />
     </header>
   );

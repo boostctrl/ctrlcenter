@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, Suspense, type FormEvent } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { TextField, Button } from "@/components/admin/ui";
 
 // Only follow `next` when it's a same-site, same-origin path: a single leading
@@ -14,7 +14,6 @@ function safeNext(next: string | null): string {
 }
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -35,8 +34,11 @@ function LoginForm() {
       setError(data?.error || "Incorrect password");
       return;
     }
-    router.push(safeNext(searchParams.get("next")));
-    router.refresh();
+    // Hard navigation (not router.push): a full document load re-runs the auth
+    // middleware with the freshly-set session cookie, so the protected route
+    // loads on the first try. A client navigation can resolve against a stale
+    // Router Cache entry from before login and bounce back here.
+    window.location.assign(safeNext(searchParams.get("next")));
   }
 
   return (

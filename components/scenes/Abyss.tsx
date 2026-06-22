@@ -2,28 +2,13 @@
 
 import { useEffect, useRef } from "react";
 import type { SceneProps } from "./index";
+import { effectRgb } from "./color";
 
 // Abyss — a deep-sea scene. Dark = the trench: a bioluminescent halo + depth
-// tint, drifting "marine snow", a depth-gauge ornament. Light = sunlit shallows:
-// the same family re-themed — a bright wash from above, brighter drifting motes,
-// deep-teal ink. Everything is built from the accent / background CSS vars so it
-// recolors with the active palette, and all motion is disabled under
-// prefers-reduced-motion. Ported from the reference 404 page.
-
-// Read a #rrggbb CSS var as an "r, g, b" string for canvas fills; falls back to
-// a teal so the motes are always visible even mid-theme-edit.
-function readAccentRgb(): string {
-  const fallback = "150, 230, 222";
-  if (typeof document === "undefined") return fallback;
-  const v = getComputedStyle(document.documentElement)
-    .getPropertyValue("--accent-from")
-    .trim();
-  const m = /^#?([0-9a-fA-F]{6})$/.exec(v);
-  if (!m) return fallback;
-  const n = parseInt(m[1], 16);
-  return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
-}
-
+// tint and drifting "marine snow". Light = sunlit shallows: the same family
+// re-themed — a bright wash from above and deeper, contrasting motes. Built from
+// the accent / background CSS vars so it recolors with the active palette, and
+// all motion is disabled under prefers-reduced-motion. Ported from the 404 page.
 export function AbyssBackdrop({ light }: SceneProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -39,7 +24,7 @@ export function AbyssBackdrop({ light }: SceneProps) {
     const dpr = window.devicePixelRatio || 1;
     let w = 0;
     let h = 0;
-    let rgb = readAccentRgb();
+    let rgb = effectRgb(light);
     let particles: {
       x: number;
       y: number;
@@ -58,13 +43,13 @@ export function AbyssBackdrop({ light }: SceneProps) {
       vy: (Math.random() * 0.25 + 0.08) * dpr,
       drift: Math.random() * 0.4 - 0.2,
       phase: Math.random() * Math.PI * 2,
-      // Brighter, slightly denser motes in the shallows so they read on a pale
+      // Deeper, slightly stronger motes in the shallows so they read on a pale
       // wash; fainter glints in the trench.
-      a: light ? Math.random() * 0.3 + 0.15 : Math.random() * 0.4 + 0.1,
+      a: light ? Math.random() * 0.35 + 0.25 : Math.random() * 0.4 + 0.1,
     });
 
     const resize = () => {
-      rgb = readAccentRgb();
+      rgb = effectRgb(light);
       w = canvas.width = window.innerWidth * dpr;
       h = canvas.height = window.innerHeight * dpr;
       canvas.style.width = window.innerWidth + "px";

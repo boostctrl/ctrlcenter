@@ -26,12 +26,7 @@ export default async function WeatherPage() {
       </div>
 
       {weather.enabled ? (
-        <WeatherDetails
-          initial={initial}
-          defaultLat={weather.latitude}
-          defaultLon={weather.longitude}
-          defaultUnits={weather.units}
-        />
+        <WeatherDetails initial={initial} />
       ) : (
         <p className="text-fg/50">The weather widget is turned off in settings.</p>
       )}

@@ -9,7 +9,6 @@ import {
   unitSymbol,
   weatherCodeToIcon,
   type CurrentWeather,
-  type Units,
 } from "@/lib/weather";
 
 // Header widget: live date + clock in the visitor's effective time zone, plus
@@ -19,16 +18,10 @@ export default function TimeWeather({
   initialDate,
   weatherEnabled,
   initial,
-  defaultLat,
-  defaultLon,
-  defaultUnits,
 }: {
   initialDate: string;
   weatherEnabled: boolean;
   initial: CurrentWeather | null;
-  defaultLat: number;
-  defaultLon: number;
-  defaultUnits: Units;
 }) {
   const { timezone, location, units } = useVisitorPrefs();
   const [now, setNow] = useState<Date | null>(null);
@@ -44,23 +37,26 @@ export default function TimeWeather({
     return () => clearTimeout(timer);
   }, []);
 
-  const usesDefault =
-    Math.abs(location.latitude - defaultLat) < 1e-4 &&
-    Math.abs(location.longitude - defaultLon) < 1e-4 &&
-    units === defaultUnits;
-
+  // Always refetch live on mount (and every 10 min) for the effective location/
+  // units, rather than relying on the server-cached SSR seed. This keeps the
+  // widget current and in sync with the /weather page, which refetches the same
+  // way — the two no longer drift apart on independent 30-min cache windows.
   useEffect(() => {
-    if (!weatherEnabled || usesDefault) return;
+    if (!weatherEnabled) return;
     let active = true;
-    fetchWeather(location.latitude, location.longitude, units).then((w) => {
-      if (active) setFetched(w);
-    });
+    const load = () =>
+      fetchWeather(location.latitude, location.longitude, units).then((w) => {
+        if (active && w) setFetched(w);
+      });
+    load();
+    const timer = setInterval(load, 10 * 60 * 1000);
     return () => {
       active = false;
+      clearInterval(timer);
     };
-  }, [weatherEnabled, usesDefault, location.latitude, location.longitude, units]);
+  }, [weatherEnabled, location.latitude, location.longitude, units]);
 
-  const weather = usesDefault ? initial : (fetched ?? initial);
+  const weather = fetched ?? initial;
   const time = now ? timeString(now, timezone) : " ";
   const date = now ? shortDate(now, timezone) : initialDate;
   const showWeather = weatherEnabled && weather;

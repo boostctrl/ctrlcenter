@@ -2,24 +2,12 @@
 
 import { useEffect, useRef } from "react";
 import type { SceneProps } from "./index";
+import { effectRgb } from "./color";
 
-// Read a #rrggbb CSS var as an "r, g, b" string for canvas fills; falls back to
-// a soft blue so the stars are always visible even mid-theme-edit.
-function readAccentRgb(): string {
-  const fallback = "150, 180, 240";
-  if (typeof document === "undefined") return fallback;
-  const v = getComputedStyle(document.documentElement)
-    .getPropertyValue("--accent-from")
-    .trim();
-  const m = /^#?([0-9a-fA-F]{6})$/.exec(v);
-  if (!m) return fallback;
-  const n = parseInt(m[1], 16);
-  return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
-}
-
-// Starfield — twinkling, slowly drifting stars on a canvas. Dark = a night sky;
-// light = pale drifting motes (lower opacity). Recolors from the accent var; a
-// single static frame is drawn under prefers-reduced-motion.
+// Starfield — twinkling, slowly drifting stars on a canvas. Dark = a glowing
+// night sky; light = deeper, contrasting motes (the accent blended toward the
+// ink so they read on a pale background). A single static frame is drawn under
+// prefers-reduced-motion.
 export default function Starfield({ light }: SceneProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -31,10 +19,10 @@ export default function Starfield({ light }: SceneProps) {
 
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const dpr = window.devicePixelRatio || 1;
-    const peak = light ? 0.45 : 0.9;
+    const peak = light ? 0.7 : 0.9;
     let w = 0;
     let h = 0;
-    let rgb = readAccentRgb();
+    let rgb = effectRgb(light);
     let stars: {
       x: number;
       y: number;
@@ -59,7 +47,7 @@ export default function Starfield({ light }: SceneProps) {
     });
 
     const resize = () => {
-      rgb = readAccentRgb();
+      rgb = effectRgb(light);
       w = canvas.width = window.innerWidth * dpr;
       h = canvas.height = window.innerHeight * dpr;
       canvas.style.width = window.innerWidth + "px";
