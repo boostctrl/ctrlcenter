@@ -39,11 +39,21 @@ export function isDesignId(v: unknown): v is DesignId {
 // component bundle (see components/scenes) selected by a `scene-<id>` class on
 // <html>; the components read the color CSS vars, so any scene works with any
 // palette. "aurora" is the default — the floating accent glow blobs.
-export type SceneId = "aurora" | "abyss";
+export type SceneId =
+  | "aurora"
+  | "abyss"
+  | "nebula"
+  | "grid"
+  | "starfield"
+  | "waves";
 
 export const SCENES: { id: SceneId; name: string; description: string }[] = [
   { id: "aurora", name: "Aurora", description: "Floating accent glow (default)" },
-  { id: "abyss", name: "Abyss", description: "Deep sea — drifting snow & depth gauge" },
+  { id: "abyss", name: "Abyss", description: "Deep sea — drifting marine snow" },
+  { id: "nebula", name: "Nebula", description: "Drifting clouds of accent light" },
+  { id: "grid", name: "Grid", description: "Perspective grid to the horizon" },
+  { id: "starfield", name: "Starfield", description: "Twinkling, drifting stars" },
+  { id: "waves", name: "Waves", description: "Layered waves along the base" },
 ];
 
 export const SCENE_IDS = SCENES.map((s) => s.id) as [SceneId, ...SceneId[]];
@@ -116,21 +126,53 @@ export const BASE_THEMES: PresetTheme[] = [
   },
 ];
 
-// A theme pack is a curated, art-directed look applied in one tap: a palette
-// bundled with the design (card surface) and scene (backdrop + ornament) that
-// were composed to go with it. Unlike a bare palette, applying a pack sets all
-// three at once — but the visitor can still tweak each part afterward.
+// A "Theme" is a curated, art-directed look applied in one tap: a palette
+// bundled with the design (card surface) and scene (backdrop) composed to go
+// with it, tailored for both light and dark. Applying one sets all three at
+// once; the visitor can still tweak each part afterward. (Surfaced as "Themes"
+// in the builder, alongside the visitor's saved CustomThemes.)
 export type ThemePack = { name: string; design: DesignId; scene: SceneId } & ModeColors;
 
 export const THEME_PACKS: ThemePack[] = [
   {
-    // The headline curated look built on the Abyss scene; named distinctly from
-    // the scene (deepest ocean trench) so the two "Abyss"-flavored entries in the
-    // theme builder don't collide. Dark = deep trench; light = sunlit shallows.
+    // Deepest ocean trench, built on the Abyss scene. Dark = the trench;
+    // light = sunlit shallows.
     name: "Mariana",
     design: "glass",
     scene: "abyss",
     dark: { background: "#02060a", foreground: "#c7d6db", accentFrom: "#5fe3d6", accentTo: "#2f8f9d" },
     light: { background: "#e7f4f5", foreground: "#0c3a40", accentFrom: "#0e9aa7", accentTo: "#2f8f9d" },
+  },
+  {
+    // Drifting violet/indigo clouds on the Nebula scene.
+    name: "Nebula",
+    design: "soft",
+    scene: "nebula",
+    dark: { background: "#0a0814", foreground: "#e9e6f5", accentFrom: "#a78bfa", accentTo: "#7c3aed" },
+    light: { background: "#f1eefb", foreground: "#1c172e", accentFrom: "#7c3aed", accentTo: "#a78bfa" },
+  },
+  {
+    // Synthwave magenta/cyan on the Grid scene, paired with the Cyber design.
+    name: "Outrun",
+    design: "cyber",
+    scene: "grid",
+    dark: { background: "#0c0716", foreground: "#f3e9f6", accentFrom: "#ff4dd6", accentTo: "#22d3ee" },
+    light: { background: "#f4eefb", foreground: "#241430", accentFrom: "#d6219a", accentTo: "#0ea5c4" },
+  },
+  {
+    // Deep indigo night sky on the Starfield scene with a minimal surface.
+    name: "Observatory",
+    design: "minimal",
+    scene: "starfield",
+    dark: { background: "#05070f", foreground: "#dfe4f2", accentFrom: "#7aa2ff", accentTo: "#a78bfa" },
+    light: { background: "#eef1f8", foreground: "#161a2b", accentFrom: "#4f6bd6", accentTo: "#7c5cf0" },
+  },
+  {
+    // Calm teal/aqua tides on the Waves scene with a soft surface.
+    name: "Tide",
+    design: "soft",
+    scene: "waves",
+    dark: { background: "#04110f", foreground: "#dceee9", accentFrom: "#2dd4bf", accentTo: "#38bdf8" },
+    light: { background: "#e8f5f1", foreground: "#0d2a26", accentFrom: "#0d9488", accentTo: "#0284c7" },
   },
 ];

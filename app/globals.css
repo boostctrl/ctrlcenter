@@ -309,11 +309,58 @@ body::before {
   animation: breathe 7s ease-in-out infinite;
 }
 
+/* Nebula scene — slow, wide drift of the accent clouds (larger range than
+   `float`, with a gentle rotation). */
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+  50% {
+    transform: translate(-40px, 30px) scale(1.12) rotate(8deg);
+  }
+}
+
+.animate-drift {
+  animation: drift 32s ease-in-out infinite;
+}
+
+/* Grid scene — scroll the grid toward the horizon. */
+@keyframes grid-scroll {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 0 var(--grid-size, 48px);
+  }
+}
+
+.animate-grid {
+  animation: grid-scroll 4s linear infinite;
+}
+
+/* Waves scene — slide a wave layer horizontally. */
+@keyframes wave-x {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-wave {
+  animation: wave-x linear infinite;
+}
+
 /* Scenes manage their own JS-driven motion (e.g. the Abyss canvas draws a
    single static frame), but the CSS animations must be quieted here too. */
 @media (prefers-reduced-motion: reduce) {
   .animate-float,
-  .animate-breathe {
+  .animate-breathe,
+  .animate-drift,
+  .animate-grid,
+  .animate-wave {
     animation: none;
   }
 }

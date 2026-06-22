@@ -1,20 +1,25 @@
 import type { ComponentType } from "react";
 import type { SceneId } from "@/lib/theme";
 import Aurora from "./Aurora";
-import { AbyssBackdrop, AbyssOrnament } from "./Abyss";
+import { AbyssBackdrop } from "./Abyss";
+import Nebula from "./Nebula";
+import Grid from "./Grid";
+import Starfield from "./Starfield";
+import Waves from "./Waves";
 
-// Scenes render a different treatment for light vs dark surfaces, so both the
-// backdrop and ornament receive the resolved surface lightness.
+// Scenes render a different treatment for light vs dark surfaces, so each
+// backdrop receives the resolved surface lightness.
 export type SceneProps = { light: boolean };
 
-// Maps each scene to its backdrop (behind everything) and optional signature
-// ornament. <SceneLayer> renders the active scene's pair; the scene's CSS class
-// on <html> handles any pure-CSS styling. To add a scene: build the components
-// and register them here (plus its id in lib/theme.ts SCENES).
-export const SCENE_REGISTRY: Record<
-  SceneId,
-  { Backdrop: ComponentType<SceneProps>; Ornament?: ComponentType<SceneProps> }
-> = {
-  aurora: { Backdrop: Aurora },
-  abyss: { Backdrop: AbyssBackdrop, Ornament: AbyssOrnament },
+// Maps each scene to its backdrop component (a fixed layer behind everything).
+// <SceneLayer> renders the active scene; the `scene-<id>` class on <html> covers
+// any pure-CSS styling. To add a scene: build the component, register it here,
+// and add its id to lib/theme.ts SCENES.
+export const SCENE_REGISTRY: Record<SceneId, ComponentType<SceneProps>> = {
+  aurora: Aurora,
+  abyss: AbyssBackdrop,
+  nebula: Nebula,
+  grid: Grid,
+  starfield: Starfield,
+  waves: Waves,
 };

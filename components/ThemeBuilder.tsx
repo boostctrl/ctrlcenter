@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useVisitorPrefs } from "./PrefsProvider";
 import { BASE_THEMES, DESIGNS, SCENES, THEME_PACKS } from "@/lib/theme";
-import type { DesignId } from "@/lib/theme";
+import type { DesignId, SceneId } from "@/lib/theme";
 import type { ThemeColors } from "@/lib/prefs";
 
 const DESIGN_NAMES = Object.fromEntries(
@@ -33,6 +33,28 @@ function readVar(name: string, fallback: string): string {
     .getPropertyValue(name)
     .trim();
   return /^#[0-9a-fA-F]{6}$/.test(v) ? v : fallback;
+}
+
+// A small representative gradient for each scene's picker swatch, recolored live
+// by the active accent.
+function scenePreview(id: SceneId, from: string, to: string): string {
+  const mix = (c: string, pct: number) =>
+    `color-mix(in srgb, ${c} ${pct}%, transparent)`;
+  switch (id) {
+    case "abyss":
+      return `radial-gradient(120% 90% at 50% -10%, ${from}, transparent 60%), linear-gradient(to bottom, #02060a, #0a2230)`;
+    case "nebula":
+      return `radial-gradient(50% 60% at 25% 30%, ${from}, transparent 60%), radial-gradient(55% 65% at 75% 70%, ${to}, transparent 60%), radial-gradient(45% 55% at 55% 45%, ${from}, transparent 65%)`;
+    case "grid":
+      return `linear-gradient(to top, ${mix(from, 50)}, transparent 55%), repeating-linear-gradient(90deg, ${mix(from, 55)} 0 1px, transparent 1px 9px), repeating-linear-gradient(0deg, ${mix(from, 55)} 0 1px, transparent 1px 9px), #0c0716`;
+    case "starfield":
+      return `radial-gradient(1.5px 1.5px at 22% 32%, ${from}, transparent), radial-gradient(1.5px 1.5px at 62% 58%, ${to}, transparent), radial-gradient(2px 2px at 82% 26%, ${from}, transparent), radial-gradient(1.5px 1.5px at 42% 78%, ${to}, transparent), #05070f`;
+    case "waves":
+      return `linear-gradient(to top, ${mix(from, 52)}, transparent 45%), linear-gradient(to top, ${mix(to, 32)}, transparent 65%), #04110f`;
+    case "aurora":
+    default:
+      return `radial-gradient(60% 70% at 30% 20%, ${from}, transparent 60%), radial-gradient(60% 70% at 75% 80%, ${to}, transparent 60%)`;
+  }
 }
 
 export default function ThemeBuilder() {
@@ -176,10 +198,7 @@ export default function ThemeBuilder() {
                 <span
                   className="block h-9 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
                   style={{
-                    background:
-                      s.id === "abyss"
-                        ? `radial-gradient(120% 90% at 50% -10%, ${activeAccent.from}, transparent 60%), linear-gradient(to bottom, #02060a, #0a2230)`
-                        : `radial-gradient(60% 70% at 30% 20%, ${activeAccent.from}, transparent 60%), radial-gradient(60% 70% at 75% 80%, ${activeAccent.to}, transparent 60%)`,
+                    background: scenePreview(s.id, activeAccent.from, activeAccent.to),
                   }}
                   aria-hidden
                 />
@@ -196,36 +215,64 @@ export default function ThemeBuilder() {
         </div>
       </div>
 
-      {THEME_PACKS.length > 0 && (
-        <div className="space-y-2">
-          <span className="text-xs text-fg/50">Packs</span>
-          <p className="text-xs text-fg/40">
-            Curated looks — palette, design, and scene in one tap.
-          </p>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {THEME_PACKS.map((p) => (
+      <div className="space-y-2">
+        <span className="text-xs text-fg/50">Themes</span>
+        <p className="text-xs text-fg/40">
+          Full looks — palette, design, and scene (light &amp; dark) in one tap.
+          Save your own with the field below.
+        </p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {THEME_PACKS.map((p) => (
+            <button
+              key={`builtin:${p.name}`}
+              type="button"
+              onClick={() => applyPack(p)}
+              className="group flex flex-col gap-1.5 rounded-lg border border-fg/10 p-2 text-left transition-colors hover:border-fg/30"
+              title={`${p.name} · ${DESIGN_NAMES[p.design]}`}
+            >
+              <span
+                className="h-9 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
+                style={{
+                  background: `radial-gradient(120% 100% at 50% -10%, ${p.dark.accentFrom}, transparent 60%), ${p.dark.background}`,
+                }}
+                aria-hidden
+              />
+              <span className="truncate text-xs text-fg/60 group-hover:text-fg/90">
+                {p.name}
+              </span>
+            </button>
+          ))}
+          {customThemes.map((t) => (
+            <div key={t.id} className="group relative">
               <button
-                key={p.name}
                 type="button"
-                onClick={() => applyPack(p)}
-                className="group flex flex-col gap-1.5 rounded-lg border border-fg/10 p-2 text-left transition-colors hover:border-fg/30"
-                title={`${p.name} — applies its palette, design & scene`}
+                onClick={() => applyNamedTheme(t.id)}
+                className="flex w-full flex-col gap-1.5 rounded-lg border border-fg/10 p-2 text-left transition-colors hover:border-fg/30"
+                title={`${t.name} · ${DESIGN_NAMES[t.design]}`}
               >
                 <span
                   className="h-9 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
                   style={{
-                    background: `radial-gradient(120% 100% at 50% -10%, ${p.dark.accentFrom}, transparent 60%), ${p.dark.background}`,
+                    background: `radial-gradient(120% 100% at 50% -10%, ${t.dark.accentFrom}, transparent 60%), ${t.dark.background}`,
                   }}
                   aria-hidden
                 />
                 <span className="truncate text-xs text-fg/60 group-hover:text-fg/90">
-                  {p.name}
+                  {t.name}
                 </span>
               </button>
-            ))}
-          </div>
+              <button
+                type="button"
+                onClick={() => deleteNamedTheme(t.id)}
+                aria-label={`Delete ${t.name}`}
+                className="absolute top-1 right-1 rounded-md bg-background/70 px-1 text-xs text-fg/50 opacity-0 transition-opacity hover:text-red-400 group-hover:opacity-100"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
         </div>
-      )}
+      </div>
 
       <div className="space-y-2">
         <span className="text-xs text-fg/50">Palettes</span>
@@ -328,45 +375,6 @@ export default function ThemeBuilder() {
           Save
         </button>
       </div>
-
-      {customThemes.length > 0 && (
-        <div className="space-y-2">
-          <span className="text-xs text-fg/50">Saved themes</span>
-          {customThemes.map((t) => (
-            <div
-              key={t.id}
-              className="flex items-center gap-3 rounded-lg border border-fg/10 bg-fg/[0.03] px-3 py-2"
-            >
-              <span
-                className="h-5 w-5 shrink-0 rounded-full ring-1 ring-fg/10"
-                style={{
-                  background: `linear-gradient(135deg, ${t.dark.accentFrom}, ${t.dark.accentTo})`,
-                }}
-                aria-hidden
-              />
-              <span className="min-w-0 flex-1 truncate">
-                {t.name}
-                <span className="text-fg/40"> · {DESIGN_NAMES[t.design]}</span>
-              </span>
-              <button
-                type="button"
-                onClick={() => applyNamedTheme(t.id)}
-                className="shrink-0 rounded-md border border-fg/10 bg-fg/5 px-2.5 py-1 text-xs text-fg/80 transition-colors hover:bg-fg/10"
-              >
-                Apply
-              </button>
-              <button
-                type="button"
-                onClick={() => deleteNamedTheme(t.id)}
-                aria-label={`Delete ${t.name}`}
-                className="shrink-0 rounded-md px-1.5 py-1 text-xs text-fg/40 transition-colors hover:text-red-400"
-              >
-                ✕
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
 
       {(activeColors || accentOverride) && (
         <button

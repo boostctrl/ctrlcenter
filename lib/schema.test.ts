@@ -166,7 +166,7 @@ describe("settingsInputSchema partial merge semantics", () => {
         theme: {
           mode: "dark",
           design: "glass",
-          scene: "nebula",
+          scene: "hologram",
           accentFrom: "#a78bfa",
           accentTo: "#22d3ee",
         },
