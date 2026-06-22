@@ -80,7 +80,7 @@ export default function SettingsManager({
   return (
     <form
       onSubmit={handleSubmit}
-      className="glass-card flex max-w-3xl flex-col gap-6 p-6"
+      className="glass-card flex flex-col gap-6 p-6"
     >
       <Section title="General">
         <TextField
