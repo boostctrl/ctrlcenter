@@ -12,6 +12,25 @@ here.
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-06-22
+
+### Fixed
+
+- **Admin login now works on the first attempt** — it previously bounced back to
+  the login form and only succeeded after a manual reload.
+- **The weather widget and the `/weather` page now refresh and stay in sync.**
+  They were serving independently-cached snapshots that drifted apart and never
+  refreshed within a session; both now fetch live on load and every 10 minutes.
+- **Particle scenes read correctly on light backgrounds.** Starfield's stars and
+  Abyss's marine snow were washing out on light; their effect colors now deepen
+  to contrast with a light surface (dark is unchanged).
+
+### Changed
+
+- The settings page sections stack in a single column (theme builder last).
+- The admin Settings tab and the `/weather` and `/status` pages now match the
+  width of the rest of the UI instead of being narrower.
+
 ## [0.8.0] - 2026-06-22
 
 ### Added
@@ -386,7 +405,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/homepage-app/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/boostctrl/homepage-app/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/boostctrl/homepage-app/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/boostctrl/homepage-app/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/boostctrl/homepage-app/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/boostctrl/homepage-app/compare/v0.5.3...v0.6.0
