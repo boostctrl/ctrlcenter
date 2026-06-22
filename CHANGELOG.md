@@ -12,6 +12,19 @@ here.
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-06-22
+
+### Changed
+
+- **Renamed the project to ctrlcenter.** Existing visitor theme/preference data
+  (stored under the old `homepage:*` localStorage keys) resets to defaults; the
+  admin config export is now `ctrlcenter-config.json`.
+- **Theme builder: Themes now come first**, before Design and Scene.
+- **Background overlays moved out of designs and into scenes.** Designs are
+  surface-only now; the Grid scene gained a full-page grid backdrop so it serves
+  as the replacement for the grid look the Bold and Cyber designs used to bake
+  in — usable under any design.
+
 ## [0.8.1] - 2026-06-22
 
 ### Fixed
@@ -405,7 +418,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v0.8.2...HEAD
+[0.8.2]: https://github.com/boostctrl/ctrlcenter/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/boostctrl/ctrlcenter/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/boostctrl/ctrlcenter/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/boostctrl/ctrlcenter/compare/v0.6.0...v0.7.0
