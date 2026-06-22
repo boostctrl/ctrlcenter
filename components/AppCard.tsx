@@ -19,7 +19,7 @@ export default function AppCard({ app }: { app: AppItem }) {
           {app.name}
         </p>
         {app.subtitle && (
-          <p className="truncate text-sm text-fg/40">{app.subtitle}</p>
+          <p className="truncate text-sm text-fg/55">{app.subtitle}</p>
         )}
       </div>
     </a>

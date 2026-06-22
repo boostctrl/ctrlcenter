@@ -268,6 +268,13 @@ body::before {
     -webkit-background-clip: text;
     color: transparent;
   }
+  /* An accent-tinted label that stays legible in both modes: the accent is
+     blended toward the foreground, so it lightens on dark surfaces and deepens
+     on light ones instead of washing out (a fixed accent can be too pale on a
+     light background). */
+  .accent-label {
+    color: color-mix(in srgb, var(--accent-from) 58%, var(--fg));
+  }
   /* Accent-driven surfaces: kept as plain CSS so they follow the configurable
      --accent-from / --accent-to variables instead of fixed Tailwind colors. */
   .btn-accent {

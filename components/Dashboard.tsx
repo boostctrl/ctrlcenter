@@ -11,7 +11,7 @@ import type { AppItem, BookmarkItem } from "@/lib/schema";
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="mb-5 text-sm font-semibold tracking-[0.2em] text-fg/50 uppercase">
+    <h2 className="mb-5 text-sm font-semibold tracking-[0.2em] text-fg/60 uppercase">
       {children}
     </h2>
   );
@@ -138,7 +138,7 @@ export default function Dashboard({
       {filteredApps.length > 0 && (
         <section>
           <div className="mb-5 flex items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold tracking-[0.2em] text-fg/50 uppercase">
+            <h2 className="text-sm font-semibold tracking-[0.2em] text-fg/60 uppercase">
               Applications
             </h2>
             <StatusSummary />

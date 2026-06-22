@@ -150,7 +150,7 @@ export default function StatusPage({ apps }: { apps: StatusAppMeta[] }) {
                 </div>
                 <div className="min-w-0">
                   <p className="truncate font-semibold text-fg/90">{app.name}</p>
-                  <p className="truncate text-sm text-fg/40">{host(app.url)}</p>
+                  <p className="truncate text-sm text-fg/55">{host(app.url)}</p>
                 </div>
                 <div
                   className={`ml-auto shrink-0 text-right text-sm ${

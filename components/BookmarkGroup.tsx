@@ -10,7 +10,7 @@ export default function BookmarkGroup({
 }) {
   return (
     <div className="glass-card px-5 py-4">
-      <h3 className="mb-3 text-xs font-semibold tracking-[0.18em] text-violet-300/80 uppercase">
+      <h3 className="accent-label mb-3 text-xs font-semibold tracking-[0.18em] uppercase">
         {category}
       </h3>
       <ul className="space-y-1">
