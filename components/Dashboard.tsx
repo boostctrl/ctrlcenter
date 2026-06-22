@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import AppCard from "./AppCard";
 import BookmarkGroup from "./BookmarkGroup";
-import { StatusProvider } from "./StatusProvider";
+import { StatusProvider, StatusSummary } from "./StatusProvider";
 import { buildSearchUrl, engineLabel, type SearchConfig } from "@/lib/search";
 import { orderCategories } from "@/lib/bookmarks";
 import type { AppItem, BookmarkItem } from "@/lib/schema";
@@ -137,7 +137,12 @@ export default function Dashboard({
 
       {filteredApps.length > 0 && (
         <section>
-          <SectionTitle>Applications</SectionTitle>
+          <div className="mb-5 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold tracking-[0.2em] text-fg/50 uppercase">
+              Applications
+            </h2>
+            <StatusSummary />
+          </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {filteredApps.map((app) => (
               <AppCard key={app.id} app={app} />

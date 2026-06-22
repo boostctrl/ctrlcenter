@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   createContext,
   useContext,
@@ -7,8 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-
-type AppStatus = { up: boolean; status: number | null; ms: number };
+import { summarize, type AppStatus, type StatusResponse } from "@/lib/status";
 
 const StatusContext = createContext<Map<string, AppStatus> | null>(null);
 
@@ -25,8 +25,8 @@ export function StatusProvider({ children }: { children: ReactNode }) {
       try {
         const res = await fetch("/api/status", { cache: "no-store" });
         if (!res.ok) return;
-        const data: (AppStatus & { id: string })[] = await res.json();
-        if (active) setStatuses(new Map(data.map((d) => [d.id, d])));
+        const data: StatusResponse = await res.json();
+        if (active) setStatuses(new Map(data.results.map((d) => [d.id, d])));
       } catch {
         // Network hiccups just leave the previous statuses in place.
       }
@@ -71,5 +71,33 @@ export function StatusDot({ id }: { id: string }) {
         }`}
       />
     </span>
+  );
+}
+
+// A compact health pill linking to the /status page, shown by the dashboard's
+// "Applications" heading. Shares the provider's context, so it renders nothing
+// until the first poll resolves (avoiding a flash of "all systems operational").
+export function StatusSummary() {
+  const statuses = useContext(StatusContext);
+  if (!statuses || statuses.size === 0) return null;
+  const { down, total, allUp } = summarize([...statuses.values()]);
+  if (total === 0) return null;
+
+  return (
+    <Link
+      href="/status"
+      className="group inline-flex items-center gap-2 rounded-full border border-fg/10 bg-fg/[0.03] px-3 py-1 text-xs text-fg/60 transition-colors hover:border-fg/25 hover:text-fg/90"
+    >
+      <span
+        className={`h-2 w-2 rounded-full ${allUp ? "bg-emerald-400" : "bg-red-400"}`}
+        aria-hidden
+      />
+      <span>
+        {allUp ? "All systems operational" : `${down} of ${total} down`}
+      </span>
+      <span className="text-fg/30 transition-transform group-hover:translate-x-0.5">
+        →
+      </span>
+    </Link>
   );
 }
