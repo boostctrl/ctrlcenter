@@ -12,6 +12,19 @@ here.
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-06-23
+
+### Added
+
+- **1h range** on the status timeline, showing each individual poll as its own
+  bar (kept in a short ring of raw readings alongside the hourly buckets) plus a
+  matching 1h uptime figure.
+
+### Changed
+
+- The status timeline now defaults to the **24h** view (was 90d).
+- Timeline bars have **rounded edges** for a cleaner look at every range.
+
 ## [0.9.1] - 2026-06-23
 
 ### Fixed
@@ -489,7 +502,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.2...HEAD
+[0.9.2]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/boostctrl/ctrlcenter/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/boostctrl/ctrlcenter/compare/v0.8.2...v0.8.3
