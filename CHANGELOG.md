@@ -12,6 +12,18 @@ here.
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-06-23
+
+### Added
+
+- **Admin theme editor.** A new **Themes** tab in the admin portal lets you edit
+  the built-in themes — recolor them and change their design and scene — applied
+  site-wide, with a reset-to-default on each.
+- **Bigger theming catalog:** now **8 designs** (new: Clay), **8 scenes** (new:
+  Mesh, Constellation), **16 palettes** (added Dracula, Solarized, Gruvbox,
+  Catppuccin, Tokyo, Monokai, Grape, Aqua), and **8 themes** (added Bloom,
+  Lagoon, Circuit).
+
 ## [0.9.2] - 2026-06-23
 
 ### Added
@@ -502,7 +514,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.2...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.3...HEAD
+[0.9.3]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/boostctrl/ctrlcenter/compare/v0.8.3...v0.9.0
