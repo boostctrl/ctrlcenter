@@ -336,6 +336,34 @@ export default function SettingsManager({
           </label>
         </div>
 
+        {settings.statusChecks && (
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <span className="text-sm text-fg/70">Uptime check interval</span>
+              <p className="text-xs text-fg/40">
+                How often the server records each app&apos;s up/down for the
+                90-day history on the status page.
+              </p>
+            </div>
+            <div className="flex shrink-0 overflow-hidden rounded-lg border border-fg/10">
+              {([1, 5, 15] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setSettings({ ...settings, statusInterval: m })}
+                  className={`px-3 py-1.5 text-xs transition-colors ${
+                    settings.statusInterval === m
+                      ? "bg-fg/15 text-fg"
+                      : "text-fg/50 hover:text-fg/80"
+                  }`}
+                >
+                  {m} min
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-col gap-2">
           <span className="text-sm text-fg/50">Search bar engine</span>
           <select

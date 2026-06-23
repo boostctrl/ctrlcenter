@@ -10,8 +10,20 @@ import { useToast } from "./Toast";
 import { useConfirm } from "./Confirm";
 import { apiErrorMessage } from "./apiError";
 
-type FormState = { name: string; subtitle: string; url: string; icon: string };
-const emptyForm: FormState = { name: "", subtitle: "", url: "", icon: "" };
+type FormState = {
+  name: string;
+  subtitle: string;
+  url: string;
+  icon: string;
+  expectStatus: string;
+};
+const emptyForm: FormState = {
+  name: "",
+  subtitle: "",
+  url: "",
+  icon: "",
+  expectStatus: "",
+};
 
 export default function AppsManager({ initialApps }: { initialApps: AppItem[] }) {
   const [apps, setApps] = useState(initialApps);
@@ -23,7 +35,13 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
 
   function startEdit(app: AppItem) {
     setEditingId(app.id);
-    setForm({ name: app.name, subtitle: app.subtitle, url: app.url, icon: app.icon });
+    setForm({
+      name: app.name,
+      subtitle: app.subtitle,
+      url: app.url,
+      icon: app.icon,
+      expectStatus: app.expectStatus ?? "",
+    });
   }
 
   function resetForm() {
@@ -162,6 +180,58 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
           onChange={(v) => setForm({ ...form, icon: v })}
           name={form.name}
         />
+        <div className="flex flex-col gap-2">
+          <span className="text-sm text-fg/50">Counts as up when</span>
+          <div className="flex overflow-hidden rounded-lg border border-fg/10 text-xs">
+            {(
+              [
+                { key: "any", label: "Any response", value: "" },
+                { key: "ok", label: "2xx & 3xx", value: "200-399" },
+                { key: "custom", label: "Custom", value: null },
+              ] as const
+            ).map((opt) => {
+              const mode =
+                form.expectStatus === ""
+                  ? "any"
+                  : form.expectStatus === "200-399"
+                    ? "ok"
+                    : "custom";
+              const selected = mode === opt.key;
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() =>
+                    setForm({
+                      ...form,
+                      expectStatus:
+                        opt.value === null
+                          ? form.expectStatus || "200-299"
+                          : opt.value,
+                    })
+                  }
+                  className={`flex-1 px-2 py-1.5 transition-colors ${
+                    selected ? "bg-fg/15 text-fg" : "text-fg/50 hover:text-fg/80"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+          {form.expectStatus !== "" && form.expectStatus !== "200-399" && (
+            <input
+              value={form.expectStatus}
+              onChange={(e) => setForm({ ...form, expectStatus: e.target.value })}
+              placeholder="e.g. 200-299, 401"
+              className="accent-focus rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-sm text-fg outline-none transition-colors"
+            />
+          )}
+          <p className="text-xs text-fg/40">
+            Otherwise any reachable host counts as up (even 4xx/5xx). Use this to
+            mark e.g. a 404 as down.
+          </p>
+        </div>
         <div className="flex gap-2">
           <Button type="submit" disabled={saving}>
             {editingId ? "Save changes" : "Add"}

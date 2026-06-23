@@ -31,3 +31,45 @@ export function summarize(results: { up: boolean }[]): StatusSummary {
   const down = total - up;
   return { up, down, total, allUp: total > 0 && down === 0 };
 }
+
+// Whether an HTTP status code satisfies an app's `expectStatus` spec — a comma
+// list of codes and inclusive ranges, e.g. "200-299, 301, 401". An empty/blank
+// spec matches anything (any reachable host counts as up).
+export function matchesStatus(code: number, spec: string): boolean {
+  const trimmed = spec.trim();
+  if (!trimmed) return true;
+  return trimmed.split(",").some((tokenRaw) => {
+    const token = tokenRaw.trim();
+    if (!token) return false;
+    const range = /^(\d{3})\s*-\s*(\d{3})$/.exec(token);
+    if (range) {
+      const lo = Number(range[1]);
+      const hi = Number(range[2]);
+      return code >= Math.min(lo, hi) && code <= Math.max(lo, hi);
+    }
+    return /^\d{3}$/.test(token) && Number(token) === code;
+  });
+}
+
+// --- Uptime history (the background poller + /api/status/history) ---
+
+// Uptime percentage (0–100) over a window, or null when there's no data for it.
+export type UptimeWindows = {
+  d1: number | null;
+  d7: number | null;
+  d30: number | null;
+  d90: number | null;
+};
+
+// One day in the timeline: uptime % for that day, or null if nothing was
+// recorded (e.g. the server was off, or before this app existed).
+export type TimelinePoint = { date: string; uptime: number | null };
+
+export type AppHistory = {
+  id: string;
+  uptime: UptimeWindows;
+  timeline: TimelinePoint[];
+};
+
+// The /api/status/history payload.
+export type StatusHistory = { generatedAt: number; apps: AppHistory[] };

@@ -60,6 +60,9 @@ export const settingsSchema = z.object({
   // When on, the dashboard polls /api/status to show per-app online/offline
   // dots. Off by default since it makes the server ping every app URL.
   statusChecks: z.boolean().default(false),
+  // How often (minutes) the background poller records uptime history while
+  // status checks are on.
+  statusInterval: z.number().int().min(1).max(60).default(5),
   // Explicit display order for bookmark categories; categories not listed fall
   // back to first-seen order. Stale names are ignored at render time.
   bookmarkCategoryOrder: z.array(z.string()).default([]),
@@ -67,12 +70,16 @@ export const settingsSchema = z.object({
   weather: weatherSchema.default(weatherSchema.parse({})),
 });
 
+// `expectStatus` is an optional comma list of HTTP codes/ranges (e.g.
+// "200-299, 401") that count as "up" for the status check. Empty = any reachable
+// host counts as up (the original behavior).
 export const appItemSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
   subtitle: z.string().default(""),
   url: httpUrl,
   icon: z.string().default(""),
+  expectStatus: z.string().default(""),
 });
 
 export const bookmarkItemSchema = z.object({
@@ -111,6 +118,7 @@ export const appInputSchema = z.object({
   subtitle: z.string().optional().default(""),
   url: httpUrl,
   icon: z.string().optional().default(""),
+  expectStatus: z.string().optional().default(""),
 });
 
 export const bookmarkInputSchema = z.object({
@@ -166,6 +174,7 @@ export const settingsInputSchema = z.object({
   timezone: z.string().optional(),
   theme: themeInputSchema.optional(),
   statusChecks: z.boolean().optional(),
+  statusInterval: z.number().int().min(1).max(60).optional(),
   bookmarkCategoryOrder: z.array(z.string()).optional(),
   search: searchUpdateSchema.optional(),
   weather: weatherUpdateSchema.optional(),
@@ -177,6 +186,7 @@ export const appUpdateSchema = z.object({
   subtitle: z.string().optional(),
   url: httpUrl.optional(),
   icon: z.string().optional(),
+  expectStatus: z.string().optional(),
 });
 
 export const bookmarkUpdateSchema = z.object({
