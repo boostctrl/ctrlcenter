@@ -179,6 +179,7 @@ type PrefsValue = {
   applyNamedTheme: (id: string) => void;
   deleteNamedTheme: (id: string) => void;
   clearCustomTheme: () => void;
+  resetTheme: () => void;
   reset: () => void;
 };
 
@@ -437,6 +438,35 @@ export function PrefsProvider({
     });
   }, [defaultAccent, theme, modeChosen, resolveLook]);
 
+  // Reset just the theme (colors, accent, design, scene) back to the admin
+  // defaults, leaving mode/location/greeting alone — the theme-builder's own
+  // reset, distinct from the global `reset`.
+  const resetTheme = useCallback(() => {
+    setActiveLook(null);
+    saveActiveTheme(null);
+    setAccentOverrideState(null);
+    saveAccentOverride(null);
+    saveDesign(null);
+    saveScene(null);
+    setDesignState(defaultTheme.design);
+    setSceneState(defaultTheme.scene);
+    applyAll({
+      theme,
+      look: resolveLook(null, modeChosen),
+      accentOverride: null,
+      defaultAccent,
+    });
+    applyDesign(defaultTheme.design);
+    applyScene(defaultTheme.scene);
+  }, [
+    defaultAccent,
+    theme,
+    modeChosen,
+    resolveLook,
+    defaultTheme.design,
+    defaultTheme.scene,
+  ]);
+
   // Load the stored theme + custom themes on mount and keep "system" in sync
   // with OS changes. Anything the visitor hasn't set falls back to the admin
   // default theme.
@@ -645,7 +675,10 @@ export function PrefsProvider({
               : "Couldn't get your location."
         );
       },
-      { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }
+      // A generous timeout: the countdown includes the time the permission
+      // prompt is open, so a short one often "times out" before the visitor has
+      // even answered.
+      { enableHighAccuracy: false, timeout: 30000, maximumAge: 600000 }
     );
   }, [prefs, persist]);
 
@@ -709,6 +742,7 @@ export function PrefsProvider({
       applyNamedTheme,
       deleteNamedTheme,
       clearCustomTheme,
+      resetTheme,
       reset,
     };
   }, [
@@ -743,6 +777,7 @@ export function PrefsProvider({
     applyNamedTheme,
     deleteNamedTheme,
     clearCustomTheme,
+    resetTheme,
     reset,
   ]);
 

@@ -23,7 +23,10 @@ let sharedMetadata: IconMetadata | null = null;
 export default function Icon({ icon, name, size = 28, className = "" }: IconProps) {
   const { surfaceIsLight } = useVisitorPrefs();
   const [metadata, setMetadata] = useState<IconMetadata | null>(sharedMetadata);
-  const [failed, setFailed] = useState(false);
+  // Track the URL that failed rather than a boolean, so when the icon changes
+  // (e.g. editing the slug in the admin icon field) the new src is retried
+  // instead of staying stuck on the fallback letter.
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (sharedMetadata) return;
@@ -43,7 +46,7 @@ export default function Icon({ icon, name, size = 28, className = "" }: IconProp
     ? resolveThemedIconUrl(icon, metadata, surfaceIsLight)
     : resolveIconUrl(icon);
 
-  if (!url || failed) {
+  if (!url || failedUrl === url) {
     return (
       <div
         className={`flex items-center justify-center rounded-lg bg-fg/10 text-fg/70 ${className}`}
@@ -63,7 +66,7 @@ export default function Icon({ icon, name, size = 28, className = "" }: IconProp
       width={size}
       height={size}
       className={`object-contain ${className}`}
-      onError={() => setFailed(true)}
+      onError={() => setFailedUrl(url)}
     />
   );
 }

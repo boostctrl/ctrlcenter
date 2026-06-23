@@ -2,7 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useVisitorPrefs } from "./PrefsProvider";
-import { BASE_THEMES, DESIGNS, SCENES, THEME_PACKS } from "@/lib/theme";
+import {
+  BASE_THEMES,
+  DEFAULT_THEME_NAME,
+  DESIGNS,
+  SCENES,
+  THEME_PACKS,
+} from "@/lib/theme";
 import type { DesignId, SceneId } from "@/lib/theme";
 import type { ThemeColors } from "@/lib/prefs";
 
@@ -69,7 +75,6 @@ export default function ThemeBuilder() {
     customThemes,
     activeLook,
     activeColors,
-    accentOverride,
     activeAccent,
     applyThemeColors,
     setBaseColors,
@@ -77,7 +82,7 @@ export default function ThemeBuilder() {
     saveNamedTheme,
     applyNamedTheme,
     deleteNamedTheme,
-    clearCustomTheme,
+    resetTheme,
   } = useVisitorPrefs();
 
   const [draft, setDraft] = useState<ThemeColors>(DEFAULT_DRAFT);
@@ -106,6 +111,26 @@ export default function ThemeBuilder() {
     const next = { ...draft, [key]: value };
     setDraft(next);
     setAccentOverride({ from: next.accentFrom, to: next.accentTo });
+  }
+
+  function saveTheme() {
+    if (!name.trim()) return;
+    // Save the active look's full light+dark pair (so it restores in both
+    // modes), with the current accent applied to both variants. With no active
+    // look yet, seed both modes from the live draft.
+    const draftCS = {
+      background: draft.background,
+      foreground: draft.foreground,
+      accentFrom: activeAccent.from,
+      accentTo: activeAccent.to,
+    };
+    const look = activeLook ?? { dark: draftCS, light: draftCS };
+    const accent = { accentFrom: activeAccent.from, accentTo: activeAccent.to };
+    saveNamedTheme(name, {
+      dark: { ...look.dark, ...accent },
+      light: { ...look.light, ...accent },
+    });
+    setName("");
   }
 
   return (
@@ -137,21 +162,28 @@ export default function ThemeBuilder() {
         </div>
       </div>
 
-      <div className="space-y-2">
-        <span className="text-xs text-fg/50">Themes</span>
-        <p className="text-xs text-fg/40">
-          Full looks — palette, design, and scene (light &amp; dark) in one tap.
-          Save your own with the field below.
-        </p>
+      <div className="space-y-3 rounded-xl border border-fg/15 bg-fg/[0.02] p-3">
+        <div>
+          <span className="text-sm font-medium text-fg/80">Themes</span>
+          <p className="text-xs text-fg/40">
+            Presets — pick one to set the design, scene &amp; colors (light &amp;
+            dark) below in one tap.
+          </p>
+        </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {THEME_PACKS.map((p) => (
             <button
               key={`builtin:${p.name}`}
               type="button"
               onClick={() => applyPack(p)}
-              className="group flex flex-col gap-1.5 rounded-lg border border-fg/10 p-2 text-left transition-colors hover:border-fg/30"
+              className="group relative flex flex-col gap-1.5 rounded-lg border border-fg/10 p-2 text-left transition-colors hover:border-fg/30"
               title={`${p.name} · ${DESIGN_NAMES[p.design]}`}
             >
+              {p.name === DEFAULT_THEME_NAME && (
+                <span className="absolute top-1 right-1 rounded bg-fg/15 px-1 text-[9px] font-medium tracking-wide text-fg/70 uppercase">
+                  Default
+                </span>
+              )}
               <span
                 className="h-9 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
                 style={{
@@ -194,6 +226,29 @@ export default function ThemeBuilder() {
             </div>
           ))}
         </div>
+        <div className="flex items-center gap-2">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && saveTheme()}
+            placeholder="Name & save your current look as a theme"
+            className="accent-focus min-w-0 flex-1 rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-fg outline-none transition-colors"
+          />
+          <button
+            type="button"
+            onClick={saveTheme}
+            className="btn-accent shrink-0 rounded-lg px-4 py-2 text-sm font-medium text-black hover:opacity-90"
+          >
+            Save
+          </button>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3 pt-1">
+        <span className="text-xs font-semibold tracking-[0.15em] text-fg/45 uppercase">
+          Customize
+        </span>
+        <div className="h-px flex-1 bg-fg/10" />
       </div>
 
       <div className="space-y-2">
@@ -213,7 +268,7 @@ export default function ThemeBuilder() {
                 title={d.description}
               >
                 <span
-                  className={`block ${d.id === "glass" ? "" : `design-${d.id}`}`}
+                  className={`pointer-events-none block ${d.id === "glass" ? "" : `design-${d.id}`}`}
                 >
                   <span className="glass-card flex h-9 w-full items-center justify-center">
                     <span
@@ -343,48 +398,15 @@ export default function ThemeBuilder() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Theme name"
-          className="accent-focus min-w-0 flex-1 rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-fg outline-none transition-colors"
-        />
+      <div className="border-t border-fg/10 pt-4">
         <button
           type="button"
-          onClick={() => {
-            // Save the active look's full light+dark pair (so it restores in
-            // both modes), with the current accent applied to both variants. If
-            // there's no active look yet, seed both modes from the live draft.
-            const draftCS = {
-              background: draft.background,
-              foreground: draft.foreground,
-              accentFrom: activeAccent.from,
-              accentTo: activeAccent.to,
-            };
-            const look = activeLook ?? { dark: draftCS, light: draftCS };
-            const accent = { accentFrom: activeAccent.from, accentTo: activeAccent.to };
-            saveNamedTheme(name, {
-              dark: { ...look.dark, ...accent },
-              light: { ...look.light, ...accent },
-            });
-            setName("");
-          }}
-          className="btn-accent shrink-0 rounded-lg px-4 py-2 text-sm font-medium text-black hover:opacity-90"
+          onClick={resetTheme}
+          className="rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10"
         >
-          Save
+          Reset theme to default
         </button>
       </div>
-
-      {(activeColors || accentOverride) && (
-        <button
-          type="button"
-          onClick={clearCustomTheme}
-          className="text-xs text-fg/40 underline transition-colors hover:text-fg/70"
-        >
-          Remove custom theme
-        </button>
-      )}
     </div>
   );
 }

@@ -133,7 +133,22 @@ export const BASE_THEMES: PresetTheme[] = [
 // in the builder, alongside the visitor's saved CustomThemes.)
 export type ThemePack = { name: string; design: DesignId; scene: SceneId } & ModeColors;
 
+// The built-in theme that mirrors the app's stock appearance (first in the list,
+// badged in the builder).
+export const DEFAULT_THEME_NAME = "Default";
+
 export const THEME_PACKS: ThemePack[] = [
+  {
+    // The app's out-of-box look: Glass surface, Aurora scene, the default
+    // colors. Listed first and badged "Default" — applying it restores the
+    // stock appearance. Kept in sync with the :root / .theme-light CSS defaults
+    // and DEFAULT_ACCENT above.
+    name: "Default",
+    design: "glass",
+    scene: "aurora",
+    dark: { background: "#06070d", foreground: "#f4f4f6", accentFrom: "#a78bfa", accentTo: "#22d3ee" },
+    light: { background: "#eceef3", foreground: "#181b24", accentFrom: "#a78bfa", accentTo: "#22d3ee" },
+  },
   {
     // Deepest ocean trench, built on the Abyss scene. Dark = the trench;
     // light = sunlit shallows.
@@ -142,14 +157,6 @@ export const THEME_PACKS: ThemePack[] = [
     scene: "abyss",
     dark: { background: "#02060a", foreground: "#c7d6db", accentFrom: "#5fe3d6", accentTo: "#2f8f9d" },
     light: { background: "#e7f4f5", foreground: "#0c3a40", accentFrom: "#0e9aa7", accentTo: "#2f8f9d" },
-  },
-  {
-    // Drifting violet/indigo clouds on the Nebula scene.
-    name: "Nebula",
-    design: "soft",
-    scene: "nebula",
-    dark: { background: "#0a0814", foreground: "#e9e6f5", accentFrom: "#a78bfa", accentTo: "#7c3aed" },
-    light: { background: "#f1eefb", foreground: "#1c172e", accentFrom: "#7c3aed", accentTo: "#a78bfa" },
   },
   {
     // Synthwave magenta/cyan on the Grid scene, paired with the Cyber design.
