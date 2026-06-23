@@ -98,10 +98,38 @@ export const authSchema = z.object({
   passwordSalt: z.string().default(""),
 });
 
+// A cohesive set of surface + accent colors (one mode of a theme).
+export const colorSetSchema = z.object({
+  background: hexColor,
+  foreground: hexColor,
+  accentFrom: hexColor,
+  accentTo: hexColor,
+});
+
+// An admin override of a built-in theme pack, matched by `name`. Only edited
+// packs are stored; resolveThemePacks() (lib/theme.ts) applies them over the
+// built-ins and ignores any stale name. `name` is a plain string (not an enum)
+// on purpose, so renaming a built-in in a future version can't make an existing
+// config fail to load.
+export const themePackSchema = z.object({
+  name: z.string().min(1),
+  design: z.enum(DESIGN_IDS),
+  scene: z.enum(SCENE_IDS),
+  dark: colorSetSchema,
+  light: colorSetSchema,
+});
+
+// Admin sends the whole overrides array (PUT /api/themes); it replaces the
+// stored `themes` wholesale, so resetting a pack just omits it.
+export const themesInputSchema = z.array(themePackSchema);
+
 export const configSchema = z.object({
   settings: settingsSchema.default(settingsSchema.parse({})),
   apps: z.array(appItemSchema).default([]),
   bookmarks: z.array(bookmarkItemSchema).default([]),
+  // Admin overrides of the built-in theme packs (edit-and-reset; see
+  // resolveThemePacks). Empty = every pack shows its built-in values.
+  themes: z.array(themePackSchema).default([]),
   auth: authSchema.default(authSchema.parse({})),
 });
 
@@ -109,6 +137,7 @@ export type Config = z.infer<typeof configSchema>;
 export type Settings = z.infer<typeof settingsSchema>;
 export type AppItem = z.infer<typeof appItemSchema>;
 export type BookmarkItem = z.infer<typeof bookmarkItemSchema>;
+export type ThemePackConfig = z.infer<typeof themePackSchema>;
 
 // "Create" schemas (POST): required fields are required, everything else is
 // genuinely optional and defaults are fine here since we're building a

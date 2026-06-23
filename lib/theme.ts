@@ -14,7 +14,8 @@ export type DesignId =
   | "soft"
   | "minimal"
   | "bold"
-  | "cyber";
+  | "cyber"
+  | "clay";
 
 export const DESIGNS: { id: DesignId; name: string; description: string }[] = [
   { id: "glass", name: "Glass", description: "Frosted and blurred (default)" },
@@ -24,6 +25,7 @@ export const DESIGNS: { id: DesignId; name: string; description: string }[] = [
   { id: "minimal", name: "Minimal", description: "Barely-there hairlines" },
   { id: "bold", name: "Bold", description: "Sharp, high-contrast" },
   { id: "cyber", name: "Cyber", description: "Neon, techy glow" },
+  { id: "clay", name: "Clay", description: "Chunky, soft-moulded" },
 ];
 
 export const DESIGN_IDS = DESIGNS.map((d) => d.id) as [DesignId, ...DesignId[]];
@@ -45,7 +47,9 @@ export type SceneId =
   | "nebula"
   | "grid"
   | "starfield"
-  | "waves";
+  | "waves"
+  | "mesh"
+  | "constellation";
 
 export const SCENES: { id: SceneId; name: string; description: string }[] = [
   { id: "aurora", name: "Aurora", description: "Floating accent glow (default)" },
@@ -54,6 +58,8 @@ export const SCENES: { id: SceneId; name: string; description: string }[] = [
   { id: "grid", name: "Grid", description: "Perspective grid to the horizon" },
   { id: "starfield", name: "Starfield", description: "Twinkling, drifting stars" },
   { id: "waves", name: "Waves", description: "Layered waves along the base" },
+  { id: "mesh", name: "Mesh", description: "Morphing accent mesh gradient" },
+  { id: "constellation", name: "Constellation", description: "Drifting linked stars" },
 ];
 
 export const SCENE_IDS = SCENES.map((s) => s.id) as [SceneId, ...SceneId[]];
@@ -124,6 +130,46 @@ export const BASE_THEMES: PresetTheme[] = [
     dark: { background: "#161109", foreground: "#efe6d4", accentFrom: "#d97706", accentTo: "#f59e0b" },
     light: { background: "#f4ecdf", foreground: "#2b2418", accentFrom: "#b45309", accentTo: "#d97706" },
   },
+  {
+    name: "Dracula",
+    dark: { background: "#1e1f29", foreground: "#f8f8f2", accentFrom: "#bd93f9", accentTo: "#ff79c6" },
+    light: { background: "#f5f3fb", foreground: "#282a36", accentFrom: "#9a59e0", accentTo: "#e0539f" },
+  },
+  {
+    name: "Solarized",
+    dark: { background: "#002b36", foreground: "#eee8d5", accentFrom: "#2aa198", accentTo: "#b58900" },
+    light: { background: "#fdf6e3", foreground: "#073642", accentFrom: "#268bd2", accentTo: "#2aa198" },
+  },
+  {
+    name: "Gruvbox",
+    dark: { background: "#1d2021", foreground: "#ebdbb2", accentFrom: "#fabd2f", accentTo: "#fe8019" },
+    light: { background: "#fbf1c7", foreground: "#3c3836", accentFrom: "#d65d0e", accentTo: "#b57614" },
+  },
+  {
+    name: "Catppuccin",
+    dark: { background: "#1e1e2e", foreground: "#cdd6f4", accentFrom: "#cba6f7", accentTo: "#f5c2e7" },
+    light: { background: "#eff1f5", foreground: "#4c4f69", accentFrom: "#8839ef", accentTo: "#ea76cb" },
+  },
+  {
+    name: "Tokyo",
+    dark: { background: "#1a1b26", foreground: "#c0caf5", accentFrom: "#7aa2f7", accentTo: "#bb9af7" },
+    light: { background: "#e1e2e7", foreground: "#343b58", accentFrom: "#3760bf", accentTo: "#9854f1" },
+  },
+  {
+    name: "Monokai",
+    dark: { background: "#1f1f1c", foreground: "#f8f8f2", accentFrom: "#a6e22e", accentTo: "#f92672" },
+    light: { background: "#f5f5ef", foreground: "#272822", accentFrom: "#669900", accentTo: "#e6186c" },
+  },
+  {
+    name: "Grape",
+    dark: { background: "#140d1f", foreground: "#ece6f5", accentFrom: "#a855f7", accentTo: "#6366f1" },
+    light: { background: "#f2ecfb", foreground: "#241634", accentFrom: "#9333ea", accentTo: "#4f46e5" },
+  },
+  {
+    name: "Aqua",
+    dark: { background: "#04141a", foreground: "#d6f0f3", accentFrom: "#22d3ee", accentTo: "#38bdf8" },
+    light: { background: "#e6f6fa", foreground: "#0a2a32", accentFrom: "#0891b2", accentTo: "#0284c7" },
+  },
 ];
 
 // A "Theme" is a curated, art-directed look applied in one tap: a palette
@@ -182,4 +228,48 @@ export const THEME_PACKS: ThemePack[] = [
     dark: { background: "#04110f", foreground: "#dceee9", accentFrom: "#2dd4bf", accentTo: "#38bdf8" },
     light: { background: "#e8f5f1", foreground: "#0d2a26", accentFrom: "#0d9488", accentTo: "#0284c7" },
   },
+  {
+    // Soft rose/violet bloom drifting on the Nebula scene, glossy Aero surface.
+    name: "Bloom",
+    design: "aero",
+    scene: "nebula",
+    dark: { background: "#160b14", foreground: "#f6e9f1", accentFrom: "#f472b6", accentTo: "#a78bfa" },
+    light: { background: "#fbeef5", foreground: "#2c1322", accentFrom: "#db2777", accentTo: "#7c5cf0" },
+  },
+  {
+    // Warm coral-to-amber gradient over the morphing Mesh scene, chunky Clay.
+    name: "Lagoon",
+    design: "clay",
+    scene: "mesh",
+    dark: { background: "#0a1416", foreground: "#dff0ee", accentFrom: "#2dd4bf", accentTo: "#a3e635" },
+    light: { background: "#e9f6f2", foreground: "#0c2622", accentFrom: "#0d9488", accentTo: "#65a30d" },
+  },
+  {
+    // Terminal green linked nodes on the Constellation scene with a Bold surface.
+    name: "Circuit",
+    design: "bold",
+    scene: "constellation",
+    dark: { background: "#020806", foreground: "#d7f7e4", accentFrom: "#34d399", accentTo: "#22d3ee" },
+    light: { background: "#e9f7ef", foreground: "#06231a", accentFrom: "#059669", accentTo: "#0891b2" },
+  },
 ];
+
+// An admin override of a built-in THEME_PACK, keyed by its `name`. The admin can
+// recolor a built-in and swap its design/scene; resolveThemePacks() applies these
+// on top of the built-ins. A pack with no override shows its built-in values; a
+// reset removes the override.
+export type ThemePackOverride = ThemePack;
+
+// The names of the built-in packs the admin is allowed to override (others are
+// ignored as stale). Exposed so the schema/editor can validate against them.
+export const THEME_PACK_NAMES = THEME_PACKS.map((p) => p.name);
+
+// Built-in packs with any admin overrides applied (matched by name, order
+// preserved). Stale override names — e.g. a renamed built-in — are dropped.
+export function resolveThemePacks(
+  overrides: ThemePackOverride[] | undefined
+): ThemePack[] {
+  if (!overrides || overrides.length === 0) return THEME_PACKS;
+  const byName = new Map(overrides.map((o) => [o.name, o]));
+  return THEME_PACKS.map((p) => byName.get(p.name) ?? p);
+}

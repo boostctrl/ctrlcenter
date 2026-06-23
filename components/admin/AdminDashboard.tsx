@@ -2,21 +2,28 @@
 
 import { useRef, useState, type ChangeEvent } from "react";
 import Link from "next/link";
-import type { AppItem, BookmarkItem, Settings } from "@/lib/schema";
+import type {
+  AppItem,
+  BookmarkItem,
+  Settings,
+  ThemePackConfig,
+} from "@/lib/schema";
 import AppsManager from "./AppsManager";
 import BookmarksManager from "./BookmarksManager";
 import SettingsManager from "./SettingsManager";
+import ThemesManager from "./ThemesManager";
 import ChangePassword from "./ChangePassword";
 import { Button } from "./ui";
 import { ToastProvider, useToast } from "./Toast";
 import { ConfirmProvider } from "./Confirm";
 import { apiErrorMessage } from "./apiError";
 
-type Tab = "apps" | "bookmarks" | "settings";
+type Tab = "apps" | "bookmarks" | "themes" | "settings";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "apps", label: "Applications" },
   { key: "bookmarks", label: "Bookmarks" },
+  { key: "themes", label: "Themes" },
   { key: "settings", label: "Settings" },
 ];
 
@@ -24,6 +31,7 @@ type Props = {
   initialApps: AppItem[];
   initialBookmarks: BookmarkItem[];
   initialSettings: Settings;
+  initialThemes: ThemePackConfig[];
 };
 
 export default function AdminDashboard(props: Props) {
@@ -38,7 +46,12 @@ export default function AdminDashboard(props: Props) {
   );
 }
 
-function AdminBody({ initialApps, initialBookmarks, initialSettings }: Props) {
+function AdminBody({
+  initialApps,
+  initialBookmarks,
+  initialSettings,
+  initialThemes,
+}: Props) {
   const [tab, setTab] = useState<Tab>("apps");
   const fileRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
@@ -146,6 +159,7 @@ function AdminBody({ initialApps, initialBookmarks, initialSettings }: Props) {
           initialCategoryOrder={initialSettings.bookmarkCategoryOrder}
         />
       )}
+      {tab === "themes" && <ThemesManager initialOverrides={initialThemes} />}
       {tab === "settings" && (
         <div className="space-y-8">
           <SettingsManager initialSettings={initialSettings} />

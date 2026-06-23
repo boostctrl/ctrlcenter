@@ -113,6 +113,27 @@
   --glow-opacity: 0.8;
 }
 
+.design-clay {
+  /* Claymorphism: big rounding, no border, a soft outer drop plus light/dark
+     inset edges so cards look moulded out of the background. */
+  --surface-radius: 1.75rem;
+  --surface-border-width: 0px;
+  --surface-border: transparent;
+  --surface-border-hover: transparent;
+  --surface-bg: color-mix(in srgb, var(--fg) 8%, var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 12%, var(--background));
+  --surface-bg-image: none;
+  --surface-blur: 0px;
+  --surface-shadow: 0 12px 28px rgba(var(--shadow-tint), 0.3),
+    inset 0 2px 3px color-mix(in srgb, var(--fg) 18%, transparent),
+    inset 0 -3px 5px rgba(var(--shadow-tint), 0.25);
+  --surface-shadow-hover: 0 16px 36px rgba(var(--shadow-tint), 0.36),
+    inset 0 2px 3px color-mix(in srgb, var(--fg) 24%, transparent),
+    inset 0 -3px 5px rgba(var(--shadow-tint), 0.3);
+  --surface-lift: -3px;
+  --glow-opacity: 0.3;
+}
+
 .design-aero {
   --surface-radius: 0.75rem;
   --surface-border-width: 1px;
@@ -263,6 +284,25 @@ body {
   animation: drift 32s ease-in-out infinite;
 }
 
+/* Mesh scene — large accent blobs morph across the viewport on long, offset
+   cycles so the gradient never quite repeats. */
+@keyframes mesh-morph {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(8vw, -6vh) scale(1.18);
+  }
+  66% {
+    transform: translate(-7vw, 7vh) scale(0.92);
+  }
+}
+
+.animate-mesh {
+  animation: mesh-morph 40s ease-in-out infinite;
+}
+
 /* Grid scene — scroll the grid toward the horizon. */
 @keyframes grid-scroll {
   from {
@@ -297,6 +337,7 @@ body {
   .animate-float,
   .animate-breathe,
   .animate-drift,
+  .animate-mesh,
   .animate-grid,
   .animate-wave {
     animation: none;

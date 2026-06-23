@@ -15,6 +15,7 @@ const ADMIN_PREFIXES = [
   "/api/apps",
   "/api/bookmarks",
   "/api/settings",
+  "/api/themes",
   "/api/config",
   "/api/password",
 ];

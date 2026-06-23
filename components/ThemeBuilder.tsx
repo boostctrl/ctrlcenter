@@ -2,14 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useVisitorPrefs } from "./PrefsProvider";
-import {
-  BASE_THEMES,
-  DEFAULT_THEME_NAME,
-  DESIGNS,
-  SCENES,
-  THEME_PACKS,
-} from "@/lib/theme";
-import type { DesignId, SceneId } from "@/lib/theme";
+import { BASE_THEMES, DEFAULT_THEME_NAME, DESIGNS, SCENES } from "@/lib/theme";
+import type { DesignId, SceneId, ThemePack } from "@/lib/theme";
 import type { ThemeColors } from "@/lib/prefs";
 
 const DESIGN_NAMES = Object.fromEntries(
@@ -63,7 +57,7 @@ function scenePreview(id: SceneId, from: string, to: string): string {
   }
 }
 
-export default function ThemeBuilder() {
+export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
   const {
     theme,
     setTheme,
@@ -171,7 +165,7 @@ export default function ThemeBuilder() {
           </p>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {THEME_PACKS.map((p) => (
+          {packs.map((p) => (
             <button
               key={`builtin:${p.name}`}
               type="button"

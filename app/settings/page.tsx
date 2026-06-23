@@ -2,10 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import SettingsControls from "@/components/SettingsControls";
 import ThemeBuilder from "@/components/ThemeBuilder";
+import { getThemeOverrides } from "@/lib/config";
+import { resolveThemePacks } from "@/lib/theme";
 
 export const metadata: Metadata = { title: "Settings" };
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  const packs = resolveThemePacks(await getThemeOverrides());
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-8 px-6 py-12 sm:px-10 lg:py-16">
       <div>
@@ -27,7 +30,7 @@ export default function SettingsPage() {
         </div>
 
         <div className="glass-card p-6">
-          <ThemeBuilder />
+          <ThemeBuilder packs={packs} />
         </div>
       </div>
     </main>

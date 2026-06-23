@@ -6,13 +6,41 @@ import {
   bookmarkInputSchema,
   settingsInputSchema,
   weatherUpdateSchema,
+  themesInputSchema,
 } from "./schema";
+
+describe("themesInputSchema", () => {
+  const pack = {
+    name: "Mariana",
+    design: "flat",
+    scene: "mesh",
+    dark: { background: "#000000", foreground: "#ffffff", accentFrom: "#ff0000", accentTo: "#00ff00" },
+    light: { background: "#ffffff", foreground: "#000000", accentFrom: "#ff0000", accentTo: "#00ff00" },
+  };
+
+  it("accepts a well-formed override array", () => {
+    const parsed = themesInputSchema.parse([pack]);
+    expect(parsed[0].design).toBe("flat");
+    expect(parsed[0].scene).toBe("mesh");
+  });
+
+  it("rejects an unknown design or scene", () => {
+    expect(themesInputSchema.safeParse([{ ...pack, design: "nope" }]).success).toBe(false);
+    expect(themesInputSchema.safeParse([{ ...pack, scene: "nope" }]).success).toBe(false);
+  });
+
+  it("rejects a non-hex color", () => {
+    const bad = { ...pack, dark: { ...pack.dark, background: "red" } };
+    expect(themesInputSchema.safeParse([bad]).success).toBe(false);
+  });
+});
 
 describe("configSchema defaults", () => {
   it("fills a fully empty config with defaults", () => {
     const config = configSchema.parse({});
     expect(config.apps).toEqual([]);
     expect(config.bookmarks).toEqual([]);
+    expect(config.themes).toEqual([]);
     expect(config.settings.title).toBe("Home");
     expect(config.settings.theme.mode).toBe("system");
     expect(config.settings.theme.design).toBe("glass");

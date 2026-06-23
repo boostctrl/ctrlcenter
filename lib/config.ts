@@ -8,6 +8,7 @@ import {
   type BookmarkItem,
   type Settings,
   type SettingsInput,
+  type ThemePackConfig,
 } from "./schema";
 
 const CONFIG_PATH =
@@ -112,6 +113,23 @@ export async function updateSettings(
       theme: themePartial ?? config.settings.theme,
     };
     return config.settings;
+  });
+}
+
+// Admin overrides of the built-in theme packs. Pair with resolveThemePacks()
+// (lib/theme.ts) to get the packs visitors actually see.
+export async function getThemeOverrides(): Promise<ThemePackConfig[]> {
+  return (await readConfig()).themes;
+}
+
+// Replace the whole overrides array (the admin Themes editor sends all edited
+// packs at once; a reset omits that pack).
+export async function setThemeOverrides(
+  themes: ThemePackConfig[]
+): Promise<ThemePackConfig[]> {
+  return mutate((config) => {
+    config.themes = themes;
+    return config.themes;
   });
 }
 

@@ -11,6 +11,7 @@ export default async function AdminPage() {
       initialApps={config.apps}
       initialBookmarks={config.bookmarks}
       initialSettings={config.settings}
+      initialThemes={config.themes}
     />
   );
 }
