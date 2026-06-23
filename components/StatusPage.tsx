@@ -4,11 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import Icon from "./Icon";
 import {
   summarize,
+  statusMessage,
   type AppStatus,
   type StatusResponse,
   type AppHistory,
   type StatusHistory,
-  type TimelinePoint,
+  type BarPoint,
   type UptimeWindows,
 } from "@/lib/status";
 
@@ -66,18 +67,30 @@ function StateDot({ status }: { status: AppStatus | undefined }) {
   );
 }
 
-// 90-day daily uptime timeline (Atlassian Statuspage / UptimeRobot style).
-function Timeline({ points }: { points: TimelinePoint[] }) {
+// Format a BarPoint's `at` for the hover tooltip: an hour ("…Thh") shows the
+// local-ish hour label, a date shows the date.
+function barLabel(at: string): string {
+  if (at.includes("T")) {
+    const hh = Number(at.slice(11, 13));
+    const day = at.slice(0, 10);
+    return `${day} ${hh % 12 || 12}${hh < 12 ? "am" : "pm"}`;
+  }
+  return at;
+}
+
+// Uptime bar timeline (Atlassian Statuspage / UptimeRobot style). Hourly or
+// daily bars depending on the selected range.
+function Timeline({ points }: { points: BarPoint[] }) {
   if (points.length === 0) return null;
   return (
     <div className="flex h-6 items-stretch gap-px">
       {points.map((p) => (
         <span
-          key={p.date}
+          key={p.at}
           title={
             p.uptime == null
-              ? `${p.date}: no data`
-              : `${p.date}: ${p.uptime.toFixed(1)}% up`
+              ? `${barLabel(p.at)}: no data`
+              : `${barLabel(p.at)}: ${p.uptime.toFixed(1)}% up`
           }
           className={`flex-1 rounded-[1px] ${uptimeColor(p.uptime)}`}
         />
@@ -131,12 +144,18 @@ export default function StatusPage({ apps }: { apps: StatusAppMeta[] }) {
     };
   }, [load]);
 
-  const { down, total, allUp } = summarize(
+  const { total, allUp } = summarize(
     apps.flatMap((a) => {
       const s = statuses.get(a.id);
       return s ? [s] : [];
     })
   );
+  const downNames = apps
+    .filter((a) => {
+      const s = statuses.get(a.id);
+      return s && !s.up;
+    })
+    .map((a) => a.name);
   const polled = checkedAt !== null && total > 0;
   const fmtPct = (u: number | null) => (u == null ? "—" : `${u.toFixed(1)}%`);
   const rangeLabel = RANGES.find((r) => r.key === range)!.label;
@@ -154,11 +173,7 @@ export default function StatusPage({ apps }: { apps: StatusAppMeta[] }) {
           />
           <div>
             <p className="font-semibold text-fg/90">
-              {!polled
-                ? "Checking services…"
-                : allUp
-                  ? "All systems operational"
-                  : `${down} of ${total} ${down === 1 ? "service" : "services"} down`}
+              {statusMessage(downNames, total)}
             </p>
             {checkedAt !== null && (
               <p className="text-xs text-fg/40">
@@ -207,6 +222,11 @@ export default function StatusPage({ apps }: { apps: StatusAppMeta[] }) {
               const s = statuses.get(app.id);
               const h = history.get(app.id);
               const uptime = h ? h.uptime[range as keyof UptimeWindows] : null;
+              const dailyCount = range === "d7" ? 7 : range === "d30" ? 30 : 90;
+              const series =
+                range === "d1"
+                  ? (h?.hourly ?? [])
+                  : (h?.daily ?? []).slice(-dailyCount);
               const detail = !s
                 ? "Checking…"
                 : s.up
@@ -247,9 +267,9 @@ export default function StatusPage({ apps }: { apps: StatusAppMeta[] }) {
                       </p>
                     </div>
                   </div>
-                  {h && h.timeline.length > 0 && (
+                  {series.length > 0 && (
                     <div className="mt-3">
-                      <Timeline points={h.timeline} />
+                      <Timeline points={series} />
                     </div>
                   )}
                 </div>

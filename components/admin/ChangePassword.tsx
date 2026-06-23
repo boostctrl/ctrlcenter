@@ -1,16 +1,31 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { TextField, Button } from "./ui";
 import { useToast } from "./Toast";
 import { apiErrorMessage } from "./apiError";
 
 export default function ChangePassword() {
+  const [open, setOpen] = useState(false);
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
   const [saving, setSaving] = useState(false);
   const toast = useToast();
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  function close() {
+    setOpen(false);
+    setCurrent("");
+    setNext("");
+    setConfirm("");
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -31,9 +46,7 @@ export default function ChangePassword() {
         return;
       }
       toast("Password changed");
-      setCurrent("");
-      setNext("");
-      setConfirm("");
+      close();
     } catch {
       toast("Couldn't change password", "error");
     } finally {
@@ -42,47 +55,72 @@ export default function ChangePassword() {
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="glass-card flex max-w-3xl flex-col gap-4 p-6"
-    >
+    <div className="flex items-center justify-between gap-4">
       <div>
-        <h3 className="font-semibold">Change password</h3>
+        <span className="text-sm text-fg/70">Admin password</span>
         <p className="text-xs text-fg/40">
-          Sets a password stored with the app. Until you set one, the
+          Set a password stored with the app. Until you do, the
           <code className="mx-1 rounded bg-fg/10 px-1">ADMIN_PASSWORD</code>
           environment variable is used.
         </p>
       </div>
-      <TextField
-        label="Current password"
-        type="password"
-        autoComplete="current-password"
-        required
-        value={current}
-        onChange={(e) => setCurrent(e.target.value)}
-      />
-      <TextField
-        label="New password (min 8 characters)"
-        type="password"
-        autoComplete="new-password"
-        required
-        value={next}
-        onChange={(e) => setNext(e.target.value)}
-      />
-      <TextField
-        label="Confirm new password"
-        type="password"
-        autoComplete="new-password"
-        required
-        value={confirm}
-        onChange={(e) => setConfirm(e.target.value)}
-      />
-      <div>
-        <Button type="submit" disabled={saving}>
-          {saving ? "Changing…" : "Change password"}
-        </Button>
-      </div>
-    </form>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="shrink-0 rounded-lg border border-fg/10 bg-fg/5 px-4 py-2 text-sm text-fg/80 transition-colors hover:bg-fg/10"
+      >
+        Reset password
+      </button>
+
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 pt-[12vh] backdrop-blur-sm"
+          onMouseDown={close}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Reset admin password"
+        >
+          <form
+            onSubmit={handleSubmit}
+            onMouseDown={(e) => e.stopPropagation()}
+            className="glass-card flex w-full max-w-md flex-col gap-4 p-6 text-left"
+          >
+            <h3 className="font-semibold">Reset password</h3>
+            <TextField
+              label="Current password"
+              type="password"
+              autoComplete="current-password"
+              required
+              value={current}
+              onChange={(e) => setCurrent(e.target.value)}
+            />
+            <TextField
+              label="New password (min 8 characters)"
+              type="password"
+              autoComplete="new-password"
+              required
+              value={next}
+              onChange={(e) => setNext(e.target.value)}
+            />
+            <TextField
+              label="Confirm new password"
+              type="password"
+              autoComplete="new-password"
+              required
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+            />
+            <div className="flex gap-2">
+              <Button type="submit" disabled={saving}>
+                {saving ? "Changing…" : "Change password"}
+              </Button>
+              <Button type="button" variant="ghost" onClick={close}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
   );
 }

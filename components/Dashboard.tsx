@@ -141,7 +141,7 @@ export default function Dashboard({
             <h2 className="text-sm font-semibold tracking-[0.2em] text-fg/60 uppercase">
               Applications
             </h2>
-            <StatusSummary />
+            <StatusSummary apps={apps} />
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {filteredApps.map((app) => (

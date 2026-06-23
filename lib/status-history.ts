@@ -3,7 +3,7 @@ import path from "path";
 import type {
   StatusResult,
   StatusHistory,
-  TimelinePoint,
+  BarPoint,
   UptimeWindows,
 } from "./status";
 
@@ -30,6 +30,11 @@ function dayStr(hour: number): string {
   return new Date(hour * HOUR_MS).toISOString().slice(0, 10);
 }
 
+// `YYYY-MM-DDThh` for an hourly bar's `at`.
+function hourStr(hour: number): string {
+  return new Date(hour * HOUR_MS).toISOString().slice(0, 13);
+}
+
 // Uptime % (0–100) across buckets at or after `sinceHour`, or null if no samples.
 export function uptimePct(buckets: Bucket[], sinceHour: number): number | null {
   let up = 0;
@@ -48,7 +53,7 @@ export function dailyTimeline(
   buckets: Bucket[],
   days: number,
   nowHour: number
-): TimelinePoint[] {
+): BarPoint[] {
   const byDay = new Map<string, { up: number; down: number }>();
   for (const b of buckets) {
     const date = dayStr(b.hour);
@@ -58,12 +63,31 @@ export function dailyTimeline(
     byDay.set(date, cur);
   }
   const nowMs = nowHour * HOUR_MS;
-  const out: TimelinePoint[] = [];
+  const out: BarPoint[] = [];
   for (let i = days - 1; i >= 0; i--) {
     const date = dayStr(hourOf(nowMs - i * DAY_MS));
     const d = byDay.get(date);
     const total = d ? d.up + d.down : 0;
-    out.push({ date, uptime: total === 0 ? null : (d!.up / total) * 100 });
+    out.push({ at: date, uptime: total === 0 ? null : (d!.up / total) * 100 });
+  }
+  return out;
+}
+
+// A timeline of the last `hours` hours (oldest → newest), one bar each, so recent
+// activity is visible within the day (not only as days accrue).
+export function hourlyTimeline(
+  buckets: Bucket[],
+  hours: number,
+  nowHour: number
+): BarPoint[] {
+  const byHour = new Map<number, { up: number; down: number }>();
+  for (const b of buckets) byHour.set(b.hour, { up: b.up, down: b.down });
+  const out: BarPoint[] = [];
+  for (let i = hours - 1; i >= 0; i--) {
+    const hour = nowHour - i;
+    const d = byHour.get(hour);
+    const total = d ? d.up + d.down : 0;
+    out.push({ at: hourStr(hour), uptime: total === 0 ? null : (d!.up / total) * 100 });
   }
   return out;
 }
@@ -80,9 +104,22 @@ function windows(buckets: Bucket[], nowHour: number): UptimeWindows {
 // --- In-memory store + persistence (server-only) ---
 
 type AppBuckets = Map<number, { up: number; down: number }>;
-let store = new Map<string, AppBuckets>();
-let loaded = false;
-let flushQueue: Promise<unknown> = Promise.resolve();
+type HistoryState = {
+  store: Map<string, AppBuckets>;
+  loaded: boolean;
+  flushQueue: Promise<unknown>;
+};
+
+// Held on globalThis so the background poller (instrumentation.ts) and the API
+// route share ONE instance even if Next bundles them into separate module
+// graphs — otherwise the reader loads the file once and never sees the poller's
+// ongoing writes ("one reading, then frozen").
+const g = globalThis as unknown as { __ctrlcenterStatusHistory?: HistoryState };
+const state: HistoryState = (g.__ctrlcenterStatusHistory ??= {
+  store: new Map(),
+  loaded: false,
+  flushQueue: Promise.resolve(),
+});
 
 function historyPath(): string {
   const configPath =
@@ -93,8 +130,8 @@ function historyPath(): string {
 // Load the persisted history into memory once (idempotent). Stored shape:
 // { apps: { [appId]: { [hour]: [up, down] } } }.
 export async function loadHistory(): Promise<void> {
-  if (loaded) return;
-  loaded = true;
+  if (state.loaded) return;
+  state.loaded = true;
   try {
     const raw = await fs.readFile(historyPath(), "utf8");
     const data = JSON.parse(raw);
@@ -106,9 +143,9 @@ export async function loadHistory(): Promise<void> {
       }
       next.set(id, m);
     }
-    store = next;
+    state.store = next;
   } catch {
-    store = new Map();
+    state.store = new Map();
   }
 }
 
@@ -118,10 +155,10 @@ export function recordResults(results: StatusResult[], at: number): void {
   const hour = hourOf(at);
   const cutoff = hour - RETENTION_HOURS;
   for (const r of results) {
-    let m = store.get(r.id);
+    let m = state.store.get(r.id);
     if (!m) {
       m = new Map();
-      store.set(r.id, m);
+      state.store.set(r.id, m);
     }
     const b = m.get(hour) ?? { up: 0, down: 0 };
     if (r.up) b.up++;
@@ -131,34 +168,44 @@ export function recordResults(results: StatusResult[], at: number): void {
   }
 }
 
-// Serialized write of the in-memory store to disk (mirrors config's writeQueue).
+// Serialized, atomic write of the in-memory store to disk (temp file + rename so
+// a concurrent read never sees a torn JSON file).
 export function flush(): Promise<void> {
-  flushQueue = flushQueue.then(async () => {
+  state.flushQueue = state.flushQueue.then(async () => {
     const apps: Record<string, Record<number, [number, number]>> = {};
-    for (const [id, m] of store) {
+    for (const [id, m] of state.store) {
       const hours: Record<number, [number, number]> = {};
       for (const [hk, b] of m) hours[hk] = [b.up, b.down];
       apps[id] = hours;
     }
+    const file = historyPath();
+    const tmp = `${file}.tmp`;
     try {
-      await fs.mkdir(path.dirname(historyPath()), { recursive: true });
-      await fs.writeFile(historyPath(), JSON.stringify({ apps }), "utf8");
+      await fs.mkdir(path.dirname(file), { recursive: true });
+      await fs.writeFile(tmp, JSON.stringify({ apps }), "utf8");
+      await fs.rename(tmp, file);
     } catch {
       // best-effort; history is non-critical
     }
   });
-  return flushQueue as Promise<void>;
+  return state.flushQueue as Promise<void>;
 }
 
-// Read history for the given app ids (preserving order) as the API payload.
+// Read history for the given app ids (preserving order) as the API payload —
+// recent hourly bars (last 24h) + a 90-day daily timeline + uptime windows.
 export function getHistory(ids: string[]): StatusHistory {
   const nowHour = hourOf(Date.now());
   const apps = ids.map((id) => {
-    const m = store.get(id);
+    const m = state.store.get(id);
     const buckets: Bucket[] = m
       ? [...m].map(([hour, b]) => ({ hour, up: b.up, down: b.down }))
       : [];
-    return { id, uptime: windows(buckets, nowHour), timeline: dailyTimeline(buckets, 90, nowHour) };
+    return {
+      id,
+      uptime: windows(buckets, nowHour),
+      hourly: hourlyTimeline(buckets, 24, nowHour),
+      daily: dailyTimeline(buckets, 90, nowHour),
+    };
   });
   return { generatedAt: Date.now(), apps };
 }

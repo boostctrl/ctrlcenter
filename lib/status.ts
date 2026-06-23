@@ -61,15 +61,26 @@ export type UptimeWindows = {
   d90: number | null;
 };
 
-// One day in the timeline: uptime % for that day, or null if nothing was
-// recorded (e.g. the server was off, or before this app existed).
-export type TimelinePoint = { date: string; uptime: number | null };
+// One bar in a timeline: uptime % for that bucket, or null if nothing was
+// recorded (server off, or before this app existed). `at` is `YYYY-MM-DD` for a
+// daily bar or `YYYY-MM-DDThh` for an hourly one.
+export type BarPoint = { at: string; uptime: number | null };
 
 export type AppHistory = {
   id: string;
   uptime: UptimeWindows;
-  timeline: TimelinePoint[];
+  hourly: BarPoint[]; // recent (last 24h), one bar per hour
+  daily: BarPoint[]; // last 90 days, one bar per day
 };
 
 // The /api/status/history payload.
 export type StatusHistory = { generatedAt: number; apps: AppHistory[] };
+
+// The summary line for the status banner / dashboard pill. Names the single down
+// service; collapses to "Multiple services down" beyond one.
+export function statusMessage(downNames: string[], total: number): string {
+  if (total === 0) return "Checking services…";
+  if (downNames.length === 0) return "All systems operational";
+  if (downNames.length === 1) return `${downNames[0]} is down`;
+  return "Multiple services down";
+}

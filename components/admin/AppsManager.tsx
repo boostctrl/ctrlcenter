@@ -25,9 +25,20 @@ const emptyForm: FormState = {
   expectStatus: "",
 };
 
+// The "up when" mode tracked explicitly (rather than derived from the value, so
+// "Custom" can be selected even when the value happens to equal a preset).
+type UpMode = "any" | "ok" | "custom";
+function modeFromExpect(v: string): UpMode {
+  const t = v.trim();
+  if (t === "") return "any";
+  if (t === "200-399") return "ok";
+  return "custom";
+}
+
 export default function AppsManager({ initialApps }: { initialApps: AppItem[] }) {
   const [apps, setApps] = useState(initialApps);
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [upMode, setUpMode] = useState<UpMode>("any");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const toast = useToast();
@@ -42,11 +53,13 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
       icon: app.icon,
       expectStatus: app.expectStatus ?? "",
     });
+    setUpMode(modeFromExpect(app.expectStatus ?? ""));
   }
 
   function resetForm() {
     setEditingId(null);
     setForm(emptyForm);
+    setUpMode("any");
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -185,41 +198,40 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
           <div className="flex overflow-hidden rounded-lg border border-fg/10 text-xs">
             {(
               [
-                { key: "any", label: "Any response", value: "" },
-                { key: "ok", label: "2xx & 3xx", value: "200-399" },
-                { key: "custom", label: "Custom", value: null },
+                { key: "any", label: "Any response" },
+                { key: "ok", label: "2xx & 3xx" },
+                { key: "custom", label: "Custom" },
               ] as const
-            ).map((opt) => {
-              const mode =
-                form.expectStatus === ""
-                  ? "any"
-                  : form.expectStatus === "200-399"
-                    ? "ok"
-                    : "custom";
-              const selected = mode === opt.key;
-              return (
-                <button
-                  key={opt.key}
-                  type="button"
-                  onClick={() =>
+            ).map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                aria-pressed={upMode === opt.key}
+                onClick={() => {
+                  setUpMode(opt.key);
+                  if (opt.key === "any") setForm({ ...form, expectStatus: "" });
+                  else if (opt.key === "ok")
+                    setForm({ ...form, expectStatus: "200-399" });
+                  else
                     setForm({
                       ...form,
                       expectStatus:
-                        opt.value === null
-                          ? form.expectStatus || "200-299"
-                          : opt.value,
-                    })
-                  }
-                  className={`flex-1 px-2 py-1.5 transition-colors ${
-                    selected ? "bg-fg/15 text-fg" : "text-fg/50 hover:text-fg/80"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
+                        modeFromExpect(form.expectStatus) === "custom"
+                          ? form.expectStatus
+                          : "200-299",
+                    });
+                }}
+                className={`flex-1 px-2 py-1.5 transition-colors ${
+                  upMode === opt.key
+                    ? "bg-fg/15 text-fg"
+                    : "text-fg/50 hover:text-fg/80"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
-          {form.expectStatus !== "" && form.expectStatus !== "200-399" && (
+          {upMode === "custom" && (
             <input
               value={form.expectStatus}
               onChange={(e) => setForm({ ...form, expectStatus: e.target.value })}
@@ -228,8 +240,11 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
             />
           )}
           <p className="text-xs text-fg/40">
-            Otherwise any reachable host counts as up (even 4xx/5xx). Use this to
-            mark e.g. a 404 as down.
+            {upMode === "any"
+              ? "Any reachable host counts as up — even a 4xx/5xx response."
+              : upMode === "ok"
+                ? "Up only on a 2xx or 3xx response."
+                : "Up only when the response code is in these codes/ranges — e.g. mark a 404 as down."}
           </p>
         </div>
         <div className="flex gap-2">

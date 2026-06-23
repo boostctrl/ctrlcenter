@@ -139,7 +139,7 @@ the slug to `LOCAL_ICONS` in [`lib/icons.ts`](lib/icons.ts).
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `ADMIN_PASSWORD` | yes | Bootstrap password for `/admin`. After you set one in **Settings → Change password**, login uses that — but keep this set (or set `SESSION_SECRET`), as it also signs sessions. |
+| `ADMIN_PASSWORD` | yes | Bootstrap password for `/admin`. After you set one in **Settings → Reset password**, login uses that — but keep this set (or set `SESSION_SECRET`), as it also signs sessions. **Special characters:** quote the value in `.env` and double any literal `$` as `$$` (docker compose interpolates `$`), or a complex password can be mangled before the app sees it. |
 | `SESSION_SECRET` | no | Secret used to sign session cookies. If unset, derived from `ADMIN_PASSWORD`. Recommended so sessions don't depend on the password. Generate with `openssl rand -base64 32`. |
 | `CONFIG_PATH` | no | Path to the config file (default `./config/config.yaml`; the container sets `/config/config.yaml`). The uptime history (`status-history.json`) is written beside it. |
 | `TRUSTED_PROXY_HOPS` | no | Number of trusted reverse proxies in front of the app, used to find the real client IP in `X-Forwarded-For` for login throttling. Default `1`. Set `0` if exposed directly. |

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { summarize, matchesStatus } from "./status";
+import { summarize, matchesStatus, statusMessage } from "./status";
 
 const up = { up: true };
 const down = { up: false };
@@ -52,5 +52,20 @@ describe("matchesStatus", () => {
     expect(matchesStatus(401, "200-299, 401")).toBe(true);
     expect(matchesStatus(404, "200-399")).toBe(false);
     expect(matchesStatus(204, "200-399")).toBe(true);
+  });
+});
+
+describe("statusMessage", () => {
+  it("reports nothing to check yet", () => {
+    expect(statusMessage([], 0)).toBe("Checking services…");
+  });
+  it("reports all up", () => {
+    expect(statusMessage([], 4)).toBe("All systems operational");
+  });
+  it("names the single down service", () => {
+    expect(statusMessage(["Plex"], 4)).toBe("Plex is down");
+  });
+  it("collapses to 'Multiple services down' beyond one", () => {
+    expect(statusMessage(["Plex", "Grafana"], 5)).toBe("Multiple services down");
   });
 });

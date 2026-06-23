@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { summarize, type AppStatus, type StatusResponse } from "@/lib/status";
+import { statusMessage, type AppStatus, type StatusResponse } from "@/lib/status";
 
 const StatusContext = createContext<Map<string, AppStatus> | null>(null);
 
@@ -77,11 +77,19 @@ export function StatusDot({ id }: { id: string }) {
 // A compact health pill linking to the /status page, shown by the dashboard's
 // "Applications" heading. Shares the provider's context, so it renders nothing
 // until the first poll resolves (avoiding a flash of "all systems operational").
-export function StatusSummary() {
+export function StatusSummary({
+  apps,
+}: {
+  apps: { id: string; name: string }[];
+}) {
   const statuses = useContext(StatusContext);
   if (!statuses || statuses.size === 0) return null;
-  const { down, total, allUp } = summarize([...statuses.values()]);
-  if (total === 0) return null;
+  const monitored = apps.filter((a) => statuses.has(a.id));
+  const downNames = monitored
+    .filter((a) => !statuses.get(a.id)!.up)
+    .map((a) => a.name);
+  if (monitored.length === 0) return null;
+  const allUp = downNames.length === 0;
 
   return (
     <Link
@@ -92,9 +100,7 @@ export function StatusSummary() {
         className={`h-2 w-2 rounded-full ${allUp ? "bg-emerald-400" : "bg-red-400"}`}
         aria-hidden
       />
-      <span>
-        {allUp ? "All systems operational" : `${down} of ${total} down`}
-      </span>
+      <span>{statusMessage(downNames, monitored.length)}</span>
       <span className="text-fg/30 transition-transform group-hover:translate-x-0.5">
         →
       </span>

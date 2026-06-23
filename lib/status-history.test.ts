@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { hourOf, uptimePct, dailyTimeline, type Bucket } from "./status-history";
+import {
+  hourOf,
+  uptimePct,
+  dailyTimeline,
+  hourlyTimeline,
+  type Bucket,
+} from "./status-history";
 
 const HOUR = 3_600_000;
 const hr = (y: number, mo: number, d: number, h: number) =>
@@ -38,7 +44,7 @@ describe("dailyTimeline", () => {
       { hour: hr(2026, 5, 23, 1), up: 3, down: 0 },
     ];
     const tl = dailyTimeline(buckets, 3, nowHour);
-    expect(tl.map((p) => p.date)).toEqual([
+    expect(tl.map((p) => p.at)).toEqual([
       "2026-06-21",
       "2026-06-22",
       "2026-06-23",
@@ -46,5 +52,21 @@ describe("dailyTimeline", () => {
     expect(tl[0].uptime).toBeNull();
     expect(tl[1].uptime).toBe(50);
     expect(tl[2].uptime).toBe(100);
+  });
+});
+
+describe("hourlyTimeline", () => {
+  it("returns the last N hours (oldest→newest) with null gaps", () => {
+    const nowHour = hr(2026, 5, 23, 12);
+    const buckets: Bucket[] = [
+      { hour: nowHour, up: 5, down: 0 },
+      { hour: nowHour - 2, up: 1, down: 1 },
+    ];
+    const tl = hourlyTimeline(buckets, 3, nowHour);
+    expect(tl.length).toBe(3);
+    expect(tl[0].uptime).toBe(50); // nowHour-2
+    expect(tl[1].uptime).toBeNull(); // nowHour-1
+    expect(tl[2].uptime).toBe(100); // nowHour
+    expect(tl[2].at).toBe("2026-06-23T12");
   });
 });
