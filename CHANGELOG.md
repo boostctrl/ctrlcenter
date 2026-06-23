@@ -12,6 +12,32 @@ here.
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-06-22
+
+### Added
+
+- A **"Default" theme** at the top of the theme list (badged) that restores the
+  app's stock look — Glass design, Aurora scene, and the default colors.
+
+### Changed
+
+- The **settings page is full-width**, and the preferences section is reorganized
+  into a cleaner two-column layout with a clearer "Reset all settings" control.
+- **Theme builder reorganized:** the Themes presets are grouped in their own
+  section, visually separated by a "Customize" divider from the design/scene/
+  color controls; naming and saving a theme now sits with the Themes section;
+  and a dedicated **"Reset theme to default"** resets only the theme (distinct
+  from "Reset all settings").
+
+### Fixed
+
+- Design-preview swatches no longer lift/shadow oddly when hovering the theme
+  builder.
+- The admin icon preview no longer sticks on the fallback letter after a
+  transient load failure or while editing the slug.
+- The "Use my location" button no longer reports a false timeout while the
+  browser's permission prompt is still open (timeout raised to 30s).
+
 ## [0.8.2] - 2026-06-22
 
 ### Changed
@@ -418,7 +444,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v0.8.2...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v0.8.3...HEAD
+[0.8.3]: https://github.com/boostctrl/ctrlcenter/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/boostctrl/ctrlcenter/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/boostctrl/ctrlcenter/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/boostctrl/ctrlcenter/compare/v0.7.0...v0.8.0
