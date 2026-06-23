@@ -41,12 +41,44 @@ export async function fetchWeather(
   }
 }
 
+// The fuller current conditions shown on the /weather page (the header widget
+// uses the lean CurrentWeather above). uvIndex / precipProbability come from the
+// current hour of the hourly series (Open-Meteo has no "current" field for them).
+export type CurrentDetail = CurrentWeather & {
+  feelsLike: number;
+  isDay: boolean;
+  cloudCover: number;
+  pressure: number;
+  windSpeed: number;
+  windDirection: number;
+  windGusts: number;
+  precipitation: number;
+  precipProbability: number;
+  uvIndex: number;
+};
+
 // A single hour / day in the forecast. Times are ISO strings in the location's
 // own timezone (Open-Meteo timezone=auto), without an offset suffix.
-export type HourPoint = { time: string; temperature: number; code: number };
-export type DayPoint = { date: string; code: number; max: number; min: number };
+export type HourPoint = {
+  time: string;
+  temperature: number;
+  code: number;
+  precipProbability: number;
+  isDay: boolean;
+};
+export type DayPoint = {
+  date: string;
+  code: number;
+  max: number;
+  min: number;
+  precipProbabilityMax: number;
+  uvIndexMax: number;
+  windMax: number;
+  sunrise: string;
+  sunset: string;
+};
 export type Forecast = {
-  current: CurrentWeather;
+  current: CurrentDetail;
   hourly: HourPoint[];
   daily: DayPoint[];
 };
@@ -61,10 +93,14 @@ export async function fetchForecast(
   const params = new URLSearchParams({
     latitude: String(latitude),
     longitude: String(longitude),
-    current: "temperature_2m,relative_humidity_2m,weather_code",
-    hourly: "temperature_2m,weather_code",
-    daily: "weather_code,temperature_2m_max,temperature_2m_min",
+    current:
+      "temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,is_day,cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m,precipitation",
+    hourly: "temperature_2m,weather_code,precipitation_probability,is_day,uv_index",
+    daily:
+      "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_probability_max,uv_index_max,wind_speed_10m_max",
     temperature_unit: units === "metric" ? "celsius" : "fahrenheit",
+    wind_speed_unit: units === "metric" ? "kmh" : "mph",
+    precipitation_unit: units === "metric" ? "mm" : "inch",
     timezone: "auto",
     forecast_days: "7",
   });
@@ -80,6 +116,8 @@ export async function fetchForecast(
     const d = data.daily;
     if (!current || !h || !d) return null;
 
+    const num = (v: unknown): number => (typeof v === "number" ? v : 0);
+
     // Trim the hourly series to the next 24 hours from "now".
     const startRaw = h.time.findIndex((t: string) => t >= current.time);
     const start = startRaw === -1 ? 0 : startRaw;
@@ -89,6 +127,8 @@ export async function fetchForecast(
         time,
         temperature: h.temperature_2m[start + i],
         code: h.weather_code[start + i],
+        precipProbability: num(h.precipitation_probability?.[start + i]),
+        isDay: num(h.is_day?.[start + i]) === 1,
       }));
 
     const daily: DayPoint[] = d.time.map((date: string, i: number) => ({
@@ -96,13 +136,28 @@ export async function fetchForecast(
       code: d.weather_code[i],
       max: d.temperature_2m_max[i],
       min: d.temperature_2m_min[i],
+      precipProbabilityMax: num(d.precipitation_probability_max?.[i]),
+      uvIndexMax: num(d.uv_index_max?.[i]),
+      windMax: num(d.wind_speed_10m_max?.[i]),
+      sunrise: d.sunrise?.[i] ?? "",
+      sunset: d.sunset?.[i] ?? "",
     }));
 
     return {
       current: {
         temperature: current.temperature_2m,
-        humidity: current.relative_humidity_2m,
+        humidity: num(current.relative_humidity_2m),
         code: current.weather_code,
+        feelsLike: num(current.apparent_temperature),
+        isDay: num(current.is_day) === 1,
+        cloudCover: num(current.cloud_cover),
+        pressure: num(current.pressure_msl),
+        windSpeed: num(current.wind_speed_10m),
+        windDirection: num(current.wind_direction_10m),
+        windGusts: num(current.wind_gusts_10m),
+        precipitation: num(current.precipitation),
+        precipProbability: num(h.precipitation_probability?.[start]),
+        uvIndex: num(h.uv_index?.[start]),
       },
       hourly,
       daily,
@@ -114,6 +169,46 @@ export async function fetchForecast(
 
 export function unitSymbol(units: Units): string {
   return units === "metric" ? "°C" : "°F";
+}
+
+export function windUnitLabel(units: Units): string {
+  return units === "metric" ? "km/h" : "mph";
+}
+
+export function precipUnitLabel(units: Units): string {
+  return units === "metric" ? "mm" : "in";
+}
+
+const COMPASS_16 = [
+  "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+  "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW",
+];
+
+// Meteorological wind direction (degrees the wind blows *from*) → 16-point
+// compass abbreviation.
+export function windDirectionLabel(deg: number): string {
+  const i = Math.round((((deg % 360) + 360) % 360) / 22.5) % 16;
+  return COMPASS_16[i];
+}
+
+// UV index severity band (WHO scale).
+export function uvLabel(uv: number): string {
+  if (uv < 3) return "Low";
+  if (uv < 6) return "Moderate";
+  if (uv < 8) return "High";
+  if (uv < 11) return "Very high";
+  return "Extreme";
+}
+
+// Format an Open-Meteo local time string ("YYYY-MM-DDTHH:MM") as a 12-hour clock
+// (e.g. "6:42 AM"), reading the digits directly so the location's own timezone is
+// preserved rather than reinterpreted in the browser's zone.
+export function formatClock(iso: string): string {
+  const m = /T(\d{2}):(\d{2})/.exec(iso);
+  if (!m) return "—";
+  const hh = Number(m[1]);
+  const h12 = hh % 12 || 12;
+  return `${h12}:${m[2]} ${hh < 12 ? "AM" : "PM"}`;
 }
 
 // Short text label for a weather code (for the forecast page).
