@@ -4,7 +4,10 @@ import {
   uptimePct,
   dailyTimeline,
   hourlyTimeline,
+  recentBars,
+  recentPct,
   type Bucket,
+  type Reading,
 } from "./status-history";
 
 const HOUR = 3_600_000;
@@ -52,6 +55,29 @@ describe("dailyTimeline", () => {
     expect(tl[0].uptime).toBeNull();
     expect(tl[1].uptime).toBe(50);
     expect(tl[2].uptime).toBe(100);
+  });
+});
+
+describe("recentBars / recentPct", () => {
+  const now = Date.UTC(2026, 5, 23, 12, 30);
+  const readings: Reading[] = [
+    { t: now - 90 * 60_000, up: true }, // outside the window
+    { t: now - 40 * 60_000, up: false },
+    { t: now - 10 * 60_000, up: true },
+    { t: now - 5 * 60_000, up: true },
+  ];
+  const since = now - 60 * 60_000;
+
+  it("recentBars keeps the window, oldest→newest, binary uptime", () => {
+    const bars = recentBars(readings, since);
+    expect(bars.map((b) => b.uptime)).toEqual([0, 100, 100]);
+    expect(bars[0].at).toBe("2026-06-23T11:50");
+  });
+
+  it("recentPct is the up-share in the window, or null when empty", () => {
+    expect(recentPct(readings, since)).toBeCloseTo((2 / 3) * 100, 3);
+    expect(recentPct(readings, now + 60_000)).toBeNull();
+    expect(recentPct([], since)).toBeNull();
   });
 });
 

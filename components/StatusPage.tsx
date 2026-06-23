@@ -24,6 +24,7 @@ export type StatusAppMeta = {
 const POLL_MS = 30_000;
 
 const RANGES = [
+  { key: "h1", label: "1h" },
   { key: "d1", label: "24h" },
   { key: "d7", label: "7d" },
   { key: "d30", label: "30d" },
@@ -67,9 +68,10 @@ function StateDot({ status }: { status: AppStatus | undefined }) {
   );
 }
 
-// Format a BarPoint's `at` for the hover tooltip: an hour ("…Thh") shows the
-// local-ish hour label, a date shows the date.
+// Format a BarPoint's `at` for the hover tooltip: a single poll ("…Thh:mm")
+// shows HH:MM, an hour ("…Thh") shows an am/pm hour, a date shows the date.
 function barLabel(at: string): string {
+  if (at.length >= 16) return `${at.slice(0, 10)} ${at.slice(11, 16)}`;
   if (at.includes("T")) {
     const hh = Number(at.slice(11, 13));
     const day = at.slice(0, 10);
@@ -83,7 +85,7 @@ function barLabel(at: string): string {
 function Timeline({ points }: { points: BarPoint[] }) {
   if (points.length === 0) return null;
   return (
-    <div className="flex h-6 items-stretch gap-px">
+    <div className="flex h-7 items-stretch gap-0.5">
       {points.map((p) => (
         <span
           key={p.at}
@@ -92,7 +94,7 @@ function Timeline({ points }: { points: BarPoint[] }) {
               ? `${barLabel(p.at)}: no data`
               : `${barLabel(p.at)}: ${p.uptime.toFixed(1)}% up`
           }
-          className={`flex-1 rounded-[1px] ${uptimeColor(p.uptime)}`}
+          className={`flex-1 rounded ${uptimeColor(p.uptime)}`}
         />
       ))}
     </div>
@@ -105,7 +107,7 @@ export default function StatusPage({ apps }: { apps: StatusAppMeta[] }) {
   const [checkedAt, setCheckedAt] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [loading, setLoading] = useState(false);
-  const [range, setRange] = useState<RangeKey>("d90");
+  const [range, setRange] = useState<RangeKey>("d1");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -224,9 +226,11 @@ export default function StatusPage({ apps }: { apps: StatusAppMeta[] }) {
               const uptime = h ? h.uptime[range as keyof UptimeWindows] : null;
               const dailyCount = range === "d7" ? 7 : range === "d30" ? 30 : 90;
               const series =
-                range === "d1"
-                  ? (h?.hourly ?? [])
-                  : (h?.daily ?? []).slice(-dailyCount);
+                range === "h1"
+                  ? (h?.recent ?? [])
+                  : range === "d1"
+                    ? (h?.hourly ?? [])
+                    : (h?.daily ?? []).slice(-dailyCount);
               const detail = !s
                 ? "Checking…"
                 : s.up

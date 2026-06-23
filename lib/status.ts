@@ -55,6 +55,7 @@ export function matchesStatus(code: number, spec: string): boolean {
 
 // Uptime percentage (0–100) over a window, or null when there's no data for it.
 export type UptimeWindows = {
+  h1: number | null;
   d1: number | null;
   d7: number | null;
   d30: number | null;
@@ -63,12 +64,14 @@ export type UptimeWindows = {
 
 // One bar in a timeline: uptime % for that bucket, or null if nothing was
 // recorded (server off, or before this app existed). `at` is `YYYY-MM-DD` for a
-// daily bar or `YYYY-MM-DDThh` for an hourly one.
+// daily bar, `YYYY-MM-DDThh` for an hourly one, or `YYYY-MM-DDThh:mm` for a
+// single recent poll.
 export type BarPoint = { at: string; uptime: number | null };
 
 export type AppHistory = {
   id: string;
   uptime: UptimeWindows;
+  recent: BarPoint[]; // last hour, one bar per poll
   hourly: BarPoint[]; // recent (last 24h), one bar per hour
   daily: BarPoint[]; // last 90 days, one bar per day
 };

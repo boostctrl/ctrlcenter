@@ -14,7 +14,10 @@ import type {
 
 const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;
+const MIN_MS = 60_000;
 const RETENTION_HOURS = 90 * 24;
+const RECENT_KEEP_MS = 90 * MIN_MS; // ring of raw readings kept for the 1h view
+const RECENT_VIEW_MS = 60 * MIN_MS; // window the 1h view / h1 % actually show
 const HISTORY_FILE = "status-history.json";
 
 // --- Pure aggregation helpers (unit-tested) ---
@@ -33,6 +36,35 @@ function dayStr(hour: number): string {
 // `YYYY-MM-DDThh` for an hourly bar's `at`.
 function hourStr(hour: number): string {
   return new Date(hour * HOUR_MS).toISOString().slice(0, 13);
+}
+
+// `YYYY-MM-DDThh:mm` for a single recent poll's `at`.
+function minuteStr(ts: number): string {
+  return new Date(ts).toISOString().slice(0, 16);
+}
+
+// One raw reading: timestamp (ms) + whether the app was up.
+export type Reading = { t: number; up: boolean };
+
+// The last hour of raw readings as one bar each (oldest → newest); each bar is
+// binary — 100 when up, 0 when down — so a single poll reads as green/red.
+export function recentBars(readings: Reading[], sinceMs: number): BarPoint[] {
+  return readings
+    .filter((r) => r.t >= sinceMs)
+    .sort((a, b) => a.t - b.t)
+    .map((r) => ({ at: minuteStr(r.t), uptime: r.up ? 100 : 0 }));
+}
+
+// Uptime % (0–100) across readings at/after `sinceMs`, or null if none.
+export function recentPct(readings: Reading[], sinceMs: number): number | null {
+  let up = 0;
+  let total = 0;
+  for (const r of readings) {
+    if (r.t < sinceMs) continue;
+    total++;
+    if (r.up) up++;
+  }
+  return total === 0 ? null : (up / total) * 100;
 }
 
 // Uptime % (0–100) across buckets at or after `sinceHour`, or null if no samples.
@@ -92,7 +124,12 @@ export function hourlyTimeline(
   return out;
 }
 
-function windows(buckets: Bucket[], nowHour: number): UptimeWindows {
+// Day-scale windows from the hourly buckets. `h1` is added at read time from the
+// raw recent ring (see getHistory), since the buckets are only hourly.
+function dayWindows(
+  buckets: Bucket[],
+  nowHour: number
+): Omit<UptimeWindows, "h1"> {
   return {
     d1: uptimePct(buckets, nowHour - 24),
     d7: uptimePct(buckets, nowHour - 24 * 7),
@@ -106,6 +143,7 @@ function windows(buckets: Bucket[], nowHour: number): UptimeWindows {
 type AppBuckets = Map<number, { up: number; down: number }>;
 type HistoryState = {
   store: Map<string, AppBuckets>;
+  recent: Map<string, Reading[]>; // raw readings (last ~90 min) for the 1h view
   loaded: boolean;
   flushQueue: Promise<unknown>;
 };
@@ -117,9 +155,11 @@ type HistoryState = {
 const g = globalThis as unknown as { __ctrlcenterStatusHistory?: HistoryState };
 const state: HistoryState = (g.__ctrlcenterStatusHistory ??= {
   store: new Map(),
+  recent: new Map(),
   loaded: false,
   flushQueue: Promise.resolve(),
 });
+state.recent ??= new Map(); // tolerate a state created by an older build
 
 function historyPath(): string {
   const configPath =
@@ -128,7 +168,7 @@ function historyPath(): string {
 }
 
 // Load the persisted history into memory once (idempotent). Stored shape:
-// { apps: { [appId]: { [hour]: [up, down] } } }.
+// { apps: { [id]: { [hour]: [up, down] } }, recent: { [id]: [[t, up?1:0], …] } }.
 export async function loadHistory(): Promise<void> {
   if (state.loaded) return;
   state.loaded = true;
@@ -144,8 +184,18 @@ export async function loadHistory(): Promise<void> {
       next.set(id, m);
     }
     state.store = next;
+    const recent = new Map<string, Reading[]>();
+    const cutoff = Date.now() - RECENT_KEEP_MS;
+    for (const [id, rows] of Object.entries(data?.recent ?? {})) {
+      const list = (rows as [number, number][])
+        .filter((r) => r?.[0] >= cutoff)
+        .map((r) => ({ t: r[0], up: r[1] === 1 }));
+      if (list.length) recent.set(id, list);
+    }
+    state.recent = recent;
   } catch {
     state.store = new Map();
+    state.recent = new Map();
   }
 }
 
@@ -154,6 +204,7 @@ export async function loadHistory(): Promise<void> {
 export function recordResults(results: StatusResult[], at: number): void {
   const hour = hourOf(at);
   const cutoff = hour - RETENTION_HOURS;
+  const recentCutoff = at - RECENT_KEEP_MS;
   for (const r of results) {
     let m = state.store.get(r.id);
     if (!m) {
@@ -165,6 +216,14 @@ export function recordResults(results: StatusResult[], at: number): void {
     else b.down++;
     m.set(hour, b);
     for (const k of m.keys()) if (k < cutoff) m.delete(k);
+
+    // Raw ring for the 1h view, pruned to the keep window.
+    const list = state.recent.get(r.id) ?? [];
+    list.push({ t: at, up: r.up });
+    state.recent.set(
+      r.id,
+      list.filter((x) => x.t >= recentCutoff)
+    );
   }
 }
 
@@ -178,11 +237,15 @@ export function flush(): Promise<void> {
       for (const [hk, b] of m) hours[hk] = [b.up, b.down];
       apps[id] = hours;
     }
+    const recent: Record<string, [number, number][]> = {};
+    for (const [id, list] of state.recent) {
+      if (list.length) recent[id] = list.map((r) => [r.t, r.up ? 1 : 0]);
+    }
     const file = historyPath();
     const tmp = `${file}.tmp`;
     try {
       await fs.mkdir(path.dirname(file), { recursive: true });
-      await fs.writeFile(tmp, JSON.stringify({ apps }), "utf8");
+      await fs.writeFile(tmp, JSON.stringify({ apps, recent }), "utf8");
       await fs.rename(tmp, file);
     } catch {
       // best-effort; history is non-critical
@@ -191,18 +254,26 @@ export function flush(): Promise<void> {
   return state.flushQueue as Promise<void>;
 }
 
-// Read history for the given app ids (preserving order) as the API payload —
-// recent hourly bars (last 24h) + a 90-day daily timeline + uptime windows.
+// Read history for the given app ids (preserving order) as the API payload — the
+// last hour of per-poll bars + 24h of hourly bars + a 90-day daily timeline +
+// uptime windows (h1 from the raw ring, the rest from the hourly buckets).
 export function getHistory(ids: string[]): StatusHistory {
-  const nowHour = hourOf(Date.now());
+  const now = Date.now();
+  const nowHour = hourOf(now);
+  const recentSince = now - RECENT_VIEW_MS;
   const apps = ids.map((id) => {
     const m = state.store.get(id);
     const buckets: Bucket[] = m
       ? [...m].map(([hour, b]) => ({ hour, up: b.up, down: b.down }))
       : [];
+    const readings = state.recent.get(id) ?? [];
     return {
       id,
-      uptime: windows(buckets, nowHour),
+      uptime: {
+        h1: recentPct(readings, recentSince),
+        ...dayWindows(buckets, nowHour),
+      },
+      recent: recentBars(readings, recentSince),
       hourly: hourlyTimeline(buckets, 24, nowHour),
       daily: dailyTimeline(buckets, 90, nowHour),
     };
