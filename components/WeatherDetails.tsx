@@ -287,7 +287,7 @@ export default function WeatherDetails({
       {hourly.length > 0 && (
         <div className="glass-card p-5">
           <h2 className="mb-3 text-xs font-semibold tracking-[0.18em] text-fg/50 uppercase">
-            Next 24 hours
+            Hourly forecast
           </h2>
           <div className="flex gap-4 overflow-x-auto pb-1">
             {hourly.map((h) => (
