@@ -12,6 +12,28 @@ here.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-06-23
+
+### Added
+
+- **Richer, redesigned weather page.** `/weather` now shows "feels like", an
+  hourly forecast, a 7-day outlook with temperature range bars, a sunrise/sunset
+  arc, and tiles for wind (speed + direction), chance of precipitation, humidity,
+  UV, pressure, and cloud cover — in a refreshed layout that follows the active
+  theme (with a subtle condition/time-aware accent on the hero).
+- **Uptime history & charting on the status page.** `/status` shows a per-service
+  uptime % (24h / 7d / 30d / 90d) and a 90-day daily timeline, recorded by a
+  background poller that runs independent of page views. The check interval is
+  admin-configurable (1 / 5 / 15 min).
+- **Per-service status by HTTP code.** Each app can define which response codes
+  count as "up" (e.g. `200-299`), so a reachable host returning a `404` reads as
+  **down** rather than up. Set via an "Up when" control in the admin app form.
+- **MIT license.**
+
+### Changed
+
+- Renamed the weather page's "Next 24 hours" heading to "Hourly forecast".
+
 ## [0.8.3] - 2026-06-22
 
 ### Added
@@ -444,7 +466,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v0.8.3...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/boostctrl/ctrlcenter/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/boostctrl/ctrlcenter/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/boostctrl/ctrlcenter/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/boostctrl/ctrlcenter/compare/v0.8.0...v0.8.1
