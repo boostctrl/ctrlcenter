@@ -12,6 +12,29 @@ here.
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-06-23
+
+### Fixed
+
+- **Uptime history now accrues and shows recent activity.** The history store is
+  shared correctly between the background poller and the page (it could freeze on
+  the first reading before), and the status timeline now shows **hourly bars for
+  the 24h range** so activity is visible right away instead of only as days pass.
+- **Status summary names the affected service.** Exactly one service down reads
+  "{name} is down"; more than one reads "Multiple services down" (was the
+  ungrammatical "1 of N service down") — in both the status page and the
+  dashboard pill.
+- **Admin app form:** the "Custom" up-when option now works from every preset and
+  the help text updates per option.
+
+### Changed
+
+- The **admin portal** matches the rest of the app's width.
+- **Change password** is now a "Reset password" button that opens a modal.
+- Documented escaping special characters in `ADMIN_PASSWORD` (quote the value;
+  double a literal `$` for docker compose) — a complex password can otherwise be
+  mangled by `.env`/compose before the app sees it.
+
 ## [0.9.0] - 2026-06-23
 
 ### Added
@@ -466,7 +489,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/boostctrl/ctrlcenter/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/boostctrl/ctrlcenter/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/boostctrl/ctrlcenter/compare/v0.8.1...v0.8.2
