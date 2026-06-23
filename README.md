@@ -1,88 +1,119 @@
 # ctrlcenter
 
-A self-hosted dashboard: applications grid, categorized bookmarks,
-a live date/greeting header with a ticking clock, and a weather widget. Built
-with Next.js + Tailwind, configured through a single YAML file, with a built-in
-admin UI for adding/editing apps and bookmarks without touching the file by
-hand.
+A self-hosted **start page and service dashboard** — your apps and bookmarks,
+live weather, and at-a-glance uptime for everything you run, wrapped in a theme
+system that's genuinely fun to make your own. One small YAML file, a built-in
+admin UI, and a single container.
 
-Features:
+Built with Next.js 16, React 19, and Tailwind v4.
 
-- **Instant search** across apps and bookmarks — press `/` to focus, `Esc`
-  to clear.
-- **Drag-to-reorder** apps and bookmarks in the admin UI; order is saved back
-  to the YAML file.
-- **Installable** as a PWA (web app manifest) and exposes `/api/health` for
-  container/orchestrator health checks.
+---
+
+## Features
+
+- **Apps & bookmarks.** A clean grid of your services and category-grouped
+  bookmarks. Instant search across everything (press `/` to focus, `Esc` to
+  clear), and drag-to-reorder apps and bookmark categories from the admin UI.
+
+- **A real theme system.** Mix and match three independent axes and save the
+  result:
+  - **Designs** — the card surface: `glass`, `aero`, `flat`, `soft`, `minimal`,
+    `bold`, `cyber`.
+  - **Scenes** — an animated backdrop: `aurora`, `abyss`, `nebula`, `grid`,
+    `starfield`, `waves` (all motion respects `prefers-reduced-motion`).
+  - **Colors** — a palette plus an accent gradient, or hand-pick your own.
+
+  Every look has a **cohesive light and dark variant**, and one-tap **Themes**
+  (Default, Mariana, Outrun, Observatory, Tide, …) bundle a palette, design, and
+  scene together. The admin sets a site-wide default; each visitor can override
+  any of it in their own browser.
+
+- **Weather.** A header widget with the current conditions, plus a full
+  **/weather** page: a hero with feels-like, an hourly forecast, a 7-day outlook
+  with temperature range bars, a sunrise/sunset arc, and tiles for wind
+  (speed + direction), chance of precipitation, humidity, UV, pressure, and
+  cloud cover. Powered by [Open-Meteo](https://open-meteo.com) — no API key.
+
+- **Uptime & status.** Optional reachability checks show an online/offline dot on
+  each app, and a dedicated **/status** page with per-service **uptime %** and a
+  **90-day daily timeline** (Statuspage / UptimeRobot style). A background poller
+  records history independent of page views, and each service can define which
+  HTTP status codes count as up (so a `404` can read as **down**, not just
+  "reachable").
+
+- **Per-visitor personalization, no accounts.** Each visitor can set a greeting
+  name, timezone, weather location/units, and their whole theme from **/settings**
+  — all stored in their own browser, never on the server.
+
+- **Admin portal.** A password-gated UI to manage apps, bookmarks, and settings
+  without touching YAML: an icon picker with live preview, favicon config, the
+  search engine, and one-click **Export/Import** of your whole config.
+
+- **Self-hosted & simple.** A single YAML config, a prebuilt multi-arch Docker
+  image, an installable PWA manifest, and `/api/health` for orchestrators.
 
 ## Quick start (Docker Compose)
 
-1. Copy the env file and set an admin password:
+1. Set an admin password:
    ```bash
    cp .env.example .env
-   # edit .env and set ADMIN_PASSWORD (and, recommended, SESSION_SECRET)
+   # edit .env: set ADMIN_PASSWORD (and, recommended, SESSION_SECRET)
    ```
-2. Pull the published image and run:
+2. Pull and run the published image:
    ```bash
    docker compose pull
    docker compose up -d
    ```
-   The bundled [docker-compose.yml](docker-compose.yml) uses the prebuilt image
-   `ghcr.io/boostctrl/ctrlcenter:latest`. To build from source instead,
-   comment out `image:` and uncomment `build: .`, then run
-   `docker compose up -d --build`.
-3. Open `http://localhost:3000` for the dashboard, `http://localhost:3000/admin`
-   to manage apps/bookmarks/settings (sign in with `ADMIN_PASSWORD`).
+   The bundled [docker-compose.yml](docker-compose.yml) uses
+   `ghcr.io/boostctrl/ctrlcenter:latest`. To build from source instead, comment
+   out `image:`, uncomment `build: .`, and run `docker compose up -d --build`.
+3. Open **http://localhost:3000** for the dashboard and **/admin** to manage it
+   (sign in with `ADMIN_PASSWORD`).
 
-## Environment variables
-
-| Variable         | Required | Description                                                                                                                                      |
-| ---------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `ADMIN_PASSWORD` | yes      | Bootstrap password for the `/admin` UI. Once you set a password from **Settings → Change password**, login uses that instead — but keep this set (or set `SESSION_SECRET`), as it's also used to sign sessions. |
-| `SESSION_SECRET` | no       | Secret used to sign session cookies. If unset, the key is derived from `ADMIN_PASSWORD`. Recommended so sessions don't depend on the password. Generate one with `openssl rand -base64 32`. |
-| `CONFIG_PATH`    | no       | Path to the config file (defaults to `./config/config.yaml`; the container sets `/config/config.yaml`).                                           |
-| `TRUSTED_PROXY_HOPS` | no   | Number of trusted reverse proxies in front of the app, used to find the real client IP in `X-Forwarded-For` for login throttling. Defaults to `1` (one proxy). Set to `0` if the app is exposed directly so a forged header can't bypass the limit. |
-
-Your data lives in `./config/config.yaml`, bind-mounted into the container.
-You can edit it by hand (changes are picked up on the next page load — no
-rebuild needed) or through the `/admin` UI, which writes back to the same
-file. The admin header also has **Export**/**Import** buttons to download a
-JSON backup of the whole config and restore it later.
-
-The container fixes ownership of the bind-mounted `./config` directory on
-startup and runs the app as a non-root user, so this works no matter who owns
-the host directory — no manual `chown` required.
+Your data lives in `./config/config.yaml`, bind-mounted into the container. The
+container fixes ownership of that directory on startup and runs as a non-root
+user, so it works regardless of who owns the host folder — no manual `chown`.
 
 ## Configuration
 
-`config/config.yaml` has three sections:
+Edit through **/admin** (recommended) or by hand — changes are picked up on the
+next page load, no rebuild. The file has three sections:
 
 ```yaml
 settings:
-  title: Home              # browser tab title
-  timezone: America/Chicago # IANA timezone, used for date + greeting
-  theme:                   # site-wide default theme (visitors can override)
-    mode: system           # system | light | dark
-    design: glass          # glass | aero | flat | soft | minimal | bold | cyber
-    accentFrom: '#a78bfa'  # accent gradient start (#rrggbb)
-    accentTo: '#22d3ee'    # accent gradient end (same as start = solid)
-    # background: '#06070d' # optional: custom default colors (overrides mode)
+  title: ctrlcenter         # browser tab title
+  timezone: America/Chicago # IANA timezone, used for the date + greeting
+  theme:                    # site-wide default (visitors can override in /settings)
+    mode: system            # system | light | dark
+    design: glass           # glass | aero | flat | soft | minimal | bold | cyber
+    scene: aurora           # aurora | abyss | nebula | grid | starfield | waves
+    accentFrom: '#a78bfa'   # accent gradient start (#rrggbb)
+    accentTo: '#22d3ee'     # accent gradient end (same as start = solid)
+    # Optional fixed default colors (override light/dark mode). Set in pairs:
+    # background: '#06070d'       # dark surface / ink
     # foreground: '#f4f4f6'
-  statusChecks: false      # ping app URLs and show online/offline dots
+    # backgroundLight: '#eceef3'  # light surface / ink
+    # foregroundLight: '#181b24'
+  statusChecks: false       # ping app URLs, show online/offline dots + /status
+  statusInterval: 5         # minutes between background uptime checks (1–60)
   search:
-    engine: duckduckgo     # duckduckgo | google | bing | brave | custom
-    customUrl: ""          # used when engine: custom; must contain %s
+    engine: duckduckgo      # duckduckgo | google | bing | brave | custom
+    customUrl: ""           # used when engine: custom; must contain %s
   weather:
     enabled: true
     latitude: 38.9072
     longitude: -77.0369
     units: imperial         # imperial | metric
+
 apps:
   - id: <uuid>
     name: Cloud Drive
     subtitle: Nextcloud
     url: "https://cloud.example.com"
     icon: nextcloud          # icon slug or full image URL
+    expectStatus: ""         # codes/ranges that count as up, e.g. "200-299, 401"
+                             # (blank = any reachable host is up)
+
 bookmarks:
   - id: <uuid>
     category: Shopping       # bookmarks are grouped by category
@@ -93,86 +124,81 @@ bookmarks:
 
 ### Icons
 
-Set `icon` to a slug from the [dashboard-icons](https://github.com/homarr-labs/dashboard-icons)
-set (e.g. `plex`, `nextcloud`, `youtube`) and it's resolved automatically;
-icons that ship light/dark variants automatically use the legible one for the
-active theme. If a slug isn't in that set, paste a direct image URL instead —
-anything starting with `http://` or `https://` is used as-is. The admin UI
-shows a live icon preview as you type.
+Set `icon` to a slug from the
+[dashboard-icons](https://github.com/homarr-labs/dashboard-icons) set
+(e.g. `plex`, `nextcloud`, `youtube`) and it resolves automatically — icons with
+light/dark variants pick the legible one for the active surface. Not in the set?
+Paste a direct image URL (anything starting with `http(s)://` is used as-is). The
+admin shows a live preview as you type.
 
-A few logos the CDN doesn't carry (e.g. `rockauto`, plus `car`, `tire`,
-`car-battery`, `steering-wheel`) are **bundled with the app** and selectable
-like any other. To add your own: drop `<slug>.svg` into `public/icons/` and add
-the slug to `LOCAL_ICONS` in `lib/icons.ts`.
+A few logos the CDN doesn't carry are **bundled** with the app and selectable
+like any other; to add your own, drop `<slug>.svg` into `public/icons/` and add
+the slug to `LOCAL_ICONS` in [`lib/icons.ts`](lib/icons.ts).
 
-## Local development
+## Environment variables
 
-Requires Node.js 22+.
+| Variable | Required | Description |
+| --- | --- | --- |
+| `ADMIN_PASSWORD` | yes | Bootstrap password for `/admin`. After you set one in **Settings → Change password**, login uses that — but keep this set (or set `SESSION_SECRET`), as it also signs sessions. |
+| `SESSION_SECRET` | no | Secret used to sign session cookies. If unset, derived from `ADMIN_PASSWORD`. Recommended so sessions don't depend on the password. Generate with `openssl rand -base64 32`. |
+| `CONFIG_PATH` | no | Path to the config file (default `./config/config.yaml`; the container sets `/config/config.yaml`). The uptime history (`status-history.json`) is written beside it. |
+| `TRUSTED_PROXY_HOPS` | no | Number of trusted reverse proxies in front of the app, used to find the real client IP in `X-Forwarded-For` for login throttling. Default `1`. Set `0` if exposed directly. |
+
+## Development
+
+Requires **Node.js 22+**.
 
 ```bash
 npm install
-npm run dev
+npm run dev          # http://localhost:3000
 ```
 
-The app reads/writes `config/config.yaml` relative to the project root in
-dev (override the path with the `CONFIG_PATH` env var). Set `ADMIN_PASSWORD`
-in a `.env.local` file to use the admin UI locally.
-
-### Tests
-
-Unit tests (Vitest) cover the config read/write logic, schema validation,
-auth, and the login rate limiter:
+The app reads/writes `config/config.yaml` relative to the project root in dev
+(override with `CONFIG_PATH`). Put `ADMIN_PASSWORD` in `.env.local` to use the
+admin UI locally.
 
 ```bash
-npm test         # run once
-npm run test:watch
+npm run lint
+npm test             # Vitest unit tests; npm run test:watch to watch
+npm run build
 ```
 
-## Project structure
+Tests cover the config read/write + merge logic, schema validation, auth and
+login throttling, and the pure helpers behind theming, weather, and status.
 
-- `lib/config.ts` — reads/writes `config.yaml`, validated with `lib/schema.ts`
-- `lib/auth.ts` / `proxy.ts` — password-gated admin session (signed cookie),
-  enforced by the Next.js proxy middleware
-- `lib/rate-limit.ts` — in-memory login throttling
-- `app/page.tsx` / `components/Dashboard.tsx` — public dashboard + client-side
-  search/filter
-- `app/admin/` — password-protected management UI (drag-to-reorder lives in
-  `components/admin/`)
-- `app/api/` — CRUD + reorder (`PATCH`) routes backing the admin UI, plus
-  `app/api/health`
-- `app/manifest.ts` — generated web app manifest
-- `.github/workflows/` — CI (lint + test + build) and the release pipeline
+### How it fits together
+
+- [`lib/config.ts`](lib/config.ts) reads/writes `config.yaml`, validated by
+  [`lib/schema.ts`](lib/schema.ts) (zod).
+- [`lib/auth.ts`](lib/auth.ts) + [`proxy.ts`](proxy.ts) gate `/admin` with a
+  signed-cookie session, enforced by the Next.js middleware (which also sets a
+  per-request CSP nonce).
+- `components/scenes/` are the animated backdrops; the theme builder lives in
+  [`components/ThemeBuilder.tsx`](components/ThemeBuilder.tsx) and persists
+  per-visitor prefs via [`components/PrefsProvider.tsx`](components/PrefsProvider.tsx).
+- [`instrumentation.ts`](instrumentation.ts) starts the background uptime poller
+  ([`lib/status-poller.ts`](lib/status-poller.ts) → [`lib/status-history.ts`](lib/status-history.ts)).
+- `app/api/` holds the admin CRUD/reorder routes plus `status`, `status/history`,
+  and `health`.
 
 ## Releasing
 
-Branching model: day-to-day work lands on `develop`; `main` tracks released
-code. Every push/PR to either branch runs CI
-([`.github/workflows/ci.yml`](.github/workflows/ci.yml): lint, tests, build).
+Day-to-day work lands on `develop`; `main` tracks released code. Every push/PR
+runs CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml): lint, tests,
+build). To cut a release:
 
-To cut a release:
+1. On `develop`, move `CHANGELOG.md`'s `[Unreleased]` section to a new
+   `[X.Y.Z]` heading with today's date (Keep a Changelog format), add a fresh
+   empty `[Unreleased]`, update the compare links, and bump `version` in
+   `package.json`.
+2. Merge `develop` into `main`, then tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 
-1. On `develop`, update [`CHANGELOG.md`](CHANGELOG.md): rename the
-   `[Unreleased]` heading to the new version with today's date (keeping the
-   [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) sections), add a
-   fresh empty `[Unreleased]` section above it, and update the link
-   references at the bottom. Bump `version` in `package.json` to match.
-2. Merge `develop` into `main`.
-3. Tag the release and push the tag:
-   ```bash
-   git tag vX.Y.Z
-   git push origin vX.Y.Z
-   ```
+Pushing a `v*` tag triggers [`.github/workflows/release.yml`](.github/workflows/release.yml):
+it re-runs tests, builds and publishes a multi-arch (`amd64`/`arm64`) image to
+`ghcr.io/boostctrl/ctrlcenter` (tagged `X.Y.Z`, `X.Y`, `latest`), and creates the
+GitHub release with notes pulled from the matching `CHANGELOG.md` section.
+Hyphenated tags (e.g. `v1.0.0-rc1`) publish as pre-releases.
 
-Pushing a `v*` tag triggers
-[`.github/workflows/release.yml`](.github/workflows/release.yml), which:
+## License
 
-1. re-runs the tests;
-2. builds a multi-arch (`linux/amd64`, `linux/arm64`) image and publishes it
-   to `ghcr.io/boostctrl/ctrlcenter` tagged `X.Y.Z`, `X.Y`, and `latest`; and
-3. creates the GitHub release, with notes extracted from the matching
-   `CHANGELOG.md` section (so the release will fail if that section is
-   missing — keep step 1 above honest). Tags containing a hyphen
-   (e.g. `v1.0.0-rc1`) are published as pre-releases.
-
-> The GHCR package is private until you set it to public in the repository's
-> Packages settings — do this once if you want others to pull without auth.
+[MIT](LICENSE) © boostctrl
