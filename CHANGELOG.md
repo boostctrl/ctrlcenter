@@ -12,6 +12,23 @@ here.
 
 ## [Unreleased]
 
+## [0.9.6] - 2026-06-24
+
+### Fixed
+
+- Uptime bars no longer show a stray segment at the opposite end after switching
+  from the 1h view to 24h / 30d / 90d (a duplicate-key rendering bug).
+
+### Changed
+
+- Admin **Settings → Appearance** is now a simple **Default mode + Default theme**
+  picker instead of duplicating the Themes editor's design/scene/colour controls.
+- The admin **Themes** editor shows an accent gradient preview, not just the
+  start/end colour pickers.
+- The uptime monitor drops the **7-day** range (now 1h / 24h / 30d / 90d) and
+  renders periods with no data as clearly empty, with an "oldest left, now right"
+  note so gaps don't look out of order.
+
 ## [0.9.5] - 2026-06-24
 
 ### Added
@@ -546,7 +563,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.5...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.6...HEAD
+[0.9.6]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.5...v0.9.6
 [0.9.5]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.2...v0.9.3
