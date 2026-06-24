@@ -12,6 +12,21 @@ here.
 
 ## [Unreleased]
 
+## [0.9.5] - 2026-06-24
+
+### Added
+
+- **Rename the built-in themes** from the admin Themes tab (alongside recoloring
+  and changing their design/scene).
+- A **Visibility** tile on the weather page, which also evens out the stat grid.
+
+### Changed
+
+- The theme builder's **palette swatches** show the accent gradient on its own
+  again (clearer than washing it over the background).
+- The admin **Settings** page is reorganized into a tidy two-column layout of
+  section cards, with the password reset grouped as a Security card.
+
 ## [0.9.4] - 2026-06-23
 
 ### Changed
@@ -531,7 +546,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.4...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.5...HEAD
+[0.9.5]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.1...v0.9.2
