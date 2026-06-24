@@ -12,6 +12,27 @@ here.
 
 ## [Unreleased]
 
+## [0.9.7] - 2026-06-24
+
+### Added
+
+- **Traces** scene — a motherboard / circuit-board backdrop with signal pulses
+  travelling along the traces (used by the Circuit theme).
+
+### Changed
+
+- The light/dark/system **mode selector moved to Preferences**; the theme builder
+  now has its own "Editing: dark / light" toggle so both modes can be designed
+  independently of what the app is currently showing.
+- **Wider pages** — all pages grew from 1152px to 1280px.
+- **Starfield** now mixes a dense star field with a few linked constellations
+  (the old Constellation scene folded into it).
+
+### Removed
+
+- The "oldest left, now right…" caption under the uptime bars.
+- The standalone Constellation scene (merged into Starfield).
+
 ## [0.9.6] - 2026-06-24
 
 ### Fixed
@@ -563,7 +584,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.6...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.7...HEAD
+[0.9.7]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.6...v0.9.7
 [0.9.6]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.5...v0.9.6
 [0.9.5]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.3...v0.9.4
