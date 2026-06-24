@@ -13,7 +13,7 @@ describe("themesInputSchema", () => {
   const pack = {
     name: "Mariana",
     design: "flat",
-    scene: "mesh",
+    scene: "rays",
     dark: { background: "#000000", foreground: "#ffffff", accentFrom: "#ff0000", accentTo: "#00ff00" },
     light: { background: "#ffffff", foreground: "#000000", accentFrom: "#ff0000", accentTo: "#00ff00" },
   };
@@ -21,12 +21,16 @@ describe("themesInputSchema", () => {
   it("accepts a well-formed override array", () => {
     const parsed = themesInputSchema.parse([pack]);
     expect(parsed[0].design).toBe("flat");
-    expect(parsed[0].scene).toBe("mesh");
+    expect(parsed[0].scene).toBe("rays");
   });
 
-  it("rejects an unknown design or scene", () => {
-    expect(themesInputSchema.safeParse([{ ...pack, design: "nope" }]).success).toBe(false);
-    expect(themesInputSchema.safeParse([{ ...pack, scene: "nope" }]).success).toBe(false);
+  it("coerces a retired/unknown design or scene to the default", () => {
+    // `.catch` keeps an old config (e.g. a "mesh" scene) loadable instead of
+    // failing the whole parse.
+    const d = themesInputSchema.parse([{ ...pack, design: "nope" }]);
+    expect(d[0].design).toBe("glass");
+    const s = themesInputSchema.parse([{ ...pack, scene: "mesh" }]);
+    expect(s[0].scene).toBe("aurora");
   });
 
   it("rejects a non-hex color", () => {

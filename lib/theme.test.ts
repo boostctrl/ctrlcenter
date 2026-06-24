@@ -21,7 +21,7 @@ describe("resolveThemePacks", () => {
   const override: ThemePack = {
     name: "Mariana",
     design: "flat",
-    scene: "mesh",
+    scene: "rays",
     dark: { background: "#000000", foreground: "#ffffff", accentFrom: "#ff0000", accentTo: "#00ff00" },
     light: { background: "#ffffff", foreground: "#000000", accentFrom: "#ff0000", accentTo: "#00ff00" },
   };

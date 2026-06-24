@@ -19,7 +19,7 @@ export default function Starfield({ light }: SceneProps) {
 
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const dpr = window.devicePixelRatio || 1;
-    const peak = light ? 0.7 : 0.9;
+    const peak = light ? 0.95 : 0.9;
     let w = 0;
     let h = 0;
     let rgb = effectRgb(light);

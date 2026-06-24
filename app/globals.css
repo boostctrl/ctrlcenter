@@ -284,23 +284,21 @@ body {
   animation: drift 32s ease-in-out infinite;
 }
 
-/* Mesh scene — large accent blobs morph across the viewport on long, offset
-   cycles so the gradient never quite repeats. */
-@keyframes mesh-morph {
+/* Rays scene — gently sweep the fan of light beams side to side (origin pinned
+   at the top-centre so the beams pivot like curtains). */
+@keyframes rays-sweep {
   0%,
   100% {
-    transform: translate(0, 0) scale(1);
+    transform: translateX(-50%) rotate(-7deg);
   }
-  33% {
-    transform: translate(8vw, -6vh) scale(1.18);
-  }
-  66% {
-    transform: translate(-7vw, 7vh) scale(0.92);
+  50% {
+    transform: translateX(-50%) rotate(7deg);
   }
 }
 
-.animate-mesh {
-  animation: mesh-morph 40s ease-in-out infinite;
+.animate-rays {
+  transform-origin: 50% 0%;
+  animation: rays-sweep 24s ease-in-out infinite;
 }
 
 /* Grid scene — scroll the grid toward the horizon. */
@@ -337,7 +335,7 @@ body {
   .animate-float,
   .animate-breathe,
   .animate-drift,
-  .animate-mesh,
+  .animate-rays,
   .animate-grid,
   .animate-wave {
     animation: none;

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useVisitorPrefs } from "./PrefsProvider";
 import { BASE_THEMES, DEFAULT_THEME_NAME, DESIGNS, SCENES } from "@/lib/theme";
-import type { DesignId, SceneId, ThemePack } from "@/lib/theme";
+import type { ColorSet, DesignId, SceneId, ThemePack } from "@/lib/theme";
 import type { ThemeColors } from "@/lib/prefs";
 
 const DESIGN_NAMES = Object.fromEntries(
@@ -36,24 +36,30 @@ function readVar(name: string, fallback: string): string {
 }
 
 // A small representative gradient for each scene's picker swatch, recolored live
-// by the active accent.
+// by the active accent. The base is the live surface (`var(--background)`), so
+// every swatch tracks the current light/dark mode.
 function scenePreview(id: SceneId, from: string, to: string): string {
   const mix = (c: string, pct: number) =>
     `color-mix(in srgb, ${c} ${pct}%, transparent)`;
+  const bg = "var(--background)";
   switch (id) {
     case "abyss":
-      return `radial-gradient(120% 90% at 50% -10%, ${from}, transparent 60%), linear-gradient(to bottom, #02060a, #0a2230)`;
+      return `radial-gradient(120% 90% at 50% -10%, ${from}, transparent 60%), ${bg}`;
     case "nebula":
-      return `radial-gradient(50% 60% at 25% 30%, ${from}, transparent 60%), radial-gradient(55% 65% at 75% 70%, ${to}, transparent 60%), radial-gradient(45% 55% at 55% 45%, ${from}, transparent 65%)`;
+      return `radial-gradient(45% 55% at 22% 28%, ${from}, transparent 60%), radial-gradient(50% 60% at 75% 68%, ${to}, transparent 60%), radial-gradient(40% 50% at 55% 45%, ${from}, transparent 65%), radial-gradient(35% 45% at 40% 80%, ${to}, transparent 65%), ${bg}`;
     case "grid":
-      return `linear-gradient(to top, ${mix(from, 50)}, transparent 55%), repeating-linear-gradient(90deg, ${mix(from, 55)} 0 1px, transparent 1px 9px), repeating-linear-gradient(0deg, ${mix(from, 55)} 0 1px, transparent 1px 9px), #0c0716`;
+      return `linear-gradient(to top, ${mix(from, 50)}, transparent 55%), repeating-linear-gradient(90deg, ${mix(from, 55)} 0 1px, transparent 1px 9px), repeating-linear-gradient(0deg, ${mix(from, 55)} 0 1px, transparent 1px 9px), ${bg}`;
     case "starfield":
-      return `radial-gradient(1.5px 1.5px at 22% 32%, ${from}, transparent), radial-gradient(1.5px 1.5px at 62% 58%, ${to}, transparent), radial-gradient(2px 2px at 82% 26%, ${from}, transparent), radial-gradient(1.5px 1.5px at 42% 78%, ${to}, transparent), #05070f`;
+      return `radial-gradient(1.5px 1.5px at 22% 32%, ${from}, transparent), radial-gradient(1.5px 1.5px at 62% 58%, ${to}, transparent), radial-gradient(2px 2px at 82% 26%, ${from}, transparent), radial-gradient(1.5px 1.5px at 42% 78%, ${to}, transparent), ${bg}`;
+    case "constellation":
+      return `linear-gradient(58deg, transparent 47%, ${mix(from, 50)} 48% 52%, transparent 53%), radial-gradient(2px 2px at 25% 35%, ${from}, transparent), radial-gradient(2px 2px at 68% 60%, ${to}, transparent), radial-gradient(2px 2px at 50% 82%, ${from}, transparent), ${bg}`;
+    case "rays":
+      return `repeating-conic-gradient(from 0deg at 50% -12%, ${mix(from, 65)} 0 3deg, transparent 3deg 12deg), ${bg}`;
     case "waves":
-      return `linear-gradient(to top, ${mix(from, 52)}, transparent 45%), linear-gradient(to top, ${mix(to, 32)}, transparent 65%), #04110f`;
+      return `linear-gradient(to top, ${mix(from, 52)}, transparent 45%), linear-gradient(to top, ${mix(to, 32)}, transparent 65%), ${bg}`;
     case "aurora":
     default:
-      return `radial-gradient(60% 70% at 30% 20%, ${from}, transparent 60%), radial-gradient(60% 70% at 75% 80%, ${to}, transparent 60%)`;
+      return `radial-gradient(60% 70% at 30% 20%, ${from}, transparent 60%), radial-gradient(60% 70% at 75% 80%, ${to}, transparent 60%), ${bg}`;
   }
 }
 
@@ -77,6 +83,7 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
     applyNamedTheme,
     deleteNamedTheme,
     resetTheme,
+    surfaceIsLight,
   } = useVisitorPrefs();
 
   const [draft, setDraft] = useState<ThemeColors>(DEFAULT_DRAFT);
@@ -126,6 +133,13 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
     });
     setName("");
   }
+
+  // A full-palette swatch (surface bg + accent glow) for the current mode, so the
+  // theme/palette previews track light/dark instead of always showing dark.
+  const lookSwatch = (look: { dark: ColorSet; light: ColorSet }) => {
+    const cs = surfaceIsLight ? look.light : look.dark;
+    return `radial-gradient(120% 100% at 50% -10%, ${cs.accentFrom}, transparent 60%), ${cs.background}`;
+  };
 
   return (
     <div className="space-y-5 text-sm">
@@ -180,9 +194,7 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
               )}
               <span
                 className="h-9 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
-                style={{
-                  background: `radial-gradient(120% 100% at 50% -10%, ${p.dark.accentFrom}, transparent 60%), ${p.dark.background}`,
-                }}
+                style={{ background: lookSwatch(p) }}
                 aria-hidden
               />
               <span className="truncate text-xs text-fg/60 group-hover:text-fg/90">
@@ -200,9 +212,7 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
               >
                 <span
                   className="h-9 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
-                  style={{
-                    background: `radial-gradient(120% 100% at 50% -10%, ${t.dark.accentFrom}, transparent 60%), ${t.dark.background}`,
-                  }}
+                  style={{ background: lookSwatch(t) }}
                   aria-hidden
                 />
                 <span className="truncate text-xs text-fg/60 group-hover:text-fg/90">
@@ -323,8 +333,15 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
         </div>
       </div>
 
-      <div className="space-y-2">
-        <span className="text-xs text-fg/50">Palettes</span>
+      <div className="space-y-3 rounded-xl border border-fg/15 bg-fg/[0.02] p-3">
+        <div>
+          <span className="text-sm font-medium text-fg/80">Palette</span>
+          <p className="text-xs text-fg/40">
+            The colors. Pick a preset, then fine-tune the current mode below —
+            background, text &amp; accent together make a palette, and the accent
+            is just its gradient.
+          </p>
+        </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {BASE_THEMES.map((t) => (
             <button
@@ -335,10 +352,8 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
               title={t.name}
             >
               <span
-                className="h-9 w-full rounded-md ring-1 ring-fg/10"
-                style={{
-                  background: `linear-gradient(135deg, ${t.dark.accentFrom}, ${t.dark.accentTo})`,
-                }}
+                className="h-9 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
+                style={{ background: lookSwatch(t) }}
                 aria-hidden
               />
               <span className="truncate text-xs text-fg/60 group-hover:text-fg/90">
@@ -347,48 +362,52 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
             </button>
           ))}
         </div>
-      </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        {BASE_FIELDS.map(({ key, label }) => (
-          <label key={key} className="flex items-center gap-2">
-            <input
-              type="color"
-              value={draft[key]}
-              onChange={(e) => updateBase(key, e.target.value)}
-              aria-label={label}
-              className="h-8 w-8 shrink-0 cursor-pointer rounded border border-fg/10 bg-transparent"
+        <div className="space-y-3 border-t border-fg/10 pt-3">
+          <span className="text-xs font-medium text-fg/55">
+            Customize (this mode)
+          </span>
+          <div className="grid grid-cols-2 gap-3">
+            {BASE_FIELDS.map(({ key, label }) => (
+              <label key={key} className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={draft[key]}
+                  onChange={(e) => updateBase(key, e.target.value)}
+                  aria-label={label}
+                  className="h-8 w-8 shrink-0 cursor-pointer rounded border border-fg/10 bg-transparent"
+                />
+                <span className="text-fg/60">{label}</span>
+              </label>
+            ))}
+          </div>
+          <div className="space-y-2">
+            <span className="text-xs text-fg/50">Accent (gradient)</span>
+            <div
+              className="h-9 w-full rounded-lg ring-1 ring-fg/10"
+              style={{
+                backgroundImage: `linear-gradient(to right, ${activeAccent.from}, ${activeAccent.to})`,
+              }}
+              aria-hidden
             />
-            <span className="text-fg/60">{label}</span>
-          </label>
-        ))}
-      </div>
-
-      <div className="space-y-2.5">
-        <span className="text-xs text-fg/50">Accent</span>
-        <div
-          className="h-9 w-full rounded-lg ring-1 ring-fg/10"
-          style={{
-            backgroundImage: `linear-gradient(to right, ${activeAccent.from}, ${activeAccent.to})`,
-          }}
-          aria-hidden
-        />
-        <p className="text-xs text-fg/40">
-          Set both ends to the same color for a solid accent.
-        </p>
-        <div className="grid grid-cols-2 gap-3">
-          {ACCENT_FIELDS.map(({ key, label }) => (
-            <label key={key} className="flex items-center gap-2">
-              <input
-                type="color"
-                value={draft[key]}
-                onChange={(e) => updateAccent(key, e.target.value)}
-                aria-label={`Accent ${label.toLowerCase()}`}
-                className="h-8 w-8 shrink-0 cursor-pointer rounded border border-fg/10 bg-transparent"
-              />
-              <span className="text-fg/60">{label}</span>
-            </label>
-          ))}
+            <div className="grid grid-cols-2 gap-3">
+              {ACCENT_FIELDS.map(({ key, label }) => (
+                <label key={key} className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={draft[key]}
+                    onChange={(e) => updateAccent(key, e.target.value)}
+                    aria-label={`Accent ${label.toLowerCase()}`}
+                    className="h-8 w-8 shrink-0 cursor-pointer rounded border border-fg/10 bg-transparent"
+                  />
+                  <span className="text-fg/60">{label}</span>
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-fg/40">
+              Set both ends to the same color for a solid accent.
+            </p>
+          </div>
         </div>
       </div>
 

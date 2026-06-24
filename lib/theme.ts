@@ -48,7 +48,7 @@ export type SceneId =
   | "grid"
   | "starfield"
   | "waves"
-  | "mesh"
+  | "rays"
   | "constellation";
 
 export const SCENES: { id: SceneId; name: string; description: string }[] = [
@@ -58,7 +58,7 @@ export const SCENES: { id: SceneId; name: string; description: string }[] = [
   { id: "grid", name: "Grid", description: "Perspective grid to the horizon" },
   { id: "starfield", name: "Starfield", description: "Twinkling, drifting stars" },
   { id: "waves", name: "Waves", description: "Layered waves along the base" },
-  { id: "mesh", name: "Mesh", description: "Morphing accent mesh gradient" },
+  { id: "rays", name: "Rays", description: "Sweeping beams of accent light" },
   { id: "constellation", name: "Constellation", description: "Drifting linked stars" },
 ];
 
@@ -89,41 +89,24 @@ export type ModeColors = { dark: ColorSet; light: ColorSet };
 // apply with one tap and then tweak.
 export type PresetTheme = { name: string } & ModeColors;
 
+// Color-only presets, ordered around the hue wheel (neutral → warm → green →
+// teal/cyan → blue → indigo → violet → pink) so the palette row reads as an even
+// spectrum rather than clustering on any one family.
 export const BASE_THEMES: PresetTheme[] = [
   {
-    name: "Midnight",
-    dark: { background: "#06070d", foreground: "#f4f4f6", accentFrom: "#a78bfa", accentTo: "#22d3ee" },
-    light: { background: "#edeef5", foreground: "#181b28", accentFrom: "#a78bfa", accentTo: "#22d3ee" },
+    name: "Mono",
+    dark: { background: "#0f0f10", foreground: "#e8e8ea", accentFrom: "#a1a1aa", accentTo: "#71717a" },
+    light: { background: "#efeff0", foreground: "#1b1b1d", accentFrom: "#52525b", accentTo: "#71717a" },
   },
   {
-    name: "Paper",
-    dark: { background: "#14130e", foreground: "#ece9e0", accentFrom: "#6366f1", accentTo: "#0ea5e9" },
-    light: { background: "#f6f5f1", foreground: "#1c1b18", accentFrom: "#6366f1", accentTo: "#0ea5e9" },
-  },
-  {
-    name: "Nord",
-    dark: { background: "#2e3440", foreground: "#e5e9f0", accentFrom: "#88c0d0", accentTo: "#81a1c1" },
-    light: { background: "#eceff4", foreground: "#2e3440", accentFrom: "#5e81ac", accentTo: "#81a1c1" },
-  },
-  {
-    name: "Forest",
-    dark: { background: "#0c1410", foreground: "#e7f0e9", accentFrom: "#34d399", accentTo: "#2dd4bf" },
-    light: { background: "#eef4ee", foreground: "#14241b", accentFrom: "#0d9488", accentTo: "#15a394" },
+    name: "Crimson",
+    dark: { background: "#150807", foreground: "#f6e6e4", accentFrom: "#ef4444", accentTo: "#f87171" },
+    light: { background: "#f8eceb", foreground: "#2a1110", accentFrom: "#dc2626", accentTo: "#b91c1c" },
   },
   {
     name: "Ember",
-    dark: { background: "#140b0a", foreground: "#f6ece8", accentFrom: "#fb7185", accentTo: "#fbbf24" },
-    light: { background: "#f8efe9", foreground: "#2a1714", accentFrom: "#e11d48", accentTo: "#d97706" },
-  },
-  {
-    name: "Slate",
-    dark: { background: "#0f1115", foreground: "#e6e8ec", accentFrom: "#60a5fa", accentTo: "#a78bfa" },
-    light: { background: "#eef0f3", foreground: "#1a1d24", accentFrom: "#3b82f6", accentTo: "#8b5cf6" },
-  },
-  {
-    name: "Rosé",
-    dark: { background: "#1a1016", foreground: "#f5e9f0", accentFrom: "#fb7185", accentTo: "#f472b6" },
-    light: { background: "#f8eef3", foreground: "#2a121f", accentFrom: "#e11d48", accentTo: "#db2777" },
+    dark: { background: "#160c06", foreground: "#f6ebe2", accentFrom: "#fb923c", accentTo: "#f97316" },
+    light: { background: "#f7eee3", foreground: "#2a1a0e", accentFrom: "#ea580c", accentTo: "#c2410c" },
   },
   {
     name: "Sand",
@@ -131,29 +114,14 @@ export const BASE_THEMES: PresetTheme[] = [
     light: { background: "#f4ecdf", foreground: "#2b2418", accentFrom: "#b45309", accentTo: "#d97706" },
   },
   {
-    name: "Dracula",
-    dark: { background: "#1e1f29", foreground: "#f8f8f2", accentFrom: "#bd93f9", accentTo: "#ff79c6" },
-    light: { background: "#f5f3fb", foreground: "#282a36", accentFrom: "#9a59e0", accentTo: "#e0539f" },
-  },
-  {
-    name: "Solarized",
-    dark: { background: "#002b36", foreground: "#eee8d5", accentFrom: "#2aa198", accentTo: "#b58900" },
-    light: { background: "#fdf6e3", foreground: "#073642", accentFrom: "#268bd2", accentTo: "#2aa198" },
-  },
-  {
     name: "Gruvbox",
     dark: { background: "#1d2021", foreground: "#ebdbb2", accentFrom: "#fabd2f", accentTo: "#fe8019" },
     light: { background: "#fbf1c7", foreground: "#3c3836", accentFrom: "#d65d0e", accentTo: "#b57614" },
   },
   {
-    name: "Catppuccin",
-    dark: { background: "#1e1e2e", foreground: "#cdd6f4", accentFrom: "#cba6f7", accentTo: "#f5c2e7" },
-    light: { background: "#eff1f5", foreground: "#4c4f69", accentFrom: "#8839ef", accentTo: "#ea76cb" },
-  },
-  {
-    name: "Tokyo",
-    dark: { background: "#1a1b26", foreground: "#c0caf5", accentFrom: "#7aa2f7", accentTo: "#bb9af7" },
-    light: { background: "#e1e2e7", foreground: "#343b58", accentFrom: "#3760bf", accentTo: "#9854f1" },
+    name: "Forest",
+    dark: { background: "#0c1410", foreground: "#e7f0e9", accentFrom: "#34d399", accentTo: "#10b981" },
+    light: { background: "#eef4ee", foreground: "#14241b", accentFrom: "#059669", accentTo: "#047857" },
   },
   {
     name: "Monokai",
@@ -161,14 +129,49 @@ export const BASE_THEMES: PresetTheme[] = [
     light: { background: "#f5f5ef", foreground: "#272822", accentFrom: "#669900", accentTo: "#e6186c" },
   },
   {
-    name: "Grape",
-    dark: { background: "#140d1f", foreground: "#ece6f5", accentFrom: "#a855f7", accentTo: "#6366f1" },
-    light: { background: "#f2ecfb", foreground: "#241634", accentFrom: "#9333ea", accentTo: "#4f46e5" },
+    name: "Solarized",
+    dark: { background: "#002b36", foreground: "#eee8d5", accentFrom: "#2aa198", accentTo: "#b58900" },
+    light: { background: "#fdf6e3", foreground: "#073642", accentFrom: "#268bd2", accentTo: "#2aa198" },
   },
   {
     name: "Aqua",
     dark: { background: "#04141a", foreground: "#d6f0f3", accentFrom: "#22d3ee", accentTo: "#38bdf8" },
     light: { background: "#e6f6fa", foreground: "#0a2a32", accentFrom: "#0891b2", accentTo: "#0284c7" },
+  },
+  {
+    name: "Nord",
+    dark: { background: "#2e3440", foreground: "#e5e9f0", accentFrom: "#88c0d0", accentTo: "#81a1c1" },
+    light: { background: "#eceff4", foreground: "#2e3440", accentFrom: "#5e81ac", accentTo: "#81a1c1" },
+  },
+  {
+    name: "Tokyo",
+    dark: { background: "#1a1b26", foreground: "#c0caf5", accentFrom: "#7aa2f7", accentTo: "#2ac3de" },
+    light: { background: "#e1e2e7", foreground: "#343b58", accentFrom: "#3760bf", accentTo: "#0d9bb5" },
+  },
+  {
+    name: "Indigo",
+    dark: { background: "#0d0f1c", foreground: "#e3e6f5", accentFrom: "#818cf8", accentTo: "#6366f1" },
+    light: { background: "#ecedf8", foreground: "#16182c", accentFrom: "#4f46e5", accentTo: "#4338ca" },
+  },
+  {
+    name: "Grape",
+    dark: { background: "#140d1f", foreground: "#ece6f5", accentFrom: "#a855f7", accentTo: "#7c3aed" },
+    light: { background: "#f2ecfb", foreground: "#241634", accentFrom: "#9333ea", accentTo: "#7c3aed" },
+  },
+  {
+    name: "Dracula",
+    dark: { background: "#1e1f29", foreground: "#f8f8f2", accentFrom: "#bd93f9", accentTo: "#ff79c6" },
+    light: { background: "#f5f3fb", foreground: "#282a36", accentFrom: "#9a59e0", accentTo: "#e0539f" },
+  },
+  {
+    name: "Catppuccin",
+    dark: { background: "#1e1e2e", foreground: "#cdd6f4", accentFrom: "#cba6f7", accentTo: "#f5c2e7" },
+    light: { background: "#eff1f5", foreground: "#4c4f69", accentFrom: "#8839ef", accentTo: "#ea76cb" },
+  },
+  {
+    name: "Rosé",
+    dark: { background: "#1a1016", foreground: "#f5e9f0", accentFrom: "#fb7185", accentTo: "#f472b6" },
+    light: { background: "#f8eef3", foreground: "#2a121f", accentFrom: "#e11d48", accentTo: "#db2777" },
   },
 ];
 
@@ -229,18 +232,20 @@ export const THEME_PACKS: ThemePack[] = [
     light: { background: "#e8f5f1", foreground: "#0d2a26", accentFrom: "#0d9488", accentTo: "#0284c7" },
   },
   {
-    // Soft rose/violet bloom drifting on the Nebula scene, glossy Aero surface.
+    // Soft rose→violet bloom on the textured Nebula scene with a glossy Aero
+    // surface. Designed light-first: a warm pale-pink wash that reads as a bright,
+    // airy theme, with a complementary plum dark.
     name: "Bloom",
     design: "aero",
     scene: "nebula",
-    dark: { background: "#160b14", foreground: "#f6e9f1", accentFrom: "#f472b6", accentTo: "#a78bfa" },
-    light: { background: "#fbeef5", foreground: "#2c1322", accentFrom: "#db2777", accentTo: "#7c5cf0" },
+    light: { background: "#faedf4", foreground: "#3a172e", accentFrom: "#db2777", accentTo: "#7c3aed" },
+    dark: { background: "#170e1b", foreground: "#f4e9f2", accentFrom: "#f472b6", accentTo: "#a78bfa" },
   },
   {
-    // Warm coral-to-amber gradient over the morphing Mesh scene, chunky Clay.
+    // Teal-to-lime over the sweeping Rays scene, chunky Clay surface.
     name: "Lagoon",
     design: "clay",
-    scene: "mesh",
+    scene: "rays",
     dark: { background: "#0a1416", foreground: "#dff0ee", accentFrom: "#2dd4bf", accentTo: "#a3e635" },
     light: { background: "#e9f6f2", foreground: "#0c2622", accentFrom: "#0d9488", accentTo: "#65a30d" },
   },

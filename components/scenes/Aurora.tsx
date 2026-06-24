@@ -6,7 +6,7 @@ import type { SceneProps } from "./index";
 // blobs are dimmed so they tint rather than wash out. The float animation is
 // disabled under prefers-reduced-motion (see globals.css).
 export default function Aurora({ light }: SceneProps) {
-  const op = light ? [0.18, 0.12, 0.08] : [0.3, 0.2, 0.15];
+  const op = light ? [0.32, 0.24, 0.16] : [0.3, 0.2, 0.15];
   return (
     <div
       aria-hidden

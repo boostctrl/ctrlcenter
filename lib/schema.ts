@@ -113,8 +113,10 @@ export const colorSetSchema = z.object({
 // config fail to load.
 export const themePackSchema = z.object({
   name: z.string().min(1),
-  design: z.enum(DESIGN_IDS),
-  scene: z.enum(SCENE_IDS),
+  // `.catch` so a retired design/scene id (e.g. an old "mesh" override) coerces
+  // to the default instead of failing the whole config parse on load.
+  design: z.enum(DESIGN_IDS).catch("glass"),
+  scene: z.enum(SCENE_IDS).catch("aurora"),
   dark: colorSetSchema,
   light: colorSetSchema,
 });

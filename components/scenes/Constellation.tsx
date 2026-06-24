@@ -19,8 +19,8 @@ export default function Constellation({ light }: SceneProps) {
 
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const dpr = window.devicePixelRatio || 1;
-    const nodeAlpha = light ? 0.55 : 0.75;
-    const linkAlpha = light ? 0.22 : 0.3;
+    const nodeAlpha = light ? 0.8 : 0.75;
+    const linkAlpha = light ? 0.42 : 0.3;
     let w = 0;
     let h = 0;
     let link = 0; // squared max link distance
