@@ -12,6 +12,23 @@ here.
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-06-23
+
+### Changed
+
+- **Scenes are now visible in light mode** — Aurora, Nebula, Rays, Starfield and
+  Constellation were washed out on light surfaces and now read clearly.
+- **More distinct backdrops:** replaced Mesh with **Rays** (sweeping beams of
+  accent light) and redesigned **Nebula** into a denser, textured cloudbank, so
+  it no longer looks like Aurora.
+- **Rebalanced the 16 palettes** to span the colour wheel instead of clustering
+  on purple/blue (added Mono, Crimson, Indigo; retuned others).
+- **Redesigned the Bloom theme**, light mode first.
+- **Theme builder clarity:** the colour pickers are now grouped under a
+  **Palette** section ("Customize (this mode)"), making clear they build the
+  palette and the accent is just its gradient. Theme and scene preview swatches
+  now follow the active light/dark mode.
+
 ## [0.9.3] - 2026-06-23
 
 ### Added
@@ -514,7 +531,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.3...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.4...HEAD
+[0.9.4]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.0...v0.9.1
