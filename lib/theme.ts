@@ -49,17 +49,17 @@ export type SceneId =
   | "starfield"
   | "waves"
   | "rays"
-  | "constellation";
+  | "traces";
 
 export const SCENES: { id: SceneId; name: string; description: string }[] = [
   { id: "aurora", name: "Aurora", description: "Floating accent glow (default)" },
   { id: "abyss", name: "Abyss", description: "Deep sea — drifting marine snow" },
   { id: "nebula", name: "Nebula", description: "Drifting clouds of accent light" },
   { id: "grid", name: "Grid", description: "Perspective grid to the horizon" },
-  { id: "starfield", name: "Starfield", description: "Twinkling, drifting stars" },
+  { id: "starfield", name: "Starfield", description: "Twinkling stars + a few constellations" },
   { id: "waves", name: "Waves", description: "Layered waves along the base" },
   { id: "rays", name: "Rays", description: "Sweeping beams of accent light" },
-  { id: "constellation", name: "Constellation", description: "Drifting linked stars" },
+  { id: "traces", name: "Traces", description: "Circuit-board traces with signal pulses" },
 ];
 
 export const SCENE_IDS = SCENES.map((s) => s.id) as [SceneId, ...SceneId[]];
@@ -250,10 +250,10 @@ export const THEME_PACKS: ThemePack[] = [
     light: { background: "#e9f6f2", foreground: "#0c2622", accentFrom: "#0d9488", accentTo: "#65a30d" },
   },
   {
-    // Terminal green linked nodes on the Constellation scene with a Bold surface.
+    // Terminal green over the motherboard Traces scene with a Bold surface.
     name: "Circuit",
     design: "bold",
-    scene: "constellation",
+    scene: "traces",
     dark: { background: "#020806", foreground: "#d7f7e4", accentFrom: "#34d399", accentTo: "#22d3ee" },
     light: { background: "#e9f7ef", foreground: "#06231a", accentFrom: "#059669", accentTo: "#0891b2" },
   },

@@ -7,7 +7,7 @@ import Grid from "./Grid";
 import Starfield from "./Starfield";
 import Waves from "./Waves";
 import Rays from "./Rays";
-import Constellation from "./Constellation";
+import Traces from "./Traces";
 
 // Scenes render a different treatment for light vs dark surfaces, so each
 // backdrop receives the resolved surface lightness.
@@ -25,5 +25,5 @@ export const SCENE_REGISTRY: Record<SceneId, ComponentType<SceneProps>> = {
   starfield: Starfield,
   waves: Waves,
   rays: Rays,
-  constellation: Constellation,
+  traces: Traces,
 };
