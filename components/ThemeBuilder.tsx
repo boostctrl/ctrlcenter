@@ -17,6 +17,13 @@ const DEFAULT_DRAFT: ThemeColors = {
   accentTo: "#22d3ee",
 };
 
+// Surface defaults per mode (mirror the :root / .theme-light CSS), used to seed
+// the pickers when editing a mode that has no custom colors yet.
+const MODE_DEFAULTS: Record<"dark" | "light", { background: string; foreground: string }> = {
+  dark: { background: "#06070d", foreground: "#f4f4f6" },
+  light: { background: "#eceef3", foreground: "#181b24" },
+};
+
 const BASE_FIELDS: { key: "background" | "foreground"; label: string }[] = [
   { key: "background", label: "Background" },
   { key: "foreground", label: "Text & surfaces" },
@@ -26,14 +33,6 @@ const ACCENT_FIELDS: { key: "accentFrom" | "accentTo"; label: string }[] = [
   { key: "accentFrom", label: "Start" },
   { key: "accentTo", label: "End" },
 ];
-
-function readVar(name: string, fallback: string): string {
-  if (typeof document === "undefined") return fallback;
-  const v = getComputedStyle(document.documentElement)
-    .getPropertyValue(name)
-    .trim();
-  return /^#[0-9a-fA-F]{6}$/.test(v) ? v : fallback;
-}
 
 // A small representative gradient for each scene's picker swatch, recolored live
 // by the active accent. The base is the live surface (`var(--background)`), so
@@ -65,8 +64,6 @@ function scenePreview(id: SceneId, from: string, to: string): string {
 
 export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
   const {
-    theme,
-    setTheme,
     design,
     setDesign,
     scene,
@@ -74,7 +71,6 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
     applyPack,
     customThemes,
     activeLook,
-    activeColors,
     activeAccent,
     applyThemeColors,
     setBaseColors,
@@ -86,26 +82,34 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
     surfaceIsLight,
   } = useVisitorPrefs();
 
+  // Which mode's colors the pickers edit — independent of what the app is
+  // currently displaying (that lives in Preferences now). Seeds from the active
+  // mode for convenience.
+  const [editMode, setEditMode] = useState<"dark" | "light">(
+    surfaceIsLight ? "light" : "dark"
+  );
   const [draft, setDraft] = useState<ThemeColors>(DEFAULT_DRAFT);
   const [name, setName] = useState("");
 
-  // Keep the pickers in sync with the active theme/accent. Background and text
-  // come from the active custom theme (or the current mode's colors); the accent
-  // pickers follow the resolved accent (override → theme → admin default).
+  // Keep the pickers in sync with the edit mode's colorset. Background/text come
+  // from the active look's chosen-mode variant (or that mode's defaults when
+  // there's no custom look yet); the accent is shared across modes.
   useEffect(() => {
+    const cs = activeLook ? activeLook[editMode] : null;
+    const dflt = MODE_DEFAULTS[editMode];
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraft({
-      background: activeColors?.background ?? readVar("--background", DEFAULT_DRAFT.background),
-      foreground: activeColors?.foreground ?? readVar("--foreground", DEFAULT_DRAFT.foreground),
+      background: cs?.background ?? dflt.background,
+      foreground: cs?.foreground ?? dflt.foreground,
       accentFrom: activeAccent.from,
       accentTo: activeAccent.to,
     });
-  }, [activeColors, activeAccent]);
+  }, [activeLook, editMode, activeAccent]);
 
   function updateBase(key: "background" | "foreground", value: string) {
     const next = { ...draft, [key]: value };
     setDraft(next);
-    setBaseColors(next.background, next.foreground);
+    setBaseColors(next.background, next.foreground, editMode === "dark");
   }
 
   function updateAccent(key: "accentFrom" | "accentTo", value: string) {
@@ -154,27 +158,10 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
         <h2 className="font-semibold">Theme builder</h2>
         <p className="text-xs text-fg/50">
           Pick a design and a palette, then tweak the colors — changes apply
-          live. Every look has a matching light and dark; the Mode toggle
-          switches between them, and the color pickers edit the current mode.
+          live. Every look has a matching light and dark; use the Editing toggle
+          below to design each. Switch the app between light and dark in
+          Preferences.
         </p>
-      </div>
-
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-fg/50">Mode</span>
-        <div className="flex overflow-hidden rounded-lg border border-fg/10">
-          {(["system", "light", "dark"] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTheme(t)}
-              className={`px-3 py-1.5 text-xs capitalize transition-colors ${
-                theme === t ? "bg-fg/15 text-fg" : "text-fg/50 hover:text-fg/80"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
       </div>
 
       <div className="space-y-3 rounded-xl border border-fg/15 bg-fg/[0.02] p-3">
@@ -371,9 +358,45 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
         </div>
 
         <div className="space-y-3 border-t border-fg/10 pt-3">
-          <span className="text-xs font-medium text-fg/55">
-            Customize (this mode)
-          </span>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-medium text-fg/55">Customize</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-fg/40">Editing</span>
+              <div className="flex overflow-hidden rounded-lg border border-fg/10">
+                {(["dark", "light"] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setEditMode(m)}
+                    aria-pressed={editMode === m}
+                    className={`px-2.5 py-1 text-xs capitalize transition-colors ${
+                      editMode === m
+                        ? "bg-fg/15 text-fg"
+                        : "text-fg/50 hover:text-fg/80"
+                    }`}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Preview of the mode being edited (so the off mode has feedback). */}
+          <div
+            className="flex h-10 items-end justify-start overflow-hidden rounded-lg p-1.5 ring-1 ring-fg/10"
+            style={{
+              background: `radial-gradient(120% 100% at 50% -10%, ${draft.accentFrom}, transparent 60%), ${draft.background}`,
+            }}
+          >
+            <span
+              className="rounded px-1 text-[9px] font-medium capitalize"
+              style={{ color: draft.foreground }}
+            >
+              {editMode} preview
+            </span>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             {BASE_FIELDS.map(({ key, label }) => (
               <label key={key} className="flex items-center gap-2">
@@ -389,7 +412,9 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
             ))}
           </div>
           <div className="space-y-2">
-            <span className="text-xs text-fg/50">Accent (gradient)</span>
+            <span className="text-xs text-fg/50">
+              Accent (gradient) · shared by both modes
+            </span>
             <div
               className="h-9 w-full rounded-lg ring-1 ring-fg/10"
               style={{

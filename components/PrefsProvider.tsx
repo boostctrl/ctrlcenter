@@ -173,7 +173,11 @@ type PrefsValue = {
   setScene: (scene: SceneId) => void;
   applyPack: (pack: ThemePack) => void;
   applyThemeColors: (colors: ModeColors) => void;
-  setBaseColors: (background: string, foreground: string) => void;
+  setBaseColors: (
+    background: string,
+    foreground: string,
+    targetDark?: boolean
+  ) => void;
   setAccentOverride: (accent: AccentColors | null) => void;
   saveNamedTheme: (name: string, colors: ModeColors) => void;
   applyNamedTheme: (id: string) => void;
@@ -351,8 +355,11 @@ export function PrefsProvider({
   // theme builder's base-color pickers). With no active look yet, seed both
   // modes from the edit so the new look still has both.
   const setBaseColors = useCallback(
-    (background: string, foreground: string) => {
-      const dark = resolveDark(theme);
+    (background: string, foreground: string, targetDark?: boolean) => {
+      // Which mode's colorset to edit. Defaults to the displayed mode (the old
+      // behavior); the theme builder passes an explicit target so it can design
+      // the non-active mode without changing what the app shows.
+      const dark = targetDark ?? resolveDark(theme);
       const accent = resolveAccent(
         accentOverride,
         variantFor(activeLook, dark),
@@ -364,13 +371,28 @@ export function PrefsProvider({
         accentFrom: accent.from,
         accentTo: accent.to,
       };
-      const base = activeLook ?? { dark: cs, light: cs };
+      // With no custom look yet, seed each mode with ITS OWN defaults (admin
+      // default colors, else the CSS :root / .theme-light values) so editing one
+      // mode never overwrites the other.
+      const seedFor = (d: boolean): ColorSet => {
+        const a = resolveAccent(accentOverride, variantFor(adminLook, d), defaultAccent);
+        const ad = adminLook ? (d ? adminLook.dark : adminLook.light) : null;
+        return {
+          background: ad?.background ?? (d ? "#06070d" : "#eceef3"),
+          foreground: ad?.foreground ?? (d ? "#f4f4f6" : "#181b24"),
+          accentFrom: a.from,
+          accentTo: a.to,
+        };
+      };
+      const base = activeLook ?? { dark: seedFor(true), light: seedFor(false) };
       const next: ModeColors = dark ? { ...base, dark: cs } : { ...base, light: cs };
       setActiveLook(next);
       saveActiveTheme(next);
+      // Display still follows the actual `theme`, so editing the off mode persists
+      // its colors without flipping the screen.
       applyAll({ theme, look: next, accentOverride, defaultAccent });
     },
-    [theme, defaultAccent, accentOverride, activeLook]
+    [theme, defaultAccent, accentOverride, activeLook, adminLook]
   );
 
   // Set or clear the accent on its own, leaving the background/foreground as-is.

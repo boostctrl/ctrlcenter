@@ -10,6 +10,8 @@ import { supportedTimezones } from "@/lib/prefs";
 // builder. Rendered on the /settings page; reads/writes the shared PrefsProvider.
 export default function SettingsControls() {
   const {
+    theme,
+    setTheme,
     timezone,
     units,
     location,
@@ -41,6 +43,29 @@ export default function SettingsControls() {
       </div>
 
       <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <span className="text-fg/50">Appearance mode</span>
+          <div className="flex w-fit overflow-hidden rounded-lg border border-fg/10">
+            {(["system", "light", "dark"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setTheme(m)}
+                className={`px-4 py-2 text-xs capitalize transition-colors ${
+                  theme === m
+                    ? "bg-fg/15 text-fg"
+                    : "text-fg/50 hover:text-fg/80"
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-fg/40">
+            Light, dark, or follow your device.
+          </p>
+        </div>
+
         <div className="space-y-1.5">
           <label htmlFor="greeting-name" className="text-fg/50">
             Greeting name

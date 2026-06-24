@@ -204,30 +204,24 @@ export default function StatusPage({ apps }: { apps: StatusAppMeta[] }) {
         <p className="text-fg/40">No applications to monitor yet.</p>
       ) : (
         <>
-          <div>
-            <div className="flex items-center justify-between gap-2 px-1">
-              <span className="text-xs text-fg/40">Uptime over {rangeLabel}</span>
-              <div className="flex overflow-hidden rounded-lg border border-fg/10">
-                {RANGES.map((r) => (
-                  <button
-                    key={r.key}
-                    type="button"
-                    onClick={() => setRange(r.key)}
-                    className={`px-2.5 py-1 text-xs transition-colors ${
-                      range === r.key
-                        ? "bg-fg/15 text-fg"
-                        : "text-fg/50 hover:text-fg/80"
-                    }`}
-                  >
-                    {r.label}
-                  </button>
-                ))}
-              </div>
+          <div className="flex items-center justify-between gap-2 px-1">
+            <span className="text-xs text-fg/40">Uptime over {rangeLabel}</span>
+            <div className="flex overflow-hidden rounded-lg border border-fg/10">
+              {RANGES.map((r) => (
+                <button
+                  key={r.key}
+                  type="button"
+                  onClick={() => setRange(r.key)}
+                  className={`px-2.5 py-1 text-xs transition-colors ${
+                    range === r.key
+                      ? "bg-fg/15 text-fg"
+                      : "text-fg/50 hover:text-fg/80"
+                  }`}
+                >
+                  {r.label}
+                </button>
+              ))}
             </div>
-            <p className="mt-1 px-1 text-[11px] text-fg/35">
-              Oldest on the left, now on the right; faded bars are periods with no
-              data.
-            </p>
           </div>
 
           <div className="space-y-3">
