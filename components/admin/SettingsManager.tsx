@@ -15,10 +15,12 @@ import CitySearch from "./CitySearch";
 import { useToast } from "./Toast";
 import { apiErrorMessage } from "./apiError";
 
+// Each settings group is its own card; the form tiles them into a masonry-style
+// two-column layout (CSS columns) so variable-height cards pack without gaps.
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="space-y-4 border-t border-fg/10 pt-5 first:border-0 first:pt-0">
-      <h3 className="text-xs font-semibold tracking-[0.15em] text-fg/40 uppercase">
+    <section className="glass-card mb-4 flex break-inside-avoid flex-col gap-4 p-5">
+      <h3 className="text-xs font-semibold tracking-[0.15em] text-fg/45 uppercase">
         {title}
       </h3>
       {children}
@@ -78,11 +80,9 @@ export default function SettingsManager({
   const fgFallback = colorMode === "light" ? "#181b24" : "#f4f4f6";
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="glass-card flex flex-col gap-6 p-6"
-    >
-      <Section title="General">
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="gap-4 lg:columns-2">
+        <Section title="General">
         <TextField
           label="Page title"
           value={settings.title}
@@ -493,9 +493,10 @@ export default function SettingsManager({
             <option value="metric">Metric (°C)</option>
           </select>
         </label>
-      </Section>
+        </Section>
+      </div>
 
-      <div className="flex items-center gap-3">
+      <div className="glass-card flex items-center justify-end gap-3 p-4">
         <Button type="submit" disabled={saving}>
           Save settings
         </Button>

@@ -112,6 +112,10 @@ export const colorSetSchema = z.object({
 // on purpose, so renaming a built-in in a future version can't make an existing
 // config fail to load.
 export const themePackSchema = z.object({
+  // Stable id pinning this override to a built-in pack (its original name), so the
+  // editable `name` below can differ. Optional for back-compat: an override saved
+  // before renaming existed has no `key` and is matched by `name` instead.
+  key: z.string().optional(),
   name: z.string().min(1),
   // `.catch` so a retired design/scene id (e.g. an old "mesh" override) coerces
   // to the default instead of failing the whole config parse on load.

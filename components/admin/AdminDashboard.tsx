@@ -161,9 +161,14 @@ function AdminBody({
       )}
       {tab === "themes" && <ThemesManager initialOverrides={initialThemes} />}
       {tab === "settings" && (
-        <div className="space-y-8">
+        <div className="space-y-4">
           <SettingsManager initialSettings={initialSettings} />
-          <ChangePassword />
+          <section className="glass-card flex flex-col gap-4 p-5">
+            <h3 className="text-xs font-semibold tracking-[0.15em] text-fg/45 uppercase">
+              Security
+            </h3>
+            <ChangePassword />
+          </section>
         </div>
       )}
     </div>

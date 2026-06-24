@@ -281,6 +281,20 @@ export default function WeatherDetails({
             </>
           }
         />
+        <StatTile
+          label="Visibility"
+          value={
+            <>
+              {(units === "metric"
+                ? current.visibility / 1000
+                : current.visibility / 1609.34
+              ).toFixed(1)}{" "}
+              <span className="text-sm font-normal text-fg/50">
+                {units === "metric" ? "km" : "mi"}
+              </span>
+            </>
+          }
+        />
       </div>
 
       {/* Next 24 hours */}

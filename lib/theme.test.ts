@@ -6,6 +6,7 @@ import {
   SCENES,
   BASE_THEMES,
   type ThemePack,
+  type ThemePackOverride,
 } from "./theme";
 
 describe("catalog sizes", () => {
@@ -44,5 +45,15 @@ describe("resolveThemePacks", () => {
   it("ignores overrides whose name matches no built-in", () => {
     const stale: ThemePack = { ...override, name: "Nope" };
     expect(resolveThemePacks([stale])).toEqual(THEME_PACKS);
+  });
+
+  it("renames the matched built-in via key, keeping its slot/order", () => {
+    const renamed: ThemePackOverride = { ...override, key: "Mariana", name: "Ocean" };
+    const resolved = resolveThemePacks([renamed]);
+    const idx = THEME_PACKS.findIndex((p) => p.name === "Mariana");
+    expect(resolved).toHaveLength(THEME_PACKS.length);
+    expect(resolved[idx].name).toBe("Ocean");
+    expect(resolved[idx].design).toBe("flat");
+    expect(resolved[0]).toEqual(THEME_PACKS[0]); // others untouched
   });
 });

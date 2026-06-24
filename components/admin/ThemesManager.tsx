@@ -38,37 +38,47 @@ export default function ThemesManager({
   initialOverrides: ThemePackConfig[];
 }) {
   const toast = useToast();
-  const [overrides, setOverrides] = useState<Record<string, ThemePack>>(() =>
-    Object.fromEntries(initialOverrides.map((o) => [o.name, o]))
+  // Overrides keyed by the built-in's stable `key` (its original name), so the
+  // editable display `name` can differ. Normalize legacy key-less overrides.
+  const [overrides, setOverrides] = useState<Record<string, ThemePackConfig>>(
+    () =>
+      Object.fromEntries(
+        initialOverrides.map((o) => {
+          const key = o.key ?? o.name;
+          return [key, { ...o, key }];
+        })
+      )
   );
   const [saving, setSaving] = useState(false);
 
-  function setPack(name: string, patch: Partial<ThemePack>) {
+  // Seed an override for `slot` (a built-in name) from its current value, so a
+  // partial edit keeps the other fields and always carries the stable key.
+  function setPack(slot: string, patch: Partial<ThemePackConfig>) {
     setOverrides((o) => {
-      const base = o[name] ?? builtin(name);
-      return { ...o, [name]: { ...base, ...patch } };
+      const base = o[slot] ?? { ...builtin(slot), key: slot };
+      return { ...o, [slot]: { ...base, ...patch } };
     });
   }
 
   function setColor(
-    name: string,
+    slot: string,
     mode: "dark" | "light",
     key: keyof ColorSet,
     value: string
   ) {
     setOverrides((o) => {
-      const base = o[name] ?? builtin(name);
+      const base = o[slot] ?? { ...builtin(slot), key: slot };
       return {
         ...o,
-        [name]: { ...base, [mode]: { ...base[mode], [key]: value } },
+        [slot]: { ...base, [mode]: { ...base[mode], [key]: value } },
       };
     });
   }
 
-  function reset(name: string) {
+  function reset(slot: string) {
     setOverrides((o) => {
       const next = { ...o };
-      delete next[name];
+      delete next[slot];
       return next;
     });
   }
@@ -87,7 +97,9 @@ export default function ThemesManager({
         return;
       }
       const saved: ThemePackConfig[] = await res.json();
-      setOverrides(Object.fromEntries(saved.map((o) => [o.name, o])));
+      setOverrides(
+        Object.fromEntries(saved.map((o) => [o.key ?? o.name, o]))
+      );
       toast("Themes saved");
     } catch {
       toast("Failed to save", "error");
@@ -100,9 +112,9 @@ export default function ThemesManager({
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-prose text-sm text-fg/50">
-          Edit the built-in themes visitors can pick in the theme builder. Recolor
-          a theme or change its design and scene; changes apply site-wide. Reset
-          any theme to restore its original.
+          Edit the built-in themes visitors can pick in the theme builder. Rename
+          a theme, recolor it, or change its design and scene; changes apply
+          site-wide. Reset any theme to restore its original.
         </p>
         <Button type="button" onClick={save} disabled={saving}>
           {saving ? "Saving…" : "Save themes"}
@@ -114,6 +126,7 @@ export default function ThemesManager({
           <PackEditor
             key={p.name}
             pack={overrides[p.name] ?? p}
+            isDefault={p.name === DEFAULT_THEME_NAME}
             edited={p.name in overrides}
             onField={(patch) => setPack(p.name, patch)}
             onColor={(mode, key, value) => setColor(p.name, mode, key, value)}
@@ -127,14 +140,16 @@ export default function ThemesManager({
 
 function PackEditor({
   pack,
+  isDefault,
   edited,
   onField,
   onColor,
   onReset,
 }: {
   pack: ThemePack;
+  isDefault: boolean;
   edited: boolean;
-  onField: (patch: Partial<ThemePack>) => void;
+  onField: (patch: Partial<ThemePackConfig>) => void;
   onColor: (mode: "dark" | "light", key: keyof ColorSet, value: string) => void;
   onReset: () => void;
 }) {
@@ -143,20 +158,25 @@ function PackEditor({
   return (
     <div className="glass-card flex flex-col gap-3 p-4">
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="font-semibold">{pack.name}</span>
-          {pack.name === DEFAULT_THEME_NAME && (
-            <span className="rounded bg-fg/15 px-1 text-[9px] font-medium tracking-wide text-fg/70 uppercase">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <input
+            value={pack.name}
+            onChange={(e) => onField({ name: e.target.value })}
+            aria-label="Theme name"
+            className="accent-focus min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1 py-0.5 font-semibold text-fg outline-none transition-colors hover:border-fg/15 focus:border-fg/25 focus:bg-fg/5"
+          />
+          {isDefault && (
+            <span className="shrink-0 rounded bg-fg/15 px-1 text-[9px] font-medium tracking-wide text-fg/70 uppercase">
               Default
             </span>
           )}
-          {edited && <span className="text-xs text-fg/40">· edited</span>}
+          {edited && <span className="shrink-0 text-xs text-fg/40">· edited</span>}
         </div>
         {edited && (
           <button
             type="button"
             onClick={onReset}
-            className="rounded-md px-2 py-1 text-xs text-fg/50 transition-colors hover:bg-fg/10 hover:text-fg/80"
+            className="shrink-0 rounded-md px-2 py-1 text-xs text-fg/50 transition-colors hover:bg-fg/10 hover:text-fg/80"
           >
             Reset
           </button>

@@ -24,6 +24,12 @@ describe("themesInputSchema", () => {
     expect(parsed[0].scene).toBe("rays");
   });
 
+  it("accepts an optional key for renaming", () => {
+    const parsed = themesInputSchema.parse([{ ...pack, key: "Mariana", name: "Ocean" }]);
+    expect(parsed[0].key).toBe("Mariana");
+    expect(parsed[0].name).toBe("Ocean");
+  });
+
   it("coerces a retired/unknown design or scene to the default", () => {
     // `.catch` keeps an old config (e.g. a "mesh" scene) loadable instead of
     // failing the whole parse.

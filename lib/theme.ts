@@ -259,22 +259,25 @@ export const THEME_PACKS: ThemePack[] = [
   },
 ];
 
-// An admin override of a built-in THEME_PACK, keyed by its `name`. The admin can
-// recolor a built-in and swap its design/scene; resolveThemePacks() applies these
-// on top of the built-ins. A pack with no override shows its built-in values; a
-// reset removes the override.
-export type ThemePackOverride = ThemePack;
+// An admin override of a built-in THEME_PACK. `key` pins it to a built-in (that
+// pack's original name) so the editable `name` can differ — i.e. the admin can
+// rename a theme. `key` is optional for back-compat: an override saved before
+// renaming existed is matched by its `name` instead. resolveThemePacks() applies
+// these over the built-ins; a reset removes the override.
+export type ThemePackOverride = ThemePack & { key?: string };
 
-// The names of the built-in packs the admin is allowed to override (others are
-// ignored as stale). Exposed so the schema/editor can validate against them.
+// The names of the built-in packs the admin can override. Exposed so the
+// schema/editor can validate against them.
 export const THEME_PACK_NAMES = THEME_PACKS.map((p) => p.name);
 
-// Built-in packs with any admin overrides applied (matched by name, order
-// preserved). Stale override names — e.g. a renamed built-in — are dropped.
+// Built-in packs with any admin overrides applied (matched to a built-in by
+// `key`, falling back to `name`; order preserved). The override's `name` becomes
+// the display label, so renamed packs show their new name. Stale overrides that
+// match no built-in are dropped.
 export function resolveThemePacks(
   overrides: ThemePackOverride[] | undefined
 ): ThemePack[] {
   if (!overrides || overrides.length === 0) return THEME_PACKS;
-  const byName = new Map(overrides.map((o) => [o.name, o]));
-  return THEME_PACKS.map((p) => byName.get(p.name) ?? p);
+  const byKey = new Map(overrides.map((o) => [o.key ?? o.name, o]));
+  return THEME_PACKS.map((p) => byKey.get(p.name) ?? p);
 }

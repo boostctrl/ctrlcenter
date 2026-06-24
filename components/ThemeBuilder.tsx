@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useVisitorPrefs } from "./PrefsProvider";
-import { BASE_THEMES, DEFAULT_THEME_NAME, DESIGNS, SCENES } from "@/lib/theme";
+import { BASE_THEMES, DESIGNS, SCENES } from "@/lib/theme";
 import type { ColorSet, DesignId, SceneId, ThemePack } from "@/lib/theme";
 import type { ThemeColors } from "@/lib/prefs";
 
@@ -134,11 +134,18 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
     setName("");
   }
 
-  // A full-palette swatch (surface bg + accent glow) for the current mode, so the
-  // theme/palette previews track light/dark instead of always showing dark.
+  // A full-palette swatch (surface bg + accent glow) for the current mode — used
+  // for the theme packs, where the whole look (incl. background) matters.
   const lookSwatch = (look: { dark: ColorSet; light: ColorSet }) => {
     const cs = surfaceIsLight ? look.light : look.dark;
     return `radial-gradient(120% 100% at 50% -10%, ${cs.accentFrom}, transparent 60%), ${cs.background}`;
+  };
+
+  // A palette swatch: just the accent gradient (clearer than washing it over the
+  // background), still mode-aware via the current colorset.
+  const paletteGradient = (look: { dark: ColorSet; light: ColorSet }) => {
+    const cs = surfaceIsLight ? look.light : look.dark;
+    return `linear-gradient(135deg, ${cs.accentFrom}, ${cs.accentTo})`;
   };
 
   return (
@@ -179,15 +186,15 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
           </p>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {packs.map((p) => (
+          {packs.map((p, i) => (
             <button
-              key={`builtin:${p.name}`}
+              key={`builtin:${i}`}
               type="button"
               onClick={() => applyPack(p)}
               className="group relative flex flex-col gap-1.5 rounded-lg border border-fg/10 p-2 text-left transition-colors hover:border-fg/30"
               title={`${p.name} · ${DESIGN_NAMES[p.design]}`}
             >
-              {p.name === DEFAULT_THEME_NAME && (
+              {i === 0 && (
                 <span className="absolute top-1 right-1 rounded bg-fg/15 px-1 text-[9px] font-medium tracking-wide text-fg/70 uppercase">
                   Default
                 </span>
@@ -353,7 +360,7 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
             >
               <span
                 className="h-9 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
-                style={{ background: lookSwatch(t) }}
+                style={{ background: paletteGradient(t) }}
                 aria-hidden
               />
               <span className="truncate text-xs text-fg/60 group-hover:text-fg/90">
