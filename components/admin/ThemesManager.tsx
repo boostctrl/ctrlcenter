@@ -253,6 +253,15 @@ function PackEditor({
           </label>
         ))}
       </div>
+
+      {/* Accent gradient preview for the current mode. */}
+      <div
+        className="h-6 w-full rounded-lg ring-1 ring-fg/10"
+        style={{
+          backgroundImage: `linear-gradient(135deg, ${cs.accentFrom}, ${cs.accentTo})`,
+        }}
+        aria-hidden
+      />
     </div>
   );
 }

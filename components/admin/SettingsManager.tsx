@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import type { Settings } from "@/lib/schema";
-import { DESIGNS, SCENES, type DesignId, type SceneId } from "@/lib/theme";
+import type { ThemePack } from "@/lib/theme";
 import {
   SEARCH_ENGINES,
   SEARCH_ENGINE_KEYS,
@@ -30,8 +30,10 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 
 export default function SettingsManager({
   initialSettings,
+  themePacks,
 }: {
   initialSettings: Settings;
+  themePacks: ThemePack[];
 }) {
   const [settings, setSettings] = useState(initialSettings);
   const [saving, setSaving] = useState(false);
@@ -64,20 +66,28 @@ export default function SettingsManager({
 
   const selectClass =
     "accent-focus rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-fg outline-none transition-colors";
-  const colorClass =
-    "h-8 w-8 shrink-0 cursor-pointer rounded border border-fg/10 bg-transparent";
 
   const theme = settings.theme;
   const updateTheme = (patch: Partial<Settings["theme"]>) =>
     setSettings((s) => ({ ...s, theme: { ...s.theme, ...patch } }));
-  const customColors = Boolean(theme.background && theme.foreground);
-  // Which mode's custom default colors the pickers below edit (the accent is
-  // shared across both). Dark = background/foreground; light = the *Light pair.
-  const [colorMode, setColorMode] = useState<"dark" | "light">("dark");
-  const bgKey = colorMode === "light" ? "backgroundLight" : "background";
-  const fgKey = colorMode === "light" ? "foregroundLight" : "foreground";
-  const bgFallback = colorMode === "light" ? "#eceef3" : "#06070d";
-  const fgFallback = colorMode === "light" ? "#181b24" : "#f4f4f6";
+
+  // Apply a theme pack as the site default: record it as the preset and copy its
+  // concrete design/scene/colors into the theme fields the layout actually reads.
+  function applyDefaultTheme(name: string) {
+    const pack = themePacks.find((p) => p.name === name);
+    if (!pack) return;
+    updateTheme({
+      preset: pack.name,
+      design: pack.design,
+      scene: pack.scene,
+      accentFrom: pack.dark.accentFrom,
+      accentTo: pack.dark.accentTo,
+      background: pack.dark.background,
+      foreground: pack.dark.foreground,
+      backgroundLight: pack.light.background,
+      foregroundLight: pack.light.foreground,
+    });
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -115,8 +125,9 @@ export default function SettingsManager({
 
       <Section title="Appearance">
         <p className="-mt-1 text-xs text-fg/40">
-          The site-wide default theme. Visitors can override any of this in their
-          own browser from the settings page.
+          The site-wide default look visitors see before they customize their own.
+          Pick a theme as the default; edit the themes themselves in the{" "}
+          <span className="text-fg/60">Themes</span> tab.
         </p>
 
         <div className="flex items-center justify-between gap-2">
@@ -140,178 +151,46 @@ export default function SettingsManager({
         </div>
 
         <label className="flex flex-col gap-1 text-sm">
-          <span className="text-fg/50">Default design</span>
+          <span className="text-fg/50">Default theme</span>
           <select
-            value={theme.design}
-            onChange={(e) =>
-              updateTheme({ design: e.target.value as DesignId })
-            }
+            value={theme.preset ?? ""}
+            onChange={(e) => applyDefaultTheme(e.target.value)}
             className={selectClass}
           >
-            {DESIGNS.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name} — {d.description}
+            {!theme.preset && (
+              <option value="" disabled>
+                Custom
+              </option>
+            )}
+            {themePacks.map((p) => (
+              <option key={p.name} value={p.name}>
+                {p.name}
               </option>
             ))}
           </select>
         </label>
 
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-fg/50">Default scene</span>
-          <select
-            value={theme.scene}
-            onChange={(e) =>
-              updateTheme({ scene: e.target.value as SceneId })
-            }
-            className={selectClass}
-          >
-            {SCENES.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name} — {s.description}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <div className="flex flex-col gap-2">
-          <span className="text-sm text-fg/50">Default accent</span>
-          <div
-            className="h-8 w-full rounded-lg ring-1 ring-fg/10"
-            style={{
-              backgroundImage: `linear-gradient(to right, ${theme.accentFrom}, ${theme.accentTo})`,
-            }}
-            aria-hidden
-          />
-          <div className="grid grid-cols-2 gap-3">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="color"
-                value={theme.accentFrom}
-                onChange={(e) => updateTheme({ accentFrom: e.target.value })}
-                aria-label="Accent start"
-                className={colorClass}
-              />
-              <span className="text-fg/60">Start</span>
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="color"
-                value={theme.accentTo}
-                onChange={(e) => updateTheme({ accentTo: e.target.value })}
-                aria-label="Accent end"
-                className={colorClass}
-              />
-              <span className="text-fg/60">End</span>
-            </label>
-          </div>
-          <p className="text-xs text-fg/40">
-            Set both ends to the same color for a solid accent.
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <label className="flex items-center justify-between gap-4 text-sm">
-            <span>
-              <span className="text-fg/70">Custom default colors</span>
-              <span className="block text-xs text-fg/40">
-                Override the light/dark background and text with fixed colors.
-              </span>
-            </span>
-            <input
-              type="checkbox"
-              checked={customColors}
-              onChange={(e) =>
-                updateTheme(
-                  e.target.checked
-                    ? {
-                        background: theme.background ?? "#06070d",
-                        foreground: theme.foreground ?? "#f4f4f6",
-                        backgroundLight: theme.backgroundLight ?? "#eceef3",
-                        foregroundLight: theme.foregroundLight ?? "#181b24",
-                      }
-                    : {
-                        background: undefined,
-                        foreground: undefined,
-                        backgroundLight: undefined,
-                        foregroundLight: undefined,
-                      }
-                )
-              }
-            />
-          </label>
-          {customColors && (
-            <>
-              {/* Live preview chips: each shows that mode's surface + text, so
-                  both pairs are visible at a glance and it's clear which one the
-                  pickers below edit. */}
-              <div className="grid grid-cols-2 gap-2">
-                {(["dark", "light"] as const).map((m) => {
-                  const bg =
-                    m === "light"
-                      ? theme.backgroundLight ?? "#eceef3"
-                      : theme.background ?? "#06070d";
-                  const fg =
-                    m === "light"
-                      ? theme.foregroundLight ?? "#181b24"
-                      : theme.foreground ?? "#f4f4f6";
-                  const selected = colorMode === m;
-                  return (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setColorMode(m)}
-                      aria-pressed={selected}
-                      className={`flex items-center gap-2 rounded-lg border p-1.5 text-left transition-colors ${
-                        selected
-                          ? "border-fg/40"
-                          : "border-fg/10 hover:border-fg/25"
-                      }`}
-                    >
-                      <span
-                        className="flex h-8 w-10 items-center justify-center rounded-md ring-1 ring-fg/10"
-                        style={{ background: bg, color: fg }}
-                      >
-                        <span className="text-xs font-semibold">Aa</span>
-                      </span>
-                      <span
-                        className={`text-xs capitalize ${
-                          selected ? "text-fg/90" : "text-fg/55"
-                        }`}
-                      >
-                        {m}
-                      </span>
-                    </button>
-                  );
-                })}
+        {/* Preview of the default look's dark + light surfaces with the accent. */}
+        <div className="grid grid-cols-2 gap-2">
+          {(["dark", "light"] as const).map((m) => {
+            const bg =
+              m === "light"
+                ? theme.backgroundLight ?? "#eceef3"
+                : theme.background ?? "#06070d";
+            return (
+              <div
+                key={m}
+                className="flex h-12 items-end justify-start overflow-hidden rounded-lg p-1.5 ring-1 ring-fg/10"
+                style={{
+                  background: `radial-gradient(120% 100% at 50% -10%, ${theme.accentFrom}, transparent 60%), ${bg}`,
+                }}
+              >
+                <span className="rounded bg-black/20 px-1 text-[9px] text-white/80 capitalize">
+                  {m}
+                </span>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="color"
-                    value={theme[bgKey] ?? bgFallback}
-                    onChange={(e) => updateTheme({ [bgKey]: e.target.value })}
-                    aria-label={`${colorMode} background`}
-                    className={colorClass}
-                  />
-                  <span className="text-fg/60">Background</span>
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="color"
-                    value={theme[fgKey] ?? fgFallback}
-                    onChange={(e) => updateTheme({ [fgKey]: e.target.value })}
-                    aria-label={`${colorMode} text & surfaces`}
-                    className={colorClass}
-                  />
-                  <span className="text-fg/60">Text &amp; surfaces</span>
-                </label>
-              </div>
-              <p className="text-xs text-fg/40">
-                Editing the <span className="text-fg/60">{colorMode}</span> pair —
-                the accent above is shared across both.
-              </p>
-            </>
-          )}
+            );
+          })}
         </div>
       </Section>
 

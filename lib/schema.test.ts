@@ -62,6 +62,12 @@ describe("configSchema defaults", () => {
     expect(config.settings.weather.units).toBe("imperial");
   });
 
+  it("accepts an optional theme preset pointer", () => {
+    const config = configSchema.parse({ settings: { theme: { preset: "Mariana" } } });
+    expect(config.settings.theme.preset).toBe("Mariana");
+    expect(configSchema.parse({}).settings.theme.preset).toBeUndefined();
+  });
+
   it("preserves provided values while defaulting the rest", () => {
     const config = configSchema.parse({ settings: { title: "Dash" } });
     expect(config.settings.title).toBe("Dash");

@@ -26,7 +26,6 @@ const POLL_MS = 30_000;
 const RANGES = [
   { key: "h1", label: "1h" },
   { key: "d1", label: "24h" },
-  { key: "d7", label: "7d" },
   { key: "d30", label: "30d" },
   { key: "d90", label: "90d" },
 ] as const;
@@ -49,7 +48,9 @@ function relativeTime(from: number, now: number): string {
 }
 
 function uptimeColor(u: number | null): string {
-  if (u == null) return "bg-fg/15";
+  // No-data bars read as clearly empty slots (much fainter than any colored
+  // "has-data" bar) so gaps don't get mistaken for a red "down" reading.
+  if (u == null) return "bg-fg/[0.06]";
   if (u >= 99.5) return "bg-emerald-400/80";
   if (u >= 95) return "bg-emerald-400/55";
   if (u >= 80) return "bg-amber-400/70";
@@ -86,9 +87,13 @@ function Timeline({ points }: { points: BarPoint[] }) {
   if (points.length === 0) return null;
   return (
     <div className="flex h-7 items-stretch gap-0.5">
-      {points.map((p) => (
+      {points.map((p, i) => (
+        // Position-unique key: bars are a fixed positional sequence, and two
+        // recent readings can share a minute-level `at`. A bare `p.at` key then
+        // duplicates, corrupting reconciliation so a stale bar from the previous
+        // range (e.g. 1h) lingers at the far end when switching views.
         <span
-          key={p.at}
+          key={`${p.at}-${i}`}
           title={
             p.uptime == null
               ? `${barLabel(p.at)}: no data`
@@ -199,24 +204,30 @@ export default function StatusPage({ apps }: { apps: StatusAppMeta[] }) {
         <p className="text-fg/40">No applications to monitor yet.</p>
       ) : (
         <>
-          <div className="flex items-center justify-between gap-2 px-1">
-            <span className="text-xs text-fg/40">Uptime over {rangeLabel}</span>
-            <div className="flex overflow-hidden rounded-lg border border-fg/10">
-              {RANGES.map((r) => (
-                <button
-                  key={r.key}
-                  type="button"
-                  onClick={() => setRange(r.key)}
-                  className={`px-2.5 py-1 text-xs transition-colors ${
-                    range === r.key
-                      ? "bg-fg/15 text-fg"
-                      : "text-fg/50 hover:text-fg/80"
-                  }`}
-                >
-                  {r.label}
-                </button>
-              ))}
+          <div>
+            <div className="flex items-center justify-between gap-2 px-1">
+              <span className="text-xs text-fg/40">Uptime over {rangeLabel}</span>
+              <div className="flex overflow-hidden rounded-lg border border-fg/10">
+                {RANGES.map((r) => (
+                  <button
+                    key={r.key}
+                    type="button"
+                    onClick={() => setRange(r.key)}
+                    className={`px-2.5 py-1 text-xs transition-colors ${
+                      range === r.key
+                        ? "bg-fg/15 text-fg"
+                        : "text-fg/50 hover:text-fg/80"
+                    }`}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
             </div>
+            <p className="mt-1 px-1 text-[11px] text-fg/35">
+              Oldest on the left, now on the right; faded bars are periods with no
+              data.
+            </p>
           </div>
 
           <div className="space-y-3">
@@ -224,7 +235,7 @@ export default function StatusPage({ apps }: { apps: StatusAppMeta[] }) {
               const s = statuses.get(app.id);
               const h = history.get(app.id);
               const uptime = h ? h.uptime[range as keyof UptimeWindows] : null;
-              const dailyCount = range === "d7" ? 7 : range === "d30" ? 30 : 90;
+              const dailyCount = range === "d30" ? 30 : 90;
               const series =
                 range === "h1"
                   ? (h?.recent ?? [])

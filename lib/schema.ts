@@ -38,6 +38,10 @@ export const searchSchema = z.object({
 // custom default colors — when both are set they override the light/dark mode.
 export const themeSchema = z.object({
   mode: z.enum(["system", "light", "dark"]).default("system"),
+  // Name of the theme pack chosen as the site default (admin Settings). Purely a
+  // UI pointer for the picker — the concrete design/scene/colors below are what
+  // the layout/PrefsProvider actually apply.
+  preset: z.string().optional(),
   design: z.enum(DESIGN_IDS).default("glass"),
   scene: z.enum(SCENE_IDS).default("aurora"),
   accentFrom: hexColor.default("#a78bfa"),
@@ -193,6 +197,7 @@ export const searchUpdateSchema = z
 // (omit them and they're gone). Required fields keep a saved theme well-formed.
 export const themeInputSchema = z.object({
   mode: z.enum(["system", "light", "dark"]),
+  preset: z.string().optional(),
   design: z.enum(DESIGN_IDS),
   scene: z.enum(SCENE_IDS),
   accentFrom: hexColor,
