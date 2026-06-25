@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useVisitorPrefs } from "./PrefsProvider";
 import { BASE_THEMES, DESIGNS, SCENES } from "@/lib/theme";
 import type { ColorSet, DesignId, SceneId, ThemePack } from "@/lib/theme";
@@ -71,6 +71,7 @@ function scenePreview(id: SceneId, from: string, to: string): string {
 
 export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
   const {
+    theme,
     design,
     setDesign,
     scene,
@@ -89,12 +90,29 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
     surfaceIsLight,
   } = useVisitorPrefs();
 
-  // Which mode's colors the pickers edit — independent of what the app is
-  // currently displaying (that lives in Preferences now). Seeds from the active
-  // mode for convenience.
+  // Which mode's colors the pickers edit. Defaults to the mode the app is set to;
+  // on "system" it follows the resolved display mode until the visitor pins a
+  // choice (an explicit app mode or a manual toggle below), after which it keeps
+  // that last value. Independent of the app's display — switching the editing
+  // mode doesn't change what the app shows.
   const [editMode, setEditMode] = useState<"dark" | "light">(
-    surfaceIsLight ? "light" : "dark"
+    theme === "light" ? "light" : theme === "dark" ? "dark" : surfaceIsLight ? "light" : "dark"
   );
+  const editPinned = useRef(false);
+  useEffect(() => {
+    let next: "dark" | "light" | null = null;
+    if (theme === "light" || theme === "dark") {
+      editPinned.current = true;
+      next = theme;
+    } else if (!editPinned.current) {
+      next = surfaceIsLight ? "light" : "dark";
+    }
+    if (next) setEditMode(next);
+  }, [theme, surfaceIsLight]);
+  const chooseEditMode = (m: "dark" | "light") => {
+    editPinned.current = true;
+    setEditMode(m);
+  };
   const [draft, setDraft] = useState<ThemeColors>(DEFAULT_DRAFT);
   const [name, setName] = useState("");
 
@@ -374,7 +392,7 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
                   <button
                     key={m}
                     type="button"
-                    onClick={() => setEditMode(m)}
+                    onClick={() => chooseEditMode(m)}
                     aria-pressed={editMode === m}
                     className={`px-2.5 py-1 text-xs capitalize transition-colors ${
                       editMode === m
