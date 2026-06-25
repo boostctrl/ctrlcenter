@@ -10,11 +10,11 @@ import {
 } from "./theme";
 
 describe("catalog sizes", () => {
-  it("ships 8 designs, 8 scenes, 16 palettes, 8 themes", () => {
-    expect(DESIGNS).toHaveLength(8);
-    expect(SCENES).toHaveLength(8);
+  it("ships 12 designs, 12 scenes, 16 palettes, 12 themes", () => {
+    expect(DESIGNS).toHaveLength(12);
+    expect(SCENES).toHaveLength(12);
     expect(BASE_THEMES).toHaveLength(16);
-    expect(THEME_PACKS).toHaveLength(8);
+    expect(THEME_PACKS).toHaveLength(12);
   });
 });
 

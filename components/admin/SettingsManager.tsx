@@ -29,11 +29,11 @@ async function saveSettings(settings: Settings): Promise<void> {
   }
 }
 
-// Each settings group is its own card; the form tiles them into a masonry-style
-// two-column layout (CSS columns) so variable-height cards pack without gaps.
+// Each settings group is its own card; the form lays them out in two explicit
+// columns (below) so each section's column placement is deterministic.
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="glass-card mb-4 flex break-inside-avoid flex-col gap-4 p-5">
+    <section className="glass-card flex flex-col gap-4 p-5">
       <h3 className="text-xs font-semibold tracking-[0.15em] text-fg/45 uppercase">
         {title}
       </h3>
@@ -84,7 +84,10 @@ export default function SettingsManager({
       <div className="flex h-4 items-center justify-end">
         <SaveStatus status={status} error={error} />
       </div>
-      <div className="gap-4 lg:columns-2">
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        {/* Left column — General, Appearance, Security: kept roughly even in
+            height with the right column (Dashboard, Weather). */}
+        <div className="flex flex-col gap-4">
         <Section title="General">
         <TextField
           label="Page title"
@@ -187,6 +190,13 @@ export default function SettingsManager({
         </div>
       </Section>
 
+      <Section title="Security">
+        <ChangePassword />
+      </Section>
+        </div>
+
+        {/* Right column — Dashboard, Weather. */}
+        <div className="flex flex-col gap-4">
       <Section title="Dashboard">
         <div className="flex items-center justify-between gap-4">
           <div>
@@ -395,10 +405,7 @@ export default function SettingsManager({
           </select>
         </label>
         </Section>
-
-        <Section title="Security">
-          <ChangePassword />
-        </Section>
+        </div>
       </div>
     </div>
   );

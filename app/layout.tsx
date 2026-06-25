@@ -1,17 +1,50 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import {
+  Plus_Jakarta_Sans,
+  Inter,
+  Poppins,
+  Nunito,
+  Lora,
+  JetBrains_Mono,
+} from "next/font/google";
 import { getSettings } from "@/lib/config";
 import { resolveIconUrl } from "@/lib/icons";
 import { PrefsProvider } from "@/components/PrefsProvider";
 import SceneLayer from "@/components/scenes/SceneLayer";
 import "./globals.css";
 
+// Every selectable font (see lib/fonts.ts) must be imported here: next/font is
+// analyzed at build time, so fonts can't be chosen dynamically by id. Each
+// exposes a CSS variable; the active one is selected by a `font-<id>` class on
+// <html> (app/globals.css). Only the rendered font's files are fetched by the
+// browser, so loading several is cheap at runtime.
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
   variable: "--font-jakarta",
   weight: ["300", "400", "500", "600", "700", "800"],
 });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const poppins = Poppins({
+  subsets: ["latin"],
+  variable: "--font-poppins",
+  weight: ["400", "500", "600", "700"],
+});
+const nunito = Nunito({ subsets: ["latin"], variable: "--font-nunito" });
+const lora = Lora({ subsets: ["latin"], variable: "--font-lora" });
+const jetbrains = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains",
+});
+
+const fontVariables = [
+  jakarta.variable,
+  inter.variable,
+  poppins.variable,
+  nunito.variable,
+  lora.variable,
+  jetbrains.variable,
+].join(" ");
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSettings();
@@ -48,10 +81,10 @@ export default async function RootLayout({
   // node in <body>. MUST mirror applyAll() in PrefsProvider.
   const themeScript = `(function(){try{var dt=${JSON.stringify(
     defaultTheme
-  )};var el=document.documentElement;var s=el.style;var prefersDark=window.matchMedia('(prefers-color-scheme: dark)').matches;var m=localStorage.getItem('ctrlcenter:theme');var modeChosen=(m==='light'||m==='dark'||m==='system');var mode=modeChosen?m:dt.mode;var dark=mode==='dark'||(mode==='system'&&prefersDark);el.classList.toggle('theme-light',!dark);function cs(o){return o&&typeof o.background==='string'&&typeof o.accentFrom==='string'?o:null;}var look=null;var ct=localStorage.getItem('ctrlcenter:activeTheme');if(ct){try{var c=JSON.parse(ct);if(c){if(cs(c.dark)&&cs(c.light)){look={dark:c.dark,light:c.light};}else if(cs(c)){look={dark:c,light:c};}}}catch(e){}}if(!look&&!modeChosen&&dt.background&&dt.foreground){look={dark:{background:dt.background,foreground:dt.foreground,accentFrom:dt.accentFrom,accentTo:dt.accentTo},light:{background:dt.backgroundLight||dt.background,foreground:dt.foregroundLight||dt.foreground,accentFrom:dt.accentFrom,accentTo:dt.accentTo}};}var v=look?(dark?look.dark:look.light):null;if(v){s.setProperty('--background',v.background);s.setProperty('--foreground',v.foreground);s.setProperty('--fg',v.foreground);}var af=v?v.accentFrom:dt.accentFrom;var at=v?v.accentTo:dt.accentTo;var ao=localStorage.getItem('ctrlcenter:accent');if(ao){try{var a=JSON.parse(ao);if(a&&a.from){af=a.from;at=a.to;}}catch(e){}}s.setProperty('--accent-from',af);s.setProperty('--accent-to',at);var dz=localStorage.getItem('ctrlcenter:design');var design=['glass','aero','flat','soft','minimal','bold','cyber','clay'].indexOf(dz)>=0?dz:dt.design;if(design!=='glass'){el.classList.add('design-'+design);}var sz=localStorage.getItem('ctrlcenter:scene');var scene=['aurora','abyss','nebula','grid','starfield','waves','rays','traces'].indexOf(sz)>=0?sz:dt.scene;if(scene&&scene!=='aurora'){el.classList.add('scene-'+scene);}}catch(e){}})();`;
+  )};var el=document.documentElement;var s=el.style;var prefersDark=window.matchMedia('(prefers-color-scheme: dark)').matches;var m=localStorage.getItem('ctrlcenter:theme');var modeChosen=(m==='light'||m==='dark'||m==='system');var mode=modeChosen?m:dt.mode;var dark=mode==='dark'||(mode==='system'&&prefersDark);el.classList.toggle('theme-light',!dark);function cs(o){return o&&typeof o.background==='string'&&typeof o.accentFrom==='string'?o:null;}var look=null;var ct=localStorage.getItem('ctrlcenter:activeTheme');if(ct){try{var c=JSON.parse(ct);if(c){if(cs(c.dark)&&cs(c.light)){look={dark:c.dark,light:c.light};}else if(cs(c)){look={dark:c,light:c};}}}catch(e){}}if(!look&&!modeChosen&&dt.background&&dt.foreground){look={dark:{background:dt.background,foreground:dt.foreground,accentFrom:dt.accentFrom,accentTo:dt.accentTo},light:{background:dt.backgroundLight||dt.background,foreground:dt.foregroundLight||dt.foreground,accentFrom:dt.accentFrom,accentTo:dt.accentTo}};}var v=look?(dark?look.dark:look.light):null;if(v){s.setProperty('--background',v.background);s.setProperty('--foreground',v.foreground);s.setProperty('--fg',v.foreground);}var af=v?v.accentFrom:dt.accentFrom;var at=v?v.accentTo:dt.accentTo;var ao=localStorage.getItem('ctrlcenter:accent');if(ao){try{var a=JSON.parse(ao);if(a&&a.from){af=a.from;at=a.to;}}catch(e){}}s.setProperty('--accent-from',af);s.setProperty('--accent-to',at);var dz=localStorage.getItem('ctrlcenter:design');var design=['glass','aero','flat','soft','minimal','bold','cyber','clay','frost','outline','paper','gradient'].indexOf(dz)>=0?dz:dt.design;if(design!=='glass'){el.classList.add('design-'+design);}var sz=localStorage.getItem('ctrlcenter:scene');var scene=['aurora','abyss','nebula','grid','starfield','waves','rays','traces','dots','glow','vortex','mesh'].indexOf(sz)>=0?sz:dt.scene;if(scene&&scene!=='aurora'){el.classList.add('scene-'+scene);}var fz=localStorage.getItem('ctrlcenter:font');var font=['jakarta','inter','poppins','nunito','lora','jetbrains'].indexOf(fz)>=0?fz:dt.font;if(font&&font!=='jakarta'){el.classList.add('font-'+font);}}catch(e){}})();`;
 
   return (
-    <html lang="en" className={`${jakarta.variable} h-full`}>
+    <html lang="en" className={`${fontVariables} h-full`}>
       <body className="relative min-h-full overflow-x-hidden antialiased">
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeScript }} />
         <PrefsProvider

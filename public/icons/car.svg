@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="Car">
-  <rect width="48" height="48" rx="10" fill="#0284c7"/>
-  <g fill="#ffffff">
-    <path d="M16 17h16l4 9v6a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-1H17v1a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-6l4-9zm1.4 3-2 5h17.2l-2-5H17.4z"/>
-    <circle cx="18" cy="31" r="2.4"/>
-    <circle cx="30" cy="31" r="2.4"/>
-  </g>
-</svg>

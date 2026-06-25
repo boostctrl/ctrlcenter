@@ -156,6 +156,87 @@
   --glow-opacity: 0.7;
 }
 
+.design-frost {
+  /* Heavier frosted glass: more blur and a brighter translucent fill than Glass,
+     with a soft top sheen. */
+  --surface-radius: 1.25rem;
+  --surface-border-width: 1px;
+  --surface-border: color-mix(in srgb, var(--fg) 16%, transparent);
+  --surface-border-hover: color-mix(in srgb, var(--fg) 28%, transparent);
+  --surface-bg: color-mix(in srgb, var(--fg) 10%, transparent);
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 14%, transparent);
+  --surface-bg-image: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--fg) 10%, transparent),
+    transparent 60%
+  );
+  --surface-blur: 48px;
+  --surface-shadow: 0 8px 30px rgba(var(--shadow-tint), 0.28),
+    inset 0 1px 0 color-mix(in srgb, var(--fg) 20%, transparent);
+  --surface-shadow-hover: 0 12px 40px rgba(var(--shadow-tint), 0.34),
+    inset 0 1px 0 color-mix(in srgb, var(--fg) 28%, transparent);
+  --surface-lift: -2px;
+  --glow-opacity: 0.9;
+}
+
+.design-outline {
+  /* No fill — just an accent-tinted outline that brightens on hover. */
+  --surface-radius: 0.875rem;
+  --surface-border-width: 1.5px;
+  --surface-border: color-mix(in srgb, var(--accent-from) 45%, transparent);
+  --surface-border-hover: color-mix(in srgb, var(--accent-to) 70%, transparent);
+  --surface-bg: transparent;
+  --surface-bg-hover: color-mix(in srgb, var(--accent-from) 6%, transparent);
+  --surface-bg-image: none;
+  --surface-blur: 0px;
+  --surface-shadow: none;
+  --surface-shadow-hover: 0 0 0 1px
+    color-mix(in srgb, var(--accent-to) 30%, transparent);
+  --surface-lift: 0px;
+  --glow-opacity: 0.2;
+}
+
+.design-paper {
+  /* Opaque "material" card: a solid fill over the background with a soft, layered
+     drop shadow and a small radius. */
+  --surface-radius: 0.5rem;
+  --surface-border-width: 1px;
+  --surface-border: color-mix(in srgb, var(--fg) 8%, transparent);
+  --surface-border-hover: color-mix(in srgb, var(--fg) 14%, transparent);
+  --surface-bg: color-mix(in srgb, var(--fg) 10%, var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 14%, var(--background));
+  --surface-bg-image: none;
+  --surface-blur: 0px;
+  --surface-shadow: 0 1px 2px rgba(var(--shadow-tint), 0.16),
+    0 6px 16px rgba(var(--shadow-tint), 0.12);
+  --surface-shadow-hover: 0 2px 4px rgba(var(--shadow-tint), 0.2),
+    0 10px 24px rgba(var(--shadow-tint), 0.16);
+  --surface-lift: -2px;
+  --glow-opacity: 0;
+}
+
+.design-gradient {
+  /* A faint accent gradient washed across the surface, with an accent-tinted
+     border and glow on hover. */
+  --surface-radius: 1rem;
+  --surface-border-width: 1px;
+  --surface-border: color-mix(in srgb, var(--accent-from) 30%, transparent);
+  --surface-border-hover: color-mix(in srgb, var(--accent-to) 50%, transparent);
+  --surface-bg: color-mix(in srgb, var(--fg) 5%, transparent);
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 8%, transparent);
+  --surface-bg-image: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent-from) 22%, transparent),
+    color-mix(in srgb, var(--accent-to) 14%, transparent)
+  );
+  --surface-blur: 14px;
+  --surface-shadow: 0 8px 28px rgba(var(--shadow-tint), 0.3);
+  --surface-shadow-hover: 0 12px 36px
+    color-mix(in srgb, var(--accent-from) 22%, transparent);
+  --surface-lift: -2px;
+  --glow-opacity: 0.7;
+}
+
 /* Light theme: toggled by adding `.theme-light` to <html>. */
 .theme-light {
   --background: #eceef3;
@@ -191,6 +272,24 @@ body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* Font presets: a `font-<id>` class on <html> repoints --font-sans (the default,
+   "jakarta", is the :root token and carries no class). See lib/fonts.ts. */
+.font-inter {
+  --font-sans: var(--font-inter);
+}
+.font-poppins {
+  --font-sans: var(--font-poppins);
+}
+.font-nunito {
+  --font-sans: var(--font-nunito);
+}
+.font-lora {
+  --font-sans: var(--font-lora);
+}
+.font-jetbrains {
+  --font-sans: var(--font-jetbrains);
 }
 
 @layer utilities {
@@ -329,6 +428,20 @@ body {
   animation: wave-x linear infinite;
 }
 
+/* Vortex scene — slowly rotate the conic sweep about its centre. */
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 60s linear infinite;
+}
+
 /* Scenes manage their own JS-driven motion (e.g. the Abyss canvas draws a
    single static frame), but the CSS animations must be quieted here too. */
 @media (prefers-reduced-motion: reduce) {
@@ -337,7 +450,8 @@ body {
   .animate-drift,
   .animate-rays,
   .animate-grid,
-  .animate-wave {
+  .animate-wave,
+  .animate-spin-slow {
     animation: none;
   }
 }

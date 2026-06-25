@@ -37,9 +37,10 @@ Built with Next.js 16, React 19, and Tailwind v4.
 - **Uptime & status.** Optional reachability checks show an online/offline dot on
   each app, and a dedicated **/status** page with per-service **uptime %** and a
   **90-day daily timeline** (Statuspage / UptimeRobot style). A background poller
-  records history independent of page views, and each service can define which
-  HTTP status codes count as up (so a `404` can read as **down**, not just
-  "reachable").
+  records history independent of page views. Each service picks a **check method**
+  — HTTP (define which status codes count as up, so a `404` reads as **down**),
+  **TCP port**, **keyword** in the response body, **DNS** resolution, or **ICMP
+  ping** — so non-web services can be monitored too.
 
 - **Per-visitor personalization, no accounts.** Each visitor can set a greeting
   name, timezone, weather location/units, and their whole theme from **/settings**
@@ -110,9 +111,12 @@ apps:
     name: Cloud Drive
     subtitle: Nextcloud
     url: "https://cloud.example.com"
-    icon: nextcloud          # icon slug or full image URL
-    expectStatus: ""         # codes/ranges that count as up, e.g. "200-299, 401"
+    icon: nextcloud          # slug, full image URL, or uploaded icon
+    checkType: http          # http | tcp | keyword | dns | icmp
+    expectStatus: ""         # http: codes/ranges that count as up, e.g. "200-299, 401"
                              # (blank = any reachable host is up)
+    # port: 5432             # tcp: port to connect to (else the URL's port, or 443/80)
+    # keyword: "Welcome"     # keyword: text that must appear in the response body
 
 bookmarks:
   - id: <uuid>
@@ -131,9 +135,11 @@ light/dark variants pick the legible one for the active surface. Not in the set?
 Paste a direct image URL (anything starting with `http(s)://` is used as-is). The
 admin shows a live preview as you type.
 
-A few logos the CDN doesn't carry are **bundled** with the app and selectable
-like any other; to add your own, drop `<slug>.svg` into `public/icons/` and add
-the slug to `LOCAL_ICONS` in [`lib/icons.ts`](lib/icons.ts).
+Need a logo the CDN doesn't carry? In the admin icon picker, click **Upload
+image** to add your own (PNG, JPEG, WebP, GIF, SVG, or ICO). Uploaded icons are
+stored beside `config.yaml` (in an `uploads/` dir, so they persist on the same
+volume) and served by the app; they show up under **Your icons** in the picker
+for reuse. You can also paste a direct image URL or a `data:` URI.
 
 ## Environment variables
 
@@ -141,7 +147,7 @@ the slug to `LOCAL_ICONS` in [`lib/icons.ts`](lib/icons.ts).
 | --- | --- | --- |
 | `ADMIN_PASSWORD` | yes | Bootstrap password for `/admin`. After you set one in **Settings → Reset password**, login uses that — but keep this set (or set `SESSION_SECRET`), as it also signs sessions. **Special characters:** quote the value in `.env` and double any literal `$` as `$$` (docker compose interpolates `$`), or a complex password can be mangled before the app sees it. |
 | `SESSION_SECRET` | no | Secret used to sign session cookies. If unset, derived from `ADMIN_PASSWORD`. Recommended so sessions don't depend on the password. Generate with `openssl rand -base64 32`. |
-| `CONFIG_PATH` | no | Path to the config file (default `./config/config.yaml`; the container sets `/config/config.yaml`). The uptime history (`status-history.json`) is written beside it. |
+| `CONFIG_PATH` | no | Path to the config file (default `./config/config.yaml`; the container sets `/config/config.yaml`). The uptime history (`status-history.json`) and uploaded custom icons (`uploads/`) are written beside it. |
 | `TRUSTED_PROXY_HOPS` | no | Number of trusted reverse proxies in front of the app, used to find the real client IP in `X-Forwarded-For` for login throttling. Default `1`. Set `0` if exposed directly. |
 
 ## Development

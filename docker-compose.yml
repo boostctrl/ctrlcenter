@@ -8,10 +8,16 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    # Uncomment to allow ICMP "ping" uptime checks (the Ping check type) from
+    # inside the container. Without it, ICMP checks just report down; HTTP, TCP,
+    # DNS, and keyword checks work regardless.
+    # cap_add:
+    #   - NET_RAW
     volumes:
-      # config.yaml lives here and is written when you save in /admin. The
-      # container's entrypoint fixes ownership of this mount on startup, so it
-      # works regardless of the host directory's original uid/gid.
+      # config.yaml lives here (plus uptime history and uploaded custom icons),
+      # written when you save in /admin. The container's entrypoint fixes
+      # ownership of this mount on startup, so it works regardless of the host
+      # directory's original uid/gid.
       - ./config:/config
     healthcheck:
       test:

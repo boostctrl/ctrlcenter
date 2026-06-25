@@ -15,7 +15,11 @@ export type DesignId =
   | "minimal"
   | "bold"
   | "cyber"
-  | "clay";
+  | "clay"
+  | "frost"
+  | "outline"
+  | "paper"
+  | "gradient";
 
 export const DESIGNS: { id: DesignId; name: string; description: string }[] = [
   { id: "glass", name: "Glass", description: "Frosted and blurred (default)" },
@@ -26,6 +30,10 @@ export const DESIGNS: { id: DesignId; name: string; description: string }[] = [
   { id: "bold", name: "Bold", description: "Sharp, high-contrast" },
   { id: "cyber", name: "Cyber", description: "Neon, techy glow" },
   { id: "clay", name: "Clay", description: "Chunky, soft-moulded" },
+  { id: "frost", name: "Frost", description: "Heavy frosted glass" },
+  { id: "outline", name: "Outline", description: "Accent-outlined, no fill" },
+  { id: "paper", name: "Paper", description: "Opaque, softly shadowed" },
+  { id: "gradient", name: "Gradient", description: "Accent-washed surface" },
 ];
 
 export const DESIGN_IDS = DESIGNS.map((d) => d.id) as [DesignId, ...DesignId[]];
@@ -49,7 +57,11 @@ export type SceneId =
   | "starfield"
   | "waves"
   | "rays"
-  | "traces";
+  | "traces"
+  | "dots"
+  | "glow"
+  | "vortex"
+  | "mesh";
 
 export const SCENES: { id: SceneId; name: string; description: string }[] = [
   { id: "aurora", name: "Aurora", description: "Floating accent glow (default)" },
@@ -60,6 +72,10 @@ export const SCENES: { id: SceneId; name: string; description: string }[] = [
   { id: "waves", name: "Waves", description: "Layered waves along the base" },
   { id: "rays", name: "Rays", description: "Sweeping beams of accent light" },
   { id: "traces", name: "Traces", description: "Circuit-board traces with signal pulses" },
+  { id: "dots", name: "Dots", description: "Drifting halftone dot field" },
+  { id: "glow", name: "Glow", description: "A single breathing accent glow" },
+  { id: "vortex", name: "Vortex", description: "Slow rotating sweep of light" },
+  { id: "mesh", name: "Mesh", description: "Corner-anchored gradient wash" },
 ];
 
 export const SCENE_IDS = SCENES.map((s) => s.id) as [SceneId, ...SceneId[]];
@@ -256,6 +272,39 @@ export const THEME_PACKS: ThemePack[] = [
     scene: "traces",
     dark: { background: "#020806", foreground: "#d7f7e4", accentFrom: "#34d399", accentTo: "#22d3ee" },
     light: { background: "#e9f7ef", foreground: "#06231a", accentFrom: "#059669", accentTo: "#0891b2" },
+  },
+  {
+    // Icy blue over the corner-anchored Mesh wash with the heavy Frost surface.
+    name: "Frostbite",
+    design: "frost",
+    scene: "mesh",
+    dark: { background: "#050a12", foreground: "#d6e6f2", accentFrom: "#7dd3fc", accentTo: "#38bdf8" },
+    light: { background: "#eef5fb", foreground: "#0f2230", accentFrom: "#0284c7", accentTo: "#0369a1" },
+  },
+  {
+    // Printed-ink monochrome: the Paper surface over a drifting Dots halftone.
+    name: "Halftone",
+    design: "paper",
+    scene: "dots",
+    dark: { background: "#111113", foreground: "#ececec", accentFrom: "#d6d3d1", accentTo: "#a8a29e" },
+    light: { background: "#f4f4f2", foreground: "#1c1c1a", accentFrom: "#57534e", accentTo: "#292524" },
+  },
+  {
+    // Violet event horizon: the Outline surface around a slow Vortex sweep.
+    name: "Singularity",
+    design: "outline",
+    scene: "vortex",
+    dark: { background: "#0a0612", foreground: "#ece6f7", accentFrom: "#c084fc", accentTo: "#a855f7" },
+    light: { background: "#f1ecfa", foreground: "#1d1430", accentFrom: "#9333ea", accentTo: "#7e22ce" },
+  },
+  {
+    // Sunrise warmth on the breathing Glow scene with the Gradient surface.
+    // Designed light-first — a soft peach wash, with a warm ember dark.
+    name: "Daybreak",
+    design: "gradient",
+    scene: "glow",
+    light: { background: "#fdeee6", foreground: "#3a1d12", accentFrom: "#fb923c", accentTo: "#f43f5e" },
+    dark: { background: "#160d0a", foreground: "#f5e7e0", accentFrom: "#fb923c", accentTo: "#fb7185" },
   },
 ];
 

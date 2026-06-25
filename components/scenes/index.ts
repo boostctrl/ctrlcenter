@@ -8,6 +8,10 @@ import Starfield from "./Starfield";
 import Waves from "./Waves";
 import Rays from "./Rays";
 import Traces from "./Traces";
+import Dots from "./Dots";
+import Glow from "./Glow";
+import Vortex from "./Vortex";
+import Mesh from "./Mesh";
 
 // Scenes render a different treatment for light vs dark surfaces, so each
 // backdrop receives the resolved surface lightness.
@@ -26,4 +30,8 @@ export const SCENE_REGISTRY: Record<SceneId, ComponentType<SceneProps>> = {
   waves: Waves,
   rays: Rays,
   traces: Traces,
+  dots: Dots,
+  glow: Glow,
+  vortex: Vortex,
+  mesh: Mesh,
 };

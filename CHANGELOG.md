@@ -12,6 +12,37 @@ here.
 
 ## [Unreleased]
 
+## [0.9.9] - 2026-06-25
+
+### Added
+
+- **Custom icon upload.** The admin icon picker now has an **Upload image**
+  button (PNG, JPEG, WebP, GIF, SVG, ICO). Uploaded icons are stored beside
+  `config.yaml` (in `uploads/`) and served by the app, and appear under **Your
+  icons** for reuse. Icon fields also accept a `data:` URI.
+- **More uptime check methods.** Besides HTTP, an app can now be monitored by
+  **TCP port**, a **keyword** in the response body, **DNS** resolution, or
+  **ICMP ping**. ICMP needs the `NET_RAW` capability in containers (see
+  `docker-compose.yml`); the others work anywhere.
+- **Font picker** in the theme builder — Plus Jakarta Sans (default), Inter,
+  Poppins, Nunito, Lora, and JetBrains Mono.
+- Four new **themes** (Frostbite, Halftone, Singularity, Daybreak), four new
+  **designs** (Frost, Outline, Paper, Gradient), and four new **scenes** (Dots,
+  Glow, Vortex, Mesh).
+
+### Changed
+
+- **Settings:** "Reset all settings" now sits in the preferences grid in line
+  with Units, instead of hanging off the bottom.
+- **Admin Settings:** the Security (password) section moved to the first column
+  so the two columns are more balanced.
+- The dashboard greeting is slightly smaller.
+
+### Removed
+
+- The bundled automotive sample icons (`rockauto`, `car`, `tire`,
+  `car-battery`, `steering-wheel`) — superseded by custom icon upload.
+
 ## [0.9.8] - 2026-06-24
 
 ### Added

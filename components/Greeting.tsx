@@ -29,7 +29,7 @@ export default function Greeting({
 
   return (
     <h1
-      className="text-5xl font-bold tracking-tight sm:text-6xl"
+      className="text-4xl font-bold tracking-tight sm:text-5xl"
       suppressHydrationWarning
     >
       {greeting}

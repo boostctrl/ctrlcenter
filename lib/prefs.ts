@@ -12,6 +12,7 @@ import {
   type ModeColors,
   type SceneId,
 } from "./theme";
+import { isFontId, type FontId } from "./fonts";
 
 export type Units = "imperial" | "metric";
 
@@ -323,6 +324,36 @@ export function saveScene(scene: SceneId | null): void {
       window.localStorage.setItem(SCENE_KEY, scene);
     } else {
       window.localStorage.removeItem(SCENE_KEY);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+// --- Font ---
+// The UI typeface (Plus Jakarta Sans, Inter, …). Per-visitor; applied as a
+// `font-<id>` class on <html>. See lib/fonts.ts for the catalog.
+export const FONT_KEY = "ctrlcenter:font";
+
+// Returns null when the visitor hasn't chosen a font, so callers can fall back
+// to the admin-configured default.
+export function loadFont(): FontId | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(FONT_KEY);
+    return isFontId(raw) ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveFont(font: FontId | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (font) {
+      window.localStorage.setItem(FONT_KEY, font);
+    } else {
+      window.localStorage.removeItem(FONT_KEY);
     }
   } catch {
     // ignore

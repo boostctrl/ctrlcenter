@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useVisitorPrefs } from "./PrefsProvider";
 import { BASE_THEMES, DESIGNS, SCENES } from "@/lib/theme";
 import type { ColorSet, DesignId, SceneId, ThemePack } from "@/lib/theme";
+import { FONTS, fontVar } from "@/lib/fonts";
 import type { ThemeColors } from "@/lib/prefs";
 
 const DESIGN_NAMES = Object.fromEntries(
@@ -63,6 +64,14 @@ function scenePreview(id: SceneId, from: string, to: string): string {
       return `repeating-conic-gradient(from 0deg at 50% -12%, ${mix(from, 65)} 0 3deg, transparent 3deg 12deg), ${bg}`;
     case "waves":
       return `linear-gradient(to top, ${mix(from, 52)}, transparent 45%), linear-gradient(to top, ${mix(to, 32)}, transparent 65%), ${bg}`;
+    case "dots":
+      return `radial-gradient(${mix(from, 70)} 1px, transparent 1.5px) 0 0 / 6px 6px, ${bg}`;
+    case "glow":
+      return `radial-gradient(circle at 50% 50%, ${from}, ${mix(to, 40)} 45%, transparent 70%), ${bg}`;
+    case "vortex":
+      return `conic-gradient(from 0deg at 50% 50%, transparent 0deg, ${mix(from, 70)} 50deg, transparent 130deg, ${mix(to, 55)} 220deg, transparent 300deg), ${bg}`;
+    case "mesh":
+      return `radial-gradient(55% 55% at 20% 20%, ${from}, transparent 60%), radial-gradient(55% 55% at 80% 80%, ${to}, transparent 60%), ${bg}`;
     case "aurora":
     default:
       return `radial-gradient(60% 70% at 30% 20%, ${from}, transparent 60%), radial-gradient(60% 70% at 75% 80%, ${to}, transparent 60%), ${bg}`;
@@ -76,6 +85,8 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
     setDesign,
     scene,
     setScene,
+    font,
+    setFont,
     applyPack,
     customThemes,
     activeLook,
@@ -345,6 +356,43 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
                   }`}
                 >
                   {s.name}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <span className="text-xs text-fg/50">Font</span>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {FONTS.map((f) => {
+            const selected = font === f.id;
+            return (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setFont(f.id)}
+                aria-pressed={selected}
+                className={`group flex flex-col gap-0.5 rounded-lg border p-2 text-left transition-colors ${
+                  selected ? "border-fg/40" : "border-fg/10 hover:border-fg/30"
+                }`}
+                title={f.name}
+              >
+                <span
+                  className="text-xl leading-tight text-fg/90"
+                  style={{ fontFamily: fontVar(f.id) }}
+                  aria-hidden
+                >
+                  Ag
+                </span>
+                <span
+                  className={`truncate text-xs ${
+                    selected ? "text-fg/90" : "text-fg/60 group-hover:text-fg/90"
+                  }`}
+                  style={{ fontFamily: fontVar(f.id) }}
+                >
+                  {f.name}
                 </span>
               </button>
             );

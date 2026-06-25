@@ -141,16 +141,18 @@ export default function SettingsControls() {
             </div>
           </>
         )}
-      </div>
 
-      <div className="border-t border-fg/10 pt-4">
-        <button
-          type="button"
-          onClick={reset}
-          className="rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/60 transition-colors hover:bg-red-500/10 hover:text-red-400"
-        >
-          Reset all settings
-        </button>
+        {/* Sits in the right column, bottom-aligned so it lines up with the
+            Units toggle in the left column. */}
+        <div className="flex items-end justify-start">
+          <button
+            type="button"
+            onClick={reset}
+            className="rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/60 transition-colors hover:bg-red-500/10 hover:text-red-400"
+          >
+            Reset all settings
+          </button>
+        </div>
       </div>
     </div>
   );

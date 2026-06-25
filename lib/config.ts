@@ -14,6 +14,11 @@ import {
 const CONFIG_PATH =
   process.env.CONFIG_PATH || path.join(process.cwd(), "config", "config.yaml");
 
+// Directory holding config.yaml and other runtime-written data (uploaded custom
+// icons live in an `uploads/` subdir). Derived from CONFIG_PATH so everything
+// persists in the same mounted volume.
+export const CONFIG_DIR = path.dirname(CONFIG_PATH);
+
 // Serializes read-modify-write operations so concurrent admin requests can't
 // clobber each other's changes to the on-disk YAML file.
 let writeQueue: Promise<unknown> = Promise.resolve();

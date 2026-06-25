@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { DESIGN_IDS, SCENE_IDS } from "./theme";
+import { FONT_IDS, DEFAULT_FONT } from "./fonts";
 import { SEARCH_ENGINE_KEYS, isValidCustomUrl } from "./search";
-import { STATUS_RANGE_KEYS } from "./status";
+import { STATUS_RANGE_KEYS, CHECK_TYPE_KEYS } from "./status";
 
 // 6-digit hex color (matches what <input type="color"> produces and the
 // client-side theme sanitizers accept).
@@ -45,6 +46,9 @@ export const themeSchema = z.object({
   preset: z.string().optional(),
   design: z.enum(DESIGN_IDS).default("glass"),
   scene: z.enum(SCENE_IDS).default("aurora"),
+  // Default UI font. `.catch` coerces a retired/unknown id back to the default so
+  // a hand-edited or downgraded config still parses.
+  font: z.enum(FONT_IDS).catch(DEFAULT_FONT).default(DEFAULT_FONT),
   accentFrom: hexColor.default("#a78bfa"),
   accentTo: hexColor.default("#22d3ee"),
   // Optional custom default surface colors. `background`/`foreground` are the
@@ -80,6 +84,11 @@ export const settingsSchema = z.object({
 // `expectStatus` is an optional comma list of HTTP codes/ranges (e.g.
 // "200-299, 401") that count as "up" for the status check. Empty = any reachable
 // host counts as up (the original behavior).
+//
+// `checkType` selects how reachability is measured (see CHECK_TYPES). `.catch`
+// coerces an unknown value back to "http" so a hand-edited or downgraded config
+// still loads. `port` (TCP) and `keyword` (keyword match) are the per-type
+// inputs; other types derive their host from `url`.
 export const appItemSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
@@ -87,6 +96,9 @@ export const appItemSchema = z.object({
   url: httpUrl,
   icon: z.string().default(""),
   expectStatus: z.string().default(""),
+  checkType: z.enum(CHECK_TYPE_KEYS).catch("http").default("http"),
+  port: z.number().int().min(1).max(65535).optional(),
+  keyword: z.string().default(""),
 });
 
 export const bookmarkItemSchema = z.object({
@@ -161,6 +173,9 @@ export const appInputSchema = z.object({
   url: httpUrl,
   icon: z.string().optional().default(""),
   expectStatus: z.string().optional().default(""),
+  checkType: z.enum(CHECK_TYPE_KEYS).optional().default("http"),
+  port: z.number().int().min(1).max(65535).optional(),
+  keyword: z.string().optional().default(""),
 });
 
 export const bookmarkInputSchema = z.object({
@@ -203,6 +218,7 @@ export const themeInputSchema = z.object({
   preset: z.string().optional(),
   design: z.enum(DESIGN_IDS),
   scene: z.enum(SCENE_IDS),
+  font: z.enum(FONT_IDS),
   accentFrom: hexColor,
   accentTo: hexColor,
   background: hexColor.optional(),
@@ -231,6 +247,9 @@ export const appUpdateSchema = z.object({
   url: httpUrl.optional(),
   icon: z.string().optional(),
   expectStatus: z.string().optional(),
+  checkType: z.enum(CHECK_TYPE_KEYS).optional(),
+  port: z.number().int().min(1).max(65535).optional(),
+  keyword: z.string().optional(),
 });
 
 export const bookmarkUpdateSchema = z.object({

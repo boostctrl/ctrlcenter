@@ -1,0 +1,40 @@
+// Selectable UI fonts for the theme builder. Each is loaded via next/font in
+// app/layout.tsx — which must import every face up front, since next/font is
+// analyzed at build time and fonts can't be loaded dynamically by id — and
+// exposes a CSS variable. A `font-<id>` class on <html> points --font-sans at
+// that variable (see app/globals.css). "jakarta" is the app default and carries
+// no class (it's the :root token).
+//
+// To add a font: load it in app/layout.tsx, add a `.font-<id>` rule in
+// app/globals.css, add its id to the inline pre-paint script's list in
+// app/layout.tsx, and add an entry here.
+export type FontId =
+  | "jakarta"
+  | "inter"
+  | "poppins"
+  | "nunito"
+  | "lora"
+  | "jetbrains";
+
+export const FONTS: { id: FontId; name: string }[] = [
+  { id: "jakarta", name: "Plus Jakarta Sans" },
+  { id: "inter", name: "Inter" },
+  { id: "poppins", name: "Poppins" },
+  { id: "nunito", name: "Nunito" },
+  { id: "lora", name: "Lora" },
+  { id: "jetbrains", name: "JetBrains Mono" },
+];
+
+export const FONT_IDS = FONTS.map((f) => f.id) as [FontId, ...FontId[]];
+
+export const DEFAULT_FONT: FontId = "jakarta";
+
+export function isFontId(v: unknown): v is FontId {
+  return typeof v === "string" && (FONT_IDS as string[]).includes(v);
+}
+
+// The CSS variable a font id maps to (set by next/font in app/layout.tsx). Used
+// for live previews in the theme builder.
+export function fontVar(id: FontId): string {
+  return `var(--font-${id})`;
+}

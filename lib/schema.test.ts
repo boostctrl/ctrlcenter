@@ -31,11 +31,11 @@ describe("themesInputSchema", () => {
   });
 
   it("coerces a retired/unknown design or scene to the default", () => {
-    // `.catch` keeps an old config (e.g. a "mesh" scene) loadable instead of
-    // failing the whole parse.
+    // `.catch` keeps an old config (e.g. a since-removed scene) loadable instead
+    // of failing the whole parse.
     const d = themesInputSchema.parse([{ ...pack, design: "nope" }]);
     expect(d[0].design).toBe("glass");
-    const s = themesInputSchema.parse([{ ...pack, scene: "mesh" }]);
+    const s = themesInputSchema.parse([{ ...pack, scene: "hologram" }]);
     expect(s[0].scene).toBe("aurora");
   });
 
@@ -194,6 +194,7 @@ describe("settingsInputSchema partial merge semantics", () => {
           mode: "dark",
           design: "cyber",
           scene: "abyss",
+          font: "inter",
           accentFrom: "#a78bfa",
           accentTo: "#22d3ee",
         },
@@ -206,6 +207,7 @@ describe("settingsInputSchema partial merge semantics", () => {
           mode: "dark",
           design: "hologram",
           scene: "aurora",
+          font: "jakarta",
           accentFrom: "#a78bfa",
           accentTo: "#22d3ee",
         },
@@ -218,6 +220,7 @@ describe("settingsInputSchema partial merge semantics", () => {
           mode: "dark",
           design: "glass",
           scene: "hologram",
+          font: "jakarta",
           accentFrom: "#a78bfa",
           accentTo: "#22d3ee",
         },
@@ -230,7 +233,21 @@ describe("settingsInputSchema partial merge semantics", () => {
           mode: "dark",
           design: "glass",
           scene: "aurora",
+          font: "jakarta",
           accentFrom: "violet",
+          accentTo: "#22d3ee",
+        },
+      }).success
+    ).toBe(false);
+    // Unknown font.
+    expect(
+      settingsInputSchema.safeParse({
+        theme: {
+          mode: "dark",
+          design: "glass",
+          scene: "aurora",
+          font: "comic-sans",
+          accentFrom: "#a78bfa",
           accentTo: "#22d3ee",
         },
       }).success

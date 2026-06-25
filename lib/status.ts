@@ -51,6 +51,23 @@ export function matchesStatus(code: number, spec: string): boolean {
   });
 }
 
+// The ways an app's reachability can be checked. `http` (and `keyword`, which
+// also matches the response body) speak HTTP and honour `expectStatus`; `tcp`,
+// `dns`, and `icmp` derive their target host from the app URL. Shared so the
+// schema enum, the checker, and the admin picker stay in sync.
+export const CHECK_TYPES = [
+  { key: "http", label: "HTTP" },
+  { key: "tcp", label: "TCP port" },
+  { key: "keyword", label: "Keyword" },
+  { key: "dns", label: "DNS" },
+  { key: "icmp", label: "Ping (ICMP)" },
+] as const;
+export type CheckType = (typeof CHECK_TYPES)[number]["key"];
+export const CHECK_TYPE_KEYS = CHECK_TYPES.map((c) => c.key) as [
+  CheckType,
+  ...CheckType[],
+];
+
 // --- Uptime history (the background poller + /api/status/history) ---
 
 // Uptime percentage (0–100) over a window, or null when there's no data for it.

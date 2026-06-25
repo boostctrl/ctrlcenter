@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import type { AppItem } from "@/lib/schema";
+import { CHECK_TYPES, type CheckType } from "@/lib/status";
 import Icon from "@/components/Icon";
 import { TextField, Button, MoveButtons } from "./ui";
 import IconField from "./IconField";
@@ -16,6 +17,9 @@ type FormState = {
   url: string;
   icon: string;
   expectStatus: string;
+  checkType: CheckType;
+  port: string;
+  keyword: string;
 };
 const emptyForm: FormState = {
   name: "",
@@ -23,7 +27,27 @@ const emptyForm: FormState = {
   url: "",
   icon: "",
   expectStatus: "",
+  checkType: "http",
+  port: "",
+  keyword: "",
 };
+
+// One-line description of what each check method does, shown under the picker.
+function checkTypeHint(t: CheckType): string {
+  switch (t) {
+    case "tcp":
+      return "Up when a TCP connection to the host & port opens.";
+    case "keyword":
+      return "Fetches the page; up only if the text below appears in the response.";
+    case "dns":
+      return "Up when the URL's host resolves in DNS.";
+    case "icmp":
+      return "Pings the URL's host. Needs ICMP (NET_RAW) in containers.";
+    case "http":
+    default:
+      return "Sends an HTTP request to the URL and checks the response code.";
+  }
+}
 
 // The "up when" mode tracked explicitly (rather than derived from the value, so
 // "Custom" can be selected even when the value happens to equal a preset).
@@ -52,6 +76,9 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
       url: app.url,
       icon: app.icon,
       expectStatus: app.expectStatus ?? "",
+      checkType: app.checkType ?? "http",
+      port: app.port != null ? String(app.port) : "",
+      keyword: app.keyword ?? "",
     });
     setUpMode(modeFromExpect(app.expectStatus ?? ""));
   }
@@ -66,10 +93,25 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
     e.preventDefault();
     setSaving(true);
     try {
+      // Only send the fields relevant to the chosen check method; clear the
+      // others (so switching method doesn't leave a stale keyword/expectStatus
+      // applying). `port` is sent as a number only when a TCP port was entered.
+      const payload = {
+        name: form.name,
+        subtitle: form.subtitle,
+        url: form.url,
+        icon: form.icon,
+        checkType: form.checkType,
+        expectStatus: form.checkType === "http" ? form.expectStatus : "",
+        keyword: form.checkType === "keyword" ? form.keyword : "",
+        ...(form.checkType === "tcp" && form.port.trim()
+          ? { port: Number(form.port) }
+          : {}),
+      };
       const res = await fetch(editingId ? `/api/apps/${editingId}` : "/api/apps", {
         method: editingId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
@@ -194,6 +236,49 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
           name={form.name}
         />
         <div className="flex flex-col gap-2">
+          <label htmlFor="check-method" className="text-sm text-fg/50">
+            Check method
+          </label>
+          <select
+            id="check-method"
+            value={form.checkType}
+            onChange={(e) =>
+              setForm({ ...form, checkType: e.target.value as CheckType })
+            }
+            className="accent-focus rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-sm text-fg outline-none transition-colors"
+          >
+            {CHECK_TYPES.map((c) => (
+              <option key={c.key} value={c.key}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-fg/40">{checkTypeHint(form.checkType)}</p>
+        </div>
+
+        {form.checkType === "tcp" && (
+          <TextField
+            label="Port"
+            type="number"
+            min={1}
+            max={65535}
+            placeholder="Defaults to the URL's port (or 443/80)"
+            value={form.port}
+            onChange={(e) => setForm({ ...form, port: e.target.value })}
+          />
+        )}
+
+        {form.checkType === "keyword" && (
+          <TextField
+            label="Keyword in response"
+            placeholder="e.g. Welcome"
+            value={form.keyword}
+            onChange={(e) => setForm({ ...form, keyword: e.target.value })}
+          />
+        )}
+
+        {form.checkType === "http" && (
+        <div className="flex flex-col gap-2">
           <span className="text-sm text-fg/50">Counts as up when</span>
           <div className="flex overflow-hidden rounded-lg border border-fg/10 text-xs">
             {(
@@ -247,6 +332,7 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
                 : "Up only when the response code is in these codes/ranges — e.g. mark a 404 as down."}
           </p>
         </div>
+        )}
         <div className="flex gap-2">
           <Button type="submit" disabled={saving}>
             {editingId ? "Save changes" : "Add"}

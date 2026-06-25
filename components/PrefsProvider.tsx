@@ -23,6 +23,8 @@ import {
   saveDesign,
   loadScene,
   saveScene,
+  loadFont,
+  saveFont,
   type Units,
   type VisitorLocation,
   type VisitorPrefs,
@@ -38,6 +40,7 @@ import {
   type SceneId,
   type ThemePack,
 } from "@/lib/theme";
+import { FONT_IDS, type FontId } from "@/lib/fonts";
 
 export type Theme = "system" | "light" | "dark";
 export const THEME_KEY = "ctrlcenter:theme";
@@ -76,6 +79,15 @@ function applyScene(scene: SceneId): void {
   const el = document.documentElement;
   SCENE_IDS.forEach((s) => el.classList.remove(`scene-${s}`));
   if (scene !== "aurora") el.classList.add(`scene-${scene}`);
+}
+
+// Swap the active font class on <html>, which repoints --font-sans. The default
+// ("jakarta") uses the :root token and carries no class. See lib/fonts.ts.
+function applyFont(font: FontId): void {
+  if (typeof document === "undefined") return;
+  const el = document.documentElement;
+  FONT_IDS.forEach((f) => el.classList.remove(`font-${f}`));
+  if (font !== "jakarta") el.classList.add(`font-${font}`);
 }
 
 // Perceived luminance of a #rrggbb color — used to decide whether the current
@@ -155,6 +167,7 @@ type PrefsValue = {
   theme: Theme;
   design: DesignId;
   scene: SceneId;
+  font: FontId;
   // Whether the effective background reads as light (for theme-aware icons).
   surfaceIsLight: boolean;
   customThemes: CustomTheme[];
@@ -171,6 +184,7 @@ type PrefsValue = {
   setTheme: (theme: Theme) => void;
   setDesign: (design: DesignId) => void;
   setScene: (scene: SceneId) => void;
+  setFont: (font: FontId) => void;
   applyPack: (pack: ThemePack) => void;
   applyThemeColors: (colors: ModeColors) => void;
   setBaseColors: (
@@ -211,6 +225,7 @@ export type DefaultTheme = {
   mode: Theme;
   design: DesignId;
   scene: SceneId;
+  font: FontId;
   accentFrom: string;
   accentTo: string;
   background?: string;
@@ -273,6 +288,7 @@ export function PrefsProvider({
   const [theme, setThemeState] = useState<Theme>(defaultTheme.mode);
   const [design, setDesignState] = useState<DesignId>(defaultTheme.design);
   const [scene, setSceneState] = useState<SceneId>(defaultTheme.scene);
+  const [font, setFontState] = useState<FontId>(defaultTheme.font);
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([]);
   const [activeLook, setActiveLook] = useState<ModeColors | null>(null);
   const [accentOverride, setAccentOverrideState] =
@@ -324,6 +340,12 @@ export function PrefsProvider({
     setSceneState(next);
     saveScene(next);
     applyScene(next);
+  }, []);
+
+  const setFont = useCallback((next: FontId) => {
+    setFontState(next);
+    saveFont(next);
+    applyFont(next);
   }, []);
 
   // Apply (and persist) a full custom look — base presets and saved themes. The
@@ -470,8 +492,10 @@ export function PrefsProvider({
     saveAccentOverride(null);
     saveDesign(null);
     saveScene(null);
+    saveFont(null);
     setDesignState(defaultTheme.design);
     setSceneState(defaultTheme.scene);
+    setFontState(defaultTheme.font);
     applyAll({
       theme,
       look: resolveLook(null, modeChosen),
@@ -480,6 +504,7 @@ export function PrefsProvider({
     });
     applyDesign(defaultTheme.design);
     applyScene(defaultTheme.scene);
+    applyFont(defaultTheme.font);
   }, [
     defaultAccent,
     theme,
@@ -487,6 +512,7 @@ export function PrefsProvider({
     resolveLook,
     defaultTheme.design,
     defaultTheme.scene,
+    defaultTheme.font,
   ]);
 
   // Load the stored theme + custom themes on mount and keep "system" in sync
@@ -508,11 +534,13 @@ export function PrefsProvider({
     const overrideAccent = loadAccentOverride();
     const storedDesign = loadDesign() ?? defaultTheme.design;
     const storedScene = loadScene() ?? defaultTheme.scene;
+    const storedFont = loadFont() ?? defaultTheme.font;
     /* eslint-disable react-hooks/set-state-in-effect */
     setThemeState(stored);
     setModeChosen(chosen);
     setDesignState(storedDesign);
     setSceneState(storedScene);
+    setFontState(storedFont);
     setActiveLook(active);
     setAccentOverrideState(overrideAccent);
     setCustomThemes(loadThemes());
@@ -529,6 +557,7 @@ export function PrefsProvider({
     });
     applyDesign(storedDesign);
     applyScene(storedScene);
+    applyFont(storedFont);
 
     // Re-apply on OS scheme change. Only "system" mode tracks the OS — but a look
     // is now mode-aware, so "system" must re-resolve the look's variant too.
@@ -629,12 +658,14 @@ export function PrefsProvider({
     saveAccentOverride(null);
     saveDesign(null);
     saveScene(null);
+    saveFont(null);
     setActiveLook(null);
     setAccentOverrideState(null);
     setModeChosen(false);
     setThemeState(defaultTheme.mode);
     setDesignState(defaultTheme.design);
     setSceneState(defaultTheme.scene);
+    setFontState(defaultTheme.font);
     applyAll({
       theme: defaultTheme.mode,
       look: adminLook,
@@ -643,11 +674,13 @@ export function PrefsProvider({
     });
     applyDesign(defaultTheme.design);
     applyScene(defaultTheme.scene);
+    applyFont(defaultTheme.font);
   }, [
     persist,
     defaultTheme.mode,
     defaultTheme.design,
     defaultTheme.scene,
+    defaultTheme.font,
     adminLook,
     defaultAccent,
   ]);
@@ -743,6 +776,7 @@ export function PrefsProvider({
       theme,
       design,
       scene,
+      font,
       surfaceIsLight,
       customThemes,
       activeLook,
@@ -756,6 +790,7 @@ export function PrefsProvider({
       setTheme,
       setDesign,
       setScene,
+      setFont,
       applyPack,
       applyThemeColors,
       setBaseColors,
@@ -779,6 +814,7 @@ export function PrefsProvider({
     theme,
     design,
     scene,
+    font,
     systemDark,
     modeChosen,
     customThemes,
@@ -791,6 +827,7 @@ export function PrefsProvider({
     setTheme,
     setDesign,
     setScene,
+    setFont,
     applyPack,
     applyThemeColors,
     setBaseColors,
