@@ -123,15 +123,10 @@ export default function Dashboard({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onSearchKeyDown}
-            placeholder="Search applications and bookmarks…"
+            placeholder="Search"
             aria-label="Search applications and bookmarks"
             className="accent-focus w-full rounded-2xl border border-fg/10 bg-fg/[0.04] px-5 py-3.5 text-fg placeholder-fg/30 outline-none backdrop-blur-xl transition-colors"
           />
-          {!query && (
-            <kbd className="pointer-events-none absolute top-1/2 right-5 -translate-y-1/2 rounded-md border border-fg/10 bg-fg/5 px-2 py-0.5 text-xs text-fg/40">
-              /
-            </kbd>
-          )}
         </div>
       )}
 
