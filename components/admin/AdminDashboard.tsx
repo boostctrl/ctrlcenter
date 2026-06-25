@@ -13,7 +13,6 @@ import BookmarksManager from "./BookmarksManager";
 import SettingsManager from "./SettingsManager";
 import ThemesManager from "./ThemesManager";
 import { resolveThemePacks } from "@/lib/theme";
-import ChangePassword from "./ChangePassword";
 import { Button } from "./ui";
 import { ToastProvider, useToast } from "./Toast";
 import { ConfirmProvider } from "./Confirm";
@@ -162,18 +161,10 @@ function AdminBody({
       )}
       {tab === "themes" && <ThemesManager initialOverrides={initialThemes} />}
       {tab === "settings" && (
-        <div className="space-y-4">
-          <SettingsManager
-            initialSettings={initialSettings}
-            themePacks={resolveThemePacks(initialThemes)}
-          />
-          <section className="glass-card flex flex-col gap-4 p-5">
-            <h3 className="text-xs font-semibold tracking-[0.15em] text-fg/45 uppercase">
-              Security
-            </h3>
-            <ChangePassword />
-          </section>
-        </div>
+        <SettingsManager
+          initialSettings={initialSettings}
+          themePacks={resolveThemePacks(initialThemes)}
+        />
       )}
     </div>
   );

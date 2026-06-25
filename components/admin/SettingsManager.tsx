@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { Settings } from "@/lib/schema";
 import type { ThemePack } from "@/lib/theme";
 import {
@@ -10,11 +10,24 @@ import {
 } from "@/lib/search";
 import { STATUS_RANGES } from "@/lib/status";
 import { supportedTimezones } from "@/lib/prefs";
-import { TextField, Button } from "./ui";
+import { TextField } from "./ui";
 import IconField from "./IconField";
 import CitySearch from "./CitySearch";
-import { useToast } from "./Toast";
+import ChangePassword from "./ChangePassword";
 import { apiErrorMessage } from "./apiError";
+import { useAutosave, SaveStatus } from "./useAutosave";
+
+async function saveSettings(settings: Settings): Promise<void> {
+  const res = await fetch("/api/settings", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(settings),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(apiErrorMessage(data, "Failed to save settings"));
+  }
+}
 
 // Each settings group is its own card; the form tiles them into a masonry-style
 // two-column layout (CSS columns) so variable-height cards pack without gaps.
@@ -37,33 +50,9 @@ export default function SettingsManager({
   themePacks: ThemePack[];
 }) {
   const [settings, setSettings] = useState(initialSettings);
-  const [saving, setSaving] = useState(false);
-  const toast = useToast();
+  // Persistence is automatic: every change debounce-saves via useAutosave.
+  const { status, error } = useAutosave(settings, saveSettings);
   const zones = useMemo(() => supportedTimezones(), []);
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      const res = await fetch("/api/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        toast(apiErrorMessage(data, "Failed to save settings"), "error");
-        return;
-      }
-      const data: Settings = await res.json();
-      setSettings(data);
-      toast("Settings saved");
-    } catch {
-      toast("Failed to save", "error");
-    } finally {
-      setSaving(false);
-    }
-  }
 
   const selectClass =
     "accent-focus rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-fg outline-none transition-colors";
@@ -91,7 +80,10 @@ export default function SettingsManager({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="space-y-4">
+      <div className="flex h-4 items-center justify-end">
+        <SaveStatus status={status} error={error} />
+      </div>
       <div className="gap-4 lg:columns-2">
         <Section title="General">
         <TextField
@@ -403,13 +395,11 @@ export default function SettingsManager({
           </select>
         </label>
         </Section>
-      </div>
 
-      <div className="glass-card flex items-center justify-end gap-3 p-4">
-        <Button type="submit" disabled={saving}>
-          Save settings
-        </Button>
+        <Section title="Security">
+          <ChangePassword />
+        </Section>
       </div>
-    </form>
+    </div>
   );
 }

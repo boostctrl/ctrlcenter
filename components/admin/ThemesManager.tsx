@@ -12,9 +12,22 @@ import {
   type ThemePack,
 } from "@/lib/theme";
 import type { ThemePackConfig } from "@/lib/schema";
-import { Button } from "./ui";
-import { useToast } from "./Toast";
 import { apiErrorMessage } from "./apiError";
+import { useAutosave, SaveStatus } from "./useAutosave";
+
+async function saveThemes(
+  overrides: Record<string, ThemePackConfig>
+): Promise<void> {
+  const res = await fetch("/api/themes", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(Object.values(overrides)),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(apiErrorMessage(data, "Failed to save themes"));
+  }
+}
 
 const selectClass =
   "accent-focus rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-sm text-fg outline-none transition-colors";
@@ -37,7 +50,6 @@ export default function ThemesManager({
 }: {
   initialOverrides: ThemePackConfig[];
 }) {
-  const toast = useToast();
   // Overrides keyed by the built-in's stable `key` (its original name), so the
   // editable display `name` can differ. Normalize legacy key-less overrides.
   const [overrides, setOverrides] = useState<Record<string, ThemePackConfig>>(
@@ -49,7 +61,8 @@ export default function ThemesManager({
         })
       )
   );
-  const [saving, setSaving] = useState(false);
+  // Edits debounce-save automatically (local state stays authoritative).
+  const { status, error } = useAutosave(overrides, saveThemes);
 
   // Seed an override for `slot` (a built-in name) from its current value, so a
   // partial edit keeps the other fields and always carries the stable key.
@@ -83,31 +96,6 @@ export default function ThemesManager({
     });
   }
 
-  async function save() {
-    setSaving(true);
-    try {
-      const res = await fetch("/api/themes", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(Object.values(overrides)),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        toast(apiErrorMessage(data, "Failed to save themes"), "error");
-        return;
-      }
-      const saved: ThemePackConfig[] = await res.json();
-      setOverrides(
-        Object.fromEntries(saved.map((o) => [o.key ?? o.name, o]))
-      );
-      toast("Themes saved");
-    } catch {
-      toast("Failed to save", "error");
-    } finally {
-      setSaving(false);
-    }
-  }
-
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -116,9 +104,7 @@ export default function ThemesManager({
           a theme, recolor it, or change its design and scene; changes apply
           site-wide. Reset any theme to restore its original.
         </p>
-        <Button type="button" onClick={save} disabled={saving}>
-          {saving ? "Saving…" : "Save themes"}
-        </Button>
+        <SaveStatus status={status} error={error} />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
