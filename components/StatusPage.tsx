@@ -5,6 +5,8 @@ import Icon from "./Icon";
 import {
   summarize,
   statusMessage,
+  STATUS_RANGES,
+  type StatusRangeKey,
   type AppStatus,
   type StatusResponse,
   type AppHistory,
@@ -22,14 +24,6 @@ export type StatusAppMeta = {
 };
 
 const POLL_MS = 30_000;
-
-const RANGES = [
-  { key: "h1", label: "1h" },
-  { key: "d1", label: "24h" },
-  { key: "d30", label: "30d" },
-  { key: "d90", label: "90d" },
-] as const;
-type RangeKey = (typeof RANGES)[number]["key"];
 
 // Display host (no scheme/path) for an app URL; falls back to the raw string.
 function host(url: string): string {
@@ -107,13 +101,19 @@ function Timeline({ points }: { points: BarPoint[] }) {
   );
 }
 
-export default function StatusPage({ apps }: { apps: StatusAppMeta[] }) {
+export default function StatusPage({
+  apps,
+  defaultRange,
+}: {
+  apps: StatusAppMeta[];
+  defaultRange: StatusRangeKey;
+}) {
   const [statuses, setStatuses] = useState<Map<string, AppStatus>>(new Map());
   const [history, setHistory] = useState<Map<string, AppHistory>>(new Map());
   const [checkedAt, setCheckedAt] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [loading, setLoading] = useState(false);
-  const [range, setRange] = useState<RangeKey>("d1");
+  const [range, setRange] = useState<StatusRangeKey>(defaultRange);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -166,7 +166,7 @@ export default function StatusPage({ apps }: { apps: StatusAppMeta[] }) {
     .map((a) => a.name);
   const polled = checkedAt !== null && total > 0;
   const fmtPct = (u: number | null) => (u == null ? "—" : `${u.toFixed(1)}%`);
-  const rangeLabel = RANGES.find((r) => r.key === range)!.label;
+  const rangeLabel = STATUS_RANGES.find((r) => r.key === range)!.label;
 
   return (
     <div className="space-y-4">
@@ -208,7 +208,7 @@ export default function StatusPage({ apps }: { apps: StatusAppMeta[] }) {
           <div className="flex items-center justify-between gap-2 px-1">
             <span className="text-xs text-fg/40">Uptime over {rangeLabel}</span>
             <div className="flex overflow-hidden rounded-lg border border-fg/10">
-              {RANGES.map((r) => (
+              {STATUS_RANGES.map((r) => (
                 <button
                   key={r.key}
                   type="button"

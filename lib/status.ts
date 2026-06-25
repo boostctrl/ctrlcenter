@@ -62,6 +62,21 @@ export type UptimeWindows = {
   d90: number | null;
 };
 
+// The time ranges offered by the /status page toggle (and the admin-configurable
+// default). Keys map to UptimeWindows fields. Shared so the toggle, the schema
+// enum, and the admin picker stay in sync.
+export const STATUS_RANGES = [
+  { key: "h1", label: "1h" },
+  { key: "d1", label: "24h" },
+  { key: "d30", label: "30d" },
+  { key: "d90", label: "90d" },
+] as const;
+export type StatusRangeKey = (typeof STATUS_RANGES)[number]["key"];
+export const STATUS_RANGE_KEYS = STATUS_RANGES.map((r) => r.key) as [
+  StatusRangeKey,
+  ...StatusRangeKey[],
+];
+
 // One bar in a timeline: uptime % for that bucket, or null if nothing was
 // recorded (server off, or before this app existed). `at` is `YYYY-MM-DD` for a
 // daily bar, `YYYY-MM-DDThh` for an hourly one, or `YYYY-MM-DDThh:mm` for a

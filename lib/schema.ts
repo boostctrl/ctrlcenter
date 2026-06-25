@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { DESIGN_IDS, SCENE_IDS } from "./theme";
 import { SEARCH_ENGINE_KEYS, isValidCustomUrl } from "./search";
+import { STATUS_RANGE_KEYS } from "./status";
 
 // 6-digit hex color (matches what <input type="color"> produces and the
 // client-side theme sanitizers accept).
@@ -67,6 +68,8 @@ export const settingsSchema = z.object({
   // How often (minutes) the background poller records uptime history while
   // status checks are on.
   statusInterval: z.number().int().min(1).max(60).default(5),
+  // Which time range the /status page opens on (1h / 24h / 30d / 90d).
+  statusDefaultRange: z.enum(STATUS_RANGE_KEYS).default("d1"),
   // Explicit display order for bookmark categories; categories not listed fall
   // back to first-seen order. Stale names are ignored at render time.
   bookmarkCategoryOrder: z.array(z.string()).default([]),
@@ -215,6 +218,7 @@ export const settingsInputSchema = z.object({
   theme: themeInputSchema.optional(),
   statusChecks: z.boolean().optional(),
   statusInterval: z.number().int().min(1).max(60).optional(),
+  statusDefaultRange: z.enum(STATUS_RANGE_KEYS).optional(),
   bookmarkCategoryOrder: z.array(z.string()).optional(),
   search: searchUpdateSchema.optional(),
   weather: weatherUpdateSchema.optional(),

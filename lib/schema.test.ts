@@ -58,6 +58,7 @@ describe("configSchema defaults", () => {
     expect(config.settings.theme.accentFrom).toBe("#a78bfa");
     expect(config.settings.statusChecks).toBe(false);
     expect(config.settings.statusInterval).toBe(5);
+    expect(config.settings.statusDefaultRange).toBe("d1");
     expect(config.settings.weather.enabled).toBe(true);
     expect(config.settings.weather.units).toBe("imperial");
   });

@@ -8,6 +8,7 @@ import {
   SEARCH_ENGINE_KEYS,
   type SearchEngine,
 } from "@/lib/search";
+import { STATUS_RANGES } from "@/lib/status";
 import { supportedTimezones } from "@/lib/prefs";
 import { TextField, Button } from "./ui";
 import IconField from "./IconField";
@@ -237,6 +238,35 @@ export default function SettingsManager({
                   }`}
                 >
                   {m} min
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {settings.statusChecks && (
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <span className="text-sm text-fg/70">Default status range</span>
+              <p className="text-xs text-fg/40">
+                Which time range the status page opens on.
+              </p>
+            </div>
+            <div className="flex shrink-0 overflow-hidden rounded-lg border border-fg/10">
+              {STATUS_RANGES.map((r) => (
+                <button
+                  key={r.key}
+                  type="button"
+                  onClick={() =>
+                    setSettings({ ...settings, statusDefaultRange: r.key })
+                  }
+                  className={`px-3 py-1.5 text-xs transition-colors ${
+                    settings.statusDefaultRange === r.key
+                      ? "bg-fg/15 text-fg"
+                      : "text-fg/50 hover:text-fg/80"
+                  }`}
+                >
+                  {r.label}
                 </button>
               ))}
             </div>

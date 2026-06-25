@@ -29,7 +29,7 @@ export default async function StatusRoute() {
       </div>
 
       {settings.statusChecks ? (
-        <StatusPage apps={items} />
+        <StatusPage apps={items} defaultRange={settings.statusDefaultRange} />
       ) : (
         <p className="text-fg/50">
           Status checks are turned off.{" "}
