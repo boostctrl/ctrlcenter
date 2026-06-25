@@ -12,6 +12,26 @@ here.
 
 ## [Unreleased]
 
+## [0.9.8] - 2026-06-24
+
+### Added
+
+- The **default uptime range** (1h / 24h / 30d / 90d) the status page opens on is
+  now configurable in admin settings.
+
+### Changed
+
+- **Admin Settings and Themes now autosave** as you edit (no more Save button),
+  matching Applications/Bookmarks. The password reset moved into the settings
+  card grid instead of hanging off the bottom.
+- **Uptime bars** use a finer colour scale: green ≥95%, amber 75–95%, a new
+  darker orange 50–75%, red below 50%.
+- The **Admin portal** is now a prominent button in the settings header.
+- The theme builder's **Editing (dark/light)** toggle defaults to the mode the
+  app is currently set to.
+- The search box placeholder is just **"Search"**, and the `/` badge was removed
+  (the keyboard shortcut still works).
+
 ## [0.9.7] - 2026-06-24
 
 ### Added
@@ -584,7 +604,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.7...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.8...HEAD
+[0.9.8]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.7...v0.9.8
 [0.9.7]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.6...v0.9.7
 [0.9.6]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.5...v0.9.6
 [0.9.5]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.4...v0.9.5
