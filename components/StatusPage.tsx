@@ -51,10 +51,11 @@ function uptimeColor(u: number | null): string {
   // No-data bars read as clearly empty slots (much fainter than any colored
   // "has-data" bar) so gaps don't get mistaken for a red "down" reading.
   if (u == null) return "bg-fg/[0.06]";
-  if (u >= 99.5) return "bg-emerald-400/80";
-  if (u >= 95) return "bg-emerald-400/55";
-  if (u >= 80) return "bg-amber-400/70";
-  return "bg-red-400/75";
+  if (u >= 99.5) return "bg-emerald-400/80"; // perfect
+  if (u >= 95) return "bg-emerald-400/55"; // a few blips
+  if (u >= 75) return "bg-amber-400/70"; // degraded
+  if (u >= 50) return "bg-orange-500/80"; // heavily degraded
+  return "bg-red-400/75"; // mostly down
 }
 
 function StateDot({ status }: { status: AppStatus | undefined }) {
