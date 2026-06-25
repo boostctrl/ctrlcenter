@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import Link from "next/link";
 import { useVisitorPrefs } from "./PrefsProvider";
 import { supportedTimezones } from "@/lib/prefs";
 
@@ -144,7 +143,7 @@ export default function SettingsControls() {
         )}
       </div>
 
-      <div className="flex items-center justify-between gap-2 border-t border-fg/10 pt-4">
+      <div className="border-t border-fg/10 pt-4">
         <button
           type="button"
           onClick={reset}
@@ -152,12 +151,6 @@ export default function SettingsControls() {
         >
           Reset all settings
         </button>
-        <Link
-          href="/admin"
-          className="text-sm text-fg/60 transition-colors hover:text-fg"
-        >
-          Admin portal <span aria-hidden>→</span>
-        </Link>
       </div>
     </div>
   );
