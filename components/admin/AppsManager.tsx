@@ -159,7 +159,10 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
     }
   }
 
-  const { handlers, dragIndex, overIndex, move } = useReorder(apps, persistOrder);
+  const { handlers, dragIndex, overIndex, dropEdge, move } = useReorder(
+    apps,
+    persistOrder
+  );
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_minmax(320px,380px)]">
@@ -171,10 +174,14 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
           <div
             key={app.id}
             {...handlers(index)}
-            className={`flex items-center justify-between gap-4 rounded-xl border bg-fg/[0.03] px-4 py-3 transition-colors ${
-              overIndex === index && dragIndex !== index
-                ? "border-violet-400/60"
-                : "border-fg/10"
+            className={`flex items-center justify-between gap-4 rounded-xl border border-fg/10 bg-fg/[0.03] px-4 py-3 transition-colors ${
+              overIndex === index && dragIndex !== index && dropEdge === "top"
+                ? "border-t-2 border-t-violet-400"
+                : overIndex === index &&
+                    dragIndex !== index &&
+                    dropEdge === "bottom"
+                  ? "border-b-2 border-b-violet-400"
+                  : ""
             } ${dragIndex === index ? "opacity-50" : ""}`}
           >
             <div className="flex min-w-0 items-center gap-3">
