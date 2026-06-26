@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Icon from "./Icon";
+import { useVisitorPrefs } from "./PrefsProvider";
 import {
   summarize,
   statusMessage,
+  formatBarLabel,
   STATUS_RANGES,
   type StatusRangeKey,
   type AppStatus,
@@ -64,21 +66,10 @@ function StateDot({ status }: { status: AppStatus | undefined }) {
   );
 }
 
-// Format a BarPoint's `at` for the hover tooltip: a single poll ("…Thh:mm")
-// shows HH:MM, an hour ("…Thh") shows an am/pm hour, a date shows the date.
-function barLabel(at: string): string {
-  if (at.length >= 16) return `${at.slice(0, 10)} ${at.slice(11, 16)}`;
-  if (at.includes("T")) {
-    const hh = Number(at.slice(11, 13));
-    const day = at.slice(0, 10);
-    return `${day} ${hh % 12 || 12}${hh < 12 ? "am" : "pm"}`;
-  }
-  return at;
-}
-
 // Uptime bar timeline (Atlassian Statuspage / UptimeRobot style). Hourly or
-// daily bars depending on the selected range.
-function Timeline({ points }: { points: BarPoint[] }) {
+// daily bars depending on the selected range. Tooltips read in the visitor's
+// time zone (see formatBarLabel), matching the rest of the app.
+function Timeline({ points, timeZone }: { points: BarPoint[]; timeZone: string }) {
   if (points.length === 0) return null;
   return (
     <div className="flex h-7 items-stretch gap-0.5">
@@ -91,8 +82,8 @@ function Timeline({ points }: { points: BarPoint[] }) {
           key={`${p.at}-${i}`}
           title={
             p.uptime == null
-              ? `${barLabel(p.at)}: no data`
-              : `${barLabel(p.at)}: ${p.uptime.toFixed(1)}% up`
+              ? `${formatBarLabel(p.at, timeZone)}: no data`
+              : `${formatBarLabel(p.at, timeZone)}: ${p.uptime.toFixed(1)}% up`
           }
           className={`flex-1 rounded ${uptimeColor(p.uptime)}`}
         />
@@ -114,6 +105,9 @@ export default function StatusPage({
   const [now, setNow] = useState(() => Date.now());
   const [loading, setLoading] = useState(false);
   const [range, setRange] = useState<StatusRangeKey>(defaultRange);
+  // Render timeline times in the visitor's effective time zone, like the rest of
+  // the app (the header clock, greeting), rather than UTC.
+  const { timezone } = useVisitorPrefs();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -279,7 +273,7 @@ export default function StatusPage({
                   </div>
                   {series.length > 0 && (
                     <div className="mt-3">
-                      <Timeline points={series} />
+                      <Timeline points={series} timeZone={timezone} />
                     </div>
                   )}
                 </div>

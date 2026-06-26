@@ -97,8 +97,37 @@ export const STATUS_RANGE_KEYS = STATUS_RANGES.map((r) => r.key) as [
 // One bar in a timeline: uptime % for that bucket, or null if nothing was
 // recorded (server off, or before this app existed). `at` is `YYYY-MM-DD` for a
 // daily bar, `YYYY-MM-DDThh` for an hourly one, or `YYYY-MM-DDThh:mm` for a
-// single recent poll.
+// single recent poll. All three are UTC instants (produced via toISOString).
 export type BarPoint = { at: string; uptime: number | null };
+
+// Format a BarPoint's `at` for the timeline tooltip in the visitor's time zone,
+// so the status page reads in the same zone as the rest of the app instead of
+// UTC. The minute/hour bars are real instants and are converted to local time; a
+// daily bar is a UTC calendar date and is shown as-is (converting it would
+// mislabel the bucket). Falls back to UTC if the zone is invalid.
+export function formatBarLabel(at: string, timeZone: string): string {
+  const fmt = (instant: Date, opts: Intl.DateTimeFormatOptions, tz = timeZone) => {
+    try {
+      return new Intl.DateTimeFormat("en-US", { timeZone: tz, ...opts }).format(instant);
+    } catch {
+      return new Intl.DateTimeFormat("en-US", { timeZone: "UTC", ...opts }).format(instant);
+    }
+  };
+  // Single poll: `YYYY-MM-DDThh:mm` → local date + time.
+  if (at.length >= 16) {
+    return fmt(new Date(`${at}:00Z`), {
+      month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true,
+    });
+  }
+  // Hourly bucket: `YYYY-MM-DDThh` → local date + hour.
+  if (at.includes("T")) {
+    return fmt(new Date(`${at}:00:00Z`), {
+      month: "short", day: "numeric", hour: "numeric", hour12: true,
+    });
+  }
+  // Daily bucket: a UTC calendar date — prettify it without shifting the zone.
+  return fmt(new Date(`${at}T00:00:00Z`), { month: "short", day: "numeric" }, "UTC");
+}
 
 export type AppHistory = {
   id: string;

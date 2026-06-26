@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { summarize, matchesStatus, statusMessage } from "./status";
+import {
+  summarize,
+  matchesStatus,
+  statusMessage,
+  formatBarLabel,
+} from "./status";
 
 const up = { up: true };
 const down = { up: false };
@@ -67,5 +72,38 @@ describe("statusMessage", () => {
   });
   it("collapses to 'Multiple services down' beyond one", () => {
     expect(statusMessage(["Plex", "Grafana"], 5)).toBe("Multiple services down");
+  });
+});
+
+describe("formatBarLabel", () => {
+  // 14:30 UTC is 09:30 in America/Chicago (CDT, UTC-5) on this date.
+  it("renders a per-poll instant in the given time zone, not UTC", () => {
+    expect(formatBarLabel("2026-06-25T14:30", "America/Chicago")).toBe(
+      "Jun 25, 9:30 AM"
+    );
+    expect(formatBarLabel("2026-06-25T14:30", "UTC")).toBe("Jun 25, 2:30 PM");
+  });
+
+  it("renders an hourly bucket in the given time zone", () => {
+    expect(formatBarLabel("2026-06-25T14", "America/Chicago")).toBe(
+      "Jun 25, 9 AM"
+    );
+  });
+
+  it("crosses the local day boundary correctly", () => {
+    // 02:00 UTC is the previous evening (21:00) in Chicago.
+    expect(formatBarLabel("2026-06-25T02:00", "America/Chicago")).toBe(
+      "Jun 24, 9:00 PM"
+    );
+  });
+
+  it("shows a daily bucket as its calendar date without shifting the zone", () => {
+    expect(formatBarLabel("2026-06-25", "America/Chicago")).toBe("Jun 25");
+  });
+
+  it("falls back to UTC when the time zone is invalid", () => {
+    expect(formatBarLabel("2026-06-25T14:30", "Not/AZone")).toBe(
+      "Jun 25, 2:30 PM"
+    );
   });
 });
