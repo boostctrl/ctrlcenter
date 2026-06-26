@@ -10,8 +10,8 @@ export default async function HomePage() {
   const config = await readConfig();
   const { settings, apps, bookmarks } = config;
 
-  // One poller wraps both the header chip and the per-app dots; only mount it
-  // when status checks are on and there are apps to monitor.
+  // One poller wraps both the header status row and the per-app dots; only
+  // enable it when status checks are on and there are apps to monitor.
   const statusEnabled = settings.statusChecks && apps.length > 0;
 
   return (

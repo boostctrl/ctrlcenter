@@ -15,9 +15,9 @@ const StatusContext = createContext<Map<string, AppStatus> | null>(null);
 const POLL_MS = 60_000;
 
 // Polls /api/status and exposes the latest results by app id. Wraps the whole
-// page (header chip + per-app dots) so a single fetch backs every indicator;
-// pass enabled={false} to skip polling when status checks are off or there are
-// no apps to monitor.
+// page (header status row + per-app dots) so a single fetch backs every
+// indicator; pass enabled={false} to skip polling when status checks are off or
+// there are no apps to monitor.
 export function StatusProvider({
   enabled = true,
   children,
