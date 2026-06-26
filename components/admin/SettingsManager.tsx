@@ -84,10 +84,11 @@ export default function SettingsManager({
       <div className="flex h-4 items-center justify-end">
         <SaveStatus status={status} error={error} />
       </div>
-      <div className="grid items-start gap-4 lg:grid-cols-2">
-        {/* Left column — General, Appearance, Security: kept roughly even in
-            height with the right column (Dashboard, Weather). */}
-        <div className="flex flex-col gap-4">
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* The two columns stretch to equal height (grid's default
+            items-stretch) and distribute their sections (lg:justify-between) so
+            the tops and bottoms line up. Left: General, Appearance, Security. */}
+        <div className="flex flex-col gap-4 lg:justify-between">
         <Section title="General">
         <TextField
           label="Page title"
@@ -196,7 +197,7 @@ export default function SettingsManager({
         </div>
 
         {/* Right column — Dashboard, Weather. */}
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 lg:justify-between">
       <Section title="Dashboard">
         <div className="flex items-center justify-between gap-4">
           <div>
