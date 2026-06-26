@@ -14,6 +14,11 @@ here.
 
 ### Added
 
+- The home page header now surfaces the **status page**: a health row (e.g.
+  `All systems operational`) sits beneath the time/weather row inside the same
+  header card and links to `/status`, so it's reachable from the top of the page
+  instead of only via a pill tucked beside the Applications heading. The header
+  keeps its width, and a single poller backs both this row and the per-app dots.
 - The theme builder's light/dark **Editing** toggle now switches the whole theme,
   not just the palette. Light and dark are independent looks — each with its own
   design, scene, font, and colors — so you can run, say, a Cyber/Grid dark theme

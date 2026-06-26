@@ -97,16 +97,18 @@ export default function TimeWeather({
     </>
   );
 
-  // When weather is on, the widget links to the full forecast.
+  // The card chrome (glass surface) lives in the parent so an optional status
+  // row can share the same card; this just renders the time/weather row with its
+  // own padding. When weather is on, the row links to the full forecast.
   return weatherEnabled ? (
     <Link
       href="/weather"
       title="View forecast"
-      className="glass-card flex items-center gap-5 px-6 py-4"
+      className="flex items-center gap-5 px-6 py-4 transition-colors hover:bg-fg/[0.03]"
     >
       {inner}
     </Link>
   ) : (
-    <div className="glass-card flex items-center gap-5 px-6 py-4">{inner}</div>
+    <div className="flex items-center gap-5 px-6 py-4">{inner}</div>
   );
 }

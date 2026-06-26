@@ -14,12 +14,21 @@ const StatusContext = createContext<Map<string, AppStatus> | null>(null);
 
 const POLL_MS = 60_000;
 
-// Polls /api/status and exposes the latest results by app id. Mounted only when
-// the feature is enabled, so a single fetch backs every dot on the page.
-export function StatusProvider({ children }: { children: ReactNode }) {
+// Polls /api/status and exposes the latest results by app id. Wraps the whole
+// page (header chip + per-app dots) so a single fetch backs every indicator;
+// pass enabled={false} to skip polling when status checks are off or there are
+// no apps to monitor.
+export function StatusProvider({
+  enabled = true,
+  children,
+}: {
+  enabled?: boolean;
+  children: ReactNode;
+}) {
   const [statuses, setStatuses] = useState<Map<string, AppStatus>>(new Map());
 
   useEffect(() => {
+    if (!enabled) return;
     let active = true;
     async function load() {
       try {
@@ -37,7 +46,7 @@ export function StatusProvider({ children }: { children: ReactNode }) {
       active = false;
       clearInterval(timer);
     };
-  }, []);
+  }, [enabled]);
 
   return (
     <StatusContext.Provider value={statuses}>{children}</StatusContext.Provider>
@@ -74,9 +83,10 @@ export function StatusDot({ id }: { id: string }) {
   );
 }
 
-// A compact health pill linking to the /status page, shown by the dashboard's
-// "Applications" heading. Shares the provider's context, so it renders nothing
-// until the first poll resolves (avoiding a flash of "all systems operational").
+// A health row linking to the /status page, rendered beneath the time/weather
+// row inside the same header card (a hairline border separates them). Shares the
+// provider's context, so it renders nothing — and shows no divider — until the
+// first poll resolves (avoiding a flash of "all systems operational").
 export function StatusSummary({
   apps,
 }: {
@@ -85,25 +95,29 @@ export function StatusSummary({
   const statuses = useContext(StatusContext);
   if (!statuses || statuses.size === 0) return null;
   const monitored = apps.filter((a) => statuses.has(a.id));
+  if (monitored.length === 0) return null;
   const downNames = monitored
     .filter((a) => !statuses.get(a.id)!.up)
     .map((a) => a.name);
-  if (monitored.length === 0) return null;
   const allUp = downNames.length === 0;
+  const message = statusMessage(downNames, monitored.length);
 
   return (
     <Link
       href="/status"
-      className="group inline-flex items-center gap-2 rounded-full border border-fg/10 bg-fg/[0.03] px-3 py-1 text-xs text-fg/60 transition-colors hover:border-fg/25 hover:text-fg/90"
+      title={message}
+      aria-label={`Service status: ${message}`}
+      className="flex items-center gap-2 border-t border-fg/10 px-6 py-3 text-sm text-fg/70 transition-colors hover:bg-fg/[0.03] hover:text-fg"
     >
-      <span
-        className={`h-2 w-2 rounded-full ${allUp ? "bg-emerald-400" : "bg-red-400"}`}
-        aria-hidden
-      />
-      <span>{statusMessage(downNames, monitored.length)}</span>
-      <span className="text-fg/30 transition-transform group-hover:translate-x-0.5">
-        →
+      <span className="relative flex h-2.5 w-2.5" aria-hidden>
+        {allUp && (
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/60" />
+        )}
+        <span
+          className={`relative inline-flex h-2.5 w-2.5 rounded-full ${allUp ? "bg-emerald-400" : "bg-red-400"}`}
+        />
       </span>
+      <span className="font-medium">{message}</span>
     </Link>
   );
 }

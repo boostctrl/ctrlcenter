@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import AppCard from "./AppCard";
 import BookmarkGroup from "./BookmarkGroup";
-import { StatusProvider, StatusSummary } from "./StatusProvider";
 import { buildSearchUrl, engineLabel, type SearchConfig } from "@/lib/search";
 import { orderCategories } from "@/lib/bookmarks";
 import type { AppItem, BookmarkItem } from "@/lib/schema";
@@ -36,13 +35,11 @@ function groupBookmarks(
 export default function Dashboard({
   apps,
   bookmarks,
-  statusEnabled = false,
   search,
   categoryOrder = [],
 }: {
   apps: AppItem[];
   bookmarks: BookmarkItem[];
-  statusEnabled?: boolean;
   search: SearchConfig;
   categoryOrder?: string[];
 }) {
@@ -132,12 +129,7 @@ export default function Dashboard({
 
       {filteredApps.length > 0 && (
         <section>
-          <div className="mb-5 flex items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold tracking-[0.2em] text-fg/60 uppercase">
-              Applications
-            </h2>
-            <StatusSummary apps={apps} />
-          </div>
+          <SectionTitle>Applications</SectionTitle>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {filteredApps.map((app) => (
               <AppCard key={app.id} app={app} />
@@ -184,11 +176,5 @@ export default function Dashboard({
     </>
   );
 
-  // Mount the status poller once (independent of search filtering) whenever the
-  // feature is on and there are apps to check.
-  return statusEnabled && apps.length > 0 ? (
-    <StatusProvider>{content}</StatusProvider>
-  ) : (
-    content
-  );
+  return content;
 }

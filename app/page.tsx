@@ -2,6 +2,7 @@ import { readConfig } from "@/lib/config";
 import Header from "@/components/Header";
 import Dashboard from "@/components/Dashboard";
 import FloatingSettings from "@/components/FloatingSettings";
+import { StatusProvider } from "@/components/StatusProvider";
 
 export const dynamic = "force-dynamic";
 
@@ -9,17 +10,22 @@ export default async function HomePage() {
   const config = await readConfig();
   const { settings, apps, bookmarks } = config;
 
+  // One poller wraps both the header chip and the per-app dots; only mount it
+  // when status checks are on and there are apps to monitor.
+  const statusEnabled = settings.statusChecks && apps.length > 0;
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-12 px-6 py-12 sm:px-10 lg:py-16">
-      <Header settings={settings} />
+      <StatusProvider enabled={statusEnabled}>
+        <Header settings={settings} apps={apps} statusEnabled={statusEnabled} />
 
-      <Dashboard
-        apps={apps}
-        bookmarks={bookmarks}
-        statusEnabled={settings.statusChecks}
-        search={settings.search}
-        categoryOrder={settings.bookmarkCategoryOrder}
-      />
+        <Dashboard
+          apps={apps}
+          bookmarks={bookmarks}
+          search={settings.search}
+          categoryOrder={settings.bookmarkCategoryOrder}
+        />
+      </StatusProvider>
 
       <FloatingSettings />
     </main>
