@@ -12,6 +12,32 @@ here.
 
 ## [Unreleased]
 
+### Fixed
+
+- An invalid time zone (a hand-edited config value or stale per-visitor
+  preference) no longer crashes the dashboard. The date/time helpers fall back
+  to UTC instead of throwing, and invalid stored zones are dropped.
+- A single malformed app/bookmark/theme entry in a hand-edited `config.yaml` no
+  longer takes down every page — the offending row is skipped on load while the
+  rest of the config still applies. Importing a config file is still validated
+  strictly.
+- Native controls, scrollbars, and `<select>` dropdown lists now match the
+  active light/dark theme instead of rendering light-on-light.
+- The header weather widget no longer shows `NaN°` when the weather API omits a
+  field.
+- Admin Settings autosave no longer risks persisting a stale value when a save
+  is slower than the next edit.
+- Config writes are now atomic (temp file + rename), so a concurrent read can
+  never see a half-written file.
+- Cleared the React hydration warning (#418) logged on load from the no-flash
+  theme script.
+
+### Security
+
+- Documented that `TRUSTED_PROXY_HOPS` must be set to `0` for directly-exposed
+  deployments, otherwise a spoofed `X-Forwarded-For` can evade the per-IP login
+  throttle.
+
 ## [0.9.9] - 2026-06-25
 
 ### Added
