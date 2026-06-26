@@ -293,18 +293,16 @@ export function PrefsProvider({
   const [activeLook, setActiveLook] = useState<ModeColors | null>(null);
   const [accentOverride, setAccentOverrideState] =
     useState<AccentColors | null>(null);
-  // Whether the visitor has explicitly picked a light/dark mode. Until they do,
-  // the admin custom default colors (if any) are the baseline.
-  const [modeChosen, setModeChosen] = useState(false);
   // Tracks the OS color scheme so "system" mode resolves its surface lightness.
   const [systemDark, setSystemDark] = useState(false);
 
-  // The look to apply: a per-visitor custom look wins, then the admin custom
-  // default colors (only while the visitor hasn't picked a mode), otherwise null
-  // = follow the built-in light/dark CSS defaults.
+  // The look to apply: a per-visitor custom look wins, otherwise the admin custom
+  // default colors, otherwise null = the built-in light/dark CSS defaults. The
+  // admin default carries BOTH a light and a dark variant, so the resolved mode
+  // just selects the variant — a visitor picking a mode flips the variant rather
+  // than discarding the admin default colors.
   const resolveLook = useCallback(
-    (active: ModeColors | null, chosen: boolean): ModeColors | null =>
-      active ?? (chosen ? null : adminLook),
+    (active: ModeColors | null): ModeColors | null => active ?? adminLook,
     [adminLook]
   );
 
@@ -316,18 +314,21 @@ export function PrefsProvider({
   const setTheme = useCallback(
     (next: Theme) => {
       setThemeState(next);
-      setModeChosen(true);
       try {
         window.localStorage.setItem(THEME_KEY, next);
       } catch {
         // Private mode / quota — theme just won't persist.
       }
-      // Picking a mode keeps the active look; it just re-resolves to that look's
-      // matching light/dark variant (the admin default colors stop applying once
-      // a mode is chosen, so resolve against the visitor look only).
-      applyAll({ theme: next, look: activeLook, accentOverride, defaultAccent });
+      // Picking a mode keeps the effective look (visitor custom, else admin
+      // default); it just re-resolves to that look's matching light/dark variant.
+      applyAll({
+        theme: next,
+        look: resolveLook(activeLook),
+        accentOverride,
+        defaultAccent,
+      });
     },
-    [activeLook, accentOverride, defaultAccent]
+    [activeLook, accentOverride, defaultAccent, resolveLook]
   );
 
   const setDesign = useCallback((next: DesignId) => {
@@ -424,12 +425,12 @@ export function PrefsProvider({
       saveAccentOverride(next);
       applyAll({
         theme,
-        look: resolveLook(activeLook, modeChosen),
+        look: resolveLook(activeLook),
         accentOverride: next,
         defaultAccent,
       });
     },
-    [theme, defaultAccent, activeLook, modeChosen, resolveLook]
+    [theme, defaultAccent, activeLook, resolveLook]
   );
 
   const saveNamedTheme = useCallback(
@@ -476,11 +477,11 @@ export function PrefsProvider({
     saveAccentOverride(null);
     applyAll({
       theme,
-      look: resolveLook(null, modeChosen),
+      look: resolveLook(null),
       accentOverride: null,
       defaultAccent,
     });
-  }, [defaultAccent, theme, modeChosen, resolveLook]);
+  }, [defaultAccent, theme, resolveLook]);
 
   // Reset just the theme (colors, accent, design, scene) back to the admin
   // defaults, leaving mode/location/greeting alone — the theme-builder's own
@@ -498,7 +499,7 @@ export function PrefsProvider({
     setFontState(defaultTheme.font);
     applyAll({
       theme,
-      look: resolveLook(null, modeChosen),
+      look: resolveLook(null),
       accentOverride: null,
       defaultAccent,
     });
@@ -508,7 +509,6 @@ export function PrefsProvider({
   }, [
     defaultAccent,
     theme,
-    modeChosen,
     resolveLook,
     defaultTheme.design,
     defaultTheme.scene,
@@ -520,12 +520,10 @@ export function PrefsProvider({
   // default theme.
   useEffect(() => {
     let stored: Theme = defaultTheme.mode;
-    let chosen = false;
     try {
       const raw = window.localStorage.getItem(THEME_KEY);
       if (raw === "light" || raw === "dark" || raw === "system") {
         stored = raw;
-        chosen = true;
       }
     } catch {
       // ignore
@@ -537,7 +535,6 @@ export function PrefsProvider({
     const storedFont = loadFont() ?? defaultTheme.font;
     /* eslint-disable react-hooks/set-state-in-effect */
     setThemeState(stored);
-    setModeChosen(chosen);
     setDesignState(storedDesign);
     setSceneState(storedScene);
     setFontState(storedFont);
@@ -551,7 +548,7 @@ export function PrefsProvider({
     // The inline script already applied these; re-apply for consistency.
     applyAll({
       theme: stored,
-      look: resolveLook(active, chosen),
+      look: resolveLook(active),
       accentOverride: overrideAccent,
       defaultAccent,
     });
@@ -573,7 +570,7 @@ export function PrefsProvider({
       const isMode = raw === "light" || raw === "dark" || raw === "system";
       const mode: Theme = isMode ? (raw as Theme) : defaultTheme.mode;
       if (mode !== "system") return;
-      const look = resolveLook(loadActiveTheme(), isMode);
+      const look = resolveLook(loadActiveTheme());
       applyAll({
         theme: "system",
         look,
@@ -661,7 +658,6 @@ export function PrefsProvider({
     saveFont(null);
     setActiveLook(null);
     setAccentOverrideState(null);
-    setModeChosen(false);
     setThemeState(defaultTheme.mode);
     setDesignState(defaultTheme.design);
     setSceneState(defaultTheme.scene);
@@ -744,7 +740,7 @@ export function PrefsProvider({
     // matching variant (visitor look, else admin default colors). That variant's
     // background drives the surface-lightness used by theme-aware icons/scenes.
     const isLight = theme === "light" || (theme === "system" && !systemDark);
-    const effectiveLook = activeLook ?? (modeChosen ? null : adminLook);
+    const effectiveLook = activeLook ?? adminLook;
     const activeColors: ColorSet | null = effectiveLook
       ? isLight
         ? effectiveLook.light
@@ -816,7 +812,6 @@ export function PrefsProvider({
     scene,
     font,
     systemDark,
-    modeChosen,
     customThemes,
     activeLook,
     accentOverride,
