@@ -12,8 +12,12 @@ import {
   type ModeColors,
   type SceneId,
 } from "./theme";
-import { isFontId, type FontId } from "./fonts";
+import { DEFAULT_FONT, isFontId, type FontId } from "./fonts";
 import { isValidTimeZone } from "./datetime";
+
+// A value chosen independently per resolved mode. Light and dark each carry their
+// own design/scene/font (and colors), so the two can be wholly different themes.
+export type ModePair<T> = { dark: T; light: T };
 
 export type Units = "imperial" | "metric";
 
@@ -138,13 +142,19 @@ export function supportedTimezones(): string[] {
 // via opacity), and the accent gradient endpoints. Re-exported from lib/theme.
 export type ThemeColors = ColorSet;
 
-// A saved theme bundles a cohesive light+dark color pair with the design and
-// scene it was saved with, so applying it restores all of them.
+// A saved theme bundles a cohesive light+dark color pair with the design, scene
+// and font each mode was saved with, so applying it restores two complete,
+// independent looks. The unsuffixed fields are the dark-mode parts; the
+// `*Light` fields the light-mode parts (colors come from ModeColors' dark/light).
 export type CustomTheme = ModeColors & {
   id: string;
   name: string;
   design: DesignId;
   scene: SceneId;
+  font: FontId;
+  designLight: DesignId;
+  sceneLight: SceneId;
+  fontLight: FontId;
 };
 
 // The active custom look's light+dark colors (the resolved mode selects which
@@ -218,7 +228,25 @@ export function loadThemes(): CustomTheme[] {
         // Themes saved before designs/scenes existed default to Glass/Aurora.
         const design = isDesignId(t.design) ? t.design : DEFAULT_DESIGN;
         const scene = isSceneId(t.scene) ? t.scene : DEFAULT_SCENE;
-        return [{ id: t.id, name: t.name.slice(0, 40), design, scene, ...colors }];
+        const font = isFontId(t.font) ? t.font : DEFAULT_FONT;
+        // Themes saved before light/dark were independent fall back to the
+        // dark-mode parts for the light mode too.
+        const designLight = isDesignId(t.designLight) ? t.designLight : design;
+        const sceneLight = isSceneId(t.sceneLight) ? t.sceneLight : scene;
+        const fontLight = isFontId(t.fontLight) ? t.fontLight : font;
+        return [
+          {
+            id: t.id,
+            name: t.name.slice(0, 40),
+            design,
+            scene,
+            font,
+            designLight,
+            sceneLight,
+            fontLight,
+            ...colors,
+          },
+        ];
       }
       return [];
     });
@@ -275,92 +303,95 @@ export function saveAccentOverride(accent: AccentColors | null): void {
   }
 }
 
-// --- Design ---
-// The look-and-feel preset (Glass, Flat, Bold, …). Per-visitor; applied as a
+// --- Per-mode design / scene / font ---
+// Each is chosen independently for light and dark, so the two modes can be wholly
+// different looks. Stored as a `{dark,light}` JSON object under the same key; a
+// legacy bare-string value (saved before modes were independent) is read as both
+// modes. A null per mode means the visitor hasn't chosen for that mode, so the
+// caller falls back to the admin-configured default.
+function loadModePair<T>(
+  key: string,
+  valid: (v: unknown) => v is T
+): ModePair<T | null> {
+  if (typeof window === "undefined") return { dark: null, light: null };
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return { dark: null, light: null };
+    let parsed: unknown = raw;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      // A bare legacy value like `flat` isn't valid JSON; use the raw string.
+      parsed = raw;
+    }
+    if (typeof parsed === "string") {
+      const v = valid(parsed) ? parsed : null;
+      return { dark: v, light: v };
+    }
+    if (parsed && typeof parsed === "object") {
+      const o = parsed as Record<string, unknown>;
+      return {
+        dark: valid(o.dark) ? o.dark : null,
+        light: valid(o.light) ? o.light : null,
+      };
+    }
+    return { dark: null, light: null };
+  } catch {
+    return { dark: null, light: null };
+  }
+}
+
+function saveModePair<T extends string>(
+  key: string,
+  pair: ModePair<T | null> | null
+): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (pair && (pair.dark || pair.light)) {
+      window.localStorage.setItem(
+        key,
+        JSON.stringify({ dark: pair.dark, light: pair.light })
+      );
+    } else {
+      window.localStorage.removeItem(key);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+// The look-and-feel preset (Glass, Flat, Bold, …), per mode. Applied as a
 // `design-<id>` class on <html>. See lib/theme.ts for the catalog.
 export const DESIGN_KEY = "ctrlcenter:design";
 
-// Returns null when the visitor hasn't chosen a design, so callers can fall
-// back to the admin-configured default.
-export function loadDesign(): DesignId | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(DESIGN_KEY);
-    return isDesignId(raw) ? raw : null;
-  } catch {
-    return null;
-  }
+export function loadDesign(): ModePair<DesignId | null> {
+  return loadModePair(DESIGN_KEY, isDesignId);
 }
 
-export function saveDesign(design: DesignId | null): void {
-  if (typeof window === "undefined") return;
-  try {
-    if (design) {
-      window.localStorage.setItem(DESIGN_KEY, design);
-    } else {
-      window.localStorage.removeItem(DESIGN_KEY);
-    }
-  } catch {
-    // ignore
-  }
+export function saveDesign(design: ModePair<DesignId | null> | null): void {
+  saveModePair(DESIGN_KEY, design);
 }
 
-// --- Scene ---
-// The backdrop + ornament preset (Aurora, Abyss, …). Per-visitor; applied as a
+// The backdrop + ornament preset (Aurora, Abyss, …), per mode. Applied as a
 // `scene-<id>` class on <html> and rendered by <SceneLayer>. See lib/theme.ts.
 export const SCENE_KEY = "ctrlcenter:scene";
 
-// Returns null when the visitor hasn't chosen a scene, so callers can fall back
-// to the admin-configured default.
-export function loadScene(): SceneId | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(SCENE_KEY);
-    return isSceneId(raw) ? raw : null;
-  } catch {
-    return null;
-  }
+export function loadScene(): ModePair<SceneId | null> {
+  return loadModePair(SCENE_KEY, isSceneId);
 }
 
-export function saveScene(scene: SceneId | null): void {
-  if (typeof window === "undefined") return;
-  try {
-    if (scene) {
-      window.localStorage.setItem(SCENE_KEY, scene);
-    } else {
-      window.localStorage.removeItem(SCENE_KEY);
-    }
-  } catch {
-    // ignore
-  }
+export function saveScene(scene: ModePair<SceneId | null> | null): void {
+  saveModePair(SCENE_KEY, scene);
 }
 
-// --- Font ---
-// The UI typeface (Plus Jakarta Sans, Inter, …). Per-visitor; applied as a
+// The UI typeface (Plus Jakarta Sans, Inter, …), per mode. Applied as a
 // `font-<id>` class on <html>. See lib/fonts.ts for the catalog.
 export const FONT_KEY = "ctrlcenter:font";
 
-// Returns null when the visitor hasn't chosen a font, so callers can fall back
-// to the admin-configured default.
-export function loadFont(): FontId | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(FONT_KEY);
-    return isFontId(raw) ? raw : null;
-  } catch {
-    return null;
-  }
+export function loadFont(): ModePair<FontId | null> {
+  return loadModePair(FONT_KEY, isFontId);
 }
 
-export function saveFont(font: FontId | null): void {
-  if (typeof window === "undefined") return;
-  try {
-    if (font) {
-      window.localStorage.setItem(FONT_KEY, font);
-    } else {
-      window.localStorage.removeItem(FONT_KEY);
-    }
-  } catch {
-    // ignore
-  }
+export function saveFont(font: ModePair<FontId | null> | null): void {
+  saveModePair(FONT_KEY, font);
 }

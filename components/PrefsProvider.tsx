@@ -30,6 +30,7 @@ import {
   type VisitorPrefs,
   type CustomTheme,
   type AccentColors,
+  type ModePair,
 } from "@/lib/prefs";
 import {
   DESIGN_IDS,
@@ -43,6 +44,8 @@ import {
 import { FONT_IDS, type FontId } from "@/lib/fonts";
 
 export type Theme = "system" | "light" | "dark";
+// The two resolved appearance modes a theme part can be chosen for independently.
+export type Mode = "dark" | "light";
 export const THEME_KEY = "ctrlcenter:theme";
 
 type Accent = AccentColors;
@@ -165,9 +168,15 @@ type PrefsValue = {
   weatherEnabled: boolean;
   greetingName: string;
   theme: Theme;
+  // Resolved for the current display mode (what's on <html> right now).
   design: DesignId;
   scene: SceneId;
   font: FontId;
+  // Resolved design/scene/font for a specific mode — for the theme builder, whose
+  // Editing toggle designs the non-displayed mode independently.
+  designFor: (mode: Mode) => DesignId;
+  sceneFor: (mode: Mode) => SceneId;
+  fontFor: (mode: Mode) => FontId;
   // Whether the effective background reads as light (for theme-aware icons).
   surfaceIsLight: boolean;
   customThemes: CustomTheme[];
@@ -182,18 +191,18 @@ type PrefsValue = {
   setGreetingName: (name: string) => void;
   useMyLocation: () => void;
   setTheme: (theme: Theme) => void;
-  setDesign: (design: DesignId) => void;
-  setScene: (scene: SceneId) => void;
-  setFont: (font: FontId) => void;
-  applyPack: (pack: ThemePack) => void;
-  applyThemeColors: (colors: ModeColors) => void;
+  setDesign: (design: DesignId, mode: Mode) => void;
+  setScene: (scene: SceneId, mode: Mode) => void;
+  setFont: (font: FontId, mode: Mode) => void;
+  applyPack: (pack: ThemePack, mode: Mode) => void;
+  applyThemeColors: (colors: ModeColors, mode?: Mode) => void;
   setBaseColors: (
     background: string,
     foreground: string,
     targetDark?: boolean
   ) => void;
   setAccentOverride: (accent: AccentColors | null) => void;
-  saveNamedTheme: (name: string, colors: ModeColors) => void;
+  saveNamedTheme: (name: string) => void;
   applyNamedTheme: (id: string) => void;
   deleteNamedTheme: (id: string) => void;
   clearCustomTheme: () => void;
@@ -223,9 +232,14 @@ type Defaults = {
 // pair is shared across both modes.
 export type DefaultTheme = {
   mode: Theme;
+  // The dark-mode design/scene/font; the optional `*Light` fields let the admin
+  // set a wholly different look for light mode (falling back to the dark parts).
   design: DesignId;
   scene: SceneId;
   font: FontId;
+  designLight?: DesignId;
+  sceneLight?: SceneId;
+  fontLight?: FontId;
   accentFrom: string;
   accentTo: string;
   background?: string;
@@ -286,9 +300,19 @@ export function PrefsProvider({
   const [detecting, setDetecting] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [theme, setThemeState] = useState<Theme>(defaultTheme.mode);
-  const [design, setDesignState] = useState<DesignId>(defaultTheme.design);
-  const [scene, setSceneState] = useState<SceneId>(defaultTheme.scene);
-  const [font, setFontState] = useState<FontId>(defaultTheme.font);
+  // Per-mode visitor overrides; a null per mode means "use the admin default".
+  const [designs, setDesigns] = useState<ModePair<DesignId | null>>({
+    dark: null,
+    light: null,
+  });
+  const [scenes, setScenes] = useState<ModePair<SceneId | null>>({
+    dark: null,
+    light: null,
+  });
+  const [fonts, setFonts] = useState<ModePair<FontId | null>>({
+    dark: null,
+    light: null,
+  });
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([]);
   const [activeLook, setActiveLook] = useState<ModeColors | null>(null);
   const [accentOverride, setAccentOverrideState] =
@@ -306,6 +330,65 @@ export function PrefsProvider({
     [adminLook]
   );
 
+  // The admin default design/scene/font for a mode: light falls back to the dark
+  // part when the admin hasn't set a separate light value.
+  const defDesign = useCallback(
+    (dark: boolean): DesignId =>
+      dark ? defaultTheme.design : defaultTheme.designLight ?? defaultTheme.design,
+    [defaultTheme.design, defaultTheme.designLight]
+  );
+  const defScene = useCallback(
+    (dark: boolean): SceneId =>
+      dark ? defaultTheme.scene : defaultTheme.sceneLight ?? defaultTheme.scene,
+    [defaultTheme.scene, defaultTheme.sceneLight]
+  );
+  const defFont = useCallback(
+    (dark: boolean): FontId =>
+      dark ? defaultTheme.font : defaultTheme.fontLight ?? defaultTheme.font,
+    [defaultTheme.font, defaultTheme.fontLight]
+  );
+
+  // The effective design/scene/font for a mode: the visitor's per-mode choice,
+  // else the admin default for that mode.
+  const resolveDesign = useCallback(
+    (dark: boolean): DesignId => (dark ? designs.dark : designs.light) ?? defDesign(dark),
+    [designs, defDesign]
+  );
+  const resolveScene = useCallback(
+    (dark: boolean): SceneId => (dark ? scenes.dark : scenes.light) ?? defScene(dark),
+    [scenes, defScene]
+  );
+  const resolveFont = useCallback(
+    (dark: boolean): FontId => (dark ? fonts.dark : fonts.light) ?? defFont(dark),
+    [fonts, defFont]
+  );
+
+  // Apply the design/scene/font classes for whichever mode is displayed now.
+  const applyChrome = useCallback(
+    (dark: boolean) => {
+      applyDesign(resolveDesign(dark));
+      applyScene(resolveScene(dark));
+      applyFont(resolveFont(dark));
+    },
+    [resolveDesign, resolveScene, resolveFont]
+  );
+
+  // A seeded color set for a mode when there's no active custom look yet, so
+  // editing one mode never leaves the other mode's colors null.
+  const seedColorSet = useCallback(
+    (dark: boolean): ColorSet => {
+      const a = resolveAccent(accentOverride, variantFor(adminLook, dark), defaultAccent);
+      const ad = adminLook ? (dark ? adminLook.dark : adminLook.light) : null;
+      return {
+        background: ad?.background ?? (dark ? "#06070d" : "#eceef3"),
+        foreground: ad?.foreground ?? (dark ? "#f4f4f6" : "#181b24"),
+        accentFrom: a.from,
+        accentTo: a.to,
+      };
+    },
+    [accentOverride, adminLook, defaultAccent]
+  );
+
   const persist = useCallback((next: VisitorPrefs) => {
     setPrefs(next);
     savePrefs(next);
@@ -320,55 +403,82 @@ export function PrefsProvider({
         // Private mode / quota — theme just won't persist.
       }
       // Picking a mode keeps the effective look (visitor custom, else admin
-      // default); it just re-resolves to that look's matching light/dark variant.
+      // default); it just re-resolves to that look's matching light/dark variant
+      // — and to that mode's own design/scene/font, which are independent.
       applyAll({
         theme: next,
         look: resolveLook(activeLook),
         accentOverride,
         defaultAccent,
       });
+      applyChrome(resolveDark(next));
     },
-    [activeLook, accentOverride, defaultAccent, resolveLook]
+    [activeLook, accentOverride, defaultAccent, resolveLook, applyChrome]
   );
 
-  const setDesign = useCallback((next: DesignId) => {
-    setDesignState(next);
-    saveDesign(next);
-    applyDesign(next);
-  }, []);
+  // Set one mode's design/scene/font. Persists the per-mode pair and applies the
+  // class immediately only when that mode is the one currently displayed.
+  const setDesign = useCallback(
+    (next: DesignId, mode: Mode) => {
+      const updated = { ...designs, [mode]: next };
+      setDesigns(updated);
+      saveDesign(updated);
+      if ((mode === "dark") === resolveDark(theme)) applyDesign(next);
+    },
+    [designs, theme]
+  );
 
-  const setScene = useCallback((next: SceneId) => {
-    setSceneState(next);
-    saveScene(next);
-    applyScene(next);
-  }, []);
+  const setScene = useCallback(
+    (next: SceneId, mode: Mode) => {
+      const updated = { ...scenes, [mode]: next };
+      setScenes(updated);
+      saveScene(updated);
+      if ((mode === "dark") === resolveDark(theme)) applyScene(next);
+    },
+    [scenes, theme]
+  );
 
-  const setFont = useCallback((next: FontId) => {
-    setFontState(next);
-    saveFont(next);
-    applyFont(next);
-  }, []);
+  const setFont = useCallback(
+    (next: FontId, mode: Mode) => {
+      const updated = { ...fonts, [mode]: next };
+      setFonts(updated);
+      saveFont(updated);
+      if ((mode === "dark") === resolveDark(theme)) applyFont(next);
+    },
+    [fonts, theme]
+  );
 
-  // Apply (and persist) a full custom look — base presets and saved themes. The
-  // look carries its own accent, so any standalone accent override is dropped in
-  // favor of it. The resolved mode picks which variant is applied.
+  // Apply (and persist) custom colors. With a `mode`, only that mode's colorset
+  // is filled (from `colors[mode]`), leaving the other mode untouched — this is
+  // how a preset fills just the mode being edited. Without a `mode`, both modes
+  // are replaced (restoring a complete saved theme). The colorset carries its own
+  // accent, so any standalone accent override is dropped in favor of it.
   const applyThemeColors = useCallback(
-    (look: ModeColors) => {
+    (colors: ModeColors, mode?: Mode) => {
+      let look: ModeColors;
+      if (mode) {
+        const base =
+          activeLook ?? { dark: seedColorSet(true), light: seedColorSet(false) };
+        look = { ...base, [mode]: colors[mode] };
+      } else {
+        look = colors;
+      }
       setActiveLook(look);
       saveActiveTheme(look);
       setAccentOverrideState(null);
       saveAccentOverride(null);
       applyAll({ theme, look, accentOverride: null, defaultAccent });
     },
-    [theme, defaultAccent]
+    [theme, defaultAccent, activeLook, seedColorSet]
   );
 
-  // Apply a curated pack in one tap: its design + scene + light/dark color pair.
+  // Apply a curated pack to one mode: its design + scene + that mode's colorset.
+  // (Font isn't part of a pack, so the mode's font is left as-is.)
   const applyPack = useCallback(
-    (pack: ThemePack) => {
-      setDesign(pack.design);
-      setScene(pack.scene);
-      applyThemeColors({ dark: pack.dark, light: pack.light });
+    (pack: ThemePack, mode: Mode) => {
+      setDesign(pack.design, mode);
+      setScene(pack.scene, mode);
+      applyThemeColors({ dark: pack.dark, light: pack.light }, mode);
     },
     [setDesign, setScene, applyThemeColors]
   );
@@ -397,17 +507,8 @@ export function PrefsProvider({
       // With no custom look yet, seed each mode with ITS OWN defaults (admin
       // default colors, else the CSS :root / .theme-light values) so editing one
       // mode never overwrites the other.
-      const seedFor = (d: boolean): ColorSet => {
-        const a = resolveAccent(accentOverride, variantFor(adminLook, d), defaultAccent);
-        const ad = adminLook ? (d ? adminLook.dark : adminLook.light) : null;
-        return {
-          background: ad?.background ?? (d ? "#06070d" : "#eceef3"),
-          foreground: ad?.foreground ?? (d ? "#f4f4f6" : "#181b24"),
-          accentFrom: a.from,
-          accentTo: a.to,
-        };
-      };
-      const base = activeLook ?? { dark: seedFor(true), light: seedFor(false) };
+      const base =
+        activeLook ?? { dark: seedColorSet(true), light: seedColorSet(false) };
       const next: ModeColors = dark ? { ...base, dark: cs } : { ...base, light: cs };
       setActiveLook(next);
       saveActiveTheme(next);
@@ -415,7 +516,7 @@ export function PrefsProvider({
       // its colors without flipping the screen.
       applyAll({ theme, look: next, accentOverride, defaultAccent });
     },
-    [theme, defaultAccent, accentOverride, activeLook, adminLook]
+    [theme, defaultAccent, accentOverride, activeLook, seedColorSet]
   );
 
   // Set or clear the accent on its own, leaving the background/foreground as-is.
@@ -433,14 +534,28 @@ export function PrefsProvider({
     [theme, defaultAccent, activeLook, resolveLook]
   );
 
+  // Capture the current full look — both modes' design/scene/font and colors —
+  // as a saved theme, baking each mode's effective accent into its colorset so it
+  // restores exactly as shown.
   const saveNamedTheme = useCallback(
-    (name: string, colors: ModeColors) => {
+    (name: string) => {
+      const look =
+        activeLook ?? { dark: seedColorSet(true), light: seedColorSet(false) };
+      const withAccent = (cs: ColorSet): ColorSet => {
+        const a = resolveAccent(accentOverride, cs, defaultAccent);
+        return { ...cs, accentFrom: a.from, accentTo: a.to };
+      };
       const entry: CustomTheme = {
         id: crypto.randomUUID(),
         name: name.trim().slice(0, 40) || "Custom",
-        design,
-        scene,
-        ...colors,
+        design: resolveDesign(true),
+        scene: resolveScene(true),
+        font: resolveFont(true),
+        designLight: resolveDesign(false),
+        sceneLight: resolveScene(false),
+        fontLight: resolveFont(false),
+        dark: withAccent(look.dark),
+        light: withAccent(look.light),
       };
       setCustomThemes((prev) => {
         const next = [...prev, entry];
@@ -448,18 +563,36 @@ export function PrefsProvider({
         return next;
       });
     },
-    [design, scene]
+    [
+      activeLook,
+      seedColorSet,
+      accentOverride,
+      defaultAccent,
+      resolveDesign,
+      resolveScene,
+      resolveFont,
+    ]
   );
 
+  // Restore a saved theme: both modes' design/scene/font and colors, then apply
+  // the chrome for whichever mode is displayed now.
   const applyNamedTheme = useCallback(
     (id: string) => {
       const t = customThemes.find((x) => x.id === id);
       if (!t) return;
-      setDesign(t.design);
-      setScene(t.scene);
+      const nextDesigns = { dark: t.design, light: t.designLight };
+      const nextScenes = { dark: t.scene, light: t.sceneLight };
+      const nextFonts = { dark: t.font, light: t.fontLight };
+      setDesigns(nextDesigns);
+      saveDesign(nextDesigns);
+      setScenes(nextScenes);
+      saveScene(nextScenes);
+      setFonts(nextFonts);
+      saveFont(nextFonts);
       applyThemeColors({ dark: t.dark, light: t.light });
+      applyChrome(resolveDark(theme));
     },
-    [customThemes, applyThemeColors, setDesign, setScene]
+    [customThemes, applyThemeColors, applyChrome, theme]
   );
 
   const deleteNamedTheme = useCallback((id: string) => {
@@ -483,9 +616,9 @@ export function PrefsProvider({
     });
   }, [defaultAccent, theme, resolveLook]);
 
-  // Reset just the theme (colors, accent, design, scene) back to the admin
-  // defaults, leaving mode/location/greeting alone — the theme-builder's own
-  // reset, distinct from the global `reset`.
+  // Reset just the theme (colors, accent, design, scene, font — both modes) back
+  // to the admin defaults, leaving mode/location/greeting alone — the theme
+  // builder's own reset, distinct from the global `reset`.
   const resetTheme = useCallback(() => {
     setActiveLook(null);
     saveActiveTheme(null);
@@ -494,26 +627,20 @@ export function PrefsProvider({
     saveDesign(null);
     saveScene(null);
     saveFont(null);
-    setDesignState(defaultTheme.design);
-    setSceneState(defaultTheme.scene);
-    setFontState(defaultTheme.font);
+    setDesigns({ dark: null, light: null });
+    setScenes({ dark: null, light: null });
+    setFonts({ dark: null, light: null });
     applyAll({
       theme,
       look: resolveLook(null),
       accentOverride: null,
       defaultAccent,
     });
-    applyDesign(defaultTheme.design);
-    applyScene(defaultTheme.scene);
-    applyFont(defaultTheme.font);
-  }, [
-    defaultAccent,
-    theme,
-    resolveLook,
-    defaultTheme.design,
-    defaultTheme.scene,
-    defaultTheme.font,
-  ]);
+    const dark = resolveDark(theme);
+    applyDesign(defDesign(dark));
+    applyScene(defScene(dark));
+    applyFont(defFont(dark));
+  }, [defaultAccent, theme, resolveLook, defDesign, defScene, defFont]);
 
   // Load the stored theme + custom themes on mount and keep "system" in sync
   // with OS changes. Anything the visitor hasn't set falls back to the admin
@@ -530,14 +657,21 @@ export function PrefsProvider({
     }
     const active = loadActiveTheme();
     const overrideAccent = loadAccentOverride();
-    const storedDesign = loadDesign() ?? defaultTheme.design;
-    const storedScene = loadScene() ?? defaultTheme.scene;
-    const storedFont = loadFont() ?? defaultTheme.font;
+    const storedDesigns = loadDesign();
+    const storedScenes = loadScene();
+    const storedFonts = loadFont();
+    // Resolve a mode's design/scene/font from the loaded pairs + admin defaults
+    // (the state isn't committed yet, so resolve from the raw values here).
+    const chromeFor = (dark: boolean) => ({
+      design: (dark ? storedDesigns.dark : storedDesigns.light) ?? defDesign(dark),
+      scene: (dark ? storedScenes.dark : storedScenes.light) ?? defScene(dark),
+      font: (dark ? storedFonts.dark : storedFonts.light) ?? defFont(dark),
+    });
     /* eslint-disable react-hooks/set-state-in-effect */
     setThemeState(stored);
-    setDesignState(storedDesign);
-    setSceneState(storedScene);
-    setFontState(storedFont);
+    setDesigns(storedDesigns);
+    setScenes(storedScenes);
+    setFonts(storedFonts);
     setActiveLook(active);
     setAccentOverrideState(overrideAccent);
     setCustomThemes(loadThemes());
@@ -552,12 +686,14 @@ export function PrefsProvider({
       accentOverride: overrideAccent,
       defaultAccent,
     });
-    applyDesign(storedDesign);
-    applyScene(storedScene);
-    applyFont(storedFont);
+    const initial = chromeFor(resolveDark(stored));
+    applyDesign(initial.design);
+    applyScene(initial.scene);
+    applyFont(initial.font);
 
-    // Re-apply on OS scheme change. Only "system" mode tracks the OS — but a look
-    // is now mode-aware, so "system" must re-resolve the look's variant too.
+    // Re-apply on OS scheme change. Only "system" mode tracks the OS — but the
+    // look AND the design/scene/font are mode-aware, so "system" must re-resolve
+    // all of them when the OS flips light/dark.
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => {
       setSystemDark(mq.matches);
@@ -577,6 +713,10 @@ export function PrefsProvider({
         accentOverride: loadAccentOverride(),
         defaultAccent,
       });
+      const next = chromeFor(mq.matches);
+      applyDesign(next.design);
+      applyScene(next.scene);
+      applyFont(next.font);
     };
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
@@ -659,24 +799,25 @@ export function PrefsProvider({
     setActiveLook(null);
     setAccentOverrideState(null);
     setThemeState(defaultTheme.mode);
-    setDesignState(defaultTheme.design);
-    setSceneState(defaultTheme.scene);
-    setFontState(defaultTheme.font);
+    setDesigns({ dark: null, light: null });
+    setScenes({ dark: null, light: null });
+    setFonts({ dark: null, light: null });
     applyAll({
       theme: defaultTheme.mode,
       look: adminLook,
       accentOverride: null,
       defaultAccent,
     });
-    applyDesign(defaultTheme.design);
-    applyScene(defaultTheme.scene);
-    applyFont(defaultTheme.font);
+    const dark = resolveDark(defaultTheme.mode);
+    applyDesign(defDesign(dark));
+    applyScene(defScene(dark));
+    applyFont(defFont(dark));
   }, [
     persist,
     defaultTheme.mode,
-    defaultTheme.design,
-    defaultTheme.scene,
-    defaultTheme.font,
+    defDesign,
+    defScene,
+    defFont,
     adminLook,
     defaultAccent,
   ]);
@@ -740,6 +881,7 @@ export function PrefsProvider({
     // matching variant (visitor look, else admin default colors). That variant's
     // background drives the surface-lightness used by theme-aware icons/scenes.
     const isLight = theme === "light" || (theme === "system" && !systemDark);
+    const displayDark = !isLight;
     const effectiveLook = activeLook ?? adminLook;
     const activeColors: ColorSet | null = effectiveLook
       ? isLight
@@ -770,9 +912,12 @@ export function PrefsProvider({
       weatherEnabled,
       greetingName: prefs.greetingName ?? "",
       theme,
-      design,
-      scene,
-      font,
+      design: resolveDesign(displayDark),
+      scene: resolveScene(displayDark),
+      font: resolveFont(displayDark),
+      designFor: (mode: Mode) => resolveDesign(mode === "dark"),
+      sceneFor: (mode: Mode) => resolveScene(mode === "dark"),
+      fontFor: (mode: Mode) => resolveFont(mode === "dark"),
       surfaceIsLight,
       customThemes,
       activeLook,
@@ -808,9 +953,9 @@ export function PrefsProvider({
     defaultAccent,
     adminLook,
     theme,
-    design,
-    scene,
-    font,
+    resolveDesign,
+    resolveScene,
+    resolveFont,
     systemDark,
     customThemes,
     activeLook,

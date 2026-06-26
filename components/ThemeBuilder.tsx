@@ -81,11 +81,11 @@ function scenePreview(id: SceneId, from: string, to: string): string {
 export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
   const {
     theme,
-    design,
+    designFor,
     setDesign,
-    scene,
+    sceneFor,
     setScene,
-    font,
+    fontFor,
     setFont,
     applyPack,
     customThemes,
@@ -156,35 +156,23 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
 
   function saveTheme() {
     if (!name.trim()) return;
-    // Save the active look's full light+dark pair (so it restores in both
-    // modes), with the current accent applied to both variants. With no active
-    // look yet, seed both modes from the live draft.
-    const draftCS = {
-      background: draft.background,
-      foreground: draft.foreground,
-      accentFrom: activeAccent.from,
-      accentTo: activeAccent.to,
-    };
-    const look = activeLook ?? { dark: draftCS, light: draftCS };
-    const accent = { accentFrom: activeAccent.from, accentTo: activeAccent.to };
-    saveNamedTheme(name, {
-      dark: { ...look.dark, ...accent },
-      light: { ...look.light, ...accent },
-    });
+    // Captures the full current look — both modes' design, scene, font and
+    // colors — so it restores as two complete, independent themes.
+    saveNamedTheme(name);
     setName("");
   }
 
   // A full-palette swatch (surface bg + accent glow) for the current mode — used
   // for the theme packs, where the whole look (incl. background) matters.
   const lookSwatch = (look: { dark: ColorSet; light: ColorSet }) => {
-    const cs = surfaceIsLight ? look.light : look.dark;
+    const cs = editMode === "light" ? look.light : look.dark;
     return `radial-gradient(120% 100% at 50% -10%, ${cs.accentFrom}, transparent 60%), ${cs.background}`;
   };
 
   // A palette swatch: just the accent gradient (clearer than washing it over the
   // background), still mode-aware via the current colorset.
   const paletteGradient = (look: { dark: ColorSet; light: ColorSet }) => {
-    const cs = surfaceIsLight ? look.light : look.dark;
+    const cs = editMode === "light" ? look.light : look.dark;
     return `linear-gradient(135deg, ${cs.accentFrom}, ${cs.accentTo})`;
   };
 
@@ -193,10 +181,9 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
       <div>
         <h2 className="font-semibold">Theme builder</h2>
         <p className="text-xs text-fg/50">
-          Pick a design and a palette, then tweak the colors — changes apply
-          live. Every look has a matching light and dark; use the Editing toggle
-          below to design each. Switch the app between light and dark in
-          Preferences.
+          Light and dark are two independent themes. Pick a mode with the Editing
+          toggle below, then design it — its own design, scene, font &amp; colors.
+          Switch the app between light and dark in Preferences.
         </p>
       </div>
 
@@ -204,8 +191,8 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
         <div>
           <span className="text-sm font-medium text-fg/80">Themes</span>
           <p className="text-xs text-fg/40">
-            Presets — pick one to set the design, scene &amp; colors (light &amp;
-            dark) below in one tap.
+            Presets — pick one to set the design, scene &amp; colors for the mode
+            you&apos;re editing ({editMode}) in one tap.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -213,7 +200,7 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
             <button
               key={`builtin:${i}`}
               type="button"
-              onClick={() => applyPack(p)}
+              onClick={() => applyPack(p, editMode)}
               className="group relative flex flex-col gap-1.5 rounded-lg border border-fg/10 p-2 text-left transition-colors hover:border-fg/30"
               title={`${p.name} · ${DESIGN_NAMES[p.design]}`}
             >
@@ -285,16 +272,44 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
         <div className="h-px flex-1 bg-fg/10" />
       </div>
 
+      {/* The Editing toggle governs everything below — design, scene, font and
+          palette — so light and dark can be wholly different themes. */}
+      <div className="flex items-center justify-between gap-2 rounded-xl border border-fg/15 bg-fg/[0.02] p-3">
+        <div>
+          <span className="text-sm font-medium text-fg/80">Editing</span>
+          <p className="text-xs text-fg/40">
+            Which mode you&apos;re designing. Light and dark are independent.
+          </p>
+        </div>
+        <div className="flex overflow-hidden rounded-lg border border-fg/10">
+          {(["dark", "light"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => chooseEditMode(m)}
+              aria-pressed={editMode === m}
+              className={`px-4 py-1.5 text-xs capitalize transition-colors ${
+                editMode === m
+                  ? "bg-fg/15 text-fg"
+                  : "text-fg/50 hover:text-fg/80"
+              }`}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="space-y-2">
         <span className="text-xs text-fg/50">Design</span>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {DESIGNS.map((d) => {
-            const selected = design === d.id;
+            const selected = designFor(editMode) === d.id;
             return (
               <button
                 key={d.id}
                 type="button"
-                onClick={() => setDesign(d.id)}
+                onClick={() => setDesign(d.id, editMode)}
                 aria-pressed={selected}
                 className={`group flex flex-col gap-1.5 rounded-lg border p-2 text-left transition-colors ${
                   selected ? "border-fg/40" : "border-fg/10 hover:border-fg/30"
@@ -331,12 +346,12 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
         <span className="text-xs text-fg/50">Scene</span>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {SCENES.map((s) => {
-            const selected = scene === s.id;
+            const selected = sceneFor(editMode) === s.id;
             return (
               <button
                 key={s.id}
                 type="button"
-                onClick={() => setScene(s.id)}
+                onClick={() => setScene(s.id, editMode)}
                 aria-pressed={selected}
                 className={`group flex flex-col gap-1.5 rounded-lg border p-2 text-left transition-colors ${
                   selected ? "border-fg/40" : "border-fg/10 hover:border-fg/30"
@@ -367,12 +382,12 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
         <span className="text-xs text-fg/50">Font</span>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {FONTS.map((f) => {
-            const selected = font === f.id;
+            const selected = fontFor(editMode) === f.id;
             return (
               <button
                 key={f.id}
                 type="button"
-                onClick={() => setFont(f.id)}
+                onClick={() => setFont(f.id, editMode)}
                 aria-pressed={selected}
                 className={`group flex flex-col gap-0.5 rounded-lg border p-2 text-left transition-colors ${
                   selected ? "border-fg/40" : "border-fg/10 hover:border-fg/30"
@@ -414,7 +429,7 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
             <button
               key={t.name}
               type="button"
-              onClick={() => applyThemeColors(t)}
+              onClick={() => applyThemeColors(t, editMode)}
               className="group flex flex-col gap-1.5 rounded-lg border border-fg/10 p-2 text-left transition-colors hover:border-fg/30"
               title={t.name}
             >
@@ -431,29 +446,9 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
         </div>
 
         <div className="space-y-3 border-t border-fg/10 pt-3">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-medium text-fg/55">Customize</span>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-fg/40">Editing</span>
-              <div className="flex overflow-hidden rounded-lg border border-fg/10">
-                {(["dark", "light"] as const).map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => chooseEditMode(m)}
-                    aria-pressed={editMode === m}
-                    className={`px-2.5 py-1 text-xs capitalize transition-colors ${
-                      editMode === m
-                        ? "bg-fg/15 text-fg"
-                        : "text-fg/50 hover:text-fg/80"
-                    }`}
-                  >
-                    {m}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
+          <span className="text-xs font-medium text-fg/55 capitalize">
+            Fine-tune {editMode}
+          </span>
 
           {/* Preview of the mode being edited (so the off mode has feedback). */}
           <div

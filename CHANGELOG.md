@@ -12,8 +12,21 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- The theme builder's light/dark **Editing** toggle now switches the whole theme,
+  not just the palette. Light and dark are independent looks — each with its own
+  design, scene, font, and colors — so you can run, say, a Cyber/Grid dark theme
+  alongside a Paper/Waves light theme. Tapping a preset fills only the mode you're
+  editing, and saved themes capture both modes.
+- The admin **Settings → Appearance** section gained a **Light mode look** picker,
+  letting the site-wide default use a wholly different design/scene/colors in
+  light mode (leave it on _Same as default_ to mirror the dark default).
+
 ### Changed
 
+- The Reset all settings button on the visitor settings panel now matches the
+  height of the Units toggle on the same row.
 - The two columns in the admin **Settings** tab now render at equal height, so
   their tops and bottoms line up.
 

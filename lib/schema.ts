@@ -44,11 +44,20 @@ export const themeSchema = z.object({
   // UI pointer for the picker — the concrete design/scene/colors below are what
   // the layout/PrefsProvider actually apply.
   preset: z.string().optional(),
+  // The pack chosen for an independent light-mode default (admin Settings). When
+  // unset, light mode follows the dark default's light variant.
+  presetLight: z.string().optional(),
   design: z.enum(DESIGN_IDS).default("glass"),
   scene: z.enum(SCENE_IDS).default("aurora"),
   // Default UI font. `.catch` coerces a retired/unknown id back to the default so
   // a hand-edited or downgraded config still parses.
   font: z.enum(FONT_IDS).catch(DEFAULT_FONT).default(DEFAULT_FONT),
+  // Optional light-mode design/scene/font. When set, light mode uses a wholly
+  // independent look; when omitted it falls back to the dark-mode values above.
+  // `.catch` coerces a retired id to undefined so an old config still parses.
+  designLight: z.enum(DESIGN_IDS).optional().catch(undefined),
+  sceneLight: z.enum(SCENE_IDS).optional().catch(undefined),
+  fontLight: z.enum(FONT_IDS).optional().catch(undefined),
   accentFrom: hexColor.default("#a78bfa"),
   accentTo: hexColor.default("#22d3ee"),
   // Optional custom default surface colors. `background`/`foreground` are the
@@ -242,9 +251,13 @@ export const searchUpdateSchema = z
 export const themeInputSchema = z.object({
   mode: z.enum(["system", "light", "dark"]),
   preset: z.string().optional(),
+  presetLight: z.string().optional(),
   design: z.enum(DESIGN_IDS),
   scene: z.enum(SCENE_IDS),
   font: z.enum(FONT_IDS),
+  designLight: z.enum(DESIGN_IDS).optional(),
+  sceneLight: z.enum(SCENE_IDS).optional(),
+  fontLight: z.enum(FONT_IDS).optional(),
   accentFrom: hexColor,
   accentTo: hexColor,
   background: hexColor.optional(),

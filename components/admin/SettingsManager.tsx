@@ -63,6 +63,9 @@ export default function SettingsManager({
 
   // Apply a theme pack as the site default: record it as the preset and copy its
   // concrete design/scene/colors into the theme fields the layout actually reads.
+  // This seeds BOTH modes from the one pack (dark parts + the pack's own light
+  // surfaces) and clears any separate light-mode override, so light follows dark
+  // unless the admin diverges it below.
   function applyDefaultTheme(name: string) {
     const pack = themePacks.find((p) => p.name === name);
     if (!pack) return;
@@ -74,6 +77,35 @@ export default function SettingsManager({
       accentTo: pack.dark.accentTo,
       background: pack.dark.background,
       foreground: pack.dark.foreground,
+      presetLight: undefined,
+      designLight: undefined,
+      sceneLight: undefined,
+      backgroundLight: pack.light.background,
+      foregroundLight: pack.light.foreground,
+    });
+  }
+
+  // Give light mode a wholly independent look (design + scene + surfaces) from a
+  // different pack. An empty name means "same as dark" — clear the override and
+  // re-seed the light surfaces from the dark default's pack.
+  function applyLightDefault(name: string) {
+    if (!name) {
+      const darkPack = themePacks.find((p) => p.name === theme.preset);
+      updateTheme({
+        presetLight: undefined,
+        designLight: undefined,
+        sceneLight: undefined,
+        backgroundLight: darkPack?.light.background,
+        foregroundLight: darkPack?.light.foreground,
+      });
+      return;
+    }
+    const pack = themePacks.find((p) => p.name === name);
+    if (!pack) return;
+    updateTheme({
+      presetLight: pack.name,
+      designLight: pack.design,
+      sceneLight: pack.scene,
       backgroundLight: pack.light.background,
       foregroundLight: pack.light.foreground,
     });
@@ -165,6 +197,27 @@ export default function SettingsManager({
               </option>
             ))}
           </select>
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-fg/50">Light mode look</span>
+          <select
+            value={theme.presetLight ?? ""}
+            onChange={(e) => applyLightDefault(e.target.value)}
+            className={selectClass}
+          >
+            <option value="">Same as default</option>
+            {themePacks.map((p) => (
+              <option key={p.name} value={p.name}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <span className="text-xs text-fg/40">
+            Give light mode its own design, scene &amp; colors — leave on{" "}
+            <span className="text-fg/60">Same as default</span> to mirror the
+            theme above.
+          </span>
         </label>
 
         {/* Preview of the default look's dark + light surfaces with the accent. */}
