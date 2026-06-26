@@ -207,7 +207,7 @@ export default function BookmarksManager({
 
       <form
         onSubmit={handleSubmit}
-        className="glass-card sticky top-6 flex h-fit flex-col gap-4 p-5"
+        className="glass-card flex h-fit flex-col gap-4 p-5"
       >
         <h3 className="font-semibold">{editingId ? "Edit bookmark" : "Add bookmark"}</h3>
         <TextField

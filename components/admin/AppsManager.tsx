@@ -215,7 +215,7 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
 
       <form
         onSubmit={handleSubmit}
-        className="glass-card sticky top-6 flex h-fit flex-col gap-4 p-5"
+        className="glass-card flex h-fit flex-col gap-4 p-5"
       >
         <h3 className="font-semibold">{editingId ? "Edit application" : "Add application"}</h3>
         <TextField
