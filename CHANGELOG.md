@@ -14,6 +14,9 @@ here.
 
 ### Fixed
 
+- Drag-to-reorder in the admin now shows an insertion line that points to exactly
+  where the row will land, instead of a whole-row highlight that read as
+  off-by-one.
 - Changing the admin **default theme** now applies fully. Previously its surface
   colors were ignored for any visitor who had used the light/dark toggle (only
   the design, scene, and accent changed); the default theme's colors now apply
