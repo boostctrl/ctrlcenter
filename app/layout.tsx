@@ -83,8 +83,17 @@ export default async function RootLayout({
     defaultTheme
   )};var el=document.documentElement;var s=el.style;var prefersDark=window.matchMedia('(prefers-color-scheme: dark)').matches;var m=localStorage.getItem('ctrlcenter:theme');var modeChosen=(m==='light'||m==='dark'||m==='system');var mode=modeChosen?m:dt.mode;var dark=mode==='dark'||(mode==='system'&&prefersDark);el.classList.toggle('theme-light',!dark);function cs(o){return o&&typeof o.background==='string'&&typeof o.accentFrom==='string'?o:null;}var look=null;var ct=localStorage.getItem('ctrlcenter:activeTheme');if(ct){try{var c=JSON.parse(ct);if(c){if(cs(c.dark)&&cs(c.light)){look={dark:c.dark,light:c.light};}else if(cs(c)){look={dark:c,light:c};}}}catch(e){}}if(!look&&!modeChosen&&dt.background&&dt.foreground){look={dark:{background:dt.background,foreground:dt.foreground,accentFrom:dt.accentFrom,accentTo:dt.accentTo},light:{background:dt.backgroundLight||dt.background,foreground:dt.foregroundLight||dt.foreground,accentFrom:dt.accentFrom,accentTo:dt.accentTo}};}var v=look?(dark?look.dark:look.light):null;if(v){s.setProperty('--background',v.background);s.setProperty('--foreground',v.foreground);s.setProperty('--fg',v.foreground);}var af=v?v.accentFrom:dt.accentFrom;var at=v?v.accentTo:dt.accentTo;var ao=localStorage.getItem('ctrlcenter:accent');if(ao){try{var a=JSON.parse(ao);if(a&&a.from){af=a.from;at=a.to;}}catch(e){}}s.setProperty('--accent-from',af);s.setProperty('--accent-to',at);var dz=localStorage.getItem('ctrlcenter:design');var design=['glass','aero','flat','soft','minimal','bold','cyber','clay','frost','outline','paper','gradient'].indexOf(dz)>=0?dz:dt.design;if(design!=='glass'){el.classList.add('design-'+design);}var sz=localStorage.getItem('ctrlcenter:scene');var scene=['aurora','abyss','nebula','grid','starfield','waves','rays','traces','dots','glow','vortex','mesh'].indexOf(sz)>=0?sz:dt.scene;if(scene&&scene!=='aurora'){el.classList.add('scene-'+scene);}var fz=localStorage.getItem('ctrlcenter:font');var font=['jakarta','inter','poppins','nunito','lora','jetbrains'].indexOf(fz)>=0?fz:dt.font;if(font&&font!=='jakarta'){el.classList.add('font-'+font);}}catch(e){}})();`;
 
+  // suppressHydrationWarning on <html>: the inline theme script below mutates its
+  // classes/inline styles (theme-light, design-*, scene-*, font-*, color vars)
+  // before hydration from values the server can't know (visitor localStorage), so
+  // the SSR/client diff on <html> is expected — scope the suppression to it so
+  // React doesn't log #418.
   return (
-    <html lang="en" className={`${fontVariables} h-full`}>
+    <html
+      lang="en"
+      className={`${fontVariables} h-full`}
+      suppressHydrationWarning
+    >
       <body className="relative min-h-full overflow-x-hidden antialiased">
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeScript }} />
         <PrefsProvider
