@@ -12,6 +12,11 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- The two columns in the admin **Settings** tab now render at equal height, so
+  their tops and bottoms line up.
+
 ### Fixed
 
 - The status page uptime timeline now reads in your time zone instead of UTC —
