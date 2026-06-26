@@ -148,7 +148,7 @@ export default function SettingsControls() {
           <button
             type="button"
             onClick={reset}
-            className="rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/60 transition-colors hover:bg-red-500/10 hover:text-red-400"
+            className="rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-xs text-fg/60 transition-colors hover:bg-red-500/10 hover:text-red-400"
           >
             Reset all settings
           </button>
