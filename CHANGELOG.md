@@ -14,6 +14,8 @@ here.
 
 ### Fixed
 
+- The status page uptime timeline now shows times in your time zone (matching
+  the rest of the app) instead of UTC.
 - Drag-to-reorder in the admin now shows an insertion line that points to exactly
   where the row will land, instead of a whole-row highlight that read as
   off-by-one.
