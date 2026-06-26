@@ -3,6 +3,7 @@ import path from "path";
 import YAML from "js-yaml";
 import {
   configSchema,
+  configReadSchema,
   type Config,
   type AppItem,
   type BookmarkItem,
@@ -36,12 +37,20 @@ export async function readConfig(): Promise<Config> {
   await ensureConfigExists();
   const raw = await fs.readFile(CONFIG_PATH, "utf8");
   const parsed = YAML.load(raw);
-  return configSchema.parse(parsed ?? {});
+  // Lenient read: a single malformed row is dropped rather than 500-ing every
+  // page on a hand-edited file (see configReadSchema). Writes/imports stay strict.
+  return configReadSchema.parse(parsed ?? {});
 }
 
 async function writeConfig(config: Config): Promise<void> {
   const validated = configSchema.parse(config);
-  await fs.writeFile(CONFIG_PATH, YAML.dump(validated, { lineWidth: 100 }), "utf8");
+  // Write to a temp file then rename into place (atomic on the same filesystem)
+  // so a concurrent readConfig() can never observe a torn, half-written YAML file
+  // and throw. Mirrors the persistence in lib/status-history.ts.
+  const tmp = `${CONFIG_PATH}.tmp`;
+  await fs.mkdir(CONFIG_DIR, { recursive: true });
+  await fs.writeFile(tmp, YAML.dump(validated, { lineWidth: 100 }), "utf8");
+  await fs.rename(tmp, CONFIG_PATH);
 }
 
 async function mutate<T>(fn: (config: Config) => T): Promise<T> {

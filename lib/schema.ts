@@ -158,6 +158,32 @@ export const configSchema = z.object({
   auth: authSchema.default(authSchema.parse({})),
 });
 
+// Parse an array, dropping only the items that fail validation instead of
+// failing the whole config. A non-array value falls back to an empty list.
+function lenientArray<T extends z.ZodTypeAny>(item: T) {
+  return z
+    .array(z.unknown())
+    .catch([])
+    .transform((arr) =>
+      arr.flatMap((value) => {
+        const parsed = item.safeParse(value);
+        return parsed.success ? [parsed.data as z.infer<T>] : [];
+      })
+    );
+}
+
+// Resilient variant used only when READING config.yaml from disk: a single
+// malformed app/bookmark/theme row is dropped rather than failing the whole load
+// (which would 500 every page on a hand-edited file). Import and write still use
+// the strict `configSchema` above, so the admin gets clear feedback on a bad
+// file instead of silently losing rows. Extends the per-field `.catch()`
+// resilience to whole rows.
+export const configReadSchema = configSchema.extend({
+  apps: lenientArray(appItemSchema),
+  bookmarks: lenientArray(bookmarkItemSchema),
+  themes: lenientArray(themePackSchema),
+});
+
 export type Config = z.infer<typeof configSchema>;
 export type Settings = z.infer<typeof settingsSchema>;
 export type AppItem = z.infer<typeof appItemSchema>;

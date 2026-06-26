@@ -30,6 +30,23 @@ describe("readConfig", () => {
     const onDisk = YAML.load(await fs.readFile(configPath, "utf8"));
     expect(onDisk).toBeTruthy();
   });
+
+  it("drops a malformed hand-edited row instead of failing the whole load", async () => {
+    // One valid app and two invalid ones (bad URL, empty name) written by hand.
+    await fs.writeFile(
+      configPath,
+      YAML.dump({
+        apps: [
+          { id: "a", name: "Good", url: "https://ok.example.com" },
+          { id: "b", name: "Bad URL", url: "not-a-url" },
+          { id: "c", name: "", url: "https://empty-name.example.com" },
+        ],
+      }),
+      "utf8"
+    );
+    const result = await config.readConfig();
+    expect(result.apps.map((a) => a.id)).toEqual(["a"]);
+  });
 });
 
 describe("apps CRUD", () => {
