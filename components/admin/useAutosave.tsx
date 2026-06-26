@@ -20,6 +20,12 @@ export function useAutosave<T>(
   // shouldn't), so key the effect on the serialized value.
   const key = JSON.stringify(value);
   const first = useRef(true);
+  // Serialize the actual writes so two saves can never land out of order (an
+  // older value clobbering a newer one when the first request is slower than the
+  // debounce window), and a monotonic sequence so only the latest save drives the
+  // visible status.
+  const chain = useRef<Promise<unknown>>(Promise.resolve());
+  const latestSeq = useRef(0);
 
   useEffect(() => {
     if (first.current) {
@@ -27,18 +33,23 @@ export function useAutosave<T>(
       return;
     }
     let cancelled = false;
+    const seq = ++latestSeq.current;
     setStatus("saving");
     setError(null);
-    const t = setTimeout(async () => {
-      try {
-        await save(value);
-        if (!cancelled) setStatus("saved");
-      } catch (e) {
-        if (!cancelled) {
-          setStatus("error");
-          setError(e instanceof Error ? e.message : "Couldn't save");
+    const t = setTimeout(() => {
+      // `.catch` first so a prior failed save never blocks the next one, then run
+      // this save after the previous one has fully settled (preserving order).
+      chain.current = chain.current.catch(() => undefined).then(async () => {
+        try {
+          await save(value);
+          if (!cancelled && seq === latestSeq.current) setStatus("saved");
+        } catch (e) {
+          if (!cancelled && seq === latestSeq.current) {
+            setStatus("error");
+            setError(e instanceof Error ? e.message : "Couldn't save");
+          }
         }
-      }
+      });
     }, delay);
     return () => {
       cancelled = true;
