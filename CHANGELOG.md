@@ -14,6 +14,10 @@ here.
 
 ### Fixed
 
+- Changing the admin **default theme** now applies fully. Previously its surface
+  colors were ignored for any visitor who had used the light/dark toggle (only
+  the design, scene, and accent changed); the default theme's colors now apply
+  regardless of mode choice.
 - An invalid time zone (a hand-edited config value or stale per-visitor
   preference) no longer crashes the dashboard. The date/time helpers fall back
   to UTC instead of throwing, and invalid stored zones are dropped.
