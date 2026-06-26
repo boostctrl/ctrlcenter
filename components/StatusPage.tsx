@@ -114,7 +114,11 @@ export default function StatusPage({
     try {
       const [statusRes, historyRes] = await Promise.all([
         fetch("/api/status", { cache: "no-store" }),
-        fetch("/api/status/history", { cache: "no-store" }),
+        // Pass the effective time zone so the daily timeline is bucketed by the
+        // visitor's calendar day, not UTC.
+        fetch(`/api/status/history?tz=${encodeURIComponent(timezone)}`, {
+          cache: "no-store",
+        }),
       ]);
       if (statusRes.ok) {
         const data: StatusResponse = await statusRes.json();
@@ -131,7 +135,7 @@ export default function StatusPage({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [timezone]);
 
   useEffect(() => {
     // Initial fetch on mount; load() flips a loading flag synchronously, which

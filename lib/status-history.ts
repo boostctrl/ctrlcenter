@@ -29,8 +29,17 @@ export function hourOf(ts: number): number {
   return Math.floor(ts / HOUR_MS);
 }
 
-function dayStr(hour: number): string {
-  return new Date(hour * HOUR_MS).toISOString().slice(0, 10);
+// "YYYY-MM-DD" calendar date for an instant (ms), in the given time zone, so the
+// daily timeline groups by the visitor's local day rather than the UTC day.
+function localDayStr(ms: number, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(ms));
+  const get = (t: string) => parts.find((p) => p.type === t)!.value;
+  return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
 // `YYYY-MM-DDThh` for an hourly bar's `at`.
@@ -79,25 +88,32 @@ export function uptimePct(buckets: Bucket[], sinceHour: number): number | null {
   return total === 0 ? null : (up / total) * 100;
 }
 
-// A timeline of the last `days` UTC days (oldest → newest), each with that day's
-// uptime % or null when nothing was recorded.
+// A timeline of the last `days` calendar days in `timeZone` (oldest → newest),
+// each with that day's uptime % or null when nothing was recorded. Grouping by
+// the visitor's local day (not UTC) keeps the chart aligned with their calendar
+// — an hourly bucket near midnight counts toward the local day it falls in.
 export function dailyTimeline(
   buckets: Bucket[],
   days: number,
-  nowHour: number
+  now: number,
+  timeZone: string
 ): BarPoint[] {
   const byDay = new Map<string, { up: number; down: number }>();
   for (const b of buckets) {
-    const date = dayStr(b.hour);
+    const date = localDayStr(b.hour * HOUR_MS, timeZone);
     const cur = byDay.get(date) ?? { up: 0, down: 0 };
     cur.up += b.up;
     cur.down += b.down;
     byDay.set(date, cur);
   }
-  const nowMs = nowHour * HOUR_MS;
+  // Enumerate the last `days` calendar dates ending on today (local). Anchor each
+  // at a UTC midnight and step by whole UTC days so the enumeration is DST-proof
+  // (no local-midnight arithmetic), then match against the local-day keys above.
+  const [ty, tm, td] = localDayStr(now, timeZone).split("-").map(Number);
+  const cursor = Date.UTC(ty, tm - 1, td);
   const out: BarPoint[] = [];
   for (let i = days - 1; i >= 0; i--) {
-    const date = dayStr(hourOf(nowMs - i * DAY_MS));
+    const date = new Date(cursor - i * DAY_MS).toISOString().slice(0, 10);
     const d = byDay.get(date);
     const total = d ? d.up + d.down : 0;
     out.push({ at: date, uptime: total === 0 ? null : (d!.up / total) * 100 });
@@ -256,8 +272,10 @@ export function flush(): Promise<void> {
 
 // Read history for the given app ids (preserving order) as the API payload — the
 // last hour of per-poll bars + 24h of hourly bars + a 90-day daily timeline +
-// uptime windows (h1 from the raw ring, the rest from the hourly buckets).
-export function getHistory(ids: string[]): StatusHistory {
+// uptime windows (h1 from the raw ring, the rest from the hourly buckets). The
+// daily timeline is bucketed by `timeZone`'s calendar day so the chart lines up
+// with the visitor's local days; defaults to UTC when no zone is given.
+export function getHistory(ids: string[], timeZone = "UTC"): StatusHistory {
   const now = Date.now();
   const nowHour = hourOf(now);
   const recentSince = now - RECENT_VIEW_MS;
@@ -275,7 +293,7 @@ export function getHistory(ids: string[]): StatusHistory {
       },
       recent: recentBars(readings, recentSince),
       hourly: hourlyTimeline(buckets, 24, nowHour),
-      daily: dailyTimeline(buckets, 90, nowHour),
+      daily: dailyTimeline(buckets, 90, now, timeZone),
     };
   });
   return { generatedAt: Date.now(), apps };

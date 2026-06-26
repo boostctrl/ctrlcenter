@@ -40,13 +40,13 @@ describe("uptimePct", () => {
 });
 
 describe("dailyTimeline", () => {
-  it("returns one point per UTC day (oldest→newest) ending today", () => {
-    const nowHour = hr(2026, 5, 23, 12);
+  it("returns one point per day (oldest→newest) ending today", () => {
+    const now = Date.UTC(2026, 5, 23, 12);
     const buckets: Bucket[] = [
       { hour: hr(2026, 5, 22, 5), up: 2, down: 2 },
       { hour: hr(2026, 5, 23, 1), up: 3, down: 0 },
     ];
-    const tl = dailyTimeline(buckets, 3, nowHour);
+    const tl = dailyTimeline(buckets, 3, now, "UTC");
     expect(tl.map((p) => p.at)).toEqual([
       "2026-06-21",
       "2026-06-22",
@@ -55,6 +55,17 @@ describe("dailyTimeline", () => {
     expect(tl[0].uptime).toBeNull();
     expect(tl[1].uptime).toBe(50);
     expect(tl[2].uptime).toBe(100);
+  });
+
+  it("buckets by the given time zone's calendar day, not UTC", () => {
+    // 02:00 UTC on the 23rd is 21:00 on the 22nd in America/Chicago (CDT, -5),
+    // so the reading must count toward the local 22nd — not the UTC 23rd.
+    const now = Date.UTC(2026, 5, 23, 12); // 07:00 local on the 23rd
+    const buckets: Bucket[] = [{ hour: hr(2026, 5, 23, 2), up: 4, down: 0 }];
+    const tl = dailyTimeline(buckets, 2, now, "America/Chicago");
+    expect(tl.map((p) => p.at)).toEqual(["2026-06-22", "2026-06-23"]);
+    expect(tl[0].uptime).toBe(100); // landed on the local 22nd
+    expect(tl[1].uptime).toBeNull();
   });
 });
 
