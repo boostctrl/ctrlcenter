@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-06-26
+
 ### Added
 
 - The home page header now surfaces the **status page**: a health row (e.g.
@@ -696,7 +698,9 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.8...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.9...v1.0.0
+[0.9.9]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.8...v0.9.9
 [0.9.8]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.7...v0.9.8
 [0.9.7]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.6...v0.9.7
 [0.9.6]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.5...v0.9.6
