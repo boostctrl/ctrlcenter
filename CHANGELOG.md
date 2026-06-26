@@ -19,6 +19,8 @@ here.
 
 ### Fixed
 
+- The add/edit form on the admin Applications and Bookmarks tabs now lines up
+  with the top of the list instead of sitting slightly lower.
 - The status page uptime timeline now reads in your time zone instead of UTC —
   both the displayed times and the daily-bar boundaries align to your local
   calendar day.
