@@ -18,10 +18,13 @@ Built with Next.js 16, React 19, and Tailwind v4.
 - **A real theme system.** Mix and match three independent axes and save the
   result:
   - **Designs** — the card surface: `glass`, `aero`, `flat`, `soft`, `minimal`,
-    `bold`, `cyber`.
+    `bold`, `cyber`, `clay`, `frost`, `outline`, `paper`, `gradient`.
   - **Scenes** — an animated backdrop: `aurora`, `abyss`, `nebula`, `grid`,
-    `starfield`, `waves` (all motion respects `prefers-reduced-motion`).
-  - **Colors** — a palette plus an accent gradient, or hand-pick your own.
+    `starfield`, `waves`, `rays`, `traces`, `dots`, `glow`, `vortex`, `mesh`
+    (all motion respects `prefers-reduced-motion`).
+  - **Colors & font** — a palette plus an accent gradient (or hand-pick your
+    own), and a UI font: `jakarta`, `inter`, `poppins`, `nunito`, `lora`,
+    `jetbrains`.
 
   Every look has a **cohesive light and dark variant**, and one-tap **Themes**
   (Default, Mariana, Outrun, Observatory, Tide, …) bundle a palette, design, and
@@ -86,8 +89,9 @@ settings:
   timezone: America/Chicago # IANA timezone, used for the date + greeting
   theme:                    # site-wide default (visitors can override in /settings)
     mode: system            # system | light | dark
-    design: glass           # glass | aero | flat | soft | minimal | bold | cyber
-    scene: aurora           # aurora | abyss | nebula | grid | starfield | waves
+    design: glass           # glass|aero|flat|soft|minimal|bold|cyber|clay|frost|outline|paper|gradient
+    scene: aurora           # aurora|abyss|nebula|grid|starfield|waves|rays|traces|dots|glow|vortex|mesh
+    font: jakarta           # jakarta | inter | poppins | nunito | lora | jetbrains
     accentFrom: '#a78bfa'   # accent gradient start (#rrggbb)
     accentTo: '#22d3ee'     # accent gradient end (same as start = solid)
     # Optional fixed default colors (override light/dark mode). Set in pairs:
@@ -148,7 +152,7 @@ for reuse. You can also paste a direct image URL or a `data:` URI.
 | `ADMIN_PASSWORD` | yes | Bootstrap password for `/admin`. After you set one in **Settings → Reset password**, login uses that — but keep this set (or set `SESSION_SECRET`), as it also signs sessions. **Special characters:** quote the value in `.env` and double any literal `$` as `$$` (docker compose interpolates `$`), or a complex password can be mangled before the app sees it. |
 | `SESSION_SECRET` | no | Secret used to sign session cookies. If unset, derived from `ADMIN_PASSWORD`. Recommended so sessions don't depend on the password. Generate with `openssl rand -base64 32`. |
 | `CONFIG_PATH` | no | Path to the config file (default `./config/config.yaml`; the container sets `/config/config.yaml`). The uptime history (`status-history.json`) and uploaded custom icons (`uploads/`) are written beside it. |
-| `TRUSTED_PROXY_HOPS` | no | Number of trusted reverse proxies in front of the app, used to find the real client IP in `X-Forwarded-For` for login throttling. Default `1`. Set `0` if exposed directly. |
+| `TRUSTED_PROXY_HOPS` | no | Number of trusted reverse proxies in front of the app, used to find the real client IP in `X-Forwarded-For` for login throttling. Default `1` (the app sits behind one reverse proxy). **Set `0` if the app is exposed directly** — otherwise a client can spoof `X-Forwarded-For` to forge a fresh source IP per request and slip past the per-IP login throttle. A global attempt cap still applies as a backstop, but the per-IP limit is your first line of defense. |
 
 ## Development
 
