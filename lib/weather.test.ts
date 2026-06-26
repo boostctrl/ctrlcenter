@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   windDirectionLabel,
   windUnitLabel,
@@ -6,6 +6,7 @@ import {
   uvLabel,
   formatClock,
   unitSymbol,
+  fetchWeather,
 } from "./weather";
 
 describe("windDirectionLabel", () => {
@@ -56,5 +57,40 @@ describe("unit labels", () => {
     expect(windUnitLabel("metric")).toBe("km/h");
     expect(precipUnitLabel("imperial")).toBe("in");
     expect(precipUnitLabel("metric")).toBe("mm");
+  });
+});
+
+describe("fetchWeather", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const mockFetch = (body: unknown, ok = true) =>
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok, json: async () => body })
+    );
+
+  it("returns the current conditions on a well-formed response", async () => {
+    mockFetch({
+      current: { temperature_2m: 21, relative_humidity_2m: 60, weather_code: 1 },
+    });
+    expect(await fetchWeather(0, 0, "metric")).toEqual({
+      temperature: 21,
+      humidity: 60,
+      code: 1,
+    });
+  });
+
+  it("returns null when a required numeric field is missing (no NaN render)", async () => {
+    mockFetch({ current: { relative_humidity_2m: 60, weather_code: 1 } });
+    expect(await fetchWeather(0, 0, "metric")).toBeNull();
+  });
+
+  it("coerces a missing humidity to 0 rather than failing", async () => {
+    mockFetch({ current: { temperature_2m: 21, weather_code: 1 } });
+    expect(await fetchWeather(0, 0, "metric")).toEqual({
+      temperature: 21,
+      humidity: 0,
+      code: 1,
+    });
   });
 });

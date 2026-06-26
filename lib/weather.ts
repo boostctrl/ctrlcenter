@@ -31,9 +31,21 @@ export async function fetchWeather(
     const data = await res.json();
     const current = data.current;
     if (!current) return null;
+    // Guard the fields like fetchForecast does: bail if the API omits a required
+    // numeric (so the widget hides rather than rendering NaN°), and coerce the
+    // rest.
+    if (
+      typeof current.temperature_2m !== "number" ||
+      typeof current.weather_code !== "number"
+    ) {
+      return null;
+    }
     return {
       temperature: current.temperature_2m,
-      humidity: current.relative_humidity_2m,
+      humidity:
+        typeof current.relative_humidity_2m === "number"
+          ? current.relative_humidity_2m
+          : 0,
       code: current.weather_code,
     };
   } catch {
