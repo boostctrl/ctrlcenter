@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
 :root {
+  /* Theme native controls — <select> dropdown lists, scrollbars, checkboxes — to
+     match the mode so OS-rendered popups aren't light-on-dark. `.theme-light`
+     flips it. */
+  color-scheme: dark;
   --background: #06070d;
   --foreground: #f4f4f6;
   /* `fg` is the themeable base used by every text/surface/border utility (the
@@ -239,6 +243,7 @@
 
 /* Light theme: toggled by adding `.theme-light` to <html>. */
 .theme-light {
+  color-scheme: light;
   --background: #eceef3;
   --foreground: #181b24;
   --fg: #1a1d27;
@@ -272,6 +277,16 @@ body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* Native <select> dropdown lists are OS-rendered and otherwise inherit the
+   control's translucent fill + near-white ink, which reads as light-on-light.
+   Give the options the solid theme surface colors so the open list matches the
+   theme and stays legible in both modes. */
+select option,
+select optgroup {
+  background-color: var(--background);
+  color: var(--foreground);
 }
 
 /* Font presets: a `font-<id>` class on <html> repoints --font-sans (the default,
