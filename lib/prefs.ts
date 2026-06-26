@@ -13,6 +13,7 @@ import {
   type SceneId,
 } from "./theme";
 import { isFontId, type FontId } from "./fonts";
+import { isValidTimeZone } from "./datetime";
 
 export type Units = "imperial" | "metric";
 
@@ -48,7 +49,11 @@ export function sanitizePrefs(input: unknown): VisitorPrefs {
   const raw = input as Record<string, unknown>;
   const prefs: VisitorPrefs = {};
 
-  if (typeof raw.timezone === "string" && raw.timezone.length <= 100) {
+  if (
+    typeof raw.timezone === "string" &&
+    raw.timezone.length <= 100 &&
+    isValidTimeZone(raw.timezone)
+  ) {
     prefs.timezone = raw.timezone;
   }
   if (typeof raw.greetingName === "string" && raw.greetingName.trim()) {

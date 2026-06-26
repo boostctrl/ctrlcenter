@@ -76,6 +76,11 @@ describe("sanitizePrefs", () => {
     expect(out.dismissedAuto).toBeUndefined();
   });
 
+  it("drops an invalid time zone so the clock can't crash on it", () => {
+    expect(sanitizePrefs({ timezone: "America/Chicagoo" }).timezone).toBeUndefined();
+    expect(sanitizePrefs({ timezone: "" }).timezone).toBeUndefined();
+  });
+
   it("accepts a well-formed in-range location with a clamped label", () => {
     const out = sanitizePrefs({
       location: {
