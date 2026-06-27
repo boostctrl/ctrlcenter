@@ -12,6 +12,23 @@ here.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-06-26
+
+### Changed
+
+- The status page rows now show each app's **subtitle** next to its host (e.g.
+  `Nextcloud · files.example.com`), matching how apps read in the admin
+  ordering cards; rows with no subtitle still show just the host.
+- In the theme builder, switching the light/dark **Editing** toggle now previews
+  that mode live so you can see the edits you're making. The preview is
+  temporary — it never changes your saved Appearance mode and reverts when you
+  leave the page — and the toggle always starts on the mode currently on screen.
+
+### Fixed
+
+- The admin **Settings** tab's two columns no longer leave dead space between
+  their cards; each column now stacks its cards flush from the top.
+
 ## [1.0.0] - 2026-06-26
 
 ### Added
@@ -698,7 +715,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/boostctrl/ctrlcenter/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.9...v1.0.0
 [0.9.9]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.8...v0.9.9
 [0.9.8]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.7...v0.9.8
