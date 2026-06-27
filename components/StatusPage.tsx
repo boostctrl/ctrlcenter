@@ -259,7 +259,9 @@ export default function StatusPage({
                         {app.name}
                       </p>
                       <p className="truncate text-sm text-fg/55">
-                        {host(app.url)}
+                        {app.subtitle
+                          ? `${app.subtitle} · ${host(app.url)}`
+                          : host(app.url)}
                       </p>
                     </div>
                     <div className="shrink-0 text-right">
