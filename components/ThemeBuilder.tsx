@@ -80,7 +80,6 @@ function scenePreview(id: SceneId, from: string, to: string): string {
 
 export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
   const {
-    theme,
     designFor,
     setDesign,
     sceneFor,
@@ -98,32 +97,26 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
     applyNamedTheme,
     deleteNamedTheme,
     resetTheme,
-    surfaceIsLight,
+    resolvedMode,
+    setPreviewMode,
   } = useVisitorPrefs();
 
-  // Which mode's colors the pickers edit. Defaults to the mode the app is set to;
-  // on "system" it follows the resolved display mode until the visitor pins a
-  // choice (an explicit app mode or a manual toggle below), after which it keeps
-  // that last value. Independent of the app's display — switching the editing
-  // mode doesn't change what the app shows.
-  const [editMode, setEditMode] = useState<"dark" | "light">(
-    theme === "light" ? "light" : theme === "dark" ? "dark" : surfaceIsLight ? "light" : "dark"
-  );
-  const editPinned = useRef(false);
+  // Always edit the mode that's actually on screen, so what you tweak is what you
+  // see. The Editing toggle below switches modes by previewing them live (see
+  // setPreviewMode) rather than keeping a separate, hidden edit target.
+  const editMode = resolvedMode;
+
+  // The preview is display-only and never persisted, so dropping it when the
+  // builder unmounts returns the visitor to their saved Appearance mode the
+  // moment they leave the page. A latest-value ref keeps this an unmount-only
+  // cleanup that still calls the current setPreviewMode (whose identity changes
+  // as theme state updates), so it applies the up-to-date look, not a stale one.
+  const dropPreview = useRef(setPreviewMode);
   useEffect(() => {
-    let next: "dark" | "light" | null = null;
-    if (theme === "light" || theme === "dark") {
-      editPinned.current = true;
-      next = theme;
-    } else if (!editPinned.current) {
-      next = surfaceIsLight ? "light" : "dark";
-    }
-    if (next) setEditMode(next);
-  }, [theme, surfaceIsLight]);
-  const chooseEditMode = (m: "dark" | "light") => {
-    editPinned.current = true;
-    setEditMode(m);
-  };
+    dropPreview.current = setPreviewMode;
+  });
+  useEffect(() => () => dropPreview.current(null), []);
+
   const [draft, setDraft] = useState<ThemeColors>(DEFAULT_DRAFT);
   const [name, setName] = useState("");
 
@@ -273,12 +266,15 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
       </div>
 
       {/* The Editing toggle governs everything below — design, scene, font and
-          palette — so light and dark can be wholly different themes. */}
+          palette — so light and dark can be wholly different themes. Switching it
+          previews that mode live (setPreviewMode) so edits are visible. */}
       <div className="flex items-center justify-between gap-2 rounded-xl border border-fg/15 bg-fg/[0.02] p-3">
         <div>
           <span className="text-sm font-medium text-fg/80">Editing</span>
           <p className="text-xs text-fg/40">
-            Which mode you&apos;re designing. Light and dark are independent.
+            Which mode you&apos;re designing — light and dark are independent.
+            Switching previews it here so you can see your edits; it won&apos;t
+            change your saved Appearance mode, and reverts when you leave.
           </p>
         </div>
         <div className="flex overflow-hidden rounded-lg border border-fg/10">
@@ -286,7 +282,7 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
             <button
               key={m}
               type="button"
-              onClick={() => chooseEditMode(m)}
+              onClick={() => setPreviewMode(m)}
               aria-pressed={editMode === m}
               className={`px-4 py-1.5 text-xs capitalize transition-colors ${
                 editMode === m

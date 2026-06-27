@@ -168,6 +168,10 @@ type PrefsValue = {
   weatherEnabled: boolean;
   greetingName: string;
   theme: Theme;
+  // The appearance mode actually displayed now ("dark"/"light"). A live theme-
+  // builder preview can make this differ from `theme` (the saved choice) without
+  // persisting anything.
+  resolvedMode: Mode;
   // Resolved for the current display mode (what's on <html> right now).
   design: DesignId;
   scene: SceneId;
@@ -191,6 +195,9 @@ type PrefsValue = {
   setGreetingName: (name: string) => void;
   useMyLocation: () => void;
   setTheme: (theme: Theme) => void;
+  // Preview a mode's appearance without persisting it (theme builder). Passing
+  // null drops the preview and returns to the saved `theme`.
+  setPreviewMode: (mode: Mode | null) => void;
   setDesign: (design: DesignId, mode: Mode) => void;
   setScene: (scene: SceneId, mode: Mode) => void;
   setFont: (font: FontId, mode: Mode) => void;
@@ -319,6 +326,15 @@ export function PrefsProvider({
     useState<AccentColors | null>(null);
   // Tracks the OS color scheme so "system" mode resolves its surface lightness.
   const [systemDark, setSystemDark] = useState(false);
+  // A non-persisted appearance-mode preview for the theme builder: lets the
+  // visitor see a mode while editing it without changing their saved choice.
+  const [previewMode, setPreviewModeState] = useState<Mode | null>(null);
+
+  // The mode actually shown on screen: a live builder preview overrides the
+  // saved app mode (without persisting). Everything that drives the *display* —
+  // the DOM classes/vars and the resolved design/scene/font — keys off this,
+  // while persistence and the Preferences toggle still use the saved `theme`.
+  const displayTheme: Theme = previewMode ?? theme;
 
   // The look to apply: a per-visitor custom look wins, otherwise the admin custom
   // default colors, otherwise null = the built-in light/dark CSS defaults. The
@@ -396,6 +412,8 @@ export function PrefsProvider({
 
   const setTheme = useCallback(
     (next: Theme) => {
+      // Committing a real mode ends any live preview.
+      setPreviewModeState(null);
       setThemeState(next);
       try {
         window.localStorage.setItem(THEME_KEY, next);
@@ -416,6 +434,25 @@ export function PrefsProvider({
     [activeLook, accentOverride, defaultAccent, resolveLook, applyChrome]
   );
 
+  // Preview a mode's appearance live (theme builder) without persisting it, or
+  // pass null to drop the preview and return to the saved mode. Only the display
+  // changes — `theme` and localStorage are untouched, so leaving the page (which
+  // clears this) reverts to the saved choice.
+  const setPreviewMode = useCallback(
+    (mode: Mode | null) => {
+      setPreviewModeState(mode);
+      const dt: Theme = mode ?? theme;
+      applyAll({
+        theme: dt,
+        look: resolveLook(activeLook),
+        accentOverride,
+        defaultAccent,
+      });
+      applyChrome(resolveDark(dt));
+    },
+    [theme, activeLook, accentOverride, defaultAccent, resolveLook, applyChrome]
+  );
+
   // Set one mode's design/scene/font. Persists the per-mode pair and applies the
   // class immediately only when that mode is the one currently displayed.
   const setDesign = useCallback(
@@ -423,9 +460,9 @@ export function PrefsProvider({
       const updated = { ...designs, [mode]: next };
       setDesigns(updated);
       saveDesign(updated);
-      if ((mode === "dark") === resolveDark(theme)) applyDesign(next);
+      if ((mode === "dark") === resolveDark(displayTheme)) applyDesign(next);
     },
-    [designs, theme]
+    [designs, displayTheme]
   );
 
   const setScene = useCallback(
@@ -433,9 +470,9 @@ export function PrefsProvider({
       const updated = { ...scenes, [mode]: next };
       setScenes(updated);
       saveScene(updated);
-      if ((mode === "dark") === resolveDark(theme)) applyScene(next);
+      if ((mode === "dark") === resolveDark(displayTheme)) applyScene(next);
     },
-    [scenes, theme]
+    [scenes, displayTheme]
   );
 
   const setFont = useCallback(
@@ -443,9 +480,9 @@ export function PrefsProvider({
       const updated = { ...fonts, [mode]: next };
       setFonts(updated);
       saveFont(updated);
-      if ((mode === "dark") === resolveDark(theme)) applyFont(next);
+      if ((mode === "dark") === resolveDark(displayTheme)) applyFont(next);
     },
-    [fonts, theme]
+    [fonts, displayTheme]
   );
 
   // Apply (and persist) custom colors. With a `mode`, only that mode's colorset
@@ -467,9 +504,9 @@ export function PrefsProvider({
       saveActiveTheme(look);
       setAccentOverrideState(null);
       saveAccentOverride(null);
-      applyAll({ theme, look, accentOverride: null, defaultAccent });
+      applyAll({ theme: displayTheme, look, accentOverride: null, defaultAccent });
     },
-    [theme, defaultAccent, activeLook, seedColorSet]
+    [displayTheme, defaultAccent, activeLook, seedColorSet]
   );
 
   // Apply a curated pack to one mode: its design + scene + that mode's colorset.
@@ -492,7 +529,7 @@ export function PrefsProvider({
       // Which mode's colorset to edit. Defaults to the displayed mode (the old
       // behavior); the theme builder passes an explicit target so it can design
       // the non-active mode without changing what the app shows.
-      const dark = targetDark ?? resolveDark(theme);
+      const dark = targetDark ?? resolveDark(displayTheme);
       const accent = resolveAccent(
         accentOverride,
         variantFor(activeLook, dark),
@@ -512,11 +549,11 @@ export function PrefsProvider({
       const next: ModeColors = dark ? { ...base, dark: cs } : { ...base, light: cs };
       setActiveLook(next);
       saveActiveTheme(next);
-      // Display still follows the actual `theme`, so editing the off mode persists
-      // its colors without flipping the screen.
-      applyAll({ theme, look: next, accentOverride, defaultAccent });
+      // Display follows the on-screen mode (the saved `theme`, or a live builder
+      // preview), so editing the previewed mode shows immediately.
+      applyAll({ theme: displayTheme, look: next, accentOverride, defaultAccent });
     },
-    [theme, defaultAccent, accentOverride, activeLook, seedColorSet]
+    [displayTheme, defaultAccent, accentOverride, activeLook, seedColorSet]
   );
 
   // Set or clear the accent on its own, leaving the background/foreground as-is.
@@ -525,13 +562,13 @@ export function PrefsProvider({
       setAccentOverrideState(next);
       saveAccentOverride(next);
       applyAll({
-        theme,
+        theme: displayTheme,
         look: resolveLook(activeLook),
         accentOverride: next,
         defaultAccent,
       });
     },
-    [theme, defaultAccent, activeLook, resolveLook]
+    [displayTheme, defaultAccent, activeLook, resolveLook]
   );
 
   // Capture the current full look — both modes' design/scene/font and colors —
@@ -590,9 +627,9 @@ export function PrefsProvider({
       setFonts(nextFonts);
       saveFont(nextFonts);
       applyThemeColors({ dark: t.dark, light: t.light });
-      applyChrome(resolveDark(theme));
+      applyChrome(resolveDark(displayTheme));
     },
-    [customThemes, applyThemeColors, applyChrome, theme]
+    [customThemes, applyThemeColors, applyChrome, displayTheme]
   );
 
   const deleteNamedTheme = useCallback((id: string) => {
@@ -609,12 +646,12 @@ export function PrefsProvider({
     setAccentOverrideState(null);
     saveAccentOverride(null);
     applyAll({
-      theme,
+      theme: displayTheme,
       look: resolveLook(null),
       accentOverride: null,
       defaultAccent,
     });
-  }, [defaultAccent, theme, resolveLook]);
+  }, [defaultAccent, displayTheme, resolveLook]);
 
   // Reset just the theme (colors, accent, design, scene, font — both modes) back
   // to the admin defaults, leaving mode/location/greeting alone — the theme
@@ -631,16 +668,16 @@ export function PrefsProvider({
     setScenes({ dark: null, light: null });
     setFonts({ dark: null, light: null });
     applyAll({
-      theme,
+      theme: displayTheme,
       look: resolveLook(null),
       accentOverride: null,
       defaultAccent,
     });
-    const dark = resolveDark(theme);
+    const dark = resolveDark(displayTheme);
     applyDesign(defDesign(dark));
     applyScene(defScene(dark));
     applyFont(defFont(dark));
-  }, [defaultAccent, theme, resolveLook, defDesign, defScene, defFont]);
+  }, [defaultAccent, displayTheme, resolveLook, defDesign, defScene, defFont]);
 
   // Load the stored theme + custom themes on mount and keep "system" in sync
   // with OS changes. Anything the visitor hasn't set falls back to the admin
@@ -877,10 +914,12 @@ export function PrefsProvider({
   const value = useMemo<PrefsValue>(() => {
     const timezone = prefs.timezone || detectedTz || defaults.timezone;
     const units = prefs.units || defaults.units;
-    // Resolve the current mode to a lightness, then pick the effective look's
-    // matching variant (visitor look, else admin default colors). That variant's
-    // background drives the surface-lightness used by theme-aware icons/scenes.
-    const isLight = theme === "light" || (theme === "system" && !systemDark);
+    // Resolve the displayed mode (saved `theme`, or a live builder preview) to a
+    // lightness, then pick the effective look's matching variant (visitor look,
+    // else admin default colors). That variant's background drives the surface-
+    // lightness used by theme-aware icons/scenes.
+    const isLight =
+      displayTheme === "light" || (displayTheme === "system" && !systemDark);
     const displayDark = !isLight;
     const effectiveLook = activeLook ?? adminLook;
     const activeColors: ColorSet | null = effectiveLook
@@ -912,6 +951,7 @@ export function PrefsProvider({
       weatherEnabled,
       greetingName: prefs.greetingName ?? "",
       theme,
+      resolvedMode: displayDark ? "dark" : "light",
       design: resolveDesign(displayDark),
       scene: resolveScene(displayDark),
       font: resolveFont(displayDark),
@@ -929,6 +969,7 @@ export function PrefsProvider({
       setGreetingName,
       useMyLocation,
       setTheme,
+      setPreviewMode,
       setDesign,
       setScene,
       setFont,
@@ -953,6 +994,7 @@ export function PrefsProvider({
     defaultAccent,
     adminLook,
     theme,
+    displayTheme,
     resolveDesign,
     resolveScene,
     resolveFont,
@@ -965,6 +1007,7 @@ export function PrefsProvider({
     setGreetingName,
     useMyLocation,
     setTheme,
+    setPreviewMode,
     setDesign,
     setScene,
     setFont,
