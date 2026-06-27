@@ -19,7 +19,7 @@ export default function Dots({ light }: SceneProps) {
       <div
         className="animate-drift absolute -top-1/4 -left-1/4 h-[150%] w-[150%]"
         style={{
-          backgroundImage: `${dot("var(--accent-from)", a)}, ${dot("var(--accent-to)", b)}`,
+          backgroundImage: `${dot("var(--scene-from)", a)}, ${dot("var(--scene-to)", b)}`,
           backgroundPosition: "0 0, 14px 14px",
           backgroundSize: "28px 28px, 28px 28px",
           WebkitMaskImage:

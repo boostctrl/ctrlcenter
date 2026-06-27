@@ -11,9 +11,9 @@ const WAVE =
 export default function Waves({ light }: SceneProps) {
   const k = light ? 1.4 : 1;
   const layers = [
-    { color: "var(--accent-from)", pct: 12 * k, h: 220, dur: "26s", bottom: 0 },
-    { color: "var(--accent-to)", pct: 16 * k, h: 180, dur: "19s", bottom: 0 },
-    { color: "var(--accent-from)", pct: 22 * k, h: 130, dur: "13s", bottom: 0 },
+    { color: "var(--scene-from)", pct: 12 * k, h: 220, dur: "26s", bottom: 0 },
+    { color: "var(--scene-to)", pct: 16 * k, h: 180, dur: "19s", bottom: 0 },
+    { color: "var(--scene-from)", pct: 22 * k, h: 130, dur: "13s", bottom: 0 },
   ];
   return (
     <div

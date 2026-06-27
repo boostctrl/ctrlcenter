@@ -22,8 +22,8 @@ export default function Rays({ light }: SceneProps) {
       <div
         className="animate-rays absolute top-[-20%] left-1/2 h-[130vmax] w-[130vmax]"
         style={{
-          backgroundImage: `${beam("var(--accent-from)", a, 0)}, ${beam(
-            "var(--accent-to)",
+          backgroundImage: `${beam("var(--scene-from)", a, 0)}, ${beam(
+            "var(--scene-to)",
             b,
             6
           )}`,

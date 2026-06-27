@@ -11,11 +11,11 @@ const SIZE = 48;
 // under prefers-reduced-motion.
 export default function Grid({ light }: SceneProps) {
   const line = light
-    ? "color-mix(in srgb, var(--accent-from) 22%, transparent)"
-    : "color-mix(in srgb, var(--accent-from) 42%, transparent)";
+    ? "color-mix(in srgb, var(--scene-from) 22%, transparent)"
+    : "color-mix(in srgb, var(--scene-from) 42%, transparent)";
   const flatLine = light
-    ? "color-mix(in srgb, var(--accent-from) 13%, transparent)"
-    : "color-mix(in srgb, var(--accent-from) 16%, transparent)";
+    ? "color-mix(in srgb, var(--scene-from) 13%, transparent)"
+    : "color-mix(in srgb, var(--scene-from) 16%, transparent)";
   const flatMask =
     "linear-gradient(to bottom, transparent, black 28%, black 68%, transparent)";
 
@@ -52,7 +52,7 @@ export default function Grid({ light }: SceneProps) {
             top: "50%",
             height: "200px",
             background:
-              "radial-gradient(60% 100% at 50% 0%, color-mix(in srgb, var(--accent-from) 32%, transparent), transparent 72%)",
+              "radial-gradient(60% 100% at 50% 0%, color-mix(in srgb, var(--scene-from) 32%, transparent), transparent 72%)",
             filter: "blur(24px)",
           }}
         />

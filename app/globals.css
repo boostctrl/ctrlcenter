@@ -13,6 +13,14 @@
   --fg: #ffffff;
   --accent-from: #a78bfa;
   --accent-to: #22d3ee;
+  /* Scene backdrops paint translucent accent over the page background. A bright
+     accent reads as a vivid burst over the dark surface but washes out over the
+     near-white light one — so dark uses the accent as-is, while `.theme-light`
+     deepens and saturates it into a richer tone that still pops. Scenes read
+     these instead of --accent-* directly; this falls back to the raw accent
+     pre-hydration and on browsers without relative-color syntax. */
+  --scene-from: var(--accent-from);
+  --scene-to: var(--accent-to);
 
   /* Design tokens — the `glass-card` surface and the background glow read these,
      so a "design" (Glass, Flat, Bold, …) is just a different set of values while
@@ -250,6 +258,11 @@
   /* Cool slate shadows instead of black, and a touch lighter, so elevated cards
      read softly on light surfaces across every design. */
   --shadow-tint: 30, 41, 59;
+  /* --scene-from/--scene-to are deepened + saturated for the light surface (so
+     backdrops read as colour bursts, not a wash) by PrefsProvider, which sets
+     concrete values on <html> via the same JS deepen the canvas scenes use
+     (components/scenes/color.ts). The :root fallback above keeps them valid
+     before hydration. */
 }
 
 /* Aero's glossy top highlight is a light inset line — keep it light-on-light in

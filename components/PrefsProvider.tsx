@@ -42,6 +42,7 @@ import {
   type ThemePack,
 } from "@/lib/theme";
 import { FONT_IDS, type FontId } from "@/lib/fonts";
+import { deepenForLight } from "./scenes/color";
 
 export type Theme = "system" | "light" | "dark";
 // The two resolved appearance modes a theme part can be chosen for independently.
@@ -58,11 +59,17 @@ function resolveDark(theme: Theme): boolean {
   return theme === "dark" || (theme === "system" && prefersDark);
 }
 
-function applyAccent(accent: Accent): void {
+function applyAccent(accent: Accent, dark: boolean): void {
   if (typeof document === "undefined") return;
   const s = document.documentElement.style;
   s.setProperty("--accent-from", accent.from);
   s.setProperty("--accent-to", accent.to);
+  // Scene backdrops read --scene-* so they can deepen + saturate the accent on
+  // the near-white light surface (where the raw accent washes out) while keeping
+  // it as-is on dark. Both modes are set explicitly so switching light→dark
+  // clears any deepened value left on <html>.
+  s.setProperty("--scene-from", dark ? accent.from : `rgb(${deepenForLight(accent.from)})`);
+  s.setProperty("--scene-to", dark ? accent.to : `rgb(${deepenForLight(accent.to)})`);
 }
 
 // Swap the active design class on <html>. The default ("glass") uses the :root
@@ -149,7 +156,7 @@ function applyAll(opts: {
     s.removeProperty("--foreground");
     s.removeProperty("--fg");
   }
-  applyAccent(resolveAccent(opts.accentOverride, cs, opts.defaultAccent));
+  applyAccent(resolveAccent(opts.accentOverride, cs, opts.defaultAccent), dark);
 }
 
 type EffectiveLocation = {

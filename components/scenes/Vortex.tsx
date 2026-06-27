@@ -17,9 +17,9 @@ export default function Vortex({ light }: SceneProps) {
       <div
         className="animate-spin-slow h-[140vmax] w-[140vmax] rounded-full blur-2xl"
         style={{
-          backgroundImage: `conic-gradient(from 0deg, transparent 0deg, color-mix(in srgb, var(--accent-from) ${
+          backgroundImage: `conic-gradient(from 0deg, transparent 0deg, color-mix(in srgb, var(--scene-from) ${
             a * 100
-          }%, transparent) 40deg, transparent 110deg, color-mix(in srgb, var(--accent-to) ${
+          }%, transparent) 40deg, transparent 110deg, color-mix(in srgb, var(--scene-to) ${
             b * 100
           }%, transparent) 200deg, transparent 280deg)`,
           WebkitMaskImage:

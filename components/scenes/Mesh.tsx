@@ -20,16 +20,16 @@ export default function Mesh({ light }: SceneProps) {
         className="animate-drift absolute -top-1/4 -left-1/4 h-[150%] w-[150%] blur-2xl"
         style={{
           backgroundImage: `radial-gradient(40% 50% at 18% 22%, ${mix(
-            "var(--accent-from)",
+            "var(--scene-from)",
             a
           )}, transparent 60%), radial-gradient(45% 55% at 82% 18%, ${mix(
-            "var(--accent-to)",
+            "var(--scene-to)",
             b
           )}, transparent 60%), radial-gradient(50% 55% at 78% 80%, ${mix(
-            "var(--accent-from)",
+            "var(--scene-from)",
             a
           )}, transparent 62%), radial-gradient(45% 50% at 20% 82%, ${mix(
-            "var(--accent-to)",
+            "var(--scene-to)",
             b
           )}, transparent 60%)`,
         }}

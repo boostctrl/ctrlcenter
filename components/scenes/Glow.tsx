@@ -15,9 +15,9 @@ export default function Glow({ light }: SceneProps) {
       <div
         className="animate-breathe absolute top-1/2 left-1/2 h-[80vmax] w-[80vmax] rounded-full blur-3xl"
         style={{
-          background: `radial-gradient(circle, color-mix(in srgb, var(--accent-from) ${
+          background: `radial-gradient(circle, color-mix(in srgb, var(--scene-from) ${
             op * 100
-          }%, transparent), color-mix(in srgb, var(--accent-to) ${
+          }%, transparent), color-mix(in srgb, var(--scene-to) ${
             op * 60
           }%, transparent) 45%, transparent 70%)`,
         }}

@@ -6,6 +6,7 @@ import { BASE_THEMES, DESIGNS, SCENES } from "@/lib/theme";
 import type { ColorSet, DesignId, SceneId, ThemePack } from "@/lib/theme";
 import { FONTS, fontVar } from "@/lib/fonts";
 import type { ThemeColors } from "@/lib/prefs";
+import { deepenForLight } from "./scenes/color";
 
 const DESIGN_NAMES = Object.fromEntries(
   DESIGNS.map((d) => [d.id, d.name])
@@ -105,6 +106,18 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
   // see. The Editing toggle below switches modes by previewing them live (see
   // setPreviewMode) rather than keeping a separate, hidden edit target.
   const editMode = resolvedMode;
+
+  // Scene swatches paint the accent over the previewed surface, so on light they
+  // must deepen it the same way the real scenes do (PrefsProvider / scenes/color)
+  // — otherwise the swatch washes out while the live scene behind it pops.
+  const sceneFrom =
+    editMode === "light"
+      ? `rgb(${deepenForLight(activeAccent.from)})`
+      : activeAccent.from;
+  const sceneTo =
+    editMode === "light"
+      ? `rgb(${deepenForLight(activeAccent.to)})`
+      : activeAccent.to;
 
   // The preview is display-only and never persisted, so dropping it when the
   // builder unmounts returns the visitor to their saved Appearance mode the
@@ -357,7 +370,7 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
                 <span
                   className="block h-9 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
                   style={{
-                    background: scenePreview(s.id, activeAccent.from, activeAccent.to),
+                    background: scenePreview(s.id, sceneFrom, sceneTo),
                   }}
                   aria-hidden
                 />
