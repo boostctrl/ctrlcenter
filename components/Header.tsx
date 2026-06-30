@@ -42,9 +42,14 @@ export default async function Header({
       {showGreeting && <Greeting initialGreeting={initialGreeting} />}
       {showCard && (
         <div
-          className={`glass-card flex w-full flex-col overflow-hidden sm:w-auto${
-            showGreeting ? "" : " sm:ml-auto"
-          }`}
+          className={
+            // Full static class strings (not a template literal) so Tailwind's
+            // extractor keeps sm:w-auto — interpolating it once purged it, which
+            // stretched the card to full width.
+            showGreeting
+              ? "glass-card flex w-full flex-col overflow-hidden sm:w-auto"
+              : "glass-card flex w-full flex-col overflow-hidden sm:w-auto sm:ml-auto"
+          }
         >
           {showTimeWeather && (
             <TimeWeather
