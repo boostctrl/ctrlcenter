@@ -692,6 +692,20 @@ export default function SettingsManager({
                     value={alerts.email.to}
                     onChange={(e) => updateAlertEmail({ to: e.target.value })}
                   />
+                  <div>
+                    <TextField
+                      label="Subject"
+                      placeholder="{service} is {status}"
+                      value={alerts.email.subject}
+                      onChange={(e) =>
+                        updateAlertEmail({ subject: e.target.value })
+                      }
+                    />
+                    <p className="mt-1 text-xs text-fg/40">
+                      Variables: <code>{"{service}"}</code> and{" "}
+                      <code>{"{status}"}</code> (down/up). Blank uses the default.
+                    </p>
+                  </div>
                   {!(
                     alerts.email.host.trim() &&
                     alerts.email.from.trim() &&

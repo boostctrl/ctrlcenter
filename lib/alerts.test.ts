@@ -3,6 +3,7 @@ import {
   evaluateTransitions,
   buildAlertRequest,
   buildEmailMessage,
+  renderSubject,
   emailReady,
   type AppAlertState,
   type AlertEvent,
@@ -149,23 +150,60 @@ describe("buildEmailMessage", () => {
   const app = { name: "Jellyfin", url: "https://jelly.example.com" };
   const at = Date.parse("2026-06-30T12:00:00Z");
 
-  it("subjects a down event and includes the URL and timestamp in the body", () => {
-    const { subject, text } = buildEmailMessage({ id: "a", type: "down" }, app, at);
-    expect(subject).toBe("Jellyfin is down");
+  it("defaults the subject and includes the URL/timestamp in text and HTML", () => {
+    const { subject, text, html } = buildEmailMessage(
+      { id: "a", type: "down" },
+      app,
+      at
+    );
+    expect(subject).toBe("Jellyfin is down"); // default template
     expect(text).toContain("🔴 Jellyfin is down");
     expect(text).toContain(app.url);
     expect(text).toContain("2026-06-30T12:00:00.000Z");
+    expect(html).toContain("Jellyfin is down");
+    expect(html).toContain(app.url);
+    expect(html).toContain("<html");
   });
 
-  it("subjects a recovery and omits the URL line when there's no URL", () => {
-    const { subject, text } = buildEmailMessage(
+  it("omits the URL line/row when there's no URL and renders the up status", () => {
+    const { subject, text, html } = buildEmailMessage(
       { id: "a", type: "up" },
       { name: "DB", url: "" },
       at
     );
-    expect(subject).toBe("DB recovered");
+    expect(subject).toBe("DB is up"); // default template, {status} = up
     expect(text).toContain("🟢 DB recovered");
     expect(text).not.toContain("\nhttp");
+    expect(html).not.toContain("href");
+  });
+
+  it("renders a custom subject template and HTML-escapes the service name", () => {
+    const evil = { name: 'A&B <x> "q"', url: "https://x" };
+    const { subject, html } = buildEmailMessage(
+      { id: "a", type: "down" },
+      evil,
+      at,
+      "[ALERT] {service} ({status})"
+    );
+    expect(subject).toBe('[ALERT] A&B <x> "q" (down)'); // subject is plain text
+    expect(html).toContain("A&amp;B &lt;x&gt; &quot;q&quot;"); // escaped in HTML
+    expect(html).not.toContain("<x>");
+  });
+});
+
+describe("renderSubject", () => {
+  it("substitutes variables and strips CR/LF (header-injection guard)", () => {
+    const out = renderSubject(
+      "{service} is {status}\r\nBcc: evil@x",
+      { name: "API", url: "" },
+      true
+    );
+    expect(out).toBe("API is down Bcc: evil@x"); // newlines collapsed to a space
+    expect(out).not.toMatch(/[\r\n]/);
+  });
+
+  it("falls back to the default when the template is blank", () => {
+    expect(renderSubject("   ", { name: "API", url: "" }, false)).toBe("API is up");
   });
 });
 

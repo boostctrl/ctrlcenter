@@ -62,6 +62,9 @@ export const alertEmailSchema = z.object({
   pass: z.string().default(""),
   from: z.string().default(""),
   to: z.string().default(""),
+  // Subject template; {service} and {status} are substituted. Empty = the
+  // default "{service} is {status}".
+  subject: z.string().default(""),
 });
 export type AlertEmailConfig = z.infer<typeof alertEmailSchema>;
 
@@ -336,6 +339,7 @@ export const alertEmailUpdateSchema = z.object({
   host: z.string(),
   port: z.number().int().min(1).max(65535),
   secure: z.boolean(),
+  subject: z.string(),
   user: z.string(),
   pass: z.string(),
   from: z.string(),

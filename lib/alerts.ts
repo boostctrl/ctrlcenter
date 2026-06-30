@@ -100,20 +100,64 @@ export function buildAlertRequest(
   }
 }
 
-// Plain-text email content for an alert (pure, unit-tested). The body mirrors the
-// webhook message and adds the app URL plus a timestamp.
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// Render the subject from its template, substituting {service}/{status}. CR/LF
+// are stripped (the service name is admin-controlled but flows into a header) and
+// the length is capped; an empty template falls back to the default.
+export function renderSubject(
+  template: string,
+  app: AlertApp,
+  down: boolean
+): string {
+  const status = down ? "down" : "up";
+  const out = (template.trim() || "{service} is {status}")
+    .replace(/\{service\}/gi, app.name)
+    .replace(/\{status\}/gi, status)
+    .replace(/[\r\n]+/g, " ")
+    .trim()
+    .slice(0, 200);
+  return out || `${app.name} is ${status}`;
+}
+
+// Email content for an alert (pure, unit-tested): a rendered subject, an HTML
+// body, and a plain-text fallback. The body keeps the fixed nice wording while
+// the subject is templated.
 export function buildEmailMessage(
   event: AlertEvent,
   app: AlertApp,
-  at: number
-): { subject: string; text: string } {
+  at: number,
+  subjectTemplate = ""
+): { subject: string; text: string; html: string } {
   const down = event.type === "down";
   const title = down ? `${app.name} is down` : `${app.name} recovered`;
+  const when = new Date(at).toISOString();
+  const subject = renderSubject(subjectTemplate, app, down);
   const text =
     `${down ? "🔴" : "🟢"} ${title}` +
     (app.url ? `\n${app.url}` : "") +
-    `\n\nAt ${new Date(at).toISOString()}`;
-  return { subject: title, text };
+    `\n\nAt ${when}`;
+  const accent = down ? "#dc2626" : "#16a34a";
+  const urlRow = app.url
+    ? `<p style="margin:0 0 4px"><a href="${escapeHtml(app.url)}" style="color:${accent};text-decoration:none">${escapeHtml(app.url)}</a></p>`
+    : "";
+  const html = `<!doctype html><html><body style="margin:0;background:#f4f4f5;padding:24px">
+<table role="presentation" cellpadding="0" cellspacing="0" style="max-width:480px;margin:0 auto;width:100%;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+<tr><td style="background:#ffffff;border-radius:12px;border-left:4px solid ${accent};padding:20px 24px">
+<p style="margin:0 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:${accent};font-weight:600">${down ? "Service down" : "Recovered"}</p>
+<h1 style="margin:0 0 12px;font-size:18px;color:#18181b">${escapeHtml(title)}</h1>
+${urlRow}
+<p style="margin:8px 0 0;font-size:12px;color:#71717a">At ${when}</p>
+</td></tr>
+</table>
+</body></html>`;
+  return { subject, text, html };
 }
 
 function jsonReq(url: string, payload: unknown): AlertRequest {
@@ -168,8 +212,8 @@ async function sendEmailAlert(
       greetingTimeout: ALERT_TIMEOUT_MS,
       socketTimeout: ALERT_TIMEOUT_MS,
     });
-    const { subject, text } = buildEmailMessage(event, app, at);
-    await transport.sendMail({ from: cfg.from, to: cfg.to, subject, text });
+    const { subject, text, html } = buildEmailMessage(event, app, at, cfg.subject);
+    await transport.sendMail({ from: cfg.from, to: cfg.to, subject, text, html });
   } catch {
     // best-effort: a mail failure must never disturb the poller
   }
