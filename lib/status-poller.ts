@@ -1,6 +1,7 @@
 import { readConfig } from "./config";
 import { checkApp } from "./status-check";
-import { loadHistory, recordResults, flush } from "./status-history";
+import { loadHistory, recordResults, flush, lastReadings } from "./status-history";
+import { processAlerts } from "./alerts";
 import type { StatusResult } from "./status";
 
 // Background uptime poller. Runs in the (single) standalone Node server process,
@@ -25,8 +26,12 @@ async function tick(): Promise<void> {
     const results: StatusResult[] = await Promise.all(
       apps.map(async (app) => ({ id: app.id, ...(await checkApp(app)) }))
     );
+    // Capture the prior per-app state before recording this tick, so alert
+    // seeding on first run reflects the previous reading, not the current one.
+    const prior = lastReadings(apps.map((a) => a.id));
     recordResults(results, lastRun);
     await flush();
+    await processAlerts(results, apps, settings.alerts, prior);
   } catch {
     // Best-effort; try again next tick.
   }

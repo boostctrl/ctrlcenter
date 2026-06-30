@@ -108,6 +108,7 @@ export async function updateSettings(
     const {
       weather: weatherPartial,
       search: searchPartial,
+      alerts: alertsPartial,
       theme: themePartial,
       ...rest
     } = partial;
@@ -121,6 +122,10 @@ export async function updateSettings(
       search: {
         ...config.settings.search,
         ...withoutUndefined(searchPartial ?? {}),
+      },
+      alerts: {
+        ...config.settings.alerts,
+        ...withoutUndefined(alertsPartial ?? {}),
       },
       // Theme is sent whole, so replace it (this is how clearing the optional
       // custom colors works); keep the existing one when not provided.

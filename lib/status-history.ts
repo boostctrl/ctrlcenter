@@ -215,6 +215,19 @@ export async function loadHistory(): Promise<void> {
   }
 }
 
+// The most recent raw reading (up/down) per id, for ids that have one in the
+// recent ring. The alert poller uses this to seed its state on startup so a
+// restart doesn't re-alert an app that was already down. Call it BEFORE
+// recordResults so it reflects the prior tick, not the one being recorded.
+export function lastReadings(ids: string[]): Map<string, boolean> {
+  const out = new Map<string, boolean>();
+  for (const id of ids) {
+    const list = state.recent.get(id);
+    if (list && list.length) out.set(id, list[list.length - 1].up);
+  }
+  return out;
+}
+
 // Tally one round of results into the current hour, pruning anything older than
 // the retention window.
 export function recordResults(results: StatusResult[], at: number): void {

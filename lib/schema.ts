@@ -34,6 +34,22 @@ export const searchSchema = z.object({
   customUrl: z.string().default(""),
 });
 
+// Outbound uptime alerts. When status checks are on, the background poller can
+// POST to a webhook as apps transition down (or recover). Stored leniently so a
+// hand-edited file always parses; the URL is validated on the admin-input path.
+export const ALERT_TYPES = ["generic", "discord", "slack", "ntfy"] as const;
+export type AlertType = (typeof ALERT_TYPES)[number];
+export const alertsSchema = z.object({
+  enabled: z.boolean().default(false),
+  type: z.enum(ALERT_TYPES).default("generic"),
+  webhookUrl: z.string().default(""),
+  // Also notify when a down app comes back up.
+  notifyOnRecovery: z.boolean().default(true),
+  // Consecutive failed polls before an app is declared down (flap dampening).
+  confirmations: z.number().int().min(1).max(10).default(2),
+});
+export type AlertConfig = z.infer<typeof alertsSchema>;
+
 // The site-wide default theme. Visitors can override every part of this in
 // their own browser (the theme builder / settings page); these values are the
 // baseline an un-customized visitor sees. `background`/`foreground` are optional
@@ -88,6 +104,7 @@ export const settingsSchema = z.object({
   bookmarkCategoryOrder: z.array(z.string()).default([]),
   search: searchSchema.default(searchSchema.parse({})),
   weather: weatherSchema.default(weatherSchema.parse({})),
+  alerts: alertsSchema.default(alertsSchema.parse({})),
 });
 
 // `expectStatus` is an optional comma list of HTTP codes/ranges (e.g.
@@ -245,6 +262,21 @@ export const searchUpdateSchema = z
     path: ["customUrl"],
   });
 
+// Admin sends the whole alerts object. A webhook URL is optional (alerts stay
+// inert until one is set), but when present it must be http(s).
+export const alertsUpdateSchema = z
+  .object({
+    enabled: z.boolean(),
+    type: z.enum(ALERT_TYPES),
+    webhookUrl: z.string(),
+    notifyOnRecovery: z.boolean(),
+    confirmations: z.number().int().min(1).max(10),
+  })
+  .refine(
+    (a) => a.webhookUrl.trim() === "" || /^https?:\/\//i.test(a.webhookUrl.trim()),
+    { message: "Webhook URL must start with http(s)", path: ["webhookUrl"] }
+  );
+
 // The admin sends the whole theme object (not a partial), so updateSettings
 // replaces it wholesale — that's how clearing the optional custom colors works
 // (omit them and they're gone). Required fields keep a saved theme well-formed.
@@ -277,6 +309,7 @@ export const settingsInputSchema = z.object({
   bookmarkCategoryOrder: z.array(z.string()).optional(),
   search: searchUpdateSchema.optional(),
   weather: weatherUpdateSchema.optional(),
+  alerts: alertsUpdateSchema.optional(),
 });
 export type SettingsInput = z.infer<typeof settingsInputSchema>;
 

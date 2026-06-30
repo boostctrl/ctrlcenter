@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import type { Settings } from "@/lib/schema";
+import { ALERT_TYPES } from "@/lib/schema";
 import type { ThemePack } from "@/lib/theme";
 import {
   SEARCH_ENGINES,
@@ -60,6 +61,22 @@ export default function SettingsManager({
   const theme = settings.theme;
   const updateTheme = (patch: Partial<Settings["theme"]>) =>
     setSettings((s) => ({ ...s, theme: { ...s.theme, ...patch } }));
+
+  const alerts = settings.alerts;
+  const updateAlerts = (patch: Partial<Settings["alerts"]>) =>
+    setSettings((s) => ({ ...s, alerts: { ...s.alerts, ...patch } }));
+  const alertTypeLabel: Record<Settings["alerts"]["type"], string> = {
+    generic: "Generic JSON webhook",
+    discord: "Discord",
+    slack: "Slack",
+    ntfy: "ntfy",
+  };
+  const alertUrlPlaceholder: Record<Settings["alerts"]["type"], string> = {
+    generic: "https://example.com/hook",
+    discord: "https://discord.com/api/webhooks/…",
+    slack: "https://hooks.slack.com/services/…",
+    ntfy: "https://ntfy.sh/your-topic",
+  };
 
   // Apply a theme pack as the site default: record it as the preset and copy its
   // concrete design/scene/colors into the theme fields the layout actually reads.
@@ -366,6 +383,87 @@ export default function SettingsManager({
             here when nothing matches.
           </p>
         </div>
+      </Section>
+
+      <Section title="Alerts">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <span className="text-sm text-fg/70">Uptime alerts</span>
+            <p className="text-xs text-fg/40">
+              Notify a webhook when an app goes down or recovers. Requires service
+              status indicators (above) to be on.
+            </p>
+          </div>
+          <label className="flex shrink-0 items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={alerts.enabled}
+              onChange={(e) => updateAlerts({ enabled: e.target.checked })}
+            />
+            Enabled
+          </label>
+        </div>
+
+        {alerts.enabled && (
+          <>
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-fg/50">Notify via</span>
+              <select
+                value={alerts.type}
+                onChange={(e) =>
+                  updateAlerts({ type: e.target.value as Settings["alerts"]["type"] })
+                }
+                className={selectClass}
+              >
+                {ALERT_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {alertTypeLabel[t]}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <TextField
+              label="Webhook URL"
+              placeholder={alertUrlPlaceholder[alerts.type]}
+              value={alerts.webhookUrl}
+              onChange={(e) => updateAlerts({ webhookUrl: e.target.value })}
+            />
+
+            <label className="flex items-center justify-between text-sm">
+              <span className="text-fg/50">Notify on recovery</span>
+              <input
+                type="checkbox"
+                checked={alerts.notifyOnRecovery}
+                onChange={(e) => updateAlerts({ notifyOnRecovery: e.target.checked })}
+              />
+            </label>
+
+            <label className="flex items-center justify-between gap-4 text-sm">
+              <span className="text-fg/50">
+                Confirmations before down
+                <span className="block text-xs text-fg/40">
+                  Consecutive failed checks required first.
+                </span>
+              </span>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={alerts.confirmations}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10);
+                  updateAlerts({
+                    confirmations: Number.isNaN(v)
+                      ? alerts.confirmations
+                      : Math.min(10, Math.max(1, v)),
+                  });
+                }}
+                className={`${selectClass} w-20 text-center`}
+              />
+            </label>
+          </>
+        )}
       </Section>
 
       <Section title="Weather">
