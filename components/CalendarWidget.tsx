@@ -1,19 +1,24 @@
+"use client";
+
+import { useVisitorPrefs } from "./PrefsProvider";
 import { eventWhen, type CalendarEvent } from "@/lib/calendar";
 
 // Agenda card: the next few events from the configured iCal feed. Times render
-// in the site's default time zone (server-rendered); all-day events show their
-// literal calendar date. Renders nothing when empty so it never shows a
-// stale/blank card. `now` is passed in (computed at the request boundary) so the
-// render stays pure.
+// in the visitor's effective time zone — `useVisitorPrefs().timezone` starts as
+// the admin default (so the hydration render matches SSR) and switches to the
+// visitor's zone after mount, the same way TimeWeather keeps the header clock in
+// sync. All-day events keep their literal calendar date. Renders nothing when
+// empty so it never shows a stale/blank card. `now` is passed in (computed at the
+// request boundary) so the first render stays pure.
 export default function CalendarWidget({
   events,
-  timeZone,
   now,
 }: {
   events: CalendarEvent[];
-  timeZone: string;
   now: number;
 }) {
+  const { timezone } = useVisitorPrefs();
+
   if (events.length === 0) return null;
   return (
     <section className="glass-card p-6">
@@ -22,12 +27,19 @@ export default function CalendarWidget({
       </h2>
       <ul className="flex flex-col gap-3">
         {events.map((e, i) => {
-          const { day, time } = eventWhen(e, timeZone, now);
+          const { day, time } = eventWhen(e, timezone, now);
           return (
             <li key={i} className="flex items-baseline gap-4">
               <div className="w-24 shrink-0">
-                <span className="block text-sm font-medium text-fg/80">{day}</span>
-                <span className="text-xs text-fg/45">{time}</span>
+                <span
+                  className="block text-sm font-medium text-fg/80"
+                  suppressHydrationWarning
+                >
+                  {day}
+                </span>
+                <span className="text-xs text-fg/45" suppressHydrationWarning>
+                  {time}
+                </span>
               </div>
               <div className="min-w-0">
                 <p className="truncate text-fg/90">{e.summary}</p>

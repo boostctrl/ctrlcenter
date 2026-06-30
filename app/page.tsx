@@ -25,11 +25,7 @@ export default async function HomePage() {
       <StatusProvider enabled={statusEnabled}>
         <Header settings={settings} apps={apps} statusEnabled={statusEnabled} />
 
-        <CalendarWidget
-          events={events}
-          timeZone={settings.timezone || "UTC"}
-          now={new Date().getTime()}
-        />
+        <CalendarWidget events={events} now={new Date().getTime()} />
 
         <Dashboard
           apps={apps}

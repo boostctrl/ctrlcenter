@@ -434,6 +434,9 @@ export function eventWhen(
   tz: string,
   now: number
 ): { day: string; time: string } {
+  // tz now flows from per-visitor prefs (localStorage / Intl detection), so guard
+  // it: an unknown zone would make Intl throw rather than just look wrong.
+  if (!isValidTimeZone(tz)) tz = "UTC";
   const zone = event.allDay ? "UTC" : tz;
   const key = ymd(event.start, zone);
   const day =
