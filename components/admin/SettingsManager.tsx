@@ -663,7 +663,8 @@ export default function SettingsManager({
               />
             </label>
             <p className="text-xs text-fg/40">
-              Times use the default time zone. Recurring events may not appear.
+              Times use the default time zone. Repeating events expand for common
+              rules (daily/weekly/monthly); unusual recurrence may not.
             </p>
           </>
         )}

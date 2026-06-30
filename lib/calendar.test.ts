@@ -2,10 +2,14 @@ import { describe, it, expect } from "vitest";
 import {
   parseICS,
   parseICalDate,
+  parseRRule,
+  expandRecurring,
   upcomingEvents,
   eventWhen,
   fetchCalendar,
 } from "./calendar";
+
+const DAY = 86_400_000;
 
 describe("parseICalDate", () => {
   it("parses a UTC date-time", () => {
@@ -145,6 +149,132 @@ describe("eventWhen", () => {
   });
 });
 
+describe("parseRRule", () => {
+  it("parses a weekly rule with interval, byday, and count", () => {
+    expect(parseRRule("FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE;COUNT=10")).toEqual({
+      freq: "WEEKLY",
+      interval: 2,
+      count: 10,
+      byDay: [1, 3],
+    });
+  });
+
+  it("parses UNTIL and defaults interval to 1", () => {
+    const r = parseRRule("FREQ=DAILY;UNTIL=20260605T100000Z");
+    expect(r?.freq).toBe("DAILY");
+    expect(r?.interval).toBe(1);
+    expect(r?.until).toBe(Date.parse("2026-06-05T10:00:00Z"));
+  });
+
+  it("returns null for an unsupported frequency", () => {
+    expect(parseRRule("FREQ=HOURLY")).toBeNull();
+  });
+});
+
+describe("expandRecurring", () => {
+  it("expands a weekly UTC event 7 days apart and strips recurrence metadata", () => {
+    const start = Date.parse("2026-06-01T13:00:00Z");
+    const master = {
+      summary: "Standup",
+      start,
+      end: start + 15 * 60_000,
+      allDay: false,
+      rrule: { freq: "WEEKLY" as const, interval: 1 },
+      uid: "a@x",
+    };
+    const now = Date.parse("2026-06-30T00:00:00Z");
+    const out = expandRecurring([master], now, now + 28 * DAY);
+    expect(out.length).toBeGreaterThanOrEqual(3);
+    for (let i = 1; i < out.length; i++)
+      expect(out[i].start - out[i - 1].start).toBe(7 * DAY);
+    expect(out.every((e) => e.start > now)).toBe(true);
+    expect(out[0].end! - out[0].start).toBe(15 * 60_000);
+    expect("rrule" in out[0]).toBe(false);
+    expect("uid" in out[0]).toBe(false);
+  });
+
+  it("honors weekly BYDAY across weeks", () => {
+    const start = Date.parse("2026-06-01T09:00:00Z");
+    const startDow = new Date(start).getUTCDay();
+    const otherDow = (startDow + 2) % 7;
+    const master = {
+      summary: "x",
+      start,
+      allDay: false,
+      rrule: { freq: "WEEKLY" as const, interval: 1, byDay: [startDow, otherDow] },
+      uid: "b",
+    };
+    const out = expandRecurring([master], start - DAY, start + 21 * DAY);
+    expect(new Set(out.map((e) => new Date(e.start).getUTCDay()))).toEqual(
+      new Set([startDow, otherDow])
+    );
+  });
+
+  it("stops after COUNT occurrences", () => {
+    const start = Date.parse("2026-06-01T10:00:00Z");
+    const master = {
+      summary: "x",
+      start,
+      allDay: false,
+      rrule: { freq: "DAILY" as const, interval: 1, count: 3 },
+      uid: "c",
+    };
+    const out = expandRecurring([master], start - DAY, start + 365 * DAY);
+    expect(out.map((e) => e.start)).toEqual([start, start + DAY, start + 2 * DAY]);
+  });
+
+  it("expands a monthly event keeping the day of month", () => {
+    const start = Date.parse("2026-01-15T12:00:00Z");
+    const master = {
+      summary: "x",
+      start,
+      allDay: false,
+      rrule: { freq: "MONTHLY" as const, interval: 1 },
+      uid: "m",
+    };
+    const now = Date.parse("2026-06-30T00:00:00Z");
+    const out = expandRecurring([master], now, now + 90 * DAY);
+    expect(out.length).toBeGreaterThanOrEqual(2);
+    for (const e of out) expect(new Date(e.start).getUTCDate()).toBe(15);
+  });
+
+  it("skips EXDATE cancellations and applies RECURRENCE-ID overrides", () => {
+    const ics = [
+      "BEGIN:VCALENDAR",
+      "BEGIN:VEVENT",
+      "UID:s@x",
+      "SUMMARY:Weekly",
+      "DTSTART:20260601T150000Z",
+      "DTEND:20260601T153000Z",
+      "RRULE:FREQ=WEEKLY;COUNT=6",
+      "EXDATE:20260615T150000Z",
+      "END:VEVENT",
+      "BEGIN:VEVENT",
+      "UID:s@x",
+      "RECURRENCE-ID:20260608T150000Z",
+      "SUMMARY:Weekly (moved)",
+      "DTSTART:20260608T170000Z",
+      "DTEND:20260608T173000Z",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+    const now = Date.parse("2026-05-31T00:00:00Z");
+    const out = expandRecurring(parseICS(ics), now, now + 60 * DAY).sort(
+      (a, b) => a.start - b.start
+    );
+    const iso = out.map((e) => new Date(e.start).toISOString());
+    // Series Jun1,8,15,22,29,Jul6: Jun15 cancelled, Jun8 moved to 17:00.
+    expect(iso).toContain("2026-06-01T15:00:00.000Z");
+    expect(iso).not.toContain("2026-06-15T15:00:00.000Z");
+    expect(iso).not.toContain("2026-06-08T15:00:00.000Z");
+    expect(iso).toContain("2026-06-08T17:00:00.000Z");
+    expect(
+      out.find((e) => e.start === Date.parse("2026-06-08T17:00:00Z"))?.summary
+    ).toBe("Weekly (moved)");
+    expect(out).toHaveLength(5);
+  });
+});
+
 describe("fetchCalendar caching", () => {
   it("parses once and serves the cache without re-fetching within the TTL", async () => {
     const ics = [
@@ -169,6 +299,32 @@ describe("fetchCalendar caching", () => {
       expect(calls).toBe(1);
       expect(a).toEqual(b);
       expect(a[0]?.summary).toBe("Far future");
+    } finally {
+      globalThis.fetch = orig;
+    }
+  });
+
+  it("expands recurring events relative to now", async () => {
+    const ics = [
+      "BEGIN:VCALENDAR",
+      "BEGIN:VEVENT",
+      "UID:d",
+      "SUMMARY:Daily standup",
+      "DTSTART:20200101T080000Z", // years ago — only future occurrences should show
+      "RRULE:FREQ=DAILY",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+    const orig = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      new Response(ics, { status: 200 })) as typeof fetch;
+    try {
+      const t0 = Date.now();
+      const out = await fetchCalendar(`https://cal.example.test/${t0}-rrule.ics`, 3);
+      expect(out).toHaveLength(3);
+      expect(out.every((e) => e.summary === "Daily standup")).toBe(true);
+      expect(out.every((e) => e.start > t0)).toBe(true);
+      expect(out[1].start - out[0].start).toBe(DAY);
     } finally {
       globalThis.fetch = orig;
     }

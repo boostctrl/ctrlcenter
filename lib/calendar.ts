@@ -2,11 +2,12 @@ import { isValidTimeZone } from "./datetime";
 
 // Minimal iCalendar (RFC 5545) reader for the agenda widget. Hand-rolled (no
 // dependency) and deliberately small: it pulls upcoming VEVENTs (summary, start,
-// end, location) from a published .ics feed. Recurring events (RRULE) are NOT
-// expanded — only each event's base DTSTART is read, so a repeating event shows
-// at most its first occurrence. Many feeds (e.g. Google's secret address) keep
-// recurrence as RRULE rather than expanding it, so repeats may be missing; this
-// is a known v1 limitation.
+// end, location) from a published .ics feed, and expands a practical subset of
+// recurring events (RRULE: FREQ/INTERVAL/COUNT/UNTIL + weekly BYDAY, honoring
+// EXDATE cancellations and RECURRENCE-ID overrides) over a bounded window so
+// weekly/monthly meetings actually surface. Not yet handled: monthly/yearly
+// BYDAY ordinals (e.g. "2nd Tuesday"), BYMONTHDAY/BYSETPOS, and other rarer
+// RFC 5545 recurrence parts.
 
 export type CalendarEvent = {
   summary: string;
@@ -14,6 +15,13 @@ export type CalendarEvent = {
   end?: number; // epoch ms
   allDay: boolean;
   location?: string;
+  // Recurrence metadata, present only on the series master (rrule) or on a
+  // RECURRENCE-ID override instance. Stripped out once events are expanded.
+  rrule?: RecurrenceRule;
+  exdates?: number[]; // cancelled occurrence starts (epoch ms)
+  tzid?: string; // zone the wall-clock time is anchored in, for re-anchoring
+  uid?: string;
+  recurrenceId?: number; // original start this event overrides, for its `uid`
 };
 
 const DAY_MS = 86_400_000;
@@ -125,6 +133,224 @@ export function parseICalDate(
   return { ms: Date.UTC(y, mo, d, h, mi, s), allDay: false };
 }
 
+// ---- Recurrence (RRULE) expansion -----------------------------------------
+
+export type RecurrenceRule = {
+  freq: "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
+  interval: number;
+  count?: number;
+  until?: number; // epoch ms, inclusive
+  byDay?: number[]; // 0=Sun..6=Sat, applied for WEEKLY
+};
+
+const WEEKDAY: Record<string, number> = {
+  SU: 0,
+  MO: 1,
+  TU: 2,
+  WE: 3,
+  TH: 4,
+  FR: 5,
+  SA: 6,
+};
+
+// Parse an RRULE value into the supported subset. Returns null for an
+// unsupported or malformed FREQ (the event then behaves as a one-off).
+export function parseRRule(value: string): RecurrenceRule | null {
+  const parts: Record<string, string> = {};
+  for (const seg of value.split(";")) {
+    const eq = seg.indexOf("=");
+    if (eq > 0) parts[seg.slice(0, eq).toUpperCase()] = seg.slice(eq + 1);
+  }
+  const freq = parts.FREQ?.toUpperCase();
+  if (
+    freq !== "DAILY" &&
+    freq !== "WEEKLY" &&
+    freq !== "MONTHLY" &&
+    freq !== "YEARLY"
+  )
+    return null;
+  const interval = Math.max(1, parseInt(parts.INTERVAL ?? "1", 10) || 1);
+  const rule: RecurrenceRule = { freq, interval };
+  const count = parseInt(parts.COUNT ?? "", 10);
+  if (count > 0) rule.count = count;
+  if (parts.UNTIL) {
+    const u = parseICalDate(parts.UNTIL.trim(), {});
+    // A date-only UNTIL is inclusive of that whole day.
+    if (u) rule.until = u.allDay ? u.ms + DAY_MS - 1 : u.ms;
+  }
+  if (parts.BYDAY) {
+    const days = parts.BYDAY.split(",")
+      .map((d) => WEEKDAY[d.trim().slice(-2).toUpperCase()])
+      .filter((d): d is number => d !== undefined);
+    if (days.length) rule.byDay = days;
+  }
+  return rule;
+}
+
+// Wall-clock parts of an instant in a zone, so each occurrence can be re-anchored
+// to the same local time (a 9am weekly meeting stays 9am across a DST change).
+function wallParts(ms: number, tz: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(new Date(ms));
+  const o: Record<string, number> = {};
+  for (const p of parts) if (p.type !== "literal") o[p.type] = Number(p.value);
+  return { y: o.year, mo: o.month, d: o.day, h: o.hour % 24, mi: o.minute, s: o.second };
+}
+
+type YMD = { y: number; mo: number; d: number };
+
+// Calendar arithmetic in UTC component space: the zone only matters when the
+// final wall components are turned back into an instant (via zonedToUtc), so day
+// and month stepping can be done with plain UTC dates.
+const dayNum = (y: number, mo: number, d: number) =>
+  Math.floor(Date.UTC(y, mo - 1, d) / DAY_MS);
+function fromDayNum(n: number): YMD {
+  const dt = new Date(n * DAY_MS);
+  return { y: dt.getUTCFullYear(), mo: dt.getUTCMonth() + 1, d: dt.getUTCDate() };
+}
+const mondayIndex = (n: number) => (new Date(n * DAY_MS).getUTCDay() + 6) % 7;
+// Add `n` months, keeping the day-of-month; returns null when the target month
+// has no such day (e.g. Feb 30), which RFC 5545 skips rather than clamps.
+function addMonths(y: number, mo: number, d: number, n: number): YMD | null {
+  const total = y * 12 + (mo - 1) + n;
+  const ny = Math.floor(total / 12);
+  const nmo = (total % 12) + 1;
+  const dim = new Date(Date.UTC(ny, nmo, 0)).getUTCDate();
+  return d > dim ? null : { y: ny, mo: nmo, d };
+}
+
+// A chronological stream of occurrence dates from the series start. When
+// `ffDay` is set (safe only without COUNT) it jumps ahead to near that day so we
+// don't iterate years of history before the window. The consumer bounds it.
+function* occurrenceDates(
+  rule: RecurrenceRule,
+  start: YMD,
+  ffDay: number | null
+): Generator<YMD> {
+  const startNum = dayNum(start.y, start.mo, start.d);
+  if (rule.freq === "DAILY") {
+    let n = startNum;
+    if (ffDay != null && ffDay > startNum) {
+      n = startNum + Math.ceil((ffDay - startNum) / rule.interval) * rule.interval;
+    }
+    for (;;) {
+      yield fromDayNum(n);
+      n += rule.interval;
+    }
+  } else if (rule.freq === "WEEKLY") {
+    const startDow = new Date(startNum * DAY_MS).getUTCDay();
+    const byDay = rule.byDay ?? [startDow];
+    const startWeek = startNum - mondayIndex(startNum);
+    let n = ffDay != null && ffDay > startNum ? ffDay : startNum;
+    for (;;) {
+      const week = (n - mondayIndex(n) - startWeek) / 7;
+      if (
+        n >= startNum &&
+        week % rule.interval === 0 &&
+        byDay.includes(new Date(n * DAY_MS).getUTCDay())
+      )
+        yield fromDayNum(n);
+      n++;
+    }
+  } else {
+    const stepMonths = rule.freq === "YEARLY" ? rule.interval * 12 : rule.interval;
+    let k = 0;
+    if (ffDay != null) {
+      const ff = fromDayNum(ffDay);
+      const diff = ff.y * 12 + (ff.mo - 1) - (start.y * 12 + (start.mo - 1));
+      if (diff > 0) k = Math.floor(diff / stepMonths);
+    }
+    for (let guard = 0; guard < 20000; guard++, k++) {
+      const d = addMonths(start.y, start.mo, start.d, k * stepMonths);
+      if (d) yield d;
+    }
+  }
+}
+
+const RECUR_WINDOW_MS = 62 * DAY_MS;
+const RECUR_CAP = 1500; // max occurrences examined per series, a safety bound
+
+// Expand one recurring master into concrete occurrences that fall within
+// (now, windowEnd], skipping cancelled (EXDATE) and overridden (RECURRENCE-ID)
+// instances. Past, finished occurrences are dropped here too.
+function expandOne(
+  e: CalendarEvent,
+  now: number,
+  windowEnd: number,
+  overrides: Set<string>
+): CalendarEvent[] {
+  const rule = e.rrule!;
+  const tz = e.allDay ? "UTC" : e.tzid && isValidTimeZone(e.tzid) ? e.tzid : "UTC";
+  const base = wallParts(e.start, tz);
+  const hasEnd = e.end != null;
+  const duration = hasEnd ? e.end! - e.start : 0;
+  const exset = new Set(e.exdates ?? []);
+  // COUNT must be tallied from the series start, so it disables fast-forward.
+  const ffDay = rule.count != null ? null : Math.floor((now - DAY_MS) / DAY_MS);
+  const out: CalendarEvent[] = [];
+  let generated = 0;
+  let iter = 0;
+  for (const date of occurrenceDates(rule, { y: base.y, mo: base.mo, d: base.d }, ffDay)) {
+    if (++iter > RECUR_CAP) break;
+    if (rule.count != null && generated >= rule.count) break;
+    const instant = e.allDay
+      ? Date.UTC(date.y, date.mo - 1, date.d)
+      : zonedToUtc(date.y, date.mo - 1, date.d, base.h, base.mi, base.s, tz);
+    if (rule.until != null && instant > rule.until) break;
+    generated++;
+    if (instant > windowEnd) break;
+    const effEnd = hasEnd ? instant + duration : e.allDay ? instant + DAY_MS : instant;
+    if (effEnd <= now) continue; // already finished
+    if (exset.has(instant)) continue; // cancelled occurrence
+    if (e.uid && overrides.has(`${e.uid}|${instant}`)) continue; // replaced
+    out.push({
+      summary: e.summary,
+      start: instant,
+      end: hasEnd ? instant + duration : undefined,
+      allDay: e.allDay,
+      location: e.location,
+    });
+  }
+  return out;
+}
+
+// Turn a parsed event list into plain, expanded occurrences within the window.
+// Non-recurring events pass through (with recurrence metadata stripped); masters
+// are expanded; RECURRENCE-ID overrides ride through as their own one-offs and
+// suppress the matching generated instance.
+export function expandRecurring(
+  events: CalendarEvent[],
+  now: number,
+  windowEnd: number
+): CalendarEvent[] {
+  const overrides = new Set<string>();
+  for (const e of events)
+    if (e.recurrenceId != null && e.uid) overrides.add(`${e.uid}|${e.recurrenceId}`);
+  const out: CalendarEvent[] = [];
+  for (const e of events) {
+    if (e.rrule) {
+      out.push(...expandOne(e, now, windowEnd, overrides));
+    } else {
+      out.push({
+        summary: e.summary,
+        start: e.start,
+        end: e.end,
+        allDay: e.allDay,
+        location: e.location,
+      });
+    }
+  }
+  return out;
+}
+
 // Parse every VEVENT in an .ics document into events (unsorted, unfiltered).
 export function parseICS(text: string): CalendarEvent[] {
   const events: CalendarEvent[] = [];
@@ -136,13 +362,24 @@ export function parseICS(text: string): CalendarEvent[] {
     }
     if (line === "END:VEVENT") {
       if (cur && cur.summary && typeof cur.start === "number") {
-        events.push({
+        const ev: CalendarEvent = {
           summary: cur.summary,
           start: cur.start,
           end: cur.end,
           allDay: cur.allDay ?? false,
           location: cur.location,
-        });
+        };
+        if (cur.rrule) {
+          ev.rrule = cur.rrule;
+          if (cur.tzid) ev.tzid = cur.tzid;
+          if (cur.uid) ev.uid = cur.uid;
+          if (cur.exdates?.length) ev.exdates = cur.exdates;
+        }
+        if (cur.recurrenceId != null) {
+          ev.recurrenceId = cur.recurrenceId;
+          if (cur.uid) ev.uid = cur.uid;
+        }
+        events.push(ev);
       }
       cur = null;
       continue;
@@ -152,11 +389,23 @@ export function parseICS(text: string): CalendarEvent[] {
     if (!p) continue;
     if (p.name === "SUMMARY") cur.summary = unescapeText(p.value);
     else if (p.name === "LOCATION") cur.location = unescapeText(p.value) || undefined;
-    else if (p.name === "DTSTART") {
+    else if (p.name === "UID") cur.uid = p.value.trim();
+    else if (p.name === "RRULE") {
+      const r = parseRRule(p.value);
+      if (r) cur.rrule = r;
+    } else if (p.name === "RECURRENCE-ID") {
+      cur.recurrenceId = parseICalDate(p.value, p.params)?.ms;
+    } else if (p.name === "EXDATE") {
+      for (const raw of p.value.split(",")) {
+        const d = parseICalDate(raw, p.params);
+        if (d) (cur.exdates ??= []).push(d.ms);
+      }
+    } else if (p.name === "DTSTART") {
       const d = parseICalDate(p.value, p.params);
       if (d) {
         cur.start = d.ms;
         cur.allDay = d.allDay;
+        if (p.params.TZID) cur.tzid = p.params.TZID;
       }
     } else if (p.name === "DTEND") {
       const d = parseICalDate(p.value, p.params);
@@ -268,5 +517,6 @@ export async function fetchCalendar(
     }
     // On failure, keep serving the stale cache (events stays as cached?.events).
   }
-  return upcomingEvents(events ?? [], now, count);
+  const expanded = expandRecurring(events ?? [], now, now + RECUR_WINDOW_MS);
+  return upcomingEvents(expanded, now, count);
 }
