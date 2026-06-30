@@ -793,8 +793,8 @@ export default function SettingsManager({
           <div>
             <span className="text-sm text-fg/70">Agenda widget</span>
             <p className="text-xs text-fg/40">
-              Show upcoming events from a published iCal (.ics) URL on the
-              dashboard.
+              Show upcoming events from a published iCal (.ics) URL — or a private
+              CalDAV/WebDAV calendar (e.g. a Nextcloud DAV URL) with credentials.
             </p>
           </div>
           <label className="flex shrink-0 items-center gap-2 text-sm">
@@ -810,11 +810,26 @@ export default function SettingsManager({
         {calendar.enabled && (
           <>
             <TextField
-              label="iCal (.ics) URL"
+              label="Calendar URL (.ics or CalDAV/WebDAV)"
               placeholder="https://calendar.google.com/…/basic.ics"
               value={calendar.url}
               onChange={(e) => updateCalendar({ url: e.target.value })}
             />
+            <div className="grid grid-cols-2 gap-3">
+              <TextField
+                label="Username (optional)"
+                autoComplete="off"
+                value={calendar.username}
+                onChange={(e) => updateCalendar({ username: e.target.value })}
+              />
+              <TextField
+                label="Password (optional)"
+                type="password"
+                autoComplete="new-password"
+                value={calendar.password}
+                onChange={(e) => updateCalendar({ password: e.target.value })}
+              />
+            </div>
             <label className="flex items-center justify-between gap-4 text-sm">
               <span className="text-fg/50">Events to show</span>
               <input
@@ -832,8 +847,12 @@ export default function SettingsManager({
               />
             </label>
             <p className="text-xs text-fg/40">
-              Times show in each visitor&apos;s time zone. Repeating events expand
-              for common rules (daily/weekly/monthly); unusual recurrence may not.
+              For a private calendar, paste its CalDAV/WebDAV collection URL and
+              credentials (a Nextcloud app password is recommended); the events are
+              fetched server-side. The password can instead come from the
+              CTRLCENTER_CALDAV_PASS env var. Times show in each visitor&apos;s
+              time zone; repeating events expand for common rules
+              (daily/weekly/monthly).
             </p>
           </>
         )}

@@ -18,7 +18,12 @@ export default async function HomePage() {
 
   const cal = settings.calendar;
   const events =
-    cal.enabled && cal.url ? await fetchCalendar(cal.url, cal.count) : [];
+    cal.enabled && cal.url
+      ? await fetchCalendar(cal.url, cal.count, {
+          username: cal.username,
+          password: cal.password,
+        })
+      : [];
 
   const components = settings.components;
 

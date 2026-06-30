@@ -485,13 +485,20 @@ const g = globalThis as unknown as {
 };
 const calCache = (g.__ctrlcenterCalCache ??= new Map());
 
-async function fetchAndParse(target: string): Promise<CalendarEvent[] | null> {
+// GET a URL (time-boxed) and return its body only if it looks like an iCalendar
+// document. Lets the caller distinguish "served ICS" from "served a WebDAV
+// collection / HTML error page".
+async function getIcs(
+  target: string,
+  headers: HeadersInit
+): Promise<string | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), CAL_TIMEOUT_MS);
   try {
-    const res = await fetch(target, { signal: controller.signal });
+    const res = await fetch(target, { headers, signal: controller.signal });
     if (!res.ok) return null;
-    return parseICS(await res.text());
+    const text = await res.text();
+    return text.includes("BEGIN:VCALENDAR") ? text : null;
   } catch {
     return null;
   } finally {
@@ -499,21 +506,47 @@ async function fetchAndParse(target: string): Promise<CalendarEvent[] | null> {
   }
 }
 
-// Fetch + parse a published calendar (cached for a few minutes), returning the
-// next `count` upcoming events. Best-effort: a fetch/parse failure serves the
-// last good cache if there is one, else an empty list — it never throws.
-// `webcal://` URLs are normalized to https.
+// Fetch + parse a calendar. A plain GET handles published .ics feeds; if that
+// doesn't return ICS (a CalDAV/WebDAV *collection* URL serves an XML/HTML
+// listing instead), retry with `?export`, which Nextcloud/ownCloud/Radicale/
+// Baikal use to emit the collection as a single ICS.
+async function fetchAndParse(
+  target: string,
+  headers: HeadersInit
+): Promise<CalendarEvent[] | null> {
+  let text = await getIcs(target, headers);
+  if (!text && !/[?&]export(=|&|$)/i.test(target)) {
+    const sep = target.includes("?") ? "&" : "?";
+    text = await getIcs(`${target}${sep}export`, headers);
+  }
+  return text ? parseICS(text) : null;
+}
+
+// Fetch + parse a published or private calendar (cached for a few minutes),
+// returning the next `count` upcoming events. Best-effort: a fetch/parse failure
+// serves the last good cache if there is one, else an empty list — it never
+// throws. `webcal://` URLs are normalized to https. Optional Basic-auth
+// credentials (for a private CalDAV/WebDAV calendar) are sent on the request; the
+// password may also come from CTRLCENTER_CALDAV_PASS.
 export async function fetchCalendar(
   url: string,
-  count = 5
+  count = 5,
+  auth?: { username?: string; password?: string }
 ): Promise<CalendarEvent[]> {
   const target = url.trim().replace(/^webcal:\/\//i, "https://");
   if (!/^https?:\/\//i.test(target)) return [];
+  const headers: Record<string, string> = { Accept: "text/calendar, */*" };
+  const user = auth?.username?.trim();
+  if (user) {
+    const pass = process.env.CTRLCENTER_CALDAV_PASS || auth?.password || "";
+    headers.Authorization =
+      "Basic " + Buffer.from(`${user}:${pass}`).toString("base64");
+  }
   const now = Date.now();
   const cached = calCache.get(target);
   let events = cached?.events;
   if (!cached || now - cached.at >= CAL_CACHE_TTL_MS) {
-    const fresh = await fetchAndParse(target);
+    const fresh = await fetchAndParse(target, headers);
     if (fresh) {
       events = fresh;
       calCache.set(target, { events: fresh, at: now });

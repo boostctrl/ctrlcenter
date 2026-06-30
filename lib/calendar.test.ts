@@ -384,3 +384,71 @@ describe("fetchCalendar caching", () => {
     }
   });
 });
+
+describe("fetchCalendar auth + WebDAV", () => {
+  it("sends Basic auth and falls back to ?export for a DAV collection URL", async () => {
+    const ics = [
+      "BEGIN:VCALENDAR",
+      "BEGIN:VEVENT",
+      "UID:dav",
+      "SUMMARY:DAV event",
+      "DTSTART:20990101T120000Z",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+    const calls: { url: string; auth?: string }[] = [];
+    const orig = globalThis.fetch;
+    globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      const u = String(url);
+      const headers = (init?.headers ?? {}) as Record<string, string>;
+      calls.push({ url: u, auth: headers.Authorization });
+      // The bare collection URL serves a WebDAV listing (not ICS); ?export does.
+      return u.includes("export")
+        ? new Response(ics, { status: 200 })
+        : new Response("<d:multistatus xmlns:d='DAV:'/>", { status: 200 });
+    }) as typeof fetch;
+    try {
+      const url = `https://cloud.example.test/remote.php/dav/calendars/me/cal-${Date.now()}/`;
+      const out = await fetchCalendar(url, 5, {
+        username: "me",
+        password: "secret",
+      });
+      expect(out[0]?.summary).toBe("DAV event");
+      expect(calls).toHaveLength(2); // bare URL, then ?export
+      expect(calls[1].url).toContain("?export");
+      const expected = "Basic " + Buffer.from("me:secret").toString("base64");
+      expect(calls.every((c) => c.auth === expected)).toBe(true);
+    } finally {
+      globalThis.fetch = orig;
+    }
+  });
+
+  it("does not append ?export when the URL already returns ICS, and omits auth when no username", async () => {
+    const ics = [
+      "BEGIN:VCALENDAR",
+      "BEGIN:VEVENT",
+      "UID:p",
+      "SUMMARY:Public",
+      "DTSTART:20990101T120000Z",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+    const calls: { url: string; auth?: string }[] = [];
+    const orig = globalThis.fetch;
+    globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      const headers = (init?.headers ?? {}) as Record<string, string>;
+      calls.push({ url: String(url), auth: headers.Authorization });
+      return new Response(ics, { status: 200 });
+    }) as typeof fetch;
+    try {
+      const url = `https://cal.example.test/${Date.now()}-public.ics`;
+      const out = await fetchCalendar(url, 5);
+      expect(out[0]?.summary).toBe("Public");
+      expect(calls).toHaveLength(1);
+      expect(calls[0].url).not.toContain("export");
+      expect(calls[0].auth).toBeUndefined();
+    } finally {
+      globalThis.fetch = orig;
+    }
+  });
+});

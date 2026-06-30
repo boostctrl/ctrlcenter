@@ -83,6 +83,10 @@ export const calendarSchema = z.object({
   enabled: z.boolean().default(false),
   url: z.string().default(""),
   count: z.number().int().min(1).max(20).default(5),
+  // Optional Basic-auth credentials for a private CalDAV/WebDAV calendar (e.g. a
+  // Nextcloud DAV URL). The password can also come from CTRLCENTER_CALDAV_PASS.
+  username: z.string().default(""),
+  password: z.string().default(""),
 });
 export type CalendarConfig = z.infer<typeof calendarSchema>;
 
@@ -355,6 +359,8 @@ export const calendarUpdateSchema = z
     enabled: z.boolean(),
     url: z.string(),
     count: z.number().int().min(1).max(20),
+    username: z.string(),
+    password: z.string(),
   })
   .refine(
     (c) =>
