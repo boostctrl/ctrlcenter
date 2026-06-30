@@ -48,13 +48,18 @@ const fontVariables = [
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSettings();
-  // A configured favicon (icon slug, bundled local icon, or URL) overrides the
-  // default app/icon.svg; otherwise fall back to that convention.
-  const favicon = settings.favicon ? resolveIconUrl(settings.favicon) : null;
+  // The browser-tab favicon: a configured value (icon slug, bundled local icon,
+  // or URL) when set, else the bundled default served from /public. We emit it
+  // here rather than via the app/ file conventions (app/favicon.ico,
+  // app/icon.svg) on purpose: those conventions always render their own <link>
+  // tags that take precedence over metadata, so a configured favicon would never
+  // win. Keeping the default in /public means this is the only icon link.
+  const favicon =
+    (settings.favicon && resolveIconUrl(settings.favicon)) || "/icon.svg";
   return {
     title: settings.title || "Home",
     description: "Personal dashboard",
-    ...(favicon ? { icons: { icon: favicon } } : {}),
+    icons: { icon: favicon },
   };
 }
 
