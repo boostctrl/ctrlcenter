@@ -58,6 +58,15 @@ export const alertsSchema = z.object({
 });
 export type AlertConfig = z.infer<typeof alertsSchema>;
 
+// Agenda widget fed by a published iCal (.ics) URL. Stored leniently; the URL is
+// validated on the admin path.
+export const calendarSchema = z.object({
+  enabled: z.boolean().default(false),
+  url: z.string().default(""),
+  count: z.number().int().min(1).max(20).default(5),
+});
+export type CalendarConfig = z.infer<typeof calendarSchema>;
+
 // The site-wide default theme. Visitors can override every part of this in
 // their own browser (the theme builder / settings page); these values are the
 // baseline an un-customized visitor sees. `background`/`foreground` are optional
@@ -113,6 +122,7 @@ export const settingsSchema = z.object({
   search: searchSchema.default(searchSchema.parse({})),
   weather: weatherSchema.default(weatherSchema.parse({})),
   alerts: alertsSchema.default(alertsSchema.parse({})),
+  calendar: calendarSchema.default(calendarSchema.parse({})),
 });
 
 // `expectStatus` is an optional comma list of HTTP codes/ranges (e.g.
@@ -288,6 +298,20 @@ export const alertsUpdateSchema = z
     { message: "Webhook URL must start with http(s)", path: ["webhookUrl"] }
   );
 
+// Admin sends the whole calendar object. The URL is optional (the widget stays
+// off until set) but must be http(s) or webcal when present.
+export const calendarUpdateSchema = z
+  .object({
+    enabled: z.boolean(),
+    url: z.string(),
+    count: z.number().int().min(1).max(20),
+  })
+  .refine(
+    (c) =>
+      c.url.trim() === "" || /^(https?|webcal):\/\//i.test(c.url.trim()),
+    { message: "Calendar URL must start with http(s) or webcal", path: ["url"] }
+  );
+
 // The admin sends the whole theme object (not a partial), so updateSettings
 // replaces it wholesale — that's how clearing the optional custom colors works
 // (omit them and they're gone). Required fields keep a saved theme well-formed.
@@ -321,6 +345,7 @@ export const settingsInputSchema = z.object({
   search: searchUpdateSchema.optional(),
   weather: weatherUpdateSchema.optional(),
   alerts: alertsUpdateSchema.optional(),
+  calendar: calendarUpdateSchema.optional(),
 });
 export type SettingsInput = z.infer<typeof settingsInputSchema>;
 

@@ -78,6 +78,10 @@ export default function SettingsManager({
     ntfy: "https://ntfy.sh/your-topic",
   };
 
+  const calendar = settings.calendar;
+  const updateCalendar = (patch: Partial<Settings["calendar"]>) =>
+    setSettings((s) => ({ ...s, calendar: { ...s.calendar, ...patch } }));
+
   const bangs = settings.search.bangs;
   const setBangs = (next: Settings["search"]["bangs"]) =>
     setSettings((s) => ({ ...s, search: { ...s.search, bangs: next } }));
@@ -614,6 +618,56 @@ export default function SettingsManager({
           </select>
         </label>
         </Section>
+
+      <Section title="Calendar">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <span className="text-sm text-fg/70">Agenda widget</span>
+            <p className="text-xs text-fg/40">
+              Show upcoming events from a published iCal (.ics) URL on the
+              dashboard.
+            </p>
+          </div>
+          <label className="flex shrink-0 items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={calendar.enabled}
+              onChange={(e) => updateCalendar({ enabled: e.target.checked })}
+            />
+            Enabled
+          </label>
+        </div>
+
+        {calendar.enabled && (
+          <>
+            <TextField
+              label="iCal (.ics) URL"
+              placeholder="https://calendar.google.com/…/basic.ics"
+              value={calendar.url}
+              onChange={(e) => updateCalendar({ url: e.target.value })}
+            />
+            <label className="flex items-center justify-between gap-4 text-sm">
+              <span className="text-fg/50">Events to show</span>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={calendar.count}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10);
+                  updateCalendar({
+                    count: Number.isNaN(v) ? calendar.count : Math.min(20, Math.max(1, v)),
+                  });
+                }}
+                className={`${selectClass} w-20 text-center`}
+              />
+            </label>
+            <p className="text-xs text-fg/40">
+              Times use the default time zone. Recurring events may not appear.
+            </p>
+          </>
+        )}
+      </Section>
         </div>
       </div>
     </div>

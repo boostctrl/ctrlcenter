@@ -2,7 +2,9 @@ import { readConfig } from "@/lib/config";
 import Header from "@/components/Header";
 import Dashboard from "@/components/Dashboard";
 import FloatingSettings from "@/components/FloatingSettings";
+import CalendarWidget from "@/components/CalendarWidget";
 import { StatusProvider } from "@/components/StatusProvider";
+import { fetchCalendar } from "@/lib/calendar";
 
 export const dynamic = "force-dynamic";
 
@@ -14,10 +16,20 @@ export default async function HomePage() {
   // enable it when status checks are on and there are apps to monitor.
   const statusEnabled = settings.statusChecks && apps.length > 0;
 
+  const cal = settings.calendar;
+  const events =
+    cal.enabled && cal.url ? await fetchCalendar(cal.url, cal.count) : [];
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-12 px-6 py-12 sm:px-10 lg:py-16">
       <StatusProvider enabled={statusEnabled}>
         <Header settings={settings} apps={apps} statusEnabled={statusEnabled} />
+
+        <CalendarWidget
+          events={events}
+          timeZone={settings.timezone || "UTC"}
+          now={new Date().getTime()}
+        />
 
         <Dashboard
           apps={apps}
