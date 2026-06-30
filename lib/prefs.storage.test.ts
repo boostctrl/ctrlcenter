@@ -7,8 +7,11 @@ import {
   loadFont,
   saveFont,
   loadThemes,
+  loadFavorites,
+  saveFavorites,
   THEMES_KEY,
   DESIGN_KEY,
+  FAVORITES_KEY,
 } from "@/lib/prefs";
 
 // Minimal localStorage stub so the window-gated load/save helpers run under the
@@ -73,6 +76,24 @@ describe("per-mode design/scene/font storage", () => {
   it("saving an all-null pair clears the key", () => {
     saveDesign({ dark: null, light: null });
     expect(store.raw(DESIGN_KEY)).toBeNull();
+  });
+});
+
+describe("favorites storage", () => {
+  it("round-trips the pinned id list in order", () => {
+    saveFavorites(["b", "a", "c"]);
+    expect(loadFavorites()).toEqual(["b", "a", "c"]);
+  });
+
+  it("returns an empty list when unset", () => {
+    expect(loadFavorites()).toEqual([]);
+  });
+
+  it("ignores non-array or non-string junk", () => {
+    store.setItem(FAVORITES_KEY, JSON.stringify({ not: "an array" }));
+    expect(loadFavorites()).toEqual([]);
+    store.setItem(FAVORITES_KEY, JSON.stringify(["ok", 5, null, "two"]));
+    expect(loadFavorites()).toEqual(["ok", "two"]);
   });
 });
 

@@ -116,6 +116,35 @@ export function savePrefs(prefs: VisitorPrefs): void {
   }
 }
 
+// --- Favorites ---
+// Per-visitor pinned app IDs, surfaced in a Favorites row at the top of the
+// dashboard. Stored as a JSON string array (pin order preserved); unknown or
+// deleted IDs are ignored at render time. Purely client-side — never written to
+// the server config.
+export const FAVORITES_KEY = "ctrlcenter:favorites";
+
+export function loadFavorites(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(FAVORITES_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr)
+      ? arr.filter((x): x is string => typeof x === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveFavorites(ids: string[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(FAVORITES_KEY, JSON.stringify(ids));
+  } catch {
+    // Private mode / quota — favorites just won't persist.
+  }
+}
+
 export function detectTimezone(): string | undefined {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;

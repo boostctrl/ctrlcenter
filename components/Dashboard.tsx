@@ -13,6 +13,7 @@ import {
   type SearchConfig,
 } from "@/lib/search";
 import { orderCategories } from "@/lib/bookmarks";
+import { useVisitorPrefs } from "./PrefsProvider";
 import type { AppItem, BookmarkItem } from "@/lib/schema";
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -52,6 +53,7 @@ export default function Dashboard({
 }) {
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const { favorites } = useVisitorPrefs();
 
   // "/" focuses search; Escape clears and blurs it.
   useEffect(() => {
@@ -104,6 +106,15 @@ export default function Dashboard({
     return groupBookmarks(matches, categoryOrder);
   }, [bookmarks, q, categoryOrder]);
 
+  // Pinned apps, in pin order, dropping any that no longer exist. Shown only when
+  // not searching — during a search the filtered results take over.
+  const favoriteApps = useMemo(() => {
+    const byId = new Map(apps.map((a) => [a.id, a]));
+    return favorites
+      .map((id) => byId.get(id))
+      .filter((a): a is AppItem => a !== undefined);
+  }, [apps, favorites]);
+
   const hasContent = apps.length > 0 || bookmarks.length > 0;
   const hasResults = filteredApps.length > 0 || filteredGroups.length > 0;
 
@@ -149,6 +160,17 @@ export default function Dashboard({
             className="accent-focus w-full rounded-2xl border border-fg/10 bg-fg/[0.04] px-5 py-3.5 text-fg placeholder-fg/30 outline-none backdrop-blur-xl transition-colors"
           />
         </div>
+      )}
+
+      {!q && favoriteApps.length > 0 && (
+        <section>
+          <SectionTitle>Favorites</SectionTitle>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {favoriteApps.map((app) => (
+              <AppCard key={app.id} app={app} />
+            ))}
+          </div>
+        </section>
       )}
 
       {filteredApps.length > 0 && (

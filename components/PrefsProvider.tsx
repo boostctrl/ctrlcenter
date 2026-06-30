@@ -25,6 +25,8 @@ import {
   saveScene,
   loadFont,
   saveFont,
+  loadFavorites,
+  saveFavorites,
   type Units,
   type VisitorLocation,
   type VisitorPrefs,
@@ -207,6 +209,10 @@ type PrefsValue = {
   activeColors: ColorSet | null;
   accentOverride: AccentColors | null;
   activeAccent: AccentColors;
+  // Per-visitor pinned app IDs (pin order) and a toggle. Surfaced as a Favorites
+  // row on the dashboard; client-only.
+  favorites: string[];
+  toggleFavorite: (id: string) => void;
   setTimezone: (tz: string) => void;
   setUnits: (units: Units) => void;
   setGreetingName: (name: string) => void;
@@ -346,6 +352,8 @@ export function PrefsProvider({
   // A non-persisted appearance-mode preview for the theme builder: lets the
   // visitor see a mode while editing it without changing their saved choice.
   const [previewMode, setPreviewModeState] = useState<Mode | null>(null);
+  // Pinned app IDs (starts empty to match SSR; hydrated from localStorage on mount).
+  const [favorites, setFavorites] = useState<string[]>([]);
 
   // The mode actually shown on screen: a live builder preview overrides the
   // saved app mode (without persisting). Everything that drives the *display* —
@@ -789,6 +797,7 @@ export function PrefsProvider({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPrefs(stored);
     setDetectedTz(detectTimezone());
+    setFavorites(loadFavorites());
 
     // Location only matters for weather; skip the IP lookup entirely when the
     // weather widget is off, or once the visitor has set/reset their location.
@@ -818,6 +827,16 @@ export function PrefsProvider({
       active = false;
     };
   }, [persist, weatherEnabled]);
+
+  const toggleFavorite = useCallback((id: string) => {
+    setFavorites((prev) => {
+      const next = prev.includes(id)
+        ? prev.filter((x) => x !== id)
+        : [...prev, id];
+      saveFavorites(next);
+      return next;
+    });
+  }, []);
 
   const setTimezone = useCallback(
     (tz: string) => persist({ ...prefs, timezone: tz || undefined }),
@@ -981,6 +1000,8 @@ export function PrefsProvider({
       activeColors,
       accentOverride,
       activeAccent: resolveAccent(accentOverride, activeColors, defaultAccent),
+      favorites,
+      toggleFavorite,
       setTimezone,
       setUnits,
       setGreetingName,
@@ -1019,6 +1040,8 @@ export function PrefsProvider({
     customThemes,
     activeLook,
     accentOverride,
+    favorites,
+    toggleFavorite,
     setTimezone,
     setUnits,
     setGreetingName,
