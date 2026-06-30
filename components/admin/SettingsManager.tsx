@@ -501,8 +501,8 @@ export default function SettingsManager({
           <div>
             <span className="text-sm text-fg/70">Uptime alerts</span>
             <p className="text-xs text-fg/40">
-              Notify a webhook when an app goes down or recovers. Requires service
-              status indicators (above) to be on.
+              Notify a webhook and/or email when an app goes down or recovers.
+              Requires service status indicators (above) to be on.
             </p>
           </div>
           <label className="flex shrink-0 items-center gap-2 text-sm">
@@ -517,30 +517,6 @@ export default function SettingsManager({
 
         {alerts.enabled && (
           <>
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="text-fg/50">Notify via</span>
-              <select
-                value={alerts.type}
-                onChange={(e) =>
-                  updateAlerts({ type: e.target.value as Settings["alerts"]["type"] })
-                }
-                className={selectClass}
-              >
-                {ALERT_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {alertTypeLabel[t]}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <TextField
-              label="Webhook URL"
-              placeholder={alertUrlPlaceholder[alerts.type]}
-              value={alerts.webhookUrl}
-              onChange={(e) => updateAlerts({ webhookUrl: e.target.value })}
-            />
-
             <label className="flex items-center justify-between text-sm">
               <span className="text-fg/50">Notify on recovery</span>
               <input
@@ -574,13 +550,48 @@ export default function SettingsManager({
               />
             </label>
 
+            {/* Two independent channels — set up either, both, or neither. */}
             <div className="mt-1 flex flex-col gap-3 border-t border-fg/10 pt-4">
+              <div>
+                <span className="text-sm text-fg/70">Webhook</span>
+                <p className="text-xs text-fg/40">
+                  Optional — leave the URL blank to skip. Posts to a generic JSON
+                  endpoint, Discord, Slack, or ntfy.
+                </p>
+              </div>
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="text-fg/50">Notify via</span>
+                <select
+                  value={alerts.type}
+                  onChange={(e) =>
+                    updateAlerts({
+                      type: e.target.value as Settings["alerts"]["type"],
+                    })
+                  }
+                  className={selectClass}
+                >
+                  {ALERT_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {alertTypeLabel[t]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <TextField
+                label="Webhook URL"
+                placeholder={alertUrlPlaceholder[alerts.type]}
+                value={alerts.webhookUrl}
+                onChange={(e) => updateAlerts({ webhookUrl: e.target.value })}
+              />
+            </div>
+
+            <div className="flex flex-col gap-3 border-t border-fg/10 pt-4">
               <label className="flex items-start justify-between gap-4 text-sm">
                 <span className="text-fg/50">
                   Email (SMTP)
                   <span className="block text-xs text-fg/40">
-                    Also email on down/recovery. Works with any SMTP service
-                    (SMTP2GO, Gmail, Fastmail, a relay).
+                    Optional — email on down/recovery, independent of the webhook.
+                    Works with any SMTP service (SMTP2GO, Gmail, Fastmail, a relay).
                   </span>
                 </span>
                 <input
