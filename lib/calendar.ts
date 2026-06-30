@@ -475,6 +475,35 @@ export function upcomingEvents(
 
 const CAL_TIMEOUT_MS = 6000;
 const CAL_CACHE_TTL_MS = 5 * 60_000;
+// Cap the fetched body so a huge or malicious feed can't exhaust server memory —
+// the fetch is reachable from anonymous home-page loads. Generous for ICS (real
+// feeds are well under 1 MB).
+const CAL_MAX_BYTES = 5 * 1024 * 1024;
+
+// Read a response body up to `max` bytes, returning null if it exceeds the cap
+// (via Content-Length up front, then while streaming for chunked responses).
+async function readCapped(res: Response, max: number): Promise<string | null> {
+  const declared = Number(res.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > max) return null;
+  const reader = res.body?.getReader();
+  if (!reader) return null;
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value) continue;
+    total += value.length;
+    if (total > max) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  return new TextDecoder().decode(
+    chunks.length === 1 ? chunks[0] : Buffer.concat(chunks)
+  );
+}
 
 // Parsed-event cache keyed by URL, so the homepage (force-dynamic) doesn't make
 // a blocking third-party request on every render. Held on globalThis to survive
@@ -497,8 +526,8 @@ async function getIcs(
   try {
     const res = await fetch(target, { headers, signal: controller.signal });
     if (!res.ok) return null;
-    const text = await res.text();
-    return text.includes("BEGIN:VCALENDAR") ? text : null;
+    const text = await readCapped(res, CAL_MAX_BYTES);
+    return text && text.includes("BEGIN:VCALENDAR") ? text : null;
   } catch {
     return null;
   } finally {

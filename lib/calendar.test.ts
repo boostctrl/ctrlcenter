@@ -423,6 +423,21 @@ describe("fetchCalendar auth + WebDAV", () => {
     }
   });
 
+  it("rejects an over-cap feed (Content-Length beyond the limit)", async () => {
+    const orig = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      new Response("BEGIN:VCALENDAR", {
+        status: 200,
+        headers: { "content-length": String(10 * 1024 * 1024) },
+      })) as typeof fetch;
+    try {
+      const out = await fetchCalendar(`https://big.example.test/${Date.now()}.ics`, 5);
+      expect(out).toEqual([]);
+    } finally {
+      globalThis.fetch = orig;
+    }
+  });
+
   it("does not append ?export when the URL already returns ICS, and omits auth when no username", async () => {
     const ics = [
       "BEGIN:VCALENDAR",
