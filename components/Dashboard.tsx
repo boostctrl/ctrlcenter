@@ -4,7 +4,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import AppCard from "./AppCard";
 import BookmarkGroup from "./BookmarkGroup";
-import { buildSearchUrl, engineLabel, type SearchConfig } from "@/lib/search";
+import {
+  buildSearchUrl,
+  engineLabel,
+  resolveBang,
+  appBangMap,
+  parseBang,
+  type SearchConfig,
+} from "@/lib/search";
 import { orderCategories } from "@/lib/bookmarks";
 import type { AppItem, BookmarkItem } from "@/lib/schema";
 
@@ -69,6 +76,18 @@ export default function Dashboard({
 
   const q = query.trim().toLowerCase();
 
+  // A leading `!bang` puts the search bar in "command" mode: the query targets a
+  // bang destination rather than filtering apps/bookmarks.
+  const appBangs = useMemo(
+    () => appBangMap(apps.map((a) => ({ name: a.name, url: a.url }))),
+    [apps]
+  );
+  const parsedBang = useMemo(() => parseBang(query), [query]);
+  const bangHit = useMemo(
+    () => resolveBang(query, search.bangs ?? [], appBangs),
+    [query, search.bangs, appBangs]
+  );
+
   const filteredApps = useMemo(() => {
     if (!q) return apps;
     return apps.filter((a) =>
@@ -99,9 +118,14 @@ export default function Dashboard({
     if (url) window.open(url, "_blank", "noopener,noreferrer");
   }
 
-  // Enter opens the top match if there is one, otherwise searches the web.
+  // Enter: a recognized bang wins, then the top app/bookmark match, then a web
+  // search of the query.
   function onSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key !== "Enter" || !q) return;
+    if (bangHit) {
+      window.open(bangHit.url, "_blank", "noopener,noreferrer");
+      return;
+    }
     const top = topResultUrl();
     if (top) {
       window.open(top, "_blank", "noopener,noreferrer");
@@ -149,7 +173,24 @@ export default function Dashboard({
         </section>
       )}
 
-      {hasContent && !hasResults && (
+      {hasContent && !hasResults && parsedBang && (
+        <p className="text-fg/50">
+          {bangHit ? (
+            <>
+              <span className="text-fg/40">↵</span>{" "}
+              {bangHit.term
+                ? `Search ${bangHit.label} for “${bangHit.term}”`
+                : `Open ${bangHit.label}`}
+            </>
+          ) : (
+            <span className="text-fg/40">
+              No bang “!{parsedBang.key}”. Press Enter to search the web.
+            </span>
+          )}
+        </p>
+      )}
+
+      {hasContent && !hasResults && !parsedBang && (
         <p className="text-fg/40">
           No matches for “{query}”.{" "}
           {buildSearchUrl(search, query) && (

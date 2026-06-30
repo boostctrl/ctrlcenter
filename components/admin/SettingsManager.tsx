@@ -78,6 +78,12 @@ export default function SettingsManager({
     ntfy: "https://ntfy.sh/your-topic",
   };
 
+  const bangs = settings.search.bangs;
+  const setBangs = (next: Settings["search"]["bangs"]) =>
+    setSettings((s) => ({ ...s, search: { ...s.search, bangs: next } }));
+  const updateBang = (i: number, patch: Partial<Settings["search"]["bangs"][number]>) =>
+    setBangs(bangs.map((b, idx) => (idx === i ? { ...b, ...patch } : b)));
+
   // Apply a theme pack as the site default: record it as the preset and copy its
   // concrete design/scene/colors into the theme fields the layout actually reads.
   // This seeds BOTH modes from the one pack (dark parts + the pack's own light
@@ -382,6 +388,56 @@ export default function SettingsManager({
             Pressing Enter in the search bar opens the top match, or searches
             here when nothing matches.
           </p>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <span className="text-sm text-fg/50">Custom search bangs</span>
+          <p className="-mt-1 text-xs text-fg/40">
+            Type <span className="text-fg/60">!key term</span> in the search bar
+            to jump to a site (use <span className="text-fg/60">%s</span> for the
+            term). Built-ins (<span className="text-fg/60">!yt</span>,{" "}
+            <span className="text-fg/60">!gh</span>,{" "}
+            <span className="text-fg/60">!w</span>…) and your app names work
+            already.
+          </p>
+          {bangs.map((b, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <span className="text-fg/40">!</span>
+              <input
+                value={b.key}
+                onChange={(e) =>
+                  updateBang(i, {
+                    key: e.target.value.replace(/[^a-z0-9]/gi, "").toLowerCase(),
+                  })
+                }
+                placeholder="key"
+                aria-label={`Bang ${i + 1} key`}
+                className={`${selectClass} w-24`}
+              />
+              <input
+                value={b.url}
+                onChange={(e) => updateBang(i, { url: e.target.value })}
+                placeholder="https://example.com/search?q=%s"
+                aria-label={`Bang ${i + 1} URL`}
+                className={`${selectClass} min-w-0 flex-1`}
+              />
+              <button
+                type="button"
+                onClick={() => setBangs(bangs.filter((_, idx) => idx !== i))}
+                aria-label={`Remove bang ${i + 1}`}
+                className="shrink-0 rounded-md px-2 py-1 text-fg/40 transition-colors hover:bg-fg/10 hover:text-red-400"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => setBangs([...bangs, { key: "", url: "" }])}
+            className="self-start rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10"
+          >
+            + Add bang
+          </button>
         </div>
       </Section>
 

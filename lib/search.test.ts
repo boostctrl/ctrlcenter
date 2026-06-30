@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { buildSearchUrl, isValidCustomUrl } from "./search";
+import {
+  buildSearchUrl,
+  isValidCustomUrl,
+  parseBang,
+  resolveBang,
+  appBangMap,
+} from "./search";
 import { searchUpdateSchema } from "./schema";
 
 describe("buildSearchUrl", () => {
@@ -38,6 +44,67 @@ describe("isValidCustomUrl", () => {
     expect(isValidCustomUrl("http://x.com/%s")).toBe(true);
     expect(isValidCustomUrl("https://x.com/?q=foo")).toBe(false);
     expect(isValidCustomUrl("ftp://x.com/%s")).toBe(false);
+  });
+});
+
+describe("parseBang", () => {
+  it("splits a leading bang and its term", () => {
+    expect(parseBang("!yt cats")).toEqual({ key: "yt", term: "cats" });
+    expect(parseBang("  !GH  next js ")).toEqual({ key: "gh", term: "next js" });
+    expect(parseBang("!yt")).toEqual({ key: "yt", term: "" });
+  });
+
+  it("returns null without a leading bang", () => {
+    expect(parseBang("just a search")).toBeNull();
+    expect(parseBang("a !yt later")).toBeNull();
+    expect(parseBang("!")).toBeNull();
+  });
+});
+
+describe("resolveBang", () => {
+  const apps = [{ name: "Jellyfin", url: "https://jelly.example.com" }];
+  const appBangs = appBangMap(apps);
+
+  it("resolves a built-in bang with an encoded term", () => {
+    expect(resolveBang("!yt cats and dogs")?.url).toBe(
+      "https://www.youtube.com/results?search_query=cats%20and%20dogs"
+    );
+  });
+
+  it("opens the engine root for a bare built-in bang", () => {
+    expect(resolveBang("!yt")?.url).toBe("https://www.youtube.com");
+  });
+
+  it("lets a custom bang override a built-in", () => {
+    const hit = resolveBang("!gh thing", [
+      { key: "gh", url: "https://my.git/search?q=%s" },
+    ]);
+    expect(hit?.url).toBe("https://my.git/search?q=thing");
+  });
+
+  it("falls through to an app-name bang", () => {
+    const hit = resolveBang("!jellyfin", [], appBangs);
+    expect(hit).toEqual({ url: "https://jelly.example.com", label: "Jellyfin" });
+  });
+
+  it("returns null for an unknown bang and for no bang", () => {
+    expect(resolveBang("!nope term", [], appBangs)).toBeNull();
+    expect(resolveBang("plain search", [], appBangs)).toBeNull();
+  });
+
+  it("exposes the term only when one was given (for the hint)", () => {
+    expect(resolveBang("!yt cats")?.term).toBe("cats");
+    expect(resolveBang("!yt")?.term).toBeUndefined();
+  });
+});
+
+describe("appBangMap", () => {
+  it("slugs names and keeps the first on a collision", () => {
+    const m = appBangMap([
+      { name: "Media Server", url: "https://a" },
+      { name: "mediaserver", url: "https://b" },
+    ]);
+    expect(m.mediaserver).toEqual({ url: "https://a", name: "Media Server" });
   });
 });
 
