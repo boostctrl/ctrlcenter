@@ -45,11 +45,19 @@ export default function Dashboard({
   bookmarks,
   search,
   categoryOrder = [],
+  showSearch = true,
+  showApps = true,
+  showBookmarks = true,
+  showFavorites = true,
 }: {
   apps: AppItem[];
   bookmarks: BookmarkItem[];
   search: SearchConfig;
   categoryOrder?: string[];
+  showSearch?: boolean;
+  showApps?: boolean;
+  showBookmarks?: boolean;
+  showFavorites?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -91,20 +99,22 @@ export default function Dashboard({
   );
 
   const filteredApps = useMemo(() => {
+    if (!showApps) return [];
     if (!q) return apps;
     return apps.filter((a) =>
       [a.name, a.subtitle, a.url].some((f) => f.toLowerCase().includes(q))
     );
-  }, [apps, q]);
+  }, [apps, q, showApps]);
 
   const filteredGroups = useMemo(() => {
+    if (!showBookmarks) return [];
     const matches = !q
       ? bookmarks
       : bookmarks.filter((b) =>
           [b.name, b.category, b.url].some((f) => f.toLowerCase().includes(q))
         );
     return groupBookmarks(matches, categoryOrder);
-  }, [bookmarks, q, categoryOrder]);
+  }, [bookmarks, q, categoryOrder, showBookmarks]);
 
   // Pinned apps, in pin order, dropping any that no longer exist. Shown only when
   // not searching — during a search the filtered results take over.
@@ -115,7 +125,11 @@ export default function Dashboard({
       .filter((a): a is AppItem => a !== undefined);
   }, [apps, favorites]);
 
-  const hasContent = apps.length > 0 || bookmarks.length > 0;
+  // Whether there's anything configured at all (drives the empty-state) vs.
+  // anything the admin's left visible to search (drives the search bar/messages).
+  const hasAnyContent = apps.length > 0 || bookmarks.length > 0;
+  const hasVisibleContent =
+    (showApps && apps.length > 0) || (showBookmarks && bookmarks.length > 0);
   const hasResults = filteredApps.length > 0 || filteredGroups.length > 0;
 
   function topResultUrl(): string | null {
@@ -147,7 +161,7 @@ export default function Dashboard({
 
   const content = (
     <>
-      {hasContent && (
+      {showSearch && hasVisibleContent && (
         <div className="relative">
           <input
             ref={inputRef}
@@ -162,7 +176,7 @@ export default function Dashboard({
         </div>
       )}
 
-      {!q && favoriteApps.length > 0 && (
+      {showFavorites && !q && favoriteApps.length > 0 && (
         <section>
           <SectionTitle>Favorites</SectionTitle>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -195,7 +209,7 @@ export default function Dashboard({
         </section>
       )}
 
-      {hasContent && !hasResults && parsedBang && (
+      {hasVisibleContent && !hasResults && parsedBang && (
         <p className="text-fg/50">
           {bangHit ? (
             <>
@@ -212,7 +226,7 @@ export default function Dashboard({
         </p>
       )}
 
-      {hasContent && !hasResults && !parsedBang && (
+      {hasVisibleContent && !hasResults && !parsedBang && (
         <p className="text-fg/40">
           No matches for “{query}”.{" "}
           {buildSearchUrl(search, query) && (
@@ -227,7 +241,7 @@ export default function Dashboard({
         </p>
       )}
 
-      {!hasContent && (
+      {!hasAnyContent && (
         <p className="text-fg/40">
           Nothing here yet.{" "}
           <Link href="/admin" className="underline hover:text-fg/70">

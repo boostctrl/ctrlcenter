@@ -122,6 +122,20 @@ export const themeSchema = z.object({
   foregroundLight: hexColor.optional(),
 });
 
+// Per-component visibility for the home page. Each flag defaults on, so existing
+// configs keep showing everything. Weather, the status row, and the calendar have
+// their own dedicated toggles already, so they aren't duplicated here.
+export const componentsSchema = z.object({
+  greeting: z.boolean().default(true),
+  clock: z.boolean().default(true),
+  search: z.boolean().default(true),
+  apps: z.boolean().default(true),
+  bookmarks: z.boolean().default(true),
+  favorites: z.boolean().default(true),
+  settingsButton: z.boolean().default(true),
+});
+export type ComponentsConfig = z.infer<typeof componentsSchema>;
+
 export const settingsSchema = z.object({
   title: z.string().default("Home"),
   favicon: z.string().default(""),
@@ -142,6 +156,7 @@ export const settingsSchema = z.object({
   weather: weatherSchema.default(weatherSchema.parse({})),
   alerts: alertsSchema.default(alertsSchema.parse({})),
   calendar: calendarSchema.default(calendarSchema.parse({})),
+  components: componentsSchema.default(componentsSchema.parse({})),
 });
 
 // `expectStatus` is an optional comma list of HTTP codes/ranges (e.g.
@@ -376,6 +391,18 @@ export const themeInputSchema = z.object({
   foregroundLight: hexColor.optional(),
 });
 
+// The admin sends the whole components object (all flags), so updateSettings can
+// replace it wholesale.
+export const componentsUpdateSchema = z.object({
+  greeting: z.boolean(),
+  clock: z.boolean(),
+  search: z.boolean(),
+  apps: z.boolean(),
+  bookmarks: z.boolean(),
+  favorites: z.boolean(),
+  settingsButton: z.boolean(),
+});
+
 export const settingsInputSchema = z.object({
   title: z.string().optional(),
   favicon: z.string().optional(),
@@ -389,6 +416,7 @@ export const settingsInputSchema = z.object({
   weather: weatherUpdateSchema.optional(),
   alerts: alertsUpdateSchema.optional(),
   calendar: calendarUpdateSchema.optional(),
+  components: componentsUpdateSchema.optional(),
 });
 export type SettingsInput = z.infer<typeof settingsInputSchema>;
 

@@ -20,6 +20,8 @@ export default async function HomePage() {
   const events =
     cal.enabled && cal.url ? await fetchCalendar(cal.url, cal.count) : [];
 
+  const components = settings.components;
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-12 px-6 py-12 sm:px-10 lg:py-16">
       <StatusProvider enabled={statusEnabled}>
@@ -32,10 +34,14 @@ export default async function HomePage() {
           bookmarks={bookmarks}
           search={settings.search}
           categoryOrder={settings.bookmarkCategoryOrder}
+          showSearch={components.search}
+          showApps={components.apps}
+          showBookmarks={components.bookmarks}
+          showFavorites={components.favorites}
         />
       </StatusProvider>
 
-      <FloatingSettings />
+      {components.settingsButton && <FloatingSettings />}
     </main>
   );
 }

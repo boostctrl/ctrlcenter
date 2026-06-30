@@ -27,17 +27,32 @@ export default async function Header({
     ? await fetchWeather(weather.latitude, weather.longitude, weather.units)
     : null;
 
+  const { greeting: showGreeting, clock: showClock } = settings.components;
+  // The time/weather row renders when either the clock or weather is on; the
+  // glass card renders when that row or the status row has something to show.
+  const showTimeWeather = showClock || weather.enabled;
+  const showCard = showTimeWeather || statusEnabled;
+
   return (
     <header className="flex flex-col items-start justify-between gap-8 sm:flex-row sm:items-center">
-      <Greeting initialGreeting={initialGreeting} />
-      <div className="glass-card flex w-full flex-col overflow-hidden sm:w-auto">
-        <TimeWeather
-          initialDate={initialDate}
-          weatherEnabled={weather.enabled}
-          initial={initialWeather}
-        />
-        {statusEnabled && <StatusSummary apps={apps} />}
-      </div>
+      {showGreeting && <Greeting initialGreeting={initialGreeting} />}
+      {showCard && (
+        <div
+          className={`glass-card flex w-full flex-col overflow-hidden sm:w-auto${
+            showGreeting ? "" : " sm:ml-auto"
+          }`}
+        >
+          {showTimeWeather && (
+            <TimeWeather
+              initialDate={initialDate}
+              weatherEnabled={weather.enabled}
+              showClock={showClock}
+              initial={initialWeather}
+            />
+          )}
+          {statusEnabled && <StatusSummary apps={apps} />}
+        </div>
+      )}
     </header>
   );
 }

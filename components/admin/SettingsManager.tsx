@@ -70,6 +70,24 @@ export default function SettingsManager({
       ...s,
       alerts: { ...s.alerts, email: { ...s.alerts.email, ...patch } },
     }));
+
+  const components = settings.components;
+  const setComponent = (key: keyof Settings["components"], value: boolean) =>
+    setSettings((s) => ({
+      ...s,
+      components: { ...s.components, [key]: value },
+    }));
+  // Components without their own dedicated toggle (weather/status/calendar keep
+  // theirs). Order mirrors roughly top-to-bottom on the page.
+  const componentToggles: { key: keyof Settings["components"]; label: string }[] = [
+    { key: "greeting", label: "Greeting" },
+    { key: "clock", label: "Date & clock" },
+    { key: "search", label: "Search bar" },
+    { key: "apps", label: "Applications" },
+    { key: "bookmarks", label: "Bookmarks" },
+    { key: "favorites", label: "Favorites row" },
+    { key: "settingsButton", label: "Floating settings button" },
+  ];
   const alertTypeLabel: Record<Settings["alerts"]["type"], string> = {
     generic: "Generic JSON webhook",
     discord: "Discord",
@@ -282,8 +300,36 @@ export default function SettingsManager({
       </Section>
         </div>
 
-        {/* Right column — Dashboard, Weather. */}
+        {/* Right column — Layout, Dashboard, Weather. */}
         <div className="flex flex-col gap-4">
+      <Section title="Layout">
+        <p className="text-xs text-fg/40">
+          Show or hide individual home-page components. Weather, the status row,
+          and the calendar have their own toggles below.
+        </p>
+        <div className="flex flex-col gap-2.5">
+          {componentToggles.map((t) => (
+            <label
+              key={t.key}
+              className="flex items-center justify-between gap-4 text-sm"
+            >
+              <span className="text-fg/70">{t.label}</span>
+              <input
+                type="checkbox"
+                checked={components[t.key]}
+                onChange={(e) => setComponent(t.key, e.target.checked)}
+              />
+            </label>
+          ))}
+        </div>
+        {!components.settingsButton && (
+          <p className="text-xs text-fg/40">
+            With the floating settings button off, reach this page directly at
+            /admin.
+          </p>
+        )}
+      </Section>
+
       <Section title="Dashboard">
         <div className="flex items-center justify-between gap-4">
           <div>

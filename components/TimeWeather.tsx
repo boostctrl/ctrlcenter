@@ -17,10 +17,12 @@ import {
 export default function TimeWeather({
   initialDate,
   weatherEnabled,
+  showClock = true,
   initial,
 }: {
   initialDate: string;
   weatherEnabled: boolean;
+  showClock?: boolean;
   initial: CurrentWeather | null;
 }) {
   const { timezone, location, units } = useVisitorPrefs();
@@ -28,6 +30,7 @@ export default function TimeWeather({
   const [fetched, setFetched] = useState<CurrentWeather | null>(null);
 
   useEffect(() => {
+    if (!showClock) return; // no clock to tick when it's hidden
     let timer: ReturnType<typeof setTimeout>;
     const tick = () => {
       setNow(new Date());
@@ -35,7 +38,7 @@ export default function TimeWeather({
     };
     timer = setTimeout(tick, 0);
     return () => clearTimeout(timer);
-  }, []);
+  }, [showClock]);
 
   // Always refetch live on mount (and every 10 min) for the effective location/
   // units, rather than relying on the server-cached SSR seed. This keeps the
@@ -79,21 +82,26 @@ export default function TimeWeather({
               </p>
             </div>
           </div>
-          <div className="h-10 w-px bg-fg/10" />
+          {showClock && <div className="h-10 w-px bg-fg/10" />}
         </>
       )}
-      <div className="text-right">
-        <p
-          className="text-2xl leading-tight font-semibold tabular-nums"
-          suppressHydrationWarning
-        >
-          {time}
-        </p>
-        <p className="text-xs tracking-wide text-fg/50" suppressHydrationWarning>
-          {date}
-          {weatherEnabled && location.label ? ` · ${location.label}` : ""}
-        </p>
-      </div>
+      {showClock && (
+        <div className="text-right">
+          <p
+            className="text-2xl leading-tight font-semibold tabular-nums"
+            suppressHydrationWarning
+          >
+            {time}
+          </p>
+          <p
+            className="text-xs tracking-wide text-fg/50"
+            suppressHydrationWarning
+          >
+            {date}
+            {weatherEnabled && location.label ? ` · ${location.label}` : ""}
+          </p>
+        </div>
+      )}
     </>
   );
 
