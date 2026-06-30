@@ -12,6 +12,38 @@ here.
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-06-30
+
+### Added
+
+- **Private calendars (CalDAV/WebDAV).** The agenda can now read a password-
+  protected calendar — paste a Nextcloud (or ownCloud/Radicale/Baikal) DAV
+  calendar URL with an optional username + app-password. A bare collection URL is
+  fetched via its `?export` ICS endpoint. The password can instead come from the
+  `CTRLCENTER_CALDAV_PASS` env var. (#62)
+
+### Changed
+
+- **Webhook and email alerts are now clearly independent channels.** The Alerts
+  settings present the webhook (optional — leave the URL blank to skip) and email
+  (its own toggle) as separate channels under one master switch, so you can use
+  email alone without configuring a webhook. (#61)
+- **The floating settings button now appears on the weather and status pages**,
+  not just the home page, so visitors can reach their settings from anywhere.
+  (#63)
+
+### Fixed
+
+- **The header time/weather card no longer stretches across the page.** A 1.1.0
+  change moved its class into a template literal, which made Tailwind drop the
+  `sm:w-auto` rule, so the card fell back to full width; it's content-width again.
+  (#59)
+- **Uploaded icons keep their aspect ratio.** A non-square image (e.g. a wide
+  wordmark used as the favicon) is now centered on a square transparent canvas on
+  upload, so it isn't stretched in the browser tab or PWA. (#60)
+- **The admin Settings columns are balanced again** — the Layout section moved to
+  the left column, so the two columns are even rather than lopsided. (#64)
+
 ## [1.1.0] - 2026-06-30
 
 ### Added
@@ -779,7 +811,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/boostctrl/ctrlcenter/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/boostctrl/ctrlcenter/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/boostctrl/ctrlcenter/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/boostctrl/ctrlcenter/compare/v1.0.0...v1.0.1
