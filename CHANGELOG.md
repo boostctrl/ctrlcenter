@@ -12,6 +12,34 @@ here.
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-06-30
+
+### Changed
+
+- **Scene backdrops read richer in light mode.** The accent-driven scenes
+  (Aurora, Nebula, Rays, …) now deepen and saturate their colours on light
+  surfaces — from the first paint, via the no-flash script — so they land as a
+  colour burst instead of washing out. Dark mode is unchanged.
+- **The secondary accent colour is now actually used.** The end colour of a
+  two-tone accent gradient barely showed; it now colours the section labels
+  (bookmark group headers, drawn as a from→to gradient) and adds a second layer
+  to the card hover glow, so both accent colours read across the dashboard. (#47)
+- **One consistent "Back to dashboard" control on every page.** Settings,
+  weather, status, and admin shared differently-worded back links and the admin
+  login had none; they now use the same control, and the login screen finally has
+  a way home. (#46)
+
+### Fixed
+
+- **A favicon set in the admin portal now takes effect.** The bundled default
+  icon (a Next.js file-convention icon) overrode the configured one before it
+  reached the browser tab; the default is now only a fallback, so your favicon
+  shows. (#48)
+- **Accent-gradient buttons keep legible text in any theme.** Buttons like the
+  **Admin portal** one used a fixed black label that could turn unreadable on a
+  dark accent; the text colour is now derived from the accent's brightness and
+  works in both light and dark mode. (#45)
+
 ## [1.0.1] - 2026-06-26
 
 ### Changed
@@ -715,7 +743,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/boostctrl/ctrlcenter/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/boostctrl/ctrlcenter/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.9...v1.0.0
 [0.9.9]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.8...v0.9.9
