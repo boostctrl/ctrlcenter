@@ -32,7 +32,11 @@ export default async function HomePage() {
       <StatusProvider enabled={statusEnabled}>
         <Header settings={settings} apps={apps} statusEnabled={statusEnabled} />
 
-        <CalendarWidget events={events} now={new Date().getTime()} />
+        <CalendarWidget
+          events={events}
+          now={new Date().getTime()}
+          enabled={cal.enabled && cal.url.trim() !== ""}
+        />
 
         <Dashboard
           apps={apps}

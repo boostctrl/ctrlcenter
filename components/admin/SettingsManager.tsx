@@ -13,6 +13,7 @@ import { STATUS_RANGES } from "@/lib/status";
 import { supportedTimezones } from "@/lib/prefs";
 import { TextField } from "./ui";
 import IconField from "./IconField";
+import CalendarTest from "./CalendarTest";
 import CitySearch from "./CitySearch";
 import ChangePassword from "./ChangePassword";
 import { apiErrorMessage } from "./apiError";
@@ -874,6 +875,18 @@ export default function SettingsManager({
                 className={`${selectClass} w-20 text-center`}
               />
             </label>
+            <CalendarTest
+              url={calendar.url}
+              username={calendar.username}
+              password={calendar.password}
+            />
+            {calendar.username.trim() !== "" &&
+              /^http:\/\//i.test(calendar.url.trim()) && (
+                <p className="text-xs text-amber-400/80">
+                  This URL is plain http, so the credentials are sent in
+                  cleartext. Use https where possible.
+                </p>
+              )}
             <p className="text-xs text-fg/40">
               For a private calendar, paste its CalDAV/WebDAV collection URL and
               credentials (a Nextcloud app password is recommended); the events are
