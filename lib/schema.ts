@@ -319,28 +319,20 @@ export const searchUpdateSchema = z
 
 // Admin sends the whole alerts object. A webhook URL is optional (alerts stay
 // inert until one is set), but when present it must be http(s).
-// When email alerts are enabled, a host and from/to address are required; the
-// rest stays lenient. Optional in the parent so older clients can omit it.
-export const alertEmailUpdateSchema = z
-  .object({
-    enabled: z.boolean(),
-    host: z.string(),
-    port: z.number().int().min(1).max(65535),
-    secure: z.boolean(),
-    user: z.string(),
-    pass: z.string(),
-    from: z.string(),
-    to: z.string(),
-  })
-  .refine(
-    (e) =>
-      !e.enabled ||
-      (e.host.trim() !== "" && e.from.trim() !== "" && e.to.trim() !== ""),
-    {
-      message: "Email alerts need an SMTP host and from/to addresses",
-      path: ["host"],
-    }
-  );
+// Lenient like the webhook URL: an enabled-but-incomplete email channel just
+// stays inert (processAlerts gates sending on emailReady), so partially-filled
+// fields never block an autosave. The admin UI nudges to finish the config.
+// Optional in the parent so older clients can omit it.
+export const alertEmailUpdateSchema = z.object({
+  enabled: z.boolean(),
+  host: z.string(),
+  port: z.number().int().min(1).max(65535),
+  secure: z.boolean(),
+  user: z.string(),
+  pass: z.string(),
+  from: z.string(),
+  to: z.string(),
+});
 
 export const alertsUpdateSchema = z
   .object({

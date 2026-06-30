@@ -238,6 +238,60 @@ describe("expandRecurring", () => {
     for (const e of out) expect(new Date(e.start).getUTCDate()).toBe(15);
   });
 
+  it("keeps a weekly event at the same local time across a DST change", () => {
+    // US DST springs forward 2026-03-08. A 09:00 New York weekly event should
+    // read 09:00 local both before and after — at different UTC instants.
+    const ics = [
+      "BEGIN:VCALENDAR",
+      "BEGIN:VEVENT",
+      "UID:dst",
+      "SUMMARY:Standup",
+      "DTSTART;TZID=America/New_York:20260302T090000",
+      "RRULE:FREQ=WEEKLY;BYDAY=MO;COUNT=4",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+    const now = Date.parse("2026-03-01T00:00:00Z");
+    const out = expandRecurring(parseICS(ics), now, now + 40 * DAY).sort(
+      (a, b) => a.start - b.start
+    );
+    const localTime = (ms: number) =>
+      new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/New_York",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }).format(new Date(ms));
+    expect(out).toHaveLength(4); // Mar 2, 9, 16, 23
+    for (const e of out) expect(localTime(e.start)).toBe("09:00");
+    // EST(-05) → EDT(-04) across Mar 8, so consecutive instants aren't 7d apart.
+    expect(out[1].start - out[0].start).not.toBe(7 * DAY);
+  });
+
+  it("skips months without the start day for a monthly series", () => {
+    const ics = [
+      "BEGIN:VCALENDAR",
+      "BEGIN:VEVENT",
+      "UID:m31",
+      "SUMMARY:Rent",
+      "DTSTART:20260131T100000Z",
+      "RRULE:FREQ=MONTHLY;COUNT=4",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+    const now = Date.parse("2026-01-01T00:00:00Z");
+    const out = expandRecurring(parseICS(ics), now, now + 220 * DAY).sort(
+      (a, b) => a.start - b.start
+    );
+    // Feb/Apr/Jun have no 31st and are skipped without consuming COUNT.
+    expect(out.map((e) => new Date(e.start).toISOString())).toEqual([
+      "2026-01-31T10:00:00.000Z",
+      "2026-03-31T10:00:00.000Z",
+      "2026-05-31T10:00:00.000Z",
+      "2026-07-31T10:00:00.000Z",
+    ]);
+  });
+
   it("skips EXDATE cancellations and applies RECURRENCE-ID overrides", () => {
     const ics = [
       "BEGIN:VCALENDAR",

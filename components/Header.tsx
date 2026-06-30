@@ -33,6 +33,10 @@ export default async function Header({
   const showTimeWeather = showClock || weather.enabled;
   const showCard = showTimeWeather || statusEnabled;
 
+  // Nothing in the header is enabled — render nothing so the page's flex gap
+  // doesn't leave an empty band at the top.
+  if (!showGreeting && !showCard) return null;
+
   return (
     <header className="flex flex-col items-start justify-between gap-8 sm:flex-row sm:items-center">
       {showGreeting && <Greeting initialGreeting={initialGreeting} />}

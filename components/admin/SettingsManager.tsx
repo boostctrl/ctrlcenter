@@ -667,6 +667,16 @@ export default function SettingsManager({
                     value={alerts.email.to}
                     onChange={(e) => updateAlertEmail({ to: e.target.value })}
                   />
+                  {!(
+                    alerts.email.host.trim() &&
+                    alerts.email.from.trim() &&
+                    alerts.email.to.trim()
+                  ) && (
+                    <p className="text-xs text-amber-400/80">
+                      Add an SMTP host and from/to addresses to start sending —
+                      email stays off until then.
+                    </p>
+                  )}
                 </div>
               )}
             </div>
