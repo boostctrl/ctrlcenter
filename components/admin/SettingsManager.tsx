@@ -295,13 +295,6 @@ export default function SettingsManager({
         </div>
       </Section>
 
-      <Section title="Security">
-        <ChangePassword />
-      </Section>
-        </div>
-
-        {/* Right column — Layout, Dashboard, Weather. */}
-        <div className="flex flex-col gap-4">
       <Section title="Layout">
         <p className="text-xs text-fg/40">
           Show or hide individual home-page components. Weather, the status row,
@@ -330,6 +323,13 @@ export default function SettingsManager({
         )}
       </Section>
 
+      <Section title="Security">
+        <ChangePassword />
+      </Section>
+        </div>
+
+        {/* Right column — Dashboard, Alerts, Weather, Calendar. */}
+        <div className="flex flex-col gap-4">
       <Section title="Dashboard">
         <div className="flex items-center justify-between gap-4">
           <div>
