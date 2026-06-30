@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { readConfig } from "@/lib/config";
 import StatusPage from "@/components/StatusPage";
+import BackHome from "@/components/BackHome";
 
 export const metadata: Metadata = { title: "Status" };
 export const dynamic = "force-dynamic";
@@ -19,12 +20,7 @@ export default async function StatusRoute() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-8 px-6 py-12 sm:px-10 lg:py-16">
       <div>
-        <Link
-          href="/"
-          className="text-sm text-fg/50 transition-colors hover:text-fg/80"
-        >
-          ← Back to dashboard
-        </Link>
+        <BackHome />
         <h1 className="mt-3 text-3xl font-bold">Status</h1>
       </div>
 

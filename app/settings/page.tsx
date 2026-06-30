@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import SettingsControls from "@/components/SettingsControls";
 import ThemeBuilder from "@/components/ThemeBuilder";
+import BackHome from "@/components/BackHome";
 import { getThemeOverrides } from "@/lib/config";
 import { resolveThemePacks } from "@/lib/theme";
 
@@ -12,12 +13,7 @@ export default async function SettingsPage() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-8 px-6 py-12 sm:px-10 lg:py-16">
       <div>
-        <Link
-          href="/"
-          className="text-sm text-fg/50 transition-colors hover:text-fg/80"
-        >
-          ← Back to dashboard
-        </Link>
+        <BackHome />
         <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold">Settings</h1>

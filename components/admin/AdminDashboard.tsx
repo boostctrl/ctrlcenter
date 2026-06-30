@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState, type ChangeEvent } from "react";
-import Link from "next/link";
 import type {
   AppItem,
   BookmarkItem,
@@ -12,6 +11,7 @@ import AppsManager from "./AppsManager";
 import BookmarksManager from "./BookmarksManager";
 import SettingsManager from "./SettingsManager";
 import ThemesManager from "./ThemesManager";
+import BackHome from "@/components/BackHome";
 import { resolveThemePacks } from "@/lib/theme";
 import { Button } from "./ui";
 import { ToastProvider, useToast } from "./Toast";
@@ -105,35 +105,32 @@ function AdminBody({
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 py-12 sm:px-10">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-3xl font-bold">Manage your dashboard</h1>
-        <div className="flex flex-wrap items-center gap-3">
-          <Link
-            href="/"
-            className="text-sm text-fg/50 transition-colors hover:text-fg/80"
-          >
-            View site
-          </Link>
-          <Button variant="ghost" type="button" onClick={handleExport}>
-            Export
-          </Button>
-          <Button
-            variant="ghost"
-            type="button"
-            onClick={() => fileRef.current?.click()}
-          >
-            Import
-          </Button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="application/json,.json"
-            onChange={handleImportFile}
-            className="hidden"
-          />
-          <Button variant="ghost" type="button" onClick={handleLogout}>
-            Log out
-          </Button>
+      <div>
+        <BackHome />
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
+          <h1 className="text-3xl font-bold">Manage your dashboard</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button variant="ghost" type="button" onClick={handleExport}>
+              Export
+            </Button>
+            <Button
+              variant="ghost"
+              type="button"
+              onClick={() => fileRef.current?.click()}
+            >
+              Import
+            </Button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="application/json,.json"
+              onChange={handleImportFile}
+              className="hidden"
+            />
+            <Button variant="ghost" type="button" onClick={handleLogout}>
+              Log out
+            </Button>
+          </div>
         </div>
       </div>
 

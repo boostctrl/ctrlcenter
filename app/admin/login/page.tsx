@@ -3,6 +3,7 @@
 import { useState, Suspense, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { TextField, Button } from "@/components/admin/ui";
+import BackHome from "@/components/BackHome";
 
 // Only follow `next` when it's a same-site, same-origin path: a single leading
 // slash, not "//" or "/\" (protocol-relative URLs the browser would treat as
@@ -62,10 +63,11 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center px-6">
+    <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-6">
       <Suspense>
         <LoginForm />
       </Suspense>
+      <BackHome />
     </main>
   );
 }
