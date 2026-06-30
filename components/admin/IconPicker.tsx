@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Icon from "@/components/Icon";
 import { fetchIconSlugs } from "@/lib/icons";
 
@@ -87,7 +88,11 @@ export default function IconPicker({
 
   const shown = results.slice(0, MAX_RESULTS);
 
-  return (
+  // Portaled to <body> so the overlay escapes the admin settings card's stacking
+  // context: a .glass-card's backdrop-filter creates one (and a containing block
+  // for fixed descendants), which would otherwise trap this fixed z-50 layer
+  // behind the sibling settings cards.
+  const overlay = (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 pt-[10vh] backdrop-blur-sm"
       onMouseDown={onClose}
@@ -227,4 +232,8 @@ export default function IconPicker({
       </div>
     </div>
   );
+
+  return typeof document === "undefined"
+    ? null
+    : createPortal(overlay, document.body);
 }

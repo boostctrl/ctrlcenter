@@ -1,52 +1,102 @@
 settings:
   title: Home
+  favicon: ''
   timezone: America/Chicago
+  theme:
+    mode: system
+    design: glass
+    scene: aurora
+    font: jakarta
+    accentFrom: '#a78bfa'
+    accentTo: '#22d3ee'
+  statusChecks: false
+  statusInterval: 5
+  statusDefaultRange: d1
+  bookmarkCategoryOrder: []
+  search:
+    engine: duckduckgo
+    customUrl: ''
+    bangs: []
   weather:
     enabled: true
     latitude: 38.9072
     longitude: -77.0369
     units: imperial
+  alerts:
+    enabled: false
+    type: generic
+    webhookUrl: ''
+    notifyOnRecovery: true
+    confirmations: 2
+  calendar:
+    enabled: false
+    url: ''
+    count: 5
 apps:
   - id: 85b49535-e829-4356-8685-fef57bbeab56
     name: File Storage
     subtitle: Nextcloud
     url: https://files.example.com
     icon: nextcloud
+    expectStatus: ''
+    checkType: http
+    keyword: ''
   - id: 0079e6d2-da5d-406f-a206-08b422d5e7f6
     name: Password Manager
     subtitle: Vaultwarden
     url: https://vault.example.com
     icon: vaultwarden
+    expectStatus: ''
+    checkType: http
+    keyword: ''
   - id: a3632b22-c60b-4651-9854-6e80842da9a2
     name: Media Requests
     subtitle: Jellyseerr
     url: https://requests.example.com
     icon: jellyseerr
+    expectStatus: ''
+    checkType: http
+    keyword: ''
   - id: 8fc903c5-aab5-436b-8bf2-4235f38475bd
     name: Media Server
     subtitle: Jellyfin
     url: https://media.example.com
     icon: jellyfin
+    expectStatus: ''
+    checkType: http
+    keyword: ''
   - id: 3dea3dc7-89db-44e9-a32d-54392e94b8a8
     name: Photos
     subtitle: Immich
     url: https://photos.example.com
     icon: immich
+    expectStatus: ''
+    checkType: http
+    keyword: ''
   - id: a5bb1c52-fedd-45e7-a99e-d837cc467d14
     name: Service Status
     subtitle: Uptime Kuma
     url: https://status.example.com
     icon: uptime-kuma
+    expectStatus: ''
+    checkType: http
+    keyword: ''
   - id: e4bf8034-ce59-4828-8170-7eb79e5b878a
     name: Utilities
     subtitle: IT Tools
     url: https://tools.example.com
     icon: it-tools
+    expectStatus: ''
+    checkType: http
+    keyword: ''
   - id: 5ec3677f-7811-4d14-9b87-92010a689ef4
     name: Web Search
     subtitle: SearXNG
     url: https://search.example.com
     icon: searxng
+    expectStatus: ''
+    checkType: http
+    keyword: ''
 bookmarks:
   - id: edbe5a4d-d2ca-432b-884f-36594d426452
     category: Shopping
@@ -78,3 +128,7 @@ bookmarks:
     name: Proton
     url: https://proton.me
     icon: proton
+themes: []
+auth:
+  passwordHash: ''
+  passwordSalt: ''
