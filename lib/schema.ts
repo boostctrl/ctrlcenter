@@ -69,6 +69,10 @@ export const alertsSchema = z.object({
   enabled: z.boolean().default(false),
   type: z.enum(ALERT_TYPES).default("generic"),
   webhookUrl: z.string().default(""),
+  // Webhook channel on/off, independent of the email channel. Defaults true so an
+  // existing config with a webhook URL keeps sending; the webhook fires only when
+  // this is on AND a URL is set.
+  webhookEnabled: z.boolean().default(true),
   // Also notify when a down app comes back up.
   notifyOnRecovery: z.boolean().default(true),
   // Consecutive failed polls before an app is declared down (flap dampening).
@@ -343,6 +347,7 @@ export const alertsUpdateSchema = z
     enabled: z.boolean(),
     type: z.enum(ALERT_TYPES),
     webhookUrl: z.string(),
+    webhookEnabled: z.boolean().optional(),
     notifyOnRecovery: z.boolean(),
     confirmations: z.number().int().min(1).max(10),
     email: alertEmailUpdateSchema.optional(),

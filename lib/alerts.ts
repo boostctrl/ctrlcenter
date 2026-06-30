@@ -212,8 +212,9 @@ export async function processAlerts(
 ): Promise<void> {
   if (!config.enabled) return;
   const webhookUrl = config.webhookUrl.trim();
+  const sendWebhook = config.webhookEnabled && webhookUrl !== "";
   const sendEmail = emailReady(config.email);
-  if (!webhookUrl && !sendEmail) return;
+  if (!sendWebhook && !sendEmail) return;
   if (!g.__ctrlcenterAlertState) g.__ctrlcenterAlertState = seedState(priorReadings);
   const { next, events } = evaluateTransitions(g.__ctrlcenterAlertState, results, config);
   g.__ctrlcenterAlertState = next;
@@ -226,7 +227,7 @@ export async function processAlerts(
       if (!found) return [];
       const app = { name: found.name, url: found.url };
       const tasks: Promise<void>[] = [];
-      if (webhookUrl)
+      if (sendWebhook)
         tasks.push(sendAlert(buildAlertRequest(config.type, webhookUrl, e, app, at)));
       if (sendEmail) tasks.push(sendEmailAlert(config.email, e, app, at));
       return tasks;

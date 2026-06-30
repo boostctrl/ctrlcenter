@@ -550,39 +550,53 @@ export default function SettingsManager({
               />
             </label>
 
-            {/* Two independent channels — set up either, both, or neither. */}
+            {/* Two independent channels, each with its own toggle — enable
+                either, both, or neither. */}
             <div className="mt-1 flex flex-col gap-3 border-t border-fg/10 pt-4">
-              <div>
-                <span className="text-sm text-fg/70">Webhook</span>
-                <p className="text-xs text-fg/40">
-                  Optional — leave the URL blank to skip. Posts to a generic JSON
-                  endpoint, Discord, Slack, or ntfy.
-                </p>
-              </div>
-              <label className="flex flex-col gap-1 text-sm">
-                <span className="text-fg/50">Notify via</span>
-                <select
-                  value={alerts.type}
+              <label className="flex items-start justify-between gap-4 text-sm">
+                <span className="text-fg/50">
+                  Webhook
+                  <span className="block text-xs text-fg/40">
+                    Post to a generic JSON endpoint, Discord, Slack, or ntfy.
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  className="mt-0.5 shrink-0"
+                  checked={alerts.webhookEnabled}
                   onChange={(e) =>
-                    updateAlerts({
-                      type: e.target.value as Settings["alerts"]["type"],
-                    })
+                    updateAlerts({ webhookEnabled: e.target.checked })
                   }
-                  className={selectClass}
-                >
-                  {ALERT_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {alertTypeLabel[t]}
-                    </option>
-                  ))}
-                </select>
+                />
               </label>
-              <TextField
-                label="Webhook URL"
-                placeholder={alertUrlPlaceholder[alerts.type]}
-                value={alerts.webhookUrl}
-                onChange={(e) => updateAlerts({ webhookUrl: e.target.value })}
-              />
+              {alerts.webhookEnabled && (
+                <div className="flex flex-col gap-3">
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="text-fg/50">Notify via</span>
+                    <select
+                      value={alerts.type}
+                      onChange={(e) =>
+                        updateAlerts({
+                          type: e.target.value as Settings["alerts"]["type"],
+                        })
+                      }
+                      className={selectClass}
+                    >
+                      {ALERT_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {alertTypeLabel[t]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <TextField
+                    label="Webhook URL"
+                    placeholder={alertUrlPlaceholder[alerts.type]}
+                    value={alerts.webhookUrl}
+                    onChange={(e) => updateAlerts({ webhookUrl: e.target.value })}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="flex flex-col gap-3 border-t border-fg/10 pt-4">
