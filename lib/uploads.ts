@@ -101,12 +101,15 @@ async function squareIcon(
   if (!SQUARABLE.has(type)) return { type, data };
   try {
     const sharp = (await import("sharp")).default;
-    const meta = await sharp(data).metadata();
+    // Cap decoded pixels (defense-in-depth against a decompression bomb on top of
+    // the 512 KB upload limit) and the output dimension.
+    const opts = { limitInputPixels: 24_000_000 };
+    const meta = await sharp(data, opts).metadata();
     if (!meta.width || !meta.height || meta.width === meta.height) {
       return { type, data };
     }
-    const size = Math.max(meta.width, meta.height);
-    const out = await sharp(data)
+    const size = Math.min(1024, Math.max(meta.width, meta.height));
+    const out = await sharp(data, opts)
       .resize(size, size, {
         fit: "contain",
         background: { r: 0, g: 0, b: 0, alpha: 0 },
