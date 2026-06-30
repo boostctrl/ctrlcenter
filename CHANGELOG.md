@@ -12,6 +12,30 @@ here.
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-06-30
+
+### Changed
+
+- **The agenda is now discoverable.** A dedicated **/calendar** page (like
+  /weather and /status) shows the full agenda; the home "Upcoming" card links to
+  it and shows "No upcoming events" instead of vanishing when the feed is empty;
+  and the admin Calendar settings gained a **Test feed** button that reports
+  whether the feed is reachable and how many upcoming events it has. (#65)
+- **Webhook and email alerts are independent channels.** The webhook now has its
+  own enable toggle, symmetric with email, under the master Alerts switch — so
+  email can be used on its own without configuring a webhook. (#61)
+- **Alert emails are HTML-formatted** with a configurable **subject** template
+  (`{service}` / `{status}` variables; blank uses the default). (#66)
+
+### Security
+
+- **Capped the calendar fetch response size** (5 MB) so a huge or malicious feed
+  can't exhaust server memory — the fetch is reachable from anonymous page loads.
+  (#67)
+- Bounded sharp's decoded input pixels and squared output size on icon upload,
+  added CR/LF sanitization to the templated email subject, and warn in the admin
+  when a private calendar URL is plain http (credentials sent in cleartext). (#67)
+
 ## [1.1.1] - 2026-06-30
 
 ### Added
@@ -811,7 +835,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/boostctrl/ctrlcenter/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/boostctrl/ctrlcenter/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/boostctrl/ctrlcenter/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/boostctrl/ctrlcenter/compare/v1.0.1...v1.0.2
