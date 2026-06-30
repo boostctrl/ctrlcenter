@@ -64,6 +64,11 @@ function applyAccent(accent: Accent, dark: boolean): void {
   const s = document.documentElement.style;
   s.setProperty("--accent-from", accent.from);
   s.setProperty("--accent-to", accent.to);
+  // Legible ink for content on the accent gradient (.btn-accent): near-black on
+  // bright accents, white on dark ones, from the average luminance of the two
+  // stops. Mirrors lm() in the no-flash script (app/layout.tsx).
+  const accentLum = (luminance(accent.from) + luminance(accent.to)) / 2;
+  s.setProperty("--accent-fg", accentLum >= 0.6 ? "#000000" : "#ffffff");
   // Scene backdrops read --scene-* so they can deepen + saturate the accent on
   // the near-white light surface (where the raw accent washes out) while keeping
   // it as-is on dark. Both modes are set explicitly so switching light→dark
@@ -100,16 +105,21 @@ function applyFont(font: FontId): void {
   if (font !== "jakarta") el.classList.add(`font-${font}`);
 }
 
-// Perceived luminance of a #rrggbb color — used to decide whether the current
-// surface reads as light (so themed icons can pick a legible variant).
-function isLightColor(hex: string): boolean {
+// Perceived luminance (0–1) of a #rrggbb color; non-hex falls back to mid-gray.
+function luminance(hex: string): number {
   const m = /^#?([0-9a-fA-F]{6})$/.exec(hex.trim());
-  if (!m) return false;
+  if (!m) return 0.5;
   const n = parseInt(m[1], 16);
   const r = (n >> 16) & 255;
   const g = (n >> 8) & 255;
   const b = n & 255;
-  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.5;
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+}
+
+// Whether a surface color reads as light (so themed icons can pick a legible
+// variant).
+function isLightColor(hex: string): boolean {
+  return luminance(hex) > 0.5;
 }
 
 // Resolve the effective accent: an explicit per-visitor override wins, then the

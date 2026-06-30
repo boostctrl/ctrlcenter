@@ -27,7 +27,7 @@ export function Button({
   const base =
     "rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
   const variants: Record<ButtonVariant, string> = {
-    primary: "btn-accent text-black hover:opacity-90",
+    primary: "btn-accent hover:opacity-90",
     ghost: "border border-fg/10 bg-fg/5 text-fg/80 hover:bg-fg/10",
     danger: "border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20",
   };

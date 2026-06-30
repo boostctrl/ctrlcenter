@@ -13,6 +13,12 @@
   --fg: #ffffff;
   --accent-from: #a78bfa;
   --accent-to: #22d3ee;
+  /* Legible ink for text/icons sitting on the accent gradient (e.g. .btn-accent).
+     Chosen from the accent's perceived luminance — near-black on bright accents,
+     white on dark ones — so accent buttons stay readable with any accent, in
+     either mode. Set imperatively on <html> by the no-flash script and
+     applyAccent(); this is the default-accent fallback pre-hydration. */
+  --accent-fg: #000000;
   /* Scene backdrops paint translucent accent over the page background. A bright
      accent reads as a vivid burst over the dark surface but washes out over the
      near-white light one — so dark uses the accent as-is, while `.theme-light`
@@ -358,6 +364,7 @@ select optgroup {
      --accent-from / --accent-to variables instead of fixed Tailwind colors. */
   .btn-accent {
     background-image: linear-gradient(to right, var(--accent-from), var(--accent-to));
+    color: var(--accent-fg);
   }
   .accent-focus:focus {
     border-color: var(--accent-to);
