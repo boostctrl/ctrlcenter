@@ -166,6 +166,48 @@ export function parseICS(text: string): CalendarEvent[] {
   return events;
 }
 
+// `YYYY-MM-DD` for an instant rendered in a zone, for day-equality checks.
+function ymd(ms: number, zone: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: zone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(ms));
+}
+
+// The day label ("Today" / "Tomorrow" / "Wed, Jul 1") and time for an event.
+// All-day events are formatted in UTC — the zone they're anchored in — so their
+// date never slips in a viewer zone behind UTC; timed events use `tz`. `now`
+// anchors the relative labels (in `tz`).
+export function eventWhen(
+  event: CalendarEvent,
+  tz: string,
+  now: number
+): { day: string; time: string } {
+  const zone = event.allDay ? "UTC" : tz;
+  const key = ymd(event.start, zone);
+  const day =
+    key === ymd(now, tz)
+      ? "Today"
+      : key === ymd(now + DAY_MS, tz)
+        ? "Tomorrow"
+        : new Intl.DateTimeFormat("en-US", {
+            timeZone: zone,
+            weekday: "short",
+            month: "short",
+            day: "numeric",
+          }).format(new Date(event.start));
+  const time = event.allDay
+    ? "All day"
+    : new Intl.DateTimeFormat("en-US", {
+        timeZone: tz,
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(new Date(event.start));
+  return { day, time };
+}
+
 // Sort by start and keep the next `count` events that haven't finished yet (an
 // all-day event without an explicit end runs to the end of its day).
 export function upcomingEvents(
@@ -180,26 +222,51 @@ export function upcomingEvents(
 }
 
 const CAL_TIMEOUT_MS = 6000;
+const CAL_CACHE_TTL_MS = 5 * 60_000;
 
-// Fetch + parse a published calendar, returning the next `count` upcoming
-// events. Best-effort: any network/parse failure yields an empty list rather
-// than throwing. `webcal://` URLs are normalized to https.
+// Parsed-event cache keyed by URL, so the homepage (force-dynamic) doesn't make
+// a blocking third-party request on every render. Held on globalThis to survive
+// module-graph duplication, like the status-history store.
+type CalCacheEntry = { events: CalendarEvent[]; at: number };
+const g = globalThis as unknown as {
+  __ctrlcenterCalCache?: Map<string, CalCacheEntry>;
+};
+const calCache = (g.__ctrlcenterCalCache ??= new Map());
+
+async function fetchAndParse(target: string): Promise<CalendarEvent[] | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CAL_TIMEOUT_MS);
+  try {
+    const res = await fetch(target, { signal: controller.signal });
+    if (!res.ok) return null;
+    return parseICS(await res.text());
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Fetch + parse a published calendar (cached for a few minutes), returning the
+// next `count` upcoming events. Best-effort: a fetch/parse failure serves the
+// last good cache if there is one, else an empty list — it never throws.
+// `webcal://` URLs are normalized to https.
 export async function fetchCalendar(
   url: string,
   count = 5
 ): Promise<CalendarEvent[]> {
   const target = url.trim().replace(/^webcal:\/\//i, "https://");
   if (!/^https?:\/\//i.test(target)) return [];
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), CAL_TIMEOUT_MS);
-  try {
-    const res = await fetch(target, { signal: controller.signal });
-    if (!res.ok) return [];
-    const text = await res.text();
-    return upcomingEvents(parseICS(text), Date.now(), count);
-  } catch {
-    return [];
-  } finally {
-    clearTimeout(timer);
+  const now = Date.now();
+  const cached = calCache.get(target);
+  let events = cached?.events;
+  if (!cached || now - cached.at >= CAL_CACHE_TTL_MS) {
+    const fresh = await fetchAndParse(target);
+    if (fresh) {
+      events = fresh;
+      calCache.set(target, { events: fresh, at: now });
+    }
+    // On failure, keep serving the stale cache (events stays as cached?.events).
   }
+  return upcomingEvents(events ?? [], now, count);
 }

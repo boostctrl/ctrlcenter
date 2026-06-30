@@ -123,11 +123,21 @@ describe("buildAlertRequest", () => {
     expect(body.text).toContain("Jellyfin recovered");
   });
 
-  it("ntfy posts a plain body with title/priority headers", () => {
+  it("ntfy posts the message in the body with title/priority headers", () => {
     const req = buildAlertRequest("ntfy", "https://ntfy.sh/topic", down, app, at);
     const headers = req.init.headers as Record<string, string>;
     expect(headers.Title).toBe("Jellyfin is down");
     expect(headers.Priority).toBe("high");
-    expect(req.init.body).toBe(app.url);
+    expect(req.init.body).toContain("Jellyfin is down");
+    expect(req.init.body).toContain(app.url);
+  });
+
+  it("ntfy drops a non-ASCII Title (latin-1 header) but keeps it in the body", () => {
+    const unicode = { name: "Café 日本", url: "https://x.example" };
+    const req = buildAlertRequest("ntfy", "https://ntfy.sh/topic", down, unicode, at);
+    const headers = req.init.headers as Record<string, string>;
+    expect(headers.Title).toBeUndefined();
+    expect(headers.Priority).toBe("high");
+    expect(req.init.body).toContain("Café 日本 is down");
   });
 });

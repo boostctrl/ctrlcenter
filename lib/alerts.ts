@@ -69,19 +69,24 @@ export function buildAlertRequest(
       return jsonReq(webhookUrl, { content: app.url ? `${text}\n${app.url}` : text });
     case "slack":
       return jsonReq(webhookUrl, { text: app.url ? `${text}\n${app.url}` : text });
-    case "ntfy":
+    case "ntfy": {
+      // The Title header is latin-1 only, so a non-ASCII service name would make
+      // fetch throw and the alert silently drop. Send Title only when it's safe;
+      // the full message (emoji and all) always rides in the UTF-8 body.
+      const asciiTitle = /^[\x20-\x7E]*$/.test(title) ? title : undefined;
       return {
         url: webhookUrl,
         init: {
           method: "POST",
           headers: {
-            Title: title,
+            ...(asciiTitle ? { Title: asciiTitle } : {}),
             Priority: down ? "high" : "default",
             Tags: down ? "red_circle" : "green_circle",
           },
-          body: app.url || app.name,
+          body: app.url ? `${text}\n${app.url}` : text,
         },
       };
+    }
     case "generic":
     default:
       return jsonReq(webhookUrl, {

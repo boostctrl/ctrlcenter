@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { parseICS, parseICalDate, upcomingEvents } from "./calendar";
+import {
+  parseICS,
+  parseICalDate,
+  upcomingEvents,
+  eventWhen,
+  fetchCalendar,
+} from "./calendar";
 
 describe("parseICalDate", () => {
   it("parses a UTC date-time", () => {
@@ -104,5 +110,67 @@ describe("upcomingEvents", () => {
     // Started at UTC midnight today; still counts as upcoming at noon.
     const today = [ev("today", "2026-06-30T00:00:00Z", true)];
     expect(upcomingEvents(today, now, 5)).toHaveLength(1);
+  });
+});
+
+describe("eventWhen", () => {
+  const tz = "America/Chicago"; // behind UTC, where the all-day bug showed up
+
+  it("renders an all-day event on its literal date, not shifted by the viewer zone", () => {
+    // All-day July 1 is anchored at UTC midnight; in Chicago that instant is
+    // June 30 evening, so the old code mislabeled it "Jun 30".
+    const event = { summary: "x", start: Date.UTC(2026, 6, 1), allDay: true };
+    const now = Date.parse("2026-06-29T12:00:00Z");
+    const { day, time } = eventWhen(event, tz, now);
+    expect(day).toContain("Jul 1");
+    expect(day).not.toContain("Jun");
+    expect(time).toBe("All day");
+  });
+
+  it("labels an all-day event Today relative to the viewer's day", () => {
+    const event = { summary: "x", start: Date.UTC(2026, 6, 1), allDay: true };
+    // Viewer is on 2026-07-01 in Chicago (10:00 local = 15:00Z).
+    expect(eventWhen(event, tz, Date.parse("2026-07-01T15:00:00Z")).day).toBe("Today");
+  });
+
+  it("formats a timed event's time in the site zone", () => {
+    const event = {
+      summary: "x",
+      start: Date.parse("2026-06-30T17:00:00Z"), // 12:00 CDT
+      allDay: false,
+    };
+    const { day, time } = eventWhen(event, tz, Date.parse("2026-06-30T12:00:00Z"));
+    expect(day).toBe("Today");
+    expect(time).toBe("12:00 PM");
+  });
+});
+
+describe("fetchCalendar caching", () => {
+  it("parses once and serves the cache without re-fetching within the TTL", async () => {
+    const ics = [
+      "BEGIN:VCALENDAR",
+      "BEGIN:VEVENT",
+      "UID:1",
+      "SUMMARY:Far future",
+      "DTSTART:20990101T120000Z",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+    let calls = 0;
+    const orig = globalThis.fetch;
+    globalThis.fetch = (async () => {
+      calls++;
+      return new Response(ics, { status: 200 });
+    }) as typeof fetch;
+    try {
+      const url = `https://cal.example.test/${Date.now()}.ics`; // unique → no stale cache
+      const a = await fetchCalendar(url, 5);
+      const b = await fetchCalendar(url, 5);
+      expect(calls).toBe(1);
+      expect(a).toEqual(b);
+      expect(a[0]?.summary).toBe("Far future");
+    } finally {
+      globalThis.fetch = orig;
+    }
   });
 });
