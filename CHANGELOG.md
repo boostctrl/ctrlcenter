@@ -12,6 +12,42 @@ here.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-06-30
+
+### Added
+
+- **Uptime alerts.** With service status checks on, the background poller can now
+  notify you as a service goes **down** or **recovers** — to a **webhook**
+  (generic JSON, Discord, Slack, or ntfy) and/or by **email** over SMTP (works
+  with SMTP2GO, Gmail, Fastmail, or any relay; the password can come from a
+  `CTRLCENTER_SMTP_PASS` env var so it stays out of the config file).
+  Flap-dampening **confirmations** require a few consecutive failed checks before
+  declaring an app down, and a restart won't re-alert one that was already down.
+  Configure it under admin → Alerts. (#50, #56)
+- **Search bangs.** Start a query with `!` to jump straight out: built-ins
+  (`!gh`, `!yt`, `!w`, `!npm`, `!maps`, `!so`, `!g`, …), your own custom bangs
+  (admin → Search), and an auto-bang for every app, so `!plex` opens Plex. An
+  unrecognized bang falls back to a web search. (#51)
+- **Favorites.** Pin your most-used apps to a Favorites row at the top of the
+  dashboard. Per-visitor, stored in the browser, no account needed. (#52)
+- **Agenda widget.** A new **Upcoming** card shows the next few events from any
+  published iCal (`.ics`) URL — a Google Calendar secret address, Fastmail,
+  Nextcloud, and the like. Recurring events (daily/weekly/monthly, honoring
+  EXDATE cancellations and per-instance overrides) are expanded over the coming
+  weeks, and times render in each visitor's own time zone. Configure it under
+  admin → Calendar. (#53, #54, #55)
+- **Show or hide home-page components.** A new admin **Layout** section toggles
+  individual parts of the home page on or off — greeting, date/clock, search,
+  applications, bookmarks, the favorites row, and the floating settings button —
+  alongside the existing weather, status, and agenda toggles. (#57)
+
+### Fixed
+
+- **The favicon icon picker no longer hides behind other settings cards.** Its
+  overlay was trapped in the General card's stacking context (a side effect of
+  the card's `backdrop-filter`); it now renders through a portal so it sits above
+  everything. (#58)
+
 ## [1.0.2] - 2026-06-30
 
 ### Changed
@@ -743,7 +779,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/boostctrl/ctrlcenter/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/boostctrl/ctrlcenter/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/boostctrl/ctrlcenter/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/boostctrl/ctrlcenter/compare/v0.9.9...v1.0.0
