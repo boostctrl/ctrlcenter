@@ -65,6 +65,11 @@ export default function SettingsManager({
   const alerts = settings.alerts;
   const updateAlerts = (patch: Partial<Settings["alerts"]>) =>
     setSettings((s) => ({ ...s, alerts: { ...s.alerts, ...patch } }));
+  const updateAlertEmail = (patch: Partial<Settings["alerts"]["email"]>) =>
+    setSettings((s) => ({
+      ...s,
+      alerts: { ...s.alerts, email: { ...s.alerts.email, ...patch } },
+    }));
   const alertTypeLabel: Record<Settings["alerts"]["type"], string> = {
     generic: "Generic JSON webhook",
     discord: "Discord",
@@ -522,6 +527,103 @@ export default function SettingsManager({
                 className={`${selectClass} w-20 text-center`}
               />
             </label>
+
+            <div className="mt-1 flex flex-col gap-3 border-t border-fg/10 pt-4">
+              <label className="flex items-start justify-between gap-4 text-sm">
+                <span className="text-fg/50">
+                  Email (SMTP)
+                  <span className="block text-xs text-fg/40">
+                    Also email on down/recovery. Works with any SMTP service
+                    (SMTP2GO, Gmail, Fastmail, a relay).
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  className="mt-0.5 shrink-0"
+                  checked={alerts.email.enabled}
+                  onChange={(e) => updateAlertEmail({ enabled: e.target.checked })}
+                />
+              </label>
+
+              {alerts.email.enabled && (
+                <div className="flex flex-col gap-3">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="col-span-2">
+                      <TextField
+                        label="SMTP host"
+                        placeholder="mail.smtp2go.com"
+                        value={alerts.email.host}
+                        onChange={(e) => updateAlertEmail({ host: e.target.value })}
+                      />
+                    </div>
+                    <label className="flex flex-col gap-1 text-sm">
+                      <span className="text-fg/50">Port</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={65535}
+                        value={alerts.email.port}
+                        onChange={(e) => {
+                          const v = parseInt(e.target.value, 10);
+                          updateAlertEmail({
+                            port: Number.isNaN(v)
+                              ? alerts.email.port
+                              : Math.min(65535, Math.max(1, v)),
+                          });
+                        }}
+                        className={selectClass}
+                      />
+                    </label>
+                  </div>
+
+                  <label className="flex items-center justify-between text-sm">
+                    <span className="text-fg/50">
+                      Implicit TLS (port 465)
+                      <span className="block text-xs text-fg/40">
+                        Leave off for 587/STARTTLS.
+                      </span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={alerts.email.secure}
+                      onChange={(e) => updateAlertEmail({ secure: e.target.checked })}
+                    />
+                  </label>
+
+                  <TextField
+                    label="Username"
+                    autoComplete="off"
+                    value={alerts.email.user}
+                    onChange={(e) => updateAlertEmail({ user: e.target.value })}
+                  />
+                  <div>
+                    <TextField
+                      label="Password"
+                      type="password"
+                      autoComplete="new-password"
+                      value={alerts.email.pass}
+                      onChange={(e) => updateAlertEmail({ pass: e.target.value })}
+                    />
+                    <p className="mt-1 text-xs text-fg/40">
+                      Stored in config.yaml. Set the CTRLCENTER_SMTP_PASS env var
+                      to keep it out of the file instead.
+                    </p>
+                  </div>
+                  <TextField
+                    label="From address"
+                    placeholder="ctrlcenter@yourdomain.com"
+                    value={alerts.email.from}
+                    onChange={(e) => updateAlertEmail({ from: e.target.value })}
+                  />
+                  <TextField
+                    label="To address"
+                    placeholder="you@example.com"
+                    value={alerts.email.to}
+                    onChange={(e) => updateAlertEmail({ to: e.target.value })}
+                  />
+                </div>
+              )}
+            </div>
           </>
         )}
       </Section>

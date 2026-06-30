@@ -1,9 +1,10 @@
-import type { AlertConfig, AlertType } from "./schema";
+import type { AlertConfig, AlertEmailConfig, AlertType } from "./schema";
 
 // Outbound uptime alerting. The background poller (lib/status-poller.ts) feeds
-// each tick's results through here; we detect down/recovery transitions and POST
-// a notification to the configured webhook. The transition logic and payload
-// shaping are pure (unit-tested); only sendAlert/processAlerts do IO.
+// each tick's results through here; we detect down/recovery transitions and
+// notify the configured channels — a webhook and/or email. The transition logic
+// and payload shaping are pure (unit-tested); only sendAlert/sendEmailAlert/
+// processAlerts do IO.
 
 export type AlertEventType = "down" | "up";
 export type AlertEvent = { id: string; type: AlertEventType };
@@ -99,6 +100,22 @@ export function buildAlertRequest(
   }
 }
 
+// Plain-text email content for an alert (pure, unit-tested). The body mirrors the
+// webhook message and adds the app URL plus a timestamp.
+export function buildEmailMessage(
+  event: AlertEvent,
+  app: AlertApp,
+  at: number
+): { subject: string; text: string } {
+  const down = event.type === "down";
+  const title = down ? `${app.name} is down` : `${app.name} recovered`;
+  const text =
+    `${down ? "🔴" : "🟢"} ${title}` +
+    (app.url ? `\n${app.url}` : "") +
+    `\n\nAt ${new Date(at).toISOString()}`;
+  return { subject: title, text };
+}
+
 function jsonReq(url: string, payload: unknown): AlertRequest {
   return {
     url,
@@ -126,6 +143,38 @@ async function sendAlert(req: AlertRequest): Promise<void> {
   }
 }
 
+// Env var that overrides the stored SMTP password, so a self-hoster can keep the
+// secret out of config.yaml.
+const SMTP_PASS_ENV = "CTRLCENTER_SMTP_PASS";
+
+// Send one alert email over SMTP, best-effort. nodemailer is imported lazily so
+// it never lands in a client/edge bundle and only loads inside the Node poller.
+// Time-boxed and error-swallowing for the same reason as the webhook path.
+async function sendEmailAlert(
+  cfg: AlertEmailConfig,
+  event: AlertEvent,
+  app: AlertApp,
+  at: number
+): Promise<void> {
+  try {
+    const { default: nodemailer } = await import("nodemailer");
+    const pass = process.env[SMTP_PASS_ENV] || cfg.pass;
+    const transport = nodemailer.createTransport({
+      host: cfg.host,
+      port: cfg.port,
+      secure: cfg.secure,
+      auth: cfg.user ? { user: cfg.user, pass } : undefined,
+      connectionTimeout: ALERT_TIMEOUT_MS,
+      greetingTimeout: ALERT_TIMEOUT_MS,
+      socketTimeout: ALERT_TIMEOUT_MS,
+    });
+    const { subject, text } = buildEmailMessage(event, app, at);
+    await transport.sendMail({ from: cfg.from, to: cfg.to, subject, text });
+  } catch {
+    // best-effort: a mail failure must never disturb the poller
+  }
+}
+
 // Alert state is held on globalThis so the poller and any other module graph
 // share one instance (same reason as the status history store).
 const g = globalThis as unknown as {
@@ -140,18 +189,31 @@ function seedState(priorReadings: Map<string, boolean>): Map<string, AppAlertSta
   return m;
 }
 
+// Whether the email channel has the minimum config to send.
+export function emailReady(email: AlertEmailConfig): boolean {
+  return !!(
+    email.enabled &&
+    email.host.trim() &&
+    email.from.trim() &&
+    email.to.trim()
+  );
+}
+
 // Called by the poller each tick. `priorReadings` is the last-known up/down per
 // app from BEFORE this tick (from history) — used once to seed the in-memory
 // state so a restart doesn't re-alert an app that was already down. No-op when
-// alerts are disabled or no webhook is set.
+// alerts are off or no channel (webhook or email) is configured. A single
+// transition fans out to every configured channel.
 export async function processAlerts(
   results: { id: string; up: boolean }[],
   apps: { id: string; name: string; url: string }[],
   config: AlertConfig,
   priorReadings: Map<string, boolean>
 ): Promise<void> {
+  if (!config.enabled) return;
   const webhookUrl = config.webhookUrl.trim();
-  if (!config.enabled || !webhookUrl) return;
+  const sendEmail = emailReady(config.email);
+  if (!webhookUrl && !sendEmail) return;
   if (!g.__ctrlcenterAlertState) g.__ctrlcenterAlertState = seedState(priorReadings);
   const { next, events } = evaluateTransitions(g.__ctrlcenterAlertState, results, config);
   g.__ctrlcenterAlertState = next;
@@ -159,12 +221,15 @@ export async function processAlerts(
   const byId = new Map(apps.map((a) => [a.id, a]));
   const at = Date.now();
   await Promise.all(
-    events.map((e) => {
-      const app = byId.get(e.id);
-      if (!app) return Promise.resolve();
-      return sendAlert(
-        buildAlertRequest(config.type, webhookUrl, e, { name: app.name, url: app.url }, at)
-      );
+    events.flatMap((e) => {
+      const found = byId.get(e.id);
+      if (!found) return [];
+      const app = { name: found.name, url: found.url };
+      const tasks: Promise<void>[] = [];
+      if (webhookUrl)
+        tasks.push(sendAlert(buildAlertRequest(config.type, webhookUrl, e, app, at)));
+      if (sendEmail) tasks.push(sendEmailAlert(config.email, e, app, at));
+      return tasks;
     })
   );
 }

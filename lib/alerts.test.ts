@@ -2,9 +2,12 @@ import { describe, it, expect } from "vitest";
 import {
   evaluateTransitions,
   buildAlertRequest,
+  buildEmailMessage,
+  emailReady,
   type AppAlertState,
   type AlertEvent,
 } from "./alerts";
+import { alertEmailSchema } from "./schema";
 
 const opts = (confirmations = 1, notifyOnRecovery = true) => ({
   confirmations,
@@ -139,5 +142,50 @@ describe("buildAlertRequest", () => {
     expect(headers.Title).toBeUndefined();
     expect(headers.Priority).toBe("high");
     expect(req.init.body).toContain("Café 日本 is down");
+  });
+});
+
+describe("buildEmailMessage", () => {
+  const app = { name: "Jellyfin", url: "https://jelly.example.com" };
+  const at = Date.parse("2026-06-30T12:00:00Z");
+
+  it("subjects a down event and includes the URL and timestamp in the body", () => {
+    const { subject, text } = buildEmailMessage({ id: "a", type: "down" }, app, at);
+    expect(subject).toBe("Jellyfin is down");
+    expect(text).toContain("🔴 Jellyfin is down");
+    expect(text).toContain(app.url);
+    expect(text).toContain("2026-06-30T12:00:00.000Z");
+  });
+
+  it("subjects a recovery and omits the URL line when there's no URL", () => {
+    const { subject, text } = buildEmailMessage(
+      { id: "a", type: "up" },
+      { name: "DB", url: "" },
+      at
+    );
+    expect(subject).toBe("DB recovered");
+    expect(text).toContain("🟢 DB recovered");
+    expect(text).not.toContain("\nhttp");
+  });
+});
+
+describe("emailReady", () => {
+  const base = alertEmailSchema.parse({});
+
+  it("is false unless enabled with host, from, and to", () => {
+    expect(emailReady(base)).toBe(false);
+    expect(emailReady({ ...base, enabled: true })).toBe(false);
+    expect(
+      emailReady({ ...base, enabled: true, host: "smtp", from: "a@x" })
+    ).toBe(false);
+    expect(
+      emailReady({ ...base, enabled: true, host: "smtp", from: "a@x", to: "b@y" })
+    ).toBe(true);
+  });
+
+  it("is false when enabled is off even with full config", () => {
+    expect(
+      emailReady({ ...base, host: "smtp", from: "a@x", to: "b@y" })
+    ).toBe(false);
   });
 });
