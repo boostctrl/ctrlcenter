@@ -264,7 +264,7 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
           <button
             type="button"
             onClick={saveTheme}
-            className="btn-accent shrink-0 rounded-lg px-4 py-2 text-sm font-medium hover:opacity-90"
+            className="btn-accent shrink-0 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
           >
             Save
           </button>

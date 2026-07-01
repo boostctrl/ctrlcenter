@@ -373,10 +373,17 @@ select optgroup {
     color: transparent;
   }
   /* Accent-driven surfaces: kept as plain CSS so they follow the configurable
-     --accent-from / --accent-to variables instead of fixed Tailwind colors. */
+     --accent-from / --accent-to variables instead of fixed Tailwind colors. The
+     button fills with the primary accent; on hover its border lights up in the
+     secondary accent (the transparent base border reserves the space so there's
+     no size shift). Callers pair this with `transition-colors` for the fade. */
   .btn-accent {
-    background-image: linear-gradient(to right, var(--accent-from), var(--accent-to));
+    background-color: var(--accent-from);
     color: var(--accent-fg);
+    border: 1px solid transparent;
+  }
+  .btn-accent:hover {
+    border-color: var(--accent-to);
   }
   .accent-focus:focus {
     border-color: var(--accent-to);

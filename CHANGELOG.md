@@ -29,6 +29,9 @@ here.
   or narrower, the same way Bookmarks already stack.
 - **The navigation menu labels the status page "Service Status"** for clarity;
   it continues to list only the pages for features the admin has enabled.
+- **Accent buttons restyled.** Buttons that used the accent gradient now fill
+  with the primary accent color and light up a secondary-accent border on hover,
+  rather than showing a static two-color gradient.
 
 ## [1.2.1] - 2026-07-01
 

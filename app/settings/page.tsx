@@ -33,7 +33,7 @@ export default async function SettingsPage() {
           </div>
           <Link
             href="/admin"
-            className="btn-accent inline-flex shrink-0 items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold shadow-sm transition-opacity hover:opacity-90"
+            className="btn-accent inline-flex shrink-0 items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold shadow-sm transition-colors"
           >
             <svg
               width="16"
