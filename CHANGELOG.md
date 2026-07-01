@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-07-01
+
 ### Added
 
 - **Arrange the home page.** Admin **Settings → Layout → Arrangement** now lets you
@@ -914,7 +916,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.1.4...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/boostctrl/ctrlcenter/compare/v1.1.4...v1.2.0
 [1.1.4]: https://github.com/boostctrl/ctrlcenter/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/boostctrl/ctrlcenter/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/boostctrl/ctrlcenter/compare/v1.1.1...v1.1.2
