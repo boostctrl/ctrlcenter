@@ -3,13 +3,15 @@ import { getSettings } from "@/lib/config";
 import { fetchForecast } from "@/lib/weather";
 import WeatherDetails from "@/components/WeatherDetails";
 import BackHome from "@/components/BackHome";
-import FloatingSettings from "@/components/FloatingSettings";
+import FloatingNav from "@/components/FloatingNav";
+import { navPages } from "@/lib/nav";
 
 export const metadata: Metadata = { title: "Weather" };
 export const dynamic = "force-dynamic";
 
 export default async function WeatherPage() {
-  const { weather, components } = await getSettings();
+  const settings = await getSettings();
+  const { weather, components } = settings;
   const initial = weather.enabled
     ? await fetchForecast(weather.latitude, weather.longitude, weather.units)
     : null;
@@ -30,7 +32,7 @@ export default async function WeatherPage() {
           </p>
         )}
       </main>
-      {components.settingsButton && <FloatingSettings />}
+      {components.settingsButton && <FloatingNav {...navPages(settings)} />}
     </>
   );
 }

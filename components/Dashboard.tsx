@@ -14,16 +14,9 @@ import {
 } from "@/lib/search";
 import { orderCategories } from "@/lib/bookmarks";
 import { useVisitorPrefs } from "./PrefsProvider";
+import SectionTitle from "./SectionTitle";
 import type { AppItem, BookmarkItem } from "@/lib/schema";
 import type { LayoutSection, LayoutSectionId, SectionWidth } from "@/lib/layout";
-
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <h2 className="mb-5 text-sm font-semibold tracking-[0.2em] text-fg/60 uppercase">
-      {children}
-    </h2>
-  );
-}
 
 function groupBookmarks(
   bookmarks: BookmarkItem[],
@@ -181,7 +174,9 @@ export default function Dashboard({
   };
   const BOOKMARK_GRID: Record<SectionWidth, string> = {
     full: "grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3",
-    half: "grid grid-cols-1 gap-6 sm:grid-cols-2",
+    // Half width shows one category per row — two side-by-side category columns
+    // in a narrow half-column read as cramped.
+    half: "grid grid-cols-1 gap-6",
   };
 
   // Each movable section as a node for a given width, or null when it shouldn't

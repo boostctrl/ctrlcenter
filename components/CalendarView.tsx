@@ -43,7 +43,7 @@ export default function CalendarView({
       </div>
 
       {view === "month" ? (
-        <section className="glass-card max-w-4xl p-4 sm:p-6">
+        <section className="glass-card p-4 sm:p-6">
           <CalendarMonth
             events={monthEvents}
             now={now}

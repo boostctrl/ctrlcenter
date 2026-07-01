@@ -4,7 +4,8 @@ import { getSettings } from "@/lib/config";
 import { fetchCalendar, fetchCalendarRange } from "@/lib/calendar";
 import CalendarView from "@/components/CalendarView";
 import BackHome from "@/components/BackHome";
-import FloatingSettings from "@/components/FloatingSettings";
+import FloatingNav from "@/components/FloatingNav";
+import { navPages } from "@/lib/nav";
 
 export const metadata: Metadata = { title: "Calendar" };
 export const dynamic = "force-dynamic";
@@ -19,7 +20,8 @@ const RANGE_FWD = 130 * DAY;
 // The calendar's own page, mirroring /weather and /status. Defaults to a month
 // grid (the home widget defaults to the agenda) with an Agenda toggle.
 export default async function CalendarPage() {
-  const { calendar, components } = await getSettings();
+  const settings = await getSettings();
+  const { calendar, components } = settings;
   const enabled = calendar.enabled && calendar.url.trim() !== "";
   const now = new Date().getTime();
   const auth = { username: calendar.username, password: calendar.password };
@@ -56,7 +58,7 @@ export default async function CalendarPage() {
           />
         )}
       </main>
-      {components.settingsButton && <FloatingSettings />}
+      {components.settingsButton && <FloatingNav {...navPages(settings)} />}
     </>
   );
 }

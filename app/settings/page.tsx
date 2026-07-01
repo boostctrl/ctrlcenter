@@ -3,15 +3,19 @@ import Link from "next/link";
 import SettingsControls from "@/components/SettingsControls";
 import ThemeBuilder from "@/components/ThemeBuilder";
 import BackHome from "@/components/BackHome";
-import { getThemeOverrides } from "@/lib/config";
+import FloatingNav from "@/components/FloatingNav";
+import { readConfig } from "@/lib/config";
 import { resolveThemePacks } from "@/lib/theme";
+import { navPages } from "@/lib/nav";
 
 export const metadata: Metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
-  const packs = resolveThemePacks(await getThemeOverrides());
+  const { settings, themes } = await readConfig();
+  const packs = resolveThemePacks(themes);
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-8 px-6 py-12 sm:px-10 lg:py-16">
+    <>
+      <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-8 px-6 py-12 sm:px-10 lg:py-16">
       <div>
         <BackHome />
         <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
@@ -59,6 +63,10 @@ export default async function SettingsPage() {
           <ThemeBuilder packs={packs} />
         </div>
       </div>
-    </main>
+      </main>
+      {settings.components.settingsButton && (
+        <FloatingNav {...navPages(settings)} />
+      )}
+    </>
   );
 }

@@ -3,7 +3,8 @@ import Link from "next/link";
 import { readConfig } from "@/lib/config";
 import StatusPage from "@/components/StatusPage";
 import BackHome from "@/components/BackHome";
-import FloatingSettings from "@/components/FloatingSettings";
+import FloatingNav from "@/components/FloatingNav";
+import { navPages } from "@/lib/nav";
 
 export const metadata: Metadata = { title: "Status" };
 export const dynamic = "force-dynamic";
@@ -38,7 +39,9 @@ export default async function StatusRoute() {
           </p>
         )}
       </main>
-      {settings.components.settingsButton && <FloatingSettings />}
+      {settings.components.settingsButton && (
+        <FloatingNav {...navPages(settings)} />
+      )}
     </>
   );
 }

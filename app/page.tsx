@@ -1,11 +1,12 @@
 import { readConfig } from "@/lib/config";
 import Header from "@/components/Header";
 import Dashboard from "@/components/Dashboard";
-import FloatingSettings from "@/components/FloatingSettings";
+import FloatingNav from "@/components/FloatingNav";
 import CalendarWidget from "@/components/CalendarWidget";
 import { StatusProvider } from "@/components/StatusProvider";
 import { fetchCalendar, fetchCalendarRange } from "@/lib/calendar";
 import { resolveLayoutSections } from "@/lib/layout";
+import { navPages } from "@/lib/nav";
 
 export const dynamic = "force-dynamic";
 
@@ -69,7 +70,7 @@ export default async function HomePage() {
         />
       </StatusProvider>
 
-      {components.settingsButton && <FloatingSettings />}
+      {components.settingsButton && <FloatingNav {...navPages(settings)} />}
     </main>
   );
 }

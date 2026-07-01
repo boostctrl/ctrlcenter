@@ -3,7 +3,8 @@ import Link from "next/link";
 import { getSettings } from "@/lib/config";
 import { BUILTIN_BANGS } from "@/lib/search";
 import BackHome from "@/components/BackHome";
-import FloatingSettings from "@/components/FloatingSettings";
+import FloatingNav from "@/components/FloatingNav";
+import { navPages } from "@/lib/nav";
 
 export const metadata: Metadata = { title: "Help" };
 export const dynamic = "force-dynamic";
@@ -109,7 +110,8 @@ function Section({
 // runtime reads are the built-in bang list and the components flag that gates
 // the floating settings button.
 export default async function HelpPage() {
-  const { components } = await getSettings();
+  const settings = await getSettings();
+  const { components } = settings;
   const builtins = Object.entries(BUILTIN_BANGS);
 
   return (
@@ -470,7 +472,7 @@ export default async function HelpPage() {
           </Card>
         </Section>
       </main>
-      {components.settingsButton && <FloatingSettings />}
+      {components.settingsButton && <FloatingNav {...navPages(settings)} />}
     </>
   );
 }

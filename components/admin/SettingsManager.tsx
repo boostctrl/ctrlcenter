@@ -109,7 +109,7 @@ export default function SettingsManager({
     { key: "apps", label: "Applications" },
     { key: "bookmarks", label: "Bookmarks" },
     { key: "favorites", label: "Favorites row" },
-    { key: "settingsButton", label: "Floating settings button" },
+    { key: "settingsButton", label: "Floating navigation menu" },
   ];
   const alertTypeLabel: Record<Settings["alerts"]["type"], string> = {
     generic: "Generic JSON webhook",
@@ -338,7 +338,7 @@ export default function SettingsManager({
         </div>
         {!components.settingsButton && (
           <p className="text-xs text-fg/40">
-            With the floating settings button off, reach this page directly at
+            With the floating navigation menu off, reach this page directly at
             /admin.
           </p>
         )}
