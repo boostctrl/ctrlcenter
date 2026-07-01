@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-07-01
+
 ### Added
 
 - **Two-thirds and one-third section widths.** Admin **Settings → Layout →
@@ -956,7 +958,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.2.1...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.2.2...HEAD
+[1.2.2]: https://github.com/boostctrl/ctrlcenter/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/boostctrl/ctrlcenter/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/boostctrl/ctrlcenter/compare/v1.1.4...v1.2.0
 [1.1.4]: https://github.com/boostctrl/ctrlcenter/compare/v1.1.3...v1.1.4
