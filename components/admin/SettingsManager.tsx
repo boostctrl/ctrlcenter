@@ -31,11 +31,12 @@ async function saveSettings(settings: Settings): Promise<void> {
   }
 }
 
-// Each settings group is its own card; the form lays them out in two explicit
-// columns (below) so each section's column placement is deterministic.
+// Each settings group is its own card. The form flows them into balancing CSS
+// columns (below); `break-inside-avoid` keeps a card whole and `mb-4` is the
+// vertical gap between stacked cards (column layout ignores flex/grid `gap`).
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="glass-card flex flex-col gap-4 p-5">
+    <section className="glass-card mb-4 flex break-inside-avoid flex-col gap-4 p-5">
       <h3 className="text-xs font-semibold tracking-[0.15em] text-fg/45 uppercase">
         {title}
       </h3>
@@ -167,12 +168,10 @@ export default function SettingsManager({
       <div className="flex h-4 items-center justify-end">
         <SaveStatus status={status} error={error} />
       </div>
-      <div className="grid items-start gap-4 lg:grid-cols-2">
-        {/* Two equal-width columns; each stacks its cards from the top with a
-            fixed gap (items-start keeps columns from stretching, so there's no
-            dead space between cards in the shorter column). Left: General,
-            Appearance, Security. */}
-        <div className="flex flex-col gap-4">
+      {/* Cards flow into balancing masonry columns: the browser evens out the
+          two columns by height, so toggling any section on/off no longer strands
+          one hard-coded column short while the other runs long. */}
+      <div className="columns-1 gap-4 lg:columns-2">
         <Section title="General">
         <TextField
           label="Page title"
@@ -327,10 +326,7 @@ export default function SettingsManager({
       <Section title="Security">
         <ChangePassword />
       </Section>
-        </div>
 
-        {/* Right column — Dashboard, Alerts, Weather, Calendar. */}
-        <div className="flex flex-col gap-4">
       <Section title="Dashboard">
         <div className="flex items-center justify-between gap-4">
           <div>
@@ -453,8 +449,8 @@ export default function SettingsManager({
             to jump to a site (use <span className="text-fg/60">%s</span> for the
             term). Built-ins (<span className="text-fg/60">!yt</span>,{" "}
             <span className="text-fg/60">!gh</span>,{" "}
-            <span className="text-fg/60">!w</span>…) and your app names work
-            already.
+            <span className="text-fg/60">!w</span>…) plus your app names and
+            subtitles work already.
           </p>
           {bangs.map((b, i) => (
             <div key={i} className="flex items-center gap-2">
@@ -875,6 +871,23 @@ export default function SettingsManager({
                 className={`${selectClass} w-20 text-center`}
               />
             </label>
+            <label className="flex items-center justify-between gap-4 text-sm">
+              <span className="text-fg/50">
+                Hide when no upcoming events
+                <span className="block text-xs text-fg/40">
+                  Drop the home-page card when the agenda is empty. The{" "}
+                  /calendar page is unaffected.
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                className="shrink-0"
+                checked={calendar.hideWhenEmpty}
+                onChange={(e) =>
+                  updateCalendar({ hideWhenEmpty: e.target.checked })
+                }
+              />
+            </label>
             <CalendarTest
               url={calendar.url}
               username={calendar.username}
@@ -898,7 +911,6 @@ export default function SettingsManager({
           </>
         )}
       </Section>
-        </div>
       </div>
     </div>
   );

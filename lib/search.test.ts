@@ -106,6 +106,24 @@ describe("appBangMap", () => {
     ]);
     expect(m.mediaserver).toEqual({ url: "https://a", name: "Media Server" });
   });
+
+  it("also slugs subtitles as aliases, labelled with the app name", () => {
+    const m = appBangMap([
+      { name: "Jellyfin", subtitle: "Media", url: "https://jelly" },
+    ]);
+    expect(m.jellyfin).toEqual({ url: "https://jelly", name: "Jellyfin" });
+    expect(m.media).toEqual({ url: "https://jelly", name: "Jellyfin" });
+  });
+
+  it("lets any app name win a slug collision with another app's subtitle", () => {
+    const m = appBangMap([
+      { name: "Downloads", subtitle: "Media", url: "https://dl" },
+      { name: "Media", subtitle: "Movies", url: "https://plex" },
+    ]);
+    // "Media" is a subtitle of Downloads but the real name of the second app;
+    // names are registered before any subtitle, so the name wins.
+    expect(m.media).toEqual({ url: "https://plex", name: "Media" });
+  });
 });
 
 describe("searchUpdateSchema", () => {

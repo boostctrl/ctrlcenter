@@ -49,6 +49,7 @@ export default function Dashboard({
   showApps = true,
   showBookmarks = true,
   showFavorites = true,
+  calendar = null,
 }: {
   apps: AppItem[];
   bookmarks: BookmarkItem[];
@@ -58,6 +59,10 @@ export default function Dashboard({
   showApps?: boolean;
   showBookmarks?: boolean;
   showFavorites?: boolean;
+  // The calendar widget (rendered server-side and passed in) sits directly under
+  // the search bar; hidden during an active search so results stay adjacent to
+  // the input.
+  calendar?: React.ReactNode;
 }) {
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -89,7 +94,10 @@ export default function Dashboard({
   // A leading `!bang` puts the search bar in "command" mode: the query targets a
   // bang destination rather than filtering apps/bookmarks.
   const appBangs = useMemo(
-    () => appBangMap(apps.map((a) => ({ name: a.name, url: a.url }))),
+    () =>
+      appBangMap(
+        apps.map((a) => ({ name: a.name, subtitle: a.subtitle, url: a.url }))
+      ),
     [apps]
   );
   const parsedBang = useMemo(() => parseBang(query), [query]);
@@ -175,6 +183,8 @@ export default function Dashboard({
           />
         </div>
       )}
+
+      {!q && calendar}
 
       {showFavorites && !q && favoriteApps.length > 0 && (
         <section>

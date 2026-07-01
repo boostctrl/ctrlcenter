@@ -12,6 +12,27 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Calendar: hide the home card when nothing's coming up.** A new **Hide when
+  no upcoming events** toggle in the Calendar settings drops the home-page
+  "Upcoming" card entirely when the agenda is empty (default off, so the
+  always-visible empty state from 1.1.2 is unchanged). The /calendar page still
+  shows its own empty state. (#68)
+- **Search bangs now also match app subtitles.** Alongside the auto-generated
+  `!appname` shortcuts, each app's subtitle becomes an alias (e.g. an app named
+  "Jellyfin" with subtitle "Media" also answers to `!media`). App names always
+  win a slug collision with another app's subtitle. (#70)
+
+### Changed
+
+- **The search bar sits above the calendar** on the home page — it's now the
+  first thing under the header. The agenda card tucks in just below it and steps
+  aside during an active search so results stay next to the input. (#69)
+- **Admin Settings columns balance themselves.** The two-column layout now flows
+  its cards into balancing masonry columns, so enabling or disabling any section
+  keeps the columns roughly even instead of stranding one short. (#64)
+
 ## [1.1.2] - 2026-06-30
 
 ### Changed

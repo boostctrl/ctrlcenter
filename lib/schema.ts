@@ -90,6 +90,10 @@ export const calendarSchema = z.object({
   enabled: z.boolean().default(false),
   url: z.string().default(""),
   count: z.number().int().min(1).max(20).default(5),
+  // Hide the home-page agenda card entirely when there are no upcoming events
+  // (instead of showing an empty "No upcoming events" card). The dedicated
+  // /calendar page still renders its empty state.
+  hideWhenEmpty: z.boolean().default(false),
   // Optional Basic-auth credentials for a private CalDAV/WebDAV calendar (e.g. a
   // Nextcloud DAV URL). The password can also come from CTRLCENTER_CALDAV_PASS.
   username: z.string().default(""),
@@ -368,6 +372,7 @@ export const calendarUpdateSchema = z
     enabled: z.boolean(),
     url: z.string(),
     count: z.number().int().min(1).max(20),
+    hideWhenEmpty: z.boolean(),
     username: z.string(),
     password: z.string(),
   })

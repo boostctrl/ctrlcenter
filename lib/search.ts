@@ -84,16 +84,22 @@ export function parseBang(query: string): { key: string; term: string } | null {
   return { key: m[1].toLowerCase(), term: (m[2] ?? "").trim() };
 }
 
-// Slug-keyed map of app name → { url, name } for app-name bangs (`!jellyfin`).
-// First app wins on a slug collision; apps that slug to nothing are skipped.
+// Slug-keyed map of app name/subtitle → { url, name } for app bangs (`!jellyfin`,
+// or a subtitle alias like `!media`). Every app's name is registered before any
+// subtitle, so a name always wins a slug collision with someone's subtitle; the
+// first app wins within a pass, and slugs that come out empty are skipped. The
+// stored `name` is always the app's real name, so the resolved hint reads
+// "Open Jellyfin" even when matched by subtitle.
 export function appBangMap(
-  apps: { name: string; url: string }[]
+  apps: { name: string; subtitle?: string; url: string }[]
 ): Record<string, { url: string; name: string }> {
   const out: Record<string, { url: string; name: string }> = {};
-  for (const a of apps) {
-    const slug = a.name.toLowerCase().replace(/[^a-z0-9]+/g, "");
-    if (slug && !(slug in out)) out[slug] = { url: a.url, name: a.name };
-  }
+  const add = (text: string, url: string, name: string) => {
+    const slug = text.toLowerCase().replace(/[^a-z0-9]+/g, "");
+    if (slug && !(slug in out)) out[slug] = { url, name };
+  };
+  for (const a of apps) add(a.name, a.url, a.name);
+  for (const a of apps) if (a.subtitle) add(a.subtitle, a.url, a.name);
   return out;
 }
 

@@ -32,12 +32,6 @@ export default async function HomePage() {
       <StatusProvider enabled={statusEnabled}>
         <Header settings={settings} apps={apps} statusEnabled={statusEnabled} />
 
-        <CalendarWidget
-          events={events}
-          now={new Date().getTime()}
-          enabled={cal.enabled && cal.url.trim() !== ""}
-        />
-
         <Dashboard
           apps={apps}
           bookmarks={bookmarks}
@@ -47,6 +41,14 @@ export default async function HomePage() {
           showApps={components.apps}
           showBookmarks={components.bookmarks}
           showFavorites={components.favorites}
+          calendar={
+            <CalendarWidget
+              events={events}
+              now={new Date().getTime()}
+              enabled={cal.enabled && cal.url.trim() !== ""}
+              hideWhenEmpty={cal.hideWhenEmpty}
+            />
+          }
         />
       </StatusProvider>
 
