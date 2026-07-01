@@ -41,15 +41,37 @@ async function saveSettings(settings: Settings): Promise<void> {
   }
 }
 
-// Each settings group is its own card. The form flows them into balancing CSS
-// columns (below); `break-inside-avoid` keeps a card whole and `mb-4` is the
-// vertical gap between stacked cards (column layout ignores flex/grid `gap`).
-function Section({ title, children }: { title: string; children: ReactNode }) {
+// One nav entry per settings group; a single group shows at a time.
+const SETTINGS_SECTIONS = [
+  { id: "general", label: "General" },
+  { id: "appearance", label: "Appearance" },
+  { id: "layout", label: "Layout" },
+  { id: "search", label: "Search" },
+  { id: "status", label: "Status" },
+  { id: "alerts", label: "Alerts" },
+  { id: "weather", label: "Weather" },
+  { id: "calendar", label: "Calendar" },
+  { id: "security", label: "Security" },
+] as const;
+type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]["id"];
+
+function Section({
+  title,
+  intro,
+  children,
+}: {
+  title: string;
+  intro?: ReactNode;
+  children: ReactNode;
+}) {
   return (
-    <section className="glass-card mb-4 flex break-inside-avoid flex-col gap-4 p-5">
-      <h3 className="text-xs font-semibold tracking-[0.15em] text-fg/45 uppercase">
-        {title}
-      </h3>
+    <section className="glass-card flex flex-col gap-4 p-5">
+      <div>
+        <h3 className="text-xs font-semibold tracking-[0.15em] text-fg/45 uppercase">
+          {title}
+        </h3>
+        {intro && <p className="mt-1.5 text-xs text-fg/40">{intro}</p>}
+      </div>
       {children}
     </section>
   );
@@ -63,6 +85,7 @@ export default function SettingsManager({
   themePacks: ThemePack[];
 }) {
   const [settings, setSettings] = useState(initialSettings);
+  const [section, setSection] = useState<SettingsSectionId>("general");
   // Persistence is automatic: every change debounce-saves via useAutosave.
   const { status, error } = useAutosave(settings, saveSettings);
   const zones = useMemo(() => supportedTimezones(), []);
@@ -187,14 +210,37 @@ export default function SettingsManager({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex h-4 items-center justify-end">
-        <SaveStatus status={status} error={error} />
-      </div>
-      {/* Cards flow into balancing masonry columns: the browser evens out the
-          two columns by height, so toggling any section on/off no longer strands
-          one hard-coded column short while the other runs long. */}
-      <div className="columns-1 gap-4 lg:columns-2">
+    // Settings-page shell: a nav rail (horizontal pills on small screens, a
+    // sticky vertical rail on lg+) beside a single focused section, so any
+    // setting is one click away instead of somewhere down a masonry flow.
+    <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[11rem_minmax(0,42rem)] lg:gap-x-8">
+      <nav
+        aria-label="Settings sections"
+        className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 lg:sticky lg:top-6 lg:mx-0 lg:flex-col lg:self-start lg:overflow-visible lg:p-0 lg:pt-7"
+      >
+        {SETTINGS_SECTIONS.map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            onClick={() => setSection(s.id)}
+            className={`shrink-0 rounded-lg px-3 py-2 text-left text-sm whitespace-nowrap transition-colors ${
+              section === s.id
+                ? "bg-fg/10 font-medium text-fg"
+                : "text-fg/50 hover:bg-fg/5 hover:text-fg/80"
+            }`}
+          >
+            {s.label}
+          </button>
+        ))}
+      </nav>
+
+      <div className="flex min-w-0 flex-col gap-3">
+        {/* h-4 + gap-3 ≈ the nav's lg:pt-7, keeping rail and card tops level. */}
+        <div className="flex h-4 items-center justify-end">
+          <SaveStatus status={status} error={error} />
+        </div>
+
+        {section === "general" && (
         <Section title="General">
         <TextField
           label="Page title"
@@ -224,14 +270,20 @@ export default function SettingsManager({
             ))}
           </datalist>
         </label>
-      </Section>
+        </Section>
+        )}
 
-      <Section title="Appearance">
-        <p className="-mt-1 text-xs text-fg/40">
-          The site-wide default look visitors see before they customize their own.
-          Pick a theme as the default; edit the themes themselves in the{" "}
-          <span className="text-fg/60">Themes</span> tab.
-        </p>
+        {section === "appearance" && (
+        <Section
+          title="Appearance"
+          intro={
+            <>
+              The site-wide default look visitors see before they customize
+              their own. Pick a theme as the default; edit the themes themselves
+              in the <span className="text-fg/60">Themes</span> tab.
+            </>
+          }
+        >
 
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm text-fg/50">Default mode</span>
@@ -316,13 +368,14 @@ export default function SettingsManager({
             );
           })}
         </div>
-      </Section>
+        </Section>
+        )}
 
-      <Section title="Layout">
-        <p className="text-xs text-fg/40">
-          Show or hide individual home-page components. Weather, the status row,
-          and the calendar have their own toggles below.
-        </p>
+        {section === "layout" && (
+        <Section
+          title="Layout"
+          intro="Show or hide individual home-page components. Weather, the status row, and the calendar are toggled in their own sections."
+        >
         <div className="flex flex-col gap-2.5">
           {componentToggles.map((t) => (
             <label
@@ -386,13 +439,11 @@ export default function SettingsManager({
             ))}
           </ul>
         </div>
-      </Section>
+        </Section>
+        )}
 
-      <Section title="Security">
-        <ChangePassword />
-      </Section>
-
-      <Section title="Dashboard">
+        {section === "status" && (
+        <Section title="Status">
         <div className="flex items-center justify-between gap-4">
           <div>
             <span className="text-sm text-fg/70">Service status indicators</span>
@@ -469,25 +520,31 @@ export default function SettingsManager({
             </div>
           </div>
         )}
+        </Section>
+        )}
 
+        {section === "search" && (
+        <Section title="Search">
         <div className="flex flex-col gap-2">
-          <span className="text-sm text-fg/50">Search bar engine</span>
-          <select
-            value={settings.search.engine}
-            onChange={(e) =>
-              setSettings({
-                ...settings,
-                search: { ...settings.search, engine: e.target.value as SearchEngine },
-              })
-            }
-            className={selectClass}
-          >
-            {SEARCH_ENGINE_KEYS.map((key) => (
-              <option key={key} value={key}>
-                {key === "custom" ? "Custom…" : SEARCH_ENGINES[key].label}
-              </option>
-            ))}
-          </select>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-fg/50">Search bar engine</span>
+            <select
+              value={settings.search.engine}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  search: { ...settings.search, engine: e.target.value as SearchEngine },
+                })
+              }
+              className={selectClass}
+            >
+              {SEARCH_ENGINE_KEYS.map((key) => (
+                <option key={key} value={key}>
+                  {key === "custom" ? "Custom…" : SEARCH_ENGINES[key].label}
+                </option>
+              ))}
+            </select>
+          </label>
           {settings.search.engine === "custom" && (
             <TextField
               label="Custom search URL (use %s for the query)"
@@ -556,15 +613,18 @@ export default function SettingsManager({
             + Add bang
           </button>
         </div>
-      </Section>
+        </Section>
+        )}
 
-      <Section title="Alerts">
+        {section === "alerts" && (
+        <Section title="Alerts">
         <div className="flex items-center justify-between gap-4">
           <div>
             <span className="text-sm text-fg/70">Uptime alerts</span>
             <p className="text-xs text-fg/40">
               Notify a webhook and/or email when an app goes down or recovers.
-              Requires service status indicators (above) to be on.
+              Requires service status indicators (the{" "}
+              <span className="text-fg/60">Status</span> section) to be on.
             </p>
           </div>
           <label className="flex shrink-0 items-center gap-2 text-sm">
@@ -783,9 +843,11 @@ export default function SettingsManager({
             </div>
           </>
         )}
-      </Section>
+        </Section>
+        )}
 
-      <Section title="Weather">
+        {section === "weather" && (
+        <Section title="Weather">
         <label className="flex items-center justify-between text-sm">
           <span className="text-fg/50">Weather widget</span>
           <span className="flex items-center gap-2">
@@ -877,8 +939,10 @@ export default function SettingsManager({
           </select>
         </label>
         </Section>
+        )}
 
-      <Section title="Calendar">
+        {section === "calendar" && (
+        <Section title="Calendar">
         <div className="flex items-center justify-between gap-4">
           <div>
             <span className="text-sm text-fg/70">Agenda widget</span>
@@ -998,7 +1062,17 @@ export default function SettingsManager({
             </p>
           </>
         )}
-      </Section>
+        </Section>
+        )}
+
+        {section === "security" && (
+        <Section
+          title="Security"
+          intro="The password used to sign in to this admin portal."
+        >
+          <ChangePassword />
+        </Section>
+        )}
       </div>
     </div>
   );
