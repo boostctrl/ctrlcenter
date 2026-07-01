@@ -216,7 +216,7 @@ export default function SettingsManager({
     <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[11rem_minmax(0,42rem)] lg:gap-x-8">
       <nav
         aria-label="Settings sections"
-        className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 lg:sticky lg:top-6 lg:mx-0 lg:flex-col lg:self-start lg:overflow-visible lg:p-0 lg:pt-7"
+        className="flex flex-wrap gap-1 lg:sticky lg:top-6 lg:flex-col lg:flex-nowrap lg:self-start lg:pt-7"
       >
         {SETTINGS_SECTIONS.map((s) => (
           <button
