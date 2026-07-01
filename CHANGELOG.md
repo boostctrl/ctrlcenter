@@ -12,6 +12,22 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Two-thirds and one-third section widths.** Admin **Settings → Layout →
+  Arrangement** now offers two-thirds and one-third widths alongside full and
+  half, so up to three dashboard sections can share a row (for example
+  Applications at two-thirds beside Bookmarks at one-third).
+
+### Changed
+
+- **The Help page is now full-width**, matching the other pages, with a
+  three-column card layout on wide screens. Its copy was also tightened and
+  reworked for easier reading.
+- **Applications and Favorites reflow to match their column width.** They show
+  three cards across at full width and one per row once the column is half-width
+  or narrower, the same way Bookmarks already stack.
+
 ## [1.2.1] - 2026-07-01
 
 ### Changed

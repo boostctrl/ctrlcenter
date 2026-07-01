@@ -100,7 +100,7 @@ function Section({
         <h2 className="text-xl font-bold tracking-tight">{title}</h2>
         {note && <p className="mt-1 text-sm text-fg/50">{note}</p>}
       </div>
-      <div className="columns-1 gap-4 lg:columns-2">{children}</div>
+      <div className="columns-1 gap-4 md:columns-2 xl:columns-3">{children}</div>
     </section>
   );
 }
@@ -108,7 +108,7 @@ function Section({
 // In-app usage guide, mirroring /weather, /status and /calendar so the docs are
 // discoverable without leaving the app. Static reference content; the only
 // runtime reads are the built-in bang list and the components flag that gates
-// the floating settings button.
+// the floating navigation menu.
 export default async function HelpPage() {
   const settings = await getSettings();
   const { components } = settings;
@@ -116,7 +116,7 @@ export default async function HelpPage() {
 
   return (
     <>
-      <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-8 px-6 py-12 sm:px-10 lg:py-16">
+      <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-8 px-6 py-12 sm:px-10 lg:py-16">
         <div>
           <BackHome />
           <h1 className="mt-3 text-3xl font-bold">Help</h1>
@@ -128,27 +128,27 @@ export default async function HelpPage() {
 
         <Section
           title="For everyone"
-          note="Works in any browser — nothing here needs the admin password."
+          note="Works in any browser. Nothing here needs the admin password."
         >
           <Card title="Search">
             <P>
-              Start typing to filter your apps <em>and</em> bookmarks at once —
-              it matches on name, subtitle, URL, and a bookmark&apos;s category.
-              Opening anything launches it in a new tab.
+              Start typing to filter your apps and bookmarks at once. It matches
+              on name, subtitle, URL, and a bookmark&apos;s category, and opening
+              anything launches it in a new tab.
             </P>
             <ul className="flex flex-col gap-2 text-sm text-fg/70">
               <li className="flex items-baseline gap-3">
                 <Kbd>/</Kbd>
                 <span>
-                  Jump to the search box from anywhere on the page (as long as
-                  you&apos;re not already typing in a field).
+                  Jump to the search box from anywhere on the page, as long as
+                  you&apos;re not already typing in a field.
                 </span>
               </li>
               <li className="flex items-baseline gap-3">
                 <Kbd>Enter</Kbd>
                 <span>
-                  Open the top match. A <Code>!bang</Code> wins first; with
-                  nothing matching, it runs a web search instead.
+                  Open the top match. A <Code>!bang</Code> takes priority, and if
+                  nothing matches it runs a web search instead.
                 </span>
               </li>
               <li className="flex items-baseline gap-3">
@@ -160,10 +160,10 @@ export default async function HelpPage() {
 
           <Card title="Bang shortcuts">
             <P>
-              Begin a query with <Code>!</Code> to jump straight out instead of
-              filtering. <Code>!key term</Code> searches that site;{" "}
-              <Code>!key</Code> on its own opens its home page. An unrecognized
-              bang just falls back to a web search of your text.
+              Begin a query with <Code>!</Code> to jump straight to a site
+              instead of filtering. <Code>!key term</Code> searches that site,
+              and <Code>!key</Code> on its own opens its home page. An
+              unrecognized bang falls back to a web search of your text.
             </P>
             <div>
               <p className="mb-1.5 text-xs tracking-wide text-fg/45 uppercase">
@@ -183,10 +183,10 @@ export default async function HelpPage() {
               </div>
             </div>
             <P>
-              Every app also gets its own bang from its name <em>and</em> its
-              subtitle — so an app named &ldquo;Plex&rdquo; answers to{" "}
-              <Code>!plex</Code>. The admin can add custom bangs too, and those
-              take priority over the built-ins.
+              Every app also gets its own bang from its name and subtitle, so an
+              app named &ldquo;Plex&rdquo; answers to <Code>!plex</Code>. The
+              admin can add custom bangs too, and those take priority over the
+              built-ins.
             </P>
           </Card>
 
@@ -199,38 +199,37 @@ export default async function HelpPage() {
               >
                 ★
               </span>
-              ) to pin it; click again to unpin. Pinned apps collect in a{" "}
-              <strong>Favorites</strong> row at the top of the dashboard, in the
-              order you pinned them. Favorites live in this browser only — no
-              account needed.
+              ) to pin it, then click again to unpin. Pinned apps collect in a{" "}
+              <strong>Favorites</strong> row on the dashboard, in the order you
+              pinned them. Favorites live in this browser only, so no account is
+              needed.
             </P>
           </Card>
 
           <Card title="Your preferences">
             <P>
-              Open{" "}
-              <A href="/settings">Settings</A> (the gear in the corner) to tailor
-              your view. Every option is saved in this browser only:
+              Open <A href="/settings">Settings</A> (the gear in the corner) to
+              tailor your view. Every option is saved in this browser only.
             </P>
             <ul className={LIST_CLASS}>
               <li>
-                <strong>Appearance mode</strong> — light, dark, or follow your
+                <strong>Appearance mode.</strong> Light, dark, or follow your
                 device.
               </li>
               <li>
-                <strong>Greeting name</strong> — the name in &ldquo;Good
+                <strong>Greeting name.</strong> The name shown in &ldquo;Good
                 evening, …&rdquo;.
               </li>
               <li>
-                <strong>Time zone</strong> — used by the clock and the calendar.
+                <strong>Time zone.</strong> Used by the clock and the calendar.
               </li>
               <li>
-                <strong>Weather location &amp; units</strong> — set a spot or tap{" "}
+                <strong>Weather location and units.</strong> Set a spot or tap{" "}
                 <em>Use my location</em>, and switch between °F and °C (when the
                 admin has weather on).
               </li>
               <li>
-                <strong>Reset all settings</strong> — wipe your personalizations
+                <strong>Reset all settings.</strong> Wipe your personalizations
                 back to the site defaults.
               </li>
             </ul>
@@ -238,52 +237,52 @@ export default async function HelpPage() {
 
           <Card title="Themes & looks">
             <P>
-              The theme builder in{" "}
-              <A href="/settings">Settings</A> makes the dashboard yours, with a
-              live preview as you go:
+              The theme builder in <A href="/settings">Settings</A> makes the
+              dashboard yours, with a live preview as you go.
             </P>
             <ul className={LIST_CLASS}>
               <li>
-                <strong>Design</strong> — the card surface style, from Glass and
+                <strong>Design.</strong> The card surface style, from Glass and
                 Frost to Flat, Cyber, and Paper (12 in all).
               </li>
               <li>
-                <strong>Scene</strong> — the animated backdrop: Aurora,
+                <strong>Scene.</strong> The animated backdrop: Aurora,
                 Starfield, Waves, Grid, and more (12 in all).
               </li>
               <li>
-                <strong>Accent &amp; colors</strong> — the accent gradient plus
+                <strong>Accent and colors.</strong> The accent gradient, plus
                 optional custom surface colors.
               </li>
               <li>
-                <strong>Font</strong> — pick from six typefaces.
+                <strong>Font.</strong> Pick from six typefaces.
               </li>
             </ul>
             <P>
-              Light and dark can carry wholly independent looks, and — like the
-              rest of your preferences — everything stays on your device, so each
-              visitor gets their own.
+              Light and dark can carry wholly independent looks. Like the rest of
+              your preferences, everything stays on your device, so each visitor
+              gets their own.
             </P>
           </Card>
 
           <Card title="The extra pages">
             <P>
-              When the admin enables them, these get a card or widget on the home
-              page and a full page of their own:
+              When the admin enables them, each gets a card or widget on the home
+              page and a full page of its own.
             </P>
             <ul className={LIST_CLASS}>
               <li>
-                <A href="/weather">Weather</A> — current conditions plus an
-                hourly and 7-day forecast, sunrise/sunset, and detail tiles, for
-                your location and units.
+                <A href="/weather">Weather</A> shows current conditions with an
+                hourly and 7-day forecast, sunrise and sunset, and detail tiles
+                for your location and units.
               </li>
               <li>
-                <A href="/status">Status</A> — per-service uptime % over a range
-                you pick, with a 90-day timeline of the services being monitored.
+                <A href="/status">Status</A> reports per-service uptime over a
+                range you pick, with a 90-day timeline for each monitored
+                service.
               </li>
               <li>
-                <A href="/calendar">Calendar</A> — your full upcoming agenda, in
-                your own time zone; the home &ldquo;Upcoming&rdquo; card links
+                <A href="/calendar">Calendar</A> shows your full upcoming agenda
+                in your own time zone. The home &ldquo;Upcoming&rdquo; card links
                 here.
               </li>
             </ul>
@@ -291,8 +290,8 @@ export default async function HelpPage() {
 
           <Card title="Privacy & your data">
             <P>
-              Everything you personalize — appearance, greeting, time zone,
-              weather location, theme, and favorites — is stored in your
+              Everything you personalize (appearance, greeting, time zone,
+              weather location, theme, and favorites) is stored in your
               browser&apos;s local storage. It never leaves your device and
               isn&apos;t tied to any account, so two people on the same
               ctrlcenter each see their own setup. <em>Reset all settings</em>{" "}
@@ -312,23 +311,22 @@ export default async function HelpPage() {
 
         <Section
           title="For admins"
-          note="Running and configuring the instance — these need the admin password."
+          note="Running and configuring the instance. These need the admin password."
         >
           <Card title="The admin portal">
             <P>
-              The{" "}
-              <A href="/admin">admin portal</A> (password-protected) is organized
-              into four tabs — <strong>Applications</strong>,{" "}
+              The <A href="/admin">admin portal</A> (password-protected) is
+              organized into four tabs: <strong>Applications</strong>,{" "}
               <strong>Bookmarks</strong>, <strong>Themes</strong>, and{" "}
               <strong>Settings</strong>. Changes save automatically as you make
-              them, and the header has one-click <em>Export</em> / <em>Import</em>{" "}
-              of the whole configuration.
+              them, and the header has one-click <em>Export</em> and{" "}
+              <em>Import</em> of the whole configuration.
             </P>
           </Card>
 
           <Card title="Apps, bookmarks & icons">
             <P>
-              Add and edit the tiles on the dashboard, and drag to reorder them:
+              Add and edit the tiles on the dashboard, and drag to reorder them.
             </P>
             <ul className={LIST_CLASS}>
               <li>
@@ -336,12 +334,12 @@ export default async function HelpPage() {
                 icon.
               </li>
               <li>
-                <strong>Bookmarks</strong> group under categories you name; both
+                <strong>Bookmarks</strong> group under categories you name. Both
                 the bookmarks and the category order are drag-sortable.
               </li>
               <li>
                 <strong>Icons</strong> come from a large built-in set (pick by
-                name) or your own upload — PNG, JPG, WebP, GIF, SVG, or ICO up to
+                name) or your own upload: PNG, JPG, WebP, GIF, SVG, or ICO up to
                 512&nbsp;KB, auto-squared so it sits cleanly. The browser-tab{" "}
                 <strong>favicon</strong> is set the same way.
               </li>
@@ -351,8 +349,8 @@ export default async function HelpPage() {
           <Card title="Search engine & custom bangs">
             <P>
               Under <strong>Settings</strong>, choose the web-search engine used
-              when a query matches nothing — DuckDuckGo, Google, Bing, Brave, or
-              a custom <Code>%s</Code> URL template.
+              when a query matches nothing: DuckDuckGo, Google, Bing, Brave, or a
+              custom <Code>%s</Code> URL template.
             </P>
             <P>
               Add your own <strong>bangs</strong> too: map a <Code>!key</Code> to
@@ -365,21 +363,21 @@ export default async function HelpPage() {
             <P>
               Give any app a health check and its results show on{" "}
               <A href="/status">/status</A>. Pick the method that fits the
-              service:
+              service.
             </P>
             <ul className={LIST_CLASS}>
               <li>
-                <strong>HTTP</strong> — a request that can require a specific
+                <strong>HTTP.</strong> A request that can require a specific
                 status code or a keyword in the response body.
               </li>
               <li>
-                <strong>TCP</strong> — a port connects.
+                <strong>TCP.</strong> A port accepts a connection.
               </li>
               <li>
-                <strong>DNS</strong> — the host resolves.
+                <strong>DNS.</strong> The host resolves.
               </li>
               <li>
-                <strong>Ping</strong> — an ICMP echo (needs the container to be
+                <strong>Ping.</strong> An ICMP echo (the container must be
                 allowed to ping).
               </li>
             </ul>
@@ -394,8 +392,8 @@ export default async function HelpPage() {
               Get notified when a monitored service goes down and when it
               recovers. Under the master <strong>Alerts</strong> switch,{" "}
               <strong>email</strong> (via your SMTP server) and a{" "}
-              <strong>webhook</strong> are independent channels — enable either or
-              both.
+              <strong>webhook</strong> are independent channels, so you can
+              enable either or both.
             </P>
           </Card>
 
@@ -415,17 +413,19 @@ export default async function HelpPage() {
 
           <Card title="Home-page components">
             <P>
-              Toggle what appears on the dashboard — the greeting, clock, search
-              box, apps, bookmarks, the favorites row, and the floating settings
-              button. Weather, the status row, and the calendar have their own
-              enables alongside their setup.
+              Toggle what appears on the dashboard: the greeting, clock, search
+              box, apps, bookmarks, the favorites row, and the floating
+              navigation menu. You can also reorder these sections and set each
+              one&apos;s width (full, two-thirds, half, or a third), so two or
+              three can share a row. Weather, the status row, and the calendar
+              have their own enables alongside their setup.
             </P>
           </Card>
 
           <Card title="Themes">
             <P>
               The <strong>Themes</strong> tab edits the built-in theme packs
-              visitors can choose from — the design, scene, and colors for both
+              visitors can choose from: the design, scene, and colors for both
               light and dark. Reset any pack to restore its original values.
             </P>
           </Card>
@@ -433,9 +433,9 @@ export default async function HelpPage() {
           <Card title="Backup: export & import">
             <P>
               <em>Export</em> downloads your whole configuration as a single JSON
-              file; <em>Import</em> restores it. The admin password is never
+              file, and <em>Import</em> restores it. The admin password is never
               included in the export, and importing a file can&apos;t change or
-              clear it — password changes only happen through the flow below.
+              clear it. Password changes only happen through the flow below.
             </P>
           </Card>
 
@@ -456,10 +456,9 @@ export default async function HelpPage() {
             <P>
               Set <Code>TRUSTED_PROXY_HOPS</Code> to how many proxies sit in
               front of the app (default <Code>1</Code>). If you expose ctrlcenter{" "}
-              <strong>directly, with no proxy</strong>, set it to <Code>0</Code>{" "}
-              — otherwise a visitor can spoof <Code>X-Forwarded-For</Code> to
-              forge a fresh IP each request and slip past the per-IP login
-              throttle.
+              <strong>directly, with no proxy</strong>, set it to <Code>0</Code>.
+              Otherwise a visitor can spoof <Code>X-Forwarded-For</Code> to forge
+              a fresh IP on each request and slip past the per-IP login throttle.
             </P>
             <P>
               Installation, environment variables, and the full configuration
