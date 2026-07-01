@@ -14,6 +14,8 @@ import { supportedTimezones } from "@/lib/prefs";
 import {
   resolveLayoutSections,
   SECTION_LABELS,
+  SECTION_WIDTHS,
+  WIDTH_LABELS,
   type LayoutSection,
   type LayoutSectionId,
   type SectionWidth,
@@ -346,9 +348,9 @@ export default function SettingsManager({
         <div className="mt-2 border-t border-fg/10 pt-4">
           <span className="text-sm text-fg/70">Arrangement</span>
           <p className="mt-1 mb-3 text-xs text-fg/40">
-            Order the dashboard sections and set each full- or half-width. Two
-            half-width sections in a row sit side by side. Hidden sections
-            don&apos;t appear regardless of order.
+            Order the dashboard sections and set each to full, two-thirds, half,
+            or a third of the width. Sections whose widths fit a row sit side by
+            side. Hidden sections don&apos;t appear regardless of order.
           </p>
           <ul className="flex flex-col gap-2">
             {layoutSections.map((s, i) => (
@@ -364,18 +366,19 @@ export default function SettingsManager({
                 />
                 <span className="flex-1 text-fg/80">{SECTION_LABELS[s.id]}</span>
                 <div className="flex shrink-0 overflow-hidden rounded-lg border border-fg/10">
-                  {(["full", "half"] as const).map((w) => (
+                  {SECTION_WIDTHS.map((w) => (
                     <button
                       key={w}
                       type="button"
                       onClick={() => setSectionWidth(s.id, w)}
-                      className={`px-3 py-1 text-xs capitalize transition-colors ${
+                      title={w === "twoThirds" ? "Two-thirds" : w === "third" ? "One-third" : w === "half" ? "Half" : "Full"}
+                      className={`px-2.5 py-1 text-xs transition-colors ${
                         s.width === w
                           ? "bg-fg/15 text-fg"
                           : "text-fg/50 hover:text-fg/80"
                       }`}
                     >
-                      {w}
+                      {WIDTH_LABELS[w]}
                     </button>
                   ))}
                 </div>

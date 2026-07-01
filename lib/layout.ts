@@ -11,7 +11,12 @@ export const LAYOUT_SECTION_IDS = [
 ] as const;
 
 export type LayoutSectionId = (typeof LAYOUT_SECTION_IDS)[number];
-export type SectionWidth = "full" | "half";
+
+// Column widths, as fractions of the dashboard's row. Rendered into a 6-column
+// grid (the LCM of halves and thirds), so full/two-thirds/half/third map to a
+// clean 6/4/3/2 span and any mix of them tiles a row.
+export const SECTION_WIDTHS = ["full", "twoThirds", "half", "third"] as const;
+export type SectionWidth = (typeof SECTION_WIDTHS)[number];
 export type LayoutSection = { id: LayoutSectionId; width: SectionWidth };
 
 export const SECTION_LABELS: Record<LayoutSectionId, string> = {
@@ -22,8 +27,20 @@ export const SECTION_LABELS: Record<LayoutSectionId, string> = {
   bookmarks: "Bookmarks",
 };
 
+// Short labels for the admin width picker.
+export const WIDTH_LABELS: Record<SectionWidth, string> = {
+  full: "Full",
+  twoThirds: "⅔",
+  half: "½",
+  third: "⅓",
+};
+
 function isSectionId(v: unknown): v is LayoutSectionId {
   return typeof v === "string" && (LAYOUT_SECTION_IDS as readonly string[]).includes(v);
+}
+
+function isWidth(v: unknown): v is SectionWidth {
+  return typeof v === "string" && (SECTION_WIDTHS as readonly string[]).includes(v);
 }
 
 // Normalize a stored/partial layout into a concrete, complete section list: keep
@@ -41,7 +58,7 @@ export function resolveLayoutSections(
     const id = s?.id;
     if (!isSectionId(id) || seen.has(id)) continue;
     seen.add(id);
-    out.push({ id, width: s?.width === "half" ? "half" : "full" });
+    out.push({ id, width: isWidth(s?.width) ? s.width : "full" });
   }
   for (const id of LAYOUT_SECTION_IDS) {
     if (!seen.has(id)) out.push({ id, width: "full" });

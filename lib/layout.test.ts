@@ -46,6 +46,15 @@ describe("resolveLayoutSections", () => {
     expect(out.some((s) => (s.id as string) === "nope")).toBe(false);
     expect(out).toHaveLength(LAYOUT_SECTION_IDS.length);
   });
+
+  it("preserves the third and two-thirds widths", () => {
+    const out = resolveLayoutSections([
+      { id: "apps", width: "twoThirds" },
+      { id: "calendar", width: "third" },
+    ]);
+    expect(out.find((s) => s.id === "apps")?.width).toBe("twoThirds");
+    expect(out.find((s) => s.id === "calendar")?.width).toBe("third");
+  });
 });
 
 describe("layout schema", () => {

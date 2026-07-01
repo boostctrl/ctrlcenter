@@ -3,7 +3,7 @@ import { DESIGN_IDS, SCENE_IDS } from "./theme";
 import { FONT_IDS, DEFAULT_FONT } from "./fonts";
 import { SEARCH_ENGINE_KEYS, isValidCustomUrl } from "./search";
 import { STATUS_RANGE_KEYS, CHECK_TYPE_KEYS } from "./status";
-import { LAYOUT_SECTION_IDS } from "./layout";
+import { LAYOUT_SECTION_IDS, SECTION_WIDTHS } from "./layout";
 
 // 6-digit hex color (matches what <input type="color"> produces and the
 // client-side theme sanitizers accept).
@@ -163,7 +163,7 @@ export type ComponentsConfig = z.infer<typeof componentsSchema>;
 // rebuilt into the default rather than failing the config load.
 export const layoutSectionSchema = z.object({
   id: z.enum(LAYOUT_SECTION_IDS),
-  width: z.enum(["full", "half"]).catch("full").default("full"),
+  width: z.enum(SECTION_WIDTHS).catch("full").default("full"),
 });
 export const layoutSchema = z.object({
   sections: z
@@ -445,7 +445,7 @@ export const layoutUpdateSchema = z.object({
   sections: z.array(
     z.object({
       id: z.enum(LAYOUT_SECTION_IDS),
-      width: z.enum(["full", "half"]),
+      width: z.enum(SECTION_WIDTHS),
     })
   ),
 });

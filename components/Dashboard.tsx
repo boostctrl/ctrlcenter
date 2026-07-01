@@ -165,18 +165,30 @@ export default function Dashboard({
     }
   }
 
-  // Card grids reflow to fewer columns when their section sits in a half-width
-  // column. Complete, static class strings (no interpolation) so Tailwind's
-  // extractor keeps every variant.
-  const CARD_GRID: Record<SectionWidth, string> = {
-    full: "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4",
-    half: "grid grid-cols-1 gap-4 sm:grid-cols-2",
+  // How many columns each width spans in the 6-column section grid below, and how
+  // the card/bookmark grids reflow to match. Complete, static class strings (no
+  // interpolation) so Tailwind's extractor keeps every variant.
+  const COL_SPAN: Record<SectionWidth, string> = {
+    full: "lg:col-span-6",
+    twoThirds: "lg:col-span-4",
+    half: "lg:col-span-3",
+    third: "lg:col-span-2",
   };
+  // Apps/favorites: three across at full width, tapering to one per row in the
+  // narrower half/third columns (matching how bookmarks stack there).
+  const CARD_GRID: Record<SectionWidth, string> = {
+    full: "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3",
+    twoThirds: "grid grid-cols-1 gap-4 sm:grid-cols-2",
+    half: "grid grid-cols-1 gap-4",
+    third: "grid grid-cols-1 gap-4",
+  };
+  // Bookmarks show one category per row once the column is half width or less —
+  // two side-by-side category columns in a narrow column read as cramped.
   const BOOKMARK_GRID: Record<SectionWidth, string> = {
     full: "grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3",
-    // Half width shows one category per row — two side-by-side category columns
-    // in a narrow half-column read as cramped.
+    twoThirds: "grid grid-cols-1 gap-6 sm:grid-cols-2",
     half: "grid grid-cols-1 gap-6",
+    third: "grid grid-cols-1 gap-6",
   };
 
   // Each movable section as a node for a given width, or null when it shouldn't
@@ -241,12 +253,12 @@ export default function Dashboard({
 
   const content = (
     <>
-      <div className="grid grid-cols-1 gap-x-8 gap-y-12 lg:grid-cols-2 lg:items-start">
+      <div className="grid grid-cols-1 gap-x-8 gap-y-12 lg:grid-cols-6 lg:items-start">
         {layout.map(({ id, width }) => {
           const node = blockFor(id, width);
           if (!node) return null;
           return (
-            <div key={id} className={width === "full" ? "lg:col-span-2" : undefined}>
+            <div key={id} className={COL_SPAN[width]}>
               {node}
             </div>
           );
