@@ -27,6 +27,8 @@ here.
 - **Applications and Favorites reflow to match their column width.** They show
   three cards across at full width and one per row once the column is half-width
   or narrower, the same way Bookmarks already stack.
+- **The navigation menu labels the status page "Service Status"** for clarity;
+  it continues to list only the pages for features the admin has enabled.
 
 ## [1.2.1] - 2026-07-01
 

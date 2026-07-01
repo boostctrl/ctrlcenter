@@ -42,7 +42,7 @@ export default function FloatingNav({
     [
       { href: "/", label: "Dashboard" },
       weather ? { href: "/weather", label: "Weather" } : null,
-      status ? { href: "/status", label: "Status" } : null,
+      status ? { href: "/status", label: "Service Status" } : null,
       calendar ? { href: "/calendar", label: "Calendar" } : null,
       { href: "/help", label: "Help" },
       { href: "/settings", label: "Settings" },
