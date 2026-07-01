@@ -66,12 +66,30 @@ async function mutate<T>(fn: (config: Config) => T): Promise<T> {
   return result;
 }
 
+// The config without the admin credential — what's safe to send over the API
+// (export) and the surface an import is allowed to replace. The password lives
+// outside this: it's set only through the ChangePassword flow, never carried in
+// a backup file. See replaceConfig and the /api/config route.
+export function stripAuth(config: Config): Omit<Config, "auth"> {
+  const rest = { ...config };
+  delete (rest as Partial<Config>).auth;
+  return rest;
+}
+
 // Validate and write a whole config, replacing what's on disk (used by import).
 // Goes through the same serialized write queue as mutate() so it can't race
 // with concurrent edits.
 export async function replaceConfig(input: unknown): Promise<Config> {
   const validated = configSchema.parse(input);
   const result = writeQueue.then(async () => {
+    // Preserve the admin credential across an import. A backup file must not be
+    // able to change or wipe the password: an older or hand-made config carries
+    // no auth, which would otherwise silently drop this instance to passwordless
+    // (falling back to ADMIN_PASSWORD), and a backup from another instance would
+    // overwrite this one's password. Export omits auth for the same reason, so a
+    // freshly exported file has none to apply anyway.
+    const current = await readConfig();
+    validated.auth = current.auth;
     await writeConfig(validated);
     return validated;
   });

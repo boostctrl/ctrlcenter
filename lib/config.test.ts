@@ -205,6 +205,55 @@ describe("replaceConfig", () => {
       config.replaceConfig({ apps: [{ id: "x", name: "" }] })
     ).rejects.toBeTruthy();
   });
+
+  it("preserves the admin password when importing a config without auth", async () => {
+    // An exported backup carries no auth (see stripAuth); importing it must not
+    // wipe the password and silently drop the instance to passwordless.
+    await config.setPasswordHash("HASH", "SALT");
+    const replaced = await config.replaceConfig({
+      settings: { title: "Imported" },
+      apps: [],
+      bookmarks: [],
+    });
+    expect(replaced.auth).toEqual({ passwordHash: "HASH", passwordSalt: "SALT" });
+
+    const reread = await config.readConfig();
+    expect(reread.auth).toEqual({ passwordHash: "HASH", passwordSalt: "SALT" });
+    expect(reread.settings.title).toBe("Imported");
+  });
+
+  it("ignores any auth carried in an imported file (can't overwrite the password)", async () => {
+    // A backup from another instance shouldn't be able to change this one's
+    // password; the on-disk credential always wins.
+    await config.setPasswordHash("MINE", "MYSALT");
+    const replaced = await config.replaceConfig({
+      settings: {},
+      apps: [],
+      bookmarks: [],
+      auth: { passwordHash: "THEIRS", passwordSalt: "THEIRSALT" },
+    });
+    expect(replaced.auth).toEqual({ passwordHash: "MINE", passwordSalt: "MYSALT" });
+  });
+});
+
+describe("stripAuth", () => {
+  it("removes the credential from the exported config surface", async () => {
+    await config.setPasswordHash("HASH", "SALT");
+    const full = await config.readConfig();
+    expect(full.auth.passwordHash).toBe("HASH"); // present on disk
+
+    const exported = config.stripAuth(full);
+    expect("auth" in exported).toBe(false); // but never exported
+    // Everything else still rides along.
+    expect(exported.settings.title).toBe("Home");
+    expect(exported.apps).toEqual([]);
+  });
+
+  it("does not mutate the config it's given", async () => {
+    const full = await config.readConfig();
+    config.stripAuth(full);
+    expect(full.auth).toBeTruthy();
+  });
 });
 
 describe("write queue serialization", () => {
