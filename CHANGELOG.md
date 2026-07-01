@@ -12,6 +12,25 @@ here.
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-07-01
+
+### Changed
+
+- **Navigate from anywhere.** The floating corner button is now a menu linking to
+  every enabled page — Dashboard, Weather, Status, Calendar, Help, Settings — so
+  you can move between them without returning to the dashboard first, and the Help
+  page is reachable from every page (not just Settings). The admin toggle is now
+  labelled "Floating navigation menu".
+
+### Fixed
+
+- The home calendar widget now uses the same section title as the other widgets,
+  so it no longer looks out of place when set to half-width.
+- At half-width, the Bookmarks section shows one category per row instead of
+  squeezing two into a narrow column.
+- The **/calendar** month view now fills the page width instead of being capped
+  to a narrow column.
+
 ## [1.2.0] - 2026-07-01
 
 ### Added
@@ -916,7 +935,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/boostctrl/ctrlcenter/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/boostctrl/ctrlcenter/compare/v1.1.4...v1.2.0
 [1.1.4]: https://github.com/boostctrl/ctrlcenter/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/boostctrl/ctrlcenter/compare/v1.1.2...v1.1.3
