@@ -12,6 +12,16 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **The Help page is now a full guide.** What was a quick overview is now a
+  comprehensive reference: visitor cards for search, `!bang` shortcuts,
+  favorites, per-visitor preferences, the theme builder, the extra pages,
+  privacy, and installing as a PWA — plus a much deeper **For admins** section
+  covering apps/bookmarks/icons, the search engine and custom bangs, uptime
+  monitoring, alerts, the calendar feed, home-page components, the themes
+  editor, config backup, passwords, and deployment.
+
 ## [1.1.4] - 2026-07-01
 
 ### Security

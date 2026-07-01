@@ -26,6 +26,46 @@ function Code({ children }: { children: React.ReactNode }) {
   );
 }
 
+// A link that reads the same whether internal (Link) or external (<a>).
+function A({
+  href,
+  external,
+  children,
+}: {
+  href: string;
+  external?: boolean;
+  children: React.ReactNode;
+}) {
+  const className =
+    "font-medium text-fg/85 underline underline-offset-2 hover:text-fg";
+  if (external) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={className}
+      >
+        {children}
+      </a>
+    );
+  }
+  return (
+    <Link href={href} className={className}>
+      {children}
+    </Link>
+  );
+}
+
+// Body paragraph — the default prose style used throughout the cards.
+function P({ children }: { children: React.ReactNode }) {
+  return <p className="text-sm text-fg/70">{children}</p>;
+}
+
+// Shared class for the bulleted feature lists in the cards below.
+const LIST_CLASS =
+  "flex list-disc flex-col gap-1.5 pl-4 text-sm text-fg/70 marker:text-fg/30";
+
 function Card({
   title,
   children,
@@ -66,7 +106,8 @@ function Section({
 
 // In-app usage guide, mirroring /weather, /status and /calendar so the docs are
 // discoverable without leaving the app. Static reference content; the only
-// runtime read is the components flag that gates the floating settings button.
+// runtime reads are the built-in bang list and the components flag that gates
+// the floating settings button.
 export default async function HelpPage() {
   const { components } = await getSettings();
   const builtins = Object.entries(BUILTIN_BANGS);
@@ -78,7 +119,7 @@ export default async function HelpPage() {
           <BackHome />
           <h1 className="mt-3 text-3xl font-bold">Help</h1>
           <p className="mt-1 text-sm text-fg/50">
-            How to get around ctrlcenter, plus setup notes for admins. Some
+            Everything ctrlcenter can do, plus setup notes for admins. Some
             features below appear only when the admin has turned them on.
           </p>
         </div>
@@ -88,20 +129,24 @@ export default async function HelpPage() {
           note="Works in any browser — nothing here needs the admin password."
         >
           <Card title="Search">
-            <p className="text-sm text-fg/70">
-              Start typing to filter your apps <em>and</em> bookmarks at once.
-              The search box is the fastest way around:
-            </p>
+            <P>
+              Start typing to filter your apps <em>and</em> bookmarks at once —
+              it matches on name, subtitle, URL, and a bookmark&apos;s category.
+              Opening anything launches it in a new tab.
+            </P>
             <ul className="flex flex-col gap-2 text-sm text-fg/70">
               <li className="flex items-baseline gap-3">
                 <Kbd>/</Kbd>
-                <span>Jump to the search box from anywhere on the page.</span>
+                <span>
+                  Jump to the search box from anywhere on the page (as long as
+                  you&apos;re not already typing in a field).
+                </span>
               </li>
               <li className="flex items-baseline gap-3">
                 <Kbd>Enter</Kbd>
                 <span>
-                  Open the top match. With nothing matching, it searches the web
-                  instead.
+                  Open the top match. A <Code>!bang</Code> wins first; with
+                  nothing matching, it runs a web search instead.
                 </span>
               </li>
               <li className="flex items-baseline gap-3">
@@ -112,12 +157,12 @@ export default async function HelpPage() {
           </Card>
 
           <Card title="Bang shortcuts">
-            <p className="text-sm text-fg/70">
+            <P>
               Begin a query with <Code>!</Code> to jump straight out instead of
-              filtering. <Code>!key term</Code> searches the site;{" "}
+              filtering. <Code>!key term</Code> searches that site;{" "}
               <Code>!key</Code> on its own opens its home page. An unrecognized
-              bang just falls back to a web search.
-            </p>
+              bang just falls back to a web search of your text.
+            </P>
             <div>
               <p className="mb-1.5 text-xs tracking-wide text-fg/45 uppercase">
                 Built-in
@@ -135,83 +180,132 @@ export default async function HelpPage() {
                 ))}
               </div>
             </div>
-            <p className="text-sm text-fg/70">
-              Every app also gets its own bang from its name — and its subtitle —
-              so <Code>!plex</Code> opens Plex. The admin can add more custom
-              bangs in the portal.
-            </p>
+            <P>
+              Every app also gets its own bang from its name <em>and</em> its
+              subtitle — so an app named &ldquo;Plex&rdquo; answers to{" "}
+              <Code>!plex</Code>. The admin can add custom bangs too, and those
+              take priority over the built-ins.
+            </P>
           </Card>
 
           <Card title="Favorites">
-            <p className="text-sm text-fg/70">
+            <P>
               Hover an app card and click the star (
               <span
-                className="align-middle"
-                style={{ color: "var(--accent-from)" }}
+                className="align-middle text-[color:var(--accent-from)]"
                 aria-hidden
               >
                 ★
               </span>
-              ) to pin it. Pinned apps collect in a <strong>Favorites</strong>{" "}
-              row at the top of the dashboard. Favorites are saved in this
-              browser only — no account needed.
-            </p>
+              ) to pin it; click again to unpin. Pinned apps collect in a{" "}
+              <strong>Favorites</strong> row at the top of the dashboard, in the
+              order you pinned them. Favorites live in this browser only — no
+              account needed.
+            </P>
           </Card>
 
-          <Card title="More pages">
-            <p className="text-sm text-fg/70">
-              When the admin enables them, these get their own pages (and a card
-              or widget on the dashboard):
-            </p>
-            <ul className="flex flex-col gap-2 text-sm text-fg/70">
+          <Card title="Your preferences">
+            <P>
+              Open{" "}
+              <A href="/settings">Settings</A> (the gear in the corner) to tailor
+              your view. Every option is saved in this browser only:
+            </P>
+            <ul className={LIST_CLASS}>
               <li>
-                <Link
-                  href="/weather"
-                  className="font-medium text-fg/85 underline underline-offset-2 hover:text-fg"
-                >
-                  Weather
-                </Link>{" "}
-                — current conditions, an hourly and 7-day forecast, sun times,
-                and detail tiles.
+                <strong>Appearance mode</strong> — light, dark, or follow your
+                device.
               </li>
               <li>
-                <Link
-                  href="/status"
-                  className="font-medium text-fg/85 underline underline-offset-2 hover:text-fg"
-                >
-                  Status
-                </Link>{" "}
-                — per-service uptime % and a 90-day timeline for the apps being
-                monitored.
+                <strong>Greeting name</strong> — the name in &ldquo;Good
+                evening, …&rdquo;.
               </li>
               <li>
-                <Link
-                  href="/calendar"
-                  className="font-medium text-fg/85 underline underline-offset-2 hover:text-fg"
-                >
-                  Calendar
-                </Link>{" "}
-                — your full upcoming agenda, in your own time zone.
+                <strong>Time zone</strong> — used by the clock and the calendar.
+              </li>
+              <li>
+                <strong>Weather location &amp; units</strong> — set a spot or tap{" "}
+                <em>Use my location</em>, and switch between °F and °C (when the
+                admin has weather on).
+              </li>
+              <li>
+                <strong>Reset all settings</strong> — wipe your personalizations
+                back to the site defaults.
               </li>
             </ul>
           </Card>
 
-          <Card title="Make it yours">
-            <p className="text-sm text-fg/70">
-              Open{" "}
-              <Link
-                href="/settings"
-                className="font-medium text-fg/85 underline underline-offset-2 hover:text-fg"
-              >
-                Settings
-              </Link>{" "}
-              (the gear in the corner) to set your greeting name, time zone,
-              weather location and units, and your whole theme — design, scene,
-              colors, and font. Everything here is stored in this browser only
-              and never leaves your device, so each visitor gets their own look.
-            </p>
+          <Card title="Themes & looks">
+            <P>
+              The theme builder in{" "}
+              <A href="/settings">Settings</A> makes the dashboard yours, with a
+              live preview as you go:
+            </P>
+            <ul className={LIST_CLASS}>
+              <li>
+                <strong>Design</strong> — the card surface style, from Glass and
+                Frost to Flat, Cyber, and Paper (12 in all).
+              </li>
+              <li>
+                <strong>Scene</strong> — the animated backdrop: Aurora,
+                Starfield, Waves, Grid, and more (12 in all).
+              </li>
+              <li>
+                <strong>Accent &amp; colors</strong> — the accent gradient plus
+                optional custom surface colors.
+              </li>
+              <li>
+                <strong>Font</strong> — pick from six typefaces.
+              </li>
+            </ul>
+            <P>
+              Light and dark can carry wholly independent looks, and — like the
+              rest of your preferences — everything stays on your device, so each
+              visitor gets their own.
+            </P>
           </Card>
 
+          <Card title="The extra pages">
+            <P>
+              When the admin enables them, these get a card or widget on the home
+              page and a full page of their own:
+            </P>
+            <ul className={LIST_CLASS}>
+              <li>
+                <A href="/weather">Weather</A> — current conditions plus an
+                hourly and 7-day forecast, sunrise/sunset, and detail tiles, for
+                your location and units.
+              </li>
+              <li>
+                <A href="/status">Status</A> — per-service uptime % over a range
+                you pick, with a 90-day timeline of the services being monitored.
+              </li>
+              <li>
+                <A href="/calendar">Calendar</A> — your full upcoming agenda, in
+                your own time zone; the home &ldquo;Upcoming&rdquo; card links
+                here.
+              </li>
+            </ul>
+          </Card>
+
+          <Card title="Privacy & your data">
+            <P>
+              Everything you personalize — appearance, greeting, time zone,
+              weather location, theme, and favorites — is stored in your
+              browser&apos;s local storage. It never leaves your device and
+              isn&apos;t tied to any account, so two people on the same
+              ctrlcenter each see their own setup. <em>Reset all settings</em>{" "}
+              clears it.
+            </P>
+          </Card>
+
+          <Card title="Install it as an app">
+            <P>
+              ctrlcenter is a progressive web app, so you can install it from
+              your browser&apos;s menu (&ldquo;Install&rdquo; on desktop, or
+              &ldquo;Add to Home Screen&rdquo; on mobile). It then opens in its
+              own window, using the name and icon the admin has set.
+            </P>
+          </Card>
         </Section>
 
         <Section
@@ -219,48 +313,160 @@ export default async function HelpPage() {
           note="Running and configuring the instance — these need the admin password."
         >
           <Card title="The admin portal">
-            <p className="text-sm text-fg/70">
+            <P>
               The{" "}
-              <Link
-                href="/admin"
-                className="font-medium text-fg/85 underline underline-offset-2 hover:text-fg"
-              >
-                admin portal
-              </Link>{" "}
-              (password-protected) manages apps and bookmarks, icons and the
-              favicon, the search engine and custom bangs, uptime checks and
-              alerts, the calendar feed, which components show on the home page,
-              and one-click export/import of the whole config.
-            </p>
+              <A href="/admin">admin portal</A> (password-protected) is organized
+              into four tabs — <strong>Applications</strong>,{" "}
+              <strong>Bookmarks</strong>, <strong>Themes</strong>, and{" "}
+              <strong>Settings</strong>. Changes save automatically as you make
+              them, and the header has one-click <em>Export</em> / <em>Import</em>{" "}
+              of the whole configuration.
+            </P>
+          </Card>
+
+          <Card title="Apps, bookmarks & icons">
+            <P>
+              Add and edit the tiles on the dashboard, and drag to reorder them:
+            </P>
+            <ul className={LIST_CLASS}>
+              <li>
+                <strong>Apps</strong> carry a name, optional subtitle, URL, and
+                icon.
+              </li>
+              <li>
+                <strong>Bookmarks</strong> group under categories you name; both
+                the bookmarks and the category order are drag-sortable.
+              </li>
+              <li>
+                <strong>Icons</strong> come from a large built-in set (pick by
+                name) or your own upload — PNG, JPG, WebP, GIF, SVG, or ICO up to
+                512&nbsp;KB, auto-squared so it sits cleanly. The browser-tab{" "}
+                <strong>favicon</strong> is set the same way.
+              </li>
+            </ul>
+          </Card>
+
+          <Card title="Search engine & custom bangs">
+            <P>
+              Under <strong>Settings</strong>, choose the web-search engine used
+              when a query matches nothing — DuckDuckGo, Google, Bing, Brave, or
+              a custom <Code>%s</Code> URL template.
+            </P>
+            <P>
+              Add your own <strong>bangs</strong> too: map a <Code>!key</Code> to
+              any <Code>%s</Code> template. Custom bangs override the built-ins,
+              which override the automatic per-app bangs.
+            </P>
+          </Card>
+
+          <Card title="Uptime monitoring">
+            <P>
+              Give any app a health check and its results show on{" "}
+              <A href="/status">/status</A>. Pick the method that fits the
+              service:
+            </P>
+            <ul className={LIST_CLASS}>
+              <li>
+                <strong>HTTP</strong> — a request that can require a specific
+                status code or a keyword in the response body.
+              </li>
+              <li>
+                <strong>TCP</strong> — a port connects.
+              </li>
+              <li>
+                <strong>DNS</strong> — the host resolves.
+              </li>
+              <li>
+                <strong>Ping</strong> — an ICMP echo (needs the container to be
+                allowed to ping).
+              </li>
+            </ul>
+            <P>
+              A background poller records history on its own schedule, so uptime
+              accrues even when no one has the page open.
+            </P>
+          </Card>
+
+          <Card title="Alerts">
+            <P>
+              Get notified when a monitored service goes down and when it
+              recovers. Under the master <strong>Alerts</strong> switch,{" "}
+              <strong>email</strong> (via your SMTP server) and a{" "}
+              <strong>webhook</strong> are independent channels — enable either or
+              both.
+            </P>
+          </Card>
+
+          <Card title="Calendar feed">
+            <P>
+              Point the calendar at a published <Code>.ics</Code> feed or a
+              CalDAV URL (a <Code>webcal://</Code> address works too), with
+              optional Basic-auth credentials for a private feed. The{" "}
+              <strong>Test feed</strong> button reports whether it&apos;s
+              reachable and how many upcoming events it sees.
+            </P>
+            <P>
+              A <em>Hide when no upcoming events</em> option drops the home
+              &ldquo;Upcoming&rdquo; card entirely when the agenda is empty.
+            </P>
+          </Card>
+
+          <Card title="Home-page components">
+            <P>
+              Toggle what appears on the dashboard — the greeting, clock, search
+              box, apps, bookmarks, the favorites row, and the floating settings
+              button. Weather, the status row, and the calendar have their own
+              enables alongside their setup.
+            </P>
+          </Card>
+
+          <Card title="Themes">
+            <P>
+              The <strong>Themes</strong> tab edits the built-in theme packs
+              visitors can choose from — the design, scene, and colors for both
+              light and dark. Reset any pack to restore its original values.
+            </P>
+          </Card>
+
+          <Card title="Backup: export & import">
+            <P>
+              <em>Export</em> downloads your whole configuration as a single JSON
+              file; <em>Import</em> restores it. The admin password is never
+              included in the export, and importing a file can&apos;t change or
+              clear it — password changes only happen through the flow below.
+            </P>
+          </Card>
+
+          <Card title="Password & sessions">
+            <P>
+              Set or change the admin password from the portal. If none is set,
+              login falls back to the <Code>ADMIN_PASSWORD</Code> environment
+              variable. Changing the password signs out every other session.
+            </P>
           </Card>
 
           <Card title="Deployment & security">
-            <p className="text-sm text-fg/70">
+            <P>
               ctrlcenter is meant to run <strong>behind a reverse proxy</strong>{" "}
               (for TLS and a stable address). Login attempts are rate-limited per
               client IP, read from the <Code>X-Forwarded-For</Code> header.
-            </p>
-            <p className="text-sm text-fg/70">
+            </P>
+            <P>
               Set <Code>TRUSTED_PROXY_HOPS</Code> to how many proxies sit in
               front of the app (default <Code>1</Code>). If you expose ctrlcenter{" "}
               <strong>directly, with no proxy</strong>, set it to <Code>0</Code>{" "}
               — otherwise a visitor can spoof <Code>X-Forwarded-For</Code> to
               forge a fresh IP each request and slip past the per-IP login
               throttle.
-            </p>
-            <p className="text-sm text-fg/70">
+            </P>
+            <P>
               Installation, environment variables, and the full configuration
               reference live in the{" "}
-              <a
-                href="https://github.com/boostctrl/ctrlcenter#readme"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium text-fg/85 underline underline-offset-2 hover:text-fg"
-              >
+              <A href="https://github.com/boostctrl/ctrlcenter#readme" external>
                 project README
-              </a>
+              </A>
               .
-            </p>
+            </P>
           </Card>
         </Section>
       </main>
