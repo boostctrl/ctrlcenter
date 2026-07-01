@@ -100,9 +100,11 @@ Built with Next.js 16, React 19, and Tailwind v4.
 3. Open **http://localhost:3000** for the dashboard and **/admin** to manage it
    (sign in with `ADMIN_PASSWORD`).
 
-Your data lives in `./config/config.yaml`, bind-mounted into the container. The
-container fixes ownership of that directory on startup and runs as a non-root
-user, so it works regardless of who owns the host folder — no manual `chown`.
+Your data lives in `./config/config.yaml`, bind-mounted into the container and
+created automatically on first run (see [`config/config.example.yaml`](config/config.example.yaml)
+for a sample). The container fixes ownership of that directory on startup and
+runs as a non-root user, so it works regardless of who owns the host folder — no
+manual `chown`.
 
 ## Configuration
 

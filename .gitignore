@@ -40,3 +40,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# runtime data written into the config dir: the live config (real credentials),
+# uptime history, and uploaded icons. A sample is tracked as
+# config/config.example.yaml; the app creates config.yaml on first run.
+/config/config.yaml
+/config/status-history.json
+/config/uploads/
