@@ -35,10 +35,31 @@ function Card({
 }) {
   return (
     <section className="glass-card mb-4 flex break-inside-avoid flex-col gap-3 p-6">
-      <h2 className="text-sm font-semibold tracking-[0.15em] text-fg/60 uppercase">
+      <h3 className="text-sm font-semibold tracking-[0.15em] text-fg/60 uppercase">
         {title}
-      </h2>
+      </h3>
       {children}
+    </section>
+  );
+}
+
+// A labelled group of cards (e.g. "For everyone" vs "For admins").
+function Section({
+  title,
+  note,
+  children,
+}: {
+  title: string;
+  note?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="flex flex-col gap-4">
+      <div>
+        <h2 className="text-xl font-bold tracking-tight">{title}</h2>
+        {note && <p className="mt-1 text-sm text-fg/50">{note}</p>}
+      </div>
+      <div className="columns-1 gap-4 lg:columns-2">{children}</div>
     </section>
   );
 }
@@ -57,12 +78,15 @@ export default async function HelpPage() {
           <BackHome />
           <h1 className="mt-3 text-3xl font-bold">Help</h1>
           <p className="mt-1 text-sm text-fg/50">
-            How to get around ctrlcenter. Some features below appear only when
-            the admin has turned them on.
+            How to get around ctrlcenter, plus setup notes for admins. Some
+            features below appear only when the admin has turned them on.
           </p>
         </div>
 
-        <div className="columns-1 gap-4 lg:columns-2">
+        <Section
+          title="For everyone"
+          note="Works in any browser — nothing here needs the admin password."
+        >
           <Card title="Search">
             <p className="text-sm text-fg/70">
               Start typing to filter your apps <em>and</em> bookmarks at once.
@@ -188,7 +212,13 @@ export default async function HelpPage() {
             </p>
           </Card>
 
-          <Card title="For admins">
+        </Section>
+
+        <Section
+          title="For admins"
+          note="Running and configuring the instance — these need the admin password."
+        >
+          <Card title="The admin portal">
             <p className="text-sm text-fg/70">
               The{" "}
               <Link
@@ -202,13 +232,29 @@ export default async function HelpPage() {
               alerts, the calendar feed, which components show on the home page,
               and one-click export/import of the whole config.
             </p>
+          </Card>
+
+          <Card title="Deployment & security">
+            <p className="text-sm text-fg/70">
+              ctrlcenter is meant to run <strong>behind a reverse proxy</strong>{" "}
+              (for TLS and a stable address). Login attempts are rate-limited per
+              client IP, read from the <Code>X-Forwarded-For</Code> header.
+            </p>
+            <p className="text-sm text-fg/70">
+              Set <Code>TRUSTED_PROXY_HOPS</Code> to how many proxies sit in
+              front of the app (default <Code>1</Code>). If you expose ctrlcenter{" "}
+              <strong>directly, with no proxy</strong>, set it to <Code>0</Code>{" "}
+              — otherwise a visitor can spoof <Code>X-Forwarded-For</Code> to
+              forge a fresh IP each request and slip past the per-IP login
+              throttle.
+            </p>
             <p className="text-sm text-fg/70">
               Installation, environment variables, and the full configuration
               reference live in the{" "}
               <a
                 href="https://github.com/boostctrl/ctrlcenter#readme"
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 className="font-medium text-fg/85 underline underline-offset-2 hover:text-fg"
               >
                 project README
@@ -216,7 +262,7 @@ export default async function HelpPage() {
               .
             </p>
           </Card>
-        </div>
+        </Section>
       </main>
       {components.settingsButton && <FloatingSettings />}
     </>
