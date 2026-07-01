@@ -1,26 +1,34 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getSettings } from "@/lib/config";
-import { fetchCalendar } from "@/lib/calendar";
-import AgendaList from "@/components/AgendaList";
+import { fetchCalendar, fetchCalendarRange } from "@/lib/calendar";
+import CalendarView from "@/components/CalendarView";
 import BackHome from "@/components/BackHome";
 import FloatingSettings from "@/components/FloatingSettings";
 
 export const metadata: Metadata = { title: "Calendar" };
 export const dynamic = "force-dynamic";
 
-// The full agenda — the calendar's own page, mirroring /weather and /status, so
-// the feature is discoverable beyond the home card. Shows more events than the
-// home card and gives a clear off/empty state.
+const DAY = 86_400_000;
+// The month view can page one month back and three forward; fetch a range that
+// safely covers those months (plus each grid's neighbouring days) so navigation
+// never lands on stale-empty data. minOffset/maxOffset below match this window.
+const RANGE_BACK = 70 * DAY;
+const RANGE_FWD = 130 * DAY;
+
+// The calendar's own page, mirroring /weather and /status. Defaults to a month
+// grid (the home widget defaults to the agenda) with an Agenda toggle.
 export default async function CalendarPage() {
   const { calendar, components } = await getSettings();
   const enabled = calendar.enabled && calendar.url.trim() !== "";
-  const events = enabled
-    ? await fetchCalendar(calendar.url, 20, {
-        username: calendar.username,
-        password: calendar.password,
-      })
-    : [];
+  const now = new Date().getTime();
+  const auth = { username: calendar.username, password: calendar.password };
+  const [monthEvents, agendaEvents] = enabled
+    ? await Promise.all([
+        fetchCalendarRange(calendar.url, now - RANGE_BACK, now + RANGE_FWD, auth),
+        fetchCalendar(calendar.url, 20, auth),
+      ])
+    : [[], []];
 
   return (
     <>
@@ -38,12 +46,14 @@ export default async function CalendarPage() {
             </Link>
             .
           </p>
-        ) : events.length > 0 ? (
-          <section className="glass-card max-w-2xl p-6">
-            <AgendaList events={events} now={new Date().getTime()} />
-          </section>
         ) : (
-          <p className="text-fg/50">No upcoming events.</p>
+          <CalendarView
+            monthEvents={monthEvents}
+            agendaEvents={agendaEvents}
+            now={now}
+            minOffset={-1}
+            maxOffset={3}
+          />
         )}
       </main>
       {components.settingsButton && <FloatingSettings />}

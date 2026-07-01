@@ -12,6 +12,16 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **A month view for the calendar.** The **/calendar** page now opens on a month
+  grid, with a Month/Agenda switch to fall back to the upcoming-events list.
+  Recurring events fill each day and everything shows in each visitor's own time
+  zone, with prev/next month navigation. The home calendar widget can be switched
+  from the agenda to a compact month calendar (that links through to the full
+  page) via **admin Settings → Calendar → Home widget view**; the agenda stays
+  the default there.
+
 ### Changed
 
 - **The Help page is now a full guide.** What was a quick overview is now a

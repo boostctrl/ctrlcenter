@@ -473,6 +473,100 @@ export function upcomingEvents(
     .slice(0, Math.max(0, count));
 }
 
+// --- Month grid (for the /calendar month view and the home mini-month) ---
+
+// A single day cell: its ISO date, day-of-month number, whether it belongs to the
+// displayed month (vs a leading/trailing neighbour), and whether it's the
+// viewer's today.
+export type MonthCell = {
+  iso: string; // YYYY-MM-DD
+  day: number;
+  inMonth: boolean;
+  isToday: boolean;
+};
+
+export type MonthGrid = {
+  year: number;
+  month: number; // 1-12
+  label: string; // e.g. "July 2026"
+  weeks: MonthCell[][]; // rows of 7, Sunday-first
+};
+
+// The ISO day an event sits on for the viewer's zone. All-day events are anchored
+// in UTC (like eventWhen), so their date never slips in a zone behind UTC.
+export function eventDayKey(event: CalendarEvent, tz: string): string {
+  return ymd(event.start, event.allDay ? "UTC" : isValidTimeZone(tz) ? tz : "UTC");
+}
+
+// Group events by their ISO day for the viewer's zone; each day's list is sorted
+// by start. Multi-day events are placed on their start day only.
+export function bucketByDay(
+  events: CalendarEvent[],
+  tz: string
+): Map<string, CalendarEvent[]> {
+  const map = new Map<string, CalendarEvent[]>();
+  for (const e of events) {
+    const key = eventDayKey(e, tz);
+    const arr = map.get(key);
+    if (arr) arr.push(e);
+    else map.set(key, [e]);
+  }
+  for (const arr of map.values()) arr.sort((a, b) => a.start - b.start);
+  return map;
+}
+
+// Build a Sunday-first month grid for the month containing `reference` (shifted
+// by `monthOffset` whole months), labelled in `tz`. A date's weekday and a
+// month's length don't depend on the zone, so the grid is computed from plain
+// calendar math (via UTC) and stays hydration-stable; only the today flag uses
+// the zone. Trailing/leading days fill each week from the neighbouring months.
+export function buildMonthGrid(
+  reference: number,
+  tz: string,
+  monthOffset = 0
+): MonthGrid {
+  const zone = isValidTimeZone(tz) ? tz : "UTC";
+  const todayIso = ymd(reference, zone);
+  const [ty, tm] = todayIso.split("-").map(Number); // viewer's today year, month (1-12)
+  const base = tm - 1 + monthOffset; // zero-based month index relative to year ty
+  const year = ty + Math.floor(base / 12);
+  const month0 = ((base % 12) + 12) % 12;
+  const daysInMonth = new Date(Date.UTC(year, month0 + 1, 0)).getUTCDate();
+  const firstWeekday = new Date(Date.UTC(year, month0, 1)).getUTCDay(); // 0 = Sun
+  const label = new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month0, 1)));
+
+  const iso = (y: number, m0: number, d: number) =>
+    `${y}-${String(m0 + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  const makeCell = (y: number, m0: number, d: number, inMonth: boolean): MonthCell => {
+    const s = iso(y, m0, d);
+    return { iso: s, day: d, inMonth, isToday: s === todayIso };
+  };
+
+  const cells: MonthCell[] = [];
+  // Leading days from the previous month to reach the first weekday.
+  if (firstWeekday > 0) {
+    const prevDays = new Date(Date.UTC(year, month0, 0)).getUTCDate();
+    const py = month0 === 0 ? year - 1 : year;
+    const pm0 = (month0 + 11) % 12;
+    for (let i = firstWeekday; i > 0; i--) cells.push(makeCell(py, pm0, prevDays - i + 1, false));
+  }
+  // The month itself.
+  for (let d = 1; d <= daysInMonth; d++) cells.push(makeCell(year, month0, d, true));
+  // Trailing days from the next month to complete the final week.
+  const ny = month0 === 11 ? year + 1 : year;
+  const nm0 = (month0 + 1) % 12;
+  let nd = 1;
+  while (cells.length % 7 !== 0) cells.push(makeCell(ny, nm0, nd++, false));
+
+  const weeks: MonthCell[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  return { year, month: month0 + 1, label, weeks };
+}
+
 const CAL_TIMEOUT_MS = 6000;
 const CAL_CACHE_TTL_MS = 5 * 60_000;
 // Cap the fetched body so a huge or malicious feed can't exhaust server memory —
@@ -570,13 +664,13 @@ async function requestIcs(
   return second.text ? second : first;
 }
 
-// Fetch + parse a published or private calendar (cached for a few minutes),
-// returning the next `count` upcoming events. Best-effort: a fetch/parse failure
-// serves the last good cache if there is one, else an empty list — it never
-// throws. `webcal://` URLs are normalized to https.
-export async function fetchCalendar(
+// Fetch + parse a calendar's raw (unexpanded) VEVENTs, cached for a few minutes
+// so repeated home/calendar renders don't each hit the third-party feed. Returns
+// [] for a non-http(s) URL; on a fetch/parse failure serves the last good cache
+// if there is one, else []. Never throws. `webcal://` URLs are normalized to
+// https. Shared by fetchCalendar (upcoming) and fetchCalendarRange (month grid).
+async function loadParsedEvents(
   url: string,
-  count = 5,
   auth?: CalendarAuth
 ): Promise<CalendarEvent[]> {
   const target = url.trim().replace(/^webcal:\/\//i, "https://");
@@ -592,8 +686,38 @@ export async function fetchCalendar(
     }
     // On failure, keep serving the stale cache (events stays as cached?.events).
   }
-  const expanded = expandRecurring(events ?? [], now, now + RECUR_WINDOW_MS);
+  return events ?? [];
+}
+
+// The next `count` upcoming events (recurring series expanded over the near
+// window). Best-effort; never throws.
+export async function fetchCalendar(
+  url: string,
+  count = 5,
+  auth?: CalendarAuth
+): Promise<CalendarEvent[]> {
+  const now = Date.now();
+  const events = await loadParsedEvents(url, auth);
+  const expanded = expandRecurring(events, now, now + RECUR_WINDOW_MS);
   return upcomingEvents(expanded, now, count);
+}
+
+// Every event overlapping [from, to] — past and future, no count cap — sorted by
+// start. For the month grid, which shows a whole month rather than only what's
+// next. Recurring series are expanded across the range. Best-effort; never throws.
+export async function fetchCalendarRange(
+  url: string,
+  from: number,
+  to: number,
+  auth?: CalendarAuth
+): Promise<CalendarEvent[]> {
+  const events = await loadParsedEvents(url, auth);
+  const expanded = expandRecurring(events, from, to);
+  return expanded
+    .filter(
+      (e) => (e.end ?? (e.allDay ? e.start + DAY_MS : e.start)) > from && e.start < to
+    )
+    .sort((a, b) => a.start - b.start);
 }
 
 // Fresh (uncached) reachability check for the admin: does the URL serve a parsable

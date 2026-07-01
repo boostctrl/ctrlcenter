@@ -7,6 +7,11 @@ import {
   upcomingEvents,
   eventWhen,
   fetchCalendar,
+  fetchCalendarRange,
+  buildMonthGrid,
+  eventDayKey,
+  bucketByDay,
+  type CalendarEvent,
 } from "./calendar";
 
 const DAY = 86_400_000;
@@ -465,5 +470,105 @@ describe("fetchCalendar auth + WebDAV", () => {
     } finally {
       globalThis.fetch = orig;
     }
+  });
+});
+
+describe("fetchCalendarRange", () => {
+  it("returns past and future events overlapping the range, sorted", async () => {
+    const at = (iso: string) =>
+      new Date(iso)
+        .toISOString()
+        .replace(/[-:]/g, "")
+        .replace(/\.\d{3}/, "");
+    const ics = [
+      "BEGIN:VCALENDAR",
+      "BEGIN:VEVENT",
+      "UID:future",
+      "SUMMARY:Future",
+      `DTSTART:${at("2026-07-20T10:00:00Z")}`,
+      "END:VEVENT",
+      "BEGIN:VEVENT",
+      "UID:past",
+      "SUMMARY:Past",
+      `DTSTART:${at("2026-07-02T10:00:00Z")}`,
+      "END:VEVENT",
+      "BEGIN:VEVENT",
+      "UID:outside",
+      "SUMMARY:Outside",
+      `DTSTART:${at("2027-01-01T10:00:00Z")}`,
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+    const orig = globalThis.fetch;
+    globalThis.fetch = (async () => new Response(ics, { status: 200 })) as typeof fetch;
+    try {
+      const url = `https://cal.example.test/${Date.now()}-range.ics`;
+      const from = Date.UTC(2026, 6, 1);
+      const to = Date.UTC(2026, 7, 1);
+      const out = await fetchCalendarRange(url, from, to);
+      // Both July events are returned (past one included), sorted by start; the
+      // January event is outside the window and dropped.
+      expect(out.map((e) => e.summary)).toEqual(["Past", "Future"]);
+    } finally {
+      globalThis.fetch = orig;
+    }
+  });
+});
+
+describe("buildMonthGrid", () => {
+  const ref = Date.UTC(2026, 6, 15, 12, 0, 0); // mid-July 2026
+
+  it("lays out a Sunday-first month with neighbour days filling every week", () => {
+    const grid = buildMonthGrid(ref, "UTC", 0);
+    expect(grid).toMatchObject({ year: 2026, month: 7, label: "July 2026" });
+    const flat = grid.weeks.flat();
+    expect(grid.weeks.every((w) => w.length === 7)).toBe(true);
+    // First cell is a Sunday, and July 1 sits at its weekday index.
+    expect(new Date(`${flat[0].iso}T00:00:00Z`).getUTCDay()).toBe(0);
+    const firstWeekday = new Date(Date.UTC(2026, 6, 1)).getUTCDay();
+    expect(flat[firstWeekday].iso).toBe("2026-07-01");
+    expect(flat[firstWeekday].inMonth).toBe(true);
+    expect(flat[0].inMonth).toBe(false); // leading neighbour
+    expect(flat.filter((c) => c.inMonth).length).toBe(31);
+  });
+
+  it("flags the viewer's today and shifts whole months (crossing years)", () => {
+    expect(buildMonthGrid(ref, "UTC", 0).weeks.flat().find((c) => c.isToday)?.iso).toBe(
+      "2026-07-15"
+    );
+    const next = buildMonthGrid(ref, "UTC", 1);
+    expect(next.label).toBe("August 2026");
+    expect(next.weeks.flat().some((c) => c.isToday)).toBe(false);
+    expect(buildMonthGrid(ref, "UTC", 6).label).toBe("January 2027");
+    expect(buildMonthGrid(ref, "UTC", -7).label).toBe("December 2025");
+  });
+});
+
+describe("eventDayKey / bucketByDay", () => {
+  it("anchors all-day events in UTC and timed events in the zone", () => {
+    const allDay: CalendarEvent = {
+      summary: "Trip",
+      start: Date.UTC(2026, 6, 1),
+      allDay: true,
+    };
+    expect(eventDayKey(allDay, "America/Los_Angeles")).toBe("2026-07-01");
+    const timed: CalendarEvent = {
+      summary: "Call",
+      start: Date.UTC(2026, 6, 1, 2, 0),
+      allDay: false,
+    };
+    expect(eventDayKey(timed, "UTC")).toBe("2026-07-01");
+    expect(eventDayKey(timed, "America/Los_Angeles")).toBe("2026-06-30");
+  });
+
+  it("groups by day and sorts each day's events by start", () => {
+    const events: CalendarEvent[] = [
+      { summary: "B", start: Date.UTC(2026, 6, 1, 15, 0), allDay: false },
+      { summary: "A", start: Date.UTC(2026, 6, 1, 9, 0), allDay: false },
+      { summary: "C", start: Date.UTC(2026, 6, 2, 9, 0), allDay: false },
+    ];
+    const map = bucketByDay(events, "UTC");
+    expect(map.get("2026-07-01")?.map((e) => e.summary)).toEqual(["A", "B"]);
+    expect(map.get("2026-07-02")?.map((e) => e.summary)).toEqual(["C"]);
   });
 });

@@ -856,21 +856,44 @@ export default function SettingsManager({
               />
             </div>
             <label className="flex items-center justify-between gap-4 text-sm">
-              <span className="text-fg/50">Events to show</span>
-              <input
-                type="number"
-                min={1}
-                max={20}
-                value={calendar.count}
-                onChange={(e) => {
-                  const v = parseInt(e.target.value, 10);
+              <span className="text-fg/50">
+                Home widget view
+                <span className="block text-xs text-fg/40">
+                  Agenda lists upcoming events; Month shows a mini calendar that
+                  links through. The /calendar page always opens on the month view.
+                </span>
+              </span>
+              <select
+                value={calendar.homeView}
+                onChange={(e) =>
                   updateCalendar({
-                    count: Number.isNaN(v) ? calendar.count : Math.min(20, Math.max(1, v)),
-                  });
-                }}
-                className={`${selectClass} w-20 text-center`}
-              />
+                    homeView: e.target.value as "agenda" | "month",
+                  })
+                }
+                className={`${selectClass} shrink-0`}
+              >
+                <option value="agenda">Agenda</option>
+                <option value="month">Month</option>
+              </select>
             </label>
+            {calendar.homeView === "agenda" && (
+              <label className="flex items-center justify-between gap-4 text-sm">
+                <span className="text-fg/50">Events to show</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={calendar.count}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    updateCalendar({
+                      count: Number.isNaN(v) ? calendar.count : Math.min(20, Math.max(1, v)),
+                    });
+                  }}
+                  className={`${selectClass} w-20 text-center`}
+                />
+              </label>
+            )}
             <label className="flex items-center justify-between gap-4 text-sm">
               <span className="text-fg/50">
                 Hide when no upcoming events
