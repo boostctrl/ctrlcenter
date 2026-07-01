@@ -82,6 +82,16 @@ Built with Next.js 16, React 19, and Tailwind v4.
 - **Self-hosted & simple.** A single YAML config, a prebuilt multi-arch Docker
   image, an installable PWA manifest, and `/api/health` for orchestrators.
 
+## AI disclaimer
+
+ctrlcenter is a **vibecoded project** — it is built primarily with AI coding
+tools. I have experience with scripting and some light coding, but I am not a
+developer. Security is taken seriously (see [SECURITY.md](SECURITY.md) for the
+policy and deployment guidance), and changes are reviewed and tested before
+release — but you should weigh how the project is built when deciding whether
+to deploy it. **Running this app is at your own risk**, and reviewing the code
+yourself before deploying is recommended.
+
 ## Quick start (Docker Compose)
 
 1. Set an admin password:
