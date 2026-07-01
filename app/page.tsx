@@ -5,6 +5,7 @@ import FloatingSettings from "@/components/FloatingSettings";
 import CalendarWidget from "@/components/CalendarWidget";
 import { StatusProvider } from "@/components/StatusProvider";
 import { fetchCalendar, fetchCalendarRange } from "@/lib/calendar";
+import { resolveLayoutSections } from "@/lib/layout";
 
 export const dynamic = "force-dynamic";
 
@@ -25,14 +26,19 @@ export default async function HomePage() {
   // while the agenda widget needs the next N upcoming. A ~40-day window either
   // side of now covers the current month plus its leading/trailing neighbour days
   // in any time zone.
-  const events =
-    cal.enabled && cal.url
-      ? cal.homeView === "month"
-        ? await fetchCalendarRange(cal.url, now - 40 * DAY, now + 40 * DAY, calAuth)
-        : await fetchCalendar(cal.url, cal.count, calAuth)
-      : [];
+  const calEnabled = cal.enabled && cal.url.trim() !== "";
+  const events = calEnabled
+    ? cal.homeView === "month"
+      ? await fetchCalendarRange(cal.url, now - 40 * DAY, now + 40 * DAY, calAuth)
+      : await fetchCalendar(cal.url, cal.count, calAuth)
+    : [];
+  // Whether the widget will actually render (matches CalendarWidget's own
+  // guards), so the Dashboard layout cell isn't left empty when it won't.
+  const calendarVisible =
+    calEnabled && !(cal.hideWhenEmpty && events.length === 0);
 
   const components = settings.components;
+  const layout = resolveLayoutSections(settings.layout.sections);
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-12 px-6 py-12 sm:px-10 lg:py-16">
@@ -48,14 +54,17 @@ export default async function HomePage() {
           showApps={components.apps}
           showBookmarks={components.bookmarks}
           showFavorites={components.favorites}
+          layout={layout}
           calendar={
-            <CalendarWidget
-              events={events}
-              now={now}
-              enabled={cal.enabled && cal.url.trim() !== ""}
-              view={cal.homeView}
-              hideWhenEmpty={cal.hideWhenEmpty}
-            />
+            calendarVisible ? (
+              <CalendarWidget
+                events={events}
+                now={now}
+                enabled
+                view={cal.homeView}
+                hideWhenEmpty={cal.hideWhenEmpty}
+              />
+            ) : null
           }
         />
       </StatusProvider>

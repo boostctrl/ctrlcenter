@@ -130,6 +130,7 @@ export async function updateSettings(
       calendar: calendarPartial,
       components: componentsPartial,
       theme: themePartial,
+      layout: layoutPartial,
       ...rest
     } = partial;
     config.settings = {
@@ -158,6 +159,8 @@ export async function updateSettings(
       // Theme is sent whole, so replace it (this is how clearing the optional
       // custom colors works); keep the existing one when not provided.
       theme: themePartial ?? config.settings.theme,
+      // Layout is sent whole too (the ordered section list), so replace it.
+      layout: layoutPartial ?? config.settings.layout,
     };
     return config.settings;
   });

@@ -3,6 +3,7 @@ import { DESIGN_IDS, SCENE_IDS } from "./theme";
 import { FONT_IDS, DEFAULT_FONT } from "./fonts";
 import { SEARCH_ENGINE_KEYS, isValidCustomUrl } from "./search";
 import { STATUS_RANGE_KEYS, CHECK_TYPE_KEYS } from "./status";
+import { LAYOUT_SECTION_IDS } from "./layout";
 
 // 6-digit hex color (matches what <input type="color"> produces and the
 // client-side theme sanitizers accept).
@@ -155,6 +156,23 @@ export const componentsSchema = z.object({
 });
 export type ComponentsConfig = z.infer<typeof componentsSchema>;
 
+// Home-page section arrangement: an ordered list of sections, each full- or
+// half-width. Controls order + column width only; visibility comes from
+// componentsSchema. resolveLayoutSections (lib/layout.ts) normalizes a partial or
+// hand-edited list at render, so a malformed array `.catch([])`es to empty and is
+// rebuilt into the default rather than failing the config load.
+export const layoutSectionSchema = z.object({
+  id: z.enum(LAYOUT_SECTION_IDS),
+  width: z.enum(["full", "half"]).catch("full").default("full"),
+});
+export const layoutSchema = z.object({
+  sections: z
+    .array(layoutSectionSchema)
+    .catch([])
+    .default(LAYOUT_SECTION_IDS.map((id) => ({ id, width: "full" as const }))),
+});
+export type LayoutConfig = z.infer<typeof layoutSchema>;
+
 export const settingsSchema = z.object({
   title: z.string().default("Home"),
   favicon: z.string().default(""),
@@ -176,6 +194,7 @@ export const settingsSchema = z.object({
   alerts: alertsSchema.default(alertsSchema.parse({})),
   calendar: calendarSchema.default(calendarSchema.parse({})),
   components: componentsSchema.default(componentsSchema.parse({})),
+  layout: layoutSchema.default(layoutSchema.parse({})),
 });
 
 // `expectStatus` is an optional comma list of HTTP codes/ranges (e.g.
@@ -420,6 +439,17 @@ export const componentsUpdateSchema = z.object({
   settingsButton: z.boolean(),
 });
 
+// The admin sends the whole layout (all sections), so updateSettings replaces it
+// wholesale (like theme/components).
+export const layoutUpdateSchema = z.object({
+  sections: z.array(
+    z.object({
+      id: z.enum(LAYOUT_SECTION_IDS),
+      width: z.enum(["full", "half"]),
+    })
+  ),
+});
+
 export const settingsInputSchema = z.object({
   title: z.string().optional(),
   favicon: z.string().optional(),
@@ -434,6 +464,7 @@ export const settingsInputSchema = z.object({
   alerts: alertsUpdateSchema.optional(),
   calendar: calendarUpdateSchema.optional(),
   components: componentsUpdateSchema.optional(),
+  layout: layoutUpdateSchema.optional(),
 });
 export type SettingsInput = z.infer<typeof settingsInputSchema>;
 

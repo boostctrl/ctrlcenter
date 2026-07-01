@@ -15,6 +15,7 @@ import {
 import { orderCategories } from "@/lib/bookmarks";
 import { useVisitorPrefs } from "./PrefsProvider";
 import type { AppItem, BookmarkItem } from "@/lib/schema";
+import type { LayoutSection, LayoutSectionId, SectionWidth } from "@/lib/layout";
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
@@ -50,6 +51,7 @@ export default function Dashboard({
   showBookmarks = true,
   showFavorites = true,
   calendar = null,
+  layout,
 }: {
   apps: AppItem[];
   bookmarks: BookmarkItem[];
@@ -59,10 +61,13 @@ export default function Dashboard({
   showApps?: boolean;
   showBookmarks?: boolean;
   showFavorites?: boolean;
-  // The calendar widget (rendered server-side and passed in) sits directly under
-  // the search bar; hidden during an active search so results stay adjacent to
-  // the input.
+  // The calendar widget (rendered server-side and passed in); hidden during an
+  // active search so results stay adjacent to the input. Passed as null when the
+  // widget wouldn't render, so its layout cell isn't left empty.
   calendar?: React.ReactNode;
+  // The admin section arrangement (order + width), already resolved. Sections
+  // render in this order into a 2-column grid; `full` spans both columns.
+  layout: LayoutSection[];
 }) {
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -167,57 +172,91 @@ export default function Dashboard({
     }
   }
 
+  // Card grids reflow to fewer columns when their section sits in a half-width
+  // column. Complete, static class strings (no interpolation) so Tailwind's
+  // extractor keeps every variant.
+  const CARD_GRID: Record<SectionWidth, string> = {
+    full: "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4",
+    half: "grid grid-cols-1 gap-4 sm:grid-cols-2",
+  };
+  const BOOKMARK_GRID: Record<SectionWidth, string> = {
+    full: "grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3",
+    half: "grid grid-cols-1 gap-6 sm:grid-cols-2",
+  };
+
+  // Each movable section as a node for a given width, or null when it shouldn't
+  // render right now (hidden, empty, or hidden during an active search). Null
+  // blocks are skipped so they leave no gap in the layout grid.
+  function blockFor(id: LayoutSectionId, width: SectionWidth): React.ReactNode {
+    switch (id) {
+      case "search":
+        return showSearch && hasVisibleContent ? (
+          <div className="relative">
+            <input
+              ref={inputRef}
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={onSearchKeyDown}
+              placeholder="Search"
+              aria-label="Search applications and bookmarks"
+              className="accent-focus w-full rounded-2xl border border-fg/10 bg-fg/[0.04] px-5 py-3.5 text-fg placeholder-fg/30 outline-none backdrop-blur-xl transition-colors"
+            />
+          </div>
+        ) : null;
+      case "calendar":
+        return !q ? calendar : null;
+      case "favorites":
+        return showFavorites && !q && favoriteApps.length > 0 ? (
+          <section>
+            <SectionTitle>Favorites</SectionTitle>
+            <div className={CARD_GRID[width]}>
+              {favoriteApps.map((app) => (
+                <AppCard key={app.id} app={app} />
+              ))}
+            </div>
+          </section>
+        ) : null;
+      case "apps":
+        return filteredApps.length > 0 ? (
+          <section>
+            <SectionTitle>Applications</SectionTitle>
+            <div className={CARD_GRID[width]}>
+              {filteredApps.map((app) => (
+                <AppCard key={app.id} app={app} />
+              ))}
+            </div>
+          </section>
+        ) : null;
+      case "bookmarks":
+        return filteredGroups.length > 0 ? (
+          <section>
+            <SectionTitle>Bookmarks</SectionTitle>
+            <div className={BOOKMARK_GRID[width]}>
+              {filteredGroups.map(([category, items]) => (
+                <BookmarkGroup key={category} category={category} items={items} />
+              ))}
+            </div>
+          </section>
+        ) : null;
+      default:
+        return null;
+    }
+  }
+
   const content = (
     <>
-      {showSearch && hasVisibleContent && (
-        <div className="relative">
-          <input
-            ref={inputRef}
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={onSearchKeyDown}
-            placeholder="Search"
-            aria-label="Search applications and bookmarks"
-            className="accent-focus w-full rounded-2xl border border-fg/10 bg-fg/[0.04] px-5 py-3.5 text-fg placeholder-fg/30 outline-none backdrop-blur-xl transition-colors"
-          />
-        </div>
-      )}
-
-      {!q && calendar}
-
-      {showFavorites && !q && favoriteApps.length > 0 && (
-        <section>
-          <SectionTitle>Favorites</SectionTitle>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {favoriteApps.map((app) => (
-              <AppCard key={app.id} app={app} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {filteredApps.length > 0 && (
-        <section>
-          <SectionTitle>Applications</SectionTitle>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {filteredApps.map((app) => (
-              <AppCard key={app.id} app={app} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {filteredGroups.length > 0 && (
-        <section>
-          <SectionTitle>Bookmarks</SectionTitle>
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredGroups.map(([category, items]) => (
-              <BookmarkGroup key={category} category={category} items={items} />
-            ))}
-          </div>
-        </section>
-      )}
+      <div className="grid grid-cols-1 gap-x-8 gap-y-12 lg:grid-cols-2 lg:items-start">
+        {layout.map(({ id, width }) => {
+          const node = blockFor(id, width);
+          if (!node) return null;
+          return (
+            <div key={id} className={width === "full" ? "lg:col-span-2" : undefined}>
+              {node}
+            </div>
+          );
+        })}
+      </div>
 
       {hasVisibleContent && !hasResults && parsedBang && (
         <p className="text-fg/50">

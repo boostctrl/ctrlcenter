@@ -14,6 +14,11 @@ here.
 
 ### Added
 
+- **Arrange the home page.** Admin **Settings → Layout → Arrangement** now lets you
+  reorder the dashboard sections (search, calendar, favorites, apps, bookmarks) and
+  set each to full- or half-width — two half-width sections in a row sit side by
+  side. Visibility toggles are unchanged, and the default arrangement matches the
+  previous fixed layout.
 - **A month view for the calendar.** The **/calendar** page now opens on a month
   grid, with a Month/Agenda switch to fall back to the upcoming-events list.
   Recurring events fill each day and everything shows in each visitor's own time

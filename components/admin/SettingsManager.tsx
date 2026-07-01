@@ -11,7 +11,15 @@ import {
 } from "@/lib/search";
 import { STATUS_RANGES } from "@/lib/status";
 import { supportedTimezones } from "@/lib/prefs";
-import { TextField } from "./ui";
+import {
+  resolveLayoutSections,
+  SECTION_LABELS,
+  type LayoutSection,
+  type LayoutSectionId,
+  type SectionWidth,
+} from "@/lib/layout";
+import { TextField, MoveButtons } from "./ui";
+import { reorder } from "./useReorder";
 import IconField from "./IconField";
 import CalendarTest from "./CalendarTest";
 import CitySearch from "./CitySearch";
@@ -79,6 +87,19 @@ export default function SettingsManager({
       ...s,
       components: { ...s.components, [key]: value },
     }));
+
+  // Home-page section arrangement (order + width). Always resolved so every
+  // section shows even if the saved layout is partial; the admin sends the whole
+  // list back (updateSettings replaces it wholesale).
+  const layoutSections = resolveLayoutSections(settings.layout.sections);
+  const setLayout = (next: LayoutSection[]) =>
+    setSettings((s) => ({ ...s, layout: { sections: next } }));
+  const moveSection = (from: number, to: number) => {
+    if (to < 0 || to >= layoutSections.length) return;
+    setLayout(reorder(layoutSections, from, to));
+  };
+  const setSectionWidth = (id: LayoutSectionId, width: SectionWidth) =>
+    setLayout(layoutSections.map((s) => (s.id === id ? { ...s, width } : s)));
   // Components without their own dedicated toggle (weather/status/calendar keep
   // theirs). Order mirrors roughly top-to-bottom on the page.
   const componentToggles: { key: keyof Settings["components"]; label: string }[] = [
@@ -321,6 +342,47 @@ export default function SettingsManager({
             /admin.
           </p>
         )}
+
+        <div className="mt-2 border-t border-fg/10 pt-4">
+          <span className="text-sm text-fg/70">Arrangement</span>
+          <p className="mt-1 mb-3 text-xs text-fg/40">
+            Order the dashboard sections and set each full- or half-width. Two
+            half-width sections in a row sit side by side. Hidden sections
+            don&apos;t appear regardless of order.
+          </p>
+          <ul className="flex flex-col gap-2">
+            {layoutSections.map((s, i) => (
+              <li
+                key={s.id}
+                className="flex items-center gap-3 rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-sm"
+              >
+                <MoveButtons
+                  index={i}
+                  count={layoutSections.length}
+                  label={SECTION_LABELS[s.id]}
+                  onMove={moveSection}
+                />
+                <span className="flex-1 text-fg/80">{SECTION_LABELS[s.id]}</span>
+                <div className="flex shrink-0 overflow-hidden rounded-lg border border-fg/10">
+                  {(["full", "half"] as const).map((w) => (
+                    <button
+                      key={w}
+                      type="button"
+                      onClick={() => setSectionWidth(s.id, w)}
+                      className={`px-3 py-1 text-xs capitalize transition-colors ${
+                        s.width === w
+                          ? "bg-fg/15 text-fg"
+                          : "text-fg/50 hover:text-fg/80"
+                      }`}
+                    >
+                      {w}
+                    </button>
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
       </Section>
 
       <Section title="Security">
