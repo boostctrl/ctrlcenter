@@ -12,6 +12,31 @@ here.
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-07-01
+
+### Security
+
+- **The admin password is no longer part of config export/import.** Exporting a
+  backup from the admin portal previously included the stored password hash and
+  salt; it's now stripped from the download. Importing a config no longer
+  changes the password either — the on-disk credential is always preserved, so
+  restoring an older or hand-made backup can't silently wipe it and drop the
+  instance to passwordless. Password changes still go only through the admin
+  Change Password flow.
+- **Hardened the pre-paint theme script against HTML injection.** The inline
+  theme script now HTML-escapes the serialized theme, so a crafted theme
+  `preset`/`presetLight` value (settable through the settings API or an imported
+  backup) can't break out of the `<script>` tag and inject markup into the pages
+  served to every visitor.
+
+### Changed
+
+- **/help gained a For-admins section.** The help page is now split into "For
+  everyone" and "For admins", with a new **Deployment & security** card that
+  documents running behind a reverse proxy and setting `TRUSTED_PROXY_HOPS=0`
+  when the app is exposed directly, so a spoofed `X-Forwarded-For` can't slip
+  past the per-IP login throttle. (#36)
+
 ## [1.1.3] - 2026-06-30
 
 ### Added
@@ -864,7 +889,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.1.3...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.1.4...HEAD
+[1.1.4]: https://github.com/boostctrl/ctrlcenter/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/boostctrl/ctrlcenter/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/boostctrl/ctrlcenter/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/boostctrl/ctrlcenter/compare/v1.1.0...v1.1.1
