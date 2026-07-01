@@ -18,7 +18,13 @@ export default async function SettingsPage() {
           <div>
             <h1 className="text-3xl font-bold">Settings</h1>
             <p className="mt-1 text-sm text-fg/50">
-              These preferences are saved in this browser only.
+              These preferences are saved in this browser only.{" "}
+              <Link
+                href="/help"
+                className="underline underline-offset-2 hover:text-fg/80"
+              >
+                Help &amp; shortcuts
+              </Link>
             </p>
           </div>
           <Link

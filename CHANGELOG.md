@@ -14,6 +14,12 @@ here.
 
 ### Added
 
+- **An in-app Help page.** A new **/help** page (alongside /weather, /status and
+  /calendar) documents how to use ctrlcenter — search and keyboard shortcuts,
+  `!bang` shortcuts (built-ins plus app-name/subtitle/custom bangs), pinning
+  favorites, the extra pages, per-visitor personalization, and a pointer to the
+  admin portal and README. Linked from **/settings** (reachable via the gear on
+  every page). (#71)
 - **Calendar: hide the home card when nothing's coming up.** A new **Hide when
   no upcoming events** toggle in the Calendar settings drops the home-page
   "Upcoming" card entirely when the agenda is empty (default off, so the
