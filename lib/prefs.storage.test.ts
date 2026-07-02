@@ -9,9 +9,12 @@ import {
   loadThemes,
   loadFavorites,
   saveFavorites,
+  loadAccentOverride,
+  saveAccentOverride,
   THEMES_KEY,
   DESIGN_KEY,
   FAVORITES_KEY,
+  ACCENT_KEY,
 } from "@/lib/prefs";
 
 // Minimal localStorage stub so the window-gated load/save helpers run under the
@@ -76,6 +79,46 @@ describe("per-mode design/scene/font storage", () => {
   it("saving an all-null pair clears the key", () => {
     saveDesign({ dark: null, light: null });
     expect(store.raw(DESIGN_KEY)).toBeNull();
+  });
+});
+
+describe("accent override storage", () => {
+  const violet = { from: "#a78bfa", to: "#22d3ee" };
+  const rose = { from: "#e11d48", to: "#db2777" };
+
+  it("round-trips independent per-mode overrides", () => {
+    saveAccentOverride({ dark: violet, light: rose });
+    expect(loadAccentOverride()).toEqual({ dark: violet, light: rose });
+  });
+
+  it("keeps a one-sided override with the other mode null", () => {
+    saveAccentOverride({ dark: violet, light: null });
+    expect(loadAccentOverride()).toEqual({ dark: violet, light: null });
+  });
+
+  it("reads a legacy flat {from,to} as an override for both modes", () => {
+    // Saved before accents were per-mode.
+    store.setItem(ACCENT_KEY, JSON.stringify(violet));
+    expect(loadAccentOverride()).toEqual({ dark: violet, light: violet });
+  });
+
+  it("drops malformed colors per mode and junk entirely", () => {
+    store.setItem(
+      ACCENT_KEY,
+      JSON.stringify({ dark: { from: "red", to: "#22d3ee" }, light: rose })
+    );
+    expect(loadAccentOverride()).toEqual({ dark: null, light: rose });
+    store.setItem(ACCENT_KEY, JSON.stringify(["nope"]));
+    expect(loadAccentOverride()).toEqual({ dark: null, light: null });
+  });
+
+  it("saving null or an all-null pair clears the key", () => {
+    saveAccentOverride({ dark: violet, light: rose });
+    saveAccentOverride(null);
+    expect(store.raw(ACCENT_KEY)).toBeNull();
+    saveAccentOverride({ dark: violet, light: rose });
+    saveAccentOverride({ dark: null, light: null });
+    expect(store.raw(ACCENT_KEY)).toBeNull();
   });
 });
 

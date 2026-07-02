@@ -12,6 +12,13 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **Light and dark accents are now independent.** The accent gradient set in
+  the theme builder applies only to the mode being edited, so each mode can
+  carry its own accent. An accent saved before this release keeps applying to
+  both modes until changed.
+
 ## [1.4.1] - 2026-07-02
 
 ### Changed

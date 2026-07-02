@@ -30,8 +30,10 @@ import {
   type Units,
   type VisitorLocation,
   type VisitorPrefs,
+  NO_ACCENT_OVERRIDES,
   type CustomTheme,
   type AccentColors,
+  type AccentOverrides,
   type ModePair,
 } from "@/lib/prefs";
 import {
@@ -136,6 +138,11 @@ function resolveAccent(
   return fallback;
 }
 
+// The accent override a mode contributes (overrides are chosen per mode).
+function overrideFor(overrides: AccentOverrides, dark: boolean): AccentColors | null {
+  return dark ? overrides.dark : overrides.light;
+}
+
 // The color set a look contributes for the resolved mode.
 function variantFor(look: ModeColors | null, dark: boolean): ColorSet | null {
   if (!look) return null;
@@ -150,7 +157,7 @@ function variantFor(look: ModeColors | null, dark: boolean): ColorSet | null {
 function applyAll(opts: {
   theme: Theme;
   look: ModeColors | null;
-  accentOverride: AccentColors | null;
+  accentOverride: AccentOverrides;
   defaultAccent: Accent;
 }): void {
   if (typeof document === "undefined") return;
@@ -168,7 +175,10 @@ function applyAll(opts: {
     s.removeProperty("--foreground");
     s.removeProperty("--fg");
   }
-  applyAccent(resolveAccent(opts.accentOverride, cs, opts.defaultAccent), dark);
+  applyAccent(
+    resolveAccent(overrideFor(opts.accentOverride, dark), cs, opts.defaultAccent),
+    dark
+  );
 }
 
 type EffectiveLocation = {
@@ -207,7 +217,9 @@ type PrefsValue = {
   // current mode (what the builder's pickers show).
   activeLook: ModeColors | null;
   activeColors: ColorSet | null;
-  accentOverride: AccentColors | null;
+  // Per-mode standalone accent overrides, and the accent resolved for the
+  // current display mode.
+  accentOverride: AccentOverrides;
   activeAccent: AccentColors;
   // Per-visitor pinned app IDs (pin order) and a toggle. Surfaced as a Favorites
   // row on the dashboard; client-only.
@@ -231,7 +243,8 @@ type PrefsValue = {
     foreground: string,
     targetDark?: boolean
   ) => void;
-  setAccentOverride: (accent: AccentColors | null) => void;
+  // Set or clear one mode's standalone accent (light and dark are independent).
+  setAccentOverride: (accent: AccentColors | null, mode: Mode) => void;
   saveNamedTheme: (name: string) => void;
   applyNamedTheme: (id: string) => void;
   deleteNamedTheme: (id: string) => void;
@@ -346,7 +359,7 @@ export function PrefsProvider({
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([]);
   const [activeLook, setActiveLook] = useState<ModeColors | null>(null);
   const [accentOverride, setAccentOverrideState] =
-    useState<AccentColors | null>(null);
+    useState<AccentOverrides>(NO_ACCENT_OVERRIDES);
   // Tracks the OS color scheme so "system" mode resolves its surface lightness.
   const [systemDark, setSystemDark] = useState(false);
   // A non-persisted appearance-mode preview for the theme builder: lets the
@@ -418,7 +431,11 @@ export function PrefsProvider({
   // editing one mode never leaves the other mode's colors null.
   const seedColorSet = useCallback(
     (dark: boolean): ColorSet => {
-      const a = resolveAccent(accentOverride, variantFor(adminLook, dark), defaultAccent);
+      const a = resolveAccent(
+        overrideFor(accentOverride, dark),
+        variantFor(adminLook, dark),
+        defaultAccent
+      );
       const ad = adminLook ? (dark ? adminLook.dark : adminLook.light) : null;
       return {
         background: ad?.background ?? (dark ? "#06070d" : "#eceef3"),
@@ -527,9 +544,14 @@ export function PrefsProvider({
       }
       setActiveLook(look);
       saveActiveTheme(look);
-      setAccentOverrideState(null);
+      setAccentOverrideState(NO_ACCENT_OVERRIDES);
       saveAccentOverride(null);
-      applyAll({ theme: displayTheme, look, accentOverride: null, defaultAccent });
+      applyAll({
+        theme: displayTheme,
+        look,
+        accentOverride: NO_ACCENT_OVERRIDES,
+        defaultAccent,
+      });
     },
     [displayTheme, defaultAccent, activeLook, seedColorSet]
   );
@@ -556,7 +578,7 @@ export function PrefsProvider({
       // the non-active mode without changing what the app shows.
       const dark = targetDark ?? resolveDark(displayTheme);
       const accent = resolveAccent(
-        accentOverride,
+        overrideFor(accentOverride, dark),
         variantFor(activeLook, dark),
         defaultAccent
       );
@@ -581,19 +603,21 @@ export function PrefsProvider({
     [displayTheme, defaultAccent, accentOverride, activeLook, seedColorSet]
   );
 
-  // Set or clear the accent on its own, leaving the background/foreground as-is.
+  // Set or clear one mode's accent on its own, leaving the background/foreground
+  // (and the other mode's accent) as-is.
   const setAccentOverride = useCallback(
-    (next: AccentColors | null) => {
-      setAccentOverrideState(next);
-      saveAccentOverride(next);
+    (next: AccentColors | null, mode: Mode) => {
+      const updated: AccentOverrides = { ...accentOverride, [mode]: next };
+      setAccentOverrideState(updated);
+      saveAccentOverride(updated);
       applyAll({
         theme: displayTheme,
         look: resolveLook(activeLook),
-        accentOverride: next,
+        accentOverride: updated,
         defaultAccent,
       });
     },
-    [displayTheme, defaultAccent, activeLook, resolveLook]
+    [accentOverride, displayTheme, defaultAccent, activeLook, resolveLook]
   );
 
   // Capture the current full look — both modes' design/scene/font and colors —
@@ -603,8 +627,9 @@ export function PrefsProvider({
     (name: string) => {
       const look =
         activeLook ?? { dark: seedColorSet(true), light: seedColorSet(false) };
-      const withAccent = (cs: ColorSet): ColorSet => {
-        const a = resolveAccent(accentOverride, cs, defaultAccent);
+      // Bake each mode's own effective accent into its colorset.
+      const withAccent = (cs: ColorSet, dark: boolean): ColorSet => {
+        const a = resolveAccent(overrideFor(accentOverride, dark), cs, defaultAccent);
         return { ...cs, accentFrom: a.from, accentTo: a.to };
       };
       const entry: CustomTheme = {
@@ -616,8 +641,8 @@ export function PrefsProvider({
         designLight: resolveDesign(false),
         sceneLight: resolveScene(false),
         fontLight: resolveFont(false),
-        dark: withAccent(look.dark),
-        light: withAccent(look.light),
+        dark: withAccent(look.dark, true),
+        light: withAccent(look.light, false),
       };
       setCustomThemes((prev) => {
         const next = [...prev, entry];
@@ -668,12 +693,12 @@ export function PrefsProvider({
   const clearCustomTheme = useCallback(() => {
     setActiveLook(null);
     saveActiveTheme(null);
-    setAccentOverrideState(null);
+    setAccentOverrideState(NO_ACCENT_OVERRIDES);
     saveAccentOverride(null);
     applyAll({
       theme: displayTheme,
       look: resolveLook(null),
-      accentOverride: null,
+      accentOverride: NO_ACCENT_OVERRIDES,
       defaultAccent,
     });
   }, [defaultAccent, displayTheme, resolveLook]);
@@ -684,7 +709,7 @@ export function PrefsProvider({
   const resetTheme = useCallback(() => {
     setActiveLook(null);
     saveActiveTheme(null);
-    setAccentOverrideState(null);
+    setAccentOverrideState(NO_ACCENT_OVERRIDES);
     saveAccentOverride(null);
     saveDesign(null);
     saveScene(null);
@@ -695,7 +720,7 @@ export function PrefsProvider({
     applyAll({
       theme: displayTheme,
       look: resolveLook(null),
-      accentOverride: null,
+      accentOverride: NO_ACCENT_OVERRIDES,
       defaultAccent,
     });
     const dark = resolveDark(displayTheme);
@@ -870,7 +895,7 @@ export function PrefsProvider({
     saveScene(null);
     saveFont(null);
     setActiveLook(null);
-    setAccentOverrideState(null);
+    setAccentOverrideState(NO_ACCENT_OVERRIDES);
     setThemeState(defaultTheme.mode);
     setDesigns({ dark: null, light: null });
     setScenes({ dark: null, light: null });
@@ -878,7 +903,7 @@ export function PrefsProvider({
     applyAll({
       theme: defaultTheme.mode,
       look: adminLook,
-      accentOverride: null,
+      accentOverride: NO_ACCENT_OVERRIDES,
       defaultAccent,
     });
     const dark = resolveDark(defaultTheme.mode);
@@ -999,7 +1024,11 @@ export function PrefsProvider({
       activeLook,
       activeColors,
       accentOverride,
-      activeAccent: resolveAccent(accentOverride, activeColors, defaultAccent),
+      activeAccent: resolveAccent(
+        overrideFor(accentOverride, displayDark),
+        activeColors,
+        defaultAccent
+      ),
       favorites,
       toggleFavorite,
       setTimezone,

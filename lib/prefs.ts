@@ -296,9 +296,14 @@ export function saveThemes(themes: CustomTheme[]): void {
 // --- Accent override ---
 // The accent gradient can be changed on its own, independently of a full custom
 // theme: picking an accent leaves the background/foreground as-is (following the
-// light/dark mode, or a custom theme's colors). Per-visitor; overrides the
-// admin-configured default accent when present.
+// light/dark mode, or a custom theme's colors). Chosen per mode — light and dark
+// each carry their own override (a null per mode means no override there).
+// Per-visitor; overrides the admin-configured default accent when present.
 export type AccentColors = { from: string; to: string };
+
+export type AccentOverrides = ModePair<AccentColors | null>;
+
+export const NO_ACCENT_OVERRIDES: AccentOverrides = { dark: null, light: null };
 
 export const ACCENT_KEY = "ctrlcenter:accent";
 
@@ -309,21 +314,37 @@ export function sanitizeAccent(input: unknown): AccentColors | null {
   return ok(c.from) && ok(c.to) ? { from: c.from, to: c.to } : null;
 }
 
-export function loadAccentOverride(): AccentColors | null {
-  if (typeof window === "undefined") return null;
+// Parse the stored override pair. Back-compat: a value saved before accents were
+// per-mode is a flat {from,to} — read it as an override for both modes, so the
+// visitor's accent survives the upgrade unchanged.
+export function sanitizeAccentOverrides(input: unknown): AccentOverrides {
+  if (!input || typeof input !== "object") return NO_ACCENT_OVERRIDES;
+  const o = input as Record<string, unknown>;
+  if ("dark" in o || "light" in o) {
+    return { dark: sanitizeAccent(o.dark), light: sanitizeAccent(o.light) };
+  }
+  const flat = sanitizeAccent(input);
+  return flat ? { dark: flat, light: flat } : NO_ACCENT_OVERRIDES;
+}
+
+export function loadAccentOverride(): AccentOverrides {
+  if (typeof window === "undefined") return NO_ACCENT_OVERRIDES;
   try {
     const raw = window.localStorage.getItem(ACCENT_KEY);
-    return raw ? sanitizeAccent(JSON.parse(raw)) : null;
+    return raw ? sanitizeAccentOverrides(JSON.parse(raw)) : NO_ACCENT_OVERRIDES;
   } catch {
-    return null;
+    return NO_ACCENT_OVERRIDES;
   }
 }
 
-export function saveAccentOverride(accent: AccentColors | null): void {
+export function saveAccentOverride(accents: AccentOverrides | null): void {
   if (typeof window === "undefined") return;
   try {
-    if (accent) {
-      window.localStorage.setItem(ACCENT_KEY, JSON.stringify(accent));
+    if (accents && (accents.dark || accents.light)) {
+      window.localStorage.setItem(
+        ACCENT_KEY,
+        JSON.stringify({ dark: accents.dark, light: accents.light })
+      );
     } else {
       window.localStorage.removeItem(ACCENT_KEY);
     }

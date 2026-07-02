@@ -108,8 +108,8 @@ export type ColorSet = {
 
 // Every look (palette, pack, saved theme, active theme) carries a cohesive
 // light AND dark color set; the resolved light/dark mode selects which one is
-// applied, so toggling mode never breaks a look. The accent pair is kept the
-// same across a look's two modes for continuity — only the surface colors flip.
+// applied, so toggling mode never breaks a look. Each variant carries its own
+// accent pair too, so a look can (and often does) deepen its accent for light.
 export type ModeColors = { dark: ColorSet; light: ColorSet };
 
 // Preset full themes for the theme builder — starting points a visitor can

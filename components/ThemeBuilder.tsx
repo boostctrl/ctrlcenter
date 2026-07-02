@@ -234,7 +234,7 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
 
   // Keep the pickers in sync with the edit mode's colorset. Background/text come
   // from the active look's chosen-mode variant (or that mode's defaults when
-  // there's no custom look yet); the accent is shared across modes.
+  // there's no custom look yet); activeAccent resolves for the edit mode too.
   useEffect(() => {
     const cs = activeLook ? activeLook[editMode] : null;
     const dflt = MODE_DEFAULTS[editMode];
@@ -268,7 +268,7 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
         ? { ...draft, accentFrom: value, accentTo: value }
         : { ...draft, [key]: value };
     setDraft(next);
-    setAccentOverride({ from: next.accentFrom, to: next.accentTo });
+    setAccentOverride({ from: next.accentFrom, to: next.accentTo }, editMode);
   }
 
   function chooseAccentStyle(style: "gradient" | "solid") {
@@ -278,7 +278,7 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
     if (style === "solid" && draft.accentFrom !== draft.accentTo) {
       const next = { ...draft, accentTo: draft.accentFrom };
       setDraft(next);
-      setAccentOverride({ from: next.accentFrom, to: next.accentTo });
+      setAccentOverride({ from: next.accentFrom, to: next.accentTo }, editMode);
     }
   }
 
@@ -298,8 +298,8 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
   };
 
   // Palettes recolor BOTH modes at once, so their swatch shows both halves —
-  // dark surface left, light surface right, each with its ink — over one
-  // continuous accent strip (the accent is shared across a look's two modes).
+  // dark surface left, light surface right, each with its ink — over an accent
+  // strip that blends from the dark half's accent pair into the light half's.
   const PaletteSwatch = ({ look }: { look: ModeColors }) => (
     <span
       className="relative block h-10 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
@@ -586,7 +586,7 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-[11px] font-medium text-fg/55">
-                    Accent — shared by light &amp; dark
+                    Accent — {editMode} theme only
                   </span>
                   <div className="flex overflow-hidden rounded-md border border-fg/10">
                     {(["gradient", "solid"] as const).map((s) => (
@@ -650,7 +650,7 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
                   {accentStyle === "gradient" && <span>{draft.accentTo}</span>}
                 </div>
                 <p className="text-xs text-fg/40">
-                  Colors buttons, highlights &amp; the scene glow in both modes.
+                  Colors buttons, highlights &amp; the scene glow.
                 </p>
               </div>
             </div>
