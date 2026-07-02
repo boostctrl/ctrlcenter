@@ -69,6 +69,16 @@ describe("configSchema defaults", () => {
     expect(configSchema.parse({}).settings.theme.preset).toBeUndefined();
   });
 
+  it("coerces a retired design/scene in the default theme instead of failing", () => {
+    // A pre-1.4 config whose admin default used a since-removed scene must
+    // still load (the whole settings parse would otherwise 500 every page).
+    const config = configSchema.parse({
+      settings: { theme: { design: "nope", scene: "mesh" } },
+    });
+    expect(config.settings.theme.design).toBe("glass");
+    expect(config.settings.theme.scene).toBe("aurora");
+  });
+
   it("preserves provided values while defaulting the rest", () => {
     const config = configSchema.parse({ settings: { title: "Dash" } });
     expect(config.settings.title).toBe("Dash");

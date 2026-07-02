@@ -49,6 +49,9 @@ export function isDesignId(v: unknown): v is DesignId {
 // component bundle (see components/scenes) selected by a `scene-<id>` class on
 // <html>; the components read the color CSS vars, so any scene works with any
 // palette. "aurora" is the default — the floating accent glow blobs.
+// The pre-1.4 "glow", "vortex" and "mesh" scenes were retired (all three were
+// soft gradient washes Aurora/Nebula already cover); stored references coerce
+// back to the default via the schema catches / isSceneId guards.
 export type SceneId =
   | "aurora"
   | "abyss"
@@ -59,9 +62,13 @@ export type SceneId =
   | "rays"
   | "traces"
   | "dots"
-  | "glow"
-  | "vortex"
-  | "mesh";
+  | "horizon"
+  | "orbit"
+  | "peaks"
+  | "rain"
+  | "fireflies"
+  | "blueprint"
+  | "prisms";
 
 export const SCENES: { id: SceneId; name: string; description: string }[] = [
   { id: "aurora", name: "Aurora", description: "Floating accent glow (default)" },
@@ -73,9 +80,13 @@ export const SCENES: { id: SceneId; name: string; description: string }[] = [
   { id: "rays", name: "Rays", description: "Sweeping beams of accent light" },
   { id: "traces", name: "Traces", description: "Circuit-board traces with signal pulses" },
   { id: "dots", name: "Dots", description: "Drifting halftone dot field" },
-  { id: "glow", name: "Glow", description: "A single breathing accent glow" },
-  { id: "vortex", name: "Vortex", description: "Slow rotating sweep of light" },
-  { id: "mesh", name: "Mesh", description: "Corner-anchored gradient wash" },
+  { id: "horizon", name: "Horizon", description: "Retro sun sinking to a glowing horizon" },
+  { id: "orbit", name: "Orbit", description: "Orbital rings with wandering planets" },
+  { id: "peaks", name: "Peaks", description: "Layered mountain ridgelines in haze" },
+  { id: "rain", name: "Rain", description: "Gentle streaks of falling accent rain" },
+  { id: "fireflies", name: "Fireflies", description: "Wandering, softly pulsing lights" },
+  { id: "blueprint", name: "Blueprint", description: "Drafting-paper grid with construction marks" },
+  { id: "prisms", name: "Prisms", description: "Drifting translucent geometric shards" },
 ];
 
 export const SCENE_IDS = SCENES.map((s) => s.id) as [SceneId, ...SceneId[]];
@@ -120,6 +131,11 @@ export const BASE_THEMES: PresetTheme[] = [
     light: { background: "#f8eceb", foreground: "#2a1110", accentFrom: "#dc2626", accentTo: "#b91c1c" },
   },
   {
+    name: "Terracotta",
+    dark: { background: "#170e0b", foreground: "#f2e6e0", accentFrom: "#e2725b", accentTo: "#d99058" },
+    light: { background: "#f6ece6", foreground: "#31201a", accentFrom: "#bc4a2f", accentTo: "#a8642e" },
+  },
+  {
     name: "Ember",
     dark: { background: "#160c06", foreground: "#f6ebe2", accentFrom: "#fb923c", accentTo: "#f97316" },
     light: { background: "#f7eee3", foreground: "#2a1a0e", accentFrom: "#ea580c", accentTo: "#c2410c" },
@@ -135,9 +151,19 @@ export const BASE_THEMES: PresetTheme[] = [
     light: { background: "#fbf1c7", foreground: "#3c3836", accentFrom: "#d65d0e", accentTo: "#b57614" },
   },
   {
+    name: "Citrus",
+    dark: { background: "#121406", foreground: "#eef0dc", accentFrom: "#a3e635", accentTo: "#facc15" },
+    light: { background: "#f4f5e2", foreground: "#23260f", accentFrom: "#65a30d", accentTo: "#ca8a04" },
+  },
+  {
     name: "Forest",
     dark: { background: "#0c1410", foreground: "#e7f0e9", accentFrom: "#34d399", accentTo: "#10b981" },
     light: { background: "#eef4ee", foreground: "#14241b", accentFrom: "#059669", accentTo: "#047857" },
+  },
+  {
+    name: "Everforest",
+    dark: { background: "#2d353b", foreground: "#d3c6aa", accentFrom: "#a7c080", accentTo: "#83c092" },
+    light: { background: "#f3ead3", foreground: "#5c6a72", accentFrom: "#8da101", accentTo: "#35a77c" },
   },
   {
     name: "Monokai",
@@ -153,6 +179,11 @@ export const BASE_THEMES: PresetTheme[] = [
     name: "Aqua",
     dark: { background: "#04141a", foreground: "#d6f0f3", accentFrom: "#22d3ee", accentTo: "#38bdf8" },
     light: { background: "#e6f6fa", foreground: "#0a2a32", accentFrom: "#0891b2", accentTo: "#0284c7" },
+  },
+  {
+    name: "Cobalt",
+    dark: { background: "#06101f", foreground: "#dbe7f5", accentFrom: "#3b82f6", accentTo: "#06b6d4" },
+    light: { background: "#e8f0f9", foreground: "#0e2038", accentFrom: "#1d4ed8", accentTo: "#0e7490" },
   },
   {
     name: "Nord",
@@ -274,10 +305,10 @@ export const THEME_PACKS: ThemePack[] = [
     light: { background: "#e9f7ef", foreground: "#06231a", accentFrom: "#059669", accentTo: "#0891b2" },
   },
   {
-    // Icy blue over the corner-anchored Mesh wash with the heavy Frost surface.
+    // Icy blue over hazy mountain ridgelines with the heavy Frost surface.
     name: "Frostbite",
     design: "frost",
-    scene: "mesh",
+    scene: "peaks",
     dark: { background: "#050a12", foreground: "#d6e6f2", accentFrom: "#7dd3fc", accentTo: "#38bdf8" },
     light: { background: "#eef5fb", foreground: "#0f2230", accentFrom: "#0284c7", accentTo: "#0369a1" },
   },
@@ -290,19 +321,19 @@ export const THEME_PACKS: ThemePack[] = [
     light: { background: "#f4f4f2", foreground: "#1c1c1a", accentFrom: "#57534e", accentTo: "#292524" },
   },
   {
-    // Violet event horizon: the Outline surface around a slow Vortex sweep.
+    // Violet event horizon: the Outline surface around orbital line-art.
     name: "Singularity",
     design: "outline",
-    scene: "vortex",
+    scene: "orbit",
     dark: { background: "#0a0612", foreground: "#ece6f7", accentFrom: "#c084fc", accentTo: "#a855f7" },
     light: { background: "#f1ecfa", foreground: "#1d1430", accentFrom: "#9333ea", accentTo: "#7e22ce" },
   },
   {
-    // Sunrise warmth on the breathing Glow scene with the Gradient surface.
+    // Sunrise warmth on the retro Horizon sun with the Gradient surface.
     // Designed light-first — a soft peach wash, with a warm ember dark.
     name: "Daybreak",
     design: "gradient",
-    scene: "glow",
+    scene: "horizon",
     light: { background: "#fdeee6", foreground: "#3a1d12", accentFrom: "#fb923c", accentTo: "#f43f5e" },
     dark: { background: "#160d0a", foreground: "#f5e7e0", accentFrom: "#fb923c", accentTo: "#fb7185" },
   },

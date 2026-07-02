@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useVisitorPrefs } from "./PrefsProvider";
 import { BASE_THEMES, DESIGNS, SCENES } from "@/lib/theme";
 import type { ColorSet, DesignId, SceneId, ThemePack } from "@/lib/theme";
+import { buttonClasses } from "@/lib/buttons";
 import { FONTS, fontVar } from "@/lib/fonts";
 import type { ThemeColors } from "@/lib/prefs";
 import { deepenForLight } from "./scenes/color";
@@ -67,12 +68,20 @@ function scenePreview(id: SceneId, from: string, to: string): string {
       return `linear-gradient(to top, ${mix(from, 52)}, transparent 45%), linear-gradient(to top, ${mix(to, 32)}, transparent 65%), ${bg}`;
     case "dots":
       return `radial-gradient(${mix(from, 70)} 1px, transparent 1.5px) 0 0 / 6px 6px, ${bg}`;
-    case "glow":
-      return `radial-gradient(circle at 50% 50%, ${from}, ${mix(to, 40)} 45%, transparent 70%), ${bg}`;
-    case "vortex":
-      return `conic-gradient(from 0deg at 50% 50%, transparent 0deg, ${mix(from, 70)} 50deg, transparent 130deg, ${mix(to, 55)} 220deg, transparent 300deg), ${bg}`;
-    case "mesh":
-      return `radial-gradient(55% 55% at 20% 20%, ${from}, transparent 60%), radial-gradient(55% 55% at 80% 80%, ${to}, transparent 60%), ${bg}`;
+    case "horizon":
+      return `linear-gradient(${mix(from, 90)}, ${mix(from, 90)}) 0 62% / 100% 1px no-repeat, radial-gradient(circle at 50% 68%, ${from}, ${mix(to, 55)} 32%, transparent 52%), linear-gradient(to top, ${mix(to, 25)} 38%, transparent 38%), ${bg}`;
+    case "orbit":
+      return `radial-gradient(circle at 72% 34%, ${from} 4%, transparent 5.5%, transparent 17%, ${mix(from, 70)} 18%, transparent 19.5%, transparent 37%, ${mix(to, 55)} 38%, transparent 39.5%, transparent 57%, ${mix(from, 45)} 58%, transparent 59.5%), ${bg}`;
+    case "peaks":
+      return `linear-gradient(155deg, transparent 52%, ${mix(to, 30)} 52.5%), linear-gradient(205deg, transparent 55%, ${mix(from, 45)} 55.5%), linear-gradient(160deg, transparent 68%, ${mix(from, 65)} 68.5%), ${bg}`;
+    case "rain":
+      return `repeating-linear-gradient(100deg, transparent 0 5px, ${mix(from, 55)} 5px 6px, transparent 6px 13px, ${mix(to, 40)} 13px 14px), ${bg}`;
+    case "fireflies":
+      return `radial-gradient(4px 4px at 24% 38%, ${from}, transparent), radial-gradient(3px 3px at 64% 26%, ${to}, transparent), radial-gradient(4.5px 4.5px at 82% 66%, ${from}, transparent), radial-gradient(3px 3px at 44% 74%, ${to}, transparent), radial-gradient(2.5px 2.5px at 12% 72%, ${from}, transparent), ${bg}`;
+    case "blueprint":
+      return `radial-gradient(circle at 70% 42%, transparent 26%, ${mix(to, 70)} 27%, transparent 29%), repeating-linear-gradient(90deg, ${mix(from, 35)} 0 1px, transparent 1px 7px), repeating-linear-gradient(0deg, ${mix(from, 35)} 0 1px, transparent 1px 7px), ${bg}`;
+    case "prisms":
+      return `conic-gradient(from 205deg at 30% 42%, ${mix(from, 60)} 0 55deg, transparent 55deg), conic-gradient(from 20deg at 68% 64%, ${mix(to, 50)} 0 48deg, transparent 48deg), conic-gradient(from 120deg at 84% 22%, ${mix(from, 40)} 0 60deg, transparent 60deg), ${bg}`;
     case "aurora":
     default:
       return `radial-gradient(60% 70% at 30% 20%, ${from}, transparent 60%), radial-gradient(60% 70% at 75% 80%, ${to}, transparent 60%), ${bg}`;
@@ -175,11 +184,31 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
     return `radial-gradient(120% 100% at 50% -10%, ${cs.accentFrom}, transparent 60%), ${cs.background}`;
   };
 
-  // A palette swatch: just the accent gradient (clearer than washing it over the
-  // background), still mode-aware via the current colorset.
-  const paletteGradient = (look: { dark: ColorSet; light: ColorSet }) => {
+  // A palette swatch showing the whole palette for the current mode: the
+  // surface color with an ink glyph, over the accent gradient as a base strip —
+  // the accent-only gradient it replaces hid half of what a palette sets.
+  const PaletteSwatch = ({ look }: { look: { dark: ColorSet; light: ColorSet } }) => {
     const cs = editMode === "light" ? look.light : look.dark;
-    return `linear-gradient(135deg, ${cs.accentFrom}, ${cs.accentTo})`;
+    return (
+      <span
+        className="relative block h-9 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
+        style={{ background: cs.background }}
+        aria-hidden
+      >
+        <span
+          className="absolute top-1 left-1.5 text-[10px] leading-none font-semibold"
+          style={{ color: cs.foreground }}
+        >
+          Aa
+        </span>
+        <span
+          className="absolute inset-x-0 bottom-0 h-3"
+          style={{
+            backgroundImage: `linear-gradient(to right, ${cs.accentFrom}, ${cs.accentTo})`,
+          }}
+        />
+      </span>
+    );
   };
 
   return (
@@ -264,7 +293,7 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
           <button
             type="button"
             onClick={saveTheme}
-            className="btn-accent shrink-0 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+            className={`${buttonClasses("primary")} shrink-0`}
           >
             Save
           </button>
@@ -428,9 +457,9 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
         <div>
           <span className="text-sm font-medium text-fg/80">Palette</span>
           <p className="text-xs text-fg/40">
-            The colors. Pick a preset, then fine-tune the current mode below —
-            background, text &amp; accent together make a palette, and the accent
-            is just its gradient.
+            The colors, as a cohesive light + dark pair — picking one sets both
+            modes at once (the swatch previews the {editMode} half). Fine-tune
+            the current mode below.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -438,15 +467,11 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
             <button
               key={t.name}
               type="button"
-              onClick={() => applyThemeColors(t, editMode)}
+              onClick={() => applyThemeColors(t)}
               className="group flex flex-col gap-1.5 rounded-lg border border-fg/10 p-2 text-left transition-colors hover:border-fg/30"
               title={t.name}
             >
-              <span
-                className="h-9 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
-                style={{ background: paletteGradient(t) }}
-                aria-hidden
-              />
+              <PaletteSwatch look={t} />
               <span className="truncate text-xs text-fg/60 group-hover:text-fg/90">
                 {t.name}
               </span>

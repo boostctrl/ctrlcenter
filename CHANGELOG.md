@@ -14,6 +14,36 @@ here.
 
 ### Added
 
+- **Seven new scenes.** Horizon (a retro sun sinking to a glowing horizon),
+  Orbit (orbital rings with wandering planets), Peaks (layered mountain
+  ridgelines), Rain (gentle falling accent streaks), Fireflies (wandering,
+  softly pulsing lights), Blueprint (drafting-paper grid with construction
+  marks) and Prisms (drifting translucent geometric shards) — 16 scenes in
+  all. (#80, #81)
+- **Four new palettes.** Terracotta, Citrus, Everforest and Cobalt round the
+  preset row out to 20. (#82)
+
+### Changed
+
+- **Palette presets now apply to both modes at once.** A palette is a cohesive
+  light + dark pair; picking one used to restyle only the mode being edited
+  (while still changing the shared accent), leaving the other mode a mismatch
+  of two palettes. Swatches now show the full palette — surface, ink and
+  accent — instead of just the accent gradient. (#82)
+- **The Glow, Vortex and Mesh scenes were retired** (all three were soft
+  gradient washes that Aurora and Nebula already cover). Saved references —
+  visitor choices, admin defaults, theme-pack overrides — fall back to Aurora;
+  the Daybreak, Singularity and Frostbite packs re-point to Horizon, Orbit and
+  Peaks. (#80)
+
+### Fixed
+
+- **The Save (theme builder) and Admin portal (settings) buttons** now use the
+  app's canonical button recipe instead of one-off styles, and the decorative
+  arrow is gone from the Admin portal link. (#83)
+- A stored admin default theme referencing a retired design/scene id now
+  coerces to the default instead of failing the whole config load. (#80)
+
 - **Cards-per-row control for the Applications, Bookmarks and Favorites
   widgets.** Each gets a second stepper in the layout editor that forces how
   many cards sit side by side (1–4) instead of the automatic span-derived

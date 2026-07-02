@@ -9,9 +9,13 @@ import Waves from "./Waves";
 import Rays from "./Rays";
 import Traces from "./Traces";
 import Dots from "./Dots";
-import Glow from "./Glow";
-import Vortex from "./Vortex";
-import Mesh from "./Mesh";
+import Horizon from "./Horizon";
+import Orbit from "./Orbit";
+import Peaks from "./Peaks";
+import Rain from "./Rain";
+import Fireflies from "./Fireflies";
+import Blueprint from "./Blueprint";
+import Prisms from "./Prisms";
 
 // Scenes render a different treatment for light vs dark surfaces, so each
 // backdrop receives the resolved surface lightness.
@@ -31,7 +35,11 @@ export const SCENE_REGISTRY: Record<SceneId, ComponentType<SceneProps>> = {
   rays: Rays,
   traces: Traces,
   dots: Dots,
-  glow: Glow,
-  vortex: Vortex,
-  mesh: Mesh,
+  horizon: Horizon,
+  orbit: Orbit,
+  peaks: Peaks,
+  rain: Rain,
+  fireflies: Fireflies,
+  blueprint: Blueprint,
+  prisms: Prisms,
 };

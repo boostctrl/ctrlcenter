@@ -6,6 +6,7 @@ import BackHome from "@/components/BackHome";
 import FloatingNav from "@/components/FloatingNav";
 import { readConfig } from "@/lib/config";
 import { resolveThemePacks } from "@/lib/theme";
+import { buttonClasses } from "@/lib/buttons";
 import { navPages } from "@/lib/nav";
 
 export const metadata: Metadata = { title: "Settings" };
@@ -33,7 +34,7 @@ export default async function SettingsPage() {
           </div>
           <Link
             href="/admin"
-            className="btn-accent inline-flex shrink-0 items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold shadow-sm transition-colors"
+            className={`${buttonClasses("primary")} inline-flex shrink-0 items-center gap-2`}
           >
             <svg
               width="16"
@@ -49,7 +50,6 @@ export default async function SettingsPage() {
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             </svg>
             Admin portal
-            <span aria-hidden>→</span>
           </Link>
         </div>
       </div>

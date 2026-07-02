@@ -63,10 +63,16 @@ export function deepenForLight(hex: string): string {
 // a deepened, saturated accent on the near-white light one so it contrasts
 // instead of washing out. Falls back to a soft blue mid-theme-edit.
 export function effectRgb(light: boolean): string {
+  return effectRgbFor(light, "--accent-from");
+}
+
+// Same treatment for an arbitrary accent var, so two-color canvas scenes
+// (rain, fireflies, prisms) can alternate between both gradient stops.
+export function effectRgbFor(light: boolean, cssVar: string): string {
   const fallback = "150, 180, 240";
   if (typeof document === "undefined") return fallback;
   const cs = getComputedStyle(document.documentElement);
-  const accent = cs.getPropertyValue("--accent-from").trim();
+  const accent = cs.getPropertyValue(cssVar).trim();
   if (light) return deepenForLight(accent);
   const rgb = hexToRgb(accent);
   return rgb ? `${rgb[0]}, ${rgb[1]}, ${rgb[2]}` : fallback;

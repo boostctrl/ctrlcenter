@@ -482,7 +482,7 @@ select optgroup {
   animation: wave-x linear infinite;
 }
 
-/* Vortex scene — slowly rotate the conic sweep about its centre. */
+/* Orbit scene — slowly rotate each orbit ring (its planet rides the rim). */
 @keyframes spin-slow {
   from {
     transform: rotate(0deg);

@@ -10,11 +10,19 @@ import {
 } from "./theme";
 
 describe("catalog sizes", () => {
-  it("ships 12 designs, 12 scenes, 16 palettes, 12 themes", () => {
+  it("ships 12 designs, 16 scenes, 20 palettes, 12 themes", () => {
     expect(DESIGNS).toHaveLength(12);
-    expect(SCENES).toHaveLength(12);
-    expect(BASE_THEMES).toHaveLength(16);
+    expect(SCENES).toHaveLength(16);
+    expect(BASE_THEMES).toHaveLength(20);
     expect(THEME_PACKS).toHaveLength(12);
+  });
+
+  it("no pack references a retired scene id", () => {
+    const ids = SCENES.map((s) => s.id) as string[];
+    for (const p of THEME_PACKS) expect(ids).toContain(p.scene);
+    for (const retired of ["glow", "vortex", "mesh"]) {
+      expect(ids).not.toContain(retired);
+    }
   });
 });
 

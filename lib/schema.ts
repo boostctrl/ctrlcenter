@@ -132,10 +132,10 @@ export const themeSchema = z.object({
   // The pack chosen for an independent light-mode default (admin Settings). When
   // unset, light mode follows the dark default's light variant.
   presetLight: z.string().optional(),
-  design: z.enum(DESIGN_IDS).default("glass"),
-  scene: z.enum(SCENE_IDS).default("aurora"),
-  // Default UI font. `.catch` coerces a retired/unknown id back to the default so
-  // a hand-edited or downgraded config still parses.
+  // `.catch` coerces a retired/unknown id back to the default so a hand-edited
+  // or pre-1.4 config (e.g. scene "mesh") still parses instead of 500-ing.
+  design: z.enum(DESIGN_IDS).catch("glass").default("glass"),
+  scene: z.enum(SCENE_IDS).catch("aurora").default("aurora"),
   font: z.enum(FONT_IDS).catch(DEFAULT_FONT).default(DEFAULT_FONT),
   // Optional light-mode design/scene/font. When set, light mode uses a wholly
   // independent look; when omitted it falls back to the dark-mode values above.
