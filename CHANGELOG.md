@@ -12,6 +12,17 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **The theme builder was redesigned around tabs.** Themes, Colors, Design,
+  Scene and Font each get their own tab instead of one long stack of grids,
+  with the light/dark Editing switch always visible in the header and the
+  save/reset actions in a footer. The colors tab now makes the moving parts
+  clear: palette swatches show their dark and light halves (picking one
+  recolors both modes), the surface pickers are labelled as editing only the
+  current mode, and the accent is edited on the gradient itself — a bar with
+  a color well at each end, plus a Solid toggle for single-color accents.
+
 ## [1.4.0] - 2026-07-02
 
 ### Added

@@ -388,6 +388,27 @@ select optgroup {
   .accent-focus:focus {
     border-color: var(--accent-to);
   }
+  /* Native color inputs in the theme builder. The UA renders a bordered square
+     swatch inside the control's padding; strip that chrome so the chosen color
+     fills the whole (circular) well. */
+  .color-well {
+    -webkit-appearance: none;
+    appearance: none;
+    padding: 0;
+    border: none;
+    background: none;
+  }
+  .color-well::-webkit-color-swatch-wrapper {
+    padding: 0;
+  }
+  .color-well::-webkit-color-swatch {
+    border: 1px solid color-mix(in srgb, var(--fg) 25%, transparent);
+    border-radius: 9999px;
+  }
+  .color-well::-moz-color-swatch {
+    border: 1px solid color-mix(in srgb, var(--fg) 25%, transparent);
+    border-radius: 9999px;
+  }
 }
 
 @keyframes float {

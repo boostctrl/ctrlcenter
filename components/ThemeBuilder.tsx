@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useVisitorPrefs } from "./PrefsProvider";
 import { BASE_THEMES, DESIGNS, SCENES } from "@/lib/theme";
-import type { ColorSet, DesignId, SceneId, ThemePack } from "@/lib/theme";
+import type { DesignId, ModeColors, SceneId, ThemePack } from "@/lib/theme";
 import { buttonClasses } from "@/lib/buttons";
 import { FONTS, fontVar } from "@/lib/fonts";
 import type { ThemeColors } from "@/lib/prefs";
@@ -32,10 +33,17 @@ const BASE_FIELDS: { key: "background" | "foreground"; label: string }[] = [
   { key: "foreground", label: "Text & surfaces" },
 ];
 
-const ACCENT_FIELDS: { key: "accentFrom" | "accentTo"; label: string }[] = [
-  { key: "accentFrom", label: "Start" },
-  { key: "accentTo", label: "End" },
-];
+// The builder's sections, one per tab. Tabs keep the five option grids from
+// stacking into one endless scroll — you see one grid at a time, while the
+// header (mode switch) and footer (save/reset) stay put around them.
+const TABS = [
+  { id: "themes", name: "Themes" },
+  { id: "colors", name: "Colors" },
+  { id: "design", name: "Design" },
+  { id: "scene", name: "Scene" },
+  { id: "font", name: "Font" },
+] as const;
+type TabId = (typeof TABS)[number]["id"];
 
 // A small representative gradient for each scene's picker swatch, recolored live
 // by the active accent. The base is the live surface (`var(--background)`), so
@@ -88,6 +96,79 @@ function scenePreview(id: SceneId, from: string, to: string): string {
   }
 }
 
+// The shared shape of every option tile: swatch on top (children), name +
+// optional description below, an optional corner badge, and an accent check
+// when it's the active choice. Options that are one-shot actions rather than
+// state (packs, palettes) simply omit `selected`.
+function OptionCard({
+  onClick,
+  name,
+  selected,
+  desc,
+  title,
+  badge,
+  nameStyle,
+  children,
+}: {
+  onClick: () => void;
+  name: string;
+  selected?: boolean;
+  desc?: string;
+  title?: string;
+  badge?: string;
+  nameStyle?: CSSProperties;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      title={title}
+      className={`group relative flex w-full flex-col gap-1.5 rounded-lg border p-2 text-left transition-colors ${
+        selected ? "border-[color:var(--accent-from)]" : "border-fg/10 hover:border-fg/30"
+      }`}
+    >
+      {children}
+      <span className="min-w-0">
+        <span
+          className={`block truncate text-xs ${
+            selected ? "text-fg/90" : "text-fg/60 group-hover:text-fg/90"
+          }`}
+          style={nameStyle}
+        >
+          {name}
+        </span>
+        {desc && (
+          <span className="block truncate text-[10px] text-fg/40">{desc}</span>
+        )}
+      </span>
+      {badge && (
+        <span className="absolute top-1 right-1 rounded bg-fg/15 px-1 text-[9px] font-medium tracking-wide text-fg/70 uppercase">
+          {badge}
+        </span>
+      )}
+      {selected && (
+        <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[color:var(--accent-from)] text-[color:var(--accent-fg)] shadow-sm">
+          <svg
+            width="9"
+            height="9"
+            viewBox="0 0 12 12"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <path d="M2.5 6.5 5 9l4.5-6" />
+          </svg>
+        </span>
+      )}
+    </button>
+  );
+}
+
 export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
   const {
     designFor,
@@ -112,8 +193,8 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
   } = useVisitorPrefs();
 
   // Always edit the mode that's actually on screen, so what you tweak is what you
-  // see. The Editing toggle below switches modes by previewing them live (see
-  // setPreviewMode) rather than keeping a separate, hidden edit target.
+  // see. The Editing toggle in the header switches modes by previewing them live
+  // (see setPreviewMode) rather than keeping a separate, hidden edit target.
   const editMode = resolvedMode;
 
   // Scene swatches paint the accent over the previewed surface, so on light they
@@ -139,8 +220,17 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
   });
   useEffect(() => () => dropPreview.current(null), []);
 
+  const [tab, setTab] = useState<TabId>("themes");
   const [draft, setDraft] = useState<ThemeColors>(DEFAULT_DRAFT);
   const [name, setName] = useState("");
+  // Whether the accent editor shows one color well or a from→to pair. Solid is
+  // just a gradient with two equal stops, so this is purely a UI simplification
+  // for the common "I want one color" case.
+  const [accentStyle, setAccentStyle] = useState<"gradient" | "solid">(() =>
+    activeAccent.from.toLowerCase() === activeAccent.to.toLowerCase()
+      ? "solid"
+      : "gradient"
+  );
 
   // Keep the pickers in sync with the edit mode's colorset. Background/text come
   // from the active look's chosen-mode variant (or that mode's defaults when
@@ -157,6 +247,15 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
     });
   }, [activeLook, editMode, activeAccent]);
 
+  // A palette or saved theme can bring in a two-color accent the Solid editor
+  // can't represent — flip back to the gradient editor when that happens.
+  useEffect(() => {
+    if (draft.accentFrom.toLowerCase() !== draft.accentTo.toLowerCase()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setAccentStyle("gradient");
+    }
+  }, [draft.accentFrom, draft.accentTo]);
+
   function updateBase(key: "background" | "foreground", value: string) {
     const next = { ...draft, [key]: value };
     setDraft(next);
@@ -164,9 +263,23 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
   }
 
   function updateAccent(key: "accentFrom" | "accentTo", value: string) {
-    const next = { ...draft, [key]: value };
+    const next =
+      accentStyle === "solid"
+        ? { ...draft, accentFrom: value, accentTo: value }
+        : { ...draft, [key]: value };
     setDraft(next);
     setAccentOverride({ from: next.accentFrom, to: next.accentTo });
+  }
+
+  function chooseAccentStyle(style: "gradient" | "solid") {
+    setAccentStyle(style);
+    // Collapsing to solid keeps the start color; going back to gradient changes
+    // nothing until an end color is picked.
+    if (style === "solid" && draft.accentFrom !== draft.accentTo) {
+      const next = { ...draft, accentTo: draft.accentFrom };
+      setDraft(next);
+      setAccentOverride({ from: next.accentFrom, to: next.accentTo });
+    }
   }
 
   function saveTheme() {
@@ -177,187 +290,399 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
     setName("");
   }
 
-  // A full-palette swatch (surface bg + accent glow) for the current mode — used
-  // for the theme packs, where the whole look (incl. background) matters.
-  const lookSwatch = (look: { dark: ColorSet; light: ColorSet }) => {
+  // A full-look swatch (surface bg + accent glow) for the current mode — used
+  // for the theme packs and saved themes, which restyle the mode being edited.
+  const lookSwatch = (look: ModeColors) => {
     const cs = editMode === "light" ? look.light : look.dark;
     return `radial-gradient(120% 100% at 50% -10%, ${cs.accentFrom}, transparent 60%), ${cs.background}`;
   };
 
-  // A palette swatch showing the whole palette for the current mode: the
-  // surface color with an ink glyph, over the accent gradient as a base strip —
-  // the accent-only gradient it replaces hid half of what a palette sets.
-  const PaletteSwatch = ({ look }: { look: { dark: ColorSet; light: ColorSet } }) => {
-    const cs = editMode === "light" ? look.light : look.dark;
-    return (
-      <span
-        className="relative block h-9 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
-        style={{ background: cs.background }}
-        aria-hidden
-      >
+  // Palettes recolor BOTH modes at once, so their swatch shows both halves —
+  // dark surface left, light surface right, each with its ink — over one
+  // continuous accent strip (the accent is shared across a look's two modes).
+  const PaletteSwatch = ({ look }: { look: ModeColors }) => (
+    <span
+      className="relative block h-10 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
+      aria-hidden
+    >
+      {(
+        [
+          ["dark", "left-0"],
+          ["light", "right-0"],
+        ] as const
+      ).map(([m, side]) => (
         <span
-          className="absolute top-1 left-1.5 text-[10px] leading-none font-semibold"
-          style={{ color: cs.foreground }}
+          key={m}
+          className={`absolute inset-y-0 ${side} w-1/2`}
+          style={{ background: look[m].background }}
         >
-          Aa
+          <span
+            className="absolute top-1.5 left-1/2 -translate-x-1/2 text-[10px] leading-none font-semibold"
+            style={{ color: look[m].foreground }}
+          >
+            A
+          </span>
         </span>
-        <span
-          className="absolute inset-x-0 bottom-0 h-3"
-          style={{
-            backgroundImage: `linear-gradient(to right, ${cs.accentFrom}, ${cs.accentTo})`,
-          }}
-        />
-      </span>
-    );
-  };
+      ))}
+      <span
+        className="absolute inset-x-0 bottom-0 h-2.5"
+        style={{
+          backgroundImage: `linear-gradient(to right, ${look.dark.accentFrom}, ${look.dark.accentTo} 48%, ${look.light.accentFrom} 52%, ${look.light.accentTo})`,
+        }}
+      />
+    </span>
+  );
 
   return (
-    <div className="space-y-5 text-sm">
-      <div>
-        <h2 className="font-semibold">Theme builder</h2>
-        <p className="text-xs text-fg/50">
-          Light and dark are two independent themes. Pick a mode with the Editing
-          toggle below, then design it — its own design, scene, font &amp; colors.
-          Switch the app between light and dark in Preferences.
-        </p>
-      </div>
-
-      <div className="space-y-3 rounded-xl border border-fg/15 bg-fg/[0.02] p-3">
+    <div className="space-y-4 text-sm">
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
         <div>
-          <span className="text-sm font-medium text-fg/80">Themes</span>
-          <p className="text-xs text-fg/40">
-            Presets — pick one to set the design, scene &amp; colors for the mode
-            you&apos;re editing ({editMode}) in one tap.
+          <h2 className="font-semibold">Theme builder</h2>
+          <p className="text-xs text-fg/50">
+            Light and dark are two independent themes — design each with its own
+            style, scene, font &amp; colors. Everything applies live.
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {packs.map((p, i) => (
-            <button
-              key={`builtin:${i}`}
-              type="button"
-              onClick={() => applyPack(p, editMode)}
-              className="group relative flex flex-col gap-1.5 rounded-lg border border-fg/10 p-2 text-left transition-colors hover:border-fg/30"
-              title={`${p.name} · ${DESIGN_NAMES[p.design]}`}
-            >
-              {i === 0 && (
-                <span className="absolute top-1 right-1 rounded bg-fg/15 px-1 text-[9px] font-medium tracking-wide text-fg/70 uppercase">
-                  Default
-                </span>
-              )}
-              <span
-                className="h-9 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
-                style={{ background: lookSwatch(p) }}
-                aria-hidden
-              />
-              <span className="truncate text-xs text-fg/60 group-hover:text-fg/90">
-                {p.name}
-              </span>
-            </button>
-          ))}
-          {customThemes.map((t) => (
-            <div key={t.id} className="group relative">
-              <button
-                type="button"
-                onClick={() => applyNamedTheme(t.id)}
-                className="flex w-full flex-col gap-1.5 rounded-lg border border-fg/10 p-2 text-left transition-colors hover:border-fg/30"
-                title={`${t.name} · ${DESIGN_NAMES[t.design]}`}
-              >
-                <span
-                  className="h-9 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
-                  style={{ background: lookSwatch(t) }}
-                  aria-hidden
-                />
-                <span className="truncate text-xs text-fg/60 group-hover:text-fg/90">
-                  {t.name}
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => deleteNamedTheme(t.id)}
-                aria-label={`Delete ${t.name}`}
-                className="absolute top-1 right-1 rounded-md bg-background/70 px-1 text-xs text-fg/50 opacity-0 transition-opacity hover:text-red-400 group-hover:opacity-100"
-              >
-                ✕
-              </button>
+        <div className="flex flex-col items-end gap-1">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-fg/50">Editing</span>
+            <div className="flex overflow-hidden rounded-lg border border-fg/10">
+              {(["dark", "light"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setPreviewMode(m)}
+                  aria-pressed={editMode === m}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs capitalize transition-colors ${
+                    editMode === m
+                      ? "bg-fg/15 text-fg"
+                      : "text-fg/50 hover:text-fg/80"
+                  }`}
+                >
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
+                  >
+                    {m === "dark" ? (
+                      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                    ) : (
+                      <>
+                        <circle cx="12" cy="12" r="5" />
+                        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                      </>
+                    )}
+                  </svg>
+                  {m}
+                </button>
+              ))}
             </div>
-          ))}
-        </div>
-        <div className="flex items-center gap-2">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && saveTheme()}
-            placeholder="Name & save your current look as a theme"
-            className="accent-focus min-w-0 flex-1 rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-fg outline-none transition-colors"
-          />
-          <button
-            type="button"
-            onClick={saveTheme}
-            className={`${buttonClasses("primary")} shrink-0`}
-          >
-            Save
-          </button>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3 pt-1">
-        <span className="text-xs font-semibold tracking-[0.15em] text-fg/45 uppercase">
-          Customize
-        </span>
-        <div className="h-px flex-1 bg-fg/10" />
-      </div>
-
-      {/* The Editing toggle governs everything below — design, scene, font and
-          palette — so light and dark can be wholly different themes. Switching it
-          previews that mode live (setPreviewMode) so edits are visible. */}
-      <div className="flex items-center justify-between gap-2 rounded-xl border border-fg/15 bg-fg/[0.02] p-3">
-        <div>
-          <span className="text-sm font-medium text-fg/80">Editing</span>
-          <p className="text-xs text-fg/40">
-            Which mode you&apos;re designing — light and dark are independent.
-            Switching previews it here so you can see your edits; it won&apos;t
-            change your saved Appearance mode, and reverts when you leave.
+          </div>
+          <p className="text-[10px] text-fg/40">
+            Previews live — your saved Appearance mode is untouched.
           </p>
         </div>
-        <div className="flex overflow-hidden rounded-lg border border-fg/10">
-          {(["dark", "light"] as const).map((m) => (
+      </div>
+
+      <div
+        role="tablist"
+        aria-label="Theme builder sections"
+        className="flex gap-1 overflow-x-auto border-b border-fg/10"
+      >
+        {TABS.map((t) => {
+          const active = tab === t.id;
+          return (
             <button
-              key={m}
+              key={t.id}
               type="button"
-              onClick={() => setPreviewMode(m)}
-              aria-pressed={editMode === m}
-              className={`px-4 py-1.5 text-xs capitalize transition-colors ${
-                editMode === m
-                  ? "bg-fg/15 text-fg"
-                  : "text-fg/50 hover:text-fg/80"
+              role="tab"
+              id={`tb-tab-${t.id}`}
+              aria-selected={active}
+              aria-controls={`tb-panel-${t.id}`}
+              onClick={() => setTab(t.id)}
+              className={`relative shrink-0 px-3 py-2 text-xs font-medium transition-colors ${
+                active ? "text-fg" : "text-fg/50 hover:text-fg/80"
               }`}
             >
-              {m}
+              {t.name}
+              {active && (
+                <span
+                  className="absolute inset-x-2 bottom-0 h-0.5 rounded-full"
+                  style={{
+                    backgroundImage:
+                      "linear-gradient(to right, var(--accent-from), var(--accent-to))",
+                  }}
+                  aria-hidden
+                />
+              )}
             </button>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
-      <div className="space-y-2">
-        <span className="text-xs text-fg/50">Design</span>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {DESIGNS.map((d) => {
-            const selected = designFor(editMode) === d.id;
-            return (
-              <button
+      {tab === "themes" && (
+        <div
+          role="tabpanel"
+          id="tb-panel-themes"
+          aria-labelledby="tb-tab-themes"
+          className="space-y-4"
+        >
+          <p className="text-xs text-fg/40">
+            Curated looks — one tap sets the design, scene &amp; colors of your{" "}
+            {editMode} theme.{" "}
+            Tweak it in the other tabs, then name &amp; save your own below.
+          </p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+            {packs.map((p, i) => (
+              <OptionCard
+                key={`builtin:${i}`}
+                onClick={() => applyPack(p, editMode)}
+                name={p.name}
+                title={`${p.name} · ${DESIGN_NAMES[p.design]}`}
+                badge={i === 0 ? "Default" : undefined}
+              >
+                <span
+                  className="block h-10 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
+                  style={{ background: lookSwatch(p) }}
+                  aria-hidden
+                />
+              </OptionCard>
+            ))}
+          </div>
+          {customThemes.length > 0 && (
+            <div className="space-y-2">
+              <span className="text-[10px] font-semibold tracking-[0.15em] text-fg/45 uppercase">
+                Your themes
+              </span>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+                {customThemes.map((t) => (
+                  <div key={t.id} className="group/theme relative">
+                    <OptionCard
+                      onClick={() => applyNamedTheme(t.id)}
+                      name={t.name}
+                      title={`${t.name} · ${DESIGN_NAMES[t.design]}`}
+                    >
+                      <span
+                        className="block h-10 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
+                        style={{ background: lookSwatch(t) }}
+                        aria-hidden
+                      />
+                    </OptionCard>
+                    <button
+                      type="button"
+                      onClick={() => deleteNamedTheme(t.id)}
+                      aria-label={`Delete ${t.name}`}
+                      className="absolute top-1 right-1 rounded-md bg-background/70 px-1 text-xs text-fg/50 opacity-0 transition-opacity group-hover/theme:opacity-100 hover:text-red-400 focus-visible:opacity-100"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "colors" && (
+        <div
+          role="tabpanel"
+          id="tb-panel-colors"
+          aria-labelledby="tb-tab-colors"
+          className="space-y-5"
+        >
+          <div className="space-y-2">
+            <div>
+              <span className="text-[10px] font-semibold tracking-[0.15em] text-fg/45 uppercase">
+                Palettes
+              </span>
+              <p className="text-xs text-fg/40">
+                Ready-made color sets — one tap recolors both modes (each swatch
+                shows its dark and light halves).
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-7">
+              {BASE_THEMES.map((t) => (
+                <OptionCard
+                  key={t.name}
+                  onClick={() => applyThemeColors(t)}
+                  name={t.name}
+                  title={t.name}
+                >
+                  <PaletteSwatch look={t} />
+                </OptionCard>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3 border-t border-fg/10 pt-4">
+            <div>
+              <span className="text-[10px] font-semibold tracking-[0.15em] text-fg/45 uppercase">
+                Custom
+              </span>
+              <p className="text-xs text-fg/40">
+                Or pick each color yourself — changes apply instantly.
+              </p>
+            </div>
+            <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <span className="block text-[11px] font-medium text-fg/55">
+                  Surface — {editMode} theme only
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  {BASE_FIELDS.map(({ key, label }) => (
+                    <label
+                      key={key}
+                      className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-fg/10 bg-fg/5 p-2 transition-colors hover:border-fg/25"
+                    >
+                      <input
+                        type="color"
+                        value={draft[key]}
+                        onChange={(e) => updateBase(key, e.target.value)}
+                        aria-label={label}
+                        className="color-well h-9 w-9 shrink-0 cursor-pointer rounded-full"
+                      />
+                      <span className="min-w-0">
+                        <span className="block truncate text-xs text-fg/75">
+                          {label}
+                        </span>
+                        <span className="block font-mono text-[10px] text-fg/40 uppercase">
+                          {draft[key]}
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                {/* Live sample of the mode being edited, so even the half you're
+                    not looking at gets feedback as you pick. */}
+                <div
+                  className="flex h-11 items-center justify-between overflow-hidden rounded-lg px-3 ring-1 ring-fg/10"
+                  style={{
+                    background: `radial-gradient(120% 150% at 80% -30%, ${draft.accentFrom}, transparent 55%), ${draft.background}`,
+                  }}
+                >
+                  <span
+                    className="text-xs font-medium capitalize"
+                    style={{ color: draft.foreground }}
+                  >
+                    {editMode} preview · Aa
+                  </span>
+                  <span
+                    className="h-1.5 w-12 shrink-0 rounded-full"
+                    style={{
+                      backgroundImage: `linear-gradient(to right, ${draft.accentFrom}, ${draft.accentTo})`,
+                    }}
+                    aria-hidden
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-[11px] font-medium text-fg/55">
+                    Accent — shared by light &amp; dark
+                  </span>
+                  <div className="flex overflow-hidden rounded-md border border-fg/10">
+                    {(["gradient", "solid"] as const).map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => chooseAccentStyle(s)}
+                        aria-pressed={accentStyle === s}
+                        className={`px-2.5 py-1 text-[10px] capitalize transition-colors ${
+                          accentStyle === s
+                            ? "bg-fg/15 text-fg"
+                            : "text-fg/50 hover:text-fg/80"
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/* The accent editor IS the gradient: a bar with a color well at
+                    each end (or one centered well when solid). */}
+                <div
+                  className="relative h-11 rounded-full ring-1 ring-fg/10"
+                  style={{
+                    backgroundImage: `linear-gradient(to right, ${draft.accentFrom}, ${draft.accentTo})`,
+                  }}
+                >
+                  <input
+                    type="color"
+                    value={draft.accentFrom}
+                    onChange={(e) => updateAccent("accentFrom", e.target.value)}
+                    aria-label={
+                      accentStyle === "solid"
+                        ? "Accent color"
+                        : "Accent start color"
+                    }
+                    className={`color-well absolute top-1/2 h-7 w-7 -translate-y-1/2 cursor-pointer rounded-full shadow-md ${
+                      accentStyle === "solid"
+                        ? "left-1/2 -translate-x-1/2"
+                        : "left-2"
+                    }`}
+                  />
+                  {accentStyle === "gradient" && (
+                    <input
+                      type="color"
+                      value={draft.accentTo}
+                      onChange={(e) => updateAccent("accentTo", e.target.value)}
+                      aria-label="Accent end color"
+                      className="color-well absolute top-1/2 right-2 h-7 w-7 -translate-y-1/2 cursor-pointer rounded-full shadow-md"
+                    />
+                  )}
+                </div>
+                <div
+                  className={`flex font-mono text-[10px] text-fg/40 uppercase ${
+                    accentStyle === "gradient"
+                      ? "justify-between"
+                      : "justify-center"
+                  }`}
+                >
+                  <span>{draft.accentFrom}</span>
+                  {accentStyle === "gradient" && <span>{draft.accentTo}</span>}
+                </div>
+                <p className="text-xs text-fg/40">
+                  Colors buttons, highlights &amp; the scene glow in both modes.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === "design" && (
+        <div
+          role="tabpanel"
+          id="tb-panel-design"
+          aria-labelledby="tb-tab-design"
+          className="space-y-3"
+        >
+          <p className="text-xs text-fg/40">
+            How cards &amp; panels are drawn — the surface style of your{" "}
+            {editMode} theme.
+          </p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            {DESIGNS.map((d) => (
+              <OptionCard
                 key={d.id}
-                type="button"
+                selected={designFor(editMode) === d.id}
                 onClick={() => setDesign(d.id, editMode)}
-                aria-pressed={selected}
-                className={`group flex flex-col gap-1.5 rounded-lg border p-2 text-left transition-colors ${
-                  selected ? "border-fg/40" : "border-fg/10 hover:border-fg/30"
-                }`}
+                name={d.name}
+                desc={d.description}
                 title={d.description}
               >
                 <span
                   className={`pointer-events-none block ${d.id === "glass" ? "" : `design-${d.id}`}`}
                 >
-                  <span className="glass-card flex h-9 w-full items-center justify-center">
+                  <span className="glass-card flex h-10 w-full items-center justify-center">
                     <span
                       className="h-1.5 w-9 rounded-full"
                       style={{
@@ -367,191 +692,101 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
                     />
                   </span>
                 </span>
-                <span
-                  className={`truncate text-xs ${
-                    selected ? "text-fg/90" : "text-fg/60 group-hover:text-fg/90"
-                  }`}
-                >
-                  {d.name}
-                </span>
-              </button>
-            );
-          })}
+              </OptionCard>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="space-y-2">
-        <span className="text-xs text-fg/50">Scene</span>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {SCENES.map((s) => {
-            const selected = sceneFor(editMode) === s.id;
-            return (
-              <button
+      {tab === "scene" && (
+        <div
+          role="tabpanel"
+          id="tb-panel-scene"
+          aria-labelledby="tb-tab-scene"
+          className="space-y-3"
+        >
+          <p className="text-xs text-fg/40">
+            The animated backdrop behind your {editMode} theme.
+          </p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            {SCENES.map((s) => (
+              <OptionCard
                 key={s.id}
-                type="button"
+                selected={sceneFor(editMode) === s.id}
                 onClick={() => setScene(s.id, editMode)}
-                aria-pressed={selected}
-                className={`group flex flex-col gap-1.5 rounded-lg border p-2 text-left transition-colors ${
-                  selected ? "border-fg/40" : "border-fg/10 hover:border-fg/30"
-                }`}
+                name={s.name}
+                desc={s.description}
                 title={s.description}
               >
                 <span
-                  className="block h-9 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
+                  className="block h-10 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
                   style={{
                     background: scenePreview(s.id, sceneFrom, sceneTo),
                   }}
                   aria-hidden
                 />
-                <span
-                  className={`truncate text-xs ${
-                    selected ? "text-fg/90" : "text-fg/60 group-hover:text-fg/90"
-                  }`}
-                >
-                  {s.name}
-                </span>
-              </button>
-            );
-          })}
+              </OptionCard>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="space-y-2">
-        <span className="text-xs text-fg/50">Font</span>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {FONTS.map((f) => {
-            const selected = fontFor(editMode) === f.id;
-            return (
-              <button
+      {tab === "font" && (
+        <div
+          role="tabpanel"
+          id="tb-panel-font"
+          aria-labelledby="tb-tab-font"
+          className="space-y-3"
+        >
+          <p className="text-xs text-fg/40">
+            The interface typeface of your {editMode} theme.
+          </p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            {FONTS.map((f) => (
+              <OptionCard
                 key={f.id}
-                type="button"
+                selected={fontFor(editMode) === f.id}
                 onClick={() => setFont(f.id, editMode)}
-                aria-pressed={selected}
-                className={`group flex flex-col gap-0.5 rounded-lg border p-2 text-left transition-colors ${
-                  selected ? "border-fg/40" : "border-fg/10 hover:border-fg/30"
-                }`}
+                name={f.name}
                 title={f.name}
+                nameStyle={{ fontFamily: fontVar(f.id) }}
               >
                 <span
-                  className="text-xl leading-tight text-fg/90"
+                  className="block text-2xl leading-tight text-fg/90"
                   style={{ fontFamily: fontVar(f.id) }}
                   aria-hidden
                 >
                   Ag
                 </span>
-                <span
-                  className={`truncate text-xs ${
-                    selected ? "text-fg/90" : "text-fg/60 group-hover:text-fg/90"
-                  }`}
-                  style={{ fontFamily: fontVar(f.id) }}
-                >
-                  {f.name}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="space-y-3 rounded-xl border border-fg/15 bg-fg/[0.02] p-3">
-        <div>
-          <span className="text-sm font-medium text-fg/80">Palette</span>
-          <p className="text-xs text-fg/40">
-            The colors, as a cohesive light + dark pair — picking one sets both
-            modes at once (the swatch previews the {editMode} half). Fine-tune
-            the current mode below.
-          </p>
-        </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {BASE_THEMES.map((t) => (
-            <button
-              key={t.name}
-              type="button"
-              onClick={() => applyThemeColors(t)}
-              className="group flex flex-col gap-1.5 rounded-lg border border-fg/10 p-2 text-left transition-colors hover:border-fg/30"
-              title={t.name}
-            >
-              <PaletteSwatch look={t} />
-              <span className="truncate text-xs text-fg/60 group-hover:text-fg/90">
-                {t.name}
-              </span>
-            </button>
-          ))}
-        </div>
-
-        <div className="space-y-3 border-t border-fg/10 pt-3">
-          <span className="text-xs font-medium text-fg/55 capitalize">
-            Fine-tune {editMode}
-          </span>
-
-          {/* Preview of the mode being edited (so the off mode has feedback). */}
-          <div
-            className="flex h-10 items-end justify-start overflow-hidden rounded-lg p-1.5 ring-1 ring-fg/10"
-            style={{
-              background: `radial-gradient(120% 100% at 50% -10%, ${draft.accentFrom}, transparent 60%), ${draft.background}`,
-            }}
-          >
-            <span
-              className="rounded px-1 text-[9px] font-medium capitalize"
-              style={{ color: draft.foreground }}
-            >
-              {editMode} preview
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            {BASE_FIELDS.map(({ key, label }) => (
-              <label key={key} className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={draft[key]}
-                  onChange={(e) => updateBase(key, e.target.value)}
-                  aria-label={label}
-                  className="h-8 w-8 shrink-0 cursor-pointer rounded border border-fg/10 bg-transparent"
-                />
-                <span className="text-fg/60">{label}</span>
-              </label>
+              </OptionCard>
             ))}
           </div>
-          <div className="space-y-2">
-            <span className="text-xs text-fg/50">
-              Accent (gradient) · shared by both modes
-            </span>
-            <div
-              className="h-9 w-full rounded-lg ring-1 ring-fg/10"
-              style={{
-                backgroundImage: `linear-gradient(to right, ${activeAccent.from}, ${activeAccent.to})`,
-              }}
-              aria-hidden
-            />
-            <div className="grid grid-cols-2 gap-3">
-              {ACCENT_FIELDS.map(({ key, label }) => (
-                <label key={key} className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={draft[key]}
-                    onChange={(e) => updateAccent(key, e.target.value)}
-                    aria-label={`Accent ${label.toLowerCase()}`}
-                    className="h-8 w-8 shrink-0 cursor-pointer rounded border border-fg/10 bg-transparent"
-                  />
-                  <span className="text-fg/60">{label}</span>
-                </label>
-              ))}
-            </div>
-            <p className="text-xs text-fg/40">
-              Set both ends to the same color for a solid accent.
-            </p>
-          </div>
         </div>
-      </div>
+      )}
 
-      <div className="border-t border-fg/10 pt-4">
+      <div className="flex flex-wrap items-center gap-2 border-t border-fg/10 pt-4">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && saveTheme()}
+          placeholder="Name this look to save it — both modes included"
+          className="accent-focus min-w-0 flex-1 basis-56 rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-fg outline-none transition-colors"
+        />
+        <button
+          type="button"
+          onClick={saveTheme}
+          disabled={!name.trim()}
+          className={`${buttonClasses("primary")} shrink-0`}
+        >
+          Save theme
+        </button>
         <button
           type="button"
           onClick={resetTheme}
-          className="rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10"
+          title="Return the theme to the app default"
+          className={`${buttonClasses("ghost")} shrink-0`}
         >
-          Reset theme to default
+          Reset theme
         </button>
       </div>
     </div>
