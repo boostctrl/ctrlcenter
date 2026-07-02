@@ -476,6 +476,24 @@ select optgroup {
 .font-jetbrains {
   --font-sans: var(--font-jetbrains);
 }
+.font-outfit {
+  --font-sans: var(--font-outfit);
+}
+.font-grotesk {
+  --font-sans: var(--font-grotesk);
+}
+.font-manrope {
+  --font-sans: var(--font-manrope);
+}
+.font-rubik {
+  --font-sans: var(--font-rubik);
+}
+.font-playfair {
+  --font-sans: var(--font-playfair);
+}
+.font-quicksand {
+  --font-sans: var(--font-quicksand);
+}
 
 @layer utilities {
   /* The shared surface. Every visual value is a design token (see :root and the

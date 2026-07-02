@@ -24,6 +24,8 @@ here.
 - **Two new scenes.** Petals (cherry-blossom petals adrift on the breeze) and
   Comets (shooting stars with fading trails) — 18 scenes in all. The Bloom
   theme now drifts Petals through its rose-and-violet look instead of Nebula.
+- **Six new fonts.** Outfit, Space Grotesk, Manrope, Rubik, Playfair Display
+  and Quicksand — 12 typefaces in all.
 
 ### Changed
 

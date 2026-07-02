@@ -14,7 +14,13 @@ export type FontId =
   | "poppins"
   | "nunito"
   | "lora"
-  | "jetbrains";
+  | "jetbrains"
+  | "outfit"
+  | "grotesk"
+  | "manrope"
+  | "rubik"
+  | "playfair"
+  | "quicksand";
 
 export const FONTS: { id: FontId; name: string }[] = [
   { id: "jakarta", name: "Plus Jakarta Sans" },
@@ -23,6 +29,12 @@ export const FONTS: { id: FontId; name: string }[] = [
   { id: "nunito", name: "Nunito" },
   { id: "lora", name: "Lora" },
   { id: "jetbrains", name: "JetBrains Mono" },
+  { id: "outfit", name: "Outfit" },
+  { id: "grotesk", name: "Space Grotesk" },
+  { id: "manrope", name: "Manrope" },
+  { id: "rubik", name: "Rubik" },
+  { id: "playfair", name: "Playfair Display" },
+  { id: "quicksand", name: "Quicksand" },
 ];
 
 export const FONT_IDS = FONTS.map((f) => f.id) as [FontId, ...FontId[]];

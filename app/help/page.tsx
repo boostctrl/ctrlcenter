@@ -254,7 +254,8 @@ export default async function HelpPage() {
                 optional custom surface colors.
               </li>
               <li>
-                <strong>Font.</strong> Pick from six typefaces.
+                <strong>Font.</strong> Pick from twelve typefaces, from
+                geometric sans to serif and mono.
               </li>
             </ul>
             <P>
