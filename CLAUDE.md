@@ -5,6 +5,20 @@ process contract for anyone — human or AI — working on the repo. Setup and
 architecture live in [README.md](README.md#development); this file covers how
 work flows from idea to release.
 
+## Project skills
+
+Step-by-step recipes for this repo's mistake-prone workflows live in
+`.claude/skills/`. Reach for them instead of improvising:
+
+- **land** — finishing checklist before committing any non-trivial change
+  (changelog, issue hygiene, quality gate, verification).
+- **visual-verify** — render the standalone production build in Playwright
+  Chromium; required for anything user-visible.
+- **new-widget** — every touchpoint for adding a widget type to the dashboard
+  grid, including the config-migration traps.
+- **release** — cut a release with `scripts/release.sh` and keep hands off the
+  tag-driven pipeline.
+
 ## Branch model
 
 - All work lands on `develop`. Small, focused commits with imperative subject
