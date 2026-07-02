@@ -23,8 +23,11 @@ the thing that breaks, and it only exists in the production build.
    ```
 
 2. Launch on a spare port, pointing `CONFIG_PATH` at a scratch **copy** of the
-   config so the check can never mutate the real dev config. Run it as a
-   background task:
+   config so the check can never mutate the real dev config. **If the port is
+   already taken (`EADDRINUSE`), a stale server from an earlier run is still
+   up and will happily serve the OLD build** — the health check passes and the
+   screenshots silently show code you didn't just build. Kill it first (see
+   step 6). Run the server as a background task:
 
    ```bash
    cp config/config.yaml "$SCRATCH/visual-config.yaml"
@@ -53,7 +56,16 @@ the thing that breaks, and it only exists in the production build.
    assets load; whether the page looks right is your judgment call. Compare
    against the intent of the change, not just "did something render".
 
-6. Kill the server: `pkill -f "standalone/server.js"`.
+6. Kill the server. If it's a background task of this session, stop it by task
+   id. Don't reach for `pkill -f "standalone/server.js"`: the process renames
+   itself to `next-server (v…)` so the pattern misses it — while matching (and
+   killing) your own wrapper shell. For a stray server from an earlier session,
+   find the real PID on the port and kill that:
+
+   ```bash
+   ss -tlnp | grep 3111   # → pid=… of "next-server"
+   kill <pid>
+   ```
 
 Pages worth checking beyond the one you changed: `/` (the widget grid),
 `/help`, `/calendar`, `/weather`, `/status`, and `/admin` for settings-UI work.
