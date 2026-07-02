@@ -34,7 +34,7 @@ export default async function SettingsPage() {
           </div>
           <Link
             href="/admin"
-            className={`${buttonClasses("primary")} inline-flex shrink-0 items-center gap-2`}
+            className={`${buttonClasses("ghost")} inline-flex shrink-0 items-center gap-2`}
           >
             <svg
               width="16"

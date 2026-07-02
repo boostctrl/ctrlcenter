@@ -34,6 +34,10 @@ here.
   Bold and Console, pills on Soft and Clay — instead of one fixed rounding
   everywhere. Existing designs also got small polish tweaks: a heavier Frost
   fill and sheen, and a richer Gradient accent wash.
+- **The Admin portal is easier to reach and quieter to look at.** It's now in
+  the floating navigation menu on every page, and the button on the Settings
+  page uses the standard quiet button style instead of the loud accent fill,
+  so it sits cohesively with the rest of the theme.
 
 ### Changed
 

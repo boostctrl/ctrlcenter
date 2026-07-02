@@ -8,8 +8,9 @@ import { useEditMode } from "./EditMode";
 // The floating corner control — the old settings gear, evolved into a small menu
 // that links to every enabled page so navigation is reachable from anywhere
 // without touching the header. Which admin-gated pages appear is decided
-// server-side (see navPages); Help and Settings always appear, Dashboard is added
-// here, and the current page is omitted. Closes on outside click or Escape.
+// server-side (see navPages); Help, Settings and the Admin portal always appear,
+// Dashboard is added here, and the current page is omitted. Closes on outside
+// click or Escape.
 export default function FloatingNav({
   weather,
   status,
@@ -50,6 +51,9 @@ export default function FloatingNav({
       calendar ? { href: "/calendar", label: "Calendar" } : null,
       { href: "/help", label: "Help" },
       { href: "/settings", label: "Settings" },
+      // Always listed, like on the Settings page — /admin gates itself behind
+      // its own login.
+      { href: "/admin", label: "Admin portal" },
     ].filter(Boolean) as { href: string; label: string }[]
   ).filter((l) => l.href !== pathname);
 
