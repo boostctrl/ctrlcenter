@@ -16,6 +16,8 @@ import Rain from "./Rain";
 import Fireflies from "./Fireflies";
 import Blueprint from "./Blueprint";
 import Prisms from "./Prisms";
+import Petals from "./Petals";
+import Comets from "./Comets";
 
 // Scenes render a different treatment for light vs dark surfaces, so each
 // backdrop receives the resolved surface lightness.
@@ -42,4 +44,6 @@ export const SCENE_REGISTRY: Record<SceneId, ComponentType<SceneProps>> = {
   fireflies: Fireflies,
   blueprint: Blueprint,
   prisms: Prisms,
+  petals: Petals,
+  comets: Comets,
 };

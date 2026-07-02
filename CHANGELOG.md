@@ -21,6 +21,9 @@ here.
   (soft-raised from the page), Carve (recessed, pressed into the page), Stripe
   (crisp card with an accent top bar), Sketch (hand-drawn dashed outlines) and
   Console (terminal panel with an accent edge) — 18 designs in all.
+- **Two new scenes.** Petals (cherry-blossom petals adrift on the breeze) and
+  Comets (shooting stars with fading trails) — 18 scenes in all. The Bloom
+  theme now drifts Petals through its rose-and-violet look instead of Nebula.
 
 ### Changed
 

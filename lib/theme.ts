@@ -80,7 +80,9 @@ export type SceneId =
   | "rain"
   | "fireflies"
   | "blueprint"
-  | "prisms";
+  | "prisms"
+  | "petals"
+  | "comets";
 
 export const SCENES: { id: SceneId; name: string; description: string }[] = [
   { id: "aurora", name: "Aurora", description: "Floating accent glow (default)" },
@@ -99,6 +101,8 @@ export const SCENES: { id: SceneId; name: string; description: string }[] = [
   { id: "fireflies", name: "Fireflies", description: "Wandering, softly pulsing lights" },
   { id: "blueprint", name: "Blueprint", description: "Drafting-paper grid with construction marks" },
   { id: "prisms", name: "Prisms", description: "Drifting translucent geometric shards" },
+  { id: "petals", name: "Petals", description: "Cherry-blossom petals on the breeze" },
+  { id: "comets", name: "Comets", description: "Shooting stars with fading trails" },
 ];
 
 export const SCENE_IDS = SCENES.map((s) => s.id) as [SceneId, ...SceneId[]];
@@ -298,12 +302,12 @@ export const THEME_PACKS: ThemePack[] = [
     light: { background: "#e8f5f1", foreground: "#0d2a26", accentFrom: "#0d9488", accentTo: "#0284c7" },
   },
   {
-    // Soft rose→violet bloom on the textured Nebula scene with a glossy Aero
-    // surface. Designed light-first: a warm pale-pink wash that reads as a bright,
-    // airy theme, with a complementary plum dark.
+    // Soft rose→violet bloom under drifting cherry-blossom Petals with a glossy
+    // Aero surface. Designed light-first: a warm pale-pink wash that reads as a
+    // bright, airy theme, with a complementary plum dark.
     name: "Bloom",
     design: "aero",
-    scene: "nebula",
+    scene: "petals",
     light: { background: "#faedf4", foreground: "#3a172e", accentFrom: "#db2777", accentTo: "#7c3aed" },
     dark: { background: "#170e1b", foreground: "#f4e9f2", accentFrom: "#f472b6", accentTo: "#a78bfa" },
   },

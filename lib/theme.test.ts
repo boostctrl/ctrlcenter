@@ -10,9 +10,9 @@ import {
 } from "./theme";
 
 describe("catalog sizes", () => {
-  it("ships 18 designs, 16 scenes, 21 palettes, 12 themes", () => {
+  it("ships 18 designs, 18 scenes, 21 palettes, 12 themes", () => {
     expect(DESIGNS).toHaveLength(18);
-    expect(SCENES).toHaveLength(16);
+    expect(SCENES).toHaveLength(18);
     expect(BASE_THEMES).toHaveLength(21);
     expect(THEME_PACKS).toHaveLength(12);
   });

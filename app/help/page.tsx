@@ -247,7 +247,7 @@ export default async function HelpPage() {
               </li>
               <li>
                 <strong>Scene.</strong> The animated backdrop: Aurora,
-                Starfield, Horizon, Rain, and more (16 in all).
+                Starfield, Petals, Comets, and more (18 in all).
               </li>
               <li>
                 <strong>Accent and colors.</strong> The accent gradient, plus
