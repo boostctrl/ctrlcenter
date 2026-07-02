@@ -66,13 +66,17 @@ function StateDot({ status }: { status: AppStatus | undefined }) {
   );
 }
 
-// Uptime bar timeline (Atlassian Statuspage / UptimeRobot style). Hourly or
-// daily bars depending on the selected range. Tooltips read in the visitor's
-// time zone (see formatBarLabel), matching the rest of the app.
+// Uptime heartbeat timeline (Atlassian Statuspage / UptimeRobot style). Hourly
+// or daily bars depending on the selected range. Every bar is the same slim
+// capsule regardless of how many the range yields (bars cap at max-w-2 instead
+// of stretching into bricks on sparse ranges), and the strip anchors to the
+// right edge so "now" stays put under the uptime figure when switching ranges.
+// Tooltips read in the visitor's time zone (see formatBarLabel), matching the
+// rest of the app.
 function Timeline({ points, timeZone }: { points: BarPoint[]; timeZone: string }) {
   if (points.length === 0) return null;
   return (
-    <div className="flex h-7 items-stretch gap-0.5">
+    <div className="flex h-7 items-stretch justify-end gap-0.5">
       {points.map((p, i) => (
         // Position-unique key: bars are a fixed positional sequence, and two
         // recent readings can share a minute-level `at`. A bare `p.at` key then
@@ -85,7 +89,7 @@ function Timeline({ points, timeZone }: { points: BarPoint[]; timeZone: string }
               ? `${formatBarLabel(p.at, timeZone)}: no data`
               : `${formatBarLabel(p.at, timeZone)}: ${p.uptime.toFixed(1)}% up`
           }
-          className={`flex-1 rounded ${uptimeColor(p.uptime)}`}
+          className={`max-w-2 flex-1 rounded-full ${uptimeColor(p.uptime)}`}
         />
       ))}
     </div>

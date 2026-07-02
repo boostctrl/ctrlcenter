@@ -12,6 +12,13 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **Consistent status heartbeat pills.** The uptime timeline on the status
+  page now draws the same slim rounded pill for every time range, anchored to
+  the right edge so "now" stays put when switching ranges — instead of bars
+  stretching into wide blocks on the shorter ranges.
+
 ## [1.5.0] - 2026-07-02
 
 ### Added
