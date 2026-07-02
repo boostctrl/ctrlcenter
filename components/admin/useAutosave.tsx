@@ -19,7 +19,14 @@ export function useAutosave<T>(
   // Only real content changes should trigger a save (and identical re-renders
   // shouldn't), so key the effect on the serialized value.
   const key = JSON.stringify(value);
-  const first = useRef(true);
+  // The serialization the server is already assumed to have: the initial
+  // server-provided value, then each scheduled save's payload. Saving only when
+  // `key` departs from it makes mount runs no-ops — including StrictMode's dev
+  // replay, which used to consume a one-shot "skip the first run" flag and then
+  // save the untouched initial value on the replay (#73). It also keeps
+  // reverting-to-initial saving correctly: once an edit is scheduled the
+  // snapshot moves with it, so a later revert still differs and writes.
+  const savedKey = useRef(key);
   // Serialize the actual writes so two saves can never land out of order (an
   // older value clobbering a newer one when the first request is slower than the
   // debounce window), and a monotonic sequence so only the latest save drives the
@@ -28,10 +35,8 @@ export function useAutosave<T>(
   const latestSeq = useRef(0);
 
   useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
-    }
+    if (key === savedKey.current) return;
+    savedKey.current = key;
     let cancelled = false;
     const seq = ++latestSeq.current;
     setStatus("saving");
