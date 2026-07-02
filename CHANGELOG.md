@@ -14,6 +14,11 @@ here.
 
 ### Added
 
+- **An RSS feed widget.** Show the latest headlines from any RSS or Atom feed
+  on the home page. Configure the URL and entry count in admin Settings → RSS
+  feed (with a Test feed button), and show the card from the layout editor.
+  Entries are fetched server-side and cached for a few minutes; only safe
+  http(s) links are rendered. Ships hidden. (#79)
 - **A Notes widget.** A free-form card for the home page — reminders, runbook
   snippets, a message for the household — written in admin Settings → Notes
   using a safe markdown subset (headings, bold/italic, links, lists, quotes,

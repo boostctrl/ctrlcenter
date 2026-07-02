@@ -16,6 +16,7 @@ import { resolveLayoutWidgets, type LayoutWidgetId } from "@/lib/layout";
 import { TextField } from "./ui";
 import IconField from "./IconField";
 import CalendarTest from "./CalendarTest";
+import FeedTest from "./FeedTest";
 import CitySearch from "./CitySearch";
 import ChangePassword from "./ChangePassword";
 import { apiErrorMessage } from "./apiError";
@@ -43,6 +44,7 @@ const SETTINGS_SECTIONS = [
   { id: "alerts", label: "Alerts" },
   { id: "weather", label: "Weather" },
   { id: "calendar", label: "Calendar" },
+  { id: "feed", label: "RSS feed" },
   { id: "notes", label: "Notes" },
   { id: "security", label: "Security" },
 ] as const;
@@ -172,6 +174,10 @@ export default function SettingsManager({
   const notes = settings.notes;
   const updateNotes = (patch: Partial<Settings["notes"]>) =>
     setSettings((s) => ({ ...s, notes: { ...s.notes, ...patch } }));
+
+  const feed = settings.feed;
+  const updateFeed = (patch: Partial<Settings["feed"]>) =>
+    setSettings((s) => ({ ...s, feed: { ...s.feed, ...patch } }));
 
   const bangs = settings.search.bangs;
   const setBangs = (next: Settings["search"]["bangs"]) =>
@@ -1067,6 +1073,65 @@ export default function SettingsManager({
               time zone; repeating events expand for common rules
               (daily/weekly/monthly).
             </p>
+          </>
+        )}
+        </Section>
+        )}
+
+        {section === "feed" && (
+        <Section title="RSS feed">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <span className="text-sm text-fg/70">Feed widget</span>
+            <p className="text-xs text-fg/40">
+              Show the latest entries from an RSS or Atom feed. Fetched
+              server-side and cached for a few minutes. Ships hidden — show the
+              card in the home-page layout editor once configured.
+            </p>
+          </div>
+          <label className="flex shrink-0 items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={feed.enabled}
+              onChange={(e) => updateFeed({ enabled: e.target.checked })}
+            />
+            Enabled
+          </label>
+        </div>
+
+        {feed.enabled && (
+          <>
+            <TextField
+              label="Feed URL (RSS or Atom)"
+              placeholder="https://example.com/feed.xml"
+              value={feed.url}
+              onChange={(e) => updateFeed({ url: e.target.value })}
+            />
+            <TextField
+              label="Card title (optional — defaults to the feed's own)"
+              placeholder=""
+              value={feed.title}
+              onChange={(e) => updateFeed({ title: e.target.value })}
+            />
+            <label className="flex items-center justify-between gap-4 text-sm">
+              <span className="text-fg/50">Entries to show</span>
+              <input
+                type="number"
+                min={1}
+                max={15}
+                value={feed.count}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10);
+                  updateFeed({
+                    count: Number.isNaN(v)
+                      ? feed.count
+                      : Math.min(15, Math.max(1, v)),
+                  });
+                }}
+                className={`${selectClass} w-20 text-center`}
+              />
+            </label>
+            <FeedTest url={feed.url} />
           </>
         )}
         </Section>

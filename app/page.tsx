@@ -5,7 +5,9 @@ import CalendarWidget from "@/components/CalendarWidget";
 import { StatusProvider } from "@/components/StatusProvider";
 import { EditModeProvider } from "@/components/EditMode";
 import { fetchCalendar, fetchCalendarRange } from "@/lib/calendar";
+import { fetchFeed } from "@/lib/feed";
 import { fetchWeather } from "@/lib/weather";
+import FeedWidget from "@/components/widgets/FeedWidget";
 import { greetingFor, hourIn, shortDate } from "@/lib/datetime";
 import { resolveLayoutWidgets } from "@/lib/layout";
 import { isAdminSession } from "@/lib/api-auth";
@@ -46,6 +48,12 @@ export default async function HomePage({
   const calendarVisible =
     calEnabled && !(cal.hideWhenEmpty && events.length === 0);
 
+  // The RSS feed widget's items, fetched (and cached) server-side like the
+  // calendar's events.
+  const feedCfg = settings.feed;
+  const feedEnabled = feedCfg.enabled && feedCfg.url.trim() !== "";
+  const feed = feedEnabled ? await fetchFeed(feedCfg.url, feedCfg.count) : null;
+
   // Server-computed seeds (admin default tz/location) so the SSR'd widgets have
   // real content before the client applies the visitor's effective prefs.
   const timeZone = settings.timezone || "UTC";
@@ -85,6 +93,11 @@ export default async function HomePage({
             showClock={settings.components.clock}
             statusEnabled={statusEnabled}
             notes={settings.notes}
+            feed={
+              feedEnabled ? (
+                <FeedWidget feed={feed} titleOverride={feedCfg.title} />
+              ) : null
+            }
             calendar={
               calendarVisible ? (
                 <CalendarWidget

@@ -139,6 +139,7 @@ export default function Dashboard({
   showClock,
   statusEnabled,
   notes,
+  feed = null,
 }: {
   // The resolved widget arrangement (order + span + hidden), server-resolved so
   // legacy configs render unchanged.
@@ -164,6 +165,9 @@ export default function Dashboard({
   statusEnabled: boolean;
   // The Notes widget's admin-authored title + markdown body.
   notes: { title: string; content: string };
+  // The RSS feed widget (rendered server-side and passed in, like `calendar`);
+  // null when the feature is off, so its layout cell isn't left empty.
+  feed?: React.ReactNode;
 }) {
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -416,6 +420,8 @@ export default function Dashboard({
         return notes.content.trim() !== "" ? (
           <NotesWidget title={notes.title} content={notes.content} />
         ) : null;
+      case "feed":
+        return q && !editing ? null : feed;
       case "favorites":
         return (!q || editing) && favoriteApps.length > 0 ? (
           <section>
@@ -479,6 +485,8 @@ export default function Dashboard({
         return "The calendar is disabled, or it has no upcoming events to show.";
       case "notes":
         return "The note is empty — write it in admin Settings → Notes.";
+      case "feed":
+        return "The RSS feed is off or has no URL — set it up in admin Settings → RSS feed.";
       case "favorites":
         return "No pinned favorites yet.";
       case "apps":

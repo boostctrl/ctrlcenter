@@ -434,6 +434,18 @@ export default async function HelpPage() {
             </P>
           </Card>
 
+          <Card title="RSS feed card">
+            <P>
+              Show the latest headlines from any RSS or Atom feed — a news
+              site, a blog, release notes. Point{" "}
+              <strong>Settings → RSS feed</strong> at the feed URL (the{" "}
+              <strong>Test feed</strong> button confirms it&apos;s readable),
+              pick how many entries to show, then show the card from the
+              home-page layout editor. Entries are fetched server-side and
+              cached for a few minutes.
+            </P>
+          </Card>
+
           <Card title="Themes">
             <P>
               The <strong>Themes</strong> tab edits the built-in theme packs

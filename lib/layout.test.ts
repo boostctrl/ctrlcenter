@@ -31,6 +31,7 @@ describe("resolveLayoutWidgets", () => {
       "search",
       "calendar",
       "notes",
+      "feed",
       "favorites",
     ]);
     // Every widget appears exactly once.
@@ -71,6 +72,7 @@ describe("resolveLayoutWidgets", () => {
       "apps",
       "bookmarks",
       "notes",
+      "feed",
     ]);
     // Combined card visible, split widgets hidden — today's look.
     expect(out.find((w) => w.id === "headerCard")?.hidden).toBe(false);
@@ -131,15 +133,19 @@ describe("resolveLayoutWidgets", () => {
     expect(out.find((w) => w.id === "apps")?.hidden).toBe(false);
   });
 
-  it("appends the notes widget, dormant, to a layout saved before it existed", () => {
-    // The upgrade path: a full pre-notes layout must render unchanged, with
-    // the new widget appended hidden at its default span.
-    const preNotes = LAYOUT_WIDGET_IDS.filter((id) => id !== "notes").map(
+  it("appends widgets added in later versions, dormant, to an older layout", () => {
+    // The upgrade path: a full layout saved before notes/feed existed must
+    // render unchanged, with the new widgets appended hidden at their default
+    // spans.
+    const added: LayoutWidgetId[] = ["notes", "feed"];
+    const older = LAYOUT_WIDGET_IDS.filter((id) => !added.includes(id)).map(
       (id) => ({ id, span: 24, hidden: false })
     );
-    const out = resolveLayoutWidgets(preNotes);
-    expect(out.map((w) => w.id)).toEqual([...preNotes.map((w) => w.id), "notes"]);
-    expect(out[out.length - 1]).toEqual({ id: "notes", span: 8, hidden: true });
+    const out = resolveLayoutWidgets(older);
+    expect(out.map((w) => w.id)).toEqual([...older.map((w) => w.id), ...added]);
+    for (const id of added) {
+      expect(out.find((w) => w.id === id)).toEqual({ id, span: 8, hidden: true });
+    }
   });
 });
 

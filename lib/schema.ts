@@ -119,6 +119,17 @@ export const calendarSchema = z.object({
 });
 export type CalendarConfig = z.infer<typeof calendarSchema>;
 
+// RSS/Atom feed widget fed by a public feed URL. Stored leniently; the URL is
+// validated on the admin path.
+export const feedSchema = z.object({
+  enabled: z.boolean().default(false),
+  url: z.string().default(""),
+  count: z.number().int().min(1).max(15).default(6),
+  // Card title override; empty uses the feed's own title.
+  title: z.string().default(""),
+});
+export type FeedConfig = z.infer<typeof feedSchema>;
+
 // The Notes widget's content: a title and a markdown body (safe subset,
 // rendered by lib/markdown.ts — never as raw HTML). No `enabled` flag: the
 // widget's layout `hidden` flag governs visibility, and an empty body renders
@@ -310,6 +321,7 @@ export const settingsSchema = z.object({
   alerts: alertsSchema.default(alertsSchema.parse({})),
   calendar: calendarSchema.default(calendarSchema.parse({})),
   notes: notesSchema.default(notesSchema.parse({})),
+  feed: feedSchema.default(feedSchema.parse({})),
   components: componentsSchema.default(componentsSchema.parse({})),
   layout: layoutSchema.default(layoutSchema.parse({})),
 });
@@ -515,6 +527,20 @@ export const notesUpdateSchema = z.object({
   content: z.string(),
 });
 
+// The admin sends the whole feed object. The URL is optional (the widget stays
+// inert until set) but must be http(s) when present.
+export const feedUpdateSchema = z
+  .object({
+    enabled: z.boolean(),
+    url: z.string(),
+    count: z.number().int().min(1).max(15),
+    title: z.string(),
+  })
+  .refine(
+    (f) => f.url.trim() === "" || /^https?:\/\//i.test(f.url.trim()),
+    { message: "Feed URL must start with http(s)", path: ["url"] }
+  );
+
 // The admin sends the whole theme object (not a partial), so updateSettings
 // replaces it wholesale — that's how clearing the optional custom colors works
 // (omit them and they're gone). Required fields keep a saved theme well-formed.
@@ -584,6 +610,7 @@ export const settingsInputSchema = z.object({
   alerts: alertsUpdateSchema.optional(),
   calendar: calendarUpdateSchema.optional(),
   notes: notesUpdateSchema.optional(),
+  feed: feedUpdateSchema.optional(),
   components: componentsUpdateSchema.optional(),
   layout: layoutUpdateSchema.optional(),
 });
