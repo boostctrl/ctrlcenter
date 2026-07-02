@@ -438,6 +438,11 @@ export default async function HelpPage() {
               included in the export, and importing a file can&apos;t change or
               clear it. Password changes only happen through the flow below.
             </P>
+            <P>
+              Note: icons you uploaded are stored as files next to the config,
+              not inside it — an export restores fully on the same instance, but
+              moving to a new instance means re-uploading custom icons.
+            </P>
           </Card>
 
           <Card title="Password & sessions">

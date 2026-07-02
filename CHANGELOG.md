@@ -38,6 +38,20 @@ here.
   the floating navigation menu on every page, and the button on the Settings
   page uses the standard quiet button style instead of the loud accent fill,
   so it sits cohesively with the rest of the theme.
+- **Backups now say what they don't cover.** The Help page's backup card and
+  the admin Export button note that uploaded icon files live beside the
+  config, not inside it — so a config imported on a different instance needs
+  its custom icons re-uploaded. (#72)
+
+### Fixed
+
+- **The admin tab row no longer overflows the page on phones.** At narrow
+  widths the row scrolls within itself instead of forcing the whole page
+  sideways and cutting off content. (#74)
+- **The Settings page no longer throws a hydration error.** The time-zone
+  suggestion list is now filled in after load — the server's and the
+  browser's time-zone databases can differ, so rendering it server-side
+  guaranteed a mismatch that made React re-render the page. (#84)
 
 ### Changed
 
