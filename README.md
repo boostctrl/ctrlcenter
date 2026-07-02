@@ -262,6 +262,11 @@ Tests cover the config read/write + merge logic, schema validation, auth and
 login throttling, and the pure helpers behind theming, weather, status, search
 bangs, alerting, and the iCal/recurrence parser.
 
+Work lands on `develop`; `main` only advances by fast-forward when a release
+is cut with `scripts/release.sh X.Y.Z`, whose `v*` tag push builds the image
+and publishes the GitHub release. The full workflow conventions — branching,
+changelog, issue hygiene — live in [CLAUDE.md](CLAUDE.md).
+
 ### How it fits together
 
 - [`lib/config.ts`](lib/config.ts) reads/writes `config.yaml`, validated by
