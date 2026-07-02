@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-07-02
+
 ### Added
 
 - **A Stone palette.** A fairly neutral warm-gray palette — greige surfaces
@@ -1107,7 +1109,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.4.1...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/boostctrl/ctrlcenter/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/boostctrl/ctrlcenter/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/boostctrl/ctrlcenter/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/boostctrl/ctrlcenter/compare/v1.2.2...v1.3.0
