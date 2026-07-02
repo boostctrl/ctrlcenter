@@ -134,13 +134,15 @@ function AdminBody({
         </div>
       </div>
 
-      <div className="flex gap-2 border-b border-fg/10 pb-2">
+      {/* The row scrolls (not the page) when the tabs outgrow a phone-width
+          viewport; shrink-0 keeps each tab intact instead of squashing. */}
+      <div className="flex gap-2 overflow-x-auto border-b border-fg/10 pb-2">
         {TABS.map((t) => (
           <button
             key={t.key}
             type="button"
             onClick={() => setTab(t.key)}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+            className={`shrink-0 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
               tab === t.key ? "bg-fg/10 text-fg" : "text-fg/50 hover:text-fg/80"
             }`}
           >
