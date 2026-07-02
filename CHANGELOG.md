@@ -12,6 +12,14 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Living weather hero.** The weather page's hero now plays a subtle
+  animated effect matching the current conditions — falling rain or snow,
+  storm flashes of lightning, rolling fog, drifting clouds, a warm sun glow
+  by day or twinkling stars at night. Effects respect the reduced-motion
+  preference by rendering a single still frame.
+
 ### Changed
 
 - **Consistent status heartbeat pills.** The uptime timeline on the status

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { useVisitorPrefs } from "./PrefsProvider";
+import WeatherEffects from "./WeatherEffects";
 import {
   fetchForecast,
   unitSymbol,
@@ -159,7 +160,7 @@ export default function WeatherDetails({
 }: {
   initial: Forecast | null;
 }) {
-  const { location, units } = useVisitorPrefs();
+  const { location, units, surfaceIsLight } = useVisitorPrefs();
   const [fetched, setFetched] = useState<Forecast | null>(null);
   const [nowMin, setNowMin] = useState<number | null>(null);
 
@@ -213,6 +214,11 @@ export default function WeatherDetails({
             className="pointer-events-none absolute inset-0"
             style={{ background: conditionWash(current.code, current.isDay) }}
             aria-hidden
+          />
+          <WeatherEffects
+            code={current.code}
+            isDay={current.isDay}
+            light={surfaceIsLight}
           />
           <div className="relative flex flex-wrap items-center gap-x-6 gap-y-3">
             <span className="text-7xl leading-none" aria-hidden>
