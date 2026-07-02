@@ -12,6 +12,12 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **A Stone palette.** A fairly neutral warm-gray palette — greige surfaces
+  with muted stone accents — joins Mono at the neutral end of the preset row
+  (21 palettes in all).
+
 ### Changed
 
 - **Light and dark accents are now independent.** The accent gradient set in

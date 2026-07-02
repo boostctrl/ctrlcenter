@@ -126,6 +126,13 @@ export const BASE_THEMES: PresetTheme[] = [
     light: { background: "#efeff0", foreground: "#1b1b1d", accentFrom: "#52525b", accentTo: "#71717a" },
   },
   {
+    // Warm-gray counterpart to Mono's cool zinc: greige surfaces with muted
+    // stone accents — the "no color" choice that still feels warm.
+    name: "Stone",
+    dark: { background: "#131211", foreground: "#e8e6e3", accentFrom: "#a8a29e", accentTo: "#78716c" },
+    light: { background: "#f1efec", foreground: "#26231f", accentFrom: "#57534e", accentTo: "#78716c" },
+  },
+  {
     name: "Crimson",
     dark: { background: "#150807", foreground: "#f6e6e4", accentFrom: "#ef4444", accentTo: "#f87171" },
     light: { background: "#f8eceb", foreground: "#2a1110", accentFrom: "#dc2626", accentTo: "#b91c1c" },
