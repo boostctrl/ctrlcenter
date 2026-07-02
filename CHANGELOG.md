@@ -38,10 +38,10 @@ here.
   the floating navigation menu on every page, and the button on the Settings
   page uses the standard quiet button style instead of the loud accent fill,
   so it sits cohesively with the rest of the theme.
-- **Backups now say what they don't cover.** The Help page's backup card and
-  the admin Export button note that uploaded icon files live beside the
-  config, not inside it — so a config imported on a different instance needs
-  its custom icons re-uploaded. (#72)
+- **Backups now include your uploaded icons.** Export bundles the uploaded
+  icon files into the single JSON backup and Import restores them, so a config
+  moved to a new instance keeps its custom icons instead of showing broken
+  images. Backups made before this release still import as before. (#72)
 
 ### Fixed
 

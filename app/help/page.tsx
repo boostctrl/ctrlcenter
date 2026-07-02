@@ -439,9 +439,9 @@ export default async function HelpPage() {
               clear it. Password changes only happen through the flow below.
             </P>
             <P>
-              Note: icons you uploaded are stored as files next to the config,
-              not inside it — an export restores fully on the same instance, but
-              moving to a new instance means re-uploading custom icons.
+              Icons you uploaded are bundled into the export and restored on
+              import, so a backup moved to a new instance keeps its custom
+              icons. Backups made before icon bundling still import fine.
             </P>
           </Card>
 

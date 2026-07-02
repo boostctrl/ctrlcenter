@@ -71,3 +71,75 @@ describe("save / list / read / delete round-trip", () => {
     expect(await uploads.readIcon("../../etc/passwd")).toBeNull();
   });
 });
+
+describe("backup bundling (sanitizeBundledIcons)", () => {
+  const b64 = (bytes: number[]) => Buffer.from(bytes).toString("base64");
+
+  it("treats an absent field as no icons (pre-bundling backups)", () => {
+    expect(uploads.sanitizeBundledIcons(undefined)).toEqual([]);
+    expect(uploads.sanitizeBundledIcons(null)).toEqual([]);
+  });
+
+  it("decodes valid entries", () => {
+    const out = uploads.sanitizeBundledIcons([
+      { name: "logo-1a2b.png", data: b64([1, 2, 3]) },
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out![0].name).toBe("logo-1a2b.png");
+    expect(Array.from(out![0].bytes)).toEqual([1, 2, 3]);
+  });
+
+  it("rejects the whole bundle on any bad entry", () => {
+    const ok = { name: "logo.png", data: b64([1]) };
+    // Traversal / multi-segment names.
+    expect(
+      uploads.sanitizeBundledIcons([ok, { name: "../evil.png", data: b64([1]) }])
+    ).toBeNull();
+    // Extensions that wouldn't be served as an image.
+    expect(
+      uploads.sanitizeBundledIcons([{ name: "evil.html", data: b64([1]) }])
+    ).toBeNull();
+    // Empty or missing payloads.
+    expect(uploads.sanitizeBundledIcons([{ name: "a.png", data: "" }])).toBeNull();
+    expect(uploads.sanitizeBundledIcons([{ name: "a.png" }])).toBeNull();
+    // Non-array shapes.
+    expect(uploads.sanitizeBundledIcons({ name: "a.png" })).toBeNull();
+    expect(uploads.sanitizeBundledIcons("nope")).toBeNull();
+  });
+
+  it("rejects oversize payloads and oversize bundles", () => {
+    const big = "A".repeat(Math.ceil((uploads.MAX_ICON_BYTES * 4) / 3) + 8);
+    expect(
+      uploads.sanitizeBundledIcons([{ name: "big.png", data: big }])
+    ).toBeNull();
+    const many = Array.from({ length: uploads.MAX_BUNDLED_ICONS + 1 }, (_, i) => ({
+      name: `i${i}.png`,
+      data: b64([1]),
+    }));
+    expect(uploads.sanitizeBundledIcons(many)).toBeNull();
+  });
+});
+
+describe("backup bundling (export → wipe → restore round-trip)", () => {
+  it("re-materializes exported icons under their original names", async () => {
+    const bytes = new Uint8Array([9, 8, 7, 6, 5]);
+    const { name } = await uploads.saveIcon("Round Trip.png", "image/png", bytes);
+
+    const bundle = await uploads.exportIcons();
+    const entry = bundle.find((e) => e.name === name);
+    expect(entry).toBeDefined();
+
+    // Simulate a fresh instance: the file is gone, only the backup remains.
+    expect(await uploads.deleteIcon(name)).toBe(true);
+    expect(await uploads.readIcon(name)).toBeNull();
+
+    const sanitized = uploads.sanitizeBundledIcons([entry]);
+    expect(sanitized).toHaveLength(1);
+    await uploads.writeBundledIcons(sanitized!);
+
+    const restored = await uploads.readIcon(name);
+    expect(restored?.type).toBe("image/png");
+    expect(new Uint8Array(restored!.data)).toEqual(bytes);
+    await uploads.deleteIcon(name);
+  });
+});

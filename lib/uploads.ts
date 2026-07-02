@@ -182,3 +182,77 @@ export async function deleteIcon(name: string): Promise<boolean> {
     return false;
   }
 }
+
+// --- Backup bundling (see /api/config) ---
+// Uploaded icons ride inside the config export as base64 entries, so a backup
+// is one self-contained JSON file and an import on a fresh instance restores
+// the icons the config references.
+
+// One icon serialized into an export: the stored filename plus its bytes.
+export type BundledIcon = { name: string; data: string };
+
+// Cap the number of bundled entries an import will accept — with the per-file
+// MAX_ICON_BYTES cap this bounds how much a hand-crafted backup can write.
+export const MAX_BUNDLED_ICONS = 300;
+
+// Every stored icon with its contents, for bundling into a config export.
+export async function exportIcons(): Promise<BundledIcon[]> {
+  const icons = await listIcons();
+  const out: BundledIcon[] = [];
+  for (const { name } of icons) {
+    const icon = await readIcon(name);
+    if (icon) {
+      out.push({ name, data: Buffer.from(icon.data).toString("base64") });
+    }
+  }
+  return out;
+}
+
+// Validate one bundled entry: the same single-segment name shape the rest of
+// this module enforces, a servable image extension, and base64 within the
+// upload size cap. Returns the decoded bytes, or null when unacceptable.
+function decodeBundledIcon(
+  entry: unknown
+): { name: string; bytes: Uint8Array } | null {
+  if (!entry || typeof entry !== "object") return null;
+  const { name, data } = entry as Record<string, unknown>;
+  if (typeof name !== "string" || typeof data !== "string") return null;
+  if (!isSafeName(name) || !(extOf(name) in EXT_TO_TYPE)) return null;
+  // Cheap pre-check before decoding: base64 is ~4/3 of the byte length.
+  if (data.length > Math.ceil((MAX_ICON_BYTES * 4) / 3) + 4) return null;
+  const bytes = new Uint8Array(Buffer.from(data, "base64"));
+  if (bytes.byteLength === 0 || bytes.byteLength > MAX_ICON_BYTES) return null;
+  return { name, bytes };
+}
+
+// Validate a backup's `uploads` field. Absent/empty → no icons ([]); anything
+// malformed → null, so the import can refuse the whole file with a clear error
+// instead of restoring it partially.
+export function sanitizeBundledIcons(
+  input: unknown
+): { name: string; bytes: Uint8Array }[] | null {
+  if (input === undefined || input === null) return [];
+  if (!Array.isArray(input) || input.length > MAX_BUNDLED_ICONS) return null;
+  const out: { name: string; bytes: Uint8Array }[] = [];
+  for (const entry of input) {
+    const decoded = decodeBundledIcon(entry);
+    if (!decoded) return null;
+    out.push(decoded);
+  }
+  return out;
+}
+
+// Write restored icons under their exported names (the imported config's icon
+// URLs point at those exact names). Files not named in the bundle are left
+// alone — an import merges into the icon library rather than wiping it.
+export async function writeBundledIcons(
+  icons: { name: string; bytes: Uint8Array }[]
+): Promise<void> {
+  if (icons.length === 0) return;
+  await fs.mkdir(UPLOADS_DIR, { recursive: true });
+  for (const { name, bytes } of icons) {
+    const full = iconPath(name);
+    if (!full) continue; // names were validated; belt and braces
+    await fs.writeFile(full, bytes);
+  }
+}

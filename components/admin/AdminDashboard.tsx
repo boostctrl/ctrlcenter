@@ -110,13 +110,11 @@ function AdminBody({
         <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-3xl font-bold">Manage your dashboard</h1>
           <div className="flex flex-wrap items-center gap-3">
-            {/* Uploaded icon files live beside the config, not in it — see #72
-                for bundling them; until then the tooltip states the limit. */}
             <Button
               variant="ghost"
               type="button"
               onClick={handleExport}
-              title="Downloads the configuration as JSON. Uploaded icon files aren't included — on a different instance, re-upload them."
+              title="Downloads the configuration — uploaded icons included — as a single JSON file."
             >
               Export
             </Button>
@@ -132,6 +130,7 @@ function AdminBody({
               type="file"
               accept="application/json,.json"
               onChange={handleImportFile}
+              aria-label="Import configuration file"
               className="hidden"
             />
             <Button variant="ghost" type="button" onClick={handleLogout}>
