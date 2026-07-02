@@ -29,6 +29,10 @@ here.
 
 ### Changed
 
+- **Light and dark accents are now independent.** The accent gradient set in
+  the theme builder applies only to the mode being edited, so each mode can
+  carry its own accent. An accent saved before this release keeps applying to
+  both modes until changed.
 - **Buttons now follow the active design's personality.** Button corner
   rounding is its own design token, separate from the card radius — square on
   Bold and Console, pills on Soft and Clay — instead of one fixed rounding
@@ -52,13 +56,6 @@ here.
   suggestion list is now filled in after load — the server's and the
   browser's time-zone databases can differ, so rendering it server-side
   guaranteed a mismatch that made React re-render the page. (#84)
-
-### Changed
-
-- **Light and dark accents are now independent.** The accent gradient set in
-  the theme builder applies only to the mode being edited, so each mode can
-  carry its own accent. An accent saved before this release keeps applying to
-  both modes until changed.
 
 ## [1.4.1] - 2026-07-02
 
