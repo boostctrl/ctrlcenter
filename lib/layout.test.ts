@@ -36,17 +36,17 @@ describe("resolveLayoutWidgets", () => {
     expect(out.map((w) => w.id).sort()).toEqual([...LAYOUT_WIDGET_IDS].sort());
   });
 
-  it("maps legacy widths to spans (full/twoThirds/half/third → 12/8/6/4)", () => {
+  it("maps legacy widths to spans (full/twoThirds/half/third → 24/16/12/8)", () => {
     const out = resolveLayoutWidgets([
       { id: "search", width: "full" },
       { id: "apps", width: "twoThirds" },
       { id: "bookmarks", width: "half" },
       { id: "calendar", width: "third" },
     ]);
-    expect(out.find((w) => w.id === "search")?.span).toBe(12);
-    expect(out.find((w) => w.id === "apps")?.span).toBe(8);
-    expect(out.find((w) => w.id === "bookmarks")?.span).toBe(6);
-    expect(out.find((w) => w.id === "calendar")?.span).toBe(4);
+    expect(out.find((w) => w.id === "search")?.span).toBe(24);
+    expect(out.find((w) => w.id === "apps")?.span).toBe(16);
+    expect(out.find((w) => w.id === "bookmarks")?.span).toBe(12);
+    expect(out.find((w) => w.id === "calendar")?.span).toBe(8);
   });
 
   it("renders a legacy 5-section layout exactly like the old page", () => {
@@ -82,14 +82,25 @@ describe("resolveLayoutWidgets", () => {
       { id: "apps", span: 6 },
       { id: "apps", span: 12 }, // duplicate id — ignored (first wins)
       { id: "nope" as LayoutWidgetId, span: 6 }, // unknown — dropped
-      { id: "search", span: 13 }, // out of range — default span
+      { id: "search", span: 25 }, // out of range — default span
       { id: "bookmarks", span: 2.5 }, // not an integer — default span
     ]);
     expect(out.find((w) => w.id === "apps")?.span).toBe(6);
-    expect(out.find((w) => w.id === "search")?.span).toBe(12);
-    expect(out.find((w) => w.id === "bookmarks")?.span).toBe(12);
+    expect(out.find((w) => w.id === "search")?.span).toBe(24);
+    expect(out.find((w) => w.id === "bookmarks")?.span).toBe(24);
     expect(out.some((w) => (w.id as string) === "nope")).toBe(false);
     expect(out).toHaveLength(LAYOUT_WIDGET_IDS.length);
+  });
+
+  it("keeps a valid cards override and drops an invalid one", () => {
+    const out = resolveLayoutWidgets([
+      { id: "apps", span: 24, cards: 4 },
+      { id: "bookmarks", span: 24, cards: 0 }, // out of range — dropped
+      { id: "favorites", span: 24, cards: 2.5 }, // not an integer — dropped
+    ]);
+    expect(out.find((w) => w.id === "apps")?.cards).toBe(4);
+    expect("cards" in out.find((w) => w.id === "bookmarks")!).toBe(false);
+    expect("cards" in out.find((w) => w.id === "favorites")!).toBe(false);
   });
 
   it("folds legacy components toggles into hidden for entries without one", () => {
@@ -120,17 +131,74 @@ describe("resolveLayoutWidgets", () => {
 });
 
 describe("layout schema", () => {
-  it("settingsSchema defaults to the full widget catalog", () => {
-    expect(settingsSchema.parse({}).layout.sections).toEqual(DEFAULT_WIDGETS);
+  it("settingsSchema defaults to the full widget catalog on the 24-column grid", () => {
+    const layout = settingsSchema.parse({}).layout;
+    expect(layout.sections).toEqual(DEFAULT_WIDGETS);
+    expect(layout.columns).toBe(24);
+    expect(layout.scale).toBe(100);
   });
 
   it("transforms the legacy width shape to a span (and re-parses idempotently)", () => {
     const once = layoutSchema.parse({
       sections: [{ id: "apps", width: "half" }],
     });
-    expect(once.sections).toEqual([{ id: "apps", span: 6 }]);
+    expect(once.sections).toEqual([{ id: "apps", span: 12 }]);
     // Re-parsing the output (as writeConfig does) is a no-op.
     expect(layoutSchema.parse(once)).toEqual(once);
+  });
+
+  it("doubles spans saved on the 12-column grid exactly once", () => {
+    // A 1.3-era config: spans on the 12-column grid, no `columns` marker.
+    const once = layoutSchema.parse({
+      sections: [
+        { id: "apps", span: 6 },
+        { id: "search", span: 12, hidden: true },
+      ],
+    });
+    expect(once.sections).toEqual([
+      { id: "apps", span: 12 },
+      { id: "search", span: 24, hidden: true },
+    ]);
+    expect(once.columns).toBe(24);
+    // Re-parsing (as writeConfig does on every save) must not double again.
+    expect(layoutSchema.parse(once)).toEqual(once);
+  });
+
+  it("leaves 24-based spans alone when the columns marker is present", () => {
+    const parsed = layoutSchema.parse({
+      sections: [{ id: "apps", span: 7 }],
+      columns: 24,
+    });
+    expect(parsed.sections).toEqual([{ id: "apps", span: 7 }]);
+  });
+
+  it("doesn't double legacy width rows (they map straight to 24-based spans)", () => {
+    const parsed = layoutSchema.parse({
+      sections: [
+        { id: "apps", span: 6 },
+        { id: "bookmarks", width: "third" },
+      ],
+    });
+    expect(parsed.sections.find((w) => w.id === "apps")?.span).toBe(12);
+    expect(parsed.sections.find((w) => w.id === "bookmarks")?.span).toBe(8);
+  });
+
+  it("keeps a valid scale and coerces an out-of-range one to the default", () => {
+    expect(layoutSchema.parse({ scale: 120, columns: 24 }).scale).toBe(120);
+    expect(layoutSchema.parse({ scale: 500, columns: 24 }).scale).toBe(100);
+    expect(layoutSchema.parse({ scale: "big", columns: 24 }).scale).toBe(100);
+  });
+
+  it("keeps a valid cards override and drops an invalid one", () => {
+    const parsed = layoutSchema.parse({
+      sections: [
+        { id: "apps", span: 24, cards: 3 },
+        { id: "bookmarks", span: 24, cards: 9 },
+      ],
+      columns: 24,
+    });
+    expect(parsed.sections[0]).toEqual({ id: "apps", span: 24, cards: 3 });
+    expect(parsed.sections[1]).toEqual({ id: "bookmarks", span: 24 });
   });
 
   it("keeps hidden absent when a stored entry omits it, present when not", () => {
@@ -151,6 +219,7 @@ describe("layout schema", () => {
         { id: "apps", span: 6 },
         "garbage",
       ],
+      columns: 24,
     });
     expect(parsed.sections).toEqual([{ id: "apps", span: 6 }]);
     // The resolver then rebuilds the rest around what survived.
@@ -160,16 +229,23 @@ describe("layout schema", () => {
     );
   });
 
-  it("layoutUpdateSchema requires a fully-resolved list and bounds the span", () => {
+  it("layoutUpdateSchema requires a fully-resolved list and bounds span/cards/scale", () => {
     const good = {
-      sections: [{ id: "apps", span: 6, hidden: false }],
+      sections: [{ id: "apps", span: 13, hidden: false, cards: 4 }],
     };
-    expect(layoutUpdateSchema.safeParse(good).success).toBe(true);
+    const parsed = layoutUpdateSchema.safeParse(good);
+    expect(parsed.success).toBe(true);
+    // The grid marker and scale are stamped in so a stored layout can never
+    // re-trigger the 12→24 migration.
+    expect(parsed.data?.columns).toBe(24);
+    expect(parsed.data?.scale).toBe(100);
     for (const bad of [
       { sections: [{ id: "apps", span: 0, hidden: false }] },
-      { sections: [{ id: "apps", span: 13, hidden: false }] },
+      { sections: [{ id: "apps", span: 25, hidden: false }] },
       { sections: [{ id: "apps", span: 6 }] }, // hidden required
       { sections: [{ id: "apps", width: "half", hidden: false }] }, // legacy shape rejected
+      { sections: [{ id: "apps", span: 6, hidden: false, cards: 5 }] },
+      { sections: [], scale: 500 },
     ]) {
       expect(layoutUpdateSchema.safeParse(bad).success).toBe(false);
     }

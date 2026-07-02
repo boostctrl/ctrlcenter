@@ -25,6 +25,8 @@ import type { AppItem, BookmarkItem } from "@/lib/schema";
 import type { CurrentWeather } from "@/lib/weather";
 import {
   GRID_COLUMNS,
+  DEFAULT_UI_SCALE,
+  CARD_WIDGET_IDS,
   type LayoutWidget,
   type LayoutWidgetId,
 } from "@/lib/layout";
@@ -50,12 +52,17 @@ function groupBookmarks(
   ]);
 }
 
-// Persist the whole widget list; the settings API replaces layout wholesale.
-async function saveLayout(sections: LayoutWidget[]): Promise<void> {
+// What the layout editor edits and autosaves as one unit: the widget list plus
+// the site-wide UI scale. Saved together because the settings API replaces the
+// stored layout wholesale — a sections-only save would reset the scale.
+type EditableLayout = { sections: LayoutWidget[]; scale: number };
+
+// Persist the whole layout; the settings API replaces it wholesale.
+async function saveLayout(layout: EditableLayout): Promise<void> {
   const res = await fetch("/api/settings", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ layout: { sections } }),
+    body: JSON.stringify({ layout }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => null);
@@ -63,7 +70,7 @@ async function saveLayout(sections: LayoutWidget[]): Promise<void> {
   }
 }
 
-// How many of the 12 columns each widget spans. Complete, static class strings
+// How many of the 24 columns each widget spans. Complete, static class strings
 // (no interpolation) so Tailwind's extractor keeps every variant.
 const COL_SPAN: Record<number, string> = {
   1: "lg:col-span-1",
@@ -78,6 +85,18 @@ const COL_SPAN: Record<number, string> = {
   10: "lg:col-span-10",
   11: "lg:col-span-11",
   12: "lg:col-span-12",
+  13: "lg:col-span-13",
+  14: "lg:col-span-14",
+  15: "lg:col-span-15",
+  16: "lg:col-span-16",
+  17: "lg:col-span-17",
+  18: "lg:col-span-18",
+  19: "lg:col-span-19",
+  20: "lg:col-span-20",
+  21: "lg:col-span-21",
+  22: "lg:col-span-22",
+  23: "lg:col-span-23",
+  24: "lg:col-span-24",
 };
 
 // The former header widgets center against whatever shares their row (the old
@@ -87,27 +106,26 @@ const CELL_ALIGN: Partial<Record<LayoutWidgetId, string>> = {
   headerCard: "lg:self-center",
 };
 
-// How the inner card/bookmark grids reflow with the widget's width. Buckets
-// keep the class strings static: a wide widget (≥9 columns) fits three cards
-// across, a mid one (5–8) two, a narrow one (≤4) stacks — the same output the
-// old full/twoThirds/half/third widths produced.
-type SpanBucket = "wide" | "mid" | "narrow";
-const bucketFor = (span: number): SpanBucket =>
-  span >= 9 ? "wide" : span >= 5 ? "mid" : "narrow";
-
-const CARD_GRID: Record<SpanBucket, string> = {
-  wide: "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3",
-  mid: "grid grid-cols-1 gap-4 sm:grid-cols-2",
-  narrow: "grid grid-cols-1 gap-4",
+// How the inner card/bookmark grids reflow. An explicit `cards` override wins;
+// otherwise the count derives from the widget's span (a wide widget, ≥18 of 24
+// columns, fits three cards across; a mid one ≥10 two; narrower stacks — the
+// same output the old bucket thresholds produced). Overrides still collapse on
+// small screens: sm caps at 2 across, everything stacks below sm. Complete,
+// static class strings so Tailwind's extractor keeps every variant.
+const CARD_COLS: Record<number, string> = {
+  1: "grid-cols-1",
+  2: "grid-cols-1 sm:grid-cols-2",
+  3: "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
+  4: "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4",
 };
-const BOOKMARK_GRID: Record<SpanBucket, string> = {
-  wide: "grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3",
-  mid: "grid grid-cols-1 gap-6 sm:grid-cols-2",
-  narrow: "grid grid-cols-1 gap-6",
-};
+const cardsFor = (widget: LayoutWidget): number =>
+  widget.cards ?? (widget.span >= 18 ? 3 : widget.span >= 10 ? 2 : 1);
+const cardGridClass = (widget: LayoutWidget, gap: string): string =>
+  `grid ${gap} ${CARD_COLS[cardsFor(widget)] ?? CARD_COLS[1]}`;
 
 export default function Dashboard({
   widgets,
+  scale = DEFAULT_UI_SCALE,
   apps,
   bookmarks,
   search,
@@ -123,6 +141,9 @@ export default function Dashboard({
   // The resolved widget arrangement (order + span + hidden), server-resolved so
   // legacy configs render unchanged.
   widgets: LayoutWidget[];
+  // The saved UI scale (percent); SSR already renders it on <html>, this seeds
+  // the editor's stepper.
+  scale?: number;
   apps: AppItem[];
   bookmarks: BookmarkItem[];
   search: SearchConfig;
@@ -146,15 +167,18 @@ export default function Dashboard({
   const { editing, setEditing } = useEditMode();
   const router = useRouter();
 
-  // The rendered arrangement. Client state so editor changes apply instantly;
-  // the debounced autosave below persists them. `dirtyRef` gates saving to
-  // changes actually made through the editor — the autosave hook watches every
-  // state change and this component mounts for every visitor.
-  const [layout, setLayout] = useState(widgets);
+  // The rendered arrangement + UI scale. Client state so editor changes apply
+  // instantly; the debounced autosave below persists them. `dirtyRef` gates
+  // saving to changes actually made through the editor — the autosave hook
+  // watches every state change and this component mounts for every visitor.
+  const [layout, setLayout] = useState<EditableLayout>({
+    sections: widgets,
+    scale,
+  });
   const dirtyRef = useRef(false);
   // What Revert restores: the layout as it was when edit mode was entered (the
   // last-saved value would trail the debounced autosave by a beat).
-  const entryRef = useRef(widgets);
+  const entryRef = useRef(layout);
   useEffect(() => {
     if (editing) entryRef.current = layout;
     // Snapshot only when edit mode is entered — not again on every edit.
@@ -169,25 +193,49 @@ export default function Dashboard({
     }
   );
 
-  function mutateLayout(next: LayoutWidget[]) {
+  // Keep <html>'s font-size in step with the (possibly just-edited) scale. SSR
+  // renders the saved value, so outside editing this is a no-op re-assertion.
+  useEffect(() => {
+    document.documentElement.style.fontSize =
+      layout.scale === DEFAULT_UI_SCALE ? "" : `${layout.scale}%`;
+  }, [layout.scale]);
+
+  function mutateLayout(next: EditableLayout) {
     dirtyRef.current = true;
     setLayout(next);
   }
+  const mutateSections = (sections: LayoutWidget[]) =>
+    mutateLayout({ ...layout, sections });
   const moveWidget = (from: number, to: number) => {
-    if (to < 0 || to >= layout.length) return;
-    mutateLayout(reorder(layout, from, to));
+    if (to < 0 || to >= layout.sections.length) return;
+    mutateSections(reorder(layout.sections, from, to));
   };
   const setWidgetSpan = (id: LayoutWidgetId, span: number) =>
-    mutateLayout(
-      layout.map((w) =>
+    mutateSections(
+      layout.sections.map((w) =>
         w.id === id
           ? { ...w, span: Math.min(GRID_COLUMNS, Math.max(1, span)) }
           : w
       )
     );
+  // Cards per row for the card-grid widgets; undefined returns to auto (the
+  // key is dropped so the stored entry stays clean).
+  const setWidgetCards = (id: LayoutWidgetId, cards: number | undefined) =>
+    mutateSections(
+      layout.sections.map((w) => {
+        if (w.id !== id) return w;
+        if (cards !== undefined) return { ...w, cards };
+        const rest = { ...w };
+        delete rest.cards;
+        return rest;
+      })
+    );
+  const setScale = (next: number) => mutateLayout({ ...layout, scale: next });
   const toggleWidgetHidden = (id: LayoutWidgetId) =>
-    mutateLayout(
-      layout.map((w) => (w.id === id ? { ...w, hidden: !w.hidden } : w))
+    mutateSections(
+      layout.sections.map((w) =>
+        w.id === id ? { ...w, hidden: !w.hidden } : w
+      )
     );
   const { handlers, dragIndex, over } = useFlowReorder(moveWidget);
 
@@ -200,8 +248,8 @@ export default function Dashboard({
   }
 
   const hiddenById = useMemo(
-    () => new Map(layout.map((w) => [w.id, w.hidden])),
-    [layout]
+    () => new Map(layout.sections.map((w) => [w.id, w.hidden])),
+    [layout.sections]
   );
   const showApps = !hiddenById.get("apps");
   const showBookmarks = !hiddenById.get("bookmarks");
@@ -307,12 +355,13 @@ export default function Dashboard({
     }
   }
 
-  // Each widget as a node for a given span, or null when it has nothing to show
-  // right now (feature off, empty, or hidden during an active search). Hidden
-  // widgets are skipped by the render loop in view mode, so this only decides
-  // content-existence; in edit mode search filtering and the q-gates are
-  // suspended so every widget previews its real content.
-  function blockFor(id: LayoutWidgetId, span: number): React.ReactNode {
+  // Each widget as a node for its span/cards, or null when it has nothing to
+  // show right now (feature off, empty, or hidden during an active search).
+  // Hidden widgets are skipped by the render loop in view mode, so this only
+  // decides content-existence; in edit mode search filtering and the q-gates
+  // are suspended so every widget previews its real content.
+  function blockFor(widget: LayoutWidget): React.ReactNode {
+    const id = widget.id;
     switch (id) {
       case "greeting":
         return <Greeting initialGreeting={initialGreeting} />;
@@ -363,7 +412,7 @@ export default function Dashboard({
         return (!q || editing) && favoriteApps.length > 0 ? (
           <section>
             <SectionTitle>Favorites</SectionTitle>
-            <div className={CARD_GRID[bucketFor(span)]}>
+            <div className={cardGridClass(widget, "gap-4")}>
               {favoriteApps.map((app) => (
                 <AppCard key={app.id} app={app} />
               ))}
@@ -375,7 +424,7 @@ export default function Dashboard({
         return list.length > 0 ? (
           <section>
             <SectionTitle>Applications</SectionTitle>
-            <div className={CARD_GRID[bucketFor(span)]}>
+            <div className={cardGridClass(widget, "gap-4")}>
               {list.map((app) => (
                 <AppCard key={app.id} app={app} />
               ))}
@@ -390,7 +439,7 @@ export default function Dashboard({
         return groups.length > 0 ? (
           <section>
             <SectionTitle>Bookmarks</SectionTitle>
-            <div className={BOOKMARK_GRID[bucketFor(span)]}>
+            <div className={cardGridClass(widget, "gap-6")}>
               {groups.map(([category, items]) => (
                 <BookmarkGroup key={category} category={category} items={items} />
               ))}
@@ -433,9 +482,9 @@ export default function Dashboard({
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-x-8 gap-y-12 lg:grid-cols-12 lg:items-start">
-        {layout.map((widget, index) => {
-          const node = blockFor(widget.id, widget.span);
+      <div className="grid grid-cols-1 gap-x-8 gap-y-12 lg:grid-cols-24 lg:items-start">
+        {layout.sections.map((widget, index) => {
+          const node = blockFor(widget);
           const cellClass = `${COL_SPAN[widget.span]} ${CELL_ALIGN[widget.id] ?? ""}`;
           if (!editing) {
             if (widget.hidden || !node) return null;
@@ -450,12 +499,18 @@ export default function Dashboard({
               key={widget.id}
               widget={widget}
               index={index}
-              count={layout.length}
+              count={layout.sections.length}
               cellClass={cellClass}
               node={node}
               emptyReason={emptyReason(widget.id)}
+              effectiveCards={
+                CARD_WIDGET_IDS.includes(widget.id)
+                  ? cardsFor(widget)
+                  : undefined
+              }
               onMove={moveWidget}
               onSpan={setWidgetSpan}
+              onCards={setWidgetCards}
               onToggleHidden={toggleWidgetHidden}
               dragHandlers={handlers(index)}
               dragging={dragIndex === index}
@@ -513,6 +568,8 @@ export default function Dashboard({
         <EditToolbar
           status={saveStatus}
           error={saveError}
+          scale={layout.scale}
+          onScale={setScale}
           onRevert={() => mutateLayout(entryRef.current)}
           onDone={doneEditing}
         />

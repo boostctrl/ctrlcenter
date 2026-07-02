@@ -12,6 +12,30 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Cards-per-row control for the Applications, Bookmarks and Favorites
+  widgets.** Each gets a second stepper in the layout editor that forces how
+  many cards sit side by side (1–4) instead of the automatic span-derived
+  split; an **Auto** button returns to the old behavior. Overrides still
+  collapse responsively on small screens. (#75)
+- **A site-wide UI scale.** A stepper in the layout editor's toolbar (70–150%,
+  in 5% steps) resizes every element uniformly — text, paddings, cards — with
+  live feedback while editing. Rendered server-side, so pages load at the saved
+  scale with no flash. (#76)
+
+### Changed
+
+- **The widget grid doubles from 12 to 24 columns** for finer widget sizing.
+  Saved layouts migrate automatically on their next load/save (spans double
+  onto the new grid; a `columns` marker in the stored layout keeps the
+  migration one-shot), and pre-1.3 `width` layouts still load too. (#77)
+- **The clock/weather/status cards now adapt to their grid cell.** The
+  combined header card (and the standalone clock/weather widgets) fill their
+  cell, so resizing them in the editor is actually visible; the time/weather
+  row sits side by side when the cell is wide and stacks vertically when it's
+  narrow, instead of clipping. (#78)
+
 ## [1.3.0] - 2026-07-01
 
 ### Added

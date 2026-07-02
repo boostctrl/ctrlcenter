@@ -73,6 +73,7 @@ export default async function HomePage({
         <EditModeProvider isAdmin={isAdmin} initialEditing={initialEditing}>
           <Dashboard
             widgets={widgets}
+            scale={settings.layout.scale}
             apps={apps}
             bookmarks={bookmarks}
             search={settings.search}

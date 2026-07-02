@@ -12,7 +12,7 @@ export default function ClockWidget({
 }) {
   if (!showClock) return null;
   return (
-    <div className="glass-card flex w-full flex-col overflow-hidden sm:w-auto sm:self-start">
+    <div className="glass-card @container flex w-full flex-col overflow-hidden">
       <TimeWeather
         initialDate={initialDate}
         weatherEnabled={false}

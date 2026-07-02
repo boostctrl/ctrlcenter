@@ -9,6 +9,7 @@ import {
   JetBrains_Mono,
 } from "next/font/google";
 import { getSettings } from "@/lib/config";
+import { DEFAULT_UI_SCALE } from "@/lib/layout";
 import { resolveIconUrl } from "@/lib/icons";
 import { serializeForScript } from "@/lib/serialize";
 import { PrefsProvider } from "@/components/PrefsProvider";
@@ -102,10 +103,17 @@ export default async function RootLayout({
   // before hydration from values the server can't know (visitor localStorage), so
   // the SSR/client diff on <html> is expected — scope the suppression to it so
   // React doesn't log #418.
+  // The admin UI scale, as font-size on <html>: the whole UI is rem-based, so
+  // one percentage scales text, paddings and cards uniformly. Server-rendered
+  // (no flash); the layout editor live-updates the same property while tuning.
+  const scale = settings.layout.scale;
   return (
     <html
       lang="en"
       className={`${fontVariables} h-full`}
+      style={
+        scale !== DEFAULT_UI_SCALE ? { fontSize: `${scale}%` } : undefined
+      }
       suppressHydrationWarning
     >
       <body className="relative min-h-full overflow-x-hidden antialiased">

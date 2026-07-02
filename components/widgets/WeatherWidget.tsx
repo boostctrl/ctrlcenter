@@ -15,7 +15,7 @@ export default function WeatherWidget({
 }) {
   if (!weatherEnabled) return null;
   return (
-    <div className="glass-card flex w-full flex-col overflow-hidden sm:w-auto sm:self-start">
+    <div className="glass-card @container flex w-full flex-col overflow-hidden">
       <TimeWeather
         initialDate=""
         weatherEnabled

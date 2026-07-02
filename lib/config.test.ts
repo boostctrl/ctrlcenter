@@ -162,14 +162,23 @@ describe("updateSettings partial merge", () => {
 
   it("replaces the layout wholesale", async () => {
     await config.updateSettings({
-      layout: { sections: [{ id: "apps", span: 6, hidden: false }] },
+      layout: {
+        sections: [{ id: "apps", span: 12, hidden: false }],
+        columns: 24,
+        scale: 100,
+      },
     });
     const settings = await config.updateSettings({
-      layout: { sections: [{ id: "bookmarks", span: 12, hidden: true }] },
+      layout: {
+        sections: [{ id: "bookmarks", span: 24, hidden: true }],
+        columns: 24,
+        scale: 110,
+      },
     });
     expect(settings.layout.sections).toEqual([
-      { id: "bookmarks", span: 12, hidden: true },
+      { id: "bookmarks", span: 24, hidden: true },
     ]);
+    expect(settings.layout.scale).toBe(110);
   });
 
   it("migrates a legacy width layout to spans on the next write", async () => {
@@ -184,14 +193,49 @@ describe("updateSettings partial merge", () => {
       "utf8"
     );
     const loaded = await config.readConfig();
-    expect(loaded.settings.layout.sections).toEqual([{ id: "apps", span: 6 }]);
+    expect(loaded.settings.layout.sections).toEqual([{ id: "apps", span: 12 }]);
 
-    // Any write re-parses the whole config, persisting the span shape.
+    // Any write re-parses the whole config, persisting the span shape and the
+    // 24-column grid marker.
     await config.updateSettings({ title: "Dash" });
     const onDisk = YAML.load(await fs.readFile(configPath, "utf8")) as {
-      settings: { layout: { sections: unknown } };
+      settings: { layout: { sections: unknown; columns: number } };
     };
-    expect(onDisk.settings.layout.sections).toEqual([{ id: "apps", span: 6 }]);
+    expect(onDisk.settings.layout.sections).toEqual([{ id: "apps", span: 12 }]);
+    expect(onDisk.settings.layout.columns).toBe(24);
+  });
+
+  it("doubles a 1.3-era 12-column span layout once, and never again", async () => {
+    // A 1.3 config on disk: spans on the 12-column grid, no `columns` marker.
+    await fs.writeFile(
+      configPath,
+      YAML.dump({
+        settings: {
+          layout: {
+            sections: [
+              { id: "apps", span: 6, hidden: false },
+              { id: "search", span: 12, hidden: false },
+            ],
+          },
+        },
+      }),
+      "utf8"
+    );
+    const loaded = await config.readConfig();
+    expect(loaded.settings.layout.sections).toEqual([
+      { id: "apps", span: 12, hidden: false },
+      { id: "search", span: 24, hidden: false },
+    ]);
+
+    // A write persists the migrated spans + marker; re-reading must not
+    // double them a second time.
+    await config.updateSettings({ title: "Dash" });
+    const reloaded = await config.readConfig();
+    expect(reloaded.settings.layout.sections).toEqual([
+      { id: "apps", span: 12, hidden: false },
+      { id: "search", span: 24, hidden: false },
+    ]);
+    expect(reloaded.settings.layout.columns).toBe(24);
   });
 });
 

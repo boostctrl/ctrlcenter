@@ -82,11 +82,11 @@ export default function TimeWeather({
               </p>
             </div>
           </div>
-          {showClock && <div className="h-10 w-px bg-fg/10" />}
+          {showClock && <div className="hidden h-10 w-px bg-fg/10 @sm:block" />}
         </>
       )}
       {showClock && (
-        <div className="text-right">
+        <div className="@sm:text-right">
           <p
             className="text-2xl leading-tight font-semibold tabular-nums"
             suppressHydrationWarning
@@ -106,17 +106,23 @@ export default function TimeWeather({
   );
 
   // The card chrome (glass surface) lives in the parent so an optional status
-  // row can share the same card; this just renders the time/weather row with its
-  // own padding. When weather is on, the row links to the full forecast.
+  // row can share the same card; this just renders the time/weather row with
+  // its own padding. The parent card is a `@container`, so the row keys off the
+  // card's own width: weather and clock sit at opposite ends when it's wide
+  // enough, and stack vertically (divider hidden, clock left-aligned) when it
+  // isn't — narrow cells stack instead of clipping. When weather is on, the row
+  // links to the full forecast.
+  const row =
+    "flex flex-col gap-3 px-6 py-4 @sm:flex-row @sm:items-center @sm:justify-between @sm:gap-5";
   return weatherEnabled ? (
     <Link
       href="/weather"
       title="View forecast"
-      className="flex items-center gap-5 px-6 py-4 transition-colors hover:bg-fg/[0.03]"
+      className={`${row} transition-colors hover:bg-fg/[0.03]`}
     >
       {inner}
     </Link>
   ) : (
-    <div className="flex items-center gap-5 px-6 py-4">{inner}</div>
+    <div className={row}>{inner}</div>
   );
 }

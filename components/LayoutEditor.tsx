@@ -3,6 +3,10 @@
 import { useState, type ReactNode } from "react";
 import {
   GRID_COLUMNS,
+  MAX_CARD_COLUMNS,
+  MIN_UI_SCALE,
+  MAX_UI_SCALE,
+  UI_SCALE_STEP,
   WIDGET_LABELS,
   type LayoutWidget,
   type LayoutWidgetId,
@@ -78,10 +82,11 @@ const DROP_BAR: Record<DropSide, string> = {
 };
 
 // Edit-mode chrome around one widget cell: a dashed frame with the widget's
-// label, drag handle, MoveButtons (earlier/later in flow order), a span stepper
-// and a show/hide toggle. Renders the live widget dimmed when it's hidden, and
-// a placeholder tile when it currently has nothing to show — so every widget
-// stays visible and placeable while editing, with no separate palette.
+// label, drag handle, MoveButtons (earlier/later in flow order), a span
+// stepper, a cards-per-row stepper on the card-grid widgets, and a show/hide
+// toggle. Renders the live widget dimmed when it's hidden, and a placeholder
+// tile when it currently has nothing to show — so every widget stays visible
+// and placeable while editing, with no separate palette.
 export function WidgetFrame({
   widget,
   index,
@@ -89,8 +94,10 @@ export function WidgetFrame({
   cellClass,
   node,
   emptyReason,
+  effectiveCards,
   onMove,
   onSpan,
+  onCards,
   onToggleHidden,
   dragHandlers,
   dragging,
@@ -102,8 +109,13 @@ export function WidgetFrame({
   cellClass: string;
   node: ReactNode;
   emptyReason: string;
+  // Cards per row the widget renders right now (override, else span-derived).
+  // Only the card-grid widgets pass one; it gates the stepper and anchors the
+  // first −/+ step so adjusting from "Auto" starts at what's on screen.
+  effectiveCards?: number;
   onMove: (from: number, to: number) => void;
   onSpan: (id: LayoutWidgetId, span: number) => void;
+  onCards: (id: LayoutWidgetId, cards: number | undefined) => void;
   onToggleHidden: (id: LayoutWidgetId) => void;
   dragHandlers: React.HTMLAttributes<HTMLDivElement>;
   dragging: boolean;
@@ -159,6 +171,44 @@ export function WidgetFrame({
               +
             </button>
           </div>
+          {effectiveCards !== undefined && (
+            <div
+              className="flex items-center overflow-hidden rounded-lg border border-fg/10"
+              title="Cards per row"
+            >
+              <button
+                type="button"
+                aria-label={`Fewer cards per row in ${label}`}
+                disabled={effectiveCards <= 1}
+                onClick={() => onCards(widget.id, effectiveCards - 1)}
+                className={stepBtn}
+              >
+                −
+              </button>
+              <span className="px-1 text-fg/50 tabular-nums">
+                {widget.cards !== undefined ? `${widget.cards}×` : "Auto"}
+              </span>
+              <button
+                type="button"
+                aria-label={`More cards per row in ${label}`}
+                disabled={effectiveCards >= MAX_CARD_COLUMNS}
+                onClick={() => onCards(widget.id, effectiveCards + 1)}
+                className={stepBtn}
+              >
+                +
+              </button>
+              {widget.cards !== undefined && (
+                <button
+                  type="button"
+                  aria-label={`Automatic cards per row in ${label}`}
+                  onClick={() => onCards(widget.id, undefined)}
+                  className={`${stepBtn} border-l border-fg/10 text-[10px] tracking-wide uppercase`}
+                >
+                  Auto
+                </button>
+              )}
+            </div>
+          )}
           <button
             type="button"
             aria-pressed={widget.hidden}
@@ -183,25 +233,55 @@ export function WidgetFrame({
   );
 }
 
-// The fixed bottom pill shown while editing: autosave state, revert to how the
-// layout looked when edit mode was entered, and done.
+// The fixed bottom pill shown while editing: the UI scale stepper, autosave
+// state, revert to how the layout looked when edit mode was entered, and done.
 export function EditToolbar({
   status,
   error,
+  scale,
+  onScale,
   onRevert,
   onDone,
 }: {
   status: SaveState;
   error: string | null;
+  scale: number;
+  onScale: (scale: number) => void;
   onRevert: () => void;
   onDone: () => void;
 }) {
+  const scaleBtn =
+    "px-2.5 py-1 text-sm text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg disabled:pointer-events-none disabled:opacity-30";
   return (
     <div className="fixed bottom-5 left-1/2 z-40 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-full border border-fg/10 bg-fg/5 py-2 pr-2 pl-4 shadow-lg backdrop-blur-xl">
       <span className="text-sm font-medium text-fg/80">Editing layout</span>
       <span className="text-xs text-fg/40 lg:hidden">
         Widths apply on large screens
       </span>
+      <div
+        className="flex items-center overflow-hidden rounded-full border border-fg/10"
+        title="UI scale — resizes every element, site-wide"
+      >
+        <button
+          type="button"
+          aria-label="Smaller UI"
+          disabled={scale <= MIN_UI_SCALE}
+          onClick={() => onScale(Math.max(MIN_UI_SCALE, scale - UI_SCALE_STEP))}
+          className={scaleBtn}
+        >
+          −
+        </button>
+        <span className="px-0.5 text-xs text-fg/60 tabular-nums">{scale}%</span>
+        <button
+          type="button"
+          aria-label="Larger UI"
+          disabled={scale >= MAX_UI_SCALE}
+          onClick={() => onScale(Math.min(MAX_UI_SCALE, scale + UI_SCALE_STEP))}
+          className={scaleBtn}
+        >
+          +
+        </button>
+      </div>
       <SaveStatus status={status} error={error} />
       <button
         type="button"

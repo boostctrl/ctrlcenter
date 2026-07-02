@@ -83,6 +83,9 @@ export default function SettingsManager({
   const [settings, setSettings] = useState(() => ({
     ...initialSettings,
     layout: {
+      // Keep columns/scale — this form autosaves the whole layout object, so
+      // dropping them here would reset them on the next save.
+      ...initialSettings.layout,
       sections: resolveLayoutWidgets(
         initialSettings.layout.sections,
         initialSettings.components
@@ -126,6 +129,7 @@ export default function SettingsManager({
     setSettings((s) => ({
       ...s,
       layout: {
+        ...s.layout,
         sections: s.layout.sections.map((w) =>
           w.id === id ? { ...w, hidden: !shown } : w
         ),

@@ -73,10 +73,12 @@ Built with Next.js 16, React 19, and Tailwind v4.
 
 - **A drag-and-drop home page.** Every widget — greeting, the clock/weather/status
   header card (or each of those as its own separate widget), search, favorites,
-  apps, bookmarks, and the agenda — lives on a **12-column grid**. Signed-in
+  apps, bookmarks, and the agenda — lives on a **24-column grid**. Signed-in
   admins get an **Edit layout** mode right on the home page: drag widgets to
-  reorder, resize them from 1 to 12 columns wide, and show or hide anything in
-  place (keyboard- and touch-friendly controls included, not just mouse drag).
+  reorder, resize them from 1 to 24 columns wide, choose how many cards per row
+  the apps/bookmarks/favorites widgets show, scale the whole UI up or down, and
+  show or hide anything in place (keyboard- and touch-friendly controls
+  included, not just mouse drag).
 
 - **Admin portal.** A password-gated UI to manage apps, bookmarks, and settings
   without touching YAML: an icon picker with live preview and uploads, favicon

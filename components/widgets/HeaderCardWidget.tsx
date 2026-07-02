@@ -2,10 +2,12 @@ import TimeWeather from "../TimeWeather";
 import { StatusSummary } from "../StatusProvider";
 import type { CurrentWeather } from "@/lib/weather";
 
-// The combined header card: the time/weather row and the status row sharing one
-// glass surface with a hairline divider — exactly the fixed header's card from
-// before the widgets became placeable. The card hugs its content and sits at
-// the end of its grid cell (sm:ml-auto), matching the old top-right placement.
+// The combined header card: the time/weather row and the status row sharing
+// one glass surface with a hairline divider — the fixed header's card from
+// before the widgets became placeable. The card fills its grid cell so the
+// editor's span stepper visibly resizes it; `@container` lets the inner
+// time/weather row adapt to the cell's actual width (side by side when wide,
+// stacked when narrow) instead of clipping.
 export default function HeaderCardWidget({
   initialDate,
   initialWeather,
@@ -24,7 +26,7 @@ export default function HeaderCardWidget({
   const showTimeWeather = showClock || weatherEnabled;
   if (!showTimeWeather && !statusEnabled) return null;
   return (
-    <div className="glass-card flex w-full flex-col overflow-hidden sm:ml-auto sm:w-auto">
+    <div className="glass-card @container flex w-full flex-col overflow-hidden">
       {showTimeWeather && (
         <TimeWeather
           initialDate={initialDate}

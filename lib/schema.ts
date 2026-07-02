@@ -8,6 +8,12 @@ import {
   SECTION_WIDTHS,
   WIDTH_TO_SPAN,
   DEFAULT_WIDGETS,
+  GRID_COLUMNS,
+  LEGACY_GRID_COLUMNS,
+  MAX_CARD_COLUMNS,
+  MIN_UI_SCALE,
+  MAX_UI_SCALE,
+  DEFAULT_UI_SCALE,
   defaultSpanFor,
   type LayoutWidgetId,
 } from "./layout";
@@ -185,7 +191,8 @@ function lenientArray<T extends z.ZodTypeAny>(item: T) {
 }
 
 // Home-page widget arrangement: an ordered list of widgets, each with a column
-// span on the 12-column grid and a hidden flag. The legacy pre-1.3 shape
+// span on the 24-column grid, a hidden flag, and (for the card-grid widgets) an
+// optional cards-per-row override. The legacy pre-1.3 shape
 // ({ id, width: full|twoThirds|half|third }) still parses — the transform maps
 // a width to its span, and since writeConfig re-parses on every save, a stored
 // config migrates to the span shape on its next write (the transform is
@@ -196,9 +203,16 @@ function lenientArray<T extends z.ZodTypeAny>(item: T) {
 export const layoutWidgetSchema = z
   .object({
     id: z.enum(LAYOUT_WIDGET_IDS),
-    span: z.number().int().min(1).max(12).optional().catch(undefined),
+    span: z.number().int().min(1).max(GRID_COLUMNS).optional().catch(undefined),
     width: z.enum(SECTION_WIDTHS).optional().catch(undefined),
     hidden: z.boolean().optional().catch(undefined),
+    cards: z
+      .number()
+      .int()
+      .min(1)
+      .max(MAX_CARD_COLUMNS)
+      .optional()
+      .catch(undefined),
   })
   .transform(
     ({
@@ -206,15 +220,63 @@ export const layoutWidgetSchema = z
       span,
       width,
       hidden,
-    }): { id: LayoutWidgetId; span: number; hidden?: boolean } => ({
+      cards,
+    }): {
+      id: LayoutWidgetId;
+      span: number;
+      hidden?: boolean;
+      cards?: number;
+    } => ({
       id,
       span: span ?? (width ? WIDTH_TO_SPAN[width] : defaultSpanFor(id)),
       ...(hidden === undefined ? {} : { hidden }),
+      ...(cards === undefined ? {} : { cards }),
     })
   );
-export const layoutSchema = z.object({
-  sections: lenientArray(layoutWidgetSchema).default(DEFAULT_WIDGETS),
-});
+
+// Spans saved against the 1.3 12-column grid double onto today's 24-column
+// one. This must run BEFORE the per-widget parse: that parse fills missing
+// spans from legacy widths/defaults which are already 24-based and must not be
+// doubled. Only plausible 12-based spans are touched; anything else falls
+// through to the per-widget validation. Idempotent because the output layout
+// always carries `columns: 24`.
+function migrateLayoutColumns(raw: unknown): unknown {
+  if (typeof raw !== "object" || raw === null) return raw;
+  const obj = raw as { sections?: unknown; columns?: unknown };
+  if (obj.columns === GRID_COLUMNS || !Array.isArray(obj.sections)) {
+    return { ...obj, columns: GRID_COLUMNS };
+  }
+  const sections = obj.sections.map((row) => {
+    if (typeof row !== "object" || row === null) return row;
+    const span = (row as { span?: unknown }).span;
+    return typeof span === "number" &&
+      Number.isInteger(span) &&
+      span >= 1 &&
+      span <= LEGACY_GRID_COLUMNS
+      ? { ...row, span: span * 2 }
+      : row;
+  });
+  return { ...obj, sections, columns: GRID_COLUMNS };
+}
+
+export const layoutSchema = z.preprocess(
+  migrateLayoutColumns,
+  z.object({
+    sections: lenientArray(layoutWidgetSchema).default(DEFAULT_WIDGETS),
+    // Which grid the stored spans are for — always 24 after the preprocess;
+    // persisting it is what keeps the doubling from re-applying.
+    columns: z.literal(GRID_COLUMNS).catch(GRID_COLUMNS).default(GRID_COLUMNS),
+    // Site-wide UI scale (percent). Rendered as font-size on <html>, so the
+    // whole rem-based UI scales uniformly.
+    scale: z
+      .number()
+      .int()
+      .min(MIN_UI_SCALE)
+      .max(MAX_UI_SCALE)
+      .catch(DEFAULT_UI_SCALE)
+      .default(DEFAULT_UI_SCALE),
+  })
+);
 export type LayoutConfig = z.infer<typeof layoutSchema>;
 
 export const settingsSchema = z.object({
@@ -470,15 +532,25 @@ export const componentsUpdateSchema = z.object({
 });
 
 // The admin/editor sends the whole layout (every widget, fully resolved), so
-// updateSettings replaces it wholesale (like theme/components).
+// updateSettings replaces it wholesale (like theme/components). Spans are on
+// the 24-column grid; `columns` is stamped in so the stored layout never
+// re-triggers the 12→24 migration.
 export const layoutUpdateSchema = z.object({
   sections: z.array(
     z.object({
       id: z.enum(LAYOUT_WIDGET_IDS),
-      span: z.number().int().min(1).max(12),
+      span: z.number().int().min(1).max(GRID_COLUMNS),
       hidden: z.boolean(),
+      cards: z.number().int().min(1).max(MAX_CARD_COLUMNS).optional(),
     })
   ),
+  columns: z.literal(GRID_COLUMNS).default(GRID_COLUMNS),
+  scale: z
+    .number()
+    .int()
+    .min(MIN_UI_SCALE)
+    .max(MAX_UI_SCALE)
+    .default(DEFAULT_UI_SCALE),
 });
 
 export const settingsInputSchema = z.object({

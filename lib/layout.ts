@@ -1,6 +1,6 @@
-// The home-page widgets the admin can arrange on the dashboard's 12-column flow
+// The home-page widgets the admin can arrange on the dashboard's 24-column flow
 // grid. Every widget has a position (its place in the ordered list), a column
-// span (1–12) and a hidden flag; heights stay content-driven and rows pack
+// span (1–24) and a hidden flag; heights stay content-driven and rows pack
 // automatically — there is no pinned x/y placement.
 
 export const LAYOUT_WIDGET_IDS = [
@@ -18,24 +18,48 @@ export const LAYOUT_WIDGET_IDS = [
 
 export type LayoutWidgetId = (typeof LAYOUT_WIDGET_IDS)[number];
 
-export const GRID_COLUMNS = 12;
+export const GRID_COLUMNS = 24;
+
+// The 1.3 grid was 12 columns. Stored spans from that era double onto today's
+// 24-column grid; a `columns` marker on the persisted layout says which grid a
+// config's spans were saved against (absent = 12).
+export const LEGACY_GRID_COLUMNS = 12;
 
 // Legacy pre-1.3 widths (the old 6-column grid), still accepted when reading a
-// stored config or an old export; they map onto 12-column spans below.
+// stored config or an old export; they map onto 24-column spans below.
 export const SECTION_WIDTHS = ["full", "twoThirds", "half", "third"] as const;
 export type SectionWidth = (typeof SECTION_WIDTHS)[number];
 
 export const WIDTH_TO_SPAN: Record<SectionWidth, number> = {
-  full: 12,
-  twoThirds: 8,
-  half: 6,
-  third: 4,
+  full: 24,
+  twoThirds: 16,
+  half: 12,
+  third: 8,
 };
+
+// How many cards a widget's inner grid may show side by side (apps/bookmarks/
+// favorites). `cards` on a layout entry is an explicit override; absent means
+// "auto" — derived from the widget's span (see cardGridClass in Dashboard).
+export const MAX_CARD_COLUMNS = 4;
+export const CARD_WIDGET_IDS: readonly LayoutWidgetId[] = [
+  "favorites",
+  "apps",
+  "bookmarks",
+];
+
+// Site-wide UI scale (percent), rendered as font-size on <html>: the whole UI
+// is rem-based, so one percentage scales text, paddings and cards uniformly.
+export const MIN_UI_SCALE = 70;
+export const MAX_UI_SCALE = 150;
+export const DEFAULT_UI_SCALE = 100;
+export const UI_SCALE_STEP = 5;
 
 export type LayoutWidget = {
   id: LayoutWidgetId;
   span: number;
   hidden: boolean;
+  // Cards per row (1–4) for the card-grid widgets; absent = auto from span.
+  cards?: number;
 };
 
 export const WIDGET_LABELS: Record<LayoutWidgetId, string> = {
@@ -56,16 +80,16 @@ export const WIDGET_LABELS: Record<LayoutWidgetId, string> = {
 // The split clock/weather/status widgets exist hidden, ready to be shown from
 // the layout editor as an alternative to the combined card.
 export const DEFAULT_WIDGETS: LayoutWidget[] = [
-  { id: "greeting", span: 8, hidden: false },
-  { id: "headerCard", span: 4, hidden: false },
-  { id: "clock", span: 4, hidden: true },
-  { id: "weather", span: 4, hidden: true },
-  { id: "status", span: 4, hidden: true },
-  { id: "search", span: 12, hidden: false },
-  { id: "calendar", span: 12, hidden: false },
-  { id: "favorites", span: 12, hidden: false },
-  { id: "apps", span: 12, hidden: false },
-  { id: "bookmarks", span: 12, hidden: false },
+  { id: "greeting", span: 16, hidden: false },
+  { id: "headerCard", span: 8, hidden: false },
+  { id: "clock", span: 8, hidden: true },
+  { id: "weather", span: 8, hidden: true },
+  { id: "status", span: 8, hidden: true },
+  { id: "search", span: 24, hidden: false },
+  { id: "calendar", span: 24, hidden: false },
+  { id: "favorites", span: 24, hidden: false },
+  { id: "apps", span: 24, hidden: false },
+  { id: "bookmarks", span: 24, hidden: false },
 ];
 
 // The widgets that used to live in the fixed header. When missing from a saved
@@ -127,6 +151,15 @@ function isSpan(v: unknown): v is number {
   );
 }
 
+function isCards(v: unknown): v is number {
+  return (
+    typeof v === "number" &&
+    Number.isInteger(v) &&
+    v >= 1 &&
+    v <= MAX_CARD_COLUMNS
+  );
+}
+
 function legacyHidden(
   id: LayoutWidgetId,
   components: LegacyComponentToggles | undefined
@@ -139,12 +172,14 @@ function legacyHidden(
 
 // Normalize a stored/partial layout into a concrete, complete widget list: keep
 // the saved order, drop unknown ids and duplicates, coerce a bad span (via a
-// legacy width when present, else the widget's default), and resolve `hidden`
-// (explicit boolean > folded legacy components toggle > visible-when-listed).
-// Widgets the saved layout is missing are added — header widgets prepended,
-// body widgets appended — with their defaults (legacy toggles still folded), so
-// a config from any earlier version renders unchanged and a widget added in a
-// future version still shows. Mirrors applyOrder in lib/config.ts.
+// legacy width when present, else the widget's default), keep a valid `cards`
+// override, and resolve `hidden` (explicit boolean > folded legacy components
+// toggle > visible-when-listed). Widgets the saved layout is missing are added
+// — header widgets prepended, body widgets appended — with their defaults
+// (legacy toggles still folded), so a config from any earlier version renders
+// unchanged and a widget added in a future version still shows. Spans are
+// expected on the 24-column grid — the schema layer doubles pre-24 configs
+// before this runs. Mirrors applyOrder in lib/config.ts.
 export function resolveLayoutWidgets(
   saved:
     | readonly {
@@ -152,6 +187,7 @@ export function resolveLayoutWidgets(
         span?: unknown;
         width?: unknown;
         hidden?: unknown;
+        cards?: unknown;
       }[]
     | undefined,
   components?: LegacyComponentToggles
@@ -171,7 +207,12 @@ export function resolveLayoutWidgets(
       typeof item.hidden === "boolean"
         ? item.hidden
         : (legacyHidden(id, components) ?? false);
-    listed.push({ id, span, hidden });
+    listed.push({
+      id,
+      span,
+      hidden,
+      ...(isCards(item.cards) ? { cards: item.cards } : {}),
+    });
   }
   const missing = (ids: readonly LayoutWidgetId[]) =>
     ids

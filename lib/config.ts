@@ -1,6 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 import YAML from "js-yaml";
+import { GRID_COLUMNS } from "./layout";
 import {
   configSchema,
   configReadSchema,
@@ -160,7 +161,11 @@ export async function updateSettings(
       // custom colors works); keep the existing one when not provided.
       theme: themePartial ?? config.settings.theme,
       // Layout is sent whole too (the ordered section list), so replace it.
-      layout: layoutPartial ?? config.settings.layout,
+      // Re-stamp the grid marker: writeConfig re-parses on save, and a stored
+      // layout without `columns` would re-trigger the 12→24 span migration.
+      layout: layoutPartial
+        ? { ...layoutPartial, columns: GRID_COLUMNS }
+        : config.settings.layout,
     };
     return config.settings;
   });
