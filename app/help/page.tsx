@@ -243,7 +243,7 @@ export default async function HelpPage() {
             <ul className={LIST_CLASS}>
               <li>
                 <strong>Design.</strong> The card surface style, from Glass and
-                Frost to Flat, Cyber, and Paper (12 in all).
+                Frost to Cyber, Emboss, and Sketch (18 in all).
               </li>
               <li>
                 <strong>Scene.</strong> The animated backdrop: Aurora,

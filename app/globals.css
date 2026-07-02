@@ -33,8 +33,14 @@
      the colors above stay in control. The defaults here are the Glass design. */
   --surface-radius: 1rem;
   --surface-border-width: 1px;
+  --surface-border-style: solid;
   --surface-border: color-mix(in srgb, var(--fg) 10%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--fg) 20%, transparent);
+  /* Corner rounding for button-shaped controls (lib/buttons.ts), separate from
+     the card radius so each design shapes its buttons to match its personality
+     — square on Bold, pills on Soft and Clay — without inheriting the much
+     larger surface rounding. */
+  --control-radius: 0.5rem;
   --surface-bg: color-mix(in srgb, var(--fg) 4%, transparent);
   --surface-bg-hover: color-mix(in srgb, var(--fg) 7%, transparent);
   --surface-bg-image: none;
@@ -72,6 +78,7 @@
 
 .design-minimal {
   --surface-radius: 0.5rem;
+  --control-radius: 0.375rem;
   --surface-border-width: 1px;
   --surface-border: color-mix(in srgb, var(--fg) 8%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--fg) 14%, transparent);
@@ -87,6 +94,7 @@
 
 .design-bold {
   --surface-radius: 0px;
+  --control-radius: 0px;
   --surface-border-width: 2px;
   --surface-border: color-mix(in srgb, var(--fg) 85%, transparent);
   --surface-border-hover: var(--accent-from);
@@ -102,6 +110,7 @@
 
 .design-soft {
   --surface-radius: 1.5rem;
+  --control-radius: 9999px;
   --surface-border-width: 0px;
   --surface-border: transparent;
   --surface-border-hover: transparent;
@@ -118,6 +127,7 @@
 
 .design-cyber {
   --surface-radius: 0.25rem;
+  --control-radius: 0.25rem;
   --surface-border-width: 1px;
   --surface-border: color-mix(in srgb, var(--accent-from) 45%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--accent-to) 70%, transparent);
@@ -138,6 +148,7 @@
   /* Claymorphism: big rounding, no border, a soft outer drop plus light/dark
      inset edges so cards look moulded out of the background. */
   --surface-radius: 1.75rem;
+  --control-radius: 9999px;
   --surface-border-width: 0px;
   --surface-border: transparent;
   --surface-border-hover: transparent;
@@ -181,14 +192,15 @@
   /* Heavier frosted glass: more blur and a brighter translucent fill than Glass,
      with a soft top sheen. */
   --surface-radius: 1.25rem;
+  --control-radius: 0.75rem;
   --surface-border-width: 1px;
   --surface-border: color-mix(in srgb, var(--fg) 16%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--fg) 28%, transparent);
-  --surface-bg: color-mix(in srgb, var(--fg) 10%, transparent);
-  --surface-bg-hover: color-mix(in srgb, var(--fg) 14%, transparent);
+  --surface-bg: color-mix(in srgb, var(--fg) 12%, transparent);
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 16%, transparent);
   --surface-bg-image: linear-gradient(
     to bottom,
-    color-mix(in srgb, var(--fg) 10%, transparent),
+    color-mix(in srgb, var(--fg) 14%, transparent),
     transparent 60%
   );
   --surface-blur: 48px;
@@ -203,6 +215,7 @@
 .design-outline {
   /* No fill — just an accent-tinted outline that brightens on hover. */
   --surface-radius: 0.875rem;
+  --control-radius: 0.625rem;
   --surface-border-width: 1.5px;
   --surface-border: color-mix(in srgb, var(--accent-from) 45%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--accent-to) 70%, transparent);
@@ -221,6 +234,7 @@
   /* Opaque "material" card: a solid fill over the background with a soft, layered
      drop shadow and a small radius. */
   --surface-radius: 0.5rem;
+  --control-radius: 0.375rem;
   --surface-border-width: 1px;
   --surface-border: color-mix(in srgb, var(--fg) 8%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--fg) 14%, transparent);
@@ -247,8 +261,8 @@
   --surface-bg-hover: color-mix(in srgb, var(--fg) 8%, transparent);
   --surface-bg-image: linear-gradient(
     135deg,
-    color-mix(in srgb, var(--accent-from) 22%, transparent),
-    color-mix(in srgb, var(--accent-to) 14%, transparent)
+    color-mix(in srgb, var(--accent-from) 30%, transparent),
+    color-mix(in srgb, var(--accent-to) 18%, transparent)
   );
   --surface-blur: 14px;
   --surface-shadow: 0 8px 28px rgba(var(--shadow-tint), 0.3);
@@ -256,6 +270,131 @@
     color-mix(in srgb, var(--accent-from) 22%, transparent);
   --surface-lift: -2px;
   --glow-opacity: 0.7;
+}
+
+.design-aura {
+  /* Borderless surfaces floating in a soft two-stop accent halo — the glow IS
+     the card edge. */
+  --surface-radius: 1.25rem;
+  --control-radius: 0.75rem;
+  --surface-border-width: 0px;
+  --surface-border: transparent;
+  --surface-border-hover: transparent;
+  --surface-bg: color-mix(in srgb, var(--fg) 5%, var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 8%, var(--background));
+  --surface-bg-image: none;
+  --surface-blur: 0px;
+  --surface-shadow: 0 0 24px color-mix(in srgb, var(--accent-from) 25%, transparent),
+    0 0 8px color-mix(in srgb, var(--accent-to) 15%, transparent);
+  --surface-shadow-hover: 0 0 34px
+      color-mix(in srgb, var(--accent-from) 38%, transparent),
+    0 0 12px color-mix(in srgb, var(--accent-to) 24%, transparent);
+  --surface-lift: -1px;
+  --glow-opacity: 0.6;
+}
+
+.design-emboss {
+  /* Neumorphic: raised from a same-color surface by a paired light/dark shadow
+     — no border, the shadows do all the shaping. The highlight flips to true
+     white in light mode (see .theme-light.design-emboss). */
+  --surface-radius: 1.25rem;
+  --control-radius: 9999px;
+  --surface-border-width: 0px;
+  --surface-border: transparent;
+  --surface-border-hover: transparent;
+  --surface-bg: color-mix(in srgb, var(--fg) 3%, var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 5%, var(--background));
+  --surface-bg-image: none;
+  --surface-blur: 0px;
+  --surface-shadow: -6px -6px 14px color-mix(in srgb, var(--fg) 7%, transparent),
+    6px 6px 14px rgba(var(--shadow-tint), 0.35);
+  --surface-shadow-hover: -8px -8px 18px
+      color-mix(in srgb, var(--fg) 9%, transparent),
+    8px 8px 18px rgba(var(--shadow-tint), 0.4);
+  --surface-lift: -1px;
+  --glow-opacity: 0.25;
+}
+
+.design-carve {
+  /* The inverse of Emboss: panels pressed INTO the page — a slightly darkened
+     well with an inset top shadow and a bright inset bottom lip. */
+  --surface-radius: 1rem;
+  --control-radius: 0.625rem;
+  --surface-border-width: 0px;
+  --surface-border: transparent;
+  --surface-border-hover: transparent;
+  --surface-bg: color-mix(in srgb, var(--background), rgb(var(--shadow-tint)) 10%);
+  --surface-bg-hover: color-mix(in srgb, var(--background), rgb(var(--shadow-tint)) 6%);
+  --surface-bg-image: none;
+  --surface-blur: 0px;
+  --surface-shadow: inset 0 2px 6px rgba(var(--shadow-tint), 0.4),
+    inset 0 -1px 0 color-mix(in srgb, var(--fg) 10%, transparent);
+  --surface-shadow-hover: inset 0 2px 6px rgba(var(--shadow-tint), 0.45),
+    inset 0 -1px 0 color-mix(in srgb, var(--fg) 14%, transparent);
+  --surface-lift: 0px;
+  --glow-opacity: 0.3;
+}
+
+.design-stripe {
+  /* Editorial: an opaque card with a crisp accent bar along its top edge (drawn
+     as an inset shadow so no extra element is needed); the bar flips to the
+     secondary accent on hover. */
+  --surface-radius: 0.375rem;
+  --control-radius: 0.25rem;
+  --surface-border-width: 1px;
+  --surface-border: color-mix(in srgb, var(--fg) 10%, transparent);
+  --surface-border-hover: color-mix(in srgb, var(--fg) 18%, transparent);
+  --surface-bg: color-mix(in srgb, var(--fg) 7%, var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 10%, var(--background));
+  --surface-bg-image: none;
+  --surface-blur: 0px;
+  --surface-shadow: inset 0 3px 0 0 var(--accent-from),
+    0 4px 14px rgba(var(--shadow-tint), 0.18);
+  --surface-shadow-hover: inset 0 3px 0 0 var(--accent-to),
+    0 6px 18px rgba(var(--shadow-tint), 0.24);
+  --surface-lift: -1px;
+  --glow-opacity: 0;
+}
+
+.design-sketch {
+  /* Wireframe: hand-drawn dashed ink outlines on a bare surface. */
+  --surface-radius: 0.75rem;
+  --control-radius: 0.75rem;
+  --surface-border-width: 1.5px;
+  --surface-border-style: dashed;
+  --surface-border: color-mix(in srgb, var(--fg) 40%, transparent);
+  --surface-border-hover: color-mix(in srgb, var(--fg) 60%, transparent);
+  --surface-bg: color-mix(in srgb, var(--fg) 2%, transparent);
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 5%, transparent);
+  --surface-bg-image: none;
+  --surface-blur: 0px;
+  --surface-shadow: none;
+  --surface-shadow-hover: none;
+  --surface-lift: 0px;
+  --glow-opacity: 0.15;
+}
+
+.design-console {
+  /* Terminal panel: square, near-opaque, a thick accent rule down the left edge
+     (inset shadow) and a faint scanline wash. */
+  --surface-radius: 0px;
+  --control-radius: 0px;
+  --surface-border-width: 1px;
+  --surface-border: color-mix(in srgb, var(--fg) 14%, transparent);
+  --surface-border-hover: color-mix(in srgb, var(--accent-from) 50%, transparent);
+  --surface-bg: color-mix(in srgb, var(--fg) 4%, var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 7%, var(--background));
+  --surface-bg-image: repeating-linear-gradient(
+    0deg,
+    color-mix(in srgb, var(--fg) 2.5%, transparent) 0 1px,
+    transparent 1px 4px
+  );
+  --surface-blur: 0px;
+  --surface-shadow: inset 3px 0 0 0 var(--accent-from);
+  --surface-shadow-hover: inset 3px 0 0 0 var(--accent-to),
+    0 0 16px color-mix(in srgb, var(--accent-from) 15%, transparent);
+  --surface-lift: 0px;
+  --glow-opacity: 0.35;
 }
 
 /* Light theme: toggled by adding `.theme-light` to <html>. */
@@ -272,6 +411,15 @@
      concrete values on <html> via the same JS deepen the canvas scenes use
      (components/scenes/color.ts). The :root fallback above keeps them valid
      before hydration. */
+}
+
+/* Emboss's light-source highlight must be a true white in light mode — the
+   --fg-based one would invert into a dark smudge on the pale surface. */
+.theme-light.design-emboss {
+  --surface-shadow: -6px -6px 14px rgba(255, 255, 255, 0.85),
+    6px 6px 14px rgba(var(--shadow-tint), 0.18);
+  --surface-shadow-hover: -8px -8px 18px rgba(255, 255, 255, 0.95),
+    8px 8px 18px rgba(var(--shadow-tint), 0.22);
 }
 
 /* Aero's glossy top highlight is a light inset line — keep it light-on-light in
@@ -336,7 +484,8 @@ select optgroup {
   .glass-card {
     position: relative;
     border-radius: var(--surface-radius);
-    border: var(--surface-border-width) solid var(--surface-border);
+    border: var(--surface-border-width) var(--surface-border-style, solid)
+      var(--surface-border);
     background-color: var(--surface-bg);
     background-image: var(--surface-bg-image);
     box-shadow: var(--surface-shadow);

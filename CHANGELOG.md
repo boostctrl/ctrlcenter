@@ -17,6 +17,18 @@ here.
 - **A Stone palette.** A fairly neutral warm-gray palette — greige surfaces
   with muted stone accents — joins Mono at the neutral end of the preset row
   (21 palettes in all).
+- **Six new designs.** Aura (borderless, haloed in accent glow), Emboss
+  (soft-raised from the page), Carve (recessed, pressed into the page), Stripe
+  (crisp card with an accent top bar), Sketch (hand-drawn dashed outlines) and
+  Console (terminal panel with an accent edge) — 18 designs in all.
+
+### Changed
+
+- **Buttons now follow the active design's personality.** Button corner
+  rounding is its own design token, separate from the card radius — square on
+  Bold and Console, pills on Soft and Clay — instead of one fixed rounding
+  everywhere. Existing designs also got small polish tweaks: a heavier Frost
+  fill and sheen, and a richer Gradient accent wash.
 
 ### Changed
 

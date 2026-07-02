@@ -19,7 +19,13 @@ export type DesignId =
   | "frost"
   | "outline"
   | "paper"
-  | "gradient";
+  | "gradient"
+  | "aura"
+  | "emboss"
+  | "carve"
+  | "stripe"
+  | "sketch"
+  | "console";
 
 export const DESIGNS: { id: DesignId; name: string; description: string }[] = [
   { id: "glass", name: "Glass", description: "Frosted and blurred (default)" },
@@ -34,6 +40,12 @@ export const DESIGNS: { id: DesignId; name: string; description: string }[] = [
   { id: "outline", name: "Outline", description: "Accent-outlined, no fill" },
   { id: "paper", name: "Paper", description: "Opaque, softly shadowed" },
   { id: "gradient", name: "Gradient", description: "Accent-washed surface" },
+  { id: "aura", name: "Aura", description: "Borderless, haloed in accent glow" },
+  { id: "emboss", name: "Emboss", description: "Soft-raised from the page" },
+  { id: "carve", name: "Carve", description: "Recessed, pressed into the page" },
+  { id: "stripe", name: "Stripe", description: "Crisp card, accent top bar" },
+  { id: "sketch", name: "Sketch", description: "Hand-drawn dashed outlines" },
+  { id: "console", name: "Console", description: "Terminal panel, accent edge" },
 ];
 
 export const DESIGN_IDS = DESIGNS.map((d) => d.id) as [DesignId, ...DesignId[]];
