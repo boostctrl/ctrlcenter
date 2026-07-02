@@ -57,3 +57,14 @@ the thing that breaks, and it only exists in the production build.
 
 Pages worth checking beyond the one you changed: `/` (the widget grid),
 `/help`, `/calendar`, `/weather`, `/status`, and `/admin` for settings-UI work.
+
+## CSP / security-header changes: test via the LAN IP, not localhost
+
+`localhost` is a "potentially trustworthy" origin and is exempt from CSP
+directives like `upgrade-insecure-requests` — a localhost render can look
+perfect while a real plain-HTTP LAN deployment is completely broken. Exactly
+that shipped in 0.3.0: the directive upgraded same-origin asset/API requests
+to HTTPS on `http://<nas-ip>:3000`, killing styling and admin login (fixed in
+0.3.1). For changes touching `proxy.ts`, `next.config.ts` headers, or anything
+CSP-adjacent: bind `HOSTNAME=0.0.0.0`, get the address with `hostname -I`, and
+point the screenshot script at `http://<lan-ip>:PORT`.
