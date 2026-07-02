@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { useEditMode } from "./EditMode";
 
 // The floating corner control — the old settings gear, evolved into a small menu
 // that links to every enabled page so navigation is reachable from anywhere
@@ -21,6 +22,9 @@ export default function FloatingNav({
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
+  // Present only on the home page (the provider lives there); everywhere else
+  // the context defaults to a non-admin, so the edit item never shows.
+  const { isAdmin, editing, setEditing } = useEditMode();
 
   useEffect(() => {
     if (!open) return;
@@ -63,6 +67,18 @@ export default function FloatingNav({
               {l.label}
             </Link>
           ))}
+          {isAdmin && !editing && (
+            <button
+              type="button"
+              onClick={() => {
+                setEditing(true);
+                setOpen(false);
+              }}
+              className="border-t border-fg/10 px-4 py-2 text-left text-sm text-fg/70 transition-colors hover:bg-fg/10 hover:text-fg"
+            >
+              Edit layout
+            </button>
+          )}
         </nav>
       )}
       <button

@@ -159,6 +159,40 @@ describe("updateSettings partial merge", () => {
     expect(settings.theme.background).toBeUndefined();
     expect(settings.theme.foreground).toBeUndefined();
   });
+
+  it("replaces the layout wholesale", async () => {
+    await config.updateSettings({
+      layout: { sections: [{ id: "apps", span: 6, hidden: false }] },
+    });
+    const settings = await config.updateSettings({
+      layout: { sections: [{ id: "bookmarks", span: 12, hidden: true }] },
+    });
+    expect(settings.layout.sections).toEqual([
+      { id: "bookmarks", span: 12, hidden: true },
+    ]);
+  });
+
+  it("migrates a legacy width layout to spans on the next write", async () => {
+    // A pre-1.3 config on disk, arranged with the old width enum.
+    await fs.writeFile(
+      configPath,
+      YAML.dump({
+        settings: {
+          layout: { sections: [{ id: "apps", width: "half" }] },
+        },
+      }),
+      "utf8"
+    );
+    const loaded = await config.readConfig();
+    expect(loaded.settings.layout.sections).toEqual([{ id: "apps", span: 6 }]);
+
+    // Any write re-parses the whole config, persisting the span shape.
+    await config.updateSettings({ title: "Dash" });
+    const onDisk = YAML.load(await fs.readFile(configPath, "utf8")) as {
+      settings: { layout: { sections: unknown } };
+    };
+    expect(onDisk.settings.layout.sections).toEqual([{ id: "apps", span: 6 }]);
+  });
 });
 
 describe("reorderApps", () => {

@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { cookies } from "next/headers";
 import { SESSION_COOKIE_NAME, verifySessionToken } from "./auth";
 import { readConfig } from "./config";
 
@@ -11,6 +12,16 @@ import { readConfig } from "./config";
 // outstanding sessions).
 export async function isAdminRequest(request: NextRequest): Promise<boolean> {
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+  const { auth } = await readConfig();
+  return verifySessionToken(token, auth.passwordHash);
+}
+
+// Same check for server components (no NextRequest there — the cookie comes
+// from next/headers). Lets a page decide whether to offer admin affordances
+// like the home-page layout editor; the APIs those affordances call are still
+// gated by the proxy, so this is presentation-only trust.
+export async function isAdminSession(): Promise<boolean> {
+  const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
   const { auth } = await readConfig();
   return verifySessionToken(token, auth.passwordHash);
 }

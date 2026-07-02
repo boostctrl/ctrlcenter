@@ -69,10 +69,14 @@ Built with Next.js 16, React 19, and Tailwind v4.
 
 - **Per-visitor personalization, no accounts.** Each visitor sets a greeting name,
   timezone, weather location/units, and their whole theme from **/settings** — all
-  stored in their own browser, never on the server. And the admin can **show or
-  hide any individual home-page component** (greeting, clock, search, apps,
-  bookmarks, favorites, weather, status, agenda, settings button) to compose the
-  page they want.
+  stored in their own browser, never on the server.
+
+- **A drag-and-drop home page.** Every widget — greeting, the clock/weather/status
+  header card (or each of those as its own separate widget), search, favorites,
+  apps, bookmarks, and the agenda — lives on a **12-column grid**. Signed-in
+  admins get an **Edit layout** mode right on the home page: drag widgets to
+  reorder, resize them from 1 to 12 columns wide, and show or hide anything in
+  place (keyboard- and touch-friendly controls included, not just mouse drag).
 
 - **Admin portal.** A password-gated UI to manage apps, bookmarks, and settings
   without touching YAML: an icon picker with live preview and uploads, favicon
@@ -167,14 +171,26 @@ settings:
     enabled: false
     url: ""                 # a published iCal (.ics) URL
     count: 5                # how many upcoming events to show (1–20)
-  components:               # show/hide home-page parts — all default true
-    greeting: true
-    clock: true
-    search: true
-    apps: true
-    bookmarks: true
-    favorites: true
-    settingsButton: true
+  components:
+    clock: true             # the date/time row inside the header card
+    settingsButton: true    # the floating corner navigation menu
+    # greeting/search/apps/bookmarks/favorites are legacy visibility flags —
+    # still honored for old configs, but layout `hidden` (below) is the source
+    # of truth once set.
+  layout:                   # the home-page widget grid — best edited visually:
+    sections:               # sign in and pick "Edit layout" from the corner menu
+      - { id: greeting, span: 8 }         # order = position; widgets flow row
+      - { id: headerCard, span: 4 }       #   by row across 12 columns
+      - { id: clock, span: 4, hidden: true }    # split clock/weather/status
+      - { id: weather, span: 4, hidden: true }  #   widgets — show them as an
+      - { id: status, span: 4, hidden: true }   #   alternative to headerCard
+      - { id: search, span: 12 }
+      - { id: calendar, span: 12 }
+      - { id: favorites, span: 12 }
+      - { id: apps, span: 12 }
+      - { id: bookmarks, span: 12 }
+    # pre-1.3 configs used `width: full|twoThirds|half|third` — still accepted,
+    # auto-migrated to spans (12/8/6/4) on the next save.
 
 apps:
   - id: <uuid>

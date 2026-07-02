@@ -83,14 +83,22 @@ export function StatusDot({ id }: { id: string }) {
   );
 }
 
-// A health row linking to the /status page, rendered beneath the time/weather
-// row inside the same header card (a hairline border separates them). Shares the
-// provider's context, so it renders nothing — and shows no divider — until the
-// first poll resolves (avoiding a flash of "all systems operational").
+// A health row linking to the /status page. As a "row" it renders beneath the
+// time/weather row inside the header card (a hairline border separates them);
+// as a "card" it stands alone on its own glass surface (the status widget).
+// Shares the provider's context, so it renders nothing — and shows no divider —
+// until the first poll resolves (avoiding a flash of "all systems operational").
+const SUMMARY_VARIANTS: Record<"row" | "card", string> = {
+  row: "flex items-center gap-2 border-t border-fg/10 px-6 py-3 text-sm text-fg/70 transition-colors hover:bg-fg/[0.03] hover:text-fg",
+  card: "glass-card flex w-full items-center gap-2 px-6 py-4 text-sm text-fg/70 transition-colors hover:text-fg sm:w-auto",
+};
+
 export function StatusSummary({
   apps,
+  variant = "row",
 }: {
   apps: { id: string; name: string }[];
+  variant?: "row" | "card";
 }) {
   const statuses = useContext(StatusContext);
   if (!statuses || statuses.size === 0) return null;
@@ -107,7 +115,7 @@ export function StatusSummary({
       href="/status"
       title={message}
       aria-label={`Service status: ${message}`}
-      className="flex items-center gap-2 border-t border-fg/10 px-6 py-3 text-sm text-fg/70 transition-colors hover:bg-fg/[0.03] hover:text-fg"
+      className={SUMMARY_VARIANTS[variant]}
     >
       <span className="relative flex h-2.5 w-2.5" aria-hidden>
         {allUp && (

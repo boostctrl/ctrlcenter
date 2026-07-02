@@ -1,0 +1,222 @@
+"use client";
+
+import { useState, type ReactNode } from "react";
+import {
+  GRID_COLUMNS,
+  WIDGET_LABELS,
+  type LayoutWidget,
+  type LayoutWidgetId,
+} from "@/lib/layout";
+import { MoveButtons } from "./admin/ui";
+import { SaveStatus, type SaveState } from "./admin/useAutosave";
+
+// Which edge of the hovered cell a drop would insert on, in flow order.
+export type DropSide = "before" | "after";
+
+// Native HTML5 drag reordering for the widget flow grid — the 2-D sibling of
+// useReorder (components/admin/useReorder.ts). Cells can sit side by side on
+// lg+ screens, so the insertion side comes from the pointer's x position within
+// the hovered cell there, falling back to y when cells stack below lg. Drag is
+// mouse-only by design; MoveButtons in each frame are the keyboard/touch path.
+export function useFlowReorder(onMove: (from: number, to: number) => void) {
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [over, setOver] = useState<{ index: number; side: DropSide } | null>(
+    null
+  );
+
+  function reset() {
+    setDragIndex(null);
+    setOver(null);
+  }
+
+  function handlers(index: number) {
+    return {
+      draggable: true,
+      onDragStart: (e: React.DragEvent) => {
+        e.dataTransfer.effectAllowed = "move";
+        setDragIndex(index);
+      },
+      onDragOver: (e: React.DragEvent) => {
+        e.preventDefault(); // required to allow dropping
+        const rect = e.currentTarget.getBoundingClientRect();
+        const sideBySide = window.matchMedia("(min-width: 1024px)").matches;
+        const ratio = sideBySide
+          ? (e.clientX - rect.left) / rect.width
+          : (e.clientY - rect.top) / rect.height;
+        const side: DropSide = ratio > 0.5 ? "after" : "before";
+        if (over?.index !== index || over.side !== side)
+          setOver({ index, side });
+      },
+      onDragEnd: reset,
+      onDrop: (e: React.DragEvent) => {
+        e.preventDefault();
+        if (dragIndex === null || over === null) {
+          reset();
+          return;
+        }
+        // Insert at the hovered cell's edge, accounting for the dragged item
+        // leaving its old slot when it comes from earlier in the list.
+        let to = over.index + (over.side === "after" ? 1 : 0);
+        if (dragIndex < to) to -= 1;
+        if (to !== dragIndex) onMove(dragIndex, to);
+        reset();
+      },
+    };
+  }
+
+  return { handlers, dragIndex, over };
+}
+
+// The insertion indicator: a vertical accent bar beside the hovered cell on lg+
+// (where cells sit in a row), a horizontal one above/below it when stacked.
+// Complete static class strings so Tailwind's extractor keeps every variant.
+const DROP_BAR: Record<DropSide, string> = {
+  before:
+    "absolute right-0 left-0 -top-2 h-1 rounded-full bg-violet-400 lg:top-0 lg:bottom-0 lg:-left-2 lg:right-auto lg:h-auto lg:w-1",
+  after:
+    "absolute right-0 left-0 -bottom-2 h-1 rounded-full bg-violet-400 lg:top-0 lg:bottom-0 lg:-right-2 lg:left-auto lg:h-auto lg:w-1",
+};
+
+// Edit-mode chrome around one widget cell: a dashed frame with the widget's
+// label, drag handle, MoveButtons (earlier/later in flow order), a span stepper
+// and a show/hide toggle. Renders the live widget dimmed when it's hidden, and
+// a placeholder tile when it currently has nothing to show — so every widget
+// stays visible and placeable while editing, with no separate palette.
+export function WidgetFrame({
+  widget,
+  index,
+  count,
+  cellClass,
+  node,
+  emptyReason,
+  onMove,
+  onSpan,
+  onToggleHidden,
+  dragHandlers,
+  dragging,
+  dropSide,
+}: {
+  widget: LayoutWidget;
+  index: number;
+  count: number;
+  cellClass: string;
+  node: ReactNode;
+  emptyReason: string;
+  onMove: (from: number, to: number) => void;
+  onSpan: (id: LayoutWidgetId, span: number) => void;
+  onToggleHidden: (id: LayoutWidgetId) => void;
+  dragHandlers: React.HTMLAttributes<HTMLDivElement>;
+  dragging: boolean;
+  dropSide: DropSide | null;
+}) {
+  const label = WIDGET_LABELS[widget.id];
+  const stepBtn =
+    "px-2 py-1 text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg disabled:pointer-events-none disabled:opacity-30";
+  return (
+    <div
+      {...dragHandlers}
+      className={`relative flex flex-col gap-2 rounded-2xl p-2 outline-2 outline-dashed outline-fg/15 transition-opacity ${
+        dragging ? "opacity-40" : ""
+      } ${cellClass}`}
+    >
+      {dropSide && <span className={DROP_BAR[dropSide]} aria-hidden />}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-fg/60">
+        <span
+          className="hidden cursor-grab text-fg/30 select-none active:cursor-grabbing sm:inline"
+          aria-hidden
+          title="Drag to move"
+        >
+          ⠿
+        </span>
+        <span className="font-medium">{label}</span>
+        {widget.hidden && (
+          <span className="rounded bg-fg/10 px-1.5 py-0.5 text-[10px] tracking-wide text-fg/50 uppercase">
+            Hidden
+          </span>
+        )}
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <MoveButtons index={index} count={count} label={label} onMove={onMove} />
+          <div className="flex items-center overflow-hidden rounded-lg border border-fg/10">
+            <button
+              type="button"
+              aria-label={`Narrow ${label}`}
+              disabled={widget.span <= 1}
+              onClick={() => onSpan(widget.id, widget.span - 1)}
+              className={stepBtn}
+            >
+              −
+            </button>
+            <span className="px-1 text-fg/50 tabular-nums">
+              {widget.span}/{GRID_COLUMNS}
+            </span>
+            <button
+              type="button"
+              aria-label={`Widen ${label}`}
+              disabled={widget.span >= GRID_COLUMNS}
+              onClick={() => onSpan(widget.id, widget.span + 1)}
+              className={stepBtn}
+            >
+              +
+            </button>
+          </div>
+          <button
+            type="button"
+            aria-pressed={widget.hidden}
+            onClick={() => onToggleHidden(widget.id)}
+            className="rounded-lg border border-fg/10 px-2 py-1 text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg"
+          >
+            {widget.hidden ? "Show" : "Hide"}
+          </button>
+        </div>
+      </div>
+      {node ? (
+        // Inert while editing so a drag can't trigger the widget's links.
+        <div className={`pointer-events-none ${widget.hidden ? "opacity-40" : ""}`}>
+          {node}
+        </div>
+      ) : (
+        <div className="flex min-h-16 items-center justify-center rounded-xl bg-fg/[0.03] px-4 py-6 text-center text-xs text-fg/40">
+          {emptyReason}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// The fixed bottom pill shown while editing: autosave state, revert to how the
+// layout looked when edit mode was entered, and done.
+export function EditToolbar({
+  status,
+  error,
+  onRevert,
+  onDone,
+}: {
+  status: SaveState;
+  error: string | null;
+  onRevert: () => void;
+  onDone: () => void;
+}) {
+  return (
+    <div className="fixed bottom-5 left-1/2 z-40 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-full border border-fg/10 bg-fg/5 py-2 pr-2 pl-4 shadow-lg backdrop-blur-xl">
+      <span className="text-sm font-medium text-fg/80">Editing layout</span>
+      <span className="text-xs text-fg/40 lg:hidden">
+        Widths apply on large screens
+      </span>
+      <SaveStatus status={status} error={error} />
+      <button
+        type="button"
+        onClick={onRevert}
+        className="rounded-full border border-fg/10 bg-fg/5 px-3 py-1.5 text-sm text-fg/80 transition-colors hover:bg-fg/10"
+      >
+        Revert
+      </button>
+      <button
+        type="button"
+        onClick={onDone}
+        className="btn-accent rounded-full px-4 py-1.5 text-sm font-medium"
+      >
+        Done
+      </button>
+    </div>
+  );
+}

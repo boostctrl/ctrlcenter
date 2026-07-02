@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
 import type { Settings } from "@/lib/schema";
 import { ALERT_TYPES } from "@/lib/schema";
 import type { ThemePack } from "@/lib/theme";
@@ -11,17 +12,8 @@ import {
 } from "@/lib/search";
 import { STATUS_RANGES } from "@/lib/status";
 import { supportedTimezones } from "@/lib/prefs";
-import {
-  resolveLayoutSections,
-  SECTION_LABELS,
-  SECTION_WIDTHS,
-  WIDTH_LABELS,
-  type LayoutSection,
-  type LayoutSectionId,
-  type SectionWidth,
-} from "@/lib/layout";
-import { TextField, MoveButtons } from "./ui";
-import { reorder } from "./useReorder";
+import { resolveLayoutWidgets, type LayoutWidgetId } from "@/lib/layout";
+import { TextField } from "./ui";
 import IconField from "./IconField";
 import CalendarTest from "./CalendarTest";
 import CitySearch from "./CitySearch";
@@ -84,7 +76,19 @@ export default function SettingsManager({
   initialSettings: Settings;
   themePacks: ThemePack[];
 }) {
-  const [settings, setSettings] = useState(initialSettings);
+  // Resolve the layout up front: stored entries can omit `hidden` (the legacy
+  // components toggles fold in at resolve time), but this form autosaves the
+  // WHOLE settings object and the strict layout update schema requires every
+  // widget fully resolved.
+  const [settings, setSettings] = useState(() => ({
+    ...initialSettings,
+    layout: {
+      sections: resolveLayoutWidgets(
+        initialSettings.layout.sections,
+        initialSettings.components
+      ),
+    },
+  }));
   const [section, setSection] = useState<SettingsSectionId>("general");
   // Persistence is automatic: every change debounce-saves via useAutosave.
   const { status, error } = useAutosave(settings, saveSettings);
@@ -113,27 +117,33 @@ export default function SettingsManager({
       components: { ...s.components, [key]: value },
     }));
 
-  // Home-page section arrangement (order + width). Always resolved so every
-  // section shows even if the saved layout is partial; the admin sends the whole
-  // list back (updateSettings replaces it wholesale).
-  const layoutSections = resolveLayoutSections(settings.layout.sections);
-  const setLayout = (next: LayoutSection[]) =>
-    setSettings((s) => ({ ...s, layout: { sections: next } }));
-  const moveSection = (from: number, to: number) => {
-    if (to < 0 || to >= layoutSections.length) return;
-    setLayout(reorder(layoutSections, from, to));
-  };
-  const setSectionWidth = (id: LayoutSectionId, width: SectionWidth) =>
-    setLayout(layoutSections.map((s) => (s.id === id ? { ...s, width } : s)));
-  // Components without their own dedicated toggle (weather/status/calendar keep
-  // theirs). Order mirrors roughly top-to-bottom on the page.
+  // Widget visibility now lives on the layout entries themselves (the on-page
+  // editor owns arrangement; these checkboxes are the same `hidden` flags).
+  const layoutWidgets = settings.layout.sections;
+  const isWidgetShown = (id: LayoutWidgetId) =>
+    !layoutWidgets.find((w) => w.id === id)?.hidden;
+  const setWidgetShown = (id: LayoutWidgetId, shown: boolean) =>
+    setSettings((s) => ({
+      ...s,
+      layout: {
+        sections: s.layout.sections.map((w) =>
+          w.id === id ? { ...w, hidden: !shown } : w
+        ),
+      },
+    }));
+  // Order mirrors roughly top-to-bottom on the page. The split
+  // clock/weather/status widgets are managed in the home-page editor instead —
+  // weather/status/calendar content keeps its own feature toggles.
+  const widgetToggles: { id: LayoutWidgetId; label: string }[] = [
+    { id: "greeting", label: "Greeting" },
+    { id: "headerCard", label: "Header card (clock, weather & status)" },
+    { id: "search", label: "Search bar" },
+    { id: "apps", label: "Applications" },
+    { id: "bookmarks", label: "Bookmarks" },
+    { id: "favorites", label: "Favorites row" },
+  ];
   const componentToggles: { key: keyof Settings["components"]; label: string }[] = [
-    { key: "greeting", label: "Greeting" },
-    { key: "clock", label: "Date & clock" },
-    { key: "search", label: "Search bar" },
-    { key: "apps", label: "Applications" },
-    { key: "bookmarks", label: "Bookmarks" },
-    { key: "favorites", label: "Favorites row" },
+    { key: "clock", label: "Date & clock (inside the header card)" },
     { key: "settingsButton", label: "Floating navigation menu" },
   ];
   const alertTypeLabel: Record<Settings["alerts"]["type"], string> = {
@@ -374,9 +384,22 @@ export default function SettingsManager({
         {section === "layout" && (
         <Section
           title="Layout"
-          intro="Show or hide individual home-page components. Weather, the status row, and the calendar are toggled in their own sections."
+          intro="Show or hide home-page widgets. Weather, the status row, and the calendar are toggled in their own sections; the split clock/weather/status widgets are managed in the home-page editor below."
         >
         <div className="flex flex-col gap-2.5">
+          {widgetToggles.map((t) => (
+            <label
+              key={t.id}
+              className="flex items-center justify-between gap-4 text-sm"
+            >
+              <span className="text-fg/70">{t.label}</span>
+              <input
+                type="checkbox"
+                checked={isWidgetShown(t.id)}
+                onChange={(e) => setWidgetShown(t.id, e.target.checked)}
+              />
+            </label>
+          ))}
           {componentToggles.map((t) => (
             <label
               key={t.key}
@@ -401,43 +424,17 @@ export default function SettingsManager({
         <div className="mt-2 border-t border-fg/10 pt-4">
           <span className="text-sm text-fg/70">Arrangement</span>
           <p className="mt-1 mb-3 text-xs text-fg/40">
-            Order the dashboard sections and set each to full, two-thirds, half,
-            or a third of the width. Sections whose widths fit a row sit side by
-            side. Hidden sections don&apos;t appear regardless of order.
+            Widgets are arranged directly on the home page: drag to reorder,
+            resize from 1 to 12 columns, and show or hide everything in place —
+            including swapping the header card for the split clock, weather, and
+            status widgets.
           </p>
-          <ul className="flex flex-col gap-2">
-            {layoutSections.map((s, i) => (
-              <li
-                key={s.id}
-                className="flex items-center gap-3 rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-sm"
-              >
-                <MoveButtons
-                  index={i}
-                  count={layoutSections.length}
-                  label={SECTION_LABELS[s.id]}
-                  onMove={moveSection}
-                />
-                <span className="flex-1 text-fg/80">{SECTION_LABELS[s.id]}</span>
-                <div className="flex shrink-0 overflow-hidden rounded-lg border border-fg/10">
-                  {SECTION_WIDTHS.map((w) => (
-                    <button
-                      key={w}
-                      type="button"
-                      onClick={() => setSectionWidth(s.id, w)}
-                      title={w === "twoThirds" ? "Two-thirds" : w === "third" ? "One-third" : w === "half" ? "Half" : "Full"}
-                      className={`px-2.5 py-1 text-xs transition-colors ${
-                        s.width === w
-                          ? "bg-fg/15 text-fg"
-                          : "text-fg/50 hover:text-fg/80"
-                      }`}
-                    >
-                      {WIDTH_LABELS[w]}
-                    </button>
-                  ))}
-                </div>
-              </li>
-            ))}
-          </ul>
+          <Link
+            href="/?edit=1"
+            className="inline-block rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10"
+          >
+            Arrange the home page
+          </Link>
         </div>
         </Section>
         )}

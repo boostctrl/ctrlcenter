@@ -3,7 +3,14 @@ import { DESIGN_IDS, SCENE_IDS } from "./theme";
 import { FONT_IDS, DEFAULT_FONT } from "./fonts";
 import { SEARCH_ENGINE_KEYS, isValidCustomUrl } from "./search";
 import { STATUS_RANGE_KEYS, CHECK_TYPE_KEYS } from "./status";
-import { LAYOUT_SECTION_IDS, SECTION_WIDTHS } from "./layout";
+import {
+  LAYOUT_WIDGET_IDS,
+  SECTION_WIDTHS,
+  WIDTH_TO_SPAN,
+  DEFAULT_WIDGETS,
+  defaultSpanFor,
+  type LayoutWidgetId,
+} from "./layout";
 
 // 6-digit hex color (matches what <input type="color"> produces and the
 // client-side theme sanitizers accept).
@@ -145,6 +152,13 @@ export const themeSchema = z.object({
 // Per-component visibility for the home page. Each flag defaults on, so existing
 // configs keep showing everything. Weather, the status row, and the calendar have
 // their own dedicated toggles already, so they aren't duplicated here.
+//
+// greeting/search/apps/bookmarks/favorites are LEGACY inputs since the widget
+// grid: placement visibility lives in layout `hidden` now, and these flags are
+// only folded in by resolveLayoutWidgets for layout entries saved before that
+// (they're still honored so an old config renders unchanged). `clock` stays
+// live — it hides the date/time row inside the header card and gates the
+// standalone clock widget's content — as does `settingsButton`.
 export const componentsSchema = z.object({
   greeting: z.boolean().default(true),
   clock: z.boolean().default(true),
@@ -156,20 +170,50 @@ export const componentsSchema = z.object({
 });
 export type ComponentsConfig = z.infer<typeof componentsSchema>;
 
-// Home-page section arrangement: an ordered list of sections, each full- or
-// half-width. Controls order + column width only; visibility comes from
-// componentsSchema. resolveLayoutSections (lib/layout.ts) normalizes a partial or
-// hand-edited list at render, so a malformed array `.catch([])`es to empty and is
-// rebuilt into the default rather than failing the config load.
-export const layoutSectionSchema = z.object({
-  id: z.enum(LAYOUT_SECTION_IDS),
-  width: z.enum(SECTION_WIDTHS).catch("full").default("full"),
-});
-export const layoutSchema = z.object({
-  sections: z
-    .array(layoutSectionSchema)
+// Parse an array, dropping only the items that fail validation instead of
+// failing the whole config. A non-array value falls back to an empty list.
+function lenientArray<T extends z.ZodTypeAny>(item: T) {
+  return z
+    .array(z.unknown())
     .catch([])
-    .default(LAYOUT_SECTION_IDS.map((id) => ({ id, width: "full" as const }))),
+    .transform((arr) =>
+      arr.flatMap((value) => {
+        const parsed = item.safeParse(value);
+        return parsed.success ? [parsed.data as z.infer<T>] : [];
+      })
+    );
+}
+
+// Home-page widget arrangement: an ordered list of widgets, each with a column
+// span on the 12-column grid and a hidden flag. The legacy pre-1.3 shape
+// ({ id, width: full|twoThirds|half|third }) still parses — the transform maps
+// a width to its span, and since writeConfig re-parses on every save, a stored
+// config migrates to the span shape on its next write (the transform is
+// idempotent). `hidden` deliberately stays absent (not defaulted) when a stored
+// entry omits it, so resolveLayoutWidgets (lib/layout.ts) can fold the legacy
+// components visibility toggles in; that resolver also rebuilds whatever this
+// lenient per-row parse drops.
+export const layoutWidgetSchema = z
+  .object({
+    id: z.enum(LAYOUT_WIDGET_IDS),
+    span: z.number().int().min(1).max(12).optional().catch(undefined),
+    width: z.enum(SECTION_WIDTHS).optional().catch(undefined),
+    hidden: z.boolean().optional().catch(undefined),
+  })
+  .transform(
+    ({
+      id,
+      span,
+      width,
+      hidden,
+    }): { id: LayoutWidgetId; span: number; hidden?: boolean } => ({
+      id,
+      span: span ?? (width ? WIDTH_TO_SPAN[width] : defaultSpanFor(id)),
+      ...(hidden === undefined ? {} : { hidden }),
+    })
+  );
+export const layoutSchema = z.object({
+  sections: lenientArray(layoutWidgetSchema).default(DEFAULT_WIDGETS),
 });
 export type LayoutConfig = z.infer<typeof layoutSchema>;
 
@@ -273,20 +317,6 @@ export const configSchema = z.object({
   themes: z.array(themePackSchema).default([]),
   auth: authSchema.default(authSchema.parse({})),
 });
-
-// Parse an array, dropping only the items that fail validation instead of
-// failing the whole config. A non-array value falls back to an empty list.
-function lenientArray<T extends z.ZodTypeAny>(item: T) {
-  return z
-    .array(z.unknown())
-    .catch([])
-    .transform((arr) =>
-      arr.flatMap((value) => {
-        const parsed = item.safeParse(value);
-        return parsed.success ? [parsed.data as z.infer<T>] : [];
-      })
-    );
-}
 
 // Resilient variant used only when READING config.yaml from disk: a single
 // malformed app/bookmark/theme row is dropped rather than failing the whole load
@@ -439,13 +469,14 @@ export const componentsUpdateSchema = z.object({
   settingsButton: z.boolean(),
 });
 
-// The admin sends the whole layout (all sections), so updateSettings replaces it
-// wholesale (like theme/components).
+// The admin/editor sends the whole layout (every widget, fully resolved), so
+// updateSettings replaces it wholesale (like theme/components).
 export const layoutUpdateSchema = z.object({
   sections: z.array(
     z.object({
-      id: z.enum(LAYOUT_SECTION_IDS),
-      width: z.enum(SECTION_WIDTHS),
+      id: z.enum(LAYOUT_WIDGET_IDS),
+      span: z.number().int().min(1).max(12),
+      hidden: z.boolean(),
     })
   ),
 });

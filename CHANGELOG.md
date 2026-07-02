@@ -12,6 +12,39 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **A drag-and-drop home-page layout editor.** Signed-in admins get an **Edit
+  layout** entry in the floating corner menu (or the **Arrange the home page**
+  link in admin Settings → Layout) that turns the home page itself into the
+  editor: drag widgets to reorder, resize them with a 1–12 column stepper, and
+  show or hide anything in place. Changes autosave, **Revert** restores the
+  arrangement you entered with, and every control is a real button, so the
+  editor is keyboard- and touch-friendly — mouse drag is just a shortcut.
+- **A 12-column widget grid.** The dashboard grid doubles from 6 to 12 columns
+  for much finer widget sizing; rows still pack automatically with
+  content-driven heights.
+- **The header is now widgets.** The greeting and the clock/weather/status
+  card are placeable like everything else — and the combined card can be
+  swapped for separate **clock**, **weather**, and **status** widgets (hidden
+  by default) for a fully custom top row.
+
+### Changed
+
+- **The admin Settings tab was redesigned around a section nav rail** (a
+  sticky list on desktop, wrapping pills on mobile) showing one focused
+  section at a time, with the old "Dashboard" grab-bag split into proper
+  Search and Status sections.
+- **Admin Settings → Layout → Arrangement moved to the home page.** The
+  settings list is replaced by a link to the on-page editor; the visibility
+  checkboxes remain and now drive the same per-widget `hidden` flags the
+  editor uses.
+- Saved layouts from earlier versions (`width: full|twoThirds|half|third`)
+  still load, render identically, and migrate to the new `span` shape on the
+  next save; old config exports import cleanly. On tablet widths (below the
+  large breakpoint) the greeting and header card now stack vertically — the
+  grid packs side-by-side from the large breakpoint up.
+
 ## [1.2.2] - 2026-07-01
 
 ### Added

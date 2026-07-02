@@ -6,6 +6,21 @@ settings:
     latitude: 38.9072
     longitude: -77.0369
     units: imperial
+  # The home-page widget grid (12 columns) — easiest edited visually: sign in
+  # and pick "Edit layout" from the floating corner menu. Order = position;
+  # each widget spans 1–12 columns and rows pack automatically.
+  # layout:
+  #   sections:
+  #     - { id: greeting, span: 8 }
+  #     - { id: headerCard, span: 4 }             # clock/weather/status card
+  #     - { id: clock, span: 4, hidden: true }    # …or show these split
+  #     - { id: weather, span: 4, hidden: true }  #    widgets instead of the
+  #     - { id: status, span: 4, hidden: true }   #    combined card
+  #     - { id: search, span: 12 }
+  #     - { id: calendar, span: 12 }
+  #     - { id: favorites, span: 12 }
+  #     - { id: apps, span: 12 }
+  #     - { id: bookmarks, span: 12 }
 apps:
   - id: 85b49535-e829-4356-8685-fef57bbeab56
     name: File Storage
