@@ -119,6 +119,16 @@ export const calendarSchema = z.object({
 });
 export type CalendarConfig = z.infer<typeof calendarSchema>;
 
+// The Notes widget's content: a title and a markdown body (safe subset,
+// rendered by lib/markdown.ts — never as raw HTML). No `enabled` flag: the
+// widget's layout `hidden` flag governs visibility, and an empty body renders
+// nothing. Stored leniently so a hand-edited file always parses.
+export const notesSchema = z.object({
+  title: z.string().default("Notes"),
+  content: z.string().default(""),
+});
+export type NotesConfig = z.infer<typeof notesSchema>;
+
 // The site-wide default theme. Visitors can override every part of this in
 // their own browser (the theme builder / settings page); these values are the
 // baseline an un-customized visitor sees. `background`/`foreground` are optional
@@ -299,6 +309,7 @@ export const settingsSchema = z.object({
   weather: weatherSchema.default(weatherSchema.parse({})),
   alerts: alertsSchema.default(alertsSchema.parse({})),
   calendar: calendarSchema.default(calendarSchema.parse({})),
+  notes: notesSchema.default(notesSchema.parse({})),
   components: componentsSchema.default(componentsSchema.parse({})),
   layout: layoutSchema.default(layoutSchema.parse({})),
 });
@@ -498,6 +509,12 @@ export const calendarUpdateSchema = z
     { message: "Calendar URL must start with http(s) or webcal", path: ["url"] }
   );
 
+// The admin sends the whole notes object (title + content together).
+export const notesUpdateSchema = z.object({
+  title: z.string(),
+  content: z.string(),
+});
+
 // The admin sends the whole theme object (not a partial), so updateSettings
 // replaces it wholesale — that's how clearing the optional custom colors works
 // (omit them and they're gone). Required fields keep a saved theme well-formed.
@@ -566,6 +583,7 @@ export const settingsInputSchema = z.object({
   weather: weatherUpdateSchema.optional(),
   alerts: alertsUpdateSchema.optional(),
   calendar: calendarUpdateSchema.optional(),
+  notes: notesUpdateSchema.optional(),
   components: componentsUpdateSchema.optional(),
   layout: layoutUpdateSchema.optional(),
 });

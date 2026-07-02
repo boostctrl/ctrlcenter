@@ -11,6 +11,7 @@ export const LAYOUT_WIDGET_IDS = [
   "status",
   "search",
   "calendar",
+  "notes",
   "favorites",
   "apps",
   "bookmarks",
@@ -70,6 +71,7 @@ export const WIDGET_LABELS: Record<LayoutWidgetId, string> = {
   status: "Status",
   search: "Search",
   calendar: "Calendar",
+  notes: "Notes",
   favorites: "Favorites",
   apps: "Applications",
   bookmarks: "Bookmarks",
@@ -87,6 +89,9 @@ export const DEFAULT_WIDGETS: LayoutWidget[] = [
   { id: "status", span: 8, hidden: true },
   { id: "search", span: 24, hidden: false },
   { id: "calendar", span: 24, hidden: false },
+  // Ships dormant (hidden) so upgrades don't surprise existing dashboards;
+  // the admin shows it from the layout editor or Settings → Layout.
+  { id: "notes", span: 8, hidden: true },
   { id: "favorites", span: 24, hidden: false },
   { id: "apps", span: 24, hidden: false },
   { id: "bookmarks", span: 24, hidden: false },

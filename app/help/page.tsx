@@ -423,6 +423,17 @@ export default async function HelpPage() {
             </P>
           </Card>
 
+          <Card title="Notes card">
+            <P>
+              A free-form card for anything worth keeping in view — maintenance
+              reminders, runbook snippets, a message for the household. Write it
+              in <strong>Settings → Notes</strong> using a safe markdown subset
+              (headings, bold and italic, links, lists, quotes, and code
+              blocks), then show the card from the home-page layout editor. Raw
+              HTML is displayed as text, never rendered.
+            </P>
+          </Card>
+
           <Card title="Themes">
             <P>
               The <strong>Themes</strong> tab edits the built-in theme packs

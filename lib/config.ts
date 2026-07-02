@@ -129,6 +129,7 @@ export async function updateSettings(
       search: searchPartial,
       alerts: alertsPartial,
       calendar: calendarPartial,
+      notes: notesPartial,
       components: componentsPartial,
       theme: themePartial,
       layout: layoutPartial,
@@ -152,6 +153,10 @@ export async function updateSettings(
       calendar: {
         ...config.settings.calendar,
         ...withoutUndefined(calendarPartial ?? {}),
+      },
+      notes: {
+        ...config.settings.notes,
+        ...withoutUndefined(notesPartial ?? {}),
       },
       components: {
         ...config.settings.components,

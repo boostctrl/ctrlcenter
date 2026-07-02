@@ -43,6 +43,7 @@ const SETTINGS_SECTIONS = [
   { id: "alerts", label: "Alerts" },
   { id: "weather", label: "Weather" },
   { id: "calendar", label: "Calendar" },
+  { id: "notes", label: "Notes" },
   { id: "security", label: "Security" },
 ] as const;
 type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]["id"];
@@ -142,6 +143,7 @@ export default function SettingsManager({
     { id: "greeting", label: "Greeting" },
     { id: "headerCard", label: "Header card (clock, weather & status)" },
     { id: "search", label: "Search bar" },
+    { id: "notes", label: "Notes card" },
     { id: "apps", label: "Applications" },
     { id: "bookmarks", label: "Bookmarks" },
     { id: "favorites", label: "Favorites row" },
@@ -166,6 +168,10 @@ export default function SettingsManager({
   const calendar = settings.calendar;
   const updateCalendar = (patch: Partial<Settings["calendar"]>) =>
     setSettings((s) => ({ ...s, calendar: { ...s.calendar, ...patch } }));
+
+  const notes = settings.notes;
+  const updateNotes = (patch: Partial<Settings["notes"]>) =>
+    setSettings((s) => ({ ...s, notes: { ...s.notes, ...patch } }));
 
   const bangs = settings.search.bangs;
   const setBangs = (next: Settings["search"]["bangs"]) =>
@@ -1063,6 +1069,36 @@ export default function SettingsManager({
             </p>
           </>
         )}
+        </Section>
+        )}
+
+        {section === "notes" && (
+        <Section
+          title="Notes"
+          intro="A free-form note card for the home page. Ships hidden — show it in the home-page layout editor (or the Layout section above) once there's something to say."
+        >
+          <TextField
+            label="Card title"
+            placeholder="Notes"
+            value={notes.title}
+            onChange={(e) => updateNotes({ title: e.target.value })}
+          />
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-fg/50">Note (markdown)</span>
+            <textarea
+              value={notes.content}
+              onChange={(e) => updateNotes({ content: e.target.value })}
+              rows={10}
+              placeholder={"# Homelab\n- Renew certs **June 12**\n- `docker compose pull` after backups"}
+              className="accent-focus rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 font-mono text-xs leading-relaxed text-fg placeholder-fg/30 outline-none transition-colors"
+            />
+          </label>
+          <p className="text-xs text-fg/40">
+            Supports a safe markdown subset: # ## ### headings, **bold**,
+            *italic*, `code`, [links](https://…) (http/https only), - and 1.
+            lists, &gt; quotes, ``` code blocks and --- rules. Raw HTML is shown
+            as plain text, never rendered.
+          </p>
         </Section>
         )}
 

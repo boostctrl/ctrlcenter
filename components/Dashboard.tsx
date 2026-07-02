@@ -10,6 +10,7 @@ import HeaderCardWidget from "./widgets/HeaderCardWidget";
 import ClockWidget from "./widgets/ClockWidget";
 import WeatherWidget from "./widgets/WeatherWidget";
 import StatusWidget from "./widgets/StatusWidget";
+import NotesWidget from "./widgets/NotesWidget";
 import {
   buildSearchUrl,
   engineLabel,
@@ -137,6 +138,7 @@ export default function Dashboard({
   weatherEnabled,
   showClock,
   statusEnabled,
+  notes,
 }: {
   // The resolved widget arrangement (order + span + hidden), server-resolved so
   // legacy configs render unchanged.
@@ -160,6 +162,8 @@ export default function Dashboard({
   weatherEnabled: boolean;
   showClock: boolean;
   statusEnabled: boolean;
+  // The Notes widget's admin-authored title + markdown body.
+  notes: { title: string; content: string };
 }) {
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -408,6 +412,10 @@ export default function Dashboard({
         ) : null;
       case "calendar":
         return q && !editing ? null : calendar;
+      case "notes":
+        return notes.content.trim() !== "" ? (
+          <NotesWidget title={notes.title} content={notes.content} />
+        ) : null;
       case "favorites":
         return (!q || editing) && favoriteApps.length > 0 ? (
           <section>
@@ -469,6 +477,8 @@ export default function Dashboard({
         return "The search bar appears once there are apps or bookmarks to search.";
       case "calendar":
         return "The calendar is disabled, or it has no upcoming events to show.";
+      case "notes":
+        return "The note is empty — write it in admin Settings → Notes.";
       case "favorites":
         return "No pinned favorites yet.";
       case "apps":

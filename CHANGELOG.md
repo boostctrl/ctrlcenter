@@ -14,6 +14,11 @@ here.
 
 ### Added
 
+- **A Notes widget.** A free-form card for the home page — reminders, runbook
+  snippets, a message for the household — written in admin Settings → Notes
+  using a safe markdown subset (headings, bold/italic, links, lists, quotes,
+  code blocks). Raw HTML is displayed as text, never rendered. Ships hidden;
+  show it from the home-page layout editor. (#79)
 - **Living weather hero.** The weather page's hero now plays a subtle
   animated effect matching the current conditions — falling rain or snow,
   storm flashes of lightning, rolling fog, drifting clouds, a warm sun glow

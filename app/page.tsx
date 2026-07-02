@@ -84,6 +84,7 @@ export default async function HomePage({
             weatherEnabled={weather.enabled}
             showClock={settings.components.clock}
             statusEnabled={statusEnabled}
+            notes={settings.notes}
             calendar={
               calendarVisible ? (
                 <CalendarWidget
