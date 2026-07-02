@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-07-02
+
 ### Added
 
 - **Seven new scenes.** Horizon (a retro sun sinking to a glowing horizon),
@@ -1047,7 +1049,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/boostctrl/ctrlcenter/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/boostctrl/ctrlcenter/compare/v1.2.2...v1.3.0
 [1.2.2]: https://github.com/boostctrl/ctrlcenter/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/boostctrl/ctrlcenter/compare/v1.2.0...v1.2.1
