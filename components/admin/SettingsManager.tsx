@@ -46,6 +46,7 @@ const SETTINGS_SECTIONS = [
   { id: "calendar", label: "Calendar" },
   { id: "feed", label: "RSS feed" },
   { id: "notes", label: "Notes" },
+  { id: "countdown", label: "Countdown" },
   { id: "security", label: "Security" },
 ] as const;
 type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]["id"];
@@ -146,6 +147,7 @@ export default function SettingsManager({
     { id: "headerCard", label: "Header card (clock, weather & status)" },
     { id: "search", label: "Search bar" },
     { id: "notes", label: "Notes card" },
+    { id: "countdown", label: "Countdown card" },
     { id: "apps", label: "Applications" },
     { id: "bookmarks", label: "Bookmarks" },
     { id: "favorites", label: "Favorites row" },
@@ -178,6 +180,17 @@ export default function SettingsManager({
   const feed = settings.feed;
   const updateFeed = (patch: Partial<Settings["feed"]>) =>
     setSettings((s) => ({ ...s, feed: { ...s.feed, ...patch } }));
+
+  const countdown = settings.countdown;
+  const setCountdownItems = (items: Settings["countdown"]["items"]) =>
+    setSettings((s) => ({ ...s, countdown: { ...s.countdown, items } }));
+  const updateCountdownItem = (
+    i: number,
+    patch: Partial<Settings["countdown"]["items"][number]>
+  ) =>
+    setCountdownItems(
+      countdown.items.map((item, idx) => (idx === i ? { ...item, ...patch } : item))
+    );
 
   const bangs = settings.search.bangs;
   const setBangs = (next: Settings["search"]["bangs"]) =>
@@ -1163,6 +1176,69 @@ export default function SettingsManager({
             *italic*, `code`, [links](https://…) (http/https only), - and 1.
             lists, &gt; quotes, ``` code blocks and --- rules. Raw HTML is shown
             as plain text, never rendered.
+          </p>
+        </Section>
+        )}
+
+        {section === "countdown" && (
+        <Section
+          title="Countdown"
+          intro="Labeled dates shown as “in N days” rows — renewals, birthdays, deadlines. Ships hidden — show the card in the home-page layout editor once dates are added."
+        >
+          <TextField
+            label="Card title"
+            placeholder="Countdown"
+            value={countdown.title}
+            onChange={(e) =>
+              setSettings((s) => ({
+                ...s,
+                countdown: { ...s.countdown, title: e.target.value },
+              }))
+            }
+          />
+          <div className="flex flex-col gap-2">
+            <span className="text-sm text-fg/50">Dates</span>
+            {countdown.items.map((item, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input
+                  value={item.label}
+                  onChange={(e) => updateCountdownItem(i, { label: e.target.value })}
+                  placeholder="Renew domain"
+                  aria-label={`Countdown ${i + 1} label`}
+                  className={`${selectClass} min-w-0 flex-1`}
+                />
+                <input
+                  type="date"
+                  value={item.date}
+                  onChange={(e) => updateCountdownItem(i, { date: e.target.value })}
+                  aria-label={`Countdown ${i + 1} date`}
+                  className={`${selectClass} shrink-0`}
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCountdownItems(countdown.items.filter((_, idx) => idx !== i))
+                  }
+                  aria-label={`Remove countdown ${i + 1}`}
+                  className="shrink-0 rounded-md px-2 py-1 text-fg/40 transition-colors hover:bg-fg/10 hover:text-red-400"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() =>
+                setCountdownItems([...countdown.items, { label: "", date: "" }])
+              }
+              className="self-start rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10"
+            >
+              + Add date
+            </button>
+          </div>
+          <p className="text-xs text-fg/40">
+            Days count in each visitor&apos;s own time zone. Past dates dim and
+            sink below the upcoming ones.
           </p>
         </Section>
         )}

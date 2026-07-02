@@ -13,6 +13,7 @@ export const LAYOUT_WIDGET_IDS = [
   "calendar",
   "notes",
   "feed",
+  "countdown",
   "favorites",
   "apps",
   "bookmarks",
@@ -74,6 +75,7 @@ export const WIDGET_LABELS: Record<LayoutWidgetId, string> = {
   calendar: "Calendar",
   notes: "Notes",
   feed: "RSS feed",
+  countdown: "Countdown",
   favorites: "Favorites",
   apps: "Applications",
   bookmarks: "Bookmarks",
@@ -95,6 +97,7 @@ export const DEFAULT_WIDGETS: LayoutWidget[] = [
   // the admin shows them from the layout editor or Settings → Layout.
   { id: "notes", span: 8, hidden: true },
   { id: "feed", span: 8, hidden: true },
+  { id: "countdown", span: 8, hidden: true },
   { id: "favorites", span: 24, hidden: false },
   { id: "apps", span: 24, hidden: false },
   { id: "bookmarks", span: 24, hidden: false },

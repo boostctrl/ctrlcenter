@@ -32,6 +32,7 @@ describe("resolveLayoutWidgets", () => {
       "calendar",
       "notes",
       "feed",
+      "countdown",
       "favorites",
     ]);
     // Every widget appears exactly once.
@@ -73,6 +74,7 @@ describe("resolveLayoutWidgets", () => {
       "bookmarks",
       "notes",
       "feed",
+      "countdown",
     ]);
     // Combined card visible, split widgets hidden — today's look.
     expect(out.find((w) => w.id === "headerCard")?.hidden).toBe(false);
@@ -137,7 +139,7 @@ describe("resolveLayoutWidgets", () => {
     // The upgrade path: a full layout saved before notes/feed existed must
     // render unchanged, with the new widgets appended hidden at their default
     // spans.
-    const added: LayoutWidgetId[] = ["notes", "feed"];
+    const added: LayoutWidgetId[] = ["notes", "feed", "countdown"];
     const older = LAYOUT_WIDGET_IDS.filter((id) => !added.includes(id)).map(
       (id) => ({ id, span: 24, hidden: false })
     );

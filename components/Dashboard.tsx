@@ -11,6 +11,10 @@ import ClockWidget from "./widgets/ClockWidget";
 import WeatherWidget from "./widgets/WeatherWidget";
 import StatusWidget from "./widgets/StatusWidget";
 import NotesWidget from "./widgets/NotesWidget";
+import CountdownWidget, {
+  isValidCountdownDate,
+  type CountdownItem,
+} from "./widgets/CountdownWidget";
 import {
   buildSearchUrl,
   engineLabel,
@@ -140,6 +144,7 @@ export default function Dashboard({
   statusEnabled,
   notes,
   feed = null,
+  countdown,
 }: {
   // The resolved widget arrangement (order + span + hidden), server-resolved so
   // legacy configs render unchanged.
@@ -168,6 +173,8 @@ export default function Dashboard({
   // The RSS feed widget (rendered server-side and passed in, like `calendar`);
   // null when the feature is off, so its layout cell isn't left empty.
   feed?: React.ReactNode;
+  // The Countdown widget's admin-authored title + dated rows.
+  countdown: { title: string; items: CountdownItem[] };
 }) {
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -422,6 +429,10 @@ export default function Dashboard({
         ) : null;
       case "feed":
         return q && !editing ? null : feed;
+      case "countdown":
+        return countdown.items.some((i) => isValidCountdownDate(i.date)) ? (
+          <CountdownWidget title={countdown.title} items={countdown.items} />
+        ) : null;
       case "favorites":
         return (!q || editing) && favoriteApps.length > 0 ? (
           <section>
@@ -487,6 +498,8 @@ export default function Dashboard({
         return "The note is empty — write it in admin Settings → Notes.";
       case "feed":
         return "The RSS feed is off or has no URL — set it up in admin Settings → RSS feed.";
+      case "countdown":
+        return "No dates yet — add them in admin Settings → Countdown.";
       case "favorites":
         return "No pinned favorites yet.";
       case "apps":

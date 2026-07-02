@@ -93,6 +93,7 @@ export default async function HomePage({
             showClock={settings.components.clock}
             statusEnabled={statusEnabled}
             notes={settings.notes}
+            countdown={settings.countdown}
             feed={
               feedEnabled ? (
                 <FeedWidget feed={feed} titleOverride={feedCfg.title} />

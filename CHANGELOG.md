@@ -14,6 +14,11 @@ here.
 
 ### Added
 
+- **A Countdown widget.** Labeled dates shown as "in N days" rows — domain
+  renewals, birthdays, deadlines — managed in admin Settings → Countdown.
+  Days count in each visitor's own time zone; today and tomorrow get an
+  accent chip, past dates dim and sink below upcoming ones. Ships hidden.
+  (#79)
 - **An RSS feed widget.** Show the latest headlines from any RSS or Atom feed
   on the home page. Configure the URL and entry count in admin Settings → RSS
   feed (with a Test feed button), and show the card from the layout editor.

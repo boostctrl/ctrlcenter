@@ -131,6 +131,7 @@ export async function updateSettings(
       calendar: calendarPartial,
       notes: notesPartial,
       feed: feedPartial,
+      countdown: countdownPartial,
       components: componentsPartial,
       theme: themePartial,
       layout: layoutPartial,
@@ -162,6 +163,10 @@ export async function updateSettings(
       feed: {
         ...config.settings.feed,
         ...withoutUndefined(feedPartial ?? {}),
+      },
+      countdown: {
+        ...config.settings.countdown,
+        ...withoutUndefined(countdownPartial ?? {}),
       },
       components: {
         ...config.settings.components,

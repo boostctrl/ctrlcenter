@@ -130,6 +130,19 @@ export const feedSchema = z.object({
 });
 export type FeedConfig = z.infer<typeof feedSchema>;
 
+// Countdown widget: labeled dates rendered as "in N days" rows. Stored
+// leniently (a half-typed row never fails the config load); rows without a
+// valid YYYY-MM-DD date are ignored at render time.
+export const countdownItemSchema = z.object({
+  label: z.string().default(""),
+  date: z.string().default(""),
+});
+export const countdownSchema = z.object({
+  title: z.string().default("Countdown"),
+  items: z.array(countdownItemSchema).default([]),
+});
+export type CountdownConfig = z.infer<typeof countdownSchema>;
+
 // The Notes widget's content: a title and a markdown body (safe subset,
 // rendered by lib/markdown.ts — never as raw HTML). No `enabled` flag: the
 // widget's layout `hidden` flag governs visibility, and an empty body renders
@@ -322,6 +335,7 @@ export const settingsSchema = z.object({
   calendar: calendarSchema.default(calendarSchema.parse({})),
   notes: notesSchema.default(notesSchema.parse({})),
   feed: feedSchema.default(feedSchema.parse({})),
+  countdown: countdownSchema.default(countdownSchema.parse({})),
   components: componentsSchema.default(componentsSchema.parse({})),
   layout: layoutSchema.default(layoutSchema.parse({})),
 });
@@ -527,6 +541,13 @@ export const notesUpdateSchema = z.object({
   content: z.string(),
 });
 
+// The admin sends the whole countdown object. Rows stay lenient (a half-typed
+// date must not block autosave); invalid dates are simply not rendered.
+export const countdownUpdateSchema = z.object({
+  title: z.string(),
+  items: z.array(z.object({ label: z.string(), date: z.string() })),
+});
+
 // The admin sends the whole feed object. The URL is optional (the widget stays
 // inert until set) but must be http(s) when present.
 export const feedUpdateSchema = z
@@ -611,6 +632,7 @@ export const settingsInputSchema = z.object({
   calendar: calendarUpdateSchema.optional(),
   notes: notesUpdateSchema.optional(),
   feed: feedUpdateSchema.optional(),
+  countdown: countdownUpdateSchema.optional(),
   components: componentsUpdateSchema.optional(),
   layout: layoutUpdateSchema.optional(),
 });

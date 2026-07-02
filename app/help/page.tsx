@@ -446,6 +446,17 @@ export default async function HelpPage() {
             </P>
           </Card>
 
+          <Card title="Countdown card">
+            <P>
+              Labeled dates shown as &ldquo;in N days&rdquo; rows — domain
+              renewals, birthdays, deadlines. Add them in{" "}
+              <strong>Settings → Countdown</strong>, then show the card from
+              the home-page layout editor. Days count in each visitor&apos;s
+              own time zone; today and tomorrow get an accent chip, and past
+              dates dim and sink below the upcoming ones.
+            </P>
+          </Card>
+
           <Card title="Themes">
             <P>
               The <strong>Themes</strong> tab edits the built-in theme packs
