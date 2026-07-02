@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useVisitorPrefs } from "./PrefsProvider";
 import { supportedTimezones } from "@/lib/prefs";
 
@@ -24,7 +24,16 @@ export default function SettingsControls() {
     useMyLocation,
     reset,
   } = useVisitorPrefs();
-  const zones = useMemo(() => supportedTimezones(), []);
+  // Fill the timezone datalist only after mount: Intl.supportedValuesOf differs
+  // between the server's node and the visitor's browser (e.g. a zone one ICU
+  // has and the other doesn't), so rendering it during SSR guarantees a
+  // hydration mismatch — the React #418 this page used to throw (#49). Starting
+  // empty keeps the first client render identical to the server output.
+  const [zones, setZones] = useState<string[]>([]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setZones(supportedTimezones());
+  }, []);
 
   const locationText =
     location.label ??
