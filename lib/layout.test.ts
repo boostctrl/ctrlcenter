@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   resolveLayoutWidgets,
+  fillSpan,
   LAYOUT_WIDGET_IDS,
   HEADER_WIDGET_IDS,
   DEFAULT_WIDGETS,
@@ -109,6 +110,17 @@ describe("resolveLayoutWidgets", () => {
     expect("cards" in out.find((w) => w.id === "favorites")!).toBe(false);
   });
 
+  it("keeps a boolean hideLabel and ignores a non-boolean one", () => {
+    const out = resolveLayoutWidgets([
+      { id: "apps", span: 24, hideLabel: true },
+      { id: "bookmarks", span: 24, hideLabel: "yes" },
+      { id: "favorites", span: 24 }, // absent — stays off
+    ]);
+    expect(out.find((w) => w.id === "apps")?.hideLabel).toBe(true);
+    expect("hideLabel" in out.find((w) => w.id === "bookmarks")!).toBe(false);
+    expect("hideLabel" in out.find((w) => w.id === "favorites")!).toBe(false);
+  });
+
   it("folds legacy components toggles into hidden for entries without one", () => {
     const components = { greeting: false, apps: false, search: true };
     const out = resolveLayoutWidgets(
@@ -148,6 +160,38 @@ describe("resolveLayoutWidgets", () => {
     for (const id of added) {
       expect(out.find((w) => w.id === id)).toEqual({ id, span: 8, hidden: true });
     }
+  });
+});
+
+describe("fillSpan", () => {
+  const w = (span: number) => ({ span });
+
+  it("returns the current span when the widget already ends its row", () => {
+    expect(fillSpan([w(24)], 0)).toBe(24);
+    expect(fillSpan([w(12), w(12)], 1)).toBe(12); // second half of a full row
+  });
+
+  it("returns the current span when the next widget shares its row", () => {
+    // a and b sit together on row 0 (8+8); only the trailing 24 wraps below.
+    expect(fillSpan([w(8), w(8), w(24)], 0)).toBe(8);
+  });
+
+  it("expands to the end of the row when dead space trails the widget", () => {
+    // b ends row 0 with 8 columns free before the 24-wide widget wraps below.
+    expect(fillSpan([w(8), w(8), w(24)], 1)).toBe(16);
+    // a lone narrow widget fills the whole row.
+    expect(fillSpan([w(8)], 0)).toBe(24);
+  });
+
+  it("accounts for wrapping when it finds the row", () => {
+    // 16 + 16 can't share a row: the second wraps to row 1 and fills it, and
+    // the first has 8 trailing columns on row 0.
+    expect(fillSpan([w(16), w(16)], 0)).toBe(24);
+    expect(fillSpan([w(16), w(16)], 1)).toBe(24);
+  });
+
+  it("respects a custom column count", () => {
+    expect(fillSpan([w(3)], 0, 12)).toBe(12);
   });
 });
 
@@ -252,10 +296,13 @@ describe("layout schema", () => {
 
   it("layoutUpdateSchema requires a fully-resolved list and bounds span/cards/scale", () => {
     const good = {
-      sections: [{ id: "apps", span: 13, hidden: false, cards: 4 }],
+      sections: [
+        { id: "apps", span: 13, hidden: false, cards: 4, hideLabel: true },
+      ],
     };
     const parsed = layoutUpdateSchema.safeParse(good);
     expect(parsed.success).toBe(true);
+    expect(parsed.data?.sections[0].hideLabel).toBe(true);
     // The grid marker and scale are stamped in so a stored layout can never
     // re-trigger the 12→24 migration.
     expect(parsed.data?.columns).toBe(24);

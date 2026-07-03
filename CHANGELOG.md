@@ -12,6 +12,17 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Fill dead space in the layout editor.** When a widget doesn't reach the end
+  of its row, a **Fill** button widens it to close the gap — and any space still
+  left over is now backfilled automatically by the next card that fits, so
+  partial rows no longer strand empty columns. (#86)
+- **Per-widget section-label toggle.** Each titled section (Applications,
+  Bookmarks, Favorites, Calendar, Notes, RSS feed, Countdown) gains a
+  **Label on/off** control in the layout editor to hide its heading while
+  keeping the card itself. (#86)
+
 ## [1.6.0] - 2026-07-02
 
 ### Added

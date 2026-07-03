@@ -95,10 +95,13 @@ export function WidgetFrame({
   node,
   emptyReason,
   effectiveCards,
+  fillTo,
+  titled,
   onMove,
   onSpan,
   onCards,
   onToggleHidden,
+  onToggleLabel,
   dragHandlers,
   dragging,
   dropSide,
@@ -113,10 +116,16 @@ export function WidgetFrame({
   // Only the card-grid widgets pass one; it gates the stepper and anchors the
   // first −/+ step so adjusting from "Auto" starts at what's on screen.
   effectiveCards?: number;
+  // The span that would fill this widget to the end of its row; the Fill button
+  // shows only when that's wider than the current span (i.e. there's dead space).
+  fillTo: number;
+  // Whether the widget has a section heading that can be toggled off.
+  titled: boolean;
   onMove: (from: number, to: number) => void;
   onSpan: (id: LayoutWidgetId, span: number) => void;
   onCards: (id: LayoutWidgetId, cards: number | undefined) => void;
   onToggleHidden: (id: LayoutWidgetId) => void;
+  onToggleLabel: (id: LayoutWidgetId) => void;
   dragHandlers: React.HTMLAttributes<HTMLDivElement>;
   dragging: boolean;
   dropSide: DropSide | null;
@@ -171,6 +180,16 @@ export function WidgetFrame({
               +
             </button>
           </div>
+          {fillTo > widget.span && (
+            <button
+              type="button"
+              onClick={() => onSpan(widget.id, fillTo)}
+              title={`Widen ${label} to fill the empty space in its row`}
+              className="rounded-lg border border-fg/10 px-2 py-1 text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg"
+            >
+              Fill
+            </button>
+          )}
           {effectiveCards !== undefined && (
             <div
               className="flex items-center overflow-hidden rounded-lg border border-fg/10"
@@ -208,6 +227,21 @@ export function WidgetFrame({
                 </button>
               )}
             </div>
+          )}
+          {titled && (
+            <button
+              type="button"
+              aria-pressed={!widget.hideLabel}
+              onClick={() => onToggleLabel(widget.id)}
+              title={
+                widget.hideLabel
+                  ? `Show the ${label} heading`
+                  : `Hide the ${label} heading`
+              }
+              className="rounded-lg border border-fg/10 px-2 py-1 text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg"
+            >
+              {widget.hideLabel ? "Label off" : "Label on"}
+            </button>
           )}
           <button
             type="button"

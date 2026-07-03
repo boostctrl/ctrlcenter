@@ -50,6 +50,19 @@ export const CARD_WIDGET_IDS: readonly LayoutWidgetId[] = [
   "bookmarks",
 ];
 
+// Widgets that render a section heading (the shared SectionTitle) and so can
+// have it toggled off per-widget from the layout editor (see `hideLabel`). The
+// header widgets, search and the split clock/weather/status have no heading.
+export const TITLED_WIDGET_IDS: readonly LayoutWidgetId[] = [
+  "calendar",
+  "notes",
+  "feed",
+  "countdown",
+  "favorites",
+  "apps",
+  "bookmarks",
+];
+
 // Site-wide UI scale (percent), rendered as font-size on <html>: the whole UI
 // is rem-based, so one percentage scales text, paddings and cards uniformly.
 export const MIN_UI_SCALE = 70;
@@ -63,6 +76,9 @@ export type LayoutWidget = {
   hidden: boolean;
   // Cards per row (1–4) for the card-grid widgets; absent = auto from span.
   cards?: number;
+  // Suppress the widget's section heading (the ALL-CAPS label above it) when
+  // true; absent/false shows it. Only meaningful for TITLED_WIDGET_IDS.
+  hideLabel?: boolean;
 };
 
 export const WIDGET_LABELS: Record<LayoutWidgetId, string> = {
@@ -121,6 +137,34 @@ const DEFAULT_BY_ID = Object.fromEntries(
 
 export function defaultSpanFor(id: LayoutWidgetId): number {
   return DEFAULT_BY_ID[id].span;
+}
+
+// The span that makes the widget at `index` fill to the end of its row — its
+// current span plus any dead space trailing it. Walks the list in flow order
+// (the same left-to-right wrap the CSS grid does) to find where the widget
+// starts and whether it ends its row; a widget that already reaches the row's
+// end, or that shares its row with a following widget, returns its own span
+// (nothing to fill). Powers the editor's "Fill" button. Pure, so it's unit
+// tested directly.
+export function fillSpan(
+  widgets: readonly { span: number }[],
+  index: number,
+  columns: number = GRID_COLUMNS
+): number {
+  const clamp = (s: number) => Math.min(columns, Math.max(1, s));
+  let col = 0;
+  for (let i = 0; i < widgets.length; i++) {
+    const span = clamp(widgets[i].span);
+    if (col + span > columns) col = 0; // doesn't fit — wraps to a new row
+    if (i === index) {
+      const next = i + 1 < widgets.length ? clamp(widgets[i + 1].span) : null;
+      const endsRow = next === null || col + span + next > columns;
+      return endsRow ? columns - col : span;
+    }
+    col += span;
+    if (col >= columns) col = 0;
+  }
+  return clamp(widgets[index]?.span ?? columns);
 }
 
 // Widget visibility used to live in settings.components. Those flags fold into
@@ -199,6 +243,7 @@ export function resolveLayoutWidgets(
         width?: unknown;
         hidden?: unknown;
         cards?: unknown;
+        hideLabel?: unknown;
       }[]
     | undefined,
   components?: LegacyComponentToggles
@@ -223,6 +268,9 @@ export function resolveLayoutWidgets(
       span,
       hidden,
       ...(isCards(item.cards) ? { cards: item.cards } : {}),
+      ...(typeof item.hideLabel === "boolean"
+        ? { hideLabel: item.hideLabel }
+        : {}),
     });
   }
   const missing = (ids: readonly LayoutWidgetId[]) =>

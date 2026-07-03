@@ -16,12 +16,16 @@ export default function CalendarWidget({
   enabled,
   view = "agenda",
   hideWhenEmpty = false,
+  showTitle = true,
 }: {
   events: CalendarEvent[];
   now: number;
   enabled: boolean;
   view?: "agenda" | "month";
   hideWhenEmpty?: boolean;
+  // Show the section heading; the layout editor's per-widget label toggle turns
+  // it off. Hiding it also drops the "View calendar" action that lives in it.
+  showTitle?: boolean;
 }) {
   if (!enabled) return null;
   if (hideWhenEmpty && events.length === 0) return null;
@@ -29,7 +33,7 @@ export default function CalendarWidget({
   if (view === "month") {
     return (
       <section>
-        <SectionTitle>Calendar</SectionTitle>
+        {showTitle && <SectionTitle>Calendar</SectionTitle>}
         <Link
           href="/calendar"
           className="glass-card block p-6 transition-colors hover:bg-fg/[0.03]"
@@ -42,18 +46,20 @@ export default function CalendarWidget({
 
   return (
     <section>
-      <SectionTitle
-        action={
-          <Link
-            href="/calendar"
-            className="text-xs text-fg/45 transition-colors hover:text-fg/80"
-          >
-            View calendar
-          </Link>
-        }
-      >
-        Upcoming
-      </SectionTitle>
+      {showTitle && (
+        <SectionTitle
+          action={
+            <Link
+              href="/calendar"
+              className="text-xs text-fg/45 transition-colors hover:text-fg/80"
+            >
+              View calendar
+            </Link>
+          }
+        >
+          Upcoming
+        </SectionTitle>
+      )}
       <div className="glass-card p-6">
         {events.length > 0 ? (
           <AgendaList events={events} now={now} />

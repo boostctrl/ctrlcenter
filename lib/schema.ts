@@ -247,6 +247,7 @@ export const layoutWidgetSchema = z
       .max(MAX_CARD_COLUMNS)
       .optional()
       .catch(undefined),
+    hideLabel: z.boolean().optional().catch(undefined),
   })
   .transform(
     ({
@@ -255,16 +256,19 @@ export const layoutWidgetSchema = z
       width,
       hidden,
       cards,
+      hideLabel,
     }): {
       id: LayoutWidgetId;
       span: number;
       hidden?: boolean;
       cards?: number;
+      hideLabel?: boolean;
     } => ({
       id,
       span: span ?? (width ? WIDTH_TO_SPAN[width] : defaultSpanFor(id)),
       ...(hidden === undefined ? {} : { hidden }),
       ...(cards === undefined ? {} : { cards }),
+      ...(hideLabel === undefined ? {} : { hideLabel }),
     })
   );
 
@@ -606,6 +610,7 @@ export const layoutUpdateSchema = z.object({
       span: z.number().int().min(1).max(GRID_COLUMNS),
       hidden: z.boolean(),
       cards: z.number().int().min(1).max(MAX_CARD_COLUMNS).optional(),
+      hideLabel: z.boolean().optional(),
     })
   ),
   columns: z.literal(GRID_COLUMNS).default(GRID_COLUMNS),

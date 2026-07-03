@@ -66,9 +66,12 @@ function dateLabel(date: string): string {
 export default function CountdownWidget({
   title,
   items,
+  showTitle = true,
 }: {
   title: string;
   items: CountdownItem[];
+  // Show the section heading; the layout editor's label toggle turns it off.
+  showTitle?: boolean;
 }) {
   const { timezone } = useVisitorPrefs();
   // Post-mount clock, refreshed each minute so an open tab rolls over midnight.
@@ -100,7 +103,7 @@ export default function CountdownWidget({
   if (rows.length === 0) return null;
   return (
     <section>
-      {title.trim() !== "" && <SectionTitle>{title}</SectionTitle>}
+      {showTitle && title.trim() !== "" && <SectionTitle>{title}</SectionTitle>}
       <div className="glass-card p-6">
         <ul className="divide-y divide-fg/10">
           {rows.map(({ item, days }, i) => {

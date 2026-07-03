@@ -22,14 +22,17 @@ function dateLabel(ms: number | null): string | null {
 export default function FeedWidget({
   feed,
   titleOverride,
+  showTitle = true,
 }: {
   feed: Feed | null;
   titleOverride: string;
+  // Show the section heading; the layout editor's label toggle turns it off.
+  showTitle?: boolean;
 }) {
   const title = titleOverride.trim() || feed?.title.trim() || "Feed";
   return (
     <section>
-      <SectionTitle>{title}</SectionTitle>
+      {showTitle && <SectionTitle>{title}</SectionTitle>}
       <div className="glass-card p-6">
         {feed && feed.items.length > 0 ? (
           <ul className="divide-y divide-fg/10">

@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  cloneElement,
+  isValidElement,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AppCard from "./AppCard";
@@ -32,6 +39,8 @@ import {
   GRID_COLUMNS,
   DEFAULT_UI_SCALE,
   CARD_WIDGET_IDS,
+  TITLED_WIDGET_IDS,
+  fillSpan,
   type LayoutWidget,
   type LayoutWidgetId,
 } from "@/lib/layout";
@@ -40,6 +49,17 @@ import { useAutosave } from "./admin/useAutosave";
 import { apiErrorMessage } from "./admin/apiError";
 import { reorder } from "./admin/useReorder";
 import { WidgetFrame, EditToolbar, useFlowReorder } from "./LayoutEditor";
+
+// Apply the per-widget label toggle to a widget passed in as a pre-rendered
+// node (the calendar and feed are built in app/page.tsx). Cloning lets the
+// toggle preview live in the editor without re-fetching their server data.
+function withTitle(node: React.ReactNode, hideLabel?: boolean): React.ReactNode {
+  return isValidElement(node)
+    ? cloneElement(node as React.ReactElement<{ showTitle?: boolean }>, {
+        showTitle: !hideLabel,
+      })
+    : node;
+}
 
 function groupBookmarks(
   bookmarks: BookmarkItem[],
@@ -252,6 +272,20 @@ export default function Dashboard({
         w.id === id ? { ...w, hidden: !w.hidden } : w
       )
     );
+  // Toggle the section heading. Stored only when off (the key is dropped when
+  // turning it back on) so entries stay clean, like `cards`.
+  const toggleWidgetLabel = (id: LayoutWidgetId) =>
+    mutateSections(
+      layout.sections.map((w) => {
+        if (w.id !== id) return w;
+        if (w.hideLabel) {
+          const rest = { ...w };
+          delete rest.hideLabel;
+          return rest;
+        }
+        return { ...w, hideLabel: true };
+      })
+    );
   const { handlers, dragIndex, over } = useFlowReorder(moveWidget);
 
   function doneEditing() {
@@ -422,21 +456,29 @@ export default function Dashboard({
           </div>
         ) : null;
       case "calendar":
-        return q && !editing ? null : calendar;
+        return q && !editing ? null : withTitle(calendar, widget.hideLabel);
       case "notes":
         return notes.content.trim() !== "" ? (
-          <NotesWidget title={notes.title} content={notes.content} />
+          <NotesWidget
+            title={notes.title}
+            content={notes.content}
+            showTitle={!widget.hideLabel}
+          />
         ) : null;
       case "feed":
-        return q && !editing ? null : feed;
+        return q && !editing ? null : withTitle(feed, widget.hideLabel);
       case "countdown":
         return countdown.items.some((i) => isValidCountdownDate(i.date)) ? (
-          <CountdownWidget title={countdown.title} items={countdown.items} />
+          <CountdownWidget
+            title={countdown.title}
+            items={countdown.items}
+            showTitle={!widget.hideLabel}
+          />
         ) : null;
       case "favorites":
         return (!q || editing) && favoriteApps.length > 0 ? (
           <section>
-            <SectionTitle>Favorites</SectionTitle>
+            {!widget.hideLabel && <SectionTitle>Favorites</SectionTitle>}
             <div className={cardGridClass(widget, "gap-4")}>
               {favoriteApps.map((app) => (
                 <AppCard key={app.id} app={app} />
@@ -448,7 +490,7 @@ export default function Dashboard({
         const list = editing ? apps : filteredApps;
         return list.length > 0 ? (
           <section>
-            <SectionTitle>Applications</SectionTitle>
+            {!widget.hideLabel && <SectionTitle>Applications</SectionTitle>}
             <div className={cardGridClass(widget, "gap-4")}>
               {list.map((app) => (
                 <AppCard key={app.id} app={app} />
@@ -463,7 +505,7 @@ export default function Dashboard({
           : filteredGroups;
         return groups.length > 0 ? (
           <section>
-            <SectionTitle>Bookmarks</SectionTitle>
+            {!widget.hideLabel && <SectionTitle>Bookmarks</SectionTitle>}
             <div className={cardGridClass(widget, "gap-6")}>
               {groups.map(([category, items]) => (
                 <BookmarkGroup key={category} category={category} items={items} />
@@ -513,7 +555,16 @@ export default function Dashboard({
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-x-8 gap-y-12 lg:grid-cols-24 lg:items-start">
+      {/* Dense flow backfills the dead space a partial row leaves: a later
+          narrow widget slides up into an earlier row's empty columns. Only in
+          view mode — the editor keeps strict flow order so hidden widgets (which
+          vanish for visitors) don't reshuffle the preview and the Fill button
+          lines up with the gaps actually on screen. */}
+      <div
+        className={`grid grid-cols-1 gap-x-8 gap-y-12 lg:grid-cols-24 lg:items-start ${
+          editing ? "" : "lg:grid-flow-row-dense"
+        }`}
+      >
         {layout.sections.map((widget, index) => {
           const node = blockFor(widget);
           const cellClass = `${COL_SPAN[widget.span]} ${CELL_ALIGN[widget.id] ?? ""}`;
@@ -539,10 +590,13 @@ export default function Dashboard({
                   ? cardsFor(widget)
                   : undefined
               }
+              fillTo={fillSpan(layout.sections, index)}
+              titled={TITLED_WIDGET_IDS.includes(widget.id)}
               onMove={moveWidget}
               onSpan={setWidgetSpan}
               onCards={setWidgetCards}
               onToggleHidden={toggleWidgetHidden}
+              onToggleLabel={toggleWidgetLabel}
               dragHandlers={handlers(index)}
               dragging={dragIndex === index}
               dropSide={

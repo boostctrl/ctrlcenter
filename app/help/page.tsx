@@ -417,9 +417,13 @@ export default async function HelpPage() {
               Toggle what appears on the dashboard: the greeting, clock, search
               box, apps, bookmarks, the favorites row, and the floating
               navigation menu. You can also reorder these sections and set each
-              one&apos;s width (full, two-thirds, half, or a third), so two or
-              three can share a row. Weather, the status row, and the calendar
-              have their own enables alongside their setup.
+              one&apos;s width, so two or three can share a row. When a widget
+              doesn&apos;t reach the end of its row, a <strong>Fill</strong>{" "}
+              button widens it to close the gap, and any space still left over
+              is backfilled automatically by the next card that fits. Each
+              titled section also has a <strong>Label on/off</strong> toggle to
+              hide its heading. Weather, the status row, and the calendar have
+              their own enables alongside their setup.
             </P>
           </Card>
 
