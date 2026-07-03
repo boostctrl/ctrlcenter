@@ -261,6 +261,14 @@ export default function StatusPage({
                           : host(app.url)}
                       </p>
                     </div>
+                    {/* Heartbeat sits inline with the rest of the row on wider
+                        screens (left of the uptime figure); it drops to its own
+                        line below sm where there's no room for it. */}
+                    {series.length > 0 && (
+                      <div className="hidden shrink-0 sm:block sm:w-44 lg:w-72">
+                        <Timeline points={series} timeZone={timezone} />
+                      </div>
+                    )}
                     <div className="shrink-0 text-right">
                       <p className="font-semibold tabular-nums">
                         {fmtPct(uptime)}
@@ -275,7 +283,7 @@ export default function StatusPage({
                     </div>
                   </div>
                   {series.length > 0 && (
-                    <div className="mt-3">
+                    <div className="mt-3 sm:hidden">
                       <Timeline points={series} timeZone={timezone} />
                     </div>
                   )}

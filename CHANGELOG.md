@@ -25,10 +25,11 @@ here.
 
 ### Changed
 
-- **Consistent status timeline length.** The uptime heartbeat now draws the
-  same number of equally-sized pills for every range, so the strip keeps its
-  size when you switch between 1h, 24h, 30d and 90d — only the data underneath
-  changes, instead of the bar stretching or shrinking per range. (#85)
+- **Consistent status timeline.** The uptime heartbeat now sits inline in each
+  service's row (beside the uptime figure) and draws the same number of
+  equally-sized pills for every range, so the strip keeps its size when you
+  switch between 1h, 24h, 30d and 90d — only the data underneath changes,
+  instead of the bar stretching or shrinking per range. (#85)
 
 ## [1.6.0] - 2026-07-02
 
