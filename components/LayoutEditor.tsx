@@ -8,6 +8,11 @@ import {
   MAX_WIDGET_HEIGHT,
   DEFAULT_WIDGET_HEIGHT,
   WIDGET_HEIGHT_STEP,
+  MAX_WIDGET_SPACE_BELOW,
+  WIDGET_SPACE_STEP,
+  MIN_GRID_GAP,
+  MAX_GRID_GAP,
+  GRID_GAP_STEP,
   MIN_UI_SCALE,
   MAX_UI_SCALE,
   UI_SCALE_STEP,
@@ -101,11 +106,13 @@ export function WidgetFrame({
   effectiveCards,
   fillTo,
   titled,
-  sized,
+  previewStyle,
+  previewClass,
   onMove,
   onSpan,
   onCards,
   onHeight,
+  onSpaceBelow,
   onToggleHidden,
   onToggleLabel,
   dragHandlers,
@@ -127,12 +134,14 @@ export function WidgetFrame({
   fillTo: number;
   // Whether the widget has a section heading that can be toggled off.
   titled: boolean;
-  // Whether the widget's height can be capped (a scrollable content body).
-  sized: boolean;
+  // Applied to the live preview so the set height shows while editing.
+  previewStyle?: React.CSSProperties;
+  previewClass: string;
   onMove: (from: number, to: number) => void;
   onSpan: (id: LayoutWidgetId, span: number) => void;
   onCards: (id: LayoutWidgetId, cards: number | undefined) => void;
   onHeight: (id: LayoutWidgetId, height: number | undefined) => void;
+  onSpaceBelow: (id: LayoutWidgetId, space: number | undefined) => void;
   onToggleHidden: (id: LayoutWidgetId) => void;
   onToggleLabel: (id: LayoutWidgetId) => void;
   dragHandlers: React.HTMLAttributes<HTMLDivElement>;
@@ -145,6 +154,7 @@ export function WidgetFrame({
   return (
     <div
       {...dragHandlers}
+      data-space-below={widget.spaceBelow || undefined}
       className={`relative flex flex-col gap-2 rounded-2xl p-2 outline-2 outline-dashed outline-fg/15 transition-opacity ${
         dragging ? "opacity-40" : ""
       } ${cellClass}`}
@@ -237,69 +247,107 @@ export function WidgetFrame({
               )}
             </div>
           )}
-          {sized && (
-            <div
-              className="flex items-center overflow-hidden rounded-lg border border-fg/10"
-              title="Maximum height — taller content scrolls inside the card"
+          <div
+            className="flex items-center overflow-hidden rounded-lg border border-fg/10"
+            title="Card height — taller than the content adds breathing room; content widgets scroll"
+          >
+            <button
+              type="button"
+              aria-label={`Shorter ${label}`}
+              disabled={
+                widget.height !== undefined && widget.height <= MIN_WIDGET_HEIGHT
+              }
+              onClick={() =>
+                onHeight(
+                  widget.id,
+                  widget.height === undefined
+                    ? DEFAULT_WIDGET_HEIGHT
+                    : Math.max(
+                        MIN_WIDGET_HEIGHT,
+                        widget.height - WIDGET_HEIGHT_STEP
+                      )
+                )
+              }
+              className={stepBtn}
             >
+              −
+            </button>
+            <span className="px-1 text-fg/50 tabular-nums">
+              {widget.height !== undefined ? `${widget.height}px` : "Auto"}
+            </span>
+            <button
+              type="button"
+              aria-label={`Taller ${label}`}
+              disabled={
+                widget.height !== undefined && widget.height >= MAX_WIDGET_HEIGHT
+              }
+              onClick={() =>
+                onHeight(
+                  widget.id,
+                  widget.height === undefined
+                    ? DEFAULT_WIDGET_HEIGHT
+                    : Math.min(
+                        MAX_WIDGET_HEIGHT,
+                        widget.height + WIDGET_HEIGHT_STEP
+                      )
+                )
+              }
+              className={stepBtn}
+            >
+              +
+            </button>
+            {widget.height !== undefined && (
               <button
                 type="button"
-                aria-label={`Shorter ${label}`}
-                disabled={
-                  widget.height !== undefined &&
-                  widget.height <= MIN_WIDGET_HEIGHT
-                }
-                onClick={() =>
-                  onHeight(
-                    widget.id,
-                    widget.height === undefined
-                      ? DEFAULT_WIDGET_HEIGHT
-                      : Math.max(
-                          MIN_WIDGET_HEIGHT,
-                          widget.height - WIDGET_HEIGHT_STEP
-                        )
-                  )
-                }
-                className={stepBtn}
+                aria-label={`Automatic height for ${label}`}
+                onClick={() => onHeight(widget.id, undefined)}
+                className={`${stepBtn} border-l border-fg/10 text-[10px] tracking-wide uppercase`}
               >
-                −
+                Auto
               </button>
-              <span className="px-1 text-fg/50 tabular-nums">
-                {widget.height !== undefined ? `${widget.height}px` : "Auto"}
-              </span>
-              <button
-                type="button"
-                aria-label={`Taller ${label}`}
-                disabled={
-                  widget.height === undefined ||
-                  widget.height >= MAX_WIDGET_HEIGHT
-                }
-                onClick={() =>
-                  widget.height !== undefined &&
-                  onHeight(
-                    widget.id,
-                    Math.min(
-                      MAX_WIDGET_HEIGHT,
-                      widget.height + WIDGET_HEIGHT_STEP
-                    )
+            )}
+          </div>
+          <div
+            className="flex items-center overflow-hidden rounded-lg border border-fg/10"
+            title="Extra space below this card"
+          >
+            <button
+              type="button"
+              aria-label={`Less space below ${label}`}
+              disabled={!widget.spaceBelow}
+              onClick={() =>
+                onSpaceBelow(
+                  widget.id,
+                  widget.spaceBelow && widget.spaceBelow > WIDGET_SPACE_STEP
+                    ? widget.spaceBelow - WIDGET_SPACE_STEP
+                    : undefined
+                )
+              }
+              className={stepBtn}
+            >
+              −
+            </button>
+            <span className="px-1 text-fg/50 tabular-nums">
+              {widget.spaceBelow ? `+${widget.spaceBelow}` : "0"}
+            </span>
+            <button
+              type="button"
+              aria-label={`More space below ${label}`}
+              disabled={(widget.spaceBelow ?? 0) >= MAX_WIDGET_SPACE_BELOW}
+              onClick={() =>
+                onSpaceBelow(
+                  widget.id,
+                  Math.min(
+                    MAX_WIDGET_SPACE_BELOW,
+                    (widget.spaceBelow ?? 0) + WIDGET_SPACE_STEP
                   )
-                }
-                className={stepBtn}
-              >
-                +
-              </button>
-              {widget.height !== undefined && (
-                <button
-                  type="button"
-                  aria-label={`Automatic height for ${label}`}
-                  onClick={() => onHeight(widget.id, undefined)}
-                  className={`${stepBtn} border-l border-fg/10 text-[10px] tracking-wide uppercase`}
-                >
-                  Auto
-                </button>
-              )}
-            </div>
-          )}
+                )
+              }
+              className={stepBtn}
+            >
+              +
+            </button>
+          </div>
           {titled && (
             <button
               type="button"
@@ -326,8 +374,12 @@ export function WidgetFrame({
         </div>
       </div>
       {node ? (
-        // Inert while editing so a drag can't trigger the widget's links.
-        <div className={`pointer-events-none ${widget.hidden ? "opacity-40" : ""}`}>
+        // Inert while editing so a drag can't trigger the widget's links; the
+        // preview carries the set height so sizing shows live.
+        <div
+          className={`pointer-events-none ${previewClass} ${widget.hidden ? "opacity-40" : ""}`}
+          style={previewStyle}
+        >
           {node}
         </div>
       ) : (
@@ -346,6 +398,8 @@ export function EditToolbar({
   error,
   scale,
   onScale,
+  gap,
+  onGap,
   onRevert,
   onDone,
 }: {
@@ -353,6 +407,8 @@ export function EditToolbar({
   error: string | null;
   scale: number;
   onScale: (scale: number) => void;
+  gap: number;
+  onGap: (gap: number) => void;
   onRevert: () => void;
   onDone: () => void;
 }) {
@@ -383,6 +439,30 @@ export function EditToolbar({
           aria-label="Larger UI"
           disabled={scale >= MAX_UI_SCALE}
           onClick={() => onScale(Math.min(MAX_UI_SCALE, scale + UI_SCALE_STEP))}
+          className={scaleBtn}
+        >
+          +
+        </button>
+      </div>
+      <div
+        className="flex items-center overflow-hidden rounded-full border border-fg/10"
+        title="Spacing between cards"
+      >
+        <button
+          type="button"
+          aria-label="Less spacing"
+          disabled={gap <= MIN_GRID_GAP}
+          onClick={() => onGap(Math.max(MIN_GRID_GAP, gap - GRID_GAP_STEP))}
+          className={scaleBtn}
+        >
+          −
+        </button>
+        <span className="px-0.5 text-xs text-fg/60 tabular-nums">{gap}px</span>
+        <button
+          type="button"
+          aria-label="More spacing"
+          disabled={gap >= MAX_GRID_GAP}
+          onClick={() => onGap(Math.min(MAX_GRID_GAP, gap + GRID_GAP_STEP))}
           className={scaleBtn}
         >
           +

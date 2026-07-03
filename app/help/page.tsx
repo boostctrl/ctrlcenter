@@ -423,12 +423,15 @@ export default async function HelpPage() {
               is backfilled automatically by the next card that fits. On the
               live page the cards also pack vertically, so a short card rises
               into the space beside a taller neighbour instead of leaving a gap.
-              Content cards (apps, bookmarks, favorites, calendar, notes, RSS
-              feed, countdown) also take a <strong>max height</strong> so a long
-              list becomes a compact card that scrolls inside. Each titled
-              section has a <strong>Label on/off</strong> toggle to hide its
-              heading. Weather, the status row, and the calendar have their own
-              enables alongside their setup.
+              Every widget can take an explicit <strong>height</strong> — taller
+              than its content to give it presence (the greeting and header card
+              center in it, restoring the classic header) or shorter so a long
+              list scrolls inside. A <strong>space-below</strong> stepper adds
+              padding under a specific card, and the toolbar&apos;s{" "}
+              <strong>spacing</strong> control sets the gap between all cards.
+              Each titled section has a <strong>Label on/off</strong> toggle to
+              hide its heading. Weather, the status row, and the calendar have
+              their own enables alongside their setup.
             </P>
           </Card>
 

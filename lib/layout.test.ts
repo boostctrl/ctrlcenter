@@ -136,6 +136,19 @@ describe("resolveLayoutWidgets", () => {
     expect("height" in out.find((w) => w.id === "favorites")!).toBe(false);
   });
 
+  it("keeps an in-range integer spaceBelow and drops an invalid one", () => {
+    const out = resolveLayoutWidgets([
+      { id: "apps", span: 24, spaceBelow: 40 },
+      { id: "bookmarks", span: 24, spaceBelow: 0 }, // not >= 1 — dropped
+      { id: "feed", span: 24, spaceBelow: 99999 }, // above max — dropped
+      { id: "notes", span: 24 }, // absent — none
+    ]);
+    expect(out.find((w) => w.id === "apps")?.spaceBelow).toBe(40);
+    expect("spaceBelow" in out.find((w) => w.id === "bookmarks")!).toBe(false);
+    expect("spaceBelow" in out.find((w) => w.id === "feed")!).toBe(false);
+    expect("spaceBelow" in out.find((w) => w.id === "notes")!).toBe(false);
+  });
+
   it("folds legacy components toggles into hidden for entries without one", () => {
     const components = { greeting: false, apps: false, search: true };
     const out = resolveLayoutWidgets(
@@ -319,13 +332,17 @@ describe("layout schema", () => {
           cards: 4,
           hideLabel: true,
           height: 320,
+          spaceBelow: 40,
         },
       ],
+      gap: 48,
     };
     const parsed = layoutUpdateSchema.safeParse(good);
     expect(parsed.success).toBe(true);
     expect(parsed.data?.sections[0].hideLabel).toBe(true);
     expect(parsed.data?.sections[0].height).toBe(320);
+    expect(parsed.data?.sections[0].spaceBelow).toBe(40);
+    expect(parsed.data?.gap).toBe(48);
     // The grid marker and scale are stamped in so a stored layout can never
     // re-trigger the 12→24 migration.
     expect(parsed.data?.columns).toBe(24);
@@ -337,7 +354,9 @@ describe("layout schema", () => {
       { sections: [{ id: "apps", width: "half", hidden: false }] }, // legacy shape rejected
       { sections: [{ id: "apps", span: 6, hidden: false, cards: 5 }] },
       { sections: [{ id: "apps", span: 6, hidden: false, height: 40 }] }, // below min
+      { sections: [{ id: "apps", span: 6, hidden: false, spaceBelow: 0 }] }, // below min
       { sections: [], scale: 500 },
+      { sections: [], gap: 999 }, // gap out of range
     ]) {
       expect(layoutUpdateSchema.safeParse(bad).success).toBe(false);
     }

@@ -13,6 +13,10 @@ import {
   MAX_CARD_COLUMNS,
   MIN_WIDGET_HEIGHT,
   MAX_WIDGET_HEIGHT,
+  MAX_WIDGET_SPACE_BELOW,
+  MIN_GRID_GAP,
+  MAX_GRID_GAP,
+  DEFAULT_GRID_GAP,
   MIN_UI_SCALE,
   MAX_UI_SCALE,
   DEFAULT_UI_SCALE,
@@ -278,6 +282,13 @@ export const layoutWidgetSchema = z
       .max(MAX_WIDGET_HEIGHT)
       .optional()
       .catch(undefined),
+    spaceBelow: z
+      .number()
+      .int()
+      .min(1)
+      .max(MAX_WIDGET_SPACE_BELOW)
+      .optional()
+      .catch(undefined),
   })
   .transform(
     ({
@@ -288,6 +299,7 @@ export const layoutWidgetSchema = z
       cards,
       hideLabel,
       height,
+      spaceBelow,
     }): {
       id: LayoutWidgetId;
       span: number;
@@ -295,6 +307,7 @@ export const layoutWidgetSchema = z
       cards?: number;
       hideLabel?: boolean;
       height?: number;
+      spaceBelow?: number;
     } => ({
       id,
       span: span ?? (width ? WIDTH_TO_SPAN[width] : defaultSpanFor(id)),
@@ -302,6 +315,7 @@ export const layoutWidgetSchema = z
       ...(cards === undefined ? {} : { cards }),
       ...(hideLabel === undefined ? {} : { hideLabel }),
       ...(height === undefined ? {} : { height }),
+      ...(spaceBelow === undefined ? {} : { spaceBelow }),
     })
   );
 
@@ -346,6 +360,14 @@ export const layoutSchema = z.preprocess(
       .max(MAX_UI_SCALE)
       .catch(DEFAULT_UI_SCALE)
       .default(DEFAULT_UI_SCALE),
+    // Vertical gap (px) between cards on the grid.
+    gap: z
+      .number()
+      .int()
+      .min(MIN_GRID_GAP)
+      .max(MAX_GRID_GAP)
+      .catch(DEFAULT_GRID_GAP)
+      .default(DEFAULT_GRID_GAP),
   })
 );
 export type LayoutConfig = z.infer<typeof layoutSchema>;
@@ -659,6 +681,12 @@ export const layoutUpdateSchema = z.object({
         .min(MIN_WIDGET_HEIGHT)
         .max(MAX_WIDGET_HEIGHT)
         .optional(),
+      spaceBelow: z
+        .number()
+        .int()
+        .min(1)
+        .max(MAX_WIDGET_SPACE_BELOW)
+        .optional(),
     })
   ),
   columns: z.literal(GRID_COLUMNS).default(GRID_COLUMNS),
@@ -668,6 +696,12 @@ export const layoutUpdateSchema = z.object({
     .min(MIN_UI_SCALE)
     .max(MAX_UI_SCALE)
     .default(DEFAULT_UI_SCALE),
+  gap: z
+    .number()
+    .int()
+    .min(MIN_GRID_GAP)
+    .max(MAX_GRID_GAP)
+    .default(DEFAULT_GRID_GAP),
 });
 
 export const settingsInputSchema = z.object({

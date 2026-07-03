@@ -82,6 +82,7 @@ export default async function HomePage({
           <Dashboard
             widgets={widgets}
             scale={settings.layout.scale}
+            gap={settings.layout.gap}
             apps={apps}
             bookmarks={bookmarks}
             search={settings.search}

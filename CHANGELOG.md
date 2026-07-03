@@ -12,6 +12,24 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Set any card's height.** The layout editor's height control now sets how
+  tall a card actually is — on every widget, not just the content cards. Make a
+  card taller than its content to give it presence (the greeting and header card
+  center in it), or shorter so a long list scrolls inside. (#90)
+- **Control the spacing.** A spacing stepper in the edit toolbar sets the
+  vertical gap between all cards, and a per-widget space-below stepper adds extra
+  padding beneath a specific card — so you can space the dashboard the way you
+  want. (#90)
+
+### Fixed
+
+- **The header follows its old layout again.** After the vertical-packing change
+  in 1.7.0 the greeting was pinned to the top instead of centering beside the
+  header card. Giving the header widgets a height now centers their content, and
+  the packing respects the new height and spacing controls. (#90)
+
 ## [1.7.0] - 2026-07-03
 
 ### Added

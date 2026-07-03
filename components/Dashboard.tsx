@@ -38,6 +38,7 @@ import type { CurrentWeather } from "@/lib/weather";
 import {
   GRID_COLUMNS,
   DEFAULT_UI_SCALE,
+  DEFAULT_GRID_GAP,
   CARD_WIDGET_IDS,
   TITLED_WIDGET_IDS,
   SIZED_WIDGET_IDS,
@@ -50,23 +51,16 @@ import { useAutosave } from "./admin/useAutosave";
 import { apiErrorMessage } from "./admin/apiError";
 import { reorder } from "./admin/useReorder";
 import { WidgetFrame, EditToolbar, useFlowReorder } from "./LayoutEditor";
-import { useMasonry } from "./useMasonry";
+import { useGridLayout } from "./useGridLayout";
 
-// Apply the per-widget label toggle and height cap to a widget passed in as a
-// pre-rendered node (the calendar and feed are built in app/page.tsx). Cloning
-// lets both preview live in the editor without re-fetching their server data.
-function withWidgetProps(
-  node: React.ReactNode,
-  widget: LayoutWidget
-): React.ReactNode {
+// Apply the per-widget label toggle to a widget passed in as a pre-rendered
+// node (the calendar and feed are built in app/page.tsx). Cloning lets the
+// toggle preview live in the editor without re-fetching their server data.
+function withTitle(node: React.ReactNode, hideLabel?: boolean): React.ReactNode {
   return isValidElement(node)
-    ? cloneElement(
-        node as React.ReactElement<{
-          showTitle?: boolean;
-          maxBodyHeight?: number;
-        }>,
-        { showTitle: !widget.hideLabel, maxBodyHeight: widget.height }
-      )
+    ? cloneElement(node as React.ReactElement<{ showTitle?: boolean }>, {
+        showTitle: !hideLabel,
+      })
     : node;
 }
 
@@ -87,9 +81,10 @@ function groupBookmarks(
 }
 
 // What the layout editor edits and autosaves as one unit: the widget list plus
-// the site-wide UI scale. Saved together because the settings API replaces the
-// stored layout wholesale — a sections-only save would reset the scale.
-type EditableLayout = { sections: LayoutWidget[]; scale: number };
+// the site-wide UI scale and the grid's vertical gap. Saved together because
+// the settings API replaces the stored layout wholesale — a sections-only save
+// would reset the scale/gap.
+type EditableLayout = { sections: LayoutWidget[]; scale: number; gap: number };
 
 // Persist the whole layout; the settings API replaces it wholesale.
 async function saveLayout(layout: EditableLayout): Promise<void> {
@@ -160,6 +155,7 @@ const cardGridClass = (widget: LayoutWidget, gap: string): string =>
 export default function Dashboard({
   widgets,
   scale = DEFAULT_UI_SCALE,
+  gap = DEFAULT_GRID_GAP,
   apps,
   bookmarks,
   search,
@@ -181,6 +177,8 @@ export default function Dashboard({
   // The saved UI scale (percent); SSR already renders it on <html>, this seeds
   // the editor's stepper.
   scale?: number;
+  // The saved grid gap (px) between cards; seeds the editor's gap stepper.
+  gap?: number;
   apps: AppItem[];
   bookmarks: BookmarkItem[];
   search: SearchConfig;
@@ -219,6 +217,7 @@ export default function Dashboard({
   const [layout, setLayout] = useState<EditableLayout>({
     sections: widgets,
     scale,
+    gap,
   });
   const dirtyRef = useRef(false);
   // What Revert restores: the layout as it was when edit mode was entered (the
@@ -275,8 +274,8 @@ export default function Dashboard({
         return rest;
       })
     );
-  // Max content height (px) for a sized widget; undefined clears the cap back to
-  // auto (the key is dropped so the stored entry stays clean, like `cards`).
+  // Explicit height (px) for any widget; undefined clears it back to auto (the
+  // key is dropped so the stored entry stays clean, like `cards`).
   const setWidgetHeight = (id: LayoutWidgetId, height: number | undefined) =>
     mutateSections(
       layout.sections.map((w) => {
@@ -287,7 +286,19 @@ export default function Dashboard({
         return rest;
       })
     );
+  // Extra space below a widget (px); undefined/0 clears it (key dropped).
+  const setWidgetSpaceBelow = (id: LayoutWidgetId, space: number | undefined) =>
+    mutateSections(
+      layout.sections.map((w) => {
+        if (w.id !== id) return w;
+        if (space) return { ...w, spaceBelow: space };
+        const rest = { ...w };
+        delete rest.spaceBelow;
+        return rest;
+      })
+    );
   const setScale = (next: number) => mutateLayout({ ...layout, scale: next });
+  const setGap = (next: number) => mutateLayout({ ...layout, gap: next });
   const toggleWidgetHidden = (id: LayoutWidgetId) =>
     mutateSections(
       layout.sections.map((w) =>
@@ -309,9 +320,19 @@ export default function Dashboard({
       })
     );
   const { handlers, dragIndex, over } = useFlowReorder(moveWidget);
-  // Pack cards up the columns in view mode so short cards don't strand vertical
-  // gaps beside tall ones; the editor keeps its plain flow for predictability.
-  useMasonry(gridRef, !editing);
+  // Drives the grid's vertical layout: masonry packing in view mode (so short
+  // cards don't strand gaps), plain flow while editing, honoring the grid gap,
+  // per-widget heights and space-below. The signature re-runs it when any of
+  // those change.
+  const gridSignature =
+    `${layout.gap}|${editing ? 1 : 0}|` +
+    layout.sections
+      .map(
+        (w) =>
+          `${w.id}:${w.span}:${w.hidden ? 1 : 0}:${w.height ?? ""}:${w.spaceBelow ?? ""}`
+      )
+      .join(",");
+  useGridLayout(gridRef, editing, layout.gap, gridSignature);
 
   function doneEditing() {
     setEditing(false);
@@ -436,11 +457,6 @@ export default function Dashboard({
   // are suspended so every widget previews its real content.
   function blockFor(widget: LayoutWidget): React.ReactNode {
     const id = widget.id;
-    // The per-widget height cap, applied to the scrollable body of the
-    // card-grid widgets below (the component-rendered ones take it as a prop).
-    const bodyStyle = widget.height
-      ? { maxHeight: widget.height, overflowY: "auto" as const }
-      : undefined;
     switch (id) {
       case "greeting":
         return <Greeting initialGreeting={initialGreeting} />;
@@ -486,32 +502,30 @@ export default function Dashboard({
           </div>
         ) : null;
       case "calendar":
-        return q && !editing ? null : withWidgetProps(calendar, widget);
+        return q && !editing ? null : withTitle(calendar, widget.hideLabel);
       case "notes":
         return notes.content.trim() !== "" ? (
           <NotesWidget
             title={notes.title}
             content={notes.content}
             showTitle={!widget.hideLabel}
-            maxBodyHeight={widget.height}
           />
         ) : null;
       case "feed":
-        return q && !editing ? null : withWidgetProps(feed, widget);
+        return q && !editing ? null : withTitle(feed, widget.hideLabel);
       case "countdown":
         return countdown.items.some((i) => isValidCountdownDate(i.date)) ? (
           <CountdownWidget
             title={countdown.title}
             items={countdown.items}
             showTitle={!widget.hideLabel}
-            maxBodyHeight={widget.height}
           />
         ) : null;
       case "favorites":
         return (!q || editing) && favoriteApps.length > 0 ? (
           <section>
             {!widget.hideLabel && <SectionTitle>Favorites</SectionTitle>}
-            <div className={cardGridClass(widget, "gap-4")} style={bodyStyle}>
+            <div className={cardGridClass(widget, "gap-4")}>
               {favoriteApps.map((app) => (
                 <AppCard key={app.id} app={app} />
               ))}
@@ -523,7 +537,7 @@ export default function Dashboard({
         return list.length > 0 ? (
           <section>
             {!widget.hideLabel && <SectionTitle>Applications</SectionTitle>}
-            <div className={cardGridClass(widget, "gap-4")} style={bodyStyle}>
+            <div className={cardGridClass(widget, "gap-4")}>
               {list.map((app) => (
                 <AppCard key={app.id} app={app} />
               ))}
@@ -538,7 +552,7 @@ export default function Dashboard({
         return groups.length > 0 ? (
           <section>
             {!widget.hideLabel && <SectionTitle>Bookmarks</SectionTitle>}
-            <div className={cardGridClass(widget, "gap-6")} style={bodyStyle}>
+            <div className={cardGridClass(widget, "gap-6")}>
               {groups.map(([category, items]) => (
                 <BookmarkGroup key={category} category={category} items={items} />
               ))}
@@ -587,24 +601,38 @@ export default function Dashboard({
 
   return (
     <>
-      {/* Dense flow backfills the dead space a partial row leaves: a later
-          narrow widget slides up into an earlier row's empty columns. Only in
-          view mode — the editor keeps strict flow order so hidden widgets (which
-          vanish for visitors) don't reshuffle the preview and the Fill button
-          lines up with the gaps actually on screen. */}
+      {/* Vertical layout (row-gap, per-cell row-span and margins) is driven by
+          useGridLayout, not this class — the gap-y here is only a pre-hydration
+          fallback. Dense flow backfills a partial row in view mode; the editor
+          keeps strict flow so hidden widgets don't reshuffle the preview. */}
       <div
         ref={gridRef}
-        className={`grid grid-cols-1 gap-x-8 gap-y-12 lg:grid-cols-24 lg:items-start ${
+        className={`grid grid-cols-1 gap-x-8 gap-y-8 lg:grid-cols-24 lg:items-start ${
           editing ? "" : "lg:grid-flow-row-dense"
         }`}
       >
         {layout.sections.map((widget, index) => {
           const node = blockFor(widget);
           const cellClass = `${COL_SPAN[widget.span]} ${CELL_ALIGN[widget.id] ?? ""}`;
+          // An explicit height sizes the cell exactly: content widgets scroll
+          // their overflow, the others center their content (so a sized greeting
+          // sits centered beside the header card, restoring the classic header).
+          const scrolls = SIZED_WIDGET_IDS.includes(widget.id);
+          const heightStyle = widget.height ? { height: widget.height } : undefined;
+          const heightClass = widget.height
+            ? scrolls
+              ? "overflow-y-auto"
+              : "flex flex-col justify-center overflow-hidden"
+            : "";
           if (!editing) {
             if (widget.hidden || !node) return null;
             return (
-              <div key={widget.id} className={cellClass}>
+              <div
+                key={widget.id}
+                className={`${cellClass} ${heightClass}`}
+                style={heightStyle}
+                data-space-below={widget.spaceBelow || undefined}
+              >
                 {node}
               </div>
             );
@@ -625,11 +653,13 @@ export default function Dashboard({
               }
               fillTo={fillSpan(layout.sections, index)}
               titled={TITLED_WIDGET_IDS.includes(widget.id)}
-              sized={SIZED_WIDGET_IDS.includes(widget.id)}
+              previewStyle={heightStyle}
+              previewClass={heightClass}
               onMove={moveWidget}
               onSpan={setWidgetSpan}
               onCards={setWidgetCards}
               onHeight={setWidgetHeight}
+              onSpaceBelow={setWidgetSpaceBelow}
               onToggleHidden={toggleWidgetHidden}
               onToggleLabel={toggleWidgetLabel}
               dragHandlers={handlers(index)}
@@ -690,6 +720,8 @@ export default function Dashboard({
           error={saveError}
           scale={layout.scale}
           onScale={setScale}
+          gap={layout.gap}
+          onGap={setGap}
           onRevert={() => mutateLayout(entryRef.current)}
           onDone={doneEditing}
         />

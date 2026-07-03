@@ -120,28 +120,18 @@ export default function NotesWidget({
   title,
   content,
   showTitle = true,
-  maxBodyHeight,
 }: {
   title: string;
   content: string;
   // Show the section heading; the layout editor's label toggle turns it off.
   showTitle?: boolean;
-  // Cap the note body's height (px), scrolling past it; from the layout editor.
-  maxBodyHeight?: number;
 }) {
   const blocks = useMemo(() => parseMarkdown(content), [content]);
   if (blocks.length === 0) return null;
   return (
     <section>
       {showTitle && title.trim() !== "" && <SectionTitle>{title}</SectionTitle>}
-      <div
-        className="glass-card space-y-3 p-6 text-sm leading-relaxed text-fg/70"
-        style={
-          maxBodyHeight
-            ? { maxHeight: maxBodyHeight, overflowY: "auto" }
-            : undefined
-        }
-      >
+      <div className="glass-card space-y-3 p-6 text-sm leading-relaxed text-fg/70">
         {blocks.map((b, i) => (
           <Block key={i} block={b} />
         ))}

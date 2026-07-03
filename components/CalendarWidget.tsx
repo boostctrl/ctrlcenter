@@ -17,7 +17,6 @@ export default function CalendarWidget({
   view = "agenda",
   hideWhenEmpty = false,
   showTitle = true,
-  maxBodyHeight,
 }: {
   events: CalendarEvent[];
   now: number;
@@ -27,8 +26,6 @@ export default function CalendarWidget({
   // Show the section heading; the layout editor's per-widget label toggle turns
   // it off. Hiding it also drops the "View calendar" action that lives in it.
   showTitle?: boolean;
-  // Cap the agenda's height (px), scrolling past it; from the layout editor.
-  maxBodyHeight?: number;
 }) {
   if (!enabled) return null;
   if (hideWhenEmpty && events.length === 0) return null;
@@ -63,14 +60,7 @@ export default function CalendarWidget({
           Upcoming
         </SectionTitle>
       )}
-      <div
-        className="glass-card p-6"
-        style={
-          maxBodyHeight
-            ? { maxHeight: maxBodyHeight, overflowY: "auto" }
-            : undefined
-        }
-      >
+      <div className="glass-card p-6">
         {events.length > 0 ? (
           <AgendaList events={events} now={now} />
         ) : (

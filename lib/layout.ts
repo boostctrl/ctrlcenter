@@ -63,10 +63,11 @@ export const TITLED_WIDGET_IDS: readonly LayoutWidgetId[] = [
   "bookmarks",
 ];
 
-// Widgets whose content can be capped to a max height (a scrollable body) from
-// the layout editor — the content/list widgets, where trimming a tall list to a
-// compact card makes sense. The header widgets, search and the split
-// clock/weather/status are fixed-size and aren't capped.
+// The content/list widgets. When given an explicit `height` these scroll their
+// overflow; the others (header widgets, search) center their content in the
+// set height instead, so sizing the greeting/header card restores the classic
+// centered header. Any widget can take a height — this set only decides
+// scroll-vs-center behavior.
 export const SIZED_WIDGET_IDS: readonly LayoutWidgetId[] = [
   "calendar",
   "notes",
@@ -77,15 +78,26 @@ export const SIZED_WIDGET_IDS: readonly LayoutWidgetId[] = [
   "bookmarks",
 ];
 
-// Per-widget max content height (px). A widget with `height` set never grows
-// past it (its body scrolls); a shorter widget is unaffected. Absent = auto
-// (content height). Bounds/step drive the editor stepper and clamp stored
-// values. The whole UI is rem-based but heights are kept in px for a concrete,
-// predictable cap.
-export const MIN_WIDGET_HEIGHT = 120;
+// Per-widget explicit height (px): the card is exactly this tall — taller than
+// its content (breathing room / a header band) or shorter (content scrolls or
+// is clipped). Absent = auto (content height). Available on every widget.
+export const MIN_WIDGET_HEIGHT = 80;
 export const MAX_WIDGET_HEIGHT = 800;
 export const DEFAULT_WIDGET_HEIGHT = 320;
-export const WIDGET_HEIGHT_STEP = 40;
+export const WIDGET_HEIGHT_STEP = 20;
+
+// Per-widget extra space below a card (px), on top of the grid gap — for
+// deliberately spacing one card from the next (e.g. under the header). Absent
+// = none.
+export const MAX_WIDGET_SPACE_BELOW = 200;
+export const WIDGET_SPACE_STEP = 8;
+
+// The grid's vertical gap between cards (px). One value for the whole board,
+// tunable from the edit toolbar. Column spacing stays fixed.
+export const MIN_GRID_GAP = 0;
+export const MAX_GRID_GAP = 96;
+export const DEFAULT_GRID_GAP = 32;
+export const GRID_GAP_STEP = 4;
 
 // Site-wide UI scale (percent), rendered as font-size on <html>: the whole UI
 // is rem-based, so one percentage scales text, paddings and cards uniformly.
@@ -103,9 +115,10 @@ export type LayoutWidget = {
   // Suppress the widget's section heading (the ALL-CAPS label above it) when
   // true; absent/false shows it. Only meaningful for TITLED_WIDGET_IDS.
   hideLabel?: boolean;
-  // Max content height in px (body scrolls past it); absent = auto. Only
-  // meaningful for SIZED_WIDGET_IDS.
+  // Explicit card height in px (the card is exactly this tall); absent = auto.
   height?: number;
+  // Extra space below the card in px (beyond the grid gap); absent = none.
+  spaceBelow?: number;
 };
 
 export const WIDGET_LABELS: Record<LayoutWidgetId, string> = {
@@ -251,6 +264,15 @@ function isHeight(v: unknown): v is number {
   );
 }
 
+function isSpaceBelow(v: unknown): v is number {
+  return (
+    typeof v === "number" &&
+    Number.isInteger(v) &&
+    v >= 1 &&
+    v <= MAX_WIDGET_SPACE_BELOW
+  );
+}
+
 function legacyHidden(
   id: LayoutWidgetId,
   components: LegacyComponentToggles | undefined
@@ -281,6 +303,7 @@ export function resolveLayoutWidgets(
         cards?: unknown;
         hideLabel?: unknown;
         height?: unknown;
+        spaceBelow?: unknown;
       }[]
     | undefined,
   components?: LegacyComponentToggles
@@ -309,6 +332,9 @@ export function resolveLayoutWidgets(
         ? { hideLabel: item.hideLabel }
         : {}),
       ...(isHeight(item.height) ? { height: item.height } : {}),
+      ...(isSpaceBelow(item.spaceBelow)
+        ? { spaceBelow: item.spaceBelow }
+        : {}),
     });
   }
   const missing = (ids: readonly LayoutWidgetId[]) =>
