@@ -22,6 +22,10 @@ here.
   Bookmarks, Favorites, Calendar, Notes, RSS feed, Countdown) gains a
   **Label on/off** control in the layout editor to hide its heading while
   keeping the card itself. (#86)
+- **Cards pack up the columns.** The dashboard now packs vertically like a
+  masonry board — a short card rises into the empty space beside a taller
+  neighbour instead of leaving a ragged gap — so mixed-width layouts stay tight.
+  (#87)
 
 ### Changed
 

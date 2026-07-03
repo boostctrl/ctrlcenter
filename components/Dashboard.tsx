@@ -49,6 +49,7 @@ import { useAutosave } from "./admin/useAutosave";
 import { apiErrorMessage } from "./admin/apiError";
 import { reorder } from "./admin/useReorder";
 import { WidgetFrame, EditToolbar, useFlowReorder } from "./LayoutEditor";
+import { useMasonry } from "./useMasonry";
 
 // Apply the per-widget label toggle to a widget passed in as a pre-rendered
 // node (the calendar and feed are built in app/page.tsx). Cloning lets the
@@ -198,6 +199,7 @@ export default function Dashboard({
 }) {
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
   const { favorites } = useVisitorPrefs();
   const { editing, setEditing } = useEditMode();
   const router = useRouter();
@@ -287,6 +289,9 @@ export default function Dashboard({
       })
     );
   const { handlers, dragIndex, over } = useFlowReorder(moveWidget);
+  // Pack cards up the columns in view mode so short cards don't strand vertical
+  // gaps beside tall ones; the editor keeps its plain flow for predictability.
+  useMasonry(gridRef, !editing);
 
   function doneEditing() {
     setEditing(false);
@@ -561,6 +566,7 @@ export default function Dashboard({
           vanish for visitors) don't reshuffle the preview and the Fill button
           lines up with the gaps actually on screen. */}
       <div
+        ref={gridRef}
         className={`grid grid-cols-1 gap-x-8 gap-y-12 lg:grid-cols-24 lg:items-start ${
           editing ? "" : "lg:grid-flow-row-dense"
         }`}
