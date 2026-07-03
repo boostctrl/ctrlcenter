@@ -14,6 +14,13 @@ here.
 
 ### Added
 
+- **Announcement banner.** A purpose-built banner across the top of every page
+  for notices, maintenance windows, or a heads-up for the household — turn it on
+  in admin Settings → Announcement, write the message (safe inline **bold**,
+  *italic* and [links](https://…)), pick a tone (info, warning, success, or your
+  accent), and optionally let visitors dismiss it (it returns when you change
+  the message). No more repurposing the Notes card. (#89)
+
 - **Fill dead space in the layout editor.** When a widget doesn't reach the end
   of its row, a **Fill** button widens it to close the gap — and any space still
   left over is now backfilled automatically by the next card that fits, so

@@ -3,7 +3,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import type { Settings } from "@/lib/schema";
-import { ALERT_TYPES } from "@/lib/schema";
+import { ALERT_TYPES, ANNOUNCEMENT_TONES } from "@/lib/schema";
 import type { ThemePack } from "@/lib/theme";
 import {
   SEARCH_ENGINES,
@@ -37,6 +37,7 @@ async function saveSettings(settings: Settings): Promise<void> {
 // One nav entry per settings group; a single group shows at a time.
 const SETTINGS_SECTIONS = [
   { id: "general", label: "General" },
+  { id: "announcement", label: "Announcement" },
   { id: "appearance", label: "Appearance" },
   { id: "layout", label: "Layout" },
   { id: "search", label: "Search" },
@@ -50,6 +51,13 @@ const SETTINGS_SECTIONS = [
   { id: "security", label: "Security" },
 ] as const;
 type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]["id"];
+
+const TONE_LABELS: Record<string, string> = {
+  info: "Info",
+  warning: "Warning",
+  success: "Success",
+  accent: "Accent (theme color)",
+};
 
 function Section({
   title,
@@ -176,6 +184,13 @@ export default function SettingsManager({
   const notes = settings.notes;
   const updateNotes = (patch: Partial<Settings["notes"]>) =>
     setSettings((s) => ({ ...s, notes: { ...s.notes, ...patch } }));
+
+  const announcement = settings.announcement;
+  const updateAnnouncement = (patch: Partial<Settings["announcement"]>) =>
+    setSettings((s) => ({
+      ...s,
+      announcement: { ...s.announcement, ...patch },
+    }));
 
   const feed = settings.feed;
   const updateFeed = (patch: Partial<Settings["feed"]>) =>
@@ -1177,6 +1192,82 @@ export default function SettingsManager({
             lists, &gt; quotes, ``` code blocks and --- rules. Raw HTML is shown
             as plain text, never rendered.
           </p>
+        </Section>
+        )}
+
+        {section === "announcement" && (
+        <Section
+          title="Announcement"
+          intro="A banner across the top of every page — maintenance windows, notices, a heads-up for the household. Turn it on, write the message, and it shows site-wide until you turn it off."
+        >
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <span className="text-sm text-fg/70">Show the banner</span>
+              <p className="text-xs text-fg/40">
+                Appears at the top of every page while enabled.
+              </p>
+            </div>
+            <label className="flex shrink-0 items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={announcement.enabled}
+                onChange={(e) =>
+                  updateAnnouncement({ enabled: e.target.checked })
+                }
+              />
+              Enabled
+            </label>
+          </div>
+
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-fg/50">Message</span>
+            <textarea
+              value={announcement.message}
+              onChange={(e) => updateAnnouncement({ message: e.target.value })}
+              rows={3}
+              placeholder={"**Maintenance tonight** 10–11pm — [status](https://…)"}
+              className="accent-focus rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-sm leading-relaxed text-fg placeholder-fg/30 outline-none transition-colors"
+            />
+          </label>
+          <p className="text-xs text-fg/40">
+            Supports inline **bold**, *italic*, `code` and [links](https://…)
+            (http/https only). Raw HTML is shown as plain text, never rendered.
+          </p>
+
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-fg/50">Tone</span>
+            <select
+              value={announcement.tone}
+              onChange={(e) =>
+                updateAnnouncement({
+                  tone: e.target.value as Settings["announcement"]["tone"],
+                })
+              }
+              className={selectClass}
+            >
+              {ANNOUNCEMENT_TONES.map((t) => (
+                <option key={t} value={t}>
+                  {TONE_LABELS[t]}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex items-center justify-between gap-4 text-sm">
+            <div>
+              <span className="text-fg/70">Dismissible</span>
+              <p className="text-xs text-fg/40">
+                Let visitors close it; it returns if you change the message.
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              checked={announcement.dismissible}
+              onChange={(e) =>
+                updateAnnouncement({ dismissible: e.target.checked })
+              }
+            />
+          </label>
         </Section>
         )}
 

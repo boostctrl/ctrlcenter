@@ -130,6 +130,7 @@ export async function updateSettings(
       alerts: alertsPartial,
       calendar: calendarPartial,
       notes: notesPartial,
+      announcement: announcementPartial,
       feed: feedPartial,
       countdown: countdownPartial,
       components: componentsPartial,
@@ -159,6 +160,10 @@ export async function updateSettings(
       notes: {
         ...config.settings.notes,
         ...withoutUndefined(notesPartial ?? {}),
+      },
+      announcement: {
+        ...config.settings.announcement,
+        ...withoutUndefined(announcementPartial ?? {}),
       },
       feed: {
         ...config.settings.feed,

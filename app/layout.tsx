@@ -20,6 +20,7 @@ import { resolveIconUrl } from "@/lib/icons";
 import { serializeForScript } from "@/lib/serialize";
 import { PrefsProvider } from "@/components/PrefsProvider";
 import SceneLayer from "@/components/scenes/SceneLayer";
+import AnnouncementBanner from "@/components/AnnouncementBanner";
 import "./globals.css";
 
 // Every selectable font (see lib/fonts.ts) must be imported here: next/font is
@@ -150,6 +151,14 @@ export default async function RootLayout({
           }}
         >
           <SceneLayer />
+          {settings.announcement.enabled &&
+            settings.announcement.message.trim() !== "" && (
+              <AnnouncementBanner
+                message={settings.announcement.message}
+                tone={settings.announcement.tone}
+                dismissible={settings.announcement.dismissible}
+              />
+            )}
           {children}
         </PrefsProvider>
       </body>

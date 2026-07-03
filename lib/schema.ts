@@ -155,6 +155,27 @@ export const notesSchema = z.object({
 });
 export type NotesConfig = z.infer<typeof notesSchema>;
 
+// Site-wide announcement banner shown at the top of every page. The banner
+// renders only when `enabled` and `message` is non-empty (see
+// AnnouncementBanner). `message` is a safe inline-markdown subset (bold/italic/
+// links) rendered as React elements — never raw HTML. `tone` colors the strip;
+// `dismissible` adds a close button (a visitor's dismissal is remembered until
+// the message changes). Stored leniently so a hand-edited file always parses.
+export const ANNOUNCEMENT_TONES = [
+  "info",
+  "warning",
+  "success",
+  "accent",
+] as const;
+export type AnnouncementTone = (typeof ANNOUNCEMENT_TONES)[number];
+export const announcementSchema = z.object({
+  enabled: z.boolean().catch(false),
+  message: z.string().catch(""),
+  tone: z.enum(ANNOUNCEMENT_TONES).catch("accent"),
+  dismissible: z.boolean().catch(true),
+});
+export type AnnouncementConfig = z.infer<typeof announcementSchema>;
+
 // The site-wide default theme. Visitors can override every part of this in
 // their own browser (the theme builder / settings page); these values are the
 // baseline an un-customized visitor sees. `background`/`foreground` are optional
@@ -350,6 +371,7 @@ export const settingsSchema = z.object({
   alerts: alertsSchema.default(alertsSchema.parse({})),
   calendar: calendarSchema.default(calendarSchema.parse({})),
   notes: notesSchema.default(notesSchema.parse({})),
+  announcement: announcementSchema.default(announcementSchema.parse({})),
   feed: feedSchema.default(feedSchema.parse({})),
   countdown: countdownSchema.default(countdownSchema.parse({})),
   components: componentsSchema.default(componentsSchema.parse({})),
@@ -557,6 +579,14 @@ export const notesUpdateSchema = z.object({
   content: z.string(),
 });
 
+// The admin sends the whole announcement object.
+export const announcementUpdateSchema = z.object({
+  enabled: z.boolean(),
+  message: z.string(),
+  tone: z.enum(ANNOUNCEMENT_TONES),
+  dismissible: z.boolean(),
+});
+
 // The admin sends the whole countdown object. Rows stay lenient (a half-typed
 // date must not block autosave); invalid dates are simply not rendered.
 export const countdownUpdateSchema = z.object({
@@ -654,6 +684,7 @@ export const settingsInputSchema = z.object({
   alerts: alertsUpdateSchema.optional(),
   calendar: calendarUpdateSchema.optional(),
   notes: notesUpdateSchema.optional(),
+  announcement: announcementUpdateSchema.optional(),
   feed: feedUpdateSchema.optional(),
   countdown: countdownUpdateSchema.optional(),
   components: componentsUpdateSchema.optional(),

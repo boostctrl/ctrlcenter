@@ -432,6 +432,25 @@ export default async function HelpPage() {
             </P>
           </Card>
 
+          <Card title="Announcement banner">
+            <P>
+              A banner across the top of every page for notices, maintenance
+              windows, or a heads-up for the household. Turn it on in{" "}
+              <strong>Settings → Announcement</strong> and write the message
+              using inline <strong>bold</strong>, <em>italic</em> and{" "}
+              <a
+                href="https://example.com"
+                className="underline hover:text-fg/70"
+              >
+                links
+              </a>{" "}
+              (http/https only; raw HTML is never rendered). Pick a tone — info,
+              warning, success, or your accent color — and optionally let
+              visitors dismiss it, in which case it reappears whenever you change
+              the message.
+            </P>
+          </Card>
+
           <Card title="Notes card">
             <P>
               A free-form card for anything worth keeping in view — maintenance
