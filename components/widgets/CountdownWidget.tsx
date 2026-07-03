@@ -67,11 +67,14 @@ export default function CountdownWidget({
   title,
   items,
   showTitle = true,
+  maxBodyHeight,
 }: {
   title: string;
   items: CountdownItem[];
   // Show the section heading; the layout editor's label toggle turns it off.
   showTitle?: boolean;
+  // Cap the list height (px), scrolling past it; from the layout editor.
+  maxBodyHeight?: number;
 }) {
   const { timezone } = useVisitorPrefs();
   // Post-mount clock, refreshed each minute so an open tab rolls over midnight.
@@ -104,7 +107,14 @@ export default function CountdownWidget({
   return (
     <section>
       {showTitle && title.trim() !== "" && <SectionTitle>{title}</SectionTitle>}
-      <div className="glass-card p-6">
+      <div
+        className="glass-card p-6"
+        style={
+          maxBodyHeight
+            ? { maxHeight: maxBodyHeight, overflowY: "auto" }
+            : undefined
+        }
+      >
         <ul className="divide-y divide-fg/10">
           {rows.map(({ item, days }, i) => {
             const past = days !== null && days < 0;

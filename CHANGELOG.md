@@ -26,6 +26,11 @@ here.
   masonry board — a short card rises into the empty space beside a taller
   neighbour instead of leaving a ragged gap — so mixed-width layouts stay tight.
   (#87)
+- **Per-widget height cap.** Content cards (Applications, Bookmarks, Favorites,
+  Calendar, Notes, RSS feed, Countdown) take a max-height control in the layout
+  editor, so a long list becomes a compact card that scrolls inside instead of
+  running the full length of its content — pair it with the width to size a
+  widget into any rectangle. (#88)
 
 ### Changed
 

@@ -40,6 +40,7 @@ import {
   DEFAULT_UI_SCALE,
   CARD_WIDGET_IDS,
   TITLED_WIDGET_IDS,
+  SIZED_WIDGET_IDS,
   fillSpan,
   type LayoutWidget,
   type LayoutWidgetId,
@@ -51,14 +52,21 @@ import { reorder } from "./admin/useReorder";
 import { WidgetFrame, EditToolbar, useFlowReorder } from "./LayoutEditor";
 import { useMasonry } from "./useMasonry";
 
-// Apply the per-widget label toggle to a widget passed in as a pre-rendered
-// node (the calendar and feed are built in app/page.tsx). Cloning lets the
-// toggle preview live in the editor without re-fetching their server data.
-function withTitle(node: React.ReactNode, hideLabel?: boolean): React.ReactNode {
+// Apply the per-widget label toggle and height cap to a widget passed in as a
+// pre-rendered node (the calendar and feed are built in app/page.tsx). Cloning
+// lets both preview live in the editor without re-fetching their server data.
+function withWidgetProps(
+  node: React.ReactNode,
+  widget: LayoutWidget
+): React.ReactNode {
   return isValidElement(node)
-    ? cloneElement(node as React.ReactElement<{ showTitle?: boolean }>, {
-        showTitle: !hideLabel,
-      })
+    ? cloneElement(
+        node as React.ReactElement<{
+          showTitle?: boolean;
+          maxBodyHeight?: number;
+        }>,
+        { showTitle: !widget.hideLabel, maxBodyHeight: widget.height }
+      )
     : node;
 }
 
@@ -267,6 +275,18 @@ export default function Dashboard({
         return rest;
       })
     );
+  // Max content height (px) for a sized widget; undefined clears the cap back to
+  // auto (the key is dropped so the stored entry stays clean, like `cards`).
+  const setWidgetHeight = (id: LayoutWidgetId, height: number | undefined) =>
+    mutateSections(
+      layout.sections.map((w) => {
+        if (w.id !== id) return w;
+        if (height !== undefined) return { ...w, height };
+        const rest = { ...w };
+        delete rest.height;
+        return rest;
+      })
+    );
   const setScale = (next: number) => mutateLayout({ ...layout, scale: next });
   const toggleWidgetHidden = (id: LayoutWidgetId) =>
     mutateSections(
@@ -416,6 +436,11 @@ export default function Dashboard({
   // are suspended so every widget previews its real content.
   function blockFor(widget: LayoutWidget): React.ReactNode {
     const id = widget.id;
+    // The per-widget height cap, applied to the scrollable body of the
+    // card-grid widgets below (the component-rendered ones take it as a prop).
+    const bodyStyle = widget.height
+      ? { maxHeight: widget.height, overflowY: "auto" as const }
+      : undefined;
     switch (id) {
       case "greeting":
         return <Greeting initialGreeting={initialGreeting} />;
@@ -461,30 +486,32 @@ export default function Dashboard({
           </div>
         ) : null;
       case "calendar":
-        return q && !editing ? null : withTitle(calendar, widget.hideLabel);
+        return q && !editing ? null : withWidgetProps(calendar, widget);
       case "notes":
         return notes.content.trim() !== "" ? (
           <NotesWidget
             title={notes.title}
             content={notes.content}
             showTitle={!widget.hideLabel}
+            maxBodyHeight={widget.height}
           />
         ) : null;
       case "feed":
-        return q && !editing ? null : withTitle(feed, widget.hideLabel);
+        return q && !editing ? null : withWidgetProps(feed, widget);
       case "countdown":
         return countdown.items.some((i) => isValidCountdownDate(i.date)) ? (
           <CountdownWidget
             title={countdown.title}
             items={countdown.items}
             showTitle={!widget.hideLabel}
+            maxBodyHeight={widget.height}
           />
         ) : null;
       case "favorites":
         return (!q || editing) && favoriteApps.length > 0 ? (
           <section>
             {!widget.hideLabel && <SectionTitle>Favorites</SectionTitle>}
-            <div className={cardGridClass(widget, "gap-4")}>
+            <div className={cardGridClass(widget, "gap-4")} style={bodyStyle}>
               {favoriteApps.map((app) => (
                 <AppCard key={app.id} app={app} />
               ))}
@@ -496,7 +523,7 @@ export default function Dashboard({
         return list.length > 0 ? (
           <section>
             {!widget.hideLabel && <SectionTitle>Applications</SectionTitle>}
-            <div className={cardGridClass(widget, "gap-4")}>
+            <div className={cardGridClass(widget, "gap-4")} style={bodyStyle}>
               {list.map((app) => (
                 <AppCard key={app.id} app={app} />
               ))}
@@ -511,7 +538,7 @@ export default function Dashboard({
         return groups.length > 0 ? (
           <section>
             {!widget.hideLabel && <SectionTitle>Bookmarks</SectionTitle>}
-            <div className={cardGridClass(widget, "gap-6")}>
+            <div className={cardGridClass(widget, "gap-6")} style={bodyStyle}>
               {groups.map(([category, items]) => (
                 <BookmarkGroup key={category} category={category} items={items} />
               ))}
@@ -598,9 +625,11 @@ export default function Dashboard({
               }
               fillTo={fillSpan(layout.sections, index)}
               titled={TITLED_WIDGET_IDS.includes(widget.id)}
+              sized={SIZED_WIDGET_IDS.includes(widget.id)}
               onMove={moveWidget}
               onSpan={setWidgetSpan}
               onCards={setWidgetCards}
+              onHeight={setWidgetHeight}
               onToggleHidden={toggleWidgetHidden}
               onToggleLabel={toggleWidgetLabel}
               dragHandlers={handlers(index)}

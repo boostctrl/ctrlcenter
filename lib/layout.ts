@@ -63,6 +63,30 @@ export const TITLED_WIDGET_IDS: readonly LayoutWidgetId[] = [
   "bookmarks",
 ];
 
+// Widgets whose content can be capped to a max height (a scrollable body) from
+// the layout editor — the content/list widgets, where trimming a tall list to a
+// compact card makes sense. The header widgets, search and the split
+// clock/weather/status are fixed-size and aren't capped.
+export const SIZED_WIDGET_IDS: readonly LayoutWidgetId[] = [
+  "calendar",
+  "notes",
+  "feed",
+  "countdown",
+  "favorites",
+  "apps",
+  "bookmarks",
+];
+
+// Per-widget max content height (px). A widget with `height` set never grows
+// past it (its body scrolls); a shorter widget is unaffected. Absent = auto
+// (content height). Bounds/step drive the editor stepper and clamp stored
+// values. The whole UI is rem-based but heights are kept in px for a concrete,
+// predictable cap.
+export const MIN_WIDGET_HEIGHT = 120;
+export const MAX_WIDGET_HEIGHT = 800;
+export const DEFAULT_WIDGET_HEIGHT = 320;
+export const WIDGET_HEIGHT_STEP = 40;
+
 // Site-wide UI scale (percent), rendered as font-size on <html>: the whole UI
 // is rem-based, so one percentage scales text, paddings and cards uniformly.
 export const MIN_UI_SCALE = 70;
@@ -79,6 +103,9 @@ export type LayoutWidget = {
   // Suppress the widget's section heading (the ALL-CAPS label above it) when
   // true; absent/false shows it. Only meaningful for TITLED_WIDGET_IDS.
   hideLabel?: boolean;
+  // Max content height in px (body scrolls past it); absent = auto. Only
+  // meaningful for SIZED_WIDGET_IDS.
+  height?: number;
 };
 
 export const WIDGET_LABELS: Record<LayoutWidgetId, string> = {
@@ -215,6 +242,15 @@ function isCards(v: unknown): v is number {
   );
 }
 
+function isHeight(v: unknown): v is number {
+  return (
+    typeof v === "number" &&
+    Number.isInteger(v) &&
+    v >= MIN_WIDGET_HEIGHT &&
+    v <= MAX_WIDGET_HEIGHT
+  );
+}
+
 function legacyHidden(
   id: LayoutWidgetId,
   components: LegacyComponentToggles | undefined
@@ -244,6 +280,7 @@ export function resolveLayoutWidgets(
         hidden?: unknown;
         cards?: unknown;
         hideLabel?: unknown;
+        height?: unknown;
       }[]
     | undefined,
   components?: LegacyComponentToggles
@@ -271,6 +308,7 @@ export function resolveLayoutWidgets(
       ...(typeof item.hideLabel === "boolean"
         ? { hideLabel: item.hideLabel }
         : {}),
+      ...(isHeight(item.height) ? { height: item.height } : {}),
     });
   }
   const missing = (ids: readonly LayoutWidgetId[]) =>

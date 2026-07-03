@@ -121,6 +121,21 @@ describe("resolveLayoutWidgets", () => {
     expect("hideLabel" in out.find((w) => w.id === "favorites")!).toBe(false);
   });
 
+  it("keeps an in-range integer height and drops an invalid one", () => {
+    const out = resolveLayoutWidgets([
+      { id: "apps", span: 24, height: 320 },
+      { id: "bookmarks", span: 24, height: 50 }, // below min — dropped
+      { id: "feed", span: 24, height: 300.5 }, // not an integer — dropped
+      { id: "notes", span: 24, height: 99999 }, // above max — dropped
+      { id: "favorites", span: 24 }, // absent — stays auto
+    ]);
+    expect(out.find((w) => w.id === "apps")?.height).toBe(320);
+    expect("height" in out.find((w) => w.id === "bookmarks")!).toBe(false);
+    expect("height" in out.find((w) => w.id === "feed")!).toBe(false);
+    expect("height" in out.find((w) => w.id === "notes")!).toBe(false);
+    expect("height" in out.find((w) => w.id === "favorites")!).toBe(false);
+  });
+
   it("folds legacy components toggles into hidden for entries without one", () => {
     const components = { greeting: false, apps: false, search: true };
     const out = resolveLayoutWidgets(
@@ -297,12 +312,20 @@ describe("layout schema", () => {
   it("layoutUpdateSchema requires a fully-resolved list and bounds span/cards/scale", () => {
     const good = {
       sections: [
-        { id: "apps", span: 13, hidden: false, cards: 4, hideLabel: true },
+        {
+          id: "apps",
+          span: 13,
+          hidden: false,
+          cards: 4,
+          hideLabel: true,
+          height: 320,
+        },
       ],
     };
     const parsed = layoutUpdateSchema.safeParse(good);
     expect(parsed.success).toBe(true);
     expect(parsed.data?.sections[0].hideLabel).toBe(true);
+    expect(parsed.data?.sections[0].height).toBe(320);
     // The grid marker and scale are stamped in so a stored layout can never
     // re-trigger the 12→24 migration.
     expect(parsed.data?.columns).toBe(24);
@@ -313,6 +336,7 @@ describe("layout schema", () => {
       { sections: [{ id: "apps", span: 6 }] }, // hidden required
       { sections: [{ id: "apps", width: "half", hidden: false }] }, // legacy shape rejected
       { sections: [{ id: "apps", span: 6, hidden: false, cards: 5 }] },
+      { sections: [{ id: "apps", span: 6, hidden: false, height: 40 }] }, // below min
       { sections: [], scale: 500 },
     ]) {
       expect(layoutUpdateSchema.safeParse(bad).success).toBe(false);

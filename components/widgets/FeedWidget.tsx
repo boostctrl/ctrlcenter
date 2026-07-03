@@ -23,17 +23,27 @@ export default function FeedWidget({
   feed,
   titleOverride,
   showTitle = true,
+  maxBodyHeight,
 }: {
   feed: Feed | null;
   titleOverride: string;
   // Show the section heading; the layout editor's label toggle turns it off.
   showTitle?: boolean;
+  // Cap the list height (px), scrolling past it; from the layout editor.
+  maxBodyHeight?: number;
 }) {
   const title = titleOverride.trim() || feed?.title.trim() || "Feed";
   return (
     <section>
       {showTitle && <SectionTitle>{title}</SectionTitle>}
-      <div className="glass-card p-6">
+      <div
+        className="glass-card p-6"
+        style={
+          maxBodyHeight
+            ? { maxHeight: maxBodyHeight, overflowY: "auto" }
+            : undefined
+        }
+      >
         {feed && feed.items.length > 0 ? (
           <ul className="divide-y divide-fg/10">
             {feed.items.map((item, i) => {

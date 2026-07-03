@@ -4,6 +4,10 @@ import { useState, type ReactNode } from "react";
 import {
   GRID_COLUMNS,
   MAX_CARD_COLUMNS,
+  MIN_WIDGET_HEIGHT,
+  MAX_WIDGET_HEIGHT,
+  DEFAULT_WIDGET_HEIGHT,
+  WIDGET_HEIGHT_STEP,
   MIN_UI_SCALE,
   MAX_UI_SCALE,
   UI_SCALE_STEP,
@@ -97,9 +101,11 @@ export function WidgetFrame({
   effectiveCards,
   fillTo,
   titled,
+  sized,
   onMove,
   onSpan,
   onCards,
+  onHeight,
   onToggleHidden,
   onToggleLabel,
   dragHandlers,
@@ -121,9 +127,12 @@ export function WidgetFrame({
   fillTo: number;
   // Whether the widget has a section heading that can be toggled off.
   titled: boolean;
+  // Whether the widget's height can be capped (a scrollable content body).
+  sized: boolean;
   onMove: (from: number, to: number) => void;
   onSpan: (id: LayoutWidgetId, span: number) => void;
   onCards: (id: LayoutWidgetId, cards: number | undefined) => void;
+  onHeight: (id: LayoutWidgetId, height: number | undefined) => void;
   onToggleHidden: (id: LayoutWidgetId) => void;
   onToggleLabel: (id: LayoutWidgetId) => void;
   dragHandlers: React.HTMLAttributes<HTMLDivElement>;
@@ -221,6 +230,69 @@ export function WidgetFrame({
                   type="button"
                   aria-label={`Automatic cards per row in ${label}`}
                   onClick={() => onCards(widget.id, undefined)}
+                  className={`${stepBtn} border-l border-fg/10 text-[10px] tracking-wide uppercase`}
+                >
+                  Auto
+                </button>
+              )}
+            </div>
+          )}
+          {sized && (
+            <div
+              className="flex items-center overflow-hidden rounded-lg border border-fg/10"
+              title="Maximum height — taller content scrolls inside the card"
+            >
+              <button
+                type="button"
+                aria-label={`Shorter ${label}`}
+                disabled={
+                  widget.height !== undefined &&
+                  widget.height <= MIN_WIDGET_HEIGHT
+                }
+                onClick={() =>
+                  onHeight(
+                    widget.id,
+                    widget.height === undefined
+                      ? DEFAULT_WIDGET_HEIGHT
+                      : Math.max(
+                          MIN_WIDGET_HEIGHT,
+                          widget.height - WIDGET_HEIGHT_STEP
+                        )
+                  )
+                }
+                className={stepBtn}
+              >
+                −
+              </button>
+              <span className="px-1 text-fg/50 tabular-nums">
+                {widget.height !== undefined ? `${widget.height}px` : "Auto"}
+              </span>
+              <button
+                type="button"
+                aria-label={`Taller ${label}`}
+                disabled={
+                  widget.height === undefined ||
+                  widget.height >= MAX_WIDGET_HEIGHT
+                }
+                onClick={() =>
+                  widget.height !== undefined &&
+                  onHeight(
+                    widget.id,
+                    Math.min(
+                      MAX_WIDGET_HEIGHT,
+                      widget.height + WIDGET_HEIGHT_STEP
+                    )
+                  )
+                }
+                className={stepBtn}
+              >
+                +
+              </button>
+              {widget.height !== undefined && (
+                <button
+                  type="button"
+                  aria-label={`Automatic height for ${label}`}
+                  onClick={() => onHeight(widget.id, undefined)}
                   className={`${stepBtn} border-l border-fg/10 text-[10px] tracking-wide uppercase`}
                 >
                   Auto

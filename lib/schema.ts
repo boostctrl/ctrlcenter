@@ -11,6 +11,8 @@ import {
   GRID_COLUMNS,
   LEGACY_GRID_COLUMNS,
   MAX_CARD_COLUMNS,
+  MIN_WIDGET_HEIGHT,
+  MAX_WIDGET_HEIGHT,
   MIN_UI_SCALE,
   MAX_UI_SCALE,
   DEFAULT_UI_SCALE,
@@ -248,6 +250,13 @@ export const layoutWidgetSchema = z
       .optional()
       .catch(undefined),
     hideLabel: z.boolean().optional().catch(undefined),
+    height: z
+      .number()
+      .int()
+      .min(MIN_WIDGET_HEIGHT)
+      .max(MAX_WIDGET_HEIGHT)
+      .optional()
+      .catch(undefined),
   })
   .transform(
     ({
@@ -257,18 +266,21 @@ export const layoutWidgetSchema = z
       hidden,
       cards,
       hideLabel,
+      height,
     }): {
       id: LayoutWidgetId;
       span: number;
       hidden?: boolean;
       cards?: number;
       hideLabel?: boolean;
+      height?: number;
     } => ({
       id,
       span: span ?? (width ? WIDTH_TO_SPAN[width] : defaultSpanFor(id)),
       ...(hidden === undefined ? {} : { hidden }),
       ...(cards === undefined ? {} : { cards }),
       ...(hideLabel === undefined ? {} : { hideLabel }),
+      ...(height === undefined ? {} : { height }),
     })
   );
 
@@ -611,6 +623,12 @@ export const layoutUpdateSchema = z.object({
       hidden: z.boolean(),
       cards: z.number().int().min(1).max(MAX_CARD_COLUMNS).optional(),
       hideLabel: z.boolean().optional(),
+      height: z
+        .number()
+        .int()
+        .min(MIN_WIDGET_HEIGHT)
+        .max(MAX_WIDGET_HEIGHT)
+        .optional(),
     })
   ),
   columns: z.literal(GRID_COLUMNS).default(GRID_COLUMNS),
