@@ -1,32 +1,35 @@
 "use client";
 
 import { useEffect } from "react";
+import { SPACE_SIDES, type SpaceSide } from "@/lib/layout";
 
 // Owns the dashboard grid's vertical layout so React and this effect never
 // fight over the same inline style. React sets each cell's explicit height
-// (style.height) and a data-space-below attribute; this effect sets everything
-// else — the grid's auto-rows and row-gap, and each cell's row-span / margin.
+// (style.height) and data-space-* attributes; this effect sets everything else
+// — the grid's auto-rows and row-gap, and each cell's row-span / margins.
 //
-// Two modes:
-//  • pack (view + lg): masonry. Rows become a fine track (ROW_UNIT) with no
-//    row-gap, and each cell gets a row-span from its measured height plus the
-//    grid gap and its own space-below, so cards pack up the columns (with
-//    grid-auto-flow: dense) yet keep an even, tunable gap.
-//  • linear (editing, or below lg): a plain grid — row-gap provides the spacing
-//    and a cell's space-below is an extra bottom margin. Keeps the editor
-//    predictable and the single mobile column simple.
+// Two modes, by viewport (identical in the editor and the live page, so the
+// editor previews exactly what ships):
+//  • pack (lg+): masonry. Rows become a fine track (ROW_UNIT) with no row-gap,
+//    and each cell gets a row-span from its measured height plus the grid gap
+//    and its own top/bottom space, so cards pack up the columns yet keep an
+//    even, tunable gap. Auto-placement is sparse (no dense flow — see
+//    Dashboard), so cards stay in the order they're placed.
+//  • linear (below lg): a plain single-column grid — row-gap provides the
+//    spacing and a cell's space is applied as margins.
 //
-// Explicit heights work in both modes: React sizes the cell, we just measure
-// it (pack) or leave it (linear). A cell taller than its content gives the card
+// Explicit heights work in both modes: React sizes the cell, we just measure it
+// (pack) or leave it (linear). A cell taller than its content gives the card
 // presence; the header widgets center their content in it (see Dashboard).
 const ROW_UNIT = 4; // px per implicit row track in pack mode
 
+type Space = Record<SpaceSide, number>;
+
 export function useGridLayout(
   ref: React.RefObject<HTMLDivElement | null>,
-  editing: boolean,
   gap: number,
-  // Bumps whenever gap / heights / space-below / the cell set change, so the
-  // layout is recomputed for the new values.
+  // Bumps whenever gap / heights / per-side space / edit mode / the cell set
+  // change, so the layout is recomputed for the new values.
   signature: string
 ) {
   useEffect(() => {
@@ -38,25 +41,43 @@ export function useGridLayout(
     let frame = 0;
 
     const cells = () => Array.from(grid.children) as HTMLElement[];
-    const spaceBelowOf = (cell: HTMLElement) =>
-      Number(cell.dataset.spaceBelow) || 0;
+    const spaceOf = (cell: HTMLElement): Space => {
+      const out = { top: 0, right: 0, bottom: 0, left: 0 };
+      for (const side of SPACE_SIDES) {
+        out[side] = Number(cell.dataset[`space${side[0].toUpperCase()}${side.slice(1)}`]) || 0;
+      }
+      return out;
+    };
+
+    const clearCell = (cell: HTMLElement) => {
+      cell.style.removeProperty("margin-top");
+      cell.style.removeProperty("margin-right");
+      cell.style.removeProperty("margin-bottom");
+      cell.style.removeProperty("margin-left");
+      cell.style.removeProperty("grid-row-end");
+    };
 
     const layout = () => {
-      const pack = !editing && mq.matches;
+      const pack = mq.matches;
       const list = cells();
+      // Reset per-cell props first so a mode/space change never leaves a stale
+      // margin or span behind (and heights measure unconstrained).
+      for (const cell of list) clearCell(cell);
       if (pack) {
         grid.style.gridAutoRows = `${ROW_UNIT}px`;
         grid.style.rowGap = "0px";
         // Read all heights first, then write spans — reflow at most twice.
-        for (const cell of list) {
-          cell.style.removeProperty("margin-bottom");
-          cell.style.removeProperty("grid-row-end");
-        }
         const heights = list.map((c) => c.getBoundingClientRect().height);
         list.forEach((cell, i) => {
+          const s = spaceOf(cell);
+          if (s.top) cell.style.marginTop = `${s.top}px`;
+          if (s.left) cell.style.marginLeft = `${s.left}px`;
+          if (s.right) cell.style.marginRight = `${s.right}px`;
+          // Top + bottom space and the grid gap ride in the row-span as extra
+          // empty tracks; marginTop offsets the content, the rest sits below.
           const span = Math.max(
             1,
-            Math.ceil((heights[i] + gap + spaceBelowOf(cell)) / ROW_UNIT)
+            Math.ceil((heights[i] + s.top + s.bottom + gap) / ROW_UNIT)
           );
           cell.style.gridRowEnd = `span ${span}`;
         });
@@ -64,10 +85,11 @@ export function useGridLayout(
         grid.style.removeProperty("grid-auto-rows");
         grid.style.rowGap = `${gap}px`;
         for (const cell of list) {
-          cell.style.removeProperty("grid-row-end");
-          const sb = spaceBelowOf(cell);
-          if (sb > 0) cell.style.marginBottom = `${sb}px`;
-          else cell.style.removeProperty("margin-bottom");
+          const s = spaceOf(cell);
+          if (s.top) cell.style.marginTop = `${s.top}px`;
+          if (s.right) cell.style.marginRight = `${s.right}px`;
+          if (s.bottom) cell.style.marginBottom = `${s.bottom}px`;
+          if (s.left) cell.style.marginLeft = `${s.left}px`;
         }
       }
     };
@@ -97,10 +119,7 @@ export function useGridLayout(
       cancelAnimationFrame(frame);
       grid.style.removeProperty("grid-auto-rows");
       grid.style.removeProperty("row-gap");
-      for (const cell of cells()) {
-        cell.style.removeProperty("grid-row-end");
-        cell.style.removeProperty("margin-bottom");
-      }
+      for (const cell of cells()) clearCell(cell);
     };
-  }, [ref, editing, gap, signature]);
+  }, [ref, gap, signature]);
 }

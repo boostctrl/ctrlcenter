@@ -13,7 +13,7 @@ import {
   MAX_CARD_COLUMNS,
   MIN_WIDGET_HEIGHT,
   MAX_WIDGET_HEIGHT,
-  MAX_WIDGET_SPACE_BELOW,
+  MAX_WIDGET_SPACE,
   MIN_GRID_GAP,
   MAX_GRID_GAP,
   DEFAULT_GRID_GAP,
@@ -22,6 +22,7 @@ import {
   DEFAULT_UI_SCALE,
   defaultSpanFor,
   type LayoutWidgetId,
+  type WidgetSpace,
 } from "./layout";
 
 // 6-digit hex color (matches what <input type="color"> produces and the
@@ -261,6 +262,34 @@ function lenientArray<T extends z.ZodTypeAny>(item: T) {
 // entry omits it, so resolveLayoutWidgets (lib/layout.ts) can fold the legacy
 // components visibility toggles in; that resolver also rebuilds whatever this
 // lenient per-row parse drops.
+// One side's spacing value (px). Reused by the lenient and strict space schemas.
+const spaceSideSchema = z.number().int().min(1).max(MAX_WIDGET_SPACE);
+// Per-side extra space around a card. Lenient variant catches a bad side to
+// undefined so one stray value can't drop the rest; strict rejects the request.
+const lenientSpaceSchema = z.object({
+  top: spaceSideSchema.optional().catch(undefined),
+  right: spaceSideSchema.optional().catch(undefined),
+  bottom: spaceSideSchema.optional().catch(undefined),
+  left: spaceSideSchema.optional().catch(undefined),
+});
+export const widgetSpaceSchema = z.object({
+  top: spaceSideSchema.optional(),
+  right: spaceSideSchema.optional(),
+  bottom: spaceSideSchema.optional(),
+  left: spaceSideSchema.optional(),
+});
+
+// Drop undefined sides; undefined when nothing valid remains, so an entry with
+// no spacing never persists an empty object.
+function cleanSpace(space: WidgetSpace | undefined): WidgetSpace | undefined {
+  if (!space) return undefined;
+  const out: WidgetSpace = {};
+  for (const [side, value] of Object.entries(space)) {
+    if (typeof value === "number") out[side as keyof WidgetSpace] = value;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 export const layoutWidgetSchema = z
   .object({
     id: z.enum(LAYOUT_WIDGET_IDS),
@@ -282,13 +311,9 @@ export const layoutWidgetSchema = z
       .max(MAX_WIDGET_HEIGHT)
       .optional()
       .catch(undefined),
-    spaceBelow: z
-      .number()
-      .int()
-      .min(1)
-      .max(MAX_WIDGET_SPACE_BELOW)
-      .optional()
-      .catch(undefined),
+    space: lenientSpaceSchema.optional().catch(undefined),
+    // Pre-1.8.1 single-sided spacing; migrated into `space.bottom` below.
+    spaceBelow: spaceSideSchema.optional().catch(undefined),
   })
   .transform(
     ({
@@ -299,6 +324,7 @@ export const layoutWidgetSchema = z
       cards,
       hideLabel,
       height,
+      space,
       spaceBelow,
     }): {
       id: LayoutWidgetId;
@@ -307,16 +333,22 @@ export const layoutWidgetSchema = z
       cards?: number;
       hideLabel?: boolean;
       height?: number;
-      spaceBelow?: number;
-    } => ({
-      id,
-      span: span ?? (width ? WIDTH_TO_SPAN[width] : defaultSpanFor(id)),
-      ...(hidden === undefined ? {} : { hidden }),
-      ...(cards === undefined ? {} : { cards }),
-      ...(hideLabel === undefined ? {} : { hideLabel }),
-      ...(height === undefined ? {} : { height }),
-      ...(spaceBelow === undefined ? {} : { spaceBelow }),
-    })
+      space?: WidgetSpace;
+    } => {
+      // A valid `space` wins; else migrate a legacy `spaceBelow` to the bottom.
+      const resolvedSpace =
+        cleanSpace(space) ??
+        (spaceBelow === undefined ? undefined : { bottom: spaceBelow });
+      return {
+        id,
+        span: span ?? (width ? WIDTH_TO_SPAN[width] : defaultSpanFor(id)),
+        ...(hidden === undefined ? {} : { hidden }),
+        ...(cards === undefined ? {} : { cards }),
+        ...(hideLabel === undefined ? {} : { hideLabel }),
+        ...(height === undefined ? {} : { height }),
+        ...(resolvedSpace ? { space: resolvedSpace } : {}),
+      };
+    }
   );
 
 // Spans saved against the 1.3 12-column grid double onto today's 24-column
@@ -681,12 +713,7 @@ export const layoutUpdateSchema = z.object({
         .min(MIN_WIDGET_HEIGHT)
         .max(MAX_WIDGET_HEIGHT)
         .optional(),
-      spaceBelow: z
-        .number()
-        .int()
-        .min(1)
-        .max(MAX_WIDGET_SPACE_BELOW)
-        .optional(),
+      space: widgetSpaceSchema.optional(),
     })
   ),
   columns: z.literal(GRID_COLUMNS).default(GRID_COLUMNS),

@@ -136,17 +136,30 @@ describe("resolveLayoutWidgets", () => {
     expect("height" in out.find((w) => w.id === "favorites")!).toBe(false);
   });
 
-  it("keeps an in-range integer spaceBelow and drops an invalid one", () => {
+  it("keeps valid per-side space values and drops invalid sides", () => {
+    const out = resolveLayoutWidgets([
+      { id: "apps", span: 24, space: { top: 24, bottom: 16 } },
+      // A bad side is dropped; a valid side on the same entry survives.
+      { id: "bookmarks", span: 24, space: { left: 8, right: 0, top: 99999 } },
+      { id: "feed", span: 24, space: { top: 12.5 } }, // non-integer — dropped
+      { id: "notes", span: 24 }, // absent — none
+    ]);
+    expect(out.find((w) => w.id === "apps")?.space).toEqual({ top: 24, bottom: 16 });
+    expect(out.find((w) => w.id === "bookmarks")?.space).toEqual({ left: 8 });
+    expect("space" in out.find((w) => w.id === "feed")!).toBe(false);
+    expect("space" in out.find((w) => w.id === "notes")!).toBe(false);
+  });
+
+  it("migrates a legacy spaceBelow into space.bottom", () => {
     const out = resolveLayoutWidgets([
       { id: "apps", span: 24, spaceBelow: 40 },
       { id: "bookmarks", span: 24, spaceBelow: 0 }, // not >= 1 — dropped
-      { id: "feed", span: 24, spaceBelow: 99999 }, // above max — dropped
-      { id: "notes", span: 24 }, // absent — none
+      // An explicit `space` wins over a legacy spaceBelow on the same entry.
+      { id: "feed", span: 24, space: { top: 8 }, spaceBelow: 40 },
     ]);
-    expect(out.find((w) => w.id === "apps")?.spaceBelow).toBe(40);
-    expect("spaceBelow" in out.find((w) => w.id === "bookmarks")!).toBe(false);
-    expect("spaceBelow" in out.find((w) => w.id === "feed")!).toBe(false);
-    expect("spaceBelow" in out.find((w) => w.id === "notes")!).toBe(false);
+    expect(out.find((w) => w.id === "apps")?.space).toEqual({ bottom: 40 });
+    expect("space" in out.find((w) => w.id === "bookmarks")!).toBe(false);
+    expect(out.find((w) => w.id === "feed")?.space).toEqual({ top: 8 });
   });
 
   it("folds legacy components toggles into hidden for entries without one", () => {
@@ -294,6 +307,28 @@ describe("layout schema", () => {
     expect(parsed.sections[1]).toEqual({ id: "bookmarks", span: 24 });
   });
 
+  it("keeps a valid per-side space and migrates a legacy spaceBelow", () => {
+    const parsed = layoutSchema.parse({
+      sections: [
+        { id: "apps", span: 24, space: { top: 24, bottom: 16 } },
+        { id: "bookmarks", span: 24, spaceBelow: 40 }, // legacy → space.bottom
+        { id: "feed", span: 24, space: { top: 0 } }, // no valid side — dropped
+      ],
+      columns: 24,
+    });
+    expect(parsed.sections[0]).toEqual({
+      id: "apps",
+      span: 24,
+      space: { top: 24, bottom: 16 },
+    });
+    expect(parsed.sections[1]).toEqual({
+      id: "bookmarks",
+      span: 24,
+      space: { bottom: 40 },
+    });
+    expect(parsed.sections[2]).toEqual({ id: "feed", span: 24 });
+  });
+
   it("keeps hidden absent when a stored entry omits it, present when not", () => {
     const parsed = layoutSchema.parse({
       sections: [
@@ -332,7 +367,7 @@ describe("layout schema", () => {
           cards: 4,
           hideLabel: true,
           height: 320,
-          spaceBelow: 40,
+          space: { top: 24, bottom: 40 },
         },
       ],
       gap: 48,
@@ -341,7 +376,7 @@ describe("layout schema", () => {
     expect(parsed.success).toBe(true);
     expect(parsed.data?.sections[0].hideLabel).toBe(true);
     expect(parsed.data?.sections[0].height).toBe(320);
-    expect(parsed.data?.sections[0].spaceBelow).toBe(40);
+    expect(parsed.data?.sections[0].space).toEqual({ top: 24, bottom: 40 });
     expect(parsed.data?.gap).toBe(48);
     // The grid marker and scale are stamped in so a stored layout can never
     // re-trigger the 12→24 migration.
@@ -354,7 +389,8 @@ describe("layout schema", () => {
       { sections: [{ id: "apps", width: "half", hidden: false }] }, // legacy shape rejected
       { sections: [{ id: "apps", span: 6, hidden: false, cards: 5 }] },
       { sections: [{ id: "apps", span: 6, hidden: false, height: 40 }] }, // below min
-      { sections: [{ id: "apps", span: 6, hidden: false, spaceBelow: 0 }] }, // below min
+      { sections: [{ id: "apps", span: 6, hidden: false, space: { top: 0 } }] }, // side below min
+      { sections: [{ id: "apps", span: 6, hidden: false, space: { top: 99999 } }] }, // side above max
       { sections: [], scale: 500 },
       { sections: [], gap: 999 }, // gap out of range
     ]) {

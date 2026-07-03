@@ -8,7 +8,7 @@ import {
   MAX_WIDGET_HEIGHT,
   DEFAULT_WIDGET_HEIGHT,
   WIDGET_HEIGHT_STEP,
-  MAX_WIDGET_SPACE_BELOW,
+  MAX_WIDGET_SPACE,
   WIDGET_SPACE_STEP,
   MIN_GRID_GAP,
   MAX_GRID_GAP,
@@ -16,21 +16,26 @@ import {
   MIN_UI_SCALE,
   MAX_UI_SCALE,
   UI_SCALE_STEP,
+  SPACE_SIDES,
   WIDGET_LABELS,
   type LayoutWidget,
   type LayoutWidgetId,
+  type SpaceSide,
 } from "@/lib/layout";
 import { MoveButtons } from "./admin/ui";
 import { SaveStatus, type SaveState } from "./admin/useAutosave";
+import { useDragResize } from "./useDragResize";
 
 // Which edge of the hovered cell a drop would insert on, in flow order.
 export type DropSide = "before" | "after";
 
 // Native HTML5 drag reordering for the widget flow grid — the 2-D sibling of
-// useReorder (components/admin/useReorder.ts). Cells can sit side by side on
-// lg+ screens, so the insertion side comes from the pointer's x position within
-// the hovered cell there, falling back to y when cells stack below lg. Drag is
-// mouse-only by design; MoveButtons in each frame are the keyboard/touch path.
+// useReorder (components/admin/useReorder.ts). Reordering starts from the grip
+// handle only (so the card's resize edges are free for useDragResize); the whole
+// cell stays the drop target. Cells can sit side by side on lg+ screens, so the
+// insertion side comes from the pointer's x position within the hovered cell
+// there, falling back to y when cells stack below lg. Drag is mouse-only by
+// design; MoveButtons in each frame are the keyboard/touch path.
 export function useFlowReorder(onMove: (from: number, to: number) => void) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [over, setOver] = useState<{ index: number; side: DropSide } | null>(
@@ -42,14 +47,24 @@ export function useFlowReorder(onMove: (from: number, to: number) => void) {
     setOver(null);
   }
 
-  function handlers(index: number) {
+  // The grip: the drag source. draggable lives here, not on the cell, so a
+  // pointer-down on a resize edge can't start a reorder.
+  function gripHandlers(index: number) {
     return {
       draggable: true,
       onDragStart: (e: React.DragEvent) => {
         e.dataTransfer.effectAllowed = "move";
         setDragIndex(index);
       },
+      onDragEnd: reset,
+    };
+  }
+
+  // The cell: the drop target.
+  function dropHandlers(index: number) {
+    return {
       onDragOver: (e: React.DragEvent) => {
+        if (dragIndex === null) return;
         e.preventDefault(); // required to allow dropping
         const rect = e.currentTarget.getBoundingClientRect();
         const sideBySide = window.matchMedia("(min-width: 1024px)").matches;
@@ -60,7 +75,6 @@ export function useFlowReorder(onMove: (from: number, to: number) => void) {
         if (over?.index !== index || over.side !== side)
           setOver({ index, side });
       },
-      onDragEnd: reset,
       onDrop: (e: React.DragEvent) => {
         e.preventDefault();
         if (dragIndex === null || over === null) {
@@ -77,7 +91,7 @@ export function useFlowReorder(onMove: (from: number, to: number) => void) {
     };
   }
 
-  return { handlers, dragIndex, over };
+  return { gripHandlers, dropHandlers, dragIndex, over };
 }
 
 // The insertion indicator: a vertical accent bar beside the hovered cell on lg+
@@ -90,11 +104,74 @@ const DROP_BAR: Record<DropSide, string> = {
     "absolute right-0 left-0 -bottom-2 h-1 rounded-full bg-violet-400 lg:top-0 lg:bottom-0 lg:-right-2 lg:left-auto lg:h-auto lg:w-1",
 };
 
+const stepBtn =
+  "px-2 py-1 text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg disabled:pointer-events-none disabled:opacity-30";
+
+// A −/value/+ stepper group, optionally with a trailing button (e.g. "Auto").
+function StepGroup({
+  display,
+  title,
+  decLabel,
+  incLabel,
+  onDec,
+  onInc,
+  canDec,
+  canInc,
+  extra,
+}: {
+  display: ReactNode;
+  title?: string;
+  decLabel: string;
+  incLabel: string;
+  onDec: () => void;
+  onInc: () => void;
+  canDec: boolean;
+  canInc: boolean;
+  extra?: ReactNode;
+}) {
+  return (
+    <div
+      className="flex items-center overflow-hidden rounded-lg border border-fg/10"
+      title={title}
+    >
+      <button
+        type="button"
+        aria-label={decLabel}
+        disabled={!canDec}
+        onClick={onDec}
+        className={stepBtn}
+      >
+        −
+      </button>
+      <span className="px-1 text-fg/50 tabular-nums">{display}</span>
+      <button
+        type="button"
+        aria-label={incLabel}
+        disabled={!canInc}
+        onClick={onInc}
+        className={stepBtn}
+      >
+        +
+      </button>
+      {extra}
+    </div>
+  );
+}
+
+// Arrow + accessible name for each spacing side, in SPACE_SIDES order.
+const SIDE_META: Record<SpaceSide, { arrow: string; name: string }> = {
+  top: { arrow: "↑", name: "above" },
+  right: { arrow: "→", name: "right of" },
+  bottom: { arrow: "↓", name: "below" },
+  left: { arrow: "←", name: "left of" },
+};
+
 // Edit-mode chrome around one widget cell: a dashed frame with the widget's
-// label, drag handle, MoveButtons (earlier/later in flow order), a span
-// stepper, a cards-per-row stepper on the card-grid widgets, and a show/hide
-// toggle. Renders the live widget dimmed when it's hidden, and a placeholder
-// tile when it currently has nothing to show — so every widget stays visible
+// label, a grip that reorders, MoveButtons, the common size controls (span +
+// Fill, height), a "More" disclosure with per-side spacing / cards-per-row /
+// label toggle, and a show/hide toggle. Right- and bottom-edge handles resize
+// the width and height by dragging. Renders the live widget dimmed when hidden,
+// a placeholder tile when it has nothing to show — so every widget stays visible
 // and placeable while editing, with no separate palette.
 export function WidgetFrame({
   widget,
@@ -112,10 +189,11 @@ export function WidgetFrame({
   onSpan,
   onCards,
   onHeight,
-  onSpaceBelow,
+  onSpace,
   onToggleHidden,
   onToggleLabel,
-  dragHandlers,
+  gripHandlers,
+  dropHandlers,
   dragging,
   dropSide,
 }: {
@@ -141,20 +219,32 @@ export function WidgetFrame({
   onSpan: (id: LayoutWidgetId, span: number) => void;
   onCards: (id: LayoutWidgetId, cards: number | undefined) => void;
   onHeight: (id: LayoutWidgetId, height: number | undefined) => void;
-  onSpaceBelow: (id: LayoutWidgetId, space: number | undefined) => void;
+  onSpace: (id: LayoutWidgetId, side: SpaceSide, value: number | undefined) => void;
   onToggleHidden: (id: LayoutWidgetId) => void;
   onToggleLabel: (id: LayoutWidgetId) => void;
-  dragHandlers: React.HTMLAttributes<HTMLDivElement>;
+  gripHandlers: React.HTMLAttributes<HTMLElement> & { draggable?: boolean };
+  dropHandlers: React.HTMLAttributes<HTMLDivElement>;
   dragging: boolean;
   dropSide: DropSide | null;
 }) {
   const label = WIDGET_LABELS[widget.id];
-  const stepBtn =
-    "px-2 py-1 text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg disabled:pointer-events-none disabled:opacity-30";
+  const { frameRef, previewRef, drag, widthHandle, heightHandle } = useDragResize(
+    {
+      span: widget.span,
+      height: widget.height,
+      onSpan: (span) => onSpan(widget.id, span),
+      onHeight: (height) => onHeight(widget.id, height),
+    }
+  );
+  const space = widget.space ?? {};
   return (
     <div
-      {...dragHandlers}
-      data-space-below={widget.spaceBelow || undefined}
+      ref={frameRef}
+      {...dropHandlers}
+      data-space-top={space.top || undefined}
+      data-space-right={space.right || undefined}
+      data-space-bottom={space.bottom || undefined}
+      data-space-left={space.left || undefined}
       className={`relative flex flex-col gap-2 rounded-2xl p-2 outline-2 outline-dashed outline-fg/15 transition-opacity ${
         dragging ? "opacity-40" : ""
       } ${cellClass}`}
@@ -162,8 +252,8 @@ export function WidgetFrame({
       {dropSide && <span className={DROP_BAR[dropSide]} aria-hidden />}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-fg/60">
         <span
+          {...gripHandlers}
           className="hidden cursor-grab text-fg/30 select-none active:cursor-grabbing sm:inline"
-          aria-hidden
           title="Drag to move"
         >
           ⠿
@@ -176,29 +266,16 @@ export function WidgetFrame({
         )}
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <MoveButtons index={index} count={count} label={label} onMove={onMove} />
-          <div className="flex items-center overflow-hidden rounded-lg border border-fg/10">
-            <button
-              type="button"
-              aria-label={`Narrow ${label}`}
-              disabled={widget.span <= 1}
-              onClick={() => onSpan(widget.id, widget.span - 1)}
-              className={stepBtn}
-            >
-              −
-            </button>
-            <span className="px-1 text-fg/50 tabular-nums">
-              {widget.span}/{GRID_COLUMNS}
-            </span>
-            <button
-              type="button"
-              aria-label={`Widen ${label}`}
-              disabled={widget.span >= GRID_COLUMNS}
-              onClick={() => onSpan(widget.id, widget.span + 1)}
-              className={stepBtn}
-            >
-              +
-            </button>
-          </div>
+          <StepGroup
+            title="Column width — or drag the right edge"
+            display={`${widget.span}/${GRID_COLUMNS}`}
+            decLabel={`Narrow ${label}`}
+            incLabel={`Widen ${label}`}
+            onDec={() => onSpan(widget.id, widget.span - 1)}
+            onInc={() => onSpan(widget.id, widget.span + 1)}
+            canDec={widget.span > 1}
+            canInc={widget.span < GRID_COLUMNS}
+          />
           {fillTo > widget.span && (
             <button
               type="button"
@@ -209,160 +286,128 @@ export function WidgetFrame({
               Fill
             </button>
           )}
-          {effectiveCards !== undefined && (
-            <div
-              className="flex items-center overflow-hidden rounded-lg border border-fg/10"
-              title="Cards per row"
-            >
-              <button
-                type="button"
-                aria-label={`Fewer cards per row in ${label}`}
-                disabled={effectiveCards <= 1}
-                onClick={() => onCards(widget.id, effectiveCards - 1)}
-                className={stepBtn}
-              >
-                −
-              </button>
-              <span className="px-1 text-fg/50 tabular-nums">
-                {widget.cards !== undefined ? `${widget.cards}×` : "Auto"}
-              </span>
-              <button
-                type="button"
-                aria-label={`More cards per row in ${label}`}
-                disabled={effectiveCards >= MAX_CARD_COLUMNS}
-                onClick={() => onCards(widget.id, effectiveCards + 1)}
-                className={stepBtn}
-              >
-                +
-              </button>
-              {widget.cards !== undefined && (
+          <StepGroup
+            title="Card height — or drag the bottom edge; taller than the content adds breathing room, content widgets scroll"
+            display={widget.height !== undefined ? `${widget.height}px` : "Auto"}
+            decLabel={`Shorter ${label}`}
+            incLabel={`Taller ${label}`}
+            onDec={() =>
+              onHeight(
+                widget.id,
+                widget.height === undefined
+                  ? DEFAULT_WIDGET_HEIGHT
+                  : Math.max(MIN_WIDGET_HEIGHT, widget.height - WIDGET_HEIGHT_STEP)
+              )
+            }
+            onInc={() =>
+              onHeight(
+                widget.id,
+                widget.height === undefined
+                  ? DEFAULT_WIDGET_HEIGHT
+                  : Math.min(MAX_WIDGET_HEIGHT, widget.height + WIDGET_HEIGHT_STEP)
+              )
+            }
+            canDec={widget.height === undefined || widget.height > MIN_WIDGET_HEIGHT}
+            canInc={widget.height === undefined || widget.height < MAX_WIDGET_HEIGHT}
+            extra={
+              widget.height !== undefined && (
                 <button
                   type="button"
-                  aria-label={`Automatic cards per row in ${label}`}
-                  onClick={() => onCards(widget.id, undefined)}
+                  aria-label={`Automatic height for ${label}`}
+                  onClick={() => onHeight(widget.id, undefined)}
                   className={`${stepBtn} border-l border-fg/10 text-[10px] tracking-wide uppercase`}
                 >
                   Auto
                 </button>
+              )
+            }
+          />
+          <details className="group relative">
+            <summary className="flex cursor-pointer list-none items-center rounded-lg border border-fg/10 px-2 py-1 text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg [&::-webkit-details-marker]:hidden">
+              More
+            </summary>
+            <div className="absolute top-full right-0 z-10 mt-1 flex w-56 flex-col gap-3 rounded-xl border border-fg/10 bg-[var(--background)] p-3 shadow-lg">
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[10px] tracking-wide text-fg/40 uppercase">
+                  Space around card
+                </span>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {SPACE_SIDES.map((side) => (
+                    <StepGroup
+                      key={side}
+                      title={`Space ${SIDE_META[side].name} ${label}`}
+                      display={
+                        <span className="flex items-center gap-1">
+                          <span aria-hidden>{SIDE_META[side].arrow}</span>
+                          {space[side] ?? 0}
+                        </span>
+                      }
+                      decLabel={`Less space ${SIDE_META[side].name} ${label}`}
+                      incLabel={`More space ${SIDE_META[side].name} ${label}`}
+                      onDec={() => {
+                        const cur = space[side] ?? 0;
+                        onSpace(
+                          widget.id,
+                          side,
+                          cur > WIDGET_SPACE_STEP ? cur - WIDGET_SPACE_STEP : undefined
+                        );
+                      }}
+                      onInc={() =>
+                        onSpace(
+                          widget.id,
+                          side,
+                          Math.min(
+                            MAX_WIDGET_SPACE,
+                            (space[side] ?? 0) + WIDGET_SPACE_STEP
+                          )
+                        )
+                      }
+                      canDec={!!space[side]}
+                      canInc={(space[side] ?? 0) < MAX_WIDGET_SPACE}
+                    />
+                  ))}
+                </div>
+              </div>
+              {effectiveCards !== undefined && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] tracking-wide text-fg/40 uppercase">
+                    Cards / row
+                  </span>
+                  <StepGroup
+                    display={widget.cards !== undefined ? `${widget.cards}×` : "Auto"}
+                    decLabel={`Fewer cards per row in ${label}`}
+                    incLabel={`More cards per row in ${label}`}
+                    onDec={() => onCards(widget.id, effectiveCards - 1)}
+                    onInc={() => onCards(widget.id, effectiveCards + 1)}
+                    canDec={effectiveCards > 1}
+                    canInc={effectiveCards < MAX_CARD_COLUMNS}
+                    extra={
+                      widget.cards !== undefined && (
+                        <button
+                          type="button"
+                          aria-label={`Automatic cards per row in ${label}`}
+                          onClick={() => onCards(widget.id, undefined)}
+                          className={`${stepBtn} border-l border-fg/10 text-[10px] tracking-wide uppercase`}
+                        >
+                          Auto
+                        </button>
+                      )
+                    }
+                  />
+                </div>
+              )}
+              {titled && (
+                <button
+                  type="button"
+                  aria-pressed={!widget.hideLabel}
+                  onClick={() => onToggleLabel(widget.id)}
+                  className="rounded-lg border border-fg/10 px-2 py-1 text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg"
+                >
+                  {widget.hideLabel ? "Show heading" : "Hide heading"}
+                </button>
               )}
             </div>
-          )}
-          <div
-            className="flex items-center overflow-hidden rounded-lg border border-fg/10"
-            title="Card height — taller than the content adds breathing room; content widgets scroll"
-          >
-            <button
-              type="button"
-              aria-label={`Shorter ${label}`}
-              disabled={
-                widget.height !== undefined && widget.height <= MIN_WIDGET_HEIGHT
-              }
-              onClick={() =>
-                onHeight(
-                  widget.id,
-                  widget.height === undefined
-                    ? DEFAULT_WIDGET_HEIGHT
-                    : Math.max(
-                        MIN_WIDGET_HEIGHT,
-                        widget.height - WIDGET_HEIGHT_STEP
-                      )
-                )
-              }
-              className={stepBtn}
-            >
-              −
-            </button>
-            <span className="px-1 text-fg/50 tabular-nums">
-              {widget.height !== undefined ? `${widget.height}px` : "Auto"}
-            </span>
-            <button
-              type="button"
-              aria-label={`Taller ${label}`}
-              disabled={
-                widget.height !== undefined && widget.height >= MAX_WIDGET_HEIGHT
-              }
-              onClick={() =>
-                onHeight(
-                  widget.id,
-                  widget.height === undefined
-                    ? DEFAULT_WIDGET_HEIGHT
-                    : Math.min(
-                        MAX_WIDGET_HEIGHT,
-                        widget.height + WIDGET_HEIGHT_STEP
-                      )
-                )
-              }
-              className={stepBtn}
-            >
-              +
-            </button>
-            {widget.height !== undefined && (
-              <button
-                type="button"
-                aria-label={`Automatic height for ${label}`}
-                onClick={() => onHeight(widget.id, undefined)}
-                className={`${stepBtn} border-l border-fg/10 text-[10px] tracking-wide uppercase`}
-              >
-                Auto
-              </button>
-            )}
-          </div>
-          <div
-            className="flex items-center overflow-hidden rounded-lg border border-fg/10"
-            title="Extra space below this card"
-          >
-            <button
-              type="button"
-              aria-label={`Less space below ${label}`}
-              disabled={!widget.spaceBelow}
-              onClick={() =>
-                onSpaceBelow(
-                  widget.id,
-                  widget.spaceBelow && widget.spaceBelow > WIDGET_SPACE_STEP
-                    ? widget.spaceBelow - WIDGET_SPACE_STEP
-                    : undefined
-                )
-              }
-              className={stepBtn}
-            >
-              −
-            </button>
-            <span className="px-1 text-fg/50 tabular-nums">
-              {widget.spaceBelow ? `+${widget.spaceBelow}` : "0"}
-            </span>
-            <button
-              type="button"
-              aria-label={`More space below ${label}`}
-              disabled={(widget.spaceBelow ?? 0) >= MAX_WIDGET_SPACE_BELOW}
-              onClick={() =>
-                onSpaceBelow(
-                  widget.id,
-                  Math.min(
-                    MAX_WIDGET_SPACE_BELOW,
-                    (widget.spaceBelow ?? 0) + WIDGET_SPACE_STEP
-                  )
-                )
-              }
-              className={stepBtn}
-            >
-              +
-            </button>
-          </div>
-          {titled && (
-            <button
-              type="button"
-              aria-pressed={!widget.hideLabel}
-              onClick={() => onToggleLabel(widget.id)}
-              title={
-                widget.hideLabel
-                  ? `Show the ${label} heading`
-                  : `Hide the ${label} heading`
-              }
-              className="rounded-lg border border-fg/10 px-2 py-1 text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg"
-            >
-              {widget.hideLabel ? "Label off" : "Label on"}
-            </button>
-          )}
+          </details>
           <button
             type="button"
             aria-pressed={widget.hidden}
@@ -377,22 +422,58 @@ export function WidgetFrame({
         // Inert while editing so a drag can't trigger the widget's links; the
         // preview carries the set height so sizing shows live.
         <div
+          ref={previewRef}
           className={`pointer-events-none ${previewClass} ${widget.hidden ? "opacity-40" : ""}`}
           style={previewStyle}
         >
           {node}
         </div>
       ) : (
-        <div className="flex min-h-16 items-center justify-center rounded-xl bg-fg/[0.03] px-4 py-6 text-center text-xs text-fg/40">
+        <div
+          ref={previewRef}
+          className="flex min-h-16 items-center justify-center rounded-xl bg-fg/[0.03] px-4 py-6 text-center text-xs text-fg/40"
+        >
           {emptyReason}
         </div>
+      )}
+      {/* Drag-to-resize edges: right = width (lg+, where spans apply), bottom =
+          height. A live badge shows the value while dragging. */}
+      <span
+        {...widthHandle}
+        role="slider"
+        aria-label={`Drag to set ${label} width`}
+        aria-valuenow={widget.span}
+        aria-valuemin={1}
+        aria-valuemax={GRID_COLUMNS}
+        className="absolute top-1/2 right-0 hidden h-12 w-2 -translate-y-1/2 cursor-col-resize touch-none rounded-full bg-fg/10 transition-colors hover:bg-violet-400/70 lg:block"
+      />
+      <span
+        {...heightHandle}
+        role="slider"
+        aria-label={`Drag to set ${label} height`}
+        aria-valuenow={widget.height ?? 0}
+        aria-valuemin={MIN_WIDGET_HEIGHT}
+        aria-valuemax={MAX_WIDGET_HEIGHT}
+        className="absolute bottom-0 left-1/2 h-2 w-12 -translate-x-1/2 cursor-row-resize touch-none rounded-full bg-fg/10 transition-colors hover:bg-violet-400/70"
+      />
+      {drag && (
+        <span
+          className={`pointer-events-none absolute z-20 rounded-md bg-violet-500 px-1.5 py-0.5 text-[10px] font-medium text-white tabular-nums ${
+            drag.kind === "width"
+              ? "top-1/2 right-3 -translate-y-1/2"
+              : "bottom-3 left-1/2 -translate-x-1/2"
+          }`}
+        >
+          {drag.kind === "width" ? `${drag.value}/${GRID_COLUMNS}` : `${drag.value}px`}
+        </span>
       )}
     </div>
   );
 }
 
-// The fixed bottom pill shown while editing: the UI scale stepper, autosave
-// state, revert to how the layout looked when edit mode was entered, and done.
+// The fixed bottom pill shown while editing: the UI scale stepper, the grid gap
+// stepper, autosave state, revert to how the layout looked when edit mode was
+// entered, and done.
 export function EditToolbar({
   status,
   error,

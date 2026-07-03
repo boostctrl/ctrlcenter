@@ -86,11 +86,17 @@ export const MAX_WIDGET_HEIGHT = 800;
 export const DEFAULT_WIDGET_HEIGHT = 320;
 export const WIDGET_HEIGHT_STEP = 20;
 
-// Per-widget extra space below a card (px), on top of the grid gap — for
-// deliberately spacing one card from the next (e.g. under the header). Absent
-// = none.
-export const MAX_WIDGET_SPACE_BELOW = 200;
+// Per-widget extra space around a card (px), on top of the grid gap — for
+// deliberately spacing one card from its neighbours on any side (e.g. above the
+// header, or beside a card sharing its row). Each side is independent; absent =
+// none on that side.
+export const MAX_WIDGET_SPACE = 200;
 export const WIDGET_SPACE_STEP = 8;
+// The sides a card's `space` can carry, in the order the editor's directional
+// control lays them out.
+export const SPACE_SIDES = ["top", "right", "bottom", "left"] as const;
+export type SpaceSide = (typeof SPACE_SIDES)[number];
+export type WidgetSpace = Partial<Record<SpaceSide, number>>;
 
 // The grid's vertical gap between cards (px). One value for the whole board,
 // tunable from the edit toolbar. Column spacing stays fixed.
@@ -117,8 +123,10 @@ export type LayoutWidget = {
   hideLabel?: boolean;
   // Explicit card height in px (the card is exactly this tall); absent = auto.
   height?: number;
-  // Extra space below the card in px (beyond the grid gap); absent = none.
-  spaceBelow?: number;
+  // Extra space (px, beyond the grid gap) on any side of the card; absent sides
+  // and an absent object both mean none. Replaces the pre-1.8.1 `spaceBelow`,
+  // which resolves into `space.bottom`.
+  space?: WidgetSpace;
 };
 
 export const WIDGET_LABELS: Record<LayoutWidgetId, string> = {
@@ -264,13 +272,24 @@ function isHeight(v: unknown): v is number {
   );
 }
 
-function isSpaceBelow(v: unknown): v is number {
+// One side's spacing value: a positive integer within the cap.
+function isSpaceValue(v: unknown): v is number {
   return (
-    typeof v === "number" &&
-    Number.isInteger(v) &&
-    v >= 1 &&
-    v <= MAX_WIDGET_SPACE_BELOW
+    typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= MAX_WIDGET_SPACE
   );
+}
+
+// A valid `space` object, keeping only the sides carrying an in-range value.
+// Returns undefined when nothing valid remains, so an entry with no spacing
+// stays clean (no empty object persisted).
+function coerceSpace(v: unknown): WidgetSpace | undefined {
+  if (typeof v !== "object" || v === null) return undefined;
+  const raw = v as Record<string, unknown>;
+  const out: WidgetSpace = {};
+  for (const side of SPACE_SIDES) {
+    if (isSpaceValue(raw[side])) out[side] = raw[side] as number;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 function legacyHidden(
@@ -303,6 +322,7 @@ export function resolveLayoutWidgets(
         cards?: unknown;
         hideLabel?: unknown;
         height?: unknown;
+        space?: unknown;
         spaceBelow?: unknown;
       }[]
     | undefined,
@@ -323,6 +343,13 @@ export function resolveLayoutWidgets(
       typeof item.hidden === "boolean"
         ? item.hidden
         : (legacyHidden(id, components) ?? false);
+    // A valid `space` wins; otherwise migrate a legacy pre-1.8.1 `spaceBelow`
+    // into `space.bottom` so older configs keep their spacing.
+    const space =
+      coerceSpace(item.space) ??
+      (isSpaceValue(item.spaceBelow)
+        ? { bottom: item.spaceBelow as number }
+        : undefined);
     listed.push({
       id,
       span,
@@ -332,9 +359,7 @@ export function resolveLayoutWidgets(
         ? { hideLabel: item.hideLabel }
         : {}),
       ...(isHeight(item.height) ? { height: item.height } : {}),
-      ...(isSpaceBelow(item.spaceBelow)
-        ? { spaceBelow: item.spaceBelow }
-        : {}),
+      ...(space ? { space } : {}),
     });
   }
   const missing = (ids: readonly LayoutWidgetId[]) =>

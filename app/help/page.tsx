@@ -416,22 +416,24 @@ export default async function HelpPage() {
             <P>
               Toggle what appears on the dashboard: the greeting, clock, search
               box, apps, bookmarks, the favorites row, and the floating
-              navigation menu. You can also reorder these sections and set each
-              one&apos;s width, so two or three can share a row. When a widget
-              doesn&apos;t reach the end of its row, a <strong>Fill</strong>{" "}
-              button widens it to close the gap, and any space still left over
-              is backfilled automatically by the next card that fits. On the
-              live page the cards also pack vertically, so a short card rises
-              into the space beside a taller neighbour instead of leaving a gap.
-              Every widget can take an explicit <strong>height</strong> — taller
-              than its content to give it presence (the greeting and header card
-              center in it, restoring the classic header) or shorter so a long
-              list scrolls inside. A <strong>space-below</strong> stepper adds
-              padding under a specific card, and the toolbar&apos;s{" "}
-              <strong>spacing</strong> control sets the gap between all cards.
-              Each titled section has a <strong>Label on/off</strong> toggle to
-              hide its heading. Weather, the status row, and the calendar have
-              their own enables alongside their setup.
+              navigation menu. Reorder sections by dragging the{" "}
+              <strong>⠿</strong> grip (or the move arrows), and resize a card by
+              dragging its right edge to set the <strong>width</strong> or its
+              bottom edge to set the <strong>height</strong> — the steppers do
+              the same by exact steps. When a widget doesn&apos;t reach the end
+              of its row, a <strong>Fill</strong> button widens it to close the
+              gap. Cards pack up their columns and{" "}
+              <strong>the editor previews exactly what the live page shows</strong>
+              , staying in the order you place them. An explicit{" "}
+              <strong>height</strong> makes a card taller than its content to
+              give it presence (the greeting and header card center in it,
+              restoring the classic header) or shorter so a long list scrolls
+              inside. The <strong>More</strong> menu on each card adds{" "}
+              <strong>space on any side</strong> (above, below, or beside a card
+              sharing its row), sets cards-per-row, and hides a section&apos;s
+              heading; the toolbar&apos;s <strong>spacing</strong> control sets
+              the gap between all cards. Weather, the status row, and the
+              calendar have their own enables alongside their setup.
             </P>
           </Card>
 

@@ -45,6 +45,7 @@ import {
   fillSpan,
   type LayoutWidget,
   type LayoutWidgetId,
+  type SpaceSide,
 } from "@/lib/layout";
 import { useEditMode } from "./EditMode";
 import { useAutosave } from "./admin/useAutosave";
@@ -286,14 +287,22 @@ export default function Dashboard({
         return rest;
       })
     );
-  // Extra space below a widget (px); undefined/0 clears it (key dropped).
-  const setWidgetSpaceBelow = (id: LayoutWidgetId, space: number | undefined) =>
+  // Extra space (px) on one side of a widget; undefined/0 clears that side. An
+  // emptied `space` object is dropped so stored entries stay clean (like cards).
+  const setWidgetSpace = (
+    id: LayoutWidgetId,
+    side: SpaceSide,
+    value: number | undefined
+  ) =>
     mutateSections(
       layout.sections.map((w) => {
         if (w.id !== id) return w;
-        if (space) return { ...w, spaceBelow: space };
+        const nextSpace = { ...(w.space ?? {}) };
+        if (value) nextSpace[side] = value;
+        else delete nextSpace[side];
         const rest = { ...w };
-        delete rest.spaceBelow;
+        if (Object.keys(nextSpace).length > 0) rest.space = nextSpace;
+        else delete rest.space;
         return rest;
       })
     );
@@ -319,20 +328,22 @@ export default function Dashboard({
         return { ...w, hideLabel: true };
       })
     );
-  const { handlers, dragIndex, over } = useFlowReorder(moveWidget);
-  // Drives the grid's vertical layout: masonry packing in view mode (so short
-  // cards don't strand gaps), plain flow while editing, honoring the grid gap,
-  // per-widget heights and space-below. The signature re-runs it when any of
-  // those change.
+  const { gripHandlers, dropHandlers, dragIndex, over } =
+    useFlowReorder(moveWidget);
+  // Drives the grid's vertical layout: deterministic masonry packing on lg+ (in
+  // both the editor and the live page, so the preview matches), single-column
+  // flow below lg — honoring the grid gap, per-widget heights and per-side
+  // space. The signature (which includes edit mode, since the editor's frames
+  // are taller than live cards) re-runs it when any of those change.
   const gridSignature =
     `${layout.gap}|${editing ? 1 : 0}|` +
     layout.sections
-      .map(
-        (w) =>
-          `${w.id}:${w.span}:${w.hidden ? 1 : 0}:${w.height ?? ""}:${w.spaceBelow ?? ""}`
-      )
+      .map((w) => {
+        const s = w.space ?? {};
+        return `${w.id}:${w.span}:${w.hidden ? 1 : 0}:${w.height ?? ""}:${s.top ?? ""}.${s.right ?? ""}.${s.bottom ?? ""}.${s.left ?? ""}`;
+      })
       .join(",");
-  useGridLayout(gridRef, editing, layout.gap, gridSignature);
+  useGridLayout(gridRef, layout.gap, gridSignature);
 
   function doneEditing() {
     setEditing(false);
@@ -603,13 +614,12 @@ export default function Dashboard({
     <>
       {/* Vertical layout (row-gap, per-cell row-span and margins) is driven by
           useGridLayout, not this class — the gap-y here is only a pre-hydration
-          fallback. Dense flow backfills a partial row in view mode; the editor
-          keeps strict flow so hidden widgets don't reshuffle the preview. */}
+          fallback. Sparse (non-dense) flow keeps cards in the order they're
+          placed while still packing them up their columns, so the arrangement is
+          deterministic and the editor previews exactly what ships. */}
       <div
         ref={gridRef}
-        className={`grid grid-cols-1 gap-x-8 gap-y-8 lg:grid-cols-24 lg:items-start ${
-          editing ? "" : "lg:grid-flow-row-dense"
-        }`}
+        className="grid grid-cols-1 gap-x-8 gap-y-8 lg:grid-cols-24 lg:items-start"
       >
         {layout.sections.map((widget, index) => {
           const node = blockFor(widget);
@@ -631,7 +641,10 @@ export default function Dashboard({
                 key={widget.id}
                 className={`${cellClass} ${heightClass}`}
                 style={heightStyle}
-                data-space-below={widget.spaceBelow || undefined}
+                data-space-top={widget.space?.top || undefined}
+                data-space-right={widget.space?.right || undefined}
+                data-space-bottom={widget.space?.bottom || undefined}
+                data-space-left={widget.space?.left || undefined}
               >
                 {node}
               </div>
@@ -659,10 +672,11 @@ export default function Dashboard({
               onSpan={setWidgetSpan}
               onCards={setWidgetCards}
               onHeight={setWidgetHeight}
-              onSpaceBelow={setWidgetSpaceBelow}
+              onSpace={setWidgetSpace}
               onToggleHidden={toggleWidgetHidden}
               onToggleLabel={toggleWidgetLabel}
-              dragHandlers={handlers(index)}
+              gripHandlers={gripHandlers(index)}
+              dropHandlers={dropHandlers(index)}
               dragging={dragIndex === index}
               dropSide={
                 over?.index === index && dragIndex !== index ? over.side : null

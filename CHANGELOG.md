@@ -12,6 +12,27 @@ here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The layout editor now shows exactly what the live page will look like.**
+  Cards pack up their columns while you arrange them — the same way they do on
+  the live page — and they stay in the order you place them instead of
+  reshuffling as you make small changes. No more tuning the layout and getting a
+  different result after you hit Done. (#92)
+- **Space a card on any side, not just below.** The per-card spacing control now
+  adds room above, below, or beside a card (for cards that share a row), so you
+  can separate sections in the direction you actually need. Spacing you set in an
+  earlier version is kept as space below the card. (#92)
+
+### Changed
+
+- **Resize cards by dragging their edges.** Drag a card's right edge to set its
+  width and its bottom edge to set its height, right on the dashboard — the
+  steppers are still there for precise, keyboard-friendly adjustments. The
+  less-used controls (per-side spacing, cards-per-row, heading on/off) now live
+  behind a tidy **More** menu on each card, so the editor is far less cluttered.
+  (#92)
+
 ## [1.8.0] - 2026-07-03
 
 ### Added
