@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [1.8.1] - 2026-07-03
+
 ### Fixed
 
 - **The layout editor now shows exactly what the live page will look like.**
@@ -1220,7 +1222,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.8.0...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.8.1...HEAD
+[1.8.1]: https://github.com/boostctrl/ctrlcenter/compare/v1.8.0...v1.8.1
 [1.8.0]: https://github.com/boostctrl/ctrlcenter/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/boostctrl/ctrlcenter/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/boostctrl/ctrlcenter/compare/v1.5.0...v1.6.0
