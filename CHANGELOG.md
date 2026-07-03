@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-07-03
+
 ### Added
 
 - **Announcement banner.** A purpose-built banner across the top of every page
@@ -1175,7 +1177,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/boostctrl/ctrlcenter/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/boostctrl/ctrlcenter/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/boostctrl/ctrlcenter/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/boostctrl/ctrlcenter/compare/v1.4.0...v1.4.1
