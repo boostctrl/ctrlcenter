@@ -1,5 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
+import { TIMELINE_BARS } from "./status";
 import type {
   StatusResult,
   StatusHistory,
@@ -42,12 +43,8 @@ function localDayStr(ms: number, timeZone: string): string {
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
-// `YYYY-MM-DDThh` for an hourly bar's `at`.
-function hourStr(hour: number): string {
-  return new Date(hour * HOUR_MS).toISOString().slice(0, 13);
-}
-
-// `YYYY-MM-DDThh:mm` for a single recent poll's `at`.
+// `YYYY-MM-DDThh:mm` for a sub-day bar's `at` (a UTC instant; formatBarLabel
+// converts it to the visitor's zone).
 function minuteStr(ts: number): string {
   return new Date(ts).toISOString().slice(0, 16);
 }
@@ -55,13 +52,67 @@ function minuteStr(ts: number): string {
 // One raw reading: timestamp (ms) + whether the app was up.
 export type Reading = { t: number; up: boolean };
 
-// The last hour of raw readings as one bar each (oldest → newest); each bar is
-// binary — 100 when up, 0 when down — so a single poll reads as green/red.
-export function recentBars(readings: Reading[], sinceMs: number): BarPoint[] {
-  return readings
-    .filter((r) => r.t >= sinceMs)
-    .sort((a, b) => a.t - b.t)
-    .map((r) => ({ at: minuteStr(r.t), uptime: r.up ? 100 : 0 }));
+// Resample raw readings into `bars` equal time buckets over [startMs, endMs),
+// oldest → newest, for the 1h view. Each bucket's uptime is the up-share of the
+// readings that fall in it, or null when none do (so a gap reads as empty, not
+// down). Every range uses the same bucket count so the strip keeps its size.
+export function fixedBarsFromReadings(
+  readings: Reading[],
+  startMs: number,
+  endMs: number,
+  bars: number
+): BarPoint[] {
+  const span = (endMs - startMs) / bars;
+  const acc = Array.from({ length: bars }, () => ({ up: 0, total: 0 }));
+  for (const r of readings) {
+    if (r.t < startMs) continue;
+    const i = Math.min(bars - 1, Math.floor((r.t - startMs) / span));
+    acc[i].total++;
+    if (r.up) acc[i].up++;
+  }
+  return acc.map((a, i) => ({
+    at: minuteStr(startMs + i * span),
+    uptime: a.total === 0 ? null : (a.up / a.total) * 100,
+  }));
+}
+
+// Resample hourly up/down buckets into `bars` equal time buckets over
+// [startMs, endMs), weighting each hour by how much of it overlaps a bucket.
+// One rule covers both directions: wide ranges (a bucket spans many hours) sum
+// the hours inside it, while a sub-hour bucket takes its covering hour's ratio
+// unchanged — so every bucket is filled (no gaps) whatever the range. `atOf`
+// stamps each bucket's label instant. Uptime is null where no hour had data.
+export function fixedBarsFromBuckets(
+  buckets: Bucket[],
+  startMs: number,
+  endMs: number,
+  bars: number,
+  atOf: (ms: number) => string
+): BarPoint[] {
+  const span = (endMs - startMs) / bars;
+  const acc = Array.from({ length: bars }, () => ({ up: 0, down: 0 }));
+  for (const b of buckets) {
+    const hStart = b.hour * HOUR_MS;
+    const lo = Math.max(hStart, startMs);
+    const hi = Math.min(hStart + HOUR_MS, endMs);
+    if (hi <= lo) continue; // hour outside the window
+    for (let i = Math.floor((lo - startMs) / span); i < bars; i++) {
+      const bStart = startMs + i * span;
+      if (bStart >= hi) break;
+      const overlap = Math.min(bStart + span, hi) - Math.max(bStart, lo);
+      if (overlap <= 0) continue;
+      const w = overlap / HOUR_MS;
+      acc[i].up += b.up * w;
+      acc[i].down += b.down * w;
+    }
+  }
+  return acc.map((a, i) => {
+    const total = a.up + a.down;
+    return {
+      at: atOf(startMs + i * span),
+      uptime: total === 0 ? null : (a.up / total) * 100,
+    };
+  });
 }
 
 // Uptime % (0–100) across readings at/after `sinceMs`, or null if none.
@@ -86,58 +137,6 @@ export function uptimePct(buckets: Bucket[], sinceHour: number): number | null {
     total += b.up + b.down;
   }
   return total === 0 ? null : (up / total) * 100;
-}
-
-// A timeline of the last `days` calendar days in `timeZone` (oldest → newest),
-// each with that day's uptime % or null when nothing was recorded. Grouping by
-// the visitor's local day (not UTC) keeps the chart aligned with their calendar
-// — an hourly bucket near midnight counts toward the local day it falls in.
-export function dailyTimeline(
-  buckets: Bucket[],
-  days: number,
-  now: number,
-  timeZone: string
-): BarPoint[] {
-  const byDay = new Map<string, { up: number; down: number }>();
-  for (const b of buckets) {
-    const date = localDayStr(b.hour * HOUR_MS, timeZone);
-    const cur = byDay.get(date) ?? { up: 0, down: 0 };
-    cur.up += b.up;
-    cur.down += b.down;
-    byDay.set(date, cur);
-  }
-  // Enumerate the last `days` calendar dates ending on today (local). Anchor each
-  // at a UTC midnight and step by whole UTC days so the enumeration is DST-proof
-  // (no local-midnight arithmetic), then match against the local-day keys above.
-  const [ty, tm, td] = localDayStr(now, timeZone).split("-").map(Number);
-  const cursor = Date.UTC(ty, tm - 1, td);
-  const out: BarPoint[] = [];
-  for (let i = days - 1; i >= 0; i--) {
-    const date = new Date(cursor - i * DAY_MS).toISOString().slice(0, 10);
-    const d = byDay.get(date);
-    const total = d ? d.up + d.down : 0;
-    out.push({ at: date, uptime: total === 0 ? null : (d!.up / total) * 100 });
-  }
-  return out;
-}
-
-// A timeline of the last `hours` hours (oldest → newest), one bar each, so recent
-// activity is visible within the day (not only as days accrue).
-export function hourlyTimeline(
-  buckets: Bucket[],
-  hours: number,
-  nowHour: number
-): BarPoint[] {
-  const byHour = new Map<number, { up: number; down: number }>();
-  for (const b of buckets) byHour.set(b.hour, { up: b.up, down: b.down });
-  const out: BarPoint[] = [];
-  for (let i = hours - 1; i >= 0; i--) {
-    const hour = nowHour - i;
-    const d = byHour.get(hour);
-    const total = d ? d.up + d.down : 0;
-    out.push({ at: hourStr(hour), uptime: total === 0 ? null : (d!.up / total) * 100 });
-  }
-  return out;
 }
 
 // Day-scale windows from the hourly buckets. `h1` is added at read time from the
@@ -283,15 +282,17 @@ export function flush(): Promise<void> {
   return state.flushQueue as Promise<void>;
 }
 
-// Read history for the given app ids (preserving order) as the API payload — the
-// last hour of per-poll bars + 24h of hourly bars + a 90-day daily timeline +
-// uptime windows (h1 from the raw ring, the rest from the hourly buckets). The
-// daily timeline is bucketed by `timeZone`'s calendar day so the chart lines up
-// with the visitor's local days; defaults to UTC when no zone is given.
+// Read history for the given app ids (preserving order) as the API payload:
+// uptime windows (h1 from the raw ring, the rest from the hourly buckets) plus
+// one fixed-length bar strip per range. Every strip is TIMELINE_BARS long — the
+// 1h view resamples the raw ring, the day-scale views resample the hourly
+// buckets — so all four ranges draw an identically-sized heartbeat. The day
+// labels use `timeZone`'s calendar date; defaults to UTC when no zone is given.
 export function getHistory(ids: string[], timeZone = "UTC"): StatusHistory {
   const now = Date.now();
   const nowHour = hourOf(now);
   const recentSince = now - RECENT_VIEW_MS;
+  const dayAt = (ms: number) => localDayStr(ms, timeZone);
   const apps = ids.map((id) => {
     const m = state.store.get(id);
     const buckets: Bucket[] = m
@@ -304,9 +305,12 @@ export function getHistory(ids: string[], timeZone = "UTC"): StatusHistory {
         h1: recentPct(readings, recentSince),
         ...dayWindows(buckets, nowHour),
       },
-      recent: recentBars(readings, recentSince),
-      hourly: hourlyTimeline(buckets, 24, nowHour),
-      daily: dailyTimeline(buckets, 90, now, timeZone),
+      series: {
+        h1: fixedBarsFromReadings(readings, recentSince, now, TIMELINE_BARS),
+        d1: fixedBarsFromBuckets(buckets, now - DAY_MS, now, TIMELINE_BARS, minuteStr),
+        d30: fixedBarsFromBuckets(buckets, now - 30 * DAY_MS, now, TIMELINE_BARS, dayAt),
+        d90: fixedBarsFromBuckets(buckets, now - 90 * DAY_MS, now, TIMELINE_BARS, dayAt),
+      },
     };
   });
   return { generatedAt: Date.now(), apps };

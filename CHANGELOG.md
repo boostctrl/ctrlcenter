@@ -23,6 +23,13 @@ here.
   **Label on/off** control in the layout editor to hide its heading while
   keeping the card itself. (#86)
 
+### Changed
+
+- **Consistent status timeline length.** The uptime heartbeat now draws the
+  same number of equally-sized pills for every range, so the strip keeps its
+  size when you switch between 1h, 24h, 30d and 90d — only the data underneath
+  changes, instead of the bar stretching or shrinking per range. (#85)
+
 ## [1.6.0] - 2026-07-02
 
 ### Added

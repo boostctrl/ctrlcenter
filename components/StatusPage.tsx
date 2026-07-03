@@ -66,20 +66,19 @@ function StateDot({ status }: { status: AppStatus | undefined }) {
   );
 }
 
-// Uptime heartbeat timeline (Atlassian Statuspage / UptimeRobot style). Hourly
-// or daily bars depending on the selected range. Every bar is the same slim
-// capsule regardless of how many the range yields (bars cap at max-w-2 instead
-// of stretching into bricks on sparse ranges), and the strip anchors to the
-// right edge so "now" stays put under the uptime figure when switching ranges.
-// Tooltips read in the visitor's time zone (see formatBarLabel), matching the
-// rest of the app.
+// Uptime heartbeat timeline (Atlassian Statuspage / UptimeRobot style). The
+// server resamples every range into the same fixed number of bars (TIMELINE_BARS),
+// so the strip is the same length with equally-sized pills whatever range is
+// selected — the data under it changes, its shape doesn't. Bars share the width
+// evenly (flex-1) and fill the row. Tooltips read in the visitor's time zone
+// (see formatBarLabel), matching the rest of the app.
 function Timeline({ points, timeZone }: { points: BarPoint[]; timeZone: string }) {
   if (points.length === 0) return null;
   return (
-    <div className="flex h-7 items-stretch justify-end gap-0.5">
+    <div className="flex h-7 items-stretch gap-0.5">
       {points.map((p, i) => (
         // Position-unique key: bars are a fixed positional sequence, and two
-        // recent readings can share a minute-level `at`. A bare `p.at` key then
+        // buckets can share a minute-level `at`. A bare `p.at` key then
         // duplicates, corrupting reconciliation so a stale bar from the previous
         // range (e.g. 1h) lingers at the far end when switching views.
         <span
@@ -89,7 +88,7 @@ function Timeline({ points, timeZone }: { points: BarPoint[]; timeZone: string }
               ? `${formatBarLabel(p.at, timeZone)}: no data`
               : `${formatBarLabel(p.at, timeZone)}: ${p.uptime.toFixed(1)}% up`
           }
-          className={`max-w-2 flex-1 rounded-full ${uptimeColor(p.uptime)}`}
+          className={`min-w-0 flex-1 rounded-full ${uptimeColor(p.uptime)}`}
         />
       ))}
     </div>
@@ -232,13 +231,7 @@ export default function StatusPage({
               const s = statuses.get(app.id);
               const h = history.get(app.id);
               const uptime = h ? h.uptime[range as keyof UptimeWindows] : null;
-              const dailyCount = range === "d30" ? 30 : 90;
-              const series =
-                range === "h1"
-                  ? (h?.recent ?? [])
-                  : range === "d1"
-                    ? (h?.hourly ?? [])
-                    : (h?.daily ?? []).slice(-dailyCount);
+              const series = h?.series[range] ?? [];
               const detail = !s
                 ? "Checking…"
                 : s.up

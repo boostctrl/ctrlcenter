@@ -94,6 +94,13 @@ export const STATUS_RANGE_KEYS = STATUS_RANGES.map((r) => r.key) as [
   ...StatusRangeKey[],
 ];
 
+// Every timeline renders this many bars, whatever the range: the server buckets
+// each range's window into the same fixed count so all four views draw an
+// identically-sized heartbeat strip instead of a different length (and pill
+// size) per range. 60 keeps the 1h view near its native per-minute cadence
+// (the poller ticks once a minute) while staying legible for 90 days.
+export const TIMELINE_BARS = 60;
+
 // One bar in a timeline: uptime % for that bucket, or null if nothing was
 // recorded (server off, or before this app existed). `at` is `YYYY-MM-DD` for a
 // daily bar, `YYYY-MM-DDThh` for an hourly one, or `YYYY-MM-DDThh:mm` for a
@@ -132,9 +139,11 @@ export function formatBarLabel(at: string, timeZone: string): string {
 export type AppHistory = {
   id: string;
   uptime: UptimeWindows;
-  recent: BarPoint[]; // last hour, one bar per poll
-  hourly: BarPoint[]; // recent (last 24h), one bar per hour
-  daily: BarPoint[]; // last 90 days, one bar per day
+  // One fixed-length bar strip per range (each TIMELINE_BARS long), so switching
+  // ranges swaps the data under a strip that keeps its size. Built server-side
+  // by resampling the raw ring (1h) or the hourly buckets (24h/30d/90d) into
+  // equal time buckets — see fixedBars* in status-history.ts.
+  series: Record<StatusRangeKey, BarPoint[]>;
 };
 
 // The /api/status/history payload.
