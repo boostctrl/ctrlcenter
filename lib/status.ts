@@ -97,9 +97,10 @@ export const STATUS_RANGE_KEYS = STATUS_RANGES.map((r) => r.key) as [
 // Every timeline renders this many bars, whatever the range: the server buckets
 // each range's window into the same fixed count so all four views draw an
 // identically-sized heartbeat strip instead of a different length (and pill
-// size) per range. 60 keeps the 1h view near its native per-minute cadence
-// (the poller ticks once a minute) while staying legible for 90 days.
-export const TIMELINE_BARS = 60;
+// size) per range. The pills are flex-1 within a fixed-width strip, so this
+// count sets how many/how wide the pills are without changing the strip's
+// footprint — fewer, wider pills read more cleanly than a dense comb.
+export const TIMELINE_BARS = 30;
 
 // One bar in a timeline: uptime % for that bucket, or null if nothing was
 // recorded (server off, or before this app existed). `at` is `YYYY-MM-DD` for a

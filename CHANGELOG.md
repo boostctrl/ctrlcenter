@@ -23,6 +23,9 @@ here.
   padding beneath a specific card — so you can space the dashboard the way you
   want. (#90)
 
+- **Bolder status heartbeat.** The uptime timeline now draws 30 wider pills per
+  range instead of 60, filling the same strip — easier to read at a glance. (#91)
+
 ### Fixed
 
 - **The header follows its old layout again.** After the vertical-packing change
