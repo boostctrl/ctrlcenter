@@ -75,7 +75,7 @@ function StateDot({ status }: { status: AppStatus | undefined }) {
 function Timeline({ points, timeZone }: { points: BarPoint[]; timeZone: string }) {
   if (points.length === 0) return null;
   return (
-    <div className="flex h-7 items-stretch gap-0.5">
+    <div className="flex h-7 items-stretch gap-[3px]">
       {points.map((p, i) => (
         // Position-unique key: bars are a fixed positional sequence, and two
         // buckets can share a minute-level `at`. A bare `p.at` key then
@@ -269,12 +269,17 @@ export default function StatusPage({
                         <Timeline points={series} timeZone={timezone} />
                       </div>
                     )}
-                    <div className="shrink-0 text-right">
+                    {/* Fixed width so the heartbeat's right edge — and thus the
+                        whole strip — lands in the same place on every row,
+                        regardless of how wide the uptime figure or detail text
+                        is. Without it the flex-1 name column pushes each strip to
+                        a different position. */}
+                    <div className="w-32 shrink-0 text-right">
                       <p className="font-semibold tabular-nums">
                         {fmtPct(uptime)}
                       </p>
                       <p
-                        className={`text-xs ${
+                        className={`truncate text-xs ${
                           s && !s.up ? "text-red-400" : "text-fg/45"
                         }`}
                       >

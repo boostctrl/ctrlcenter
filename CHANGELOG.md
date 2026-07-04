@@ -12,6 +12,13 @@ here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The status heartbeats now line up across every service.** Each service's
+  uptime strip starts and ends in the same place regardless of how wide its
+  uptime figure or status text is, and the pills have a touch more space between
+  them so the strip reads less crammed. (#93)
+
 ## [1.8.1] - 2026-07-03
 
 ### Fixed
