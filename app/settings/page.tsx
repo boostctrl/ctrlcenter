@@ -16,7 +16,7 @@ export default async function SettingsPage() {
   const packs = resolveThemePacks(themes);
   return (
     <>
-      <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-8 px-6 py-12 sm:px-10 lg:py-16">
+      <main className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 py-12 sm:px-10 lg:py-16">
       <div>
         <BackHome />
         <div className="mt-3 flex flex-wrap items-center justify-between gap-4">

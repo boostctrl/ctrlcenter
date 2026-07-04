@@ -18,7 +18,7 @@ export default async function WeatherPage() {
 
   return (
     <>
-      <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-8 px-6 py-12 sm:px-10 lg:py-16">
+      <main className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 py-12 sm:px-10 lg:py-16">
         <div>
           <BackHome />
           <h1 className="mt-3 text-3xl font-bold">Weather</h1>

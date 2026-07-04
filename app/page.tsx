@@ -76,7 +76,7 @@ export default async function HomePage({
   );
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-12 px-6 py-12 sm:px-10 lg:py-16">
+    <main className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-12 px-6 py-12 sm:px-10 lg:py-16">
       <StatusProvider enabled={statusEnabled}>
         <EditModeProvider isAdmin={isAdmin} initialEditing={initialEditing}>
           <Dashboard

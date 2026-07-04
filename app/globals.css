@@ -438,6 +438,13 @@
   --font-sans: var(--font-jakarta);
 }
 
+/* One source of truth for the max content width every page's <main> wrapper
+   uses (max-w-8xl): 90rem / 1440px. Extends Tailwind's container scale, which
+   tops out at 7xl (80rem) by default. */
+@theme {
+  --container-8xl: 90rem;
+}
+
 html,
 body {
   height: 100%;

@@ -12,6 +12,12 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **More room on large screens.** The page now uses up to 1440px of width
+  (was 1280px), so the dashboard and every other page make better use of a big
+  display while staying centered. Tablet and mobile layouts are unchanged. (#94)
+
 ### Fixed
 
 - **The status heartbeats now line up across every service.** Each service's

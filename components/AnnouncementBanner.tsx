@@ -125,7 +125,7 @@ export default function AnnouncementBanner({
   const { bg, color } = TONE[tone];
   return (
     <div className="border-b border-fg/10" style={{ background: bg }} role="status">
-      <div className="mx-auto flex max-w-7xl items-center gap-3 px-6 py-2.5 sm:px-10">
+      <div className="mx-auto flex max-w-8xl items-center gap-3 px-6 py-2.5 sm:px-10">
         <svg
           width="18"
           height="18"

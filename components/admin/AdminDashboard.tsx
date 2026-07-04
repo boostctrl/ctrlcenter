@@ -104,7 +104,7 @@ function AdminBody({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 py-12 sm:px-10">
+    <div className="mx-auto flex w-full max-w-8xl flex-col gap-8 px-6 py-12 sm:px-10">
       <div>
         <BackHome />
         <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
