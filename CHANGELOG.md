@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [1.8.2] - 2026-07-03
+
 ### Changed
 
 - **More room on large screens.** The page now uses up to 1440px of width
@@ -1239,7 +1241,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.8.1...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.8.2...HEAD
+[1.8.2]: https://github.com/boostctrl/ctrlcenter/compare/v1.8.1...v1.8.2
 [1.8.1]: https://github.com/boostctrl/ctrlcenter/compare/v1.8.0...v1.8.1
 [1.8.0]: https://github.com/boostctrl/ctrlcenter/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/boostctrl/ctrlcenter/compare/v1.6.0...v1.7.0
