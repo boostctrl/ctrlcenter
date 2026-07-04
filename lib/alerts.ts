@@ -1,4 +1,5 @@
 import type { AlertConfig, AlertEmailConfig, AlertType } from "./schema";
+import { log, hostOf, errorReason } from "./log";
 
 // Outbound uptime alerting. The background poller (lib/status-poller.ts) feeds
 // each tick's results through here; we detect down/recovery transitions and
@@ -179,9 +180,13 @@ async function sendAlert(req: AlertRequest): Promise<void> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ALERT_TIMEOUT_MS);
   try {
-    await fetch(req.url, { ...req.init, signal: controller.signal });
-  } catch {
-    // best-effort
+    const res = await fetch(req.url, { ...req.init, signal: controller.signal });
+    // The request didn't throw but the endpoint rejected it — surface that, or
+    // the alert silently "sent" while nothing was delivered.
+    if (!res.ok)
+      log.warn("alert webhook rejected", { host: hostOf(req.url), status: res.status });
+  } catch (e) {
+    log.warn("alert webhook failed", { host: hostOf(req.url), reason: errorReason(e) });
   } finally {
     clearTimeout(timer);
   }
@@ -214,8 +219,10 @@ async function sendEmailAlert(
     });
     const { subject, text, html } = buildEmailMessage(event, app, at, cfg.subject);
     await transport.sendMail({ from: cfg.from, to: cfg.to, subject, text, html });
-  } catch {
-    // best-effort: a mail failure must never disturb the poller
+  } catch (e) {
+    // best-effort: a mail failure must never disturb the poller, but log it so
+    // a silently-undelivered alert can be traced.
+    log.warn("alert email failed", { host: cfg.host, reason: errorReason(e) });
   }
 }
 
@@ -270,6 +277,12 @@ export async function processAlerts(
       const found = byId.get(e.id);
       if (!found) return [];
       const app = { name: found.name, url: found.url };
+      log.info("alert firing", {
+        app: found.name,
+        event: e.type,
+        webhook: sendWebhook,
+        email: sendEmail,
+      });
       const tasks: Promise<void>[] = [];
       if (sendWebhook)
         tasks.push(sendAlert(buildAlertRequest(config.type, webhookUrl, e, app, at)));

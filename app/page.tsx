@@ -38,31 +38,37 @@ export default async function HomePage({
   // side of now covers the current month plus its leading/trailing neighbour days
   // in any time zone.
   const calEnabled = cal.enabled && cal.url.trim() !== "";
-  const events = calEnabled
-    ? cal.homeView === "month"
-      ? await fetchCalendarRange(cal.url, now - 40 * DAY, now + 40 * DAY, calAuth)
-      : await fetchCalendar(cal.url, cal.count, calAuth)
-    : [];
-  // Whether the widget will actually render (matches CalendarWidget's own
-  // guards), so its layout cell isn't left empty when it won't.
-  const calendarVisible =
-    calEnabled && !(cal.hideWhenEmpty && events.length === 0);
-
-  // The RSS feed widget's items, fetched (and cached) server-side like the
-  // calendar's events.
   const feedCfg = settings.feed;
   const feedEnabled = feedCfg.enabled && feedCfg.url.trim() !== "";
-  const feed = feedEnabled ? await fetchFeed(feedCfg.url, feedCfg.count) : null;
+  const weather = settings.weather;
+
+  // Fetch the three third-party widgets (calendar, RSS feed, weather)
+  // concurrently rather than in series, so a slow upstream only costs its own
+  // time, not the sum. Each fetch is independently time-boxed and returns
+  // null/[] on failure, so one unresponsive service can never hang the render —
+  // the page loads and that widget simply degrades or fills in client-side.
+  const [events, feed, initialWeather] = await Promise.all([
+    calEnabled
+      ? cal.homeView === "month"
+        ? fetchCalendarRange(cal.url, now - 40 * DAY, now + 40 * DAY, calAuth)
+        : fetchCalendar(cal.url, cal.count, calAuth)
+      : Promise.resolve([]),
+    feedEnabled ? fetchFeed(feedCfg.url, feedCfg.count) : Promise.resolve(null),
+    weather.enabled
+      ? fetchWeather(weather.latitude, weather.longitude, weather.units)
+      : Promise.resolve(null),
+  ]);
+
+  // Whether the calendar widget will actually render (matches CalendarWidget's
+  // own guards), so its layout cell isn't left empty when it won't.
+  const calendarVisible =
+    calEnabled && !(cal.hideWhenEmpty && events.length === 0);
 
   // Server-computed seeds (admin default tz/location) so the SSR'd widgets have
   // real content before the client applies the visitor's effective prefs.
   const timeZone = settings.timezone || "UTC";
   const initialDate = shortDate(nowDate, timeZone);
   const initialGreeting = greetingFor(hourIn(nowDate, timeZone));
-  const weather = settings.weather;
-  const initialWeather = weather.enabled
-    ? await fetchWeather(weather.latitude, weather.longitude, weather.units)
-    : null;
 
   // Admin state only unlocks the layout-editor UI (saves go through the gated
   // settings API); ?edit=1 is the deep link from admin Settings → Layout.

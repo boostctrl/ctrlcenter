@@ -1,4 +1,5 @@
 import { readCapped } from "./fetch-body";
+import { log, hostOf, errorReason } from "./log";
 
 // Minimal RSS 2.0 / Atom reader for the home-page Feed widget. Hand-rolled (no
 // dependency) and deliberately forgiving: it pulls each entry's title, link and
@@ -151,6 +152,7 @@ async function requestFeed(
     return { feed, error: null };
   } catch (e) {
     const aborted = e instanceof Error && e.name === "AbortError";
+    log.warn("feed fetch error", { host: hostOf(target), reason: errorReason(e) });
     return { feed: null, error: aborted ? "Timed out" : "Couldn't connect" };
   } finally {
     clearTimeout(timer);

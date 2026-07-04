@@ -12,6 +12,22 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **Server-side logging.** Failures that used to be silent — a timed-out or
+  unreachable weather/RSS/calendar fetch, a rejected or undelivered alert — are
+  now logged to the container's output so problems are easier to trace. Set the
+  verbosity with the `LOG_LEVEL` environment variable (`debug`, `info`, `warn`,
+  `error`; default `info`). (#97)
+
+### Fixed
+
+- **The page no longer hangs when weather is slow.** Weather requests are now
+  time-boxed, and the home page fetches weather, the calendar, and the RSS feed
+  at the same time instead of one after another — so an unresponsive weather
+  service can't stall the whole page. The weather widget just fills in once it's
+  reachable. (#96)
+
 ## [1.8.2] - 2026-07-03
 
 ### Changed

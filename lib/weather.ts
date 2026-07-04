@@ -1,7 +1,17 @@
 // Shared Open-Meteo weather fetch + presentation helpers. Used both server-side
 // (to render the admin-default location into the initial HTML) and client-side
 // (to re-fetch when a visitor's detected/overridden location differs).
+import { log, hostOf, errorReason } from "./log";
+
 export type Units = "imperial" | "metric";
+
+// Cap every weather request so an unresponsive Open-Meteo can't hang the
+// server-rendered home page (or the /weather page) — without this the fetch has
+// no timeout and blocks the render until the socket eventually gives up. Kept
+// short: weather is a nice-to-have that the widget also re-fetches client-side,
+// so on a timeout the fetch aborts, we return null, and the page renders now
+// with the widget filling in (or hiding) rather than waiting on a slow upstream.
+const WEATHER_TIMEOUT_MS = 3000;
 
 export type CurrentWeather = {
   temperature: number;
@@ -22,12 +32,19 @@ export async function fetchWeather(
     timezone: "auto",
   });
 
+  const url = `https://api.open-meteo.com/v1/forecast?${params}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), WEATHER_TIMEOUT_MS);
   try {
-    const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, {
+    const res = await fetch(url, {
       // Server-side, cache for 30 min; the option is ignored in the browser.
       next: { revalidate: 1800 },
+      signal: controller.signal,
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      log.warn("weather fetch failed", { host: hostOf(url), status: res.status });
+      return null;
+    }
     const data = await res.json();
     const current = data.current;
     if (!current) return null;
@@ -48,8 +65,11 @@ export async function fetchWeather(
           : 0,
       code: current.weather_code,
     };
-  } catch {
+  } catch (e) {
+    log.warn("weather fetch error", { host: hostOf(url), reason: errorReason(e) });
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -119,11 +139,18 @@ export async function fetchForecast(
     forecast_days: "7",
   });
 
+  const url = `https://api.open-meteo.com/v1/forecast?${params}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), WEATHER_TIMEOUT_MS);
   try {
-    const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, {
+    const res = await fetch(url, {
       next: { revalidate: 1800 },
+      signal: controller.signal,
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      log.warn("forecast fetch failed", { host: hostOf(url), status: res.status });
+      return null;
+    }
     const data = await res.json();
     const current = data.current;
     const h = data.hourly;
@@ -177,8 +204,11 @@ export async function fetchForecast(
       hourly,
       daily,
     };
-  } catch {
+  } catch (e) {
+    log.warn("forecast fetch error", { host: hostOf(url), reason: errorReason(e) });
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 

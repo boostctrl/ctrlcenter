@@ -1,5 +1,6 @@
 import { isValidTimeZone } from "./datetime";
 import { readCapped } from "./fetch-body";
+import { log, hostOf, errorReason } from "./log";
 
 // Minimal iCalendar (RFC 5545) reader for the agenda widget. Hand-rolled (no
 // dependency) and deliberately small: it pulls upcoming VEVENTs (summary, start,
@@ -618,6 +619,7 @@ async function getIcs(
     return { text, error: null };
   } catch (e) {
     const aborted = e instanceof Error && e.name === "AbortError";
+    log.warn("calendar fetch error", { host: hostOf(target), reason: errorReason(e) });
     return { text: null, error: aborted ? "Timed out" : "Couldn't connect" };
   } finally {
     clearTimeout(timer);
