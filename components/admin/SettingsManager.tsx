@@ -34,23 +34,31 @@ async function saveSettings(settings: Settings): Promise<void> {
   }
 }
 
-// One nav entry per settings group; a single group shows at a time.
+// One nav entry per settings group; a single group shows at a time. Related
+// settings are grouped so the rail stays short: Appearance folds into General,
+// the content-card widgets share Widgets, and Status + Alerts share Monitoring.
 const SETTINGS_SECTIONS = [
   { id: "general", label: "General" },
-  { id: "announcement", label: "Announcement" },
-  { id: "appearance", label: "Appearance" },
-  { id: "layout", label: "Layout" },
-  { id: "search", label: "Search" },
-  { id: "status", label: "Status" },
-  { id: "alerts", label: "Alerts" },
+  { id: "layout", label: "Home layout" },
+  { id: "widgets", label: "Widgets" },
   { id: "weather", label: "Weather" },
-  { id: "calendar", label: "Calendar" },
-  { id: "feed", label: "RSS feed" },
-  { id: "notes", label: "Notes" },
-  { id: "countdown", label: "Countdown" },
+  { id: "monitoring", label: "Monitoring" },
+  { id: "search", label: "Search" },
+  { id: "announcement", label: "Announcement" },
   { id: "security", label: "Security" },
 ] as const;
 type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]["id"];
+
+// Groups that render more than one card: their cards flow into a two-column
+// masonry so they fill the width. The rest are single, simpler forms and are
+// centered at a comfortable reading width instead of stranded on the left.
+const MULTI_CARD_SECTIONS: readonly SettingsSectionId[] = [
+  "general",
+  "layout",
+  "widgets",
+  "monitoring",
+  "search",
+];
 
 const TONE_LABELS: Record<string, string> = {
   info: "Info",
@@ -69,7 +77,7 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="glass-card flex flex-col gap-4 p-5">
+    <section className="glass-card mb-4 flex break-inside-avoid flex-col gap-4 p-5">
       <div>
         <h3 className="text-xs font-semibold tracking-[0.15em] text-fg/45 uppercase">
           {title}
@@ -265,9 +273,10 @@ export default function SettingsManager({
 
   return (
     // Settings-page shell: a nav rail (horizontal pills on small screens, a
-    // sticky vertical rail on lg+) beside a single focused section, so any
-    // setting is one click away instead of somewhere down a masonry flow.
-    <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[11rem_minmax(0,42rem)] lg:gap-x-8">
+    // sticky vertical rail on lg+) beside a content area that fills the rest of
+    // the width, so any setting is one click away instead of somewhere down a
+    // masonry flow.
+    <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[12rem_minmax(0,1fr)] lg:gap-x-8">
       <nav
         aria-label="Settings sections"
         className="flex flex-wrap gap-1 lg:sticky lg:top-6 lg:flex-col lg:flex-nowrap lg:self-start lg:pt-7"
@@ -294,6 +303,15 @@ export default function SettingsManager({
           <SaveStatus status={status} error={error} />
         </div>
 
+        {/* Multi-card groups flow into two masonry columns to fill the width;
+            single-card groups are centered at a comfortable reading width. */}
+        <div
+          className={
+            MULTI_CARD_SECTIONS.includes(section)
+              ? "lg:columns-2 lg:gap-4"
+              : "lg:mx-auto lg:w-full lg:max-w-2xl"
+          }
+        >
         {section === "general" && (
         <Section title="General">
         <TextField
@@ -327,7 +345,7 @@ export default function SettingsManager({
         </Section>
         )}
 
-        {section === "appearance" && (
+        {section === "general" && (
         <Section
           title="Appearance"
           intro={
@@ -427,8 +445,8 @@ export default function SettingsManager({
 
         {section === "layout" && (
         <Section
-          title="Layout"
-          intro="Show or hide home-page widgets. Weather, the status row, and the calendar are toggled in their own sections; the split clock/weather/status widgets are managed in the home-page editor below."
+          title="Visible widgets"
+          intro="Show or hide home-page widgets. Weather, the status row, and the calendar are toggled in their own sections; the split clock/weather/status widgets are managed in the home-page editor."
         >
         <div className="flex flex-col gap-2.5">
           {widgetToggles.map((t) => (
@@ -464,26 +482,24 @@ export default function SettingsManager({
             /admin.
           </p>
         )}
+        </Section>
+        )}
 
-        <div className="mt-2 border-t border-fg/10 pt-4">
-          <span className="text-sm text-fg/70">Arrangement</span>
-          <p className="mt-1 mb-3 text-xs text-fg/40">
-            Widgets are arranged directly on the home page: drag to reorder,
-            resize from 1 to 12 columns, and show or hide everything in place —
-            including swapping the header card for the split clock, weather, and
-            status widgets.
-          </p>
+        {section === "layout" && (
+        <Section
+          title="Arrangement"
+          intro="Widgets are arranged directly on the home page: drag to reorder, resize by dragging a card's edges, and show or hide everything in place — including swapping the header card for the split clock, weather, and status widgets."
+        >
           <Link
             href="/?edit=1"
             className="inline-block rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10"
           >
             Arrange the home page
           </Link>
-        </div>
         </Section>
         )}
 
-        {section === "status" && (
+        {section === "monitoring" && (
         <Section title="Status">
         <div className="flex items-center justify-between gap-4">
           <div>
@@ -565,7 +581,7 @@ export default function SettingsManager({
         )}
 
         {section === "search" && (
-        <Section title="Search">
+        <Section title="Search engine">
         <div className="flex flex-col gap-2">
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-fg/50">Search bar engine</span>
@@ -604,9 +620,12 @@ export default function SettingsManager({
             here when nothing matches.
           </p>
         </div>
+        </Section>
+        )}
 
+        {section === "search" && (
+        <Section title="Custom bangs">
         <div className="flex flex-col gap-2">
-          <span className="text-sm text-fg/50">Custom search bangs</span>
           <p className="-mt-1 text-xs text-fg/40">
             Type <span className="text-fg/60">!key term</span> in the search bar
             to jump to a site (use <span className="text-fg/60">%s</span> for the
@@ -657,7 +676,7 @@ export default function SettingsManager({
         </Section>
         )}
 
-        {section === "alerts" && (
+        {section === "monitoring" && (
         <Section title="Alerts">
         <div className="flex items-center justify-between gap-4">
           <div>
@@ -982,7 +1001,7 @@ export default function SettingsManager({
         </Section>
         )}
 
-        {section === "calendar" && (
+        {section === "widgets" && (
         <Section title="Calendar">
         <div className="flex items-center justify-between gap-4">
           <div>
@@ -1106,7 +1125,7 @@ export default function SettingsManager({
         </Section>
         )}
 
-        {section === "feed" && (
+        {section === "widgets" && (
         <Section title="RSS feed">
         <div className="flex items-center justify-between gap-4">
           <div>
@@ -1165,7 +1184,7 @@ export default function SettingsManager({
         </Section>
         )}
 
-        {section === "notes" && (
+        {section === "widgets" && (
         <Section
           title="Notes"
           intro="A free-form note card for the home page. Ships hidden — show it in the home-page layout editor (or the Layout section above) once there's something to say."
@@ -1271,7 +1290,7 @@ export default function SettingsManager({
         </Section>
         )}
 
-        {section === "countdown" && (
+        {section === "widgets" && (
         <Section
           title="Countdown"
           intro="Labeled dates shown as “in N days” rows — renewals, birthdays, deadlines. Ships hidden — show the card in the home-page layout editor once dates are added."
@@ -1342,6 +1361,7 @@ export default function SettingsManager({
           <ChangePassword />
         </Section>
         )}
+        </div>
       </div>
     </div>
   );

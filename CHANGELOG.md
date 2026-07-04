@@ -17,6 +17,10 @@ here.
 - **More room on large screens.** The page now uses up to 1440px of width
   (was 1280px), so the dashboard and every other page make better use of a big
   display while staying centered. Tablet and mobile layouts are unchanged. (#94)
+- **Tidier admin Settings.** The Settings sections are grouped into fewer entries
+  (Appearance folds into General, the content widgets share one Widgets section,
+  and Status + Alerts share Monitoring), and each section now fills the width
+  instead of sitting in a narrow column with empty space beside it. (#95)
 
 ### Fixed
 
