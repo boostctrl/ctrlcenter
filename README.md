@@ -1,9 +1,9 @@
 # ctrlcenter
 
-A self-hosted **start page and service dashboard** — a fast, searchable home for
-every app and bookmark you run, with live status and alerts, weather, an agenda,
-and a theme system that's genuinely fun to make your own. One small YAML file, a
-built-in admin UI, and a single container.
+A self-hosted start page and service dashboard: a searchable home for the apps
+and bookmarks you run, with optional status checks and alerts, weather, an
+agenda, notes, countdowns, an RSS feed, and a theming system. Configured with a
+single YAML file (or the built-in admin UI) and shipped as one container.
 
 Built with Next.js 16, React 19, and Tailwind v4.
 
@@ -11,11 +11,10 @@ Built with Next.js 16, React 19, and Tailwind v4.
 
 ## Features
 
-- **Your apps & bookmarks — front and center.** A clean, fast grid of the services
-  you run: each a card with a crisp icon, name, and subtitle, one click from
-  launch — with category-grouped bookmarks in the same view. The dashboard is
-  built to get you where you're going in a keystroke:
-  - **Instant search** — press `/` to focus, filter apps *and* bookmarks as you
+- **Apps & bookmarks.** A grid of the services you run — each a card with an
+  icon, name, and subtitle, one click from launch — with category-grouped
+  bookmarks in the same view. To find things quickly:
+  - **Search** — press `/` to focus, filter apps *and* bookmarks as you
     type, `Enter` opens the top match, `Esc` clears.
   - **Bang shortcuts** — start a query with `!` to jump straight out: built-ins
     (`!gh`, `!yt`, `!w`, `!npm`, `!maps`, `!so`, …), your own custom bangs, and an
@@ -40,18 +39,20 @@ Built with Next.js 16, React 19, and Tailwind v4.
   ntfy) and/or by **email** over SMTP (works with SMTP2GO, Gmail, Fastmail, any
   relay), with flap-dampening confirmations so a single blip stays quiet.
 
-- **A real theme system.** Mix and match three independent axes and save the
-  result:
-  - **Designs** — the card surface: `glass`, `aero`, `flat`, `soft`, `minimal`,
-    `bold`, `cyber`, `clay`, `frost`, `outline`, `paper`, `gradient`.
-  - **Scenes** — an animated backdrop: `aurora`, `abyss`, `nebula`, `grid`,
-    `starfield`, `waves`, `rays`, `traces`, `dots`, `glow`, `vortex`, `mesh`
-    (all motion respects `prefers-reduced-motion`).
-  - **Colors & font** — a palette plus an accent gradient (or hand-pick your
-    own), and a UI font: `jakarta`, `inter`, `poppins`, `nunito`, `lora`,
-    `jetbrains`.
+- **Theming.** Combine three independent axes and save the result:
+  - **Designs** (18) — the card surface: `glass`, `aero`, `flat`, `soft`,
+    `minimal`, `bold`, `cyber`, `clay`, `frost`, `outline`, `paper`, `gradient`,
+    `aura`, `emboss`, `carve`, `stripe`, `sketch`, `console`.
+  - **Scenes** (18) — an animated backdrop: `aurora`, `abyss`, `nebula`, `grid`,
+    `starfield`, `waves`, `rays`, `traces`, `dots`, `horizon`, `orbit`, `peaks`,
+    `rain`, `fireflies`, `blueprint`, `prisms`, `petals`, `comets` (motion
+    respects `prefers-reduced-motion`).
+  - **Colors & font** — a palette plus an accent gradient (or your own colors),
+    and one of 12 UI fonts (`jakarta`, `inter`, `poppins`, `nunito`, `lora`,
+    `jetbrains`, `outfit`, `grotesk`, `manrope`, `rubik`, `playfair`,
+    `quicksand`).
 
-  Every look has a **cohesive light and dark variant**, and one-tap **Themes**
+  Each look carries its own light and dark variant, and one-tap **Themes**
   (Default, Mariana, Outrun, Observatory, Tide, …) bundle a palette, design, and
   scene together. The admin sets a site-wide default; each visitor can override
   any of it in their own browser.
@@ -64,39 +65,45 @@ Built with Next.js 16, React 19, and Tailwind v4.
 
 - **Agenda.** An **Upcoming** card pulls the next few events from any published
   iCal (`.ics`) URL — a Google Calendar secret address, Fastmail, Nextcloud, and
-  the like. Recurring events (daily/weekly/monthly, with exceptions) are expanded,
-  and times render in each visitor's own time zone.
+  the like (private CalDAV/WebDAV with credentials too). Recurring events
+  (daily/weekly/monthly, with exceptions) are expanded, and times render in each
+  visitor's own time zone.
+
+- **More home widgets.** A **Notes** card (a safe markdown subset), a
+  **Countdown** card ("in N days" to labeled dates), and an **RSS/Atom feed**
+  card — each optional and placed from the layout editor. Plus a site-wide
+  **announcement banner** for notices or maintenance windows, with a tone and an
+  optional visitor dismiss.
 
 - **Per-visitor personalization, no accounts.** Each visitor sets a greeting name,
   timezone, weather location/units, and their whole theme from **/settings** — all
   stored in their own browser, never on the server.
 
-- **A drag-and-drop home page.** Every widget — greeting, the clock/weather/status
-  header card (or each of those as its own separate widget), search, favorites,
-  apps, bookmarks, and the agenda — lives on a **24-column grid**. Signed-in
-  admins get an **Edit layout** mode right on the home page: drag widgets to
-  reorder, resize them from 1 to 24 columns wide, choose how many cards per row
-  the apps/bookmarks/favorites widgets show, scale the whole UI up or down, and
-  show or hide anything in place (keyboard- and touch-friendly controls
-  included, not just mouse drag).
+- **A drag-and-drop home page.** Every widget lives on a 24-column grid. Signed-in
+  admins get an **Edit layout** mode on the home page: reorder by dragging, resize
+  a card's width and height by dragging its edges, add per-side spacing, choose
+  how many cards per row the apps/bookmarks/favorites grids show, scale the whole
+  UI, and show or hide anything in place. The editor previews the same packed
+  layout the live page renders, and steppers back every drag for keyboard and
+  touch.
 
 - **Admin portal.** A password-gated UI to manage apps, bookmarks, and settings
-  without touching YAML: an icon picker with live preview and uploads, favicon
-  config, search engine and custom bangs, alerts, the agenda feed, and one-click
-  **Export/Import** of your whole config.
+  without touching YAML: an icon picker with uploads, favicon, search engine and
+  custom bangs, status checks and alerts, weather, the agenda, notes, countdowns,
+  the RSS feed, the announcement banner, and one-click **Export/Import** of the
+  whole config (uploaded icons included).
 
 - **Self-hosted & simple.** A single YAML config, a prebuilt multi-arch Docker
   image, an installable PWA manifest, and `/api/health` for orchestrators.
 
 ## AI disclaimer
 
-ctrlcenter is a **vibecoded project** — it is built primarily with AI coding
-tools. I have experience with scripting and some light coding, but I am not a
-developer. Security is taken seriously (see [SECURITY.md](SECURITY.md) for the
-policy and deployment guidance), and changes are reviewed and tested before
-release — but you should weigh how the project is built when deciding whether
-to deploy it. **Running this app is at your own risk**, and reviewing the code
-yourself before deploying is recommended.
+ctrlcenter is built primarily with AI coding tools. I have some scripting and
+light coding experience, but I'm not a professional developer. I try to follow
+reasonable security practices (see [SECURITY.md](SECURITY.md) for the policy and
+deployment guidance) and changes are tested before release, but the project is
+built this way — please weigh that when deciding whether to deploy it. **Run it
+at your own risk**, and review the code yourself first.
 
 ## Quick start (Docker Compose)
 
@@ -133,9 +140,9 @@ settings:
   timezone: America/Chicago # IANA timezone, used for the date + greeting
   theme:                    # site-wide default (visitors can override in /settings)
     mode: system            # system | light | dark
-    design: glass           # glass|aero|flat|soft|minimal|bold|cyber|clay|frost|outline|paper|gradient
-    scene: aurora           # aurora|abyss|nebula|grid|starfield|waves|rays|traces|dots|glow|vortex|mesh
-    font: jakarta           # jakarta | inter | poppins | nunito | lora | jetbrains
+    design: glass           # glass aero flat soft minimal bold cyber clay frost outline paper gradient aura emboss carve stripe sketch console
+    scene: aurora           # aurora abyss nebula grid starfield waves rays traces dots horizon orbit peaks rain fireflies blueprint prisms petals comets
+    font: jakarta           # jakarta inter poppins nunito lora jetbrains outfit grotesk manrope rubik playfair quicksand
     accentFrom: '#a78bfa'   # accent gradient start (#rrggbb)
     accentTo: '#22d3ee'     # accent gradient end (same as start = solid)
     # Optional fixed default colors (override light/dark mode). Set in pairs:
@@ -237,6 +244,8 @@ for reuse. You can also paste a direct image URL or a `data:` URI.
 | `SESSION_SECRET` | no | Secret used to sign session cookies. If unset, derived from `ADMIN_PASSWORD`. Recommended so sessions don't depend on the password. Generate with `openssl rand -base64 32`. |
 | `CONFIG_PATH` | no | Path to the config file (default `./config/config.yaml`; the container sets `/config/config.yaml`). The uptime history (`status-history.json`) and uploaded custom icons (`uploads/`) are written beside it. |
 | `CTRLCENTER_SMTP_PASS` | no | Overrides the email-alert SMTP password, so the secret can stay out of `config.yaml`. |
+| `CTRLCENTER_CALDAV_PASS` | no | Overrides the private-calendar (CalDAV/WebDAV) password, so that secret can stay out of `config.yaml` too. |
+| `LOG_LEVEL` | no | Server log verbosity: `debug`, `info` (default), `warn`, or `error`. Diagnostics — a timed-out weather/feed/calendar fetch, a rejected alert — are logged to the container's stdout/stderr. |
 | `TRUSTED_PROXY_HOPS` | no | Number of trusted reverse proxies in front of the app, used to find the real client IP in `X-Forwarded-For` for login throttling. Default `1` (the app sits behind one reverse proxy). **Set `0` if the app is exposed directly** — otherwise a client can spoof `X-Forwarded-For` to forge a fresh source IP per request and slip past the per-IP login throttle. A global attempt cap still applies as a backstop, but the per-IP limit is your first line of defense. |
 
 ## Development
