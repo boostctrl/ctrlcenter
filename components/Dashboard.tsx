@@ -688,7 +688,7 @@ export default function Dashboard({
   function emptyReason(id: LayoutWidgetId): string {
     switch (id) {
       case "headerCard":
-        return "Everything this card shows is off — enable the clock, weather, or status checks.";
+        return "Everything this card shows is off — enable the clock, weather, or status checks. The separate Clock, Weather and Status widgets are an alternative to this combined card.";
       case "clock":
         return "Date & clock is toggled off in the admin Layout settings.";
       case "weather":
@@ -762,12 +762,23 @@ export default function Dashboard({
           // An explicit height sizes the cell exactly: content widgets scroll
           // their overflow, the others center their content (so a sized greeting
           // sits centered beside the header card, restoring the classic header).
+          // Scrolling widgets keep their height at every size — they can't clip.
+          // The centering ones take it on lg+ only, like spans: below lg cells
+          // stack full-width, contents grow taller (the header card's rows
+          // stack), and a height tuned against the desktop row would silently
+          // crop them (#105) — auto height is what a phone wants there.
           const scrolls = SIZED_WIDGET_IDS.includes(widget.id);
-          const heightStyle = widget.height ? { height: widget.height } : undefined;
+          const heightStyle = widget.height
+            ? scrolls
+              ? { height: widget.height }
+              : ({
+                  "--widget-height": `${widget.height}px`,
+                } as React.CSSProperties)
+            : undefined;
           const heightClass = widget.height
             ? scrolls
               ? "overflow-y-auto"
-              : "flex flex-col justify-center overflow-hidden"
+              : "lg:flex lg:h-[var(--widget-height)] lg:flex-col lg:justify-center lg:overflow-hidden"
             : "";
           if (!editing) {
             return (

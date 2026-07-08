@@ -28,6 +28,20 @@ here.
 
 ### Fixed
 
+- **A sized header card no longer clips its status row on phones.** An
+  explicit card height is tuned against the desktop layout; below the
+  large-screen breakpoint the header card's contents stack taller and the
+  fixed height silently cropped the status row (a sized greeting could clip
+  the same way). Heights now apply on large screens only for cards that
+  center their content — scrolling widgets (notes, feeds, lists) keep their
+  height everywhere, since they scroll instead of clipping. (#105)
+- **The header card now degrades gracefully as its pieces are toggled off.**
+  With weather (or the clock) disabled, the lone remaining block used to hug
+  the left edge with a slab of dead space beside it; it now centers. With
+  only status checks left, the card renders as the proper standalone status
+  pill instead of a bare sliver. The layout editor's tray also points out
+  the separate Clock, Weather and Status widgets as an alternative to the
+  combined card. (#105)
 - **The layout editor's controls now work for touch and keyboard, not just a
   mouse.** The −/+ steppers auto-repeat while held, so walking a width across
   the grid or a height through its range no longer takes dozens of taps. The

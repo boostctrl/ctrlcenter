@@ -25,16 +25,18 @@ export default function HeaderCardWidget({
 }) {
   const showTimeWeather = showClock || weatherEnabled;
   if (!showTimeWeather && !statusEnabled) return null;
+  // Status alone in the combined card used to render as a bare sliver of a
+  // pill (#105); the standalone status card is that exact state done right,
+  // so degrade into it.
+  if (!showTimeWeather) return <StatusSummary apps={apps} variant="card" />;
   return (
     <div className="glass-card @container flex w-full flex-col overflow-hidden">
-      {showTimeWeather && (
-        <TimeWeather
-          initialDate={initialDate}
-          weatherEnabled={weatherEnabled}
-          showClock={showClock}
-          initial={initialWeather}
-        />
-      )}
+      <TimeWeather
+        initialDate={initialDate}
+        weatherEnabled={weatherEnabled}
+        showClock={showClock}
+        initial={initialWeather}
+      />
       {statusEnabled && <StatusSummary apps={apps} />}
     </div>
   );

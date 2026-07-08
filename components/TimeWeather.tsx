@@ -63,6 +63,11 @@ export default function TimeWeather({
   const time = now ? timeString(now, timezone) : " ";
   const date = now ? shortDate(now, timezone) : initialDate;
   const showWeather = weatherEnabled && weather;
+  // With only one of the two blocks present (weather or clock toggled off, or
+  // the weather still loading), the two-ended row layout would leave the lone
+  // block hugging the left edge with dead space beside it (#105) — center it
+  // instead so the single-element card looks deliberate.
+  const paired = Boolean(showWeather && showClock);
 
   const inner = (
     <>
@@ -86,7 +91,7 @@ export default function TimeWeather({
         </>
       )}
       {showClock && (
-        <div className="@sm:text-right">
+        <div className={paired ? "@sm:text-right" : ""}>
           <p
             className="text-2xl leading-tight font-semibold tabular-nums"
             suppressHydrationWarning
@@ -112,8 +117,9 @@ export default function TimeWeather({
   // enough, and stack vertically (divider hidden, clock left-aligned) when it
   // isn't — narrow cells stack instead of clipping. When weather is on, the row
   // links to the full forecast.
-  const row =
-    "flex flex-col gap-3 px-6 py-4 @sm:flex-row @sm:items-center @sm:justify-between @sm:gap-5";
+  const row = `flex flex-col gap-3 px-6 py-4 @sm:flex-row @sm:items-center @sm:gap-5 ${
+    paired ? "@sm:justify-between" : "@sm:justify-center"
+  }`;
   return weatherEnabled ? (
     <Link
       href="/weather"

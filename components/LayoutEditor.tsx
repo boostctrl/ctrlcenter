@@ -374,7 +374,7 @@ export function WidgetFrame({
   const narrow = widget.span < 8;
   const heightStepper = (
     <StepGroup
-      title="Card height — or drag the bottom edge; taller than the content adds breathing room, content widgets scroll"
+      title="Card height — or drag the bottom edge; taller than the content adds breathing room, content widgets scroll. On small screens only scrolling widgets keep their height — the rest stack at auto height."
       display={widget.height !== undefined ? `${widget.height}px` : "Auto"}
       decLabel={`Shorter ${label}`}
       incLabel={`Taller ${label}`}
