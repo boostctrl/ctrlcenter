@@ -230,6 +230,12 @@ type PrefsValue = {
   setUnits: (units: Units) => void;
   setGreetingName: (name: string) => void;
   useMyLocation: () => void;
+  // Set the weather location by hand (city search) — the path that works on
+  // plain-HTTP deployments where device geolocation is unavailable (#122).
+  setManualLocation: (latitude: number, longitude: number, label?: string) => void;
+  // Return to the site default location (also stops the IP auto-detection from
+  // re-overriding the choice on the next visit).
+  clearLocation: () => void;
   setTheme: (theme: Theme) => void;
   // Preview a mode's appearance without persisting it (theme builder). Passing
   // null drops the preview and returns to the saved `theme`.
@@ -930,6 +936,24 @@ export function PrefsProvider({
     defaultAccent,
   ]);
 
+  const setManualLocation = useCallback(
+    (latitude: number, longitude: number, label?: string) => {
+      setLocationError(null);
+      persist({
+        ...prefs,
+        location: { latitude, longitude, label, source: "manual" },
+      });
+    },
+    [prefs, persist]
+  );
+
+  const clearLocation = useCallback(() => {
+    setLocationError(null);
+    // dismissedAuto: an explicit "back to the site default" must stick — without
+    // it the first-visit IP detection would re-fill the location on reload.
+    persist({ ...prefs, location: undefined, dismissedAuto: true });
+  }, [prefs, persist]);
+
   const useMyLocation = useCallback(() => {
     setLocationError(null);
     if (typeof navigator === "undefined" || !navigator.geolocation) {
@@ -1045,6 +1069,8 @@ export function PrefsProvider({
       setUnits,
       setGreetingName,
       useMyLocation,
+      setManualLocation,
+      clearLocation,
       setTheme,
       setPreviewMode,
       setDesign,
@@ -1085,6 +1111,8 @@ export function PrefsProvider({
     setUnits,
     setGreetingName,
     useMyLocation,
+    setManualLocation,
+    clearLocation,
     setTheme,
     setPreviewMode,
     setDesign,

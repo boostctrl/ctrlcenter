@@ -15,12 +15,14 @@ function label(r: Result): string {
   return [r.name, r.admin1, r.country_code].filter(Boolean).join(", ");
 }
 
-// City search via Open-Meteo's geocoding API, so the admin can set the default
-// weather location by name instead of typing raw coordinates.
+// City search via Open-Meteo's geocoding API, so a weather location can be set
+// by name instead of raw coordinates. Used by the admin default-location field
+// and the visitor Preferences card; `label` is the display name of the pick
+// ("City, Region, CC") for callers that store one.
 export default function CitySearch({
   onSelect,
 }: {
-  onSelect: (latitude: number, longitude: number) => void;
+  onSelect: (latitude: number, longitude: number, label: string) => void;
 }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Result[]>([]);
@@ -79,7 +81,7 @@ export default function CitySearch({
               key={r.id}
               type="button"
               onClick={() => {
-                onSelect(r.latitude, r.longitude);
+                onSelect(r.latitude, r.longitude, label(r));
                 setQuery(label(r));
                 setOpen(false);
               }}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useVisitorPrefs } from "./PrefsProvider";
+import CitySearch from "./admin/CitySearch";
 import { supportedTimezones } from "@/lib/prefs";
 
 // The per-visitor preference controls (greeting name, time zone, weather
@@ -22,6 +23,8 @@ export default function SettingsControls() {
     setUnits,
     setGreetingName,
     useMyLocation,
+    setManualLocation,
+    clearLocation,
     reset,
   } = useVisitorPrefs();
   // Fill the timezone datalist only after mount: Intl.supportedValuesOf differs
@@ -115,15 +118,38 @@ export default function SettingsControls() {
               <span className="text-fg/50">Weather location</span>
               <div className="flex items-center justify-between gap-2 rounded-lg border border-fg/10 bg-fg/5 px-3 py-2">
                 <span className="truncate text-fg/70">{locationText}</span>
-                <button
-                  type="button"
-                  onClick={useMyLocation}
-                  disabled={detecting}
-                  className="shrink-0 rounded-md border border-fg/10 bg-fg/5 px-2.5 py-1 text-xs text-fg/80 transition-colors hover:bg-fg/10 disabled:opacity-50"
-                >
-                  {detecting ? "Locating…" : "Use my location"}
-                </button>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {!location.isDefault && (
+                    <button
+                      type="button"
+                      onClick={clearLocation}
+                      title="Return to the site default location"
+                      className="rounded-md border border-fg/10 bg-fg/5 px-2.5 py-1 text-xs text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg/90"
+                    >
+                      Reset
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={useMyLocation}
+                    disabled={detecting}
+                    className="rounded-md border border-fg/10 bg-fg/5 px-2.5 py-1 text-xs text-fg/80 transition-colors hover:bg-fg/10 disabled:opacity-50"
+                  >
+                    {detecting ? "Locating…" : "Use my location"}
+                  </button>
+                </div>
               </div>
+              {/* The manual path: device geolocation needs HTTPS, and this app
+                  is routinely self-hosted over plain HTTP — a city search works
+                  everywhere (#122). */}
+              <CitySearch
+                onSelect={(latitude, longitude, label) =>
+                  setManualLocation(latitude, longitude, label)
+                }
+              />
+              <p className="text-xs text-fg/40">
+                Search a city, or use your device&apos;s location.
+              </p>
               {locationError && (
                 <p className="text-xs text-red-400">{locationError}</p>
               )}

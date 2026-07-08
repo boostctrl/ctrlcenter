@@ -12,6 +12,15 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Set your weather location by searching for a city.** The Preferences card
+  now has a city search next to "Use my location", so you can pick any city
+  by name — the only way to personalize weather on plain-HTTP installs, where
+  device geolocation isn't available (the error message even said to "set it
+  manually", but there was no way to). A Reset button returns to the site
+  default once you've set your own. (#122)
+
 ### Fixed
 
 - **The layout editor now shows the page as visitors will see it.** Hidden and
