@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [1.8.4] - 2026-07-07
+
 ### Fixed
 
 - **Edits made just before leaving a page are no longer lost.** Autosaved
@@ -1289,7 +1291,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.8.3...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.8.4...HEAD
+[1.8.4]: https://github.com/boostctrl/ctrlcenter/compare/v1.8.3...v1.8.4
 [1.8.3]: https://github.com/boostctrl/ctrlcenter/compare/v1.8.2...v1.8.3
 [1.8.2]: https://github.com/boostctrl/ctrlcenter/compare/v1.8.1...v1.8.2
 [1.8.1]: https://github.com/boostctrl/ctrlcenter/compare/v1.8.0...v1.8.1
