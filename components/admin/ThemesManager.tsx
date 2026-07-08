@@ -13,15 +13,17 @@ import {
 } from "@/lib/theme";
 import type { ThemePackConfig } from "@/lib/schema";
 import { apiErrorMessage } from "./apiError";
-import { useAutosave, SaveStatus } from "./useAutosave";
+import { useAutosave, SaveStatus, type SaveOptions } from "./useAutosave";
 
 async function saveThemes(
-  overrides: Record<string, ThemePackConfig>
+  overrides: Record<string, ThemePackConfig>,
+  opts?: SaveOptions
 ): Promise<void> {
   const res = await fetch("/api/themes", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(Object.values(overrides)),
+    keepalive: opts?.keepalive,
   });
   if (!res.ok) {
     const data = await res.json().catch(() => null);

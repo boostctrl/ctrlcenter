@@ -14,6 +14,12 @@ here.
 
 ### Fixed
 
+- **Edits made just before leaving a page are no longer lost.** Autosaved
+  forms (the admin settings, theme overrides, and the layout editor) wait a
+  moment before writing. Making a change and immediately navigating away —
+  or closing the tab — used to drop that last edit silently, sometimes while
+  the status still read "Saving…". The pending change is now saved on the way
+  out. (#103)
 - **Applying a saved theme now switches everything at once.** Clicking a saved
   theme applied its colors immediately but kept the previous design, scene
   styling, and font until you toggled the appearance mode or reloaded the

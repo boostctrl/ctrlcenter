@@ -48,7 +48,7 @@ import {
   type SpaceSide,
 } from "@/lib/layout";
 import { useEditMode } from "./EditMode";
-import { useAutosave } from "./admin/useAutosave";
+import { useAutosave, type SaveOptions } from "./admin/useAutosave";
 import { apiErrorMessage } from "./admin/apiError";
 import { reorder } from "./admin/useReorder";
 import { WidgetFrame, EditToolbar, useFlowReorder } from "./LayoutEditor";
@@ -88,11 +88,12 @@ function groupBookmarks(
 type EditableLayout = { sections: LayoutWidget[]; scale: number; gap: number };
 
 // Persist the whole layout; the settings API replaces it wholesale.
-async function saveLayout(layout: EditableLayout): Promise<void> {
+async function saveLayout(layout: EditableLayout, opts?: SaveOptions): Promise<void> {
   const res = await fetch("/api/settings", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ layout }),
+    keepalive: opts?.keepalive,
   });
   if (!res.ok) {
     const data = await res.json().catch(() => null);
@@ -232,9 +233,9 @@ export default function Dashboard({
 
   const { status: saveStatus, error: saveError } = useAutosave(
     layout,
-    async (value) => {
+    async (value, opts) => {
       if (!dirtyRef.current) return;
-      await saveLayout(value);
+      await saveLayout(value, opts);
     }
   );
 

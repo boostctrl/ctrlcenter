@@ -20,13 +20,14 @@ import FeedTest from "./FeedTest";
 import CitySearch from "./CitySearch";
 import ChangePassword from "./ChangePassword";
 import { apiErrorMessage } from "./apiError";
-import { useAutosave, SaveStatus } from "./useAutosave";
+import { useAutosave, SaveStatus, type SaveOptions } from "./useAutosave";
 
-async function saveSettings(settings: Settings): Promise<void> {
+async function saveSettings(settings: Settings, opts?: SaveOptions): Promise<void> {
   const res = await fetch("/api/settings", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(settings),
+    keepalive: opts?.keepalive,
   });
   if (!res.ok) {
     const data = await res.json().catch(() => null);
