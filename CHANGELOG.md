@@ -12,6 +12,14 @@ here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The status page's 1h view no longer shows false gaps.** With the default
+  5-minute check interval the hourly timeline used to render an alternating
+  comb of filled and empty pills that looked like flapping. Each check now
+  counts until the next one runs, so the strip reads continuously at any
+  interval — while a genuinely stalled poller still shows a gap. (#108)
+
 ## [1.8.4] - 2026-07-07
 
 ### Fixed

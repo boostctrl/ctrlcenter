@@ -20,5 +20,8 @@ export async function GET(request: NextRequest) {
   await loadHistory();
   const tz = request.nextUrl.searchParams.get("tz") ?? "";
   const timeZone = isValidTimeZone(tz) ? tz : "UTC";
-  return NextResponse.json(getHistory(apps.map((a) => a.id), timeZone));
+  // The poll cadence caps how long a 1h reading holds in the timeline.
+  return NextResponse.json(
+    getHistory(apps.map((a) => a.id), timeZone, settings.statusInterval)
+  );
 }

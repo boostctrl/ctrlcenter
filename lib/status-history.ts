@@ -53,22 +53,43 @@ function minuteStr(ts: number): string {
 export type Reading = { t: number; up: boolean };
 
 // Resample raw readings into `bars` equal time buckets over [startMs, endMs),
-// oldest → newest, for the 1h view. Each bucket's uptime is the up-share of the
-// readings that fall in it, or null when none do (so a gap reads as empty, not
-// down). Every range uses the same bucket count so the strip keeps its size.
+// oldest → newest, for the 1h view. A reading is a step, not a point: between
+// polls the service state is known well enough for display, so each reading
+// holds until the next one (capped at `holdMs` so a poller outage still reads
+// as a gap). Buckets weight overlapping readings by covered time; a bucket no
+// reading reaches is null (empty, not down). Without the hold, any poll
+// cadence coarser than the bucket width — the shipped default is 5 min against
+// 2-min buckets — rendered an alternating comb of filled and empty pills that
+// looked like flapping (#108). Every range uses the same bucket count so the
+// strip keeps its size.
 export function fixedBarsFromReadings(
   readings: Reading[],
   startMs: number,
   endMs: number,
-  bars: number
+  bars: number,
+  holdMs: number
 ): BarPoint[] {
   const span = (endMs - startMs) / bars;
   const acc = Array.from({ length: bars }, () => ({ up: 0, total: 0 }));
-  for (const r of readings) {
-    if (r.t < startMs) continue;
-    const i = Math.min(bars - 1, Math.floor((r.t - startMs) / span));
-    acc[i].total++;
-    if (r.up) acc[i].up++;
+  // The ring is appended chronologically; sort defensively since the step span
+  // of each reading is derived from its successor.
+  const sorted = [...readings].sort((a, b) => a.t - b.t);
+  for (let k = 0; k < sorted.length; k++) {
+    const r = sorted[k];
+    const next = sorted[k + 1];
+    // The reading covers [r.t, next poll), capped at holdMs; clip to the window.
+    // A reading from before the window can still cover its opening buckets.
+    const lo = Math.max(r.t, startMs);
+    const hi = Math.min(next ? next.t : endMs, r.t + holdMs, endMs);
+    if (hi <= lo) continue;
+    for (let i = Math.max(0, Math.floor((lo - startMs) / span)); i < bars; i++) {
+      const bStart = startMs + i * span;
+      if (bStart >= hi) break;
+      const overlap = Math.min(bStart + span, hi) - Math.max(bStart, lo);
+      if (overlap <= 0) continue;
+      acc[i].total += overlap;
+      if (r.up) acc[i].up += overlap;
+    }
   }
   return acc.map((a, i) => ({
     at: minuteStr(startMs + i * span),
@@ -288,10 +309,18 @@ export function flush(): Promise<void> {
 // 1h view resamples the raw ring, the day-scale views resample the hourly
 // buckets — so all four ranges draw an identically-sized heartbeat. The day
 // labels use `timeZone`'s calendar date; defaults to UTC when no zone is given.
-export function getHistory(ids: string[], timeZone = "UTC"): StatusHistory {
+// `intervalMinutes` is the poller cadence: a 1h reading holds for up to twice
+// that, so normal polling paints a continuous strip while a stalled poller
+// still shows a gap.
+export function getHistory(
+  ids: string[],
+  timeZone = "UTC",
+  intervalMinutes = 5
+): StatusHistory {
   const now = Date.now();
   const nowHour = hourOf(now);
   const recentSince = now - RECENT_VIEW_MS;
+  const holdMs = 2 * intervalMinutes * MIN_MS;
   const dayAt = (ms: number) => localDayStr(ms, timeZone);
   const apps = ids.map((id) => {
     const m = state.store.get(id);
@@ -306,7 +335,7 @@ export function getHistory(ids: string[], timeZone = "UTC"): StatusHistory {
         ...dayWindows(buckets, nowHour),
       },
       series: {
-        h1: fixedBarsFromReadings(readings, recentSince, now, TIMELINE_BARS),
+        h1: fixedBarsFromReadings(readings, recentSince, now, TIMELINE_BARS, holdMs),
         d1: fixedBarsFromBuckets(buckets, now - DAY_MS, now, TIMELINE_BARS, minuteStr),
         d30: fixedBarsFromBuckets(buckets, now - 30 * DAY_MS, now, TIMELINE_BARS, dayAt),
         d90: fixedBarsFromBuckets(buckets, now - 90 * DAY_MS, now, TIMELINE_BARS, dayAt),

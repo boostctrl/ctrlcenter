@@ -57,23 +57,57 @@ describe("recentPct", () => {
 });
 
 describe("fixedBarsFromReadings", () => {
-  it("resamples readings into a fixed count of equal buckets, null where empty", () => {
-    const readings: Reading[] = [
-      { t: -10, up: true }, // before the window — ignored
-      { t: 30 * 1000, up: true }, // bucket 0
-      { t: 90 * 1000, up: false }, // bucket 1
-      { t: 90 * 1000 + 500, up: true }, // bucket 1
-      { t: 210 * 1000, up: true }, // bucket 3 (bucket 2 stays empty)
-    ];
-    const bars = fixedBarsFromReadings(readings, 0, 4 * MIN, 4);
-    expect(bars).toHaveLength(4);
-    expect(bars.map((b) => b.uptime)).toEqual([100, 50, null, 100]);
+  it("holds each reading until the next, so a coarse poll cadence fills the strip (#108)", () => {
+    // The shipped default: 5-minute polls against 30 two-minute buckets used to
+    // fill ~12 of 30 and leave an alternating comb of gaps.
+    const readings: Reading[] = Array.from({ length: 12 }, (_, i) => ({
+      t: i * 5 * MIN,
+      up: true,
+    }));
+    const bars = fixedBarsFromReadings(readings, 0, 60 * MIN, 30, 10 * MIN);
+    expect(bars).toHaveLength(30);
+    expect(bars.map((b) => b.uptime)).toEqual(Array(30).fill(100));
     expect(bars[0].at).toBe("1970-01-01T00:00");
   });
 
-  it("clamps a reading at the window end into the last bucket", () => {
-    const bars = fixedBarsFromReadings([{ t: 2 * MIN, up: false }], 0, 2 * MIN, 2);
-    expect(bars.map((b) => b.uptime)).toEqual([null, 0]);
+  it("a reading's hold ends at the next reading, not the cap", () => {
+    const readings: Reading[] = [
+      { t: 0, up: true },
+      { t: 4 * MIN, up: false },
+    ];
+    const bars = fixedBarsFromReadings(readings, 0, 8 * MIN, 4, 10 * MIN);
+    expect(bars.map((b) => b.uptime)).toEqual([100, 100, 0, 0]);
+  });
+
+  it("caps the hold so a stalled poller still shows a gap", () => {
+    const bars = fixedBarsFromReadings(
+      [{ t: 0, up: true }],
+      0,
+      10 * MIN,
+      5,
+      4 * MIN
+    );
+    expect(bars.map((b) => b.uptime)).toEqual([100, 100, null, null, null]);
+  });
+
+  it("a reading from before the window covers its opening buckets", () => {
+    const bars = fixedBarsFromReadings(
+      [{ t: -MIN, up: true }],
+      0,
+      4 * MIN,
+      2,
+      4 * MIN
+    );
+    expect(bars.map((b) => b.uptime)).toEqual([100, 100]);
+  });
+
+  it("weights readings sharing a bucket by covered time", () => {
+    const readings: Reading[] = [
+      { t: 0, up: true },
+      { t: MIN, up: false },
+    ];
+    const bars = fixedBarsFromReadings(readings, 0, 2 * MIN, 1, 10 * MIN);
+    expect(bars[0].uptime).toBeCloseTo(50, 6);
   });
 });
 
