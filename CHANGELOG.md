@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-07-08
+
 ### Added
 
 - **The layout editor can undo mistakes and start over.** Ctrl+Z (or the new
@@ -1394,7 +1396,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.8.5...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.0...HEAD
+[1.9.0]: https://github.com/boostctrl/ctrlcenter/compare/v1.8.5...v1.9.0
 [1.8.5]: https://github.com/boostctrl/ctrlcenter/compare/v1.8.4...v1.8.5
 [1.8.4]: https://github.com/boostctrl/ctrlcenter/compare/v1.8.3...v1.8.4
 [1.8.3]: https://github.com/boostctrl/ctrlcenter/compare/v1.8.2...v1.8.3
