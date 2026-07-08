@@ -239,6 +239,20 @@ export default function StatusPage({
                   : s.status
                     ? `Down · HTTP ${s.status}`
                     : "Unreachable";
+              // The uptime % + live detail, used in two places: the fixed-width
+              // right column from sm up, and the second row below sm.
+              const figures = (
+                <>
+                  <p className="font-semibold tabular-nums">{fmtPct(uptime)}</p>
+                  <p
+                    className={`truncate text-xs ${
+                      s && !s.up ? "text-red-400" : "text-fg/45"
+                    }`}
+                  >
+                    {detail}
+                  </p>
+                </>
+              );
               return (
                 <div
                   key={app.id}
@@ -272,26 +286,22 @@ export default function StatusPage({
                     {/* Fixed width so the heartbeat's right edge — and thus the
                         whole strip — lands in the same place on every row,
                         regardless of how wide the uptime figure or detail text
-                        is. Without it the flex-1 name column pushes each strip to
-                        a different position. */}
-                    <div className="w-32 shrink-0 text-right">
-                      <p className="font-semibold tabular-nums">
-                        {fmtPct(uptime)}
-                      </p>
-                      <p
-                        className={`truncate text-xs ${
-                          s && !s.up ? "text-red-400" : "text-fg/45"
-                        }`}
-                      >
-                        {detail}
-                      </p>
+                        is. Only from sm up: below that the strip wraps anyway,
+                        so the reserved 128px only squeezed the name to a stub
+                        ("Home A…") — there the figures move to the second row
+                        and the name gets the full width (#110). */}
+                    <div className="hidden w-32 shrink-0 text-right sm:block">
+                      {figures}
                     </div>
                   </div>
-                  {series.length > 0 && (
-                    <div className="mt-3 sm:hidden">
-                      <Timeline points={series} timeZone={timezone} />
+                  <div className="mt-3 flex items-end gap-4 sm:hidden">
+                    <div className="min-w-0 flex-1">
+                      {series.length > 0 && (
+                        <Timeline points={series} timeZone={timezone} />
+                      )}
                     </div>
-                  )}
+                    <div className="shrink-0 text-right">{figures}</div>
+                  </div>
                 </div>
               );
             })}

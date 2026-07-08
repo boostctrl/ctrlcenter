@@ -14,6 +14,11 @@ here.
 
 ### Fixed
 
+- **Service names no longer get cut off on phones.** The status page reserved
+  a fixed-width column for the uptime figures at every screen size, squeezing
+  names on small screens down to stubs like "Home A…". On phones the figures
+  now sit beside the heartbeat strip on its own line and the name gets the
+  full width; desktop keeps the aligned columns. (#110)
 - **The status page's 1h view no longer shows false gaps.** With the default
   5-minute check interval the hourly timeline used to render an alternating
   comb of filled and empty pills that looked like flapping. Each check now
