@@ -105,6 +105,22 @@ export const MAX_GRID_GAP = 96;
 export const DEFAULT_GRID_GAP = 32;
 export const GRID_GAP_STEP = 4;
 
+// The page's gap above the first row of widgets (px), tunable from the edit
+// toolbar. One stored value: it applies as-is on large screens and is capped
+// at the small-screen stock value below them (small screens rarely want more
+// air — the stock spacing already stepped down the same way). The default
+// reproduces the stock 48px/64px pair exactly, so dashboards saved before the
+// control existed don't shift.
+export const MIN_TOP_GAP = 0;
+export const MAX_TOP_GAP = 160;
+export const DEFAULT_TOP_GAP = 64;
+export const SMALL_TOP_GAP_CAP = 48;
+export const TOP_GAP_STEP = 8;
+
+// The top gap actually used below the lg breakpoint for a stored value.
+export const smallScreenTopGap = (topGap: number): number =>
+  Math.min(topGap, SMALL_TOP_GAP_CAP);
+
 // Site-wide UI scale (percent), rendered as font-size on <html>: the whole UI
 // is rem-based, so one percentage scales text, paddings and cards uniformly.
 export const MIN_UI_SCALE = 70;

@@ -9,7 +9,7 @@ import { fetchFeed } from "@/lib/feed";
 import { fetchWeather } from "@/lib/weather";
 import FeedWidget from "@/components/widgets/FeedWidget";
 import { greetingFor, hourIn, shortDate } from "@/lib/datetime";
-import { resolveLayoutWidgets } from "@/lib/layout";
+import { resolveLayoutWidgets, smallScreenTopGap } from "@/lib/layout";
 import { isAdminSession } from "@/lib/api-auth";
 import { navPages } from "@/lib/nav";
 
@@ -81,14 +81,28 @@ export default async function HomePage({
     settings.components
   );
 
+  // The gap above the first row of widgets, tunable from the layout editor
+  // (Dashboard keeps these variables live while editing). The stored value
+  // applies on large screens; smaller ones cap it at the stock 48px.
+  const topGap = settings.layout.topGap;
+
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-12 px-6 py-12 sm:px-10 lg:py-16">
+    <main
+      style={
+        {
+          "--top-gap": `${smallScreenTopGap(topGap)}px`,
+          "--top-gap-lg": `${topGap}px`,
+        } as React.CSSProperties
+      }
+      className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-12 px-6 pt-[var(--top-gap)] pb-12 sm:px-10 lg:pt-[var(--top-gap-lg)] lg:pb-16"
+    >
       <StatusProvider enabled={statusEnabled}>
         <EditModeProvider isAdmin={isAdmin} initialEditing={initialEditing}>
           <Dashboard
             widgets={widgets}
             scale={settings.layout.scale}
             gap={settings.layout.gap}
+            topGap={topGap}
             apps={apps}
             bookmarks={bookmarks}
             search={settings.search}

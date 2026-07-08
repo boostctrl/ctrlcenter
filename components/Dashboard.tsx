@@ -40,7 +40,9 @@ import {
   GRID_COLUMNS,
   DEFAULT_UI_SCALE,
   DEFAULT_GRID_GAP,
+  DEFAULT_TOP_GAP,
   DEFAULT_WIDGETS,
+  smallScreenTopGap,
   CARD_WIDGET_IDS,
   TITLED_WIDGET_IDS,
   SIZED_WIDGET_IDS,
@@ -86,10 +88,15 @@ function groupBookmarks(
 }
 
 // What the layout editor edits and autosaves as one unit: the widget list plus
-// the site-wide UI scale and the grid's vertical gap. Saved together because
-// the settings API replaces the stored layout wholesale — a sections-only save
-// would reset the scale/gap.
-type EditableLayout = { sections: LayoutWidget[]; scale: number; gap: number };
+// the site-wide UI scale, the grid's vertical gap, and the page's top gap.
+// Saved together because the settings API replaces the stored layout wholesale
+// — a sections-only save would reset the page-level values.
+type EditableLayout = {
+  sections: LayoutWidget[];
+  scale: number;
+  gap: number;
+  topGap: number;
+};
 
 // Undo (Ctrl+Z) granularity: rapid consecutive changes — a resize drag's
 // per-column steps, a held stepper — coalesce into the entry pushed by the
@@ -178,6 +185,7 @@ export default function Dashboard({
   widgets,
   scale = DEFAULT_UI_SCALE,
   gap = DEFAULT_GRID_GAP,
+  topGap = DEFAULT_TOP_GAP,
   apps,
   bookmarks,
   search,
@@ -201,6 +209,9 @@ export default function Dashboard({
   scale?: number;
   // The saved grid gap (px) between cards; seeds the editor's gap stepper.
   gap?: number;
+  // The saved gap (px) above the first widget row; SSR renders it on <main>'s
+  // CSS variables, this seeds the editor's stepper.
+  topGap?: number;
   apps: AppItem[];
   bookmarks: BookmarkItem[];
   search: SearchConfig;
@@ -240,6 +251,7 @@ export default function Dashboard({
     sections: widgets,
     scale,
     gap,
+    topGap,
   });
   const dirtyRef = useRef(false);
   // What Revert restores: the layout as it was when edit mode was entered (the
@@ -275,6 +287,18 @@ export default function Dashboard({
       layout.scale === DEFAULT_UI_SCALE ? "" : `${layout.scale}%`;
   }, [layout.scale]);
 
+  // Keep <main>'s top-gap variables in step the same way (app/page.tsx SSRs
+  // them; the padding classes live there too).
+  useEffect(() => {
+    const main = gridRef.current?.closest("main");
+    if (!main) return;
+    main.style.setProperty(
+      "--top-gap",
+      `${smallScreenTopGap(layout.topGap)}px`
+    );
+    main.style.setProperty("--top-gap-lg", `${layout.topGap}px`);
+  }, [layout.topGap]);
+
   function mutateLayout(next: EditableLayout) {
     if (takeUndoSnapshot(undoTimingRef.current)) {
       undoRef.current.push(layout);
@@ -306,6 +330,7 @@ export default function Dashboard({
       sections: DEFAULT_WIDGETS.map((w) => ({ ...w })),
       scale: DEFAULT_UI_SCALE,
       gap: DEFAULT_GRID_GAP,
+      topGap: DEFAULT_TOP_GAP,
     });
   }
   const mutateSections = (sections: LayoutWidget[]) =>
@@ -363,6 +388,8 @@ export default function Dashboard({
     );
   const setScale = (next: number) => mutateLayout({ ...layout, scale: next });
   const setGap = (next: number) => mutateLayout({ ...layout, gap: next });
+  const setTopGap = (next: number) =>
+    mutateLayout({ ...layout, topGap: next });
   const toggleWidgetHidden = (id: LayoutWidgetId) =>
     mutateSections(
       layout.sections.map((w) =>
@@ -875,6 +902,8 @@ export default function Dashboard({
             onScale={setScale}
             gap={layout.gap}
             onGap={setGap}
+            topGap={layout.topGap}
+            onTopGap={setTopGap}
             canUndo={canUndo}
             onUndo={undoLast}
             onRevert={revertLayout}

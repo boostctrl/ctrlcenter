@@ -431,9 +431,15 @@ export default async function HelpPage() {
               inside. The <strong>More</strong> menu on each card adds{" "}
               <strong>space on any side</strong> (above, below, or beside a card
               sharing its row), sets cards-per-row, and hides a section&apos;s
-              heading; the toolbar&apos;s <strong>spacing</strong> control sets
-              the gap between all cards. Weather, the status row, and the
-              calendar have their own enables alongside their setup.
+              heading; the toolbar&apos;s <strong>card gap</strong> control
+              sets the gap between all cards and <strong>top gap</strong> the
+              space above the first row. Missteps are recoverable:{" "}
+              <strong>Undo</strong> (Ctrl+Z) takes back the last change,{" "}
+              <strong>Revert</strong> restores the layout you started the
+              session with, and <strong>Reset</strong> returns the whole
+              arrangement to its out-of-the-box defaults. Weather, the status
+              row, and the calendar have their own enables alongside their
+              setup.
             </P>
           </Card>
 

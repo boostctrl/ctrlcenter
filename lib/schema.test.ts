@@ -7,6 +7,7 @@ import {
   settingsInputSchema,
   weatherUpdateSchema,
   themesInputSchema,
+  layoutSchema,
 } from "./schema";
 
 describe("themesInputSchema", () => {
@@ -93,6 +94,22 @@ describe("settingsSchema", () => {
       enabled: true,
       units: "imperial",
     });
+  });
+});
+
+describe("layoutSchema topGap", () => {
+  it("defaults to the stock large-screen value on configs saved before it existed", () => {
+    const layout = layoutSchema.parse({
+      sections: [{ id: "apps", span: 24 }],
+      columns: 24,
+    });
+    expect(layout.topGap).toBe(64);
+  });
+
+  it("keeps a stored value and coerces an out-of-range one back to the default", () => {
+    expect(layoutSchema.parse({ topGap: 8 }).topGap).toBe(8);
+    expect(layoutSchema.parse({ topGap: 9999 }).topGap).toBe(64);
+    expect(layoutSchema.parse({ topGap: -4 }).topGap).toBe(64);
   });
 });
 

@@ -13,6 +13,9 @@ import {
   MIN_GRID_GAP,
   MAX_GRID_GAP,
   GRID_GAP_STEP,
+  MIN_TOP_GAP,
+  MAX_TOP_GAP,
+  TOP_GAP_STEP,
   MIN_UI_SCALE,
   MAX_UI_SCALE,
   UI_SCALE_STEP,
@@ -501,9 +504,66 @@ export function WidgetFrame({
   );
 }
 
-// The fixed bottom pill shown while editing: the UI scale stepper, the grid gap
-// stepper, autosave state, undo, revert to how the layout looked when edit mode
-// was entered, reset to the stock arrangement, and done.
+// One labeled −/value/+ group in the edit toolbar. The tiny always-visible
+// label is what explains the stepper on touch, where the title tooltip never
+// shows (#104).
+function ToolbarStepper({
+  label,
+  title,
+  display,
+  decLabel,
+  incLabel,
+  onDec,
+  onInc,
+  canDec,
+  canInc,
+}: {
+  label: string;
+  title: string;
+  display: string;
+  decLabel: string;
+  incLabel: string;
+  onDec: () => void;
+  onInc: () => void;
+  canDec: boolean;
+  canInc: boolean;
+}) {
+  const btn =
+    "px-2.5 py-1 text-sm text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg disabled:pointer-events-none disabled:opacity-30";
+  return (
+    <div
+      className="flex items-center overflow-hidden rounded-full border border-fg/10"
+      title={title}
+    >
+      <span className="pl-2.5 text-[10px] font-medium tracking-wide text-fg/60 uppercase">
+        {label}
+      </span>
+      <button
+        type="button"
+        aria-label={decLabel}
+        disabled={!canDec}
+        onClick={onDec}
+        className={btn}
+      >
+        −
+      </button>
+      <span className="px-0.5 text-xs text-fg/60 tabular-nums">{display}</span>
+      <button
+        type="button"
+        aria-label={incLabel}
+        disabled={!canInc}
+        onClick={onInc}
+        className={btn}
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
+// The fixed bottom pill shown while editing: the page-level steppers (UI
+// scale, card gap, top gap), autosave state, undo, revert to how the layout
+// looked when edit mode was entered, reset to the stock arrangement, and done.
 export function EditToolbar({
   status,
   error,
@@ -511,6 +571,8 @@ export function EditToolbar({
   onScale,
   gap,
   onGap,
+  topGap,
+  onTopGap,
   canUndo,
   onUndo,
   onRevert,
@@ -523,6 +585,8 @@ export function EditToolbar({
   onScale: (scale: number) => void;
   gap: number;
   onGap: (gap: number) => void;
+  topGap: number;
+  onTopGap: (topGap: number) => void;
   canUndo: boolean;
   onUndo: () => void;
   onRevert: () => void;
@@ -530,8 +594,6 @@ export function EditToolbar({
   onDone: () => void;
 }) {
   const confirm = useConfirm();
-  const scaleBtn =
-    "px-2.5 py-1 text-sm text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg disabled:pointer-events-none disabled:opacity-30";
   const ghostBtn =
     "rounded-full border border-fg/10 bg-fg/5 px-3 py-1.5 text-sm text-fg/80 transition-colors hover:bg-fg/10 disabled:pointer-events-none disabled:opacity-40";
   return (
@@ -540,54 +602,39 @@ export function EditToolbar({
       <span className="text-xs text-fg/40 lg:hidden">
         Widths apply on large screens
       </span>
-      <div
-        className="flex items-center overflow-hidden rounded-full border border-fg/10"
+      <ToolbarStepper
+        label="Scale"
         title="UI scale — resizes every element, site-wide"
-      >
-        <button
-          type="button"
-          aria-label="Smaller UI"
-          disabled={scale <= MIN_UI_SCALE}
-          onClick={() => onScale(Math.max(MIN_UI_SCALE, scale - UI_SCALE_STEP))}
-          className={scaleBtn}
-        >
-          −
-        </button>
-        <span className="px-0.5 text-xs text-fg/60 tabular-nums">{scale}%</span>
-        <button
-          type="button"
-          aria-label="Larger UI"
-          disabled={scale >= MAX_UI_SCALE}
-          onClick={() => onScale(Math.min(MAX_UI_SCALE, scale + UI_SCALE_STEP))}
-          className={scaleBtn}
-        >
-          +
-        </button>
-      </div>
-      <div
-        className="flex items-center overflow-hidden rounded-full border border-fg/10"
+        display={`${scale}%`}
+        decLabel="Smaller UI"
+        incLabel="Larger UI"
+        onDec={() => onScale(Math.max(MIN_UI_SCALE, scale - UI_SCALE_STEP))}
+        onInc={() => onScale(Math.min(MAX_UI_SCALE, scale + UI_SCALE_STEP))}
+        canDec={scale > MIN_UI_SCALE}
+        canInc={scale < MAX_UI_SCALE}
+      />
+      <ToolbarStepper
+        label="Card gap"
         title="Spacing between cards"
-      >
-        <button
-          type="button"
-          aria-label="Less spacing"
-          disabled={gap <= MIN_GRID_GAP}
-          onClick={() => onGap(Math.max(MIN_GRID_GAP, gap - GRID_GAP_STEP))}
-          className={scaleBtn}
-        >
-          −
-        </button>
-        <span className="px-0.5 text-xs text-fg/60 tabular-nums">{gap}px</span>
-        <button
-          type="button"
-          aria-label="More spacing"
-          disabled={gap >= MAX_GRID_GAP}
-          onClick={() => onGap(Math.min(MAX_GRID_GAP, gap + GRID_GAP_STEP))}
-          className={scaleBtn}
-        >
-          +
-        </button>
-      </div>
+        display={`${gap}px`}
+        decLabel="Less spacing between cards"
+        incLabel="More spacing between cards"
+        onDec={() => onGap(Math.max(MIN_GRID_GAP, gap - GRID_GAP_STEP))}
+        onInc={() => onGap(Math.min(MAX_GRID_GAP, gap + GRID_GAP_STEP))}
+        canDec={gap > MIN_GRID_GAP}
+        canInc={gap < MAX_GRID_GAP}
+      />
+      <ToolbarStepper
+        label="Top gap"
+        title="Space above the first row of widgets — small screens cap it at 48px"
+        display={`${topGap}px`}
+        decLabel="Less space above the first row"
+        incLabel="More space above the first row"
+        onDec={() => onTopGap(Math.max(MIN_TOP_GAP, topGap - TOP_GAP_STEP))}
+        onInc={() => onTopGap(Math.min(MAX_TOP_GAP, topGap + TOP_GAP_STEP))}
+        canDec={topGap > MIN_TOP_GAP}
+        canInc={topGap < MAX_TOP_GAP}
+      />
       <SaveStatus status={status} error={error} />
       <button
         type="button"

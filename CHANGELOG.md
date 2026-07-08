@@ -19,6 +19,18 @@ here.
   time — a mis-drag no longer forces a full Revert — and a new Reset button
   restores the stock arrangement, UI scale and card spacing (after asking
   first), so a regretted layout is never permanent. (#101)
+- **The space above the first row of widgets is now adjustable.** A "Top gap"
+  stepper in the edit toolbar tunes the air between the top of the page and
+  the first widget (0–160px) — dense dashboards no longer have to live with
+  the fixed padding. The default matches the old spacing exactly, so existing
+  dashboards don't shift, and small screens cap the value at the old 48px so
+  a roomy desktop setting doesn't waste phone space. (#106)
+
+### Changed
+
+- **The edit toolbar's steppers now carry labels.** "Scale", "Card gap" and
+  "Top gap" are written right on the controls instead of hiding in hover
+  tooltips that touch screens never see. (#104, #106)
 
 ## [1.8.5] - 2026-07-08
 

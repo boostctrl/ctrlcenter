@@ -17,6 +17,9 @@ import {
   MIN_GRID_GAP,
   MAX_GRID_GAP,
   DEFAULT_GRID_GAP,
+  MIN_TOP_GAP,
+  MAX_TOP_GAP,
+  DEFAULT_TOP_GAP,
   MIN_UI_SCALE,
   MAX_UI_SCALE,
   DEFAULT_UI_SCALE,
@@ -400,6 +403,16 @@ export const layoutSchema = z.preprocess(
       .max(MAX_GRID_GAP)
       .catch(DEFAULT_GRID_GAP)
       .default(DEFAULT_GRID_GAP),
+    // Gap (px) between the top of the page and the first row of widgets.
+    // Applied as-is on large screens, capped at the small-screen stock value
+    // below them (see smallScreenTopGap in lib/layout.ts).
+    topGap: z
+      .number()
+      .int()
+      .min(MIN_TOP_GAP)
+      .max(MAX_TOP_GAP)
+      .catch(DEFAULT_TOP_GAP)
+      .default(DEFAULT_TOP_GAP),
   })
 );
 export type LayoutConfig = z.infer<typeof layoutSchema>;
@@ -729,6 +742,12 @@ export const layoutUpdateSchema = z.object({
     .min(MIN_GRID_GAP)
     .max(MAX_GRID_GAP)
     .default(DEFAULT_GRID_GAP),
+  topGap: z
+    .number()
+    .int()
+    .min(MIN_TOP_GAP)
+    .max(MAX_TOP_GAP)
+    .default(DEFAULT_TOP_GAP),
 });
 
 export const settingsInputSchema = z.object({
