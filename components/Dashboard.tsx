@@ -3,6 +3,7 @@
 import {
   cloneElement,
   isValidElement,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -39,6 +40,7 @@ import {
   GRID_COLUMNS,
   DEFAULT_UI_SCALE,
   DEFAULT_GRID_GAP,
+  DEFAULT_WIDGETS,
   CARD_WIDGET_IDS,
   TITLED_WIDGET_IDS,
   SIZED_WIDGET_IDS,
@@ -49,6 +51,7 @@ import {
   type SpaceSide,
 } from "@/lib/layout";
 import { useEditMode } from "./EditMode";
+import { ConfirmProvider } from "./admin/Confirm";
 import { useAutosave, type SaveOptions } from "./admin/useAutosave";
 import { apiErrorMessage } from "./admin/apiError";
 import { reorder } from "./admin/useReorder";
@@ -87,6 +90,22 @@ function groupBookmarks(
 // the settings API replaces the stored layout wholesale — a sections-only save
 // would reset the scale/gap.
 type EditableLayout = { sections: LayoutWidget[]; scale: number; gap: number };
+
+// Undo (Ctrl+Z) granularity: rapid consecutive changes — a resize drag's
+// per-column steps, a held stepper — coalesce into the entry pushed by the
+// burst's first change, so one undo takes back the whole gesture rather than
+// its last increment. The stack is bounded; the oldest steps fall off.
+const UNDO_COALESCE_MS = 800;
+const UNDO_LIMIT = 50;
+
+// Whether the change happening now starts a new undo step (true) or coalesces
+// into the burst in progress (false), advancing the burst clock either way.
+function takeUndoSnapshot(timing: { lastPush: number }): boolean {
+  const now = Date.now();
+  const take = now - timing.lastPush > UNDO_COALESCE_MS;
+  timing.lastPush = now;
+  return take;
+}
 
 // Persist the whole layout; the settings API replaces it wholesale.
 async function saveLayout(layout: EditableLayout, opts?: SaveOptions): Promise<void> {
@@ -226,6 +245,15 @@ export default function Dashboard({
   // What Revert restores: the layout as it was when edit mode was entered (the
   // last-saved value would trail the debounced autosave by a beat).
   const entryRef = useRef(layout);
+  // The undo stack: past layouts, most recent last. Lives in a ref (it's only
+  // touched from event handlers); `canUndo` mirrors its non-emptiness as state
+  // so the toolbar's Undo button re-renders with it. The stack only grows
+  // through the editor's controls, so clearing it when editing ends (see
+  // doneEditing — the mode's only exit) is what keeps Ctrl+Z from reaching
+  // back into a finished session.
+  const undoRef = useRef<EditableLayout[]>([]);
+  const undoTimingRef = useRef({ lastPush: 0 });
+  const [canUndo, setCanUndo] = useState(false);
   useEffect(() => {
     if (editing) entryRef.current = layout;
     // Snapshot only when edit mode is entered — not again on every edit.
@@ -248,8 +276,37 @@ export default function Dashboard({
   }, [layout.scale]);
 
   function mutateLayout(next: EditableLayout) {
+    if (takeUndoSnapshot(undoTimingRef.current)) {
+      undoRef.current.push(layout);
+      if (undoRef.current.length > UNDO_LIMIT) undoRef.current.shift();
+      setCanUndo(true);
+    }
     dirtyRef.current = true;
     setLayout(next);
+  }
+  const undoLast = useCallback(() => {
+    const prev = undoRef.current.pop();
+    if (!prev) return;
+    // The next change starts a fresh undo step instead of coalescing into the
+    // burst that just got undone.
+    undoTimingRef.current.lastPush = 0;
+    setCanUndo(undoRef.current.length > 0);
+    dirtyRef.current = true;
+    setLayout(prev);
+  }, []);
+  // Revert and Reset are discrete actions: always their own undo step, so
+  // Ctrl+Z can take either back even right after another change.
+  function revertLayout() {
+    undoTimingRef.current.lastPush = 0;
+    mutateLayout(entryRef.current);
+  }
+  function resetLayout() {
+    undoTimingRef.current.lastPush = 0;
+    mutateLayout({
+      sections: DEFAULT_WIDGETS.map((w) => ({ ...w })),
+      scale: DEFAULT_UI_SCALE,
+      gap: DEFAULT_GRID_GAP,
+    });
   }
   const mutateSections = (sections: LayoutWidget[]) =>
     mutateLayout({ ...layout, sections });
@@ -345,6 +402,9 @@ export default function Dashboard({
 
   function doneEditing() {
     setEditing(false);
+    undoRef.current = [];
+    undoTimingRef.current.lastPush = 0;
+    setCanUndo(false);
     // Drop a stale ?edit=1 (the deep link from admin Settings) so a reload
     // doesn't reopen the editor.
     if (window.location.search.includes("edit="))
@@ -357,6 +417,19 @@ export default function Dashboard({
   );
   const showApps = !hiddenById.get("apps");
   const showBookmarks = !hiddenById.get("bookmarks");
+
+  // Ctrl/Cmd+Z while editing: undo the last layout change.
+  useEffect(() => {
+    if (!editing) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        undoLast();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [editing, undoLast]);
 
   // "/" focuses search; Escape clears and blurs it. Parked while editing so the
   // hotkey can't fight the editor's controls.
@@ -794,16 +867,21 @@ export default function Dashboard({
       )}
 
       {editing && (
-        <EditToolbar
-          status={saveStatus}
-          error={saveError}
-          scale={layout.scale}
-          onScale={setScale}
-          gap={layout.gap}
-          onGap={setGap}
-          onRevert={() => mutateLayout(entryRef.current)}
-          onDone={doneEditing}
-        />
+        <ConfirmProvider>
+          <EditToolbar
+            status={saveStatus}
+            error={saveError}
+            scale={layout.scale}
+            onScale={setScale}
+            gap={layout.gap}
+            onGap={setGap}
+            canUndo={canUndo}
+            onUndo={undoLast}
+            onRevert={revertLayout}
+            onReset={resetLayout}
+            onDone={doneEditing}
+          />
+        </ConfirmProvider>
       )}
     </>
   );

@@ -12,6 +12,14 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **The layout editor can undo mistakes and start over.** Ctrl+Z (or the new
+  Undo button in the edit toolbar) takes back your last change one step at a
+  time — a mis-drag no longer forces a full Revert — and a new Reset button
+  restores the stock arrangement, UI scale and card spacing (after asking
+  first), so a regretted layout is never permanent. (#101)
+
 ## [1.8.5] - 2026-07-08
 
 ### Added

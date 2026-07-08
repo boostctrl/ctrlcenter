@@ -23,6 +23,7 @@ import {
   type SpaceSide,
 } from "@/lib/layout";
 import { MoveButtons } from "./admin/ui";
+import { useConfirm } from "./admin/Confirm";
 import { SaveStatus, type SaveState } from "./admin/useAutosave";
 import { useDragResize } from "./useDragResize";
 
@@ -501,8 +502,8 @@ export function WidgetFrame({
 }
 
 // The fixed bottom pill shown while editing: the UI scale stepper, the grid gap
-// stepper, autosave state, revert to how the layout looked when edit mode was
-// entered, and done.
+// stepper, autosave state, undo, revert to how the layout looked when edit mode
+// was entered, reset to the stock arrangement, and done.
 export function EditToolbar({
   status,
   error,
@@ -510,7 +511,10 @@ export function EditToolbar({
   onScale,
   gap,
   onGap,
+  canUndo,
+  onUndo,
   onRevert,
+  onReset,
   onDone,
 }: {
   status: SaveState;
@@ -519,11 +523,17 @@ export function EditToolbar({
   onScale: (scale: number) => void;
   gap: number;
   onGap: (gap: number) => void;
+  canUndo: boolean;
+  onUndo: () => void;
   onRevert: () => void;
+  onReset: () => void;
   onDone: () => void;
 }) {
+  const confirm = useConfirm();
   const scaleBtn =
     "px-2.5 py-1 text-sm text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg disabled:pointer-events-none disabled:opacity-30";
+  const ghostBtn =
+    "rounded-full border border-fg/10 bg-fg/5 px-3 py-1.5 text-sm text-fg/80 transition-colors hover:bg-fg/10 disabled:pointer-events-none disabled:opacity-40";
   return (
     <div className="fixed bottom-5 left-1/2 z-40 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-full border border-fg/10 bg-fg/5 py-2 pr-2 pl-4 shadow-lg backdrop-blur-xl">
       <span className="text-sm font-medium text-fg/80">Editing layout</span>
@@ -581,10 +591,37 @@ export function EditToolbar({
       <SaveStatus status={status} error={error} />
       <button
         type="button"
+        disabled={!canUndo}
+        onClick={onUndo}
+        title="Undo the last change (Ctrl+Z)"
+        className={ghostBtn}
+      >
+        Undo
+      </button>
+      <button
+        type="button"
         onClick={onRevert}
-        className="rounded-full border border-fg/10 bg-fg/5 px-3 py-1.5 text-sm text-fg/80 transition-colors hover:bg-fg/10"
+        title="Go back to how the layout was when you started editing"
+        className={ghostBtn}
       >
         Revert
+      </button>
+      <button
+        type="button"
+        onClick={async () => {
+          const ok = await confirm({
+            title: "Reset the layout to its defaults?",
+            message:
+              "Every widget returns to its stock position, size and visibility, and the UI scale and card spacing go back to their defaults. Ctrl+Z can still undo this while you're editing.",
+            confirmLabel: "Reset layout",
+            danger: true,
+          });
+          if (ok) onReset();
+        }}
+        title="Restore the stock arrangement"
+        className={ghostBtn}
+      >
+        Reset
       </button>
       <button
         type="button"
