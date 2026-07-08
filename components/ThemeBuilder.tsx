@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { useVisitorPrefs } from "./PrefsProvider";
+import { useConfirm } from "./admin/Confirm";
 import { BASE_THEMES, DESIGNS, SCENES } from "@/lib/theme";
 import type { DesignId, ModeColors, SceneId, ThemePack } from "@/lib/theme";
 import { buttonClasses } from "@/lib/buttons";
@@ -195,6 +196,7 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
     resolvedMode,
     setPreviewMode,
   } = useVisitorPrefs();
+  const confirm = useConfirm();
 
   // Always edit the mode that's actually on screen, so what you tweak is what you
   // see. The Editing toggle in the header switches modes by previewing them live
@@ -482,11 +484,26 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
                         aria-hidden
                       />
                     </OptionCard>
+                    {/* Always visible (hover-revealed meant touch users couldn't
+                        delete at all — tapping the card applies the theme), and
+                        confirmed: a saved theme is two full modes of work with
+                        no undo (#121). */}
                     <button
                       type="button"
-                      onClick={() => deleteNamedTheme(t.id)}
+                      onClick={async () => {
+                        if (
+                          await confirm({
+                            title: `Delete “${t.name}”?`,
+                            message:
+                              "This saved theme is stored only in this browser and can't be recovered.",
+                            confirmLabel: "Delete",
+                            danger: true,
+                          })
+                        )
+                          deleteNamedTheme(t.id);
+                      }}
                       aria-label={`Delete ${t.name}`}
-                      className="absolute top-1 right-1 rounded-md bg-background/70 px-1 text-xs text-fg/50 opacity-0 transition-opacity group-hover/theme:opacity-100 hover:text-red-400 focus-visible:opacity-100"
+                      className="absolute top-1 right-1 rounded-md bg-background/70 px-1 text-xs text-fg/50 transition-colors hover:text-red-400"
                     >
                       ✕
                     </button>
@@ -790,7 +807,19 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
         </button>
         <button
           type="button"
-          onClick={resetTheme}
+          onClick={async () => {
+            // An unsaved look is unrecoverable — confirm before discarding (#121).
+            if (
+              await confirm({
+                title: "Reset the theme?",
+                message:
+                  "Returns colors, design, scene, and font to the site default. An unsaved look can't be recovered.",
+                confirmLabel: "Reset",
+                danger: true,
+              })
+            )
+              resetTheme();
+          }}
           title="Return the theme to the app default"
           className={`${buttonClasses("ghost")} shrink-0`}
         >

@@ -13,6 +13,7 @@ import {
 } from "@/lib/theme";
 import type { ThemePackConfig } from "@/lib/schema";
 import { apiErrorMessage } from "./apiError";
+import { useConfirm } from "./Confirm";
 import { useAutosave, SaveStatus, type SaveOptions } from "./useAutosave";
 
 async function saveThemes(
@@ -65,6 +66,7 @@ export default function ThemesManager({
   );
   // Edits debounce-save automatically (local state stays authoritative).
   const { status, error } = useAutosave(overrides, saveThemes);
+  const confirm = useConfirm();
 
   // Seed an override for `slot` (a built-in name) from its current value, so a
   // partial edit keeps the other fields and always carries the stable key.
@@ -90,7 +92,16 @@ export default function ThemesManager({
     });
   }
 
-  function reset(slot: string) {
+  // Confirmed: discards every customization of the pack at once, with no undo
+  // (aligned with the visitor-side destructive actions, #121).
+  async function resetPack(slot: string, displayName: string) {
+    const ok = await confirm({
+      title: `Reset “${displayName}”?`,
+      message: "Restores the built-in theme, discarding your edits to it.",
+      confirmLabel: "Reset",
+      danger: true,
+    });
+    if (!ok) return;
     setOverrides((o) => {
       const next = { ...o };
       delete next[slot];
@@ -118,7 +129,7 @@ export default function ThemesManager({
             edited={p.name in overrides}
             onField={(patch) => setPack(p.name, patch)}
             onColor={(mode, key, value) => setColor(p.name, mode, key, value)}
-            onReset={() => reset(p.name)}
+            onReset={() => resetPack(p.name, (overrides[p.name] ?? p).name)}
           />
         ))}
       </div>

@@ -23,6 +23,13 @@ here.
 
 ### Fixed
 
+- **Destructive settings actions now ask first.** "Reset all settings",
+  "Reset theme", deleting a saved theme, and resetting an edited theme in the
+  admin portal all fired instantly with no way back — one stray click could
+  discard a look you'd just spent time building. Each now shows a
+  confirmation. The delete button on saved themes is also visible all the
+  time instead of only on hover, so themes can finally be deleted on phones
+  and tablets. (#121)
 - **The layout editor now shows the page as visitors will see it.** Hidden and
   empty widgets used to occupy full-size cells while editing, so the editor's
   rows never matched the live page (on a fresh install the edit view was more

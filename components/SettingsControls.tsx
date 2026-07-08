@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useVisitorPrefs } from "./PrefsProvider";
 import CitySearch from "./admin/CitySearch";
+import { useConfirm } from "./admin/Confirm";
 import { supportedTimezones } from "@/lib/prefs";
 
 // The per-visitor preference controls (greeting name, time zone, weather
@@ -27,6 +28,7 @@ export default function SettingsControls() {
     clearLocation,
     reset,
   } = useVisitorPrefs();
+  const confirm = useConfirm();
   // Fill the timezone datalist only after mount: Intl.supportedValuesOf differs
   // between the server's node and the visitor's browser (e.g. a zone one ICU
   // has and the other doesn't), so rendering it during SSR guarantees a
@@ -182,7 +184,20 @@ export default function SettingsControls() {
         <div className="flex items-end justify-start">
           <button
             type="button"
-            onClick={reset}
+            onClick={async () => {
+              // Instant and irreversible without this — it also discards an
+              // unsaved theme-builder look someone may have just built (#121).
+              if (
+                await confirm({
+                  title: "Reset all settings?",
+                  message:
+                    "Clears your greeting, time zone, units, weather location, appearance mode, and any theme customizations in this browser — including an unsaved look.",
+                  confirmLabel: "Reset everything",
+                  danger: true,
+                })
+              )
+                reset();
+            }}
             className="rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-xs text-fg/60 transition-colors hover:bg-red-500/10 hover:text-red-400"
           >
             Reset all settings

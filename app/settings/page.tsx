@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import SettingsControls from "@/components/SettingsControls";
 import ThemeBuilder from "@/components/ThemeBuilder";
+import { ConfirmProvider } from "@/components/admin/Confirm";
 import BackHome from "@/components/BackHome";
 import FloatingNav from "@/components/FloatingNav";
 import { readConfig } from "@/lib/config";
@@ -54,15 +55,19 @@ export default async function SettingsPage() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-6">
-        <div className="glass-card p-6">
-          <SettingsControls />
-        </div>
+      {/* One dialog host for the page's destructive actions (reset all, reset
+          theme, delete saved theme) — the same confirm the admin managers use. */}
+      <ConfirmProvider>
+        <div className="flex flex-col gap-6">
+          <div className="glass-card p-6">
+            <SettingsControls />
+          </div>
 
-        <div className="glass-card p-6">
-          <ThemeBuilder packs={packs} />
+          <div className="glass-card p-6">
+            <ThemeBuilder packs={packs} />
+          </div>
         </div>
-      </div>
+      </ConfirmProvider>
       </main>
       {settings.components.settingsButton && (
         <FloatingNav {...navPages(settings)} />
