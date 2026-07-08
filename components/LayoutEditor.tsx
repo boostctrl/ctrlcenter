@@ -211,17 +211,16 @@ function MoreMenu({ children }: { children: ReactNode }) {
 // Edit-mode chrome around one widget cell: a dashed frame with the widget's
 // label, a title-row drag zone that reorders, MoveButtons, the common size
 // controls (span + Fill, height), a "More" popover with per-side spacing /
-// cards-per-row / label toggle, and a show/hide toggle. Right- and bottom-edge
-// handles resize the width and height by dragging. Renders the live widget
-// dimmed when hidden, a placeholder tile when it has nothing to show — so every
-// widget stays visible and placeable while editing, with no separate palette.
+// cards-per-row / label toggle, and a Hide button. Right- and bottom-edge
+// handles resize the width and height by dragging. Only widgets the live page
+// renders get a frame — hidden and empty ones live in the Dashboard's tray —
+// so the edit grid packs exactly like the live page (#98).
 export function WidgetFrame({
   widget,
   index,
   count,
   cellClass,
   node,
-  emptyReason,
   effectiveCards,
   fillTo,
   titled,
@@ -244,7 +243,6 @@ export function WidgetFrame({
   count: number;
   cellClass: string;
   node: ReactNode;
-  emptyReason: string;
   // Cards per row the widget renders right now (override, else span-derived).
   // Only the card-grid widgets pass one; it gates the stepper and anchors the
   // first −/+ step so adjusting from "Auto" starts at what's on screen.
@@ -308,11 +306,6 @@ export function WidgetFrame({
             ⠿
           </span>
           <span className="font-medium">{label}</span>
-          {widget.hidden && (
-            <span className="rounded bg-fg/10 px-1.5 py-0.5 text-[10px] tracking-wide text-fg/50 uppercase">
-              Hidden
-            </span>
-          )}
         </span>
         <div className="flex shrink-0 items-center gap-2">
           <MoveButtons index={index} count={count} label={label} onMove={onMove} />
@@ -455,32 +448,23 @@ export function WidgetFrame({
           </MoreMenu>
           <button
             type="button"
-            aria-pressed={widget.hidden}
             onClick={() => onToggleHidden(widget.id)}
+            title={`Hide ${label} from the page (it moves to the tray below)`}
             className="rounded-lg border border-fg/10 px-2 py-1 text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg"
           >
-            {widget.hidden ? "Show" : "Hide"}
+            Hide
           </button>
         </div>
       </div>
-      {node ? (
-        // Inert while editing so a drag can't trigger the widget's links; the
-        // preview carries the set height so sizing shows live.
-        <div
-          ref={previewRef}
-          className={`pointer-events-none ${previewClass} ${widget.hidden ? "opacity-40" : ""}`}
-          style={previewStyle}
-        >
-          {node}
-        </div>
-      ) : (
-        <div
-          ref={previewRef}
-          className="flex min-h-16 items-center justify-center rounded-xl bg-fg/[0.03] px-4 py-6 text-center text-xs text-fg/40"
-        >
-          {emptyReason}
-        </div>
-      )}
+      {/* Inert while editing so a drag can't trigger the widget's links; the
+          preview carries the set height so sizing shows live. */}
+      <div
+        ref={previewRef}
+        className={`pointer-events-none ${previewClass}`}
+        style={previewStyle}
+      >
+        {node}
+      </div>
       {/* Drag-to-resize edges: right = width (lg+, where spans apply), bottom =
           height. A live badge shows the value while dragging. */}
       <span

@@ -42,6 +42,7 @@ import {
   CARD_WIDGET_IDS,
   TITLED_WIDGET_IDS,
   SIZED_WIDGET_IDS,
+  WIDGET_LABELS,
   fillSpan,
   type LayoutWidget,
   type LayoutWidgetId,
@@ -252,10 +253,6 @@ export default function Dashboard({
   }
   const mutateSections = (sections: LayoutWidget[]) =>
     mutateLayout({ ...layout, sections });
-  const moveWidget = (from: number, to: number) => {
-    if (to < 0 || to >= layout.sections.length) return;
-    mutateSections(reorder(layout.sections, from, to));
-  };
   const setWidgetSpan = (id: LayoutWidgetId, span: number) =>
     mutateSections(
       layout.sections.map((w) =>
@@ -330,7 +327,7 @@ export default function Dashboard({
       })
     );
   const { gripHandlers, dropHandlers, dragIndex, over } =
-    useFlowReorder(moveWidget);
+    useFlowReorder(moveVisible);
   // Drives the grid's vertical layout: deterministic masonry packing on lg+ (in
   // both the editor and the live page, so the preview matches), single-column
   // flow below lg — honoring the grid gap, per-widget heights and per-side
@@ -611,6 +608,34 @@ export default function Dashboard({
     }
   }
 
+  // Every widget with its rendered node. Only the visible cells — not hidden,
+  // with content — enter the grid, in BOTH modes: previously edit mode gave
+  // hidden and empty widgets full-size phantom cells, so with anything hidden
+  // (a fresh install always has some) the editor's height and row structure
+  // stopped matching the live page (#98). They collapse into the tray below
+  // the grid instead.
+  const cells = layout.sections.map((widget) => ({
+    widget,
+    node: blockFor(widget),
+  }));
+  const liveCells = cells.filter(({ widget, node }) => !widget.hidden && node !== null);
+  const trayCells = cells.filter(({ widget, node }) => widget.hidden || node === null);
+  const liveWidgets = liveCells.map(({ widget }) => widget);
+
+  // Reorder within the visible flow — MoveButtons and drag both hand in
+  // visible indices. Tray widgets keep their slots in the stored order while
+  // the visible ones permute through the remaining positions, so a one-step
+  // move is always a visible change, never a silent swap with a tray widget.
+  function moveVisible(fromV: number, toV: number) {
+    if (toV < 0 || toV >= liveCells.length) return;
+    const liveIds = new Set(liveWidgets.map((w) => w.id));
+    const nextVisible = reorder(liveWidgets, fromV, toV);
+    let vi = 0;
+    mutateSections(
+      layout.sections.map((w) => (liveIds.has(w.id) ? nextVisible[vi++] : w))
+    );
+  }
+
   return (
     <>
       {/* Vertical layout (row-gap, per-cell row-span and margins) is driven by
@@ -622,8 +647,7 @@ export default function Dashboard({
         ref={gridRef}
         className="grid grid-cols-1 gap-x-8 gap-y-8 lg:grid-cols-24 lg:items-start"
       >
-        {layout.sections.map((widget, index) => {
-          const node = blockFor(widget);
+        {liveCells.map(({ widget, node }, vIndex) => {
           const cellClass = `${COL_SPAN[widget.span]} ${CELL_ALIGN[widget.id] ?? ""}`;
           // An explicit height sizes the cell exactly: content widgets scroll
           // their overflow, the others center their content (so a sized greeting
@@ -636,7 +660,6 @@ export default function Dashboard({
               : "flex flex-col justify-center overflow-hidden"
             : "";
           if (!editing) {
-            if (widget.hidden || !node) return null;
             return (
               <div
                 key={widget.id}
@@ -655,37 +678,78 @@ export default function Dashboard({
             <WidgetFrame
               key={widget.id}
               widget={widget}
-              index={index}
-              count={layout.sections.length}
+              index={vIndex}
+              count={liveCells.length}
               cellClass={cellClass}
               node={node}
-              emptyReason={emptyReason(widget.id)}
               effectiveCards={
                 CARD_WIDGET_IDS.includes(widget.id)
                   ? cardsFor(widget)
                   : undefined
               }
-              fillTo={fillSpan(layout.sections, index)}
+              fillTo={fillSpan(liveWidgets, vIndex)}
               titled={TITLED_WIDGET_IDS.includes(widget.id)}
               previewStyle={heightStyle}
               previewClass={heightClass}
-              onMove={moveWidget}
+              onMove={moveVisible}
               onSpan={setWidgetSpan}
               onCards={setWidgetCards}
               onHeight={setWidgetHeight}
               onSpace={setWidgetSpace}
               onToggleHidden={toggleWidgetHidden}
               onToggleLabel={toggleWidgetLabel}
-              gripHandlers={gripHandlers(index)}
-              dropHandlers={dropHandlers(index)}
-              dragging={dragIndex === index}
+              gripHandlers={gripHandlers(vIndex)}
+              dropHandlers={dropHandlers(vIndex)}
+              dragging={dragIndex === vIndex}
               dropSide={
-                over?.index === index && dragIndex !== index ? over.side : null
+                over?.index === vIndex && dragIndex !== vIndex ? over.side : null
               }
             />
           );
         })}
       </div>
+
+      {/* Widgets the live page doesn't render, kept discoverable while editing:
+          hidden ones can be shown (then placed in the grid above), empty ones
+          say what would give them content. */}
+      {editing && trayCells.length > 0 && (
+        <div className="rounded-2xl border border-dashed border-fg/15 p-4">
+          <p className="text-xs font-medium text-fg/70">Not on the live page</p>
+          <p className="mt-0.5 max-w-prose text-xs text-fg/40">
+            These widgets don&apos;t render for visitors right now — hidden ones
+            by choice, empty ones until they have something to show. The grid
+            above packs exactly like the live page. Show a hidden widget to
+            place it.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {trayCells.map(({ widget, node }) => (
+              <div
+                key={widget.id}
+                title={node === null ? emptyReason(widget.id) : undefined}
+                className="flex items-center gap-2 rounded-lg border border-fg/10 bg-fg/5 px-2.5 py-1.5 text-xs text-fg/60"
+              >
+                <span className="font-medium">{WIDGET_LABELS[widget.id]}</span>
+                <span className="rounded bg-fg/10 px-1.5 py-0.5 text-[10px] tracking-wide text-fg/45 uppercase">
+                  {widget.hidden ? "Hidden" : "Empty"}
+                </span>
+                {widget.hidden ? (
+                  <button
+                    type="button"
+                    onClick={() => toggleWidgetHidden(widget.id)}
+                    className="rounded-md border border-fg/10 px-2 py-0.5 text-fg/70 transition-colors hover:bg-fg/10 hover:text-fg"
+                  >
+                    Show
+                  </button>
+                ) : (
+                  <span className="max-w-72 truncate text-fg/40">
+                    {emptyReason(widget.id)}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {!editing && hasVisibleContent && !hasResults && parsedBang && (
         <p className="text-fg/50">

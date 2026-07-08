@@ -14,6 +14,13 @@ here.
 
 ### Fixed
 
+- **The layout editor now shows the page as visitors will see it.** Hidden and
+  empty widgets used to occupy full-size cells while editing, so the editor's
+  rows never matched the live page (on a fresh install the edit view was more
+  than twice the page's real height). They now collapse into a "Not on the
+  live page" tray below the grid — hidden widgets can be shown from there to
+  place them, and empty ones say what would give them content — so the grid
+  you arrange is exactly the grid visitors get. (#98)
 - **Dragging a card no longer smears a text selection.** In the layout editor,
   grabbing a card's body used to sweep a blue selection across its labels and
   content instead of doing anything useful. Text selection is off while
