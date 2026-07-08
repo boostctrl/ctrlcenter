@@ -263,6 +263,7 @@ admin UI locally.
 
 ```bash
 npm run lint
+npm run typecheck    # tsc --noEmit — next build compiles without checking types
 npm test             # Vitest unit tests; npm run test:watch to watch
 npm run build
 ```

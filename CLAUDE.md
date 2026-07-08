@@ -65,7 +65,10 @@ Step-by-step recipes for this repo's mistake-prone workflows live in
 
 ## Verification
 
-- Quality gate (identical to CI): `npm run lint && npm test && npm run build`.
+- Quality gate (identical to CI):
+  `npm run lint && npm run typecheck && npm test && npm run build`.
+  Typecheck is not optional — `next build` (Next 16) compiles without
+  checking types, so nothing else in the gate catches TS errors (#135).
 - For visual changes, verify the real production build: copy `.next/static`
   into the standalone output and drive it with Playwright Chromium. HTML-only
   smoke tests pass even when the CSS is missing — actually render the page.

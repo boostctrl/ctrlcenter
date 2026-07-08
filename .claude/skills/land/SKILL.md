@@ -10,8 +10,9 @@ the steps that get dropped at the end of a long, complex task.
 
 1. **Branch.** You're on `develop`. Never commit to `main` — it only advances
    by fast-forward at release time.
-2. **Quality gate.** `npm run lint && npm test && npm run build` — identical to
-   CI, so a local pass means a green push.
+2. **Quality gate.** `npm run lint && npm run typecheck && npm test &&
+   npm run build` — identical to CI, so a local pass means a green push.
+   Don't skip typecheck: `next build` compiles without checking types (#135).
 3. **Visual check.** If the change touches anything rendered (components,
    styles, scenes, layout, help copy), run the **visual-verify** skill. An
    HTML-that-loads smoke test is not verification.
