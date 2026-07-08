@@ -14,6 +14,11 @@ here.
 
 ### Fixed
 
+- **Applying a saved theme now switches everything at once.** Clicking a saved
+  theme applied its colors immediately but kept the previous design, scene
+  styling, and font until you toggled the appearance mode or reloaded the
+  page. The design, scene, and font now switch the moment the theme is
+  applied. (#120)
 - **Saving a theme now works on plain-HTTP deployments.** On a server reached
   over plain HTTP (a NAS or home-lab IP, the common self-hosted setup), the
   theme builder's Save button silently did nothing — the id generator it used

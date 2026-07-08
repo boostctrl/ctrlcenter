@@ -666,7 +666,10 @@ export function PrefsProvider({
   );
 
   // Restore a saved theme: both modes' design/scene/font and colors, then apply
-  // the chrome for whichever mode is displayed now.
+  // the chrome for whichever mode is displayed now — from the theme's own parts,
+  // not applyChrome, which would resolve from this render's designs/scenes/fonts
+  // state (the values from before the setState calls above commit) and re-apply
+  // the old chrome until a mode toggle or reload (#120).
   const applyNamedTheme = useCallback(
     (id: string) => {
       const t = customThemes.find((x) => x.id === id);
@@ -681,9 +684,12 @@ export function PrefsProvider({
       setFonts(nextFonts);
       saveFont(nextFonts);
       applyThemeColors({ dark: t.dark, light: t.light });
-      applyChrome(resolveDark(displayTheme));
+      const dark = resolveDark(displayTheme);
+      applyDesign(dark ? t.design : t.designLight);
+      applyScene(dark ? t.scene : t.sceneLight);
+      applyFont(dark ? t.font : t.fontLight);
     },
-    [customThemes, applyThemeColors, applyChrome, displayTheme]
+    [customThemes, applyThemeColors, displayTheme]
   );
 
   const deleteNamedTheme = useCallback((id: string) => {
