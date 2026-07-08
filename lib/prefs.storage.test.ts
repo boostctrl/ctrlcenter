@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   loadDesign,
   saveDesign,
@@ -7,6 +7,8 @@ import {
   loadFont,
   saveFont,
   loadThemes,
+  saveThemes,
+  newThemeId,
   loadFavorites,
   saveFavorites,
   loadAccentOverride,
@@ -15,6 +17,7 @@ import {
   DESIGN_KEY,
   FAVORITES_KEY,
   ACCENT_KEY,
+  type CustomTheme,
 } from "@/lib/prefs";
 
 // Minimal localStorage stub so the window-gated load/save helpers run under the
@@ -197,5 +200,62 @@ describe("loadThemes migration", () => {
     expect(t.sceneLight).toBe("waves");
     expect(t.fontLight).toBe("lora");
     expect(t.light.background).toBe("#ffffff");
+  });
+});
+
+describe("newThemeId", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("mints unique ids", () => {
+    expect(newThemeId()).not.toBe(newThemeId());
+  });
+
+  it("works without crypto.randomUUID (plain-HTTP insecure context)", () => {
+    const real = globalThis.crypto;
+    vi.stubGlobal("crypto", {
+      getRandomValues: (arr: Uint8Array) => real.getRandomValues(arr),
+    });
+    const id = newThemeId();
+    expect(id).toMatch(/^[0-9a-f]{32}$/);
+    expect(newThemeId()).not.toBe(id);
+  });
+});
+
+describe("saveThemes", () => {
+  const theme: CustomTheme = {
+    id: "t1",
+    name: "Mine",
+    design: "flat",
+    scene: "dots",
+    font: "inter",
+    designLight: "paper",
+    sceneLight: "waves",
+    fontLight: "lora",
+    dark: {
+      background: "#000000",
+      foreground: "#ffffff",
+      accentFrom: "#a78bfa",
+      accentTo: "#22d3ee",
+    },
+    light: {
+      background: "#ffffff",
+      foreground: "#000000",
+      accentFrom: "#a78bfa",
+      accentTo: "#22d3ee",
+    },
+  };
+
+  it("reports success when the write lands", () => {
+    expect(saveThemes([theme])).toBe(true);
+    expect(loadThemes()).toHaveLength(1);
+  });
+
+  it("reports failure when storage rejects the write", () => {
+    store.setItem = () => {
+      throw new Error("quota");
+    };
+    expect(saveThemes([theme])).toBe(false);
   });
 });

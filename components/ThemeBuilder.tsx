@@ -227,6 +227,9 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
   const [tab, setTab] = useState<TabId>("themes");
   const [draft, setDraft] = useState<ThemeColors>(DEFAULT_DRAFT);
   const [name, setName] = useState("");
+  // Saving a theme can fail when the browser blocks local storage (private
+  // mode, quota); say so instead of a button that silently does nothing.
+  const [saveFailed, setSaveFailed] = useState(false);
   // Whether the accent editor shows one color well or a from→to pair. Solid is
   // just a gradient with two equal stops, so this is purely a UI simplification
   // for the common "I want one color" case.
@@ -290,8 +293,9 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
     if (!name.trim()) return;
     // Captures the full current look — both modes' design, scene, font and
     // colors — so it restores as two complete, independent themes.
-    saveNamedTheme(name);
-    setName("");
+    const ok = saveNamedTheme(name);
+    setSaveFailed(!ok);
+    if (ok) setName("");
   }
 
   // A full-look swatch (surface bg + accent glow) for the current mode — used
@@ -792,6 +796,12 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
         >
           Reset theme
         </button>
+        {saveFailed && (
+          <p role="status" className="w-full text-xs text-red-400">
+            Couldn&apos;t save this theme — your browser is blocking local
+            storage (private mode or full storage).
+          </p>
+        )}
       </div>
     </div>
   );

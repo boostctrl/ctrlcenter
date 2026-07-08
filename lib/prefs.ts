@@ -284,13 +284,28 @@ export function loadThemes(): CustomTheme[] {
   }
 }
 
-export function saveThemes(themes: CustomTheme[]): void {
-  if (typeof window === "undefined") return;
+// Returns whether the write landed, so the theme builder can tell the visitor
+// when storage is unavailable (private mode / quota) instead of silently
+// showing a theme that would vanish on reload.
+export function saveThemes(themes: CustomTheme[]): boolean {
+  if (typeof window === "undefined") return false;
   try {
     window.localStorage.setItem(THEMES_KEY, JSON.stringify(themes));
+    return true;
   } catch {
-    // ignore
+    return false;
   }
+}
+
+// Mint an id for a saved theme. crypto.randomUUID() only exists in secure
+// contexts (HTTPS/localhost), and this app is routinely self-hosted over plain
+// HTTP on a LAN — so fall back to getRandomValues, which is available
+// everywhere; the id only needs to be unique within one browser's saved list.
+export function newThemeId(): string {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
+    b.toString(16).padStart(2, "0")
+  ).join("");
 }
 
 // --- Accent override ---

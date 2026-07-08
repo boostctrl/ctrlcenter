@@ -14,6 +14,12 @@ here.
 
 ### Fixed
 
+- **Saving a theme now works on plain-HTTP deployments.** On a server reached
+  over plain HTTP (a NAS or home-lab IP, the common self-hosted setup), the
+  theme builder's Save button silently did nothing — the id generator it used
+  only exists on HTTPS/localhost. Saving now works everywhere, and if the
+  browser genuinely can't persist the theme (blocked storage, private mode),
+  the builder says so instead of staying silent. (#119)
 - **Deleting an app or bookmark now reports failure honestly.** When a delete
   failed (server error, dropped connection, or a session signed out elsewhere),
   the admin page still removed the row and said "deleted" — and the item

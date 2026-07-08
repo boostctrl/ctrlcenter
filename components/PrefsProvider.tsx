@@ -27,6 +27,7 @@ import {
   saveFont,
   loadFavorites,
   saveFavorites,
+  newThemeId,
   type Units,
   type VisitorLocation,
   type VisitorPrefs,
@@ -245,7 +246,8 @@ type PrefsValue = {
   ) => void;
   // Set or clear one mode's standalone accent (light and dark are independent).
   setAccentOverride: (accent: AccentColors | null, mode: Mode) => void;
-  saveNamedTheme: (name: string) => void;
+  // Returns false when the theme couldn't be persisted (storage unavailable).
+  saveNamedTheme: (name: string) => boolean;
   applyNamedTheme: (id: string) => void;
   deleteNamedTheme: (id: string) => void;
   clearCustomTheme: () => void;
@@ -633,7 +635,7 @@ export function PrefsProvider({
         return { ...cs, accentFrom: a.from, accentTo: a.to };
       };
       const entry: CustomTheme = {
-        id: crypto.randomUUID(),
+        id: newThemeId(),
         name: name.trim().slice(0, 40) || "Custom",
         design: resolveDesign(true),
         scene: resolveScene(true),
@@ -644,13 +646,15 @@ export function PrefsProvider({
         dark: withAccent(look.dark, true),
         light: withAccent(look.light, false),
       };
-      setCustomThemes((prev) => {
-        const next = [...prev, entry];
-        saveThemes(next);
-        return next;
-      });
+      // Persist before committing to state: a theme that can't be stored would
+      // vanish on reload, so report the failure instead of showing it.
+      const next = [...customThemes, entry];
+      if (!saveThemes(next)) return false;
+      setCustomThemes(next);
+      return true;
     },
     [
+      customThemes,
       activeLook,
       seedColorSet,
       accentOverride,
