@@ -427,7 +427,7 @@ export default function Dashboard({
       .join(",");
   useGridLayout(gridRef, layout.gap, gridSignature);
 
-  function doneEditing() {
+  const doneEditing = useCallback(() => {
     setEditing(false);
     undoRef.current = [];
     undoTimingRef.current.lastPush = 0;
@@ -436,7 +436,7 @@ export default function Dashboard({
     // doesn't reopen the editor.
     if (window.location.search.includes("edit="))
       router.replace("/", { scroll: false });
-  }
+  }, [setEditing, router]);
 
   const hiddenById = useMemo(
     () => new Map(layout.sections.map((w) => [w.id, w.hidden])),
@@ -445,18 +445,28 @@ export default function Dashboard({
   const showApps = !hiddenById.get("apps");
   const showBookmarks = !hiddenById.get("bookmarks");
 
-  // Ctrl/Cmd+Z while editing: undo the last layout change.
+  // Editing hotkeys: Ctrl/Cmd+Z undoes the last layout change; Escape exits
+  // edit mode like Done — unless a layered surface should eat it first (an
+  // open More popover, the reset confirm dialog), whose own handlers close it.
+  // Capture phase, so the open-popover check runs before those document-level
+  // handlers have closed anything.
   useEffect(() => {
     if (!editing) return;
     function onKeyDown(e: KeyboardEvent) {
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z") {
         e.preventDefault();
         undoLast();
+        return;
+      }
+      if (e.key === "Escape") {
+        if (gridRef.current?.querySelector("details[open]")) return;
+        if (document.querySelector('[role="alertdialog"]')) return;
+        doneEditing();
       }
     }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [editing, undoLast]);
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [editing, undoLast, doneEditing]);
 
   // "/" focuses search; Escape clears and blurs it. Parked while editing so the
   // hotkey can't fight the editor's controls.
@@ -801,8 +811,10 @@ export default function Dashboard({
               gripHandlers={gripHandlers(vIndex)}
               dropHandlers={dropHandlers(vIndex)}
               dragging={dragIndex === vIndex}
-              dropSide={
-                over?.index === vIndex && dragIndex !== vIndex ? over.side : null
+              drop={
+                over?.index === vIndex && dragIndex !== vIndex
+                  ? { side: over.side, axis: over.axis }
+                  : null
               }
             />
           );

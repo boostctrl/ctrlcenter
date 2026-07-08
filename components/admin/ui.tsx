@@ -31,38 +31,67 @@ export function Button({
 // Keyboard- and touch-accessible reorder controls. HTML5 drag-and-drop doesn't
 // work on touch and isn't reachable by keyboard, so these buttons (which call
 // the same reorder logic) are the primary, universal way to reorder a list.
+//
+// `flow` is for 2-D flow grids (the layout editor), where "up" is really
+// "earlier in the flow" — on a row of side-by-side cards the same move goes
+// LEFT, so the labels say earlier/later and on lg+ (where rows happen) the
+// pair turns into horizontal ◀ ▶.
 export function MoveButtons({
   index,
   count,
   label,
   onMove,
+  flow = false,
 }: {
   index: number;
   count: number;
   label: string;
   onMove: (from: number, to: number) => void;
+  flow?: boolean;
 }) {
   const btn =
     "flex h-4 w-5 items-center justify-center rounded text-[10px] leading-none text-fg/40 hover:bg-fg/10 hover:text-fg disabled:pointer-events-none disabled:opacity-20";
+  const prevLabel = flow ? `Move ${label} earlier` : `Move ${label} up`;
+  const nextLabel = flow ? `Move ${label} later` : `Move ${label} down`;
   return (
-    <div className="flex shrink-0 flex-col gap-0.5">
+    <div
+      className={`flex shrink-0 flex-col gap-0.5 ${flow ? "lg:flex-row" : ""}`}
+    >
       <button
         type="button"
-        aria-label={`Move ${label} up`}
+        aria-label={prevLabel}
+        title={flow ? prevLabel : undefined}
         disabled={index === 0}
         onClick={() => onMove(index, index - 1)}
         className={btn}
       >
-        ▲
+        {flow ? (
+          <>
+            <span className="lg:hidden">▲</span>
+            {/* The small triangles (U+25C2/U+25B8) have no emoji presentation,
+                unlike ◀/▶ which Chromium renders as orange emoji. */}
+            <span className="hidden lg:inline">◂</span>
+          </>
+        ) : (
+          "▲"
+        )}
       </button>
       <button
         type="button"
-        aria-label={`Move ${label} down`}
+        aria-label={nextLabel}
+        title={flow ? nextLabel : undefined}
         disabled={index === count - 1}
         onClick={() => onMove(index, index + 1)}
         className={btn}
       >
-        ▼
+        {flow ? (
+          <>
+            <span className="lg:hidden">▼</span>
+            <span className="hidden lg:inline">▸</span>
+          </>
+        ) : (
+          "▼"
+        )}
       </button>
     </div>
   );

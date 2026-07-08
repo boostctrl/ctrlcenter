@@ -31,6 +31,16 @@ here.
 - **The edit toolbar's steppers now carry labels.** "Scale", "Card gap" and
   "Top gap" are written right on the controls instead of hiding in hover
   tooltips that touch screens never see. (#104, #106)
+- **Layout editor paper cuts smoothed over.** Dragging a card over a
+  full-width card now shows the insertion bar above or below it, instead of a
+  vertical bar that wrongly promised a side-by-side insert. The Fill button
+  no longer pops in and out while you drag-resize, and narrow cards tuck
+  their height stepper into the More menu, so the control strip stops
+  reflowing mid-gesture. The move arrows now say — and on large screens
+  show — "earlier/later" (◀ ▶) to match how side-by-side cards actually
+  move. The width stepper explains itself in plain words ("8 of 24 columns")
+  and is dimmed on screens where widths don't apply. And Escape closes an
+  open More menu, then exits edit mode just like Done. (#104)
 
 ## [1.8.5] - 2026-07-08
 

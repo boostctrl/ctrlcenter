@@ -30,21 +30,26 @@ import { useConfirm } from "./admin/Confirm";
 import { SaveStatus, type SaveState } from "./admin/useAutosave";
 import { useDragResize } from "./useDragResize";
 
-// Which edge of the hovered cell a drop would insert on, in flow order.
+// Which edge of the hovered cell a drop would insert on, in flow order, and
+// which axis that edge sits on ("x" = beside the cell, "y" = above/below it).
 export type DropSide = "before" | "after";
+export type DropAxis = "x" | "y";
+export type DropTarget = { side: DropSide; axis: DropAxis };
 
 // Native HTML5 drag reordering for the widget flow grid — the 2-D sibling of
 // useReorder (components/admin/useReorder.ts). Reordering starts from the grip
 // handle only (so the card's resize edges are free for useDragResize); the whole
 // cell stays the drop target. Cells can sit side by side on lg+ screens, so the
 // insertion side comes from the pointer's x position within the hovered cell
-// there, falling back to y when cells stack below lg. Drag is mouse-only by
-// design; MoveButtons in each frame are the keyboard/touch path.
+// there — except for cells spanning their whole row, where a drop can only land
+// above or below, so the y axis decides (as it does for every cell below lg,
+// where cells stack). Drag is mouse-only by design; MoveButtons in each frame
+// are the keyboard/touch path.
 export function useFlowReorder(onMove: (from: number, to: number) => void) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [over, setOver] = useState<{ index: number; side: DropSide } | null>(
-    null
-  );
+  const [over, setOver] = useState<
+    ({ index: number } & DropTarget) | null
+  >(null);
 
   function reset() {
     setDragIndex(null);
@@ -71,13 +76,20 @@ export function useFlowReorder(onMove: (from: number, to: number) => void) {
         if (dragIndex === null) return;
         e.preventDefault(); // required to allow dropping
         const rect = e.currentTarget.getBoundingClientRect();
-        const sideBySide = window.matchMedia("(min-width: 1024px)").matches;
-        const ratio = sideBySide
-          ? (e.clientX - rect.left) / rect.width
-          : (e.clientY - rect.top) / rect.height;
+        const grid = e.currentTarget.parentElement;
+        const fullRow =
+          grid !== null &&
+          rect.width >= grid.getBoundingClientRect().width - 1;
+        const sideBySide =
+          window.matchMedia("(min-width: 1024px)").matches && !fullRow;
+        const axis: DropAxis = sideBySide ? "x" : "y";
+        const ratio =
+          axis === "x"
+            ? (e.clientX - rect.left) / rect.width
+            : (e.clientY - rect.top) / rect.height;
         const side: DropSide = ratio > 0.5 ? "after" : "before";
-        if (over?.index !== index || over.side !== side)
-          setOver({ index, side });
+        if (over?.index !== index || over.side !== side || over.axis !== axis)
+          setOver({ index, side, axis });
       },
       onDrop: (e: React.DragEvent) => {
         e.preventDefault();
@@ -98,14 +110,15 @@ export function useFlowReorder(onMove: (from: number, to: number) => void) {
   return { gripHandlers, dropHandlers, dragIndex, over };
 }
 
-// The insertion indicator: a vertical accent bar beside the hovered cell on lg+
-// (where cells sit in a row), a horizontal one above/below it when stacked.
+// The insertion indicator: a vertical accent bar beside the hovered cell when
+// the drop would land beside it (x axis), a horizontal one above/below it when
+// the drop lands in the flow (y axis — stacked cells and full-row cells).
 // Complete static class strings so Tailwind's extractor keeps every variant.
-const DROP_BAR: Record<DropSide, string> = {
-  before:
-    "absolute right-0 left-0 -top-2 h-1 rounded-full bg-violet-400 lg:top-0 lg:bottom-0 lg:-left-2 lg:right-auto lg:h-auto lg:w-1",
-  after:
-    "absolute right-0 left-0 -bottom-2 h-1 rounded-full bg-violet-400 lg:top-0 lg:bottom-0 lg:-right-2 lg:left-auto lg:h-auto lg:w-1",
+const DROP_BAR: Record<`${DropSide}:${DropAxis}`, string> = {
+  "before:y": "absolute right-0 left-0 -top-2 h-1 rounded-full bg-violet-400",
+  "after:y": "absolute right-0 left-0 -bottom-2 h-1 rounded-full bg-violet-400",
+  "before:x": "absolute top-0 bottom-0 -left-2 w-1 rounded-full bg-violet-400",
+  "after:x": "absolute top-0 bottom-0 -right-2 w-1 rounded-full bg-violet-400",
 };
 
 const stepBtn =
@@ -122,6 +135,7 @@ function StepGroup({
   canDec,
   canInc,
   extra,
+  className = "",
 }: {
   display: ReactNode;
   title?: string;
@@ -132,10 +146,11 @@ function StepGroup({
   canDec: boolean;
   canInc: boolean;
   extra?: ReactNode;
+  className?: string;
 }) {
   return (
     <div
-      className="flex items-center overflow-hidden rounded-lg border border-fg/10"
+      className={`flex items-center overflow-hidden rounded-lg border border-fg/10 ${className}`}
       title={title}
     >
       <button
@@ -240,7 +255,7 @@ export function WidgetFrame({
   gripHandlers,
   dropHandlers,
   dragging,
-  dropSide,
+  drop,
 }: {
   widget: LayoutWidget;
   index: number;
@@ -269,7 +284,7 @@ export function WidgetFrame({
   gripHandlers: React.HTMLAttributes<HTMLElement> & { draggable?: boolean };
   dropHandlers: React.HTMLAttributes<HTMLDivElement>;
   dragging: boolean;
-  dropSide: DropSide | null;
+  drop: DropTarget | null;
 }) {
   const label = WIDGET_LABELS[widget.id];
   const { frameRef, previewRef, drag, widthHandle, heightHandle } = useDragResize(
@@ -281,6 +296,47 @@ export function WidgetFrame({
     }
   );
   const space = widget.space ?? {};
+  // Narrow cells can't fit the whole control strip beside the label without
+  // wrapping over the preview, so the height stepper moves into More there.
+  const narrow = widget.span < 8;
+  const heightStepper = (
+    <StepGroup
+      title="Card height — or drag the bottom edge; taller than the content adds breathing room, content widgets scroll"
+      display={widget.height !== undefined ? `${widget.height}px` : "Auto"}
+      decLabel={`Shorter ${label}`}
+      incLabel={`Taller ${label}`}
+      onDec={() =>
+        onHeight(
+          widget.id,
+          widget.height === undefined
+            ? DEFAULT_WIDGET_HEIGHT
+            : Math.max(MIN_WIDGET_HEIGHT, widget.height - WIDGET_HEIGHT_STEP)
+        )
+      }
+      onInc={() =>
+        onHeight(
+          widget.id,
+          widget.height === undefined
+            ? DEFAULT_WIDGET_HEIGHT
+            : Math.min(MAX_WIDGET_HEIGHT, widget.height + WIDGET_HEIGHT_STEP)
+        )
+      }
+      canDec={widget.height === undefined || widget.height > MIN_WIDGET_HEIGHT}
+      canInc={widget.height === undefined || widget.height < MAX_WIDGET_HEIGHT}
+      extra={
+        widget.height !== undefined && (
+          <button
+            type="button"
+            aria-label={`Automatic height for ${label}`}
+            onClick={() => onHeight(widget.id, undefined)}
+            className={`${stepBtn} border-l border-fg/10 text-[10px] tracking-wide uppercase`}
+          >
+            Auto
+          </button>
+        )
+      }
+    />
+  );
   return (
     <div
       ref={frameRef}
@@ -293,7 +349,9 @@ export function WidgetFrame({
         dragging ? "opacity-40" : ""
       } ${cellClass}`}
     >
-      {dropSide && <span className={DROP_BAR[dropSide]} aria-hidden />}
+      {drop && (
+        <span className={DROP_BAR[`${drop.side}:${drop.axis}`]} aria-hidden />
+      )}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-fg/60">
         {/* The whole label strip — grip, label, and the empty run before the
             controls — is the drag source, not just the 16px grip: grabbing the
@@ -312,9 +370,15 @@ export function WidgetFrame({
           <span className="font-medium">{label}</span>
         </span>
         <div className="flex shrink-0 items-center gap-2">
-          <MoveButtons index={index} count={count} label={label} onMove={onMove} />
+          <MoveButtons
+            index={index}
+            count={count}
+            label={label}
+            onMove={onMove}
+            flow
+          />
           <StepGroup
-            title="Column width — or drag the right edge"
+            title={`Column width: ${widget.span} of ${GRID_COLUMNS} columns — drag the right edge to resize. Widths apply on large screens.`}
             display={`${widget.span}/${GRID_COLUMNS}`}
             decLabel={`Narrow ${label}`}
             incLabel={`Widen ${label}`}
@@ -322,8 +386,11 @@ export function WidgetFrame({
             onInc={() => onSpan(widget.id, widget.span + 1)}
             canDec={widget.span > 1}
             canInc={widget.span < GRID_COLUMNS}
+            className="max-lg:opacity-60"
           />
-          {fillTo > widget.span && (
+          {/* Parked during a resize drag: the span changes every step, so the
+              button popping in/out would reflow the strip mid-gesture. */}
+          {!drag && fillTo > widget.span && (
             <button
               type="button"
               onClick={() => onSpan(widget.id, fillTo)}
@@ -333,43 +400,16 @@ export function WidgetFrame({
               Fill
             </button>
           )}
-          <StepGroup
-            title="Card height — or drag the bottom edge; taller than the content adds breathing room, content widgets scroll"
-            display={widget.height !== undefined ? `${widget.height}px` : "Auto"}
-            decLabel={`Shorter ${label}`}
-            incLabel={`Taller ${label}`}
-            onDec={() =>
-              onHeight(
-                widget.id,
-                widget.height === undefined
-                  ? DEFAULT_WIDGET_HEIGHT
-                  : Math.max(MIN_WIDGET_HEIGHT, widget.height - WIDGET_HEIGHT_STEP)
-              )
-            }
-            onInc={() =>
-              onHeight(
-                widget.id,
-                widget.height === undefined
-                  ? DEFAULT_WIDGET_HEIGHT
-                  : Math.min(MAX_WIDGET_HEIGHT, widget.height + WIDGET_HEIGHT_STEP)
-              )
-            }
-            canDec={widget.height === undefined || widget.height > MIN_WIDGET_HEIGHT}
-            canInc={widget.height === undefined || widget.height < MAX_WIDGET_HEIGHT}
-            extra={
-              widget.height !== undefined && (
-                <button
-                  type="button"
-                  aria-label={`Automatic height for ${label}`}
-                  onClick={() => onHeight(widget.id, undefined)}
-                  className={`${stepBtn} border-l border-fg/10 text-[10px] tracking-wide uppercase`}
-                >
-                  Auto
-                </button>
-              )
-            }
-          />
+          {!narrow && heightStepper}
           <MoreMenu>
+              {narrow && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] tracking-wide text-fg/40 uppercase">
+                    Height
+                  </span>
+                  {heightStepper}
+                </div>
+              )}
             <div className="flex flex-col gap-1.5">
                 <span className="text-[10px] tracking-wide text-fg/40 uppercase">
                   Space around card
