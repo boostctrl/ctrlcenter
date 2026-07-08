@@ -12,6 +12,14 @@ here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Keyword status checks no longer buffer huge responses.** A keyword check
+  pointed at a very large response (say, a download link instead of a landing
+  page) used to load the entire body into memory on every poll. Bodies are now
+  capped at 2 MB, and a page whose keyword can't be verified within the cap
+  counts as down. (#109)
+
 ## [1.8.3] - 2026-07-03
 
 ### Changed

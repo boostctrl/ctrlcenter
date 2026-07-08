@@ -2,9 +2,15 @@ import net from "node:net";
 import dns from "node:dns/promises";
 import { execFile } from "node:child_process";
 import { matchesStatus, type AppStatus } from "./status";
+import { readCapped } from "./fetch-body";
 import type { AppItem } from "./schema";
 
 const TIMEOUT_MS = 5000;
+// Keyword checks read the body; cap what gets buffered so a check pointed at a
+// huge response (say, a download URL instead of a landing page) can't spike the
+// Node heap on every poll. The keyword is expected in page HTML, so 2 MB is
+// plenty.
+const KEYWORD_MAX_BYTES = 2 * 1024 * 1024;
 
 // The fields a check needs. Callers pass a whole AppItem; this narrows to what
 // matters so the live /api/status endpoint and the background history poller
@@ -58,8 +64,10 @@ async function checkHttp(app: CheckInput, keyword: string): Promise<AppStatus> {
     }
     let up = matchesStatus(res.status, app.expectStatus ?? "");
     if (keyword) {
-      const body = await res.text();
-      up = up && body.toLowerCase().includes(keyword.toLowerCase());
+      // An over-cap (or unreadable) body reads as null: the keyword couldn't be
+      // verified, so treat it like a keyword miss.
+      const body = await readCapped(res, KEYWORD_MAX_BYTES);
+      up = up && body !== null && body.toLowerCase().includes(keyword.toLowerCase());
     }
     return { up, status: res.status, ms: Date.now() - start };
   } catch {

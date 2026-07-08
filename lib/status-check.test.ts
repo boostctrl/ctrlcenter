@@ -7,11 +7,11 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+// A real Response so the body-capped read path (headers + stream) is exercised.
 function mockFetch(status: number, body = "") {
-  return vi.spyOn(globalThis, "fetch").mockResolvedValue({
-    status,
-    text: async () => body,
-  } as unknown as Response);
+  return vi
+    .spyOn(globalThis, "fetch")
+    .mockResolvedValue(new Response(body, { status }));
 }
 
 const base = { expectStatus: "", keyword: "" } as const;
@@ -65,6 +65,35 @@ describe("checkApp · keyword", () => {
       keyword: "grafana",
     });
     expect(r.up).toBe(false);
+  });
+
+  it("is down when the body exceeds the size cap", async () => {
+    // Stream 3 × 1 MB chunks with no content-length so the 2 MB cap trips while
+    // reading — a miss even though the keyword is in the first chunk.
+    const megabyte = 1024 * 1024;
+    const first = new TextEncoder().encode(
+      "grafana".padEnd(megabyte, "a")
+    );
+    const filler = new Uint8Array(megabyte).fill(97);
+    const stream = new ReadableStream<Uint8Array>({
+      start(c) {
+        c.enqueue(first);
+        c.enqueue(filler);
+        c.enqueue(filler);
+        c.close();
+      },
+    });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(stream, { status: 200 })
+    );
+    const r = await checkApp({
+      ...base,
+      url: "https://x.example",
+      checkType: "keyword",
+      keyword: "grafana",
+    });
+    expect(r.up).toBe(false);
+    expect(r.status).toBe(200);
   });
 });
 
