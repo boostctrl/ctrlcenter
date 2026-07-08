@@ -26,6 +26,18 @@ here.
   dashboards don't shift, and small screens cap the value at the old 48px so
   a roomy desktop setting doesn't waste phone space. (#106)
 
+### Fixed
+
+- **The layout editor's controls now work for touch and keyboard, not just a
+  mouse.** The −/+ steppers auto-repeat while held, so walking a width across
+  the grid or a height through its range no longer takes dozens of taps. The
+  resize handles are real sliders: focusable, arrow-key operable (Home/End
+  jump the range, Delete returns a height to Auto) instead of carrying a
+  slider role they didn't honor. On touch screens the move arrows, steppers
+  and resize handles grow to comfortable target sizes — the move buttons are
+  the only way to reorder by touch and were barely 16px tall. The editor's
+  tiny labels and badges also got a contrast bump. (#102)
+
 ### Changed
 
 - **The edit toolbar's steppers now carry labels.** "Scale", "Card gap" and

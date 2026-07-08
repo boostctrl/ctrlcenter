@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   GRID_COLUMNS,
   MAX_CARD_COLUMNS,
@@ -122,7 +128,72 @@ const DROP_BAR: Record<`${DropSide}:${DropAxis}`, string> = {
 };
 
 const stepBtn =
-  "px-2 py-1 text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg disabled:pointer-events-none disabled:opacity-30";
+  "px-2 py-1 text-fg/60 transition-colors select-none touch-none hover:bg-fg/10 hover:text-fg disabled:pointer-events-none disabled:opacity-30 pointer-coarse:px-3 pointer-coarse:py-2.5";
+
+// Press-and-hold auto-repeat for a stepper button (#102): a click steps once
+// as before; holding the button repeats the step after a short delay, so
+// touch and keyboard users aren't stuck clicking 16 times to walk a span
+// across the grid. The action and its range guard live in a ref so every
+// repeat sees the latest values (the props change on each step), and the
+// guard stops the timer at the range's end. Spread the returned handlers on
+// the button INSTEAD of an onClick.
+const HOLD_DELAY_MS = 400;
+const HOLD_REPEAT_MS = 60;
+
+function useHoldRepeat(action: () => void, canRun: boolean) {
+  const live = useRef({ action, canRun });
+  useEffect(() => {
+    live.current = { action, canRun };
+  });
+  const timers = useRef<{ delay?: number; interval?: number; fired: boolean }>(
+    { fired: false }
+  );
+
+  const stop = useCallback(() => {
+    window.clearTimeout(timers.current.delay);
+    window.clearInterval(timers.current.interval);
+    timers.current.delay = timers.current.interval = undefined;
+  }, []);
+  useEffect(() => stop, [stop]);
+
+  const start = useCallback(() => {
+    stop();
+    timers.current.fired = false;
+    timers.current.delay = window.setTimeout(() => {
+      timers.current.interval = window.setInterval(() => {
+        if (!live.current.canRun) {
+          stop();
+          return;
+        }
+        timers.current.fired = true;
+        live.current.action();
+      }, HOLD_REPEAT_MS);
+    }, HOLD_DELAY_MS);
+  }, [stop]);
+
+  return {
+    // Capture the pointer for the duration of the hold: each step can move
+    // the button under the stationary pointer (widening a card shifts its
+    // whole control strip), which would otherwise fire pointerleave and kill
+    // the hold after one repeat.
+    onPointerDown: (e: React.PointerEvent) => {
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+      start();
+    },
+    onPointerUp: stop,
+    onPointerLeave: stop,
+    onPointerCancel: stop,
+    // The click that follows releasing a hold must not step once more; a
+    // plain click (or Enter/Space) steps exactly once.
+    onClick: () => {
+      if (timers.current.fired) {
+        timers.current.fired = false;
+        return;
+      }
+      live.current.action();
+    },
+  };
+}
 
 // A −/value/+ stepper group, optionally with a trailing button (e.g. "Auto").
 function StepGroup({
@@ -148,6 +219,8 @@ function StepGroup({
   extra?: ReactNode;
   className?: string;
 }) {
+  const holdDec = useHoldRepeat(onDec, canDec);
+  const holdInc = useHoldRepeat(onInc, canInc);
   return (
     <div
       className={`flex items-center overflow-hidden rounded-lg border border-fg/10 ${className}`}
@@ -157,17 +230,17 @@ function StepGroup({
         type="button"
         aria-label={decLabel}
         disabled={!canDec}
-        onClick={onDec}
+        {...holdDec}
         className={stepBtn}
       >
         −
       </button>
-      <span className="px-1 text-fg/50 tabular-nums">{display}</span>
+      <span className="px-1 text-fg/70 tabular-nums">{display}</span>
       <button
         type="button"
         aria-label={incLabel}
         disabled={!canInc}
-        onClick={onInc}
+        {...holdInc}
         className={stepBtn}
       >
         +
@@ -369,7 +442,10 @@ export function WidgetFrame({
           </span>
           <span className="font-medium">{label}</span>
         </span>
-        <div className="flex shrink-0 items-center gap-2">
+        {/* min-w-0 + wrap (not shrink-0): the coarse-pointer sizes make this
+            row wider than a phone-width frame, so it must be able to break
+            into rows instead of overflowing the card's edge. */}
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
           <MoveButtons
             index={index}
             count={count}
@@ -404,14 +480,14 @@ export function WidgetFrame({
           <MoreMenu>
               {narrow && (
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] tracking-wide text-fg/40 uppercase">
+                  <span className="text-[10px] tracking-wide text-fg/60 uppercase">
                     Height
                   </span>
                   {heightStepper}
                 </div>
               )}
             <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] tracking-wide text-fg/40 uppercase">
+                <span className="text-[10px] tracking-wide text-fg/60 uppercase">
                   Space around card
                 </span>
                 <div className="grid grid-cols-2 gap-1.5">
@@ -453,7 +529,7 @@ export function WidgetFrame({
               </div>
               {effectiveCards !== undefined && (
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] tracking-wide text-fg/40 uppercase">
+                  <span className="text-[10px] tracking-wide text-fg/60 uppercase">
                     Cards / row
                   </span>
                   <StepGroup
@@ -510,24 +586,79 @@ export function WidgetFrame({
         {node}
       </div>
       {/* Drag-to-resize edges: right = width (lg+, where spans apply), bottom =
-          height. A live badge shows the value while dragging. */}
+          height. A live badge shows the value while dragging. They carry
+          role="slider", so they're focusable and arrow-key operable (#102):
+          Up/Right increases per the ARIA convention, Home/End jump the range,
+          and Delete returns the height to automatic. */}
       <span
         {...widthHandle}
         role="slider"
-        aria-label={`Drag to set ${label} width`}
+        tabIndex={0}
+        aria-label={`${label} width`}
         aria-valuenow={widget.span}
         aria-valuemin={1}
         aria-valuemax={GRID_COLUMNS}
-        className="absolute top-1/2 right-0 hidden h-12 w-2 -translate-y-1/2 cursor-col-resize touch-none rounded-full bg-fg/10 transition-colors hover:bg-violet-400/70 lg:block"
+        aria-valuetext={`${widget.span} of ${GRID_COLUMNS} columns`}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowRight" || e.key === "ArrowUp") {
+            e.preventDefault();
+            onSpan(widget.id, widget.span + 1);
+          } else if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
+            e.preventDefault();
+            onSpan(widget.id, widget.span - 1);
+          } else if (e.key === "Home") {
+            e.preventDefault();
+            onSpan(widget.id, 1);
+          } else if (e.key === "End") {
+            e.preventDefault();
+            onSpan(widget.id, GRID_COLUMNS);
+          }
+        }}
+        className="absolute top-1/2 right-0 hidden h-12 w-2 -translate-y-1/2 cursor-col-resize touch-none rounded-full bg-fg/10 transition-colors outline-none hover:bg-violet-400/70 focus-visible:bg-violet-400/70 focus-visible:outline-2 focus-visible:outline-violet-400 lg:block pointer-coarse:h-16 pointer-coarse:w-4"
       />
       <span
         {...heightHandle}
         role="slider"
-        aria-label={`Drag to set ${label} height`}
-        aria-valuenow={widget.height ?? 0}
+        tabIndex={0}
+        aria-label={`${label} height`}
+        aria-valuenow={widget.height ?? DEFAULT_WIDGET_HEIGHT}
         aria-valuemin={MIN_WIDGET_HEIGHT}
         aria-valuemax={MAX_WIDGET_HEIGHT}
-        className="absolute bottom-0 left-1/2 h-2 w-12 -translate-x-1/2 cursor-row-resize touch-none rounded-full bg-fg/10 transition-colors hover:bg-violet-400/70"
+        aria-valuetext={
+          widget.height !== undefined ? `${widget.height} pixels` : "Automatic"
+        }
+        onKeyDown={(e) => {
+          const clampH = (h: number) =>
+            Math.min(MAX_WIDGET_HEIGHT, Math.max(MIN_WIDGET_HEIGHT, h));
+          const seeded = widget.height ?? DEFAULT_WIDGET_HEIGHT;
+          if (e.key === "ArrowUp" || e.key === "ArrowRight") {
+            e.preventDefault();
+            onHeight(
+              widget.id,
+              widget.height === undefined
+                ? DEFAULT_WIDGET_HEIGHT
+                : clampH(seeded + WIDGET_HEIGHT_STEP)
+            );
+          } else if (e.key === "ArrowDown" || e.key === "ArrowLeft") {
+            e.preventDefault();
+            onHeight(
+              widget.id,
+              widget.height === undefined
+                ? DEFAULT_WIDGET_HEIGHT
+                : clampH(seeded - WIDGET_HEIGHT_STEP)
+            );
+          } else if (e.key === "Home") {
+            e.preventDefault();
+            onHeight(widget.id, MIN_WIDGET_HEIGHT);
+          } else if (e.key === "End") {
+            e.preventDefault();
+            onHeight(widget.id, MAX_WIDGET_HEIGHT);
+          } else if (e.key === "Delete" || e.key === "Backspace") {
+            e.preventDefault();
+            onHeight(widget.id, undefined);
+          }
+        }}
+        className="absolute bottom-0 left-1/2 h-2 w-12 -translate-x-1/2 cursor-row-resize touch-none rounded-full bg-fg/10 transition-colors outline-none hover:bg-violet-400/70 focus-visible:bg-violet-400/70 focus-visible:outline-2 focus-visible:outline-violet-400 pointer-coarse:h-4 pointer-coarse:w-16"
       />
       {drag && (
         <span
@@ -569,7 +700,9 @@ function ToolbarStepper({
   canInc: boolean;
 }) {
   const btn =
-    "px-2.5 py-1 text-sm text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg disabled:pointer-events-none disabled:opacity-30";
+    "px-2.5 py-1 text-sm text-fg/60 transition-colors select-none touch-none hover:bg-fg/10 hover:text-fg disabled:pointer-events-none disabled:opacity-30 pointer-coarse:py-2.5";
+  const holdDec = useHoldRepeat(onDec, canDec);
+  const holdInc = useHoldRepeat(onInc, canInc);
   return (
     <div
       className="flex items-center overflow-hidden rounded-full border border-fg/10"
@@ -582,7 +715,7 @@ function ToolbarStepper({
         type="button"
         aria-label={decLabel}
         disabled={!canDec}
-        onClick={onDec}
+        {...holdDec}
         className={btn}
       >
         −
@@ -592,7 +725,7 @@ function ToolbarStepper({
         type="button"
         aria-label={incLabel}
         disabled={!canInc}
-        onClick={onInc}
+        {...holdInc}
         className={btn}
       >
         +
@@ -639,7 +772,7 @@ export function EditToolbar({
   return (
     <div className="fixed bottom-5 left-1/2 z-40 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-full border border-fg/10 bg-fg/5 py-2 pr-2 pl-4 shadow-lg backdrop-blur-xl">
       <span className="text-sm font-medium text-fg/80">Editing layout</span>
-      <span className="text-xs text-fg/40 lg:hidden">
+      <span className="text-xs text-fg/60 lg:hidden">
         Widths apply on large screens
       </span>
       <ToolbarStepper

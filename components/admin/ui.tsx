@@ -49,8 +49,10 @@ export function MoveButtons({
   onMove: (from: number, to: number) => void;
   flow?: boolean;
 }) {
+  // On coarse pointers these are the ONLY reorder path (HTML5 drag needs a
+  // mouse), so they grow toward the touch-target guideline there (#102).
   const btn =
-    "flex h-4 w-5 items-center justify-center rounded text-[10px] leading-none text-fg/40 hover:bg-fg/10 hover:text-fg disabled:pointer-events-none disabled:opacity-20";
+    "flex h-4 w-5 items-center justify-center rounded text-[10px] leading-none text-fg/55 select-none hover:bg-fg/10 hover:text-fg disabled:pointer-events-none disabled:opacity-20 pointer-coarse:h-9 pointer-coarse:w-9 pointer-coarse:text-sm";
   const prevLabel = flow ? `Move ${label} earlier` : `Move ${label} up`;
   const nextLabel = flow ? `Move ${label} later` : `Move ${label} down`;
   return (

@@ -827,7 +827,7 @@ export default function Dashboard({
       {editing && trayCells.length > 0 && (
         <div className="rounded-2xl border border-dashed border-fg/15 p-4">
           <p className="text-xs font-medium text-fg/70">Not on the live page</p>
-          <p className="mt-0.5 max-w-prose text-xs text-fg/40">
+          <p className="mt-0.5 max-w-prose text-xs text-fg/55">
             These widgets don&apos;t render for visitors right now — hidden ones
             by choice, empty ones until they have something to show. The grid
             above packs exactly like the live page. Show a hidden widget to
@@ -841,7 +841,7 @@ export default function Dashboard({
                 className="flex items-center gap-2 rounded-lg border border-fg/10 bg-fg/5 px-2.5 py-1.5 text-xs text-fg/60"
               >
                 <span className="font-medium">{WIDGET_LABELS[widget.id]}</span>
-                <span className="rounded bg-fg/10 px-1.5 py-0.5 text-[10px] tracking-wide text-fg/45 uppercase">
+                <span className="rounded bg-fg/10 px-1.5 py-0.5 text-[10px] tracking-wide text-fg/60 uppercase">
                   {widget.hidden ? "Hidden" : "Empty"}
                 </span>
                 {widget.hidden ? (
@@ -853,7 +853,7 @@ export default function Dashboard({
                     Show
                   </button>
                 ) : (
-                  <span className="max-w-72 truncate text-fg/40">
+                  <span className="max-w-72 truncate text-fg/55">
                     {emptyReason(widget.id)}
                   </span>
                 )}
