@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   GRID_COLUMNS,
   MAX_CARD_COLUMNS,
@@ -166,13 +166,55 @@ const SIDE_META: Record<SpaceSide, { arrow: string; name: string }> = {
   left: { arrow: "←", name: "left of" },
 };
 
+// The per-card "More" popover: a native <details> for the disclosure basics,
+// plus the app's standard popover manners (see FloatingNav) — close on outside
+// click and Escape. Without them the menu only closes by re-clicking its own
+// summary, so several can pile up and an open one overlaps the card beside it
+// (#100).
+function MoreMenu({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDetailsElement>(null);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const close = () => {
+      if (ref.current) ref.current.open = false;
+    };
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) close();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+  return (
+    <details
+      ref={ref}
+      className="relative"
+      onToggle={(e) => setOpen(e.currentTarget.open)}
+    >
+      <summary className="flex cursor-pointer list-none items-center rounded-lg border border-fg/10 px-2 py-1 text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg [&::-webkit-details-marker]:hidden">
+        More
+      </summary>
+      <div className="absolute top-full right-0 z-10 mt-1 flex w-56 flex-col gap-3 rounded-xl border border-fg/10 bg-[var(--background)] p-3 shadow-lg">
+        {children}
+      </div>
+    </details>
+  );
+}
+
 // Edit-mode chrome around one widget cell: a dashed frame with the widget's
-// label, a grip that reorders, MoveButtons, the common size controls (span +
-// Fill, height), a "More" disclosure with per-side spacing / cards-per-row /
-// label toggle, and a show/hide toggle. Right- and bottom-edge handles resize
-// the width and height by dragging. Renders the live widget dimmed when hidden,
-// a placeholder tile when it has nothing to show — so every widget stays visible
-// and placeable while editing, with no separate palette.
+// label, a title-row drag zone that reorders, MoveButtons, the common size
+// controls (span + Fill, height), a "More" popover with per-side spacing /
+// cards-per-row / label toggle, and a show/hide toggle. Right- and bottom-edge
+// handles resize the width and height by dragging. Renders the live widget
+// dimmed when hidden, a placeholder tile when it has nothing to show — so every
+// widget stays visible and placeable while editing, with no separate palette.
 export function WidgetFrame({
   widget,
   index,
@@ -245,26 +287,34 @@ export function WidgetFrame({
       data-space-right={space.right || undefined}
       data-space-bottom={space.bottom || undefined}
       data-space-left={space.left || undefined}
-      className={`relative flex flex-col gap-2 rounded-2xl p-2 outline-2 outline-dashed outline-fg/15 transition-opacity ${
+      className={`relative flex flex-col gap-2 rounded-2xl p-2 outline-2 outline-dashed outline-fg/15 transition-opacity select-none ${
         dragging ? "opacity-40" : ""
       } ${cellClass}`}
     >
       {dropSide && <span className={DROP_BAR[dropSide]} aria-hidden />}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-fg/60">
+        {/* The whole label strip — grip, label, and the empty run before the
+            controls — is the drag source, not just the 16px grip: grabbing the
+            card's title is the natural first gesture, and the resize handles
+            live on the cell edges so a wide top drag zone can't collide with
+            them (#99). The frame is select-none so a drag that starts anywhere
+            on the card can't smear a text selection instead. */}
         <span
           {...gripHandlers}
-          className="hidden cursor-grab text-fg/30 select-none active:cursor-grabbing sm:inline"
+          className="flex min-w-0 flex-1 cursor-grab items-center gap-x-2 active:cursor-grabbing"
           title="Drag to move"
         >
-          ⠿
-        </span>
-        <span className="font-medium">{label}</span>
-        {widget.hidden && (
-          <span className="rounded bg-fg/10 px-1.5 py-0.5 text-[10px] tracking-wide text-fg/50 uppercase">
-            Hidden
+          <span className="hidden text-fg/50 sm:inline" aria-hidden>
+            ⠿
           </span>
-        )}
-        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <span className="font-medium">{label}</span>
+          {widget.hidden && (
+            <span className="rounded bg-fg/10 px-1.5 py-0.5 text-[10px] tracking-wide text-fg/50 uppercase">
+              Hidden
+            </span>
+          )}
+        </span>
+        <div className="flex shrink-0 items-center gap-2">
           <MoveButtons index={index} count={count} label={label} onMove={onMove} />
           <StepGroup
             title="Column width — or drag the right edge"
@@ -322,12 +372,8 @@ export function WidgetFrame({
               )
             }
           />
-          <details className="group relative">
-            <summary className="flex cursor-pointer list-none items-center rounded-lg border border-fg/10 px-2 py-1 text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg [&::-webkit-details-marker]:hidden">
-              More
-            </summary>
-            <div className="absolute top-full right-0 z-10 mt-1 flex w-56 flex-col gap-3 rounded-xl border border-fg/10 bg-[var(--background)] p-3 shadow-lg">
-              <div className="flex flex-col gap-1.5">
+          <MoreMenu>
+            <div className="flex flex-col gap-1.5">
                 <span className="text-[10px] tracking-wide text-fg/40 uppercase">
                   Space around card
                 </span>
@@ -406,8 +452,7 @@ export function WidgetFrame({
                   {widget.hideLabel ? "Show heading" : "Hide heading"}
                 </button>
               )}
-            </div>
-          </details>
+          </MoreMenu>
           <button
             type="button"
             aria-pressed={widget.hidden}

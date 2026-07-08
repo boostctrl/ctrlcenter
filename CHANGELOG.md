@@ -14,6 +14,15 @@ here.
 
 ### Fixed
 
+- **Dragging a card no longer smears a text selection.** In the layout editor,
+  grabbing a card's body used to sweep a blue selection across its labels and
+  content instead of doing anything useful. Text selection is off while
+  editing, and a card can now be dragged by its whole title row — not just the
+  small ⠿ grip, which also got easier to see. (#99)
+- **The per-card More menu closes like every other menu.** It now closes when
+  you click anywhere else or press Escape, instead of staying open until you
+  clicked its own button again — so menus no longer pile up and cover the
+  card next door. (#100)
 - **Service names no longer get cut off on phones.** The status page reserved
   a fixed-width column for the uptime figures at every screen size, squeezing
   names on small screens down to stubs like "Home A…". On phones the figures
