@@ -139,7 +139,17 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
       danger: true,
     });
     if (!ok) return;
-    await fetch(`/api/apps/${id}`, { method: "DELETE" });
+    try {
+      const res = await fetch(`/api/apps/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        toast(apiErrorMessage(data, "Failed to delete"), "error");
+        return;
+      }
+    } catch {
+      toast("Failed to delete", "error");
+      return;
+    }
     setApps((prev) => prev.filter((a) => a.id !== id));
     if (editingId === id) resetForm();
     toast("Application deleted");

@@ -14,6 +14,11 @@ here.
 
 ### Fixed
 
+- **Deleting an app or bookmark now reports failure honestly.** When a delete
+  failed (server error, dropped connection, or a session signed out elsewhere),
+  the admin page still removed the row and said "deleted" — and the item
+  quietly reappeared on the next reload. The row now stays put and the actual
+  error is shown, matching how saving and reordering already behave. (#126)
 - **Keyword status checks no longer buffer huge responses.** A keyword check
   pointed at a very large response (say, a download link instead of a landing
   page) used to load the entire body into memory on every poll. Bodies are now

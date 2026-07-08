@@ -78,7 +78,17 @@ export default function BookmarksManager({
       danger: true,
     });
     if (!ok) return;
-    await fetch(`/api/bookmarks/${id}`, { method: "DELETE" });
+    try {
+      const res = await fetch(`/api/bookmarks/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        toast(apiErrorMessage(data, "Failed to delete"), "error");
+        return;
+      }
+    } catch {
+      toast("Failed to delete", "error");
+      return;
+    }
     setBookmarks((prev) => prev.filter((b) => b.id !== id));
     if (editingId === id) resetForm();
     toast("Bookmark deleted");
