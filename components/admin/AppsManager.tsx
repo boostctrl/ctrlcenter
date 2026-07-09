@@ -40,7 +40,7 @@ function checkTypeHint(t: CheckType): string {
     case "keyword":
       return "Fetches the page; up only if the text below appears in the response.";
     case "dns":
-      return "Up when the URL's host resolves in DNS.";
+      return "Sends a DNS query to the URL's host — up when it answers. For DNS servers like Pi-hole.";
     case "icmp":
       return "Pings the URL's host. Needs ICMP (NET_RAW) in containers.";
     case "http":
@@ -95,7 +95,8 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
     try {
       // Only send the fields relevant to the chosen check method; clear the
       // others (so switching method doesn't leave a stale keyword/expectStatus
-      // applying). `port` is sent as a number only when a TCP port was entered.
+      // applying). `port` is sent as a number only when a TCP/DNS port was
+      // entered.
       const payload = {
         name: form.name,
         subtitle: form.subtitle,
@@ -104,7 +105,8 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
         checkType: form.checkType,
         expectStatus: form.checkType === "http" ? form.expectStatus : "",
         keyword: form.checkType === "keyword" ? form.keyword : "",
-        ...(form.checkType === "tcp" && form.port.trim()
+        ...((form.checkType === "tcp" || form.checkType === "dns") &&
+        form.port.trim()
           ? { port: Number(form.port) }
           : {}),
       };
@@ -273,13 +275,17 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
           <p className="text-xs text-fg/40">{checkTypeHint(form.checkType)}</p>
         </div>
 
-        {form.checkType === "tcp" && (
+        {(form.checkType === "tcp" || form.checkType === "dns") && (
           <TextField
             label="Port"
             type="number"
             min={1}
             max={65535}
-            placeholder="Defaults to the URL's port (or 443/80)"
+            placeholder={
+              form.checkType === "dns"
+                ? "53"
+                : "Defaults to the URL's port (or 443/80)"
+            }
             value={form.port}
             onChange={(e) => setForm({ ...form, port: e.target.value })}
           />

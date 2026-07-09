@@ -12,6 +12,21 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **The DNS check now tests the server, not just the name.** A DNS check
+  sends a real query to the app's host and counts it up when it answers —
+  "is my Pi-hole actually resolving?" — instead of only checking that the
+  host's own name resolves somewhere. Resolvers on a nonstandard port get a
+  Port field in the app form. (#114)
+
+### Fixed
+
+- **Servers that mishandle HEAD requests no longer read as down.** Status
+  checks retry with a full GET when a server rejects the lightweight HEAD
+  probe (a 400/403 answer, a dropped connection, …), so services that work
+  fine in a browser stop showing false outages. (#114)
+
 ## [1.9.0] - 2026-07-08
 
 ### Added
