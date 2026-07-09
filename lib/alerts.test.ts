@@ -1,14 +1,22 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   evaluateTransitions,
   buildAlertRequest,
   buildEmailMessage,
   renderSubject,
   emailReady,
+  sendTestAlert,
   type AppAlertState,
   type AlertEvent,
 } from "./alerts";
-import { alertEmailSchema } from "./schema";
+import { alertEmailSchema, alertsSchema } from "./schema";
+
+// Stub nodemailer's transport so the email path is exercised without SMTP.
+// sendMail is reconfigured per test (resolve = delivered, reject = failure).
+const { sendMailMock } = vi.hoisted(() => ({ sendMailMock: vi.fn() }));
+vi.mock("nodemailer", () => ({
+  default: { createTransport: () => ({ sendMail: sendMailMock }) },
+}));
 
 const opts = (confirmations = 1, notifyOnRecovery = true) => ({
   confirmations,
@@ -225,5 +233,81 @@ describe("emailReady", () => {
     expect(
       emailReady({ ...base, host: "smtp", from: "a@x", to: "b@y" })
     ).toBe(false);
+  });
+});
+
+describe("sendTestAlert", () => {
+  const webhookOnly = alertsSchema.parse({
+    webhookEnabled: true,
+    webhookUrl: "https://hook.example.com/x",
+    type: "generic",
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    sendMailMock.mockReset();
+  });
+
+  it("reports webhook success and posts the synthetic down event to the URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await sendTestAlert(webhookOnly);
+    expect(result).toEqual({ webhook: { ok: true, detail: "HTTP 204" } });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("https://hook.example.com/x");
+    const body = JSON.parse(init.body as string);
+    expect(body.status).toBe("down");
+    expect(body.message).toContain("CtrlCenter test alert is down");
+  });
+
+  it("reports a webhook rejection as ok:false with the HTTP status", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 404 })));
+    const result = await sendTestAlert(webhookOnly);
+    expect(result).toEqual({ webhook: { ok: false, detail: "HTTP 404" } });
+  });
+
+  it("reports a webhook network failure as ok:false with the reason", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("connect ECONNREFUSED")));
+    const result = await sendTestAlert(webhookOnly);
+    expect(result).toEqual({ webhook: { ok: false, detail: "connect ECONNREFUSED" } });
+  });
+
+  it("attempts nothing and returns {} when no channel is configured", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await sendTestAlert(alertsSchema.parse({}));
+    expect(result).toEqual({});
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(sendMailMock).not.toHaveBeenCalled();
+  });
+
+  it("tests both channels when both are configured, ignoring the master switch", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    sendMailMock.mockResolvedValue({});
+    // enabled:false — the master switch gates the poller, not the admin's test.
+    const config = alertsSchema.parse({
+      enabled: false,
+      webhookEnabled: true,
+      webhookUrl: "https://hook.example.com/x",
+      email: { enabled: true, host: "smtp.example.com", from: "a@x", to: "b@y" },
+    });
+    const result = await sendTestAlert(config);
+    expect(result).toEqual({
+      webhook: { ok: true, detail: "HTTP 200" },
+      email: { ok: true, detail: "sent" },
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(sendMailMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports an email send failure as ok:false with the reason", async () => {
+    sendMailMock.mockRejectedValue(new Error("SMTP auth failed"));
+    const config = alertsSchema.parse({
+      email: { enabled: true, host: "smtp.example.com", from: "a@x", to: "b@y" },
+    });
+    const result = await sendTestAlert(config);
+    expect(result).toEqual({ email: { ok: false, detail: "SMTP auth failed" } });
   });
 });

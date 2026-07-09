@@ -174,37 +174,53 @@ function jsonReq(url: string, payload: unknown): AlertRequest {
 
 const ALERT_TIMEOUT_MS = 5000;
 
-// Fire one webhook, best-effort: a failed or slow alert must never disturb the
-// poller, so errors are swallowed and the request is time-boxed.
-async function sendAlert(req: AlertRequest): Promise<void> {
+// One channel's delivery outcome, reported so a test can show it. `detail` is a
+// short human string: for a webhook, the HTTP status ("HTTP 204" / "HTTP 404")
+// or the network errorReason on a throw; for email, "sent" or the errorReason.
+export type ChannelResult = { ok: boolean; detail: string };
+
+// Fire one webhook, time-boxed, and report the outcome instead of throwing so
+// both the poller (which logs) and the test path (which shows the result) can
+// share the exact same request logic. Never throws.
+async function runAlert(req: AlertRequest): Promise<ChannelResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ALERT_TIMEOUT_MS);
   try {
     const res = await fetch(req.url, { ...req.init, signal: controller.signal });
-    // The request didn't throw but the endpoint rejected it — surface that, or
-    // the alert silently "sent" while nothing was delivered.
-    if (!res.ok)
-      log.warn("alert webhook rejected", { host: hostOf(req.url), status: res.status });
+    return { ok: res.ok, detail: `HTTP ${res.status}` };
   } catch (e) {
-    log.warn("alert webhook failed", { host: hostOf(req.url), reason: errorReason(e) });
+    return { ok: false, detail: errorReason(e) };
   } finally {
     clearTimeout(timer);
   }
+}
+
+// Fire one webhook, best-effort: a failed or slow alert must never disturb the
+// poller, so errors are swallowed and the request is time-boxed.
+async function sendAlert(req: AlertRequest): Promise<void> {
+  const result = await runAlert(req);
+  if (result.ok) return;
+  const host = hostOf(req.url);
+  const rejected = /^HTTP (\d+)$/.exec(result.detail);
+  // The request didn't throw but the endpoint rejected it — surface that, or
+  // the alert silently "sent" while nothing was delivered.
+  if (rejected) log.warn("alert webhook rejected", { host, status: Number(rejected[1]) });
+  else log.warn("alert webhook failed", { host, reason: result.detail });
 }
 
 // Env var that overrides the stored SMTP password, so a self-hoster can keep the
 // secret out of config.yaml.
 const SMTP_PASS_ENV = "CTRLCENTER_SMTP_PASS";
 
-// Send one alert email over SMTP, best-effort. nodemailer is imported lazily so
-// it never lands in a client/edge bundle and only loads inside the Node poller.
-// Time-boxed and error-swallowing for the same reason as the webhook path.
-async function sendEmailAlert(
+// Send one alert email over SMTP and report the outcome. nodemailer is imported
+// lazily so it never lands in a client/edge bundle and only loads inside the
+// Node poller. Time-boxed; never throws (mirrors runAlert for the mail path).
+async function runEmailAlert(
   cfg: AlertEmailConfig,
   event: AlertEvent,
   app: AlertApp,
   at: number
-): Promise<void> {
+): Promise<ChannelResult> {
   try {
     const { default: nodemailer } = await import("nodemailer");
     const pass = process.env[SMTP_PASS_ENV] || cfg.pass;
@@ -219,11 +235,23 @@ async function sendEmailAlert(
     });
     const { subject, text, html } = buildEmailMessage(event, app, at, cfg.subject);
     await transport.sendMail({ from: cfg.from, to: cfg.to, subject, text, html });
+    return { ok: true, detail: "sent" };
   } catch (e) {
-    // best-effort: a mail failure must never disturb the poller, but log it so
-    // a silently-undelivered alert can be traced.
-    log.warn("alert email failed", { host: cfg.host, reason: errorReason(e) });
+    return { ok: false, detail: errorReason(e) };
   }
+}
+
+// Send one alert email over SMTP, best-effort. A mail failure must never disturb
+// the poller, so it's swallowed here — but logged so a silently-undelivered
+// alert can be traced.
+async function sendEmailAlert(
+  cfg: AlertEmailConfig,
+  event: AlertEvent,
+  app: AlertApp,
+  at: number
+): Promise<void> {
+  const result = await runEmailAlert(cfg, event, app, at);
+  if (!result.ok) log.warn("alert email failed", { host: cfg.host, reason: result.detail });
 }
 
 // Alert state is held on globalThis so the poller and any other module graph
@@ -248,6 +276,36 @@ export function emailReady(email: AlertEmailConfig): boolean {
     email.from.trim() &&
     email.to.trim()
   );
+}
+
+// Send a synthetic "down" alert through the real webhook/email paths so the
+// admin can verify each configured channel without waiting for a real outage.
+// Unlike the poller this reports every attempted channel's outcome (and never
+// throws), and deliberately ignores `config.enabled` — the master switch gates
+// the poller, not the admin's ability to test a channel. Both channels are sent
+// in parallel; the result carries a key only for the channels we attempted.
+export async function sendTestAlert(
+  config: AlertConfig
+): Promise<{ webhook?: ChannelResult; email?: ChannelResult }> {
+  const event: AlertEvent = { id: "test", type: "down" };
+  // A distinctly-named app so the notification reads "🔴 CtrlCenter test alert
+  // is down" — unmistakably a test, yet still exercising the real down-path
+  // formatting (ntfy priority/tags, the email subject template, etc.).
+  const app: AlertApp = { name: "CtrlCenter test alert", url: "" };
+  const at = Date.now();
+  const webhookUrl = config.webhookUrl.trim();
+  const testWebhook = config.webhookEnabled && webhookUrl !== "";
+  const testEmail = emailReady(config.email);
+  const [webhook, email] = await Promise.all([
+    testWebhook
+      ? runAlert(buildAlertRequest(config.type, webhookUrl, event, app, at))
+      : Promise.resolve(undefined),
+    testEmail ? runEmailAlert(config.email, event, app, at) : Promise.resolve(undefined),
+  ]);
+  const out: { webhook?: ChannelResult; email?: ChannelResult } = {};
+  if (webhook) out.webhook = webhook;
+  if (email) out.email = email;
+  return out;
 }
 
 // Called by the poller each tick. `priorReadings` is the last-known up/down per

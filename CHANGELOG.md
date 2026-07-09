@@ -12,6 +12,14 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Alert channels can be tested with one click.** A "Send test alert" button
+  in Settings → Monitoring pushes a test notification through the real
+  webhook and email delivery paths and reports each channel's outcome
+  separately — so a typo'd webhook URL or a wrong SMTP port shows up now,
+  not during your next outage. (#111)
+
 ### Changed
 
 - **The DNS check now tests the server, not just the name.** A DNS check

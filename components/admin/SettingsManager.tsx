@@ -17,6 +17,7 @@ import { TextField } from "./ui";
 import IconField from "./IconField";
 import CalendarTest from "./CalendarTest";
 import FeedTest from "./FeedTest";
+import AlertTest from "./AlertTest";
 import CitySearch from "./CitySearch";
 import ChangePassword from "./ChangePassword";
 import { apiErrorMessage } from "./apiError";
@@ -901,6 +902,20 @@ export default function SettingsManager({
                   )}
                 </div>
               )}
+            </div>
+
+            <div className="border-t border-fg/10 pt-4">
+              <AlertTest
+                webhookConfigured={
+                  alerts.webhookEnabled && alerts.webhookUrl.trim() !== ""
+                }
+                emailConfigured={
+                  alerts.email.enabled &&
+                  alerts.email.host.trim() !== "" &&
+                  alerts.email.from.trim() !== "" &&
+                  alerts.email.to.trim() !== ""
+                }
+              />
             </div>
           </>
         )}
