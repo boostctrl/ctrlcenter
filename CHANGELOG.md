@@ -12,6 +12,14 @@ here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **TCP and ping checks now work for apps with an IPv6-literal URL.** An app
+  configured as `http://[::1]:8096` reported down for TCP and ICMP checks —
+  the brackets URLs use to write an IPv6 address were being passed straight
+  through to the connection/ping call, which doesn't understand them. Both
+  check types now strip the brackets and reach the address correctly. (#136)
+
 ## [1.9.1] - 2026-07-08
 
 ### Added

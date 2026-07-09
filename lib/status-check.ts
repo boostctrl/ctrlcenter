@@ -116,8 +116,11 @@ async function checkHttp(app: CheckInput, keyword: string): Promise<AppStatus> {
 function hostFromUrl(raw: string): { host: string; urlPort: number | null; https: boolean } {
   try {
     const u = new URL(raw);
+    // IPv6 literals come back bracketed ("[::1]"); every caller here wants the
+    // bare address (net.isIP, socket.connect, and ping don't understand
+    // brackets), so strip them once instead of leaving each check to do it.
     return {
-      host: u.hostname,
+      host: u.hostname.replace(/^\[(.+)\]$/, "$1"),
       urlPort: u.port ? Number(u.port) : null,
       https: u.protocol === "https:",
     };
@@ -165,19 +168,16 @@ async function checkDns(app: CheckInput): Promise<AppStatus> {
   const start = Date.now();
   const { host } = hostFromUrl(app.url);
   if (!host) return { up: false, status: null, ms: 0 };
-  // URL hostnames bracket IPv6 literals ("[::1]"); strip them so net.isIP
-  // recognises the address and we control the host:port bracketing ourselves.
-  const bareHost = host.replace(/^\[(.+)\]$/, "$1");
 
   // The server's address. An IP literal is used directly; a hostname has to be
   // resolved (via the OS resolver) once just to reach the box at all — a failure
   // here means we never found the server, so it's down.
   let address: string;
   try {
-    if (net.isIP(bareHost) !== 0) {
-      address = bareHost;
+    if (net.isIP(host) !== 0) {
+      address = host;
     } else {
-      const looked = await Promise.race([dns.lookup(bareHost), rejectAfter(TIMEOUT_MS)]);
+      const looked = await Promise.race([dns.lookup(host), rejectAfter(TIMEOUT_MS)]);
       address = looked.address;
     }
   } catch {
@@ -226,9 +226,15 @@ function checkIcmp(app: CheckInput): Promise<AppStatus> {
   return new Promise((resolve) => {
     if (!host) return resolve({ up: false, status: null, ms: 0 });
     const deadline = Math.max(1, Math.ceil(TIMEOUT_MS / 1000));
+    // A bare IPv6 literal is unambiguous, but nudge ping with -6 anyway: some
+    // builds otherwise try to resolve it as a hostname first.
+    const args =
+      net.isIP(host) === 6
+        ? ["-6", "-c", "1", "-w", String(deadline), host]
+        : ["-c", "1", "-w", String(deadline), host];
     execFile(
       "ping",
-      ["-c", "1", "-w", String(deadline), host],
+      args,
       { timeout: TIMEOUT_MS },
       (err) => {
         resolve({ up: !err, status: null, ms: Date.now() - start });

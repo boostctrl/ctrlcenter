@@ -201,6 +201,26 @@ describe("checkApp · tcp", () => {
     });
     expect(r.up).toBe(false);
   });
+
+  it("connects when the URL host is a bracketed IPv6 literal", async () => {
+    // Regression test for #136: hostFromUrl must strip the brackets URL.hostname
+    // leaves on IPv6 literals, or net.Socket#connect treats "[::1]" as a literal
+    // (invalid) hostname and the connect fails even though the port is open.
+    const server = net.createServer();
+    await new Promise<void>((res) => server.listen(0, "::1", res));
+    const port = (server.address() as net.AddressInfo).port;
+    try {
+      const r = await checkApp({
+        ...base,
+        url: "http://[::1]",
+        checkType: "tcp",
+        port,
+      });
+      expect(r.up).toBe(true);
+    } finally {
+      server.close();
+    }
+  });
 });
 
 describe("checkApp · dns", () => {
