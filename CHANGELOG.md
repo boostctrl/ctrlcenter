@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [1.9.1] - 2026-07-08
+
 ### Added
 
 - **Alert channels can be tested with one click.** A "Send test alert" button
@@ -1435,7 +1437,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.0...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.1...HEAD
+[1.9.1]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.0...v1.9.1
 [1.9.0]: https://github.com/boostctrl/ctrlcenter/compare/v1.8.5...v1.9.0
 [1.8.5]: https://github.com/boostctrl/ctrlcenter/compare/v1.8.4...v1.8.5
 [1.8.4]: https://github.com/boostctrl/ctrlcenter/compare/v1.8.3...v1.8.4
