@@ -203,19 +203,24 @@ function Timeline({
             }`}
           />
         ))}
-        {/* A dedicated "now" pill fed by the live on-demand check, not the
+        {/* A dedicated "now" marker fed by the live on-demand check, not the
             historical buckets. It has to exist as its own cell for two reasons:
             the buckets can aggregate an active outage down to invisibility (a 90d
             strip buckets in ~3-day chunks, so a single down poll washes green),
             and the live status dot and the strip otherwise never meet — the dot
-            says "down now" while the strip's newest bar can still read green. Set
-            off from the history by a slightly wider gap (ml-1 over the strip's
-            gap-[3px]). Always rendered, even before the first check, so every
-            row's strip stays the same length and the right edges line up. Live
-            down pulses in a strong red so it's unmissable at every range — gated
-            motion-safe so reduced-motion users get a static red dot. The pill's
-            own state is announced through the strip's summary label (", currently
-            up/down"), so it needs no separate text alternative. */}
+            says "down now" while the strip's newest bar can still read green.
+            A small centered DOT, not another full-height pill (#137): same
+            flex-1 shape as the bars read as a 31st, mysteriously brighter data
+            bar. The circle borrows the app's dot-means-live-state language
+            (dashboard cards, header row) and its fixed size plus the wider ml-2
+            gap keep it unmistakably outside the history. Always rendered, even
+            before the first check, so every row's strip ends the same way and
+            the right edges line up. Live down pulses red — a 10px dot keeps
+            that legible without the whole-cell flash that competed with the
+            StateDot's ping — gated motion-safe so reduced-motion users get a
+            static red dot. The dot's state is announced through the strip's
+            summary label (", currently up/down"), so it needs no separate text
+            alternative. */}
         <span
           title={
             live == null
@@ -224,12 +229,12 @@ function Timeline({
                 ? "Right now: up"
                 : "Right now: down"
           }
-          className={`ml-1 min-w-0 flex-1 rounded-full ${
+          className={`ml-2 h-2.5 w-2.5 shrink-0 self-center rounded-full ${
             live == null
-              ? "bg-fg/[0.06]"
+              ? "bg-fg/20"
               : live
-                ? "bg-emerald-400/80"
-                : "bg-red-400/90 motion-safe:animate-pulse"
+                ? "bg-emerald-400/90"
+                : "bg-red-400 motion-safe:animate-pulse"
           }`}
         />
       </div>
@@ -431,24 +436,32 @@ export default function StatusPage({
               // right column from sm up, and the second row below sm.
               const figures = (
                 <>
-                  <p className="font-semibold tabular-nums">{fmtPct(uptime)}</p>
+                  {/* Uptime % and its range-average latency share one line
+                      (#137) — the % anchors it in semibold, the latency trails
+                      muted, so a healthy mature app's column is two lines, not
+                      four. flex-wrap lets an outsized latency value wrap under
+                      the % (still right-aligned) instead of truncating the
+                      fixed w-32 column. Latency renders only when the range has
+                      a sample, so a range with no latency data shows nothing
+                      (not a dash). */}
+                  <p className="flex flex-wrap items-baseline justify-end gap-x-1 tabular-nums">
+                    <span className="font-semibold">{fmtPct(uptime)}</span>
+                    {latency && (
+                      <span className="text-xs text-fg/45">
+                        · avg {latency.avg} ms
+                      </span>
+                    )}
+                  </p>
                   {/* How far back the data actually reaches, shown only when the
                       selected range asks for a longer window than exists (see
                       coverageSince above). One short muted line like "since Jul
-                      4" ("since 5:04 PM" for the 1h range), matching the latency
-                      line below; fits the fixed w-32 column without widening it. */}
+                      4" ("since 5:04 PM" for the 1h range). Kept as visible text
+                      rather than folded into a tooltip: the at-a-glance honesty
+                      of a young app's "100.0%" is the whole point of #112, and
+                      tooltips are exactly the mouse-only channel #116 retired. */}
                   {coverageSince != null && (
                     <p className="text-xs text-fg/45">
                       since {formatSince(coverageSince, timezone, range)}
-                    </p>
-                  )}
-                  {/* Range average latency, directly under the uptime % it pairs
-                      with. One compact line; rendered only when the range has a
-                      sample, so a range with no latency data shows nothing (not a
-                      dash). Fits the fixed w-32 column without widening it. */}
-                  {latency && (
-                    <p className="text-xs text-fg/45 tabular-nums">
-                      avg {latency.avg} ms
                     </p>
                   )}
                   <p

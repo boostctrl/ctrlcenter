@@ -23,6 +23,16 @@ here.
   touchscreen does the same, so the per-bucket detail is no longer a
   mouse-hover-only feature. (#116)
 
+### Changed
+
+- **The status page's figures column and live "now" marker are easier on the
+  eyes.** 1.9.1 stacked up to four lines beside each service; the uptime %
+  and its average latency now share one line ("100.0% · avg 22 ms"), so a
+  healthy service reads as two. And the live marker at the end of each
+  heartbeat strip is a small centered dot instead of another full-height
+  pill — it no longer passes for a 31st history bar, and its outage pulse is
+  a good deal calmer. All the underlying data is unchanged. (#137)
+
 ### Deprecated
 
 - **The status history API's unused `d7` (7-day) fields.** The
