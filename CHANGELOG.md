@@ -42,7 +42,9 @@ here.
   healthy service reads as two. And the live marker at the end of each
   heartbeat strip is a small centered dot instead of another full-height
   pill — it no longer passes for a 31st history bar, and its outage pulse is
-  a good deal calmer. All the underlying data is unchanged. (#137)
+  a good deal calmer. A long outage's "Unreachable for 11h 23m" now wraps
+  onto a second line instead of being cut off mid-number. All the underlying
+  data is unchanged. (#137)
 
 ### Deprecated
 

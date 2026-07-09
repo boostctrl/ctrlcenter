@@ -481,7 +481,11 @@ export default function StatusPage({
                         ? `down since ${downSinceLabel(outageStart, timezone)}`
                         : undefined
                     }
-                    className={`truncate text-xs ${
+                    // Wraps rather than truncates: an hour-scale outage's
+                    // "Unreachable for 11h 23m" overflows the w-32 column, and
+                    // cutting off the duration hides exactly the number this
+                    // line exists to show (#137).
+                    className={`text-xs ${
                       s && !s.up ? "text-red-400" : "text-fg/45"
                     }`}
                   >
