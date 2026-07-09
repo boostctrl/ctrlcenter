@@ -19,6 +19,12 @@ here.
   webhook and email delivery paths and reports each channel's outcome
   separately — so a typo'd webhook URL or a wrong SMTP port shows up now,
   not during your next outage. (#111)
+- **The status page now tracks response times.** Every check's round-trip
+  time is recorded into the uptime history: each service shows its average
+  latency for the selected range next to the uptime %, and the timeline
+  bars carry per-bucket averages in their tooltips — a service that's up
+  but getting slower is visible before it breaks. Existing history files
+  carry over untouched (they just have no latency until now). (#115)
 
 ### Changed
 

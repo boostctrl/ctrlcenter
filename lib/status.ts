@@ -79,6 +79,25 @@ export type UptimeWindows = {
   d90: number | null;
 };
 
+// Latency (round-trip `ms`) rolled up over a window. `avg` and `max` are whole
+// milliseconds. Only *up* checks contribute — a down check's `ms` is its
+// time-to-failure (usually the full request timeout) and would drag the average
+// up toward that ceiling, so those samples are dropped when recording (see
+// recordResults in status-history.ts).
+export type LatencyStat = { avg: number; max: number };
+
+// The same set of windows as UptimeWindows, but for latency; null where a window
+// has no up-check samples (server was off, app didn't exist yet, or the app was
+// down the whole time). Parallel to UptimeWindows so the /status page reads the
+// two with the same range key.
+export type LatencyWindows = {
+  h1: LatencyStat | null;
+  d1: LatencyStat | null;
+  d7: LatencyStat | null;
+  d30: LatencyStat | null;
+  d90: LatencyStat | null;
+};
+
 // The time ranges offered by the /status page toggle (and the admin-configurable
 // default). Keys map to UptimeWindows fields. Shared so the toggle, the schema
 // enum, and the admin picker stay in sync.
@@ -106,7 +125,10 @@ export const TIMELINE_BARS = 30;
 // recorded (server off, or before this app existed). `at` is `YYYY-MM-DD` for a
 // daily bar, `YYYY-MM-DDThh` for an hourly one, or `YYYY-MM-DDThh:mm` for a
 // single recent poll. All three are UTC instants (produced via toISOString).
-export type BarPoint = { at: string; uptime: number | null };
+// `ms` is the average up-check latency for that bucket, or null when the bucket
+// has no up-check samples (empty, or down the whole time) — see fixedBars* in
+// status-history.ts.
+export type BarPoint = { at: string; uptime: number | null; ms: number | null };
 
 // Format a BarPoint's `at` for the timeline tooltip in the visitor's time zone,
 // so the status page reads in the same zone as the rest of the app instead of
@@ -140,6 +162,10 @@ export function formatBarLabel(at: string, timeZone: string): string {
 export type AppHistory = {
   id: string;
   uptime: UptimeWindows;
+  // Average/max round-trip latency per window, parallel to `uptime` and keyed
+  // the same way, so the /status page reads a range's uptime % and latency with
+  // one key. Null per window where there were no up-check samples.
+  latency: LatencyWindows;
   // One fixed-length bar strip per range (each TIMELINE_BARS long), so switching
   // ranges swaps the data under a strip that keeps its size. Built server-side
   // by resampling the raw ring (1h) or the hourly buckets (24h/30d/90d) into

@@ -15,6 +15,7 @@ import {
   type StatusHistory,
   type BarPoint,
   type UptimeWindows,
+  type LatencyWindows,
 } from "@/lib/status";
 
 export type StatusAppMeta = {
@@ -86,7 +87,11 @@ function Timeline({ points, timeZone }: { points: BarPoint[]; timeZone: string }
           title={
             p.uptime == null
               ? `${formatBarLabel(p.at, timeZone)}: no data`
-              : `${formatBarLabel(p.at, timeZone)}: ${p.uptime.toFixed(1)}% up`
+              : `${formatBarLabel(p.at, timeZone)}: ${p.uptime.toFixed(1)}% up${
+                  // Append the bar's average latency when it recorded any up
+                  // check; omitted for bars with no latency sample.
+                  p.ms == null ? "" : ` · avg ${p.ms}ms`
+                }`
           }
           className={`min-w-0 flex-1 rounded-full ${uptimeColor(p.uptime)}`}
         />
@@ -231,6 +236,10 @@ export default function StatusPage({
               const s = statuses.get(app.id);
               const h = history.get(app.id);
               const uptime = h ? h.uptime[range as keyof UptimeWindows] : null;
+              // The selected range's average latency, keyed exactly like uptime
+              // (the range keys are a subset of the window keys). Null when the
+              // range recorded no up-check latency — we render nothing then.
+              const latency = h ? h.latency[range as keyof LatencyWindows] : null;
               const series = h?.series[range] ?? [];
               const detail = !s
                 ? "Checking…"
@@ -244,6 +253,15 @@ export default function StatusPage({
               const figures = (
                 <>
                   <p className="font-semibold tabular-nums">{fmtPct(uptime)}</p>
+                  {/* Range average latency, directly under the uptime % it pairs
+                      with. One compact line; rendered only when the range has a
+                      sample, so a range with no latency data shows nothing (not a
+                      dash). Fits the fixed w-32 column without widening it. */}
+                  {latency && (
+                    <p className="text-xs text-fg/45 tabular-nums">
+                      avg {latency.avg} ms
+                    </p>
+                  )}
                   <p
                     className={`truncate text-xs ${
                       s && !s.up ? "text-red-400" : "text-fg/45"
