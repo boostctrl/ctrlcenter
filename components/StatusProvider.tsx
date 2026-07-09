@@ -72,7 +72,7 @@ export function StatusDot({ id }: { id: string }) {
       aria-label={status.up ? "Online" : "Offline"}
     >
       {status.up && (
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/60" />
+        <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-emerald-400/60" />
       )}
       <span
         className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
@@ -119,7 +119,7 @@ export function StatusSummary({
     >
       <span className="relative flex h-2.5 w-2.5" aria-hidden>
         {allUp && (
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/60" />
+          <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-emerald-400/60" />
         )}
         <span
           className={`relative inline-flex h-2.5 w-2.5 rounded-full ${allUp ? "bg-emerald-400" : "bg-red-400"}`}

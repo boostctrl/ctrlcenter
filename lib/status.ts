@@ -208,6 +208,45 @@ export function formatBarLabel(
   return fmt(new Date(`${at}T00:00:00Z`), { month: "short", day: "numeric" }, "UTC");
 }
 
+// Build the timeline strip's screen-reader summary from its bars, so the whole
+// heartbeat carries one spoken text alternative (an `aria-label` on the
+// `role="img"` strip) instead of thirty silent, mouse-only tooltips — see the
+// Timeline in StatusPage. Calls out the strip's worst bucket by the time range
+// it spans, reusing formatBarLabel so the callout reads in the visitor's zone
+// like every other timeline label. `live` folds the trailing "now" pill's state
+// into the summary (the pill is otherwise unannounced) as ", currently up/down".
+// The all-empty strip (no bucket has data) is described plainly rather than as a
+// fabricated 0%.
+//
+// `windowPct` is the row's displayed windowed uptime % — pass it so the spoken
+// figure matches the number rendered beside the strip exactly. The fallback (a
+// plain mean of the data-bearing buckets) weighs every bucket equally whatever
+// its sample count, so it can drift a few tenths from the windowed figure and
+// a screen-reader user would hear two slightly different numbers for one row.
+export function timelineSummary(
+  points: BarPoint[],
+  timeZone: string,
+  range: StatusRangeKey,
+  live?: boolean,
+  windowPct?: number | null
+): string {
+  const rangeLabel = STATUS_RANGES.find((r) => r.key === range)?.label ?? "";
+  const liveSuffix =
+    live == null ? "" : live ? ", currently up" : ", currently down";
+  const withData = points.filter(
+    (p): p is BarPoint & { uptime: number } => p.uptime != null
+  );
+  if (withData.length === 0) {
+    return `${rangeLabel} uptime timeline: no data yet${liveSuffix}`;
+  }
+  const avg = withData.reduce((sum, p) => sum + p.uptime, 0) / withData.length;
+  const pct = windowPct ?? avg;
+  const worst = withData.reduce((w, p) => (p.uptime < w.uptime ? p : w));
+  const bucketMs = STATUS_RANGE_MS[range] / TIMELINE_BARS;
+  const worstLabel = formatBarLabel(worst.at, timeZone, bucketMs);
+  return `${rangeLabel} uptime timeline: ${pct.toFixed(1)}% up, worst ${worstLabel} at ${worst.uptime.toFixed(1)}% up${liveSuffix}`;
+}
+
 // Format the instant an app's recorded history actually begins, for the
 // "since …" note the /status page shows under a range's uptime % when the data
 // doesn't reach back far enough to fill the selected window (see StatusPage). A

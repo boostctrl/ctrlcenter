@@ -4,7 +4,9 @@ import {
   matchesStatus,
   statusMessage,
   formatBarLabel,
+  timelineSummary,
   formatSince,
+  type BarPoint,
 } from "./status";
 
 const up = { up: true };
@@ -135,6 +137,65 @@ describe("formatBarLabel", () => {
     expect(
       formatBarLabel("2026-06-25T14:30", "Not/AZone", 2 * 60 * 1000)
     ).toBe("Jun 25, 2:30 – 2:32 PM");
+  });
+});
+
+describe("timelineSummary", () => {
+  const bar = (at: string, uptime: number | null, ms: number | null = null): BarPoint => ({
+    at,
+    uptime,
+    ms,
+  });
+
+  it("summarizes average uptime and calls out the worst bucket by its range", () => {
+    // Two 48-minute (24h view) buckets: 100% and 0%; the 0% one is the worst and
+    // reads as the range it spans.
+    const points = [bar("2026-07-07T17:06", 100), bar("2026-07-07T17:54", 0)];
+    expect(timelineSummary(points, "UTC", "d1")).toBe(
+      "24h uptime timeline: 50.0% up, worst Jul 7, 5:54 – 6:42 PM at 0.0% up"
+    );
+  });
+
+  it("averages only the buckets that carry data, ignoring no-data gaps", () => {
+    const points = [bar("2026-07-07T17:06", 100), bar("2026-07-07T17:54", null)];
+    expect(timelineSummary(points, "UTC", "d1")).toBe(
+      "24h uptime timeline: 100.0% up, worst Jul 7, 5:06 – 5:54 PM at 100.0% up"
+    );
+  });
+
+  it("describes an all-empty strip without a fabricated 0%", () => {
+    const points = [bar("2026-07-07T17:06", null), bar("2026-07-07T17:54", null)];
+    expect(timelineSummary(points, "UTC", "d1")).toBe(
+      "24h uptime timeline: no data yet"
+    );
+  });
+
+  it("quotes the displayed windowed % over the bucket mean when given", () => {
+    // Bucket mean would say 50.0%; the row's windowed figure (weighted by real
+    // sample counts) says 90.5% — the spoken summary must match the visible one.
+    const points = [bar("2026-07-07T17:06", 100), bar("2026-07-07T17:54", 0)];
+    expect(timelineSummary(points, "UTC", "d1", undefined, 90.5)).toBe(
+      "24h uptime timeline: 90.5% up, worst Jul 7, 5:54 – 6:42 PM at 0.0% up"
+    );
+    // A null windowed % (no data for the range) falls back to the bucket mean.
+    expect(timelineSummary(points, "UTC", "d1", undefined, null)).toBe(
+      "24h uptime timeline: 50.0% up, worst Jul 7, 5:54 – 6:42 PM at 0.0% up"
+    );
+  });
+
+  it("folds the live now-pill state into the summary", () => {
+    const points = [bar("2026-07-07T17:06", 100)];
+    expect(timelineSummary(points, "UTC", "d1", true)).toBe(
+      "24h uptime timeline: 100.0% up, worst Jul 7, 5:06 – 5:54 PM at 100.0% up, currently up"
+    );
+    expect(timelineSummary(points, "UTC", "d1", false)).toBe(
+      "24h uptime timeline: 100.0% up, worst Jul 7, 5:06 – 5:54 PM at 100.0% up, currently down"
+    );
+    // No live value → no currently-clause.
+    expect(timelineSummary([], "UTC", "d1")).toBe("24h uptime timeline: no data yet");
+    expect(timelineSummary([], "UTC", "d1", false)).toBe(
+      "24h uptime timeline: no data yet, currently down"
+    );
   });
 });
 

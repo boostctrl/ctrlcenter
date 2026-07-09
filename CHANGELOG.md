@@ -12,6 +12,17 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **The status page timeline is now reachable with a keyboard and a screen
+  reader.** Each uptime heartbeat strip reads as a single control: it announces
+  a spoken summary ("24h uptime timeline: 91.7% up, worst Jul 7, 5:54 – 6:42 PM
+  at 0% up, currently up"), takes keyboard focus, and steps through its buckets
+  with the arrow keys (Home/End jump to the ends) — the focused bucket shows a
+  marker and its exact reading appears beside the strip. Tapping a bar on a
+  touchscreen does the same, so the per-bucket detail is no longer a
+  mouse-hover-only feature. (#116)
+
 ### Deprecated
 
 - **The status history API's unused `d7` (7-day) fields.** The
@@ -22,6 +33,13 @@ here.
 
 ### Fixed
 
+- **Status indicators now respect reduced-motion and announce which range is
+  selected.** The pulsing status dots — on the dashboard, the header status row,
+  and every service on the status page — hold still for visitors who ask their
+  system for reduced motion, keeping their solid up/down color. The status
+  page's range toggle (1h/24h/30d/90d) and the admin interval and default-range
+  toggles now tell a screen reader which option is active, instead of signaling
+  it by color alone. (#116)
 - **TCP and ping checks now work for apps with an IPv6-literal URL.** An app
   configured as `http://[::1]:8096` reported down for TCP and ICMP checks —
   the brackets URLs use to write an IPv6 address were being passed straight

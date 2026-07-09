@@ -371,6 +371,7 @@ export default function SettingsManager({
               <button
                 key={m}
                 type="button"
+                aria-pressed={theme.mode === m}
                 onClick={() => updateTheme({ mode: m })}
                 className={`px-3 py-1.5 text-xs capitalize transition-colors ${
                   theme.mode === m
@@ -542,6 +543,7 @@ export default function SettingsManager({
                 <button
                   key={m}
                   type="button"
+                  aria-pressed={settings.statusInterval === m}
                   onClick={() => setSettings({ ...settings, statusInterval: m })}
                   className={`px-3 py-1.5 text-xs transition-colors ${
                     settings.statusInterval === m
@@ -580,6 +582,7 @@ export default function SettingsManager({
                 <button
                   key={r.key}
                   type="button"
+                  aria-pressed={settings.statusDefaultRange === r.key}
                   onClick={() =>
                     setSettings({ ...settings, statusDefaultRange: r.key })
                   }

@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type KeyboardEvent } from "react";
 import Icon from "./Icon";
 import { useVisitorPrefs } from "./PrefsProvider";
 import {
   summarize,
   statusMessage,
   formatBarLabel,
+  timelineSummary,
   formatSince,
   STATUS_RANGES,
   STATUS_RANGE_MS,
@@ -99,7 +100,7 @@ function StateDot({ status }: { status: AppStatus | undefined }) {
   return (
     <span className="relative flex h-2.5 w-2.5 shrink-0">
       {status?.up && (
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/60" />
+        <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-emerald-400/60" />
       )}
       <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${cls}`} />
     </span>
@@ -117,6 +118,7 @@ function Timeline({
   timeZone,
   range,
   live,
+  uptimePct,
 }: {
   points: BarPoint[];
   timeZone: string;
@@ -127,59 +129,122 @@ function Timeline({
   // the trailing "now" pill (below); separate from the historical bars, which
   // come from the background poller.
   live: boolean | undefined;
+  // The row's displayed windowed uptime %, quoted in the strip's spoken summary
+  // so a screen reader hears the same figure the column shows (the bucket-mean
+  // fallback can drift a few tenths from it).
+  uptimePct: number | null;
 }) {
+  // The bucket the keyboard/tap traversal is currently on, or null when idle.
+  // One active index per strip (not per bar) keeps the strip a single tab stop:
+  // arrows move this index, its bar shows a focus ring, and its detail is
+  // announced/shown below. Cleared on Escape or blur.
+  const [active, setActive] = useState<number | null>(null);
   if (points.length === 0) return null;
   // Each bar covers this slice of the range's window. Passed to formatBarLabel
   // so a sub-day bucket reads as a range ("Jul 7, 5:54 – 6:42 PM"); day-scale
   // bars ignore it and stay a single date.
   const bucketMs = STATUS_RANGE_MS[range] / TIMELINE_BARS;
+  // The detail line for one bar — the same text the mouse tooltip shows, reused
+  // for the traversal's live region and its visible readout so keyboard, touch,
+  // and screen-reader users all get exactly what a hover reveals.
+  const bucketLabel = (p: BarPoint) =>
+    p.uptime == null
+      ? `${formatBarLabel(p.at, timeZone, bucketMs)}: no data`
+      : `${formatBarLabel(p.at, timeZone, bucketMs)}: ${p.uptime.toFixed(1)}% up${
+          // Append the bar's average latency when it recorded any up
+          // check; omitted for bars with no latency sample.
+          p.ms == null ? "" : ` · avg ${p.ms}ms`
+        }`;
+  // Arrow/Home/End move the active bucket; Escape clears it. One tab stop per
+  // strip, chart-library style — the bars themselves never become tab stops.
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    let next: number | null;
+    if (e.key === "ArrowRight")
+      next = active == null ? 0 : Math.min(points.length - 1, active + 1);
+    else if (e.key === "ArrowLeft")
+      next = active == null ? points.length - 1 : Math.max(0, active - 1);
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = points.length - 1;
+    else if (e.key === "Escape") {
+      if (active == null) return;
+      e.preventDefault();
+      setActive(null);
+      return;
+    } else return;
+    e.preventDefault();
+    setActive(next);
+  };
   return (
-    <div className="flex h-7 items-stretch gap-[3px]">
-      {points.map((p, i) => (
-        // Position-unique key: bars are a fixed positional sequence, and two
-        // buckets can share a minute-level `at`. A bare `p.at` key then
-        // duplicates, corrupting reconciliation so a stale bar from the previous
-        // range (e.g. 1h) lingers at the far end when switching views.
+    <div className="flex flex-col gap-1">
+      {/* The strip is one tab stop with a whole-strip text alternative
+          (timelineSummary) for screen readers; per-bucket detail comes from the
+          arrow-key traversal below, not from thirty focusable bars. */}
+      <div
+        role="img"
+        aria-label={timelineSummary(points, timeZone, range, live, uptimePct)}
+        tabIndex={0}
+        onKeyDown={onKeyDown}
+        onBlur={() => setActive(null)}
+        className="accent-focus flex h-7 items-stretch gap-[3px] rounded-md border border-transparent outline-none"
+      >
+        {points.map((p, i) => (
+          // Position-unique key: bars are a fixed positional sequence, and two
+          // buckets can share a minute-level `at`. A bare `p.at` key then
+          // duplicates, corrupting reconciliation so a stale bar from the previous
+          // range (e.g. 1h) lingers at the far end when switching views.
+          <span
+            key={`${p.at}-${i}`}
+            title={bucketLabel(p)}
+            // Tapping a bar is the touch path: it sets the active bucket (and
+            // focuses the strip), surfacing the same label a hover would.
+            onClick={() => setActive(i)}
+            className={`min-w-0 flex-1 rounded-full ${uptimeColor(p.uptime)}${
+              active === i ? " ring-2 ring-fg/70" : ""
+            }`}
+          />
+        ))}
+        {/* A dedicated "now" pill fed by the live on-demand check, not the
+            historical buckets. It has to exist as its own cell for two reasons:
+            the buckets can aggregate an active outage down to invisibility (a 90d
+            strip buckets in ~3-day chunks, so a single down poll washes green),
+            and the live status dot and the strip otherwise never meet — the dot
+            says "down now" while the strip's newest bar can still read green. Set
+            off from the history by a slightly wider gap (ml-1 over the strip's
+            gap-[3px]). Always rendered, even before the first check, so every
+            row's strip stays the same length and the right edges line up. Live
+            down pulses in a strong red so it's unmissable at every range — gated
+            motion-safe so reduced-motion users get a static red dot. The pill's
+            own state is announced through the strip's summary label (", currently
+            up/down"), so it needs no separate text alternative. */}
         <span
-          key={`${p.at}-${i}`}
           title={
-            p.uptime == null
-              ? `${formatBarLabel(p.at, timeZone, bucketMs)}: no data`
-              : `${formatBarLabel(p.at, timeZone, bucketMs)}: ${p.uptime.toFixed(1)}% up${
-                  // Append the bar's average latency when it recorded any up
-                  // check; omitted for bars with no latency sample.
-                  p.ms == null ? "" : ` · avg ${p.ms}ms`
-                }`
+            live == null
+              ? "Right now: checking…"
+              : live
+                ? "Right now: up"
+                : "Right now: down"
           }
-          className={`min-w-0 flex-1 rounded-full ${uptimeColor(p.uptime)}`}
+          className={`ml-1 min-w-0 flex-1 rounded-full ${
+            live == null
+              ? "bg-fg/[0.06]"
+              : live
+                ? "bg-emerald-400/80"
+                : "bg-red-400/90 motion-safe:animate-pulse"
+          }`}
         />
-      ))}
-      {/* A dedicated "now" pill fed by the live on-demand check, not the
-          historical buckets. It has to exist as its own cell for two reasons:
-          the buckets can aggregate an active outage down to invisibility (a 90d
-          strip buckets in ~3-day chunks, so a single down poll washes green),
-          and the live status dot and the strip otherwise never meet — the dot
-          says "down now" while the strip's newest bar can still read green. Set
-          off from the history by a slightly wider gap (ml-1 over the strip's
-          gap-[3px]). Always rendered, even before the first check, so every
-          row's strip stays the same length and the right edges line up. Live
-          down pulses in a strong red so it's unmissable at every range. */}
-      <span
-        title={
-          live == null
-            ? "Right now: checking…"
-            : live
-              ? "Right now: up"
-              : "Right now: down"
-        }
-        className={`ml-1 min-w-0 flex-1 rounded-full ${
-          live == null
-            ? "bg-fg/[0.06]"
-            : live
-              ? "bg-emerald-400/80"
-              : "bg-red-400/90 animate-pulse"
+      </div>
+      {/* The active bucket's detail: announced (aria-live) and shown near the
+          strip while traversing. Always mounted so the live region is stable;
+          collapses to sr-only empty text when idle, so it reserves no space and
+          says nothing until a bucket is picked. */}
+      <p
+        aria-live="polite"
+        className={`text-xs text-fg/45 tabular-nums ${
+          active == null ? "sr-only" : ""
         }`}
-      />
+      >
+        {active == null ? "" : bucketLabel(points[active])}
+      </p>
     </div>
   );
 }
@@ -306,6 +371,7 @@ export default function StatusPage({
                 <button
                   key={r.key}
                   type="button"
+                  aria-pressed={range === r.key}
                   onClick={() => setRange(r.key)}
                   className={`px-2.5 py-1 text-xs transition-colors ${
                     range === r.key
@@ -428,7 +494,7 @@ export default function StatusPage({
                         line below sm where there's no room for it. */}
                     {series.length > 0 && (
                       <div className="hidden shrink-0 sm:block sm:w-44 lg:w-72">
-                        <Timeline points={series} timeZone={timezone} range={range} live={s?.up} />
+                        <Timeline points={series} timeZone={timezone} range={range} live={s?.up} uptimePct={uptime} />
                       </div>
                     )}
                     {/* Fixed width so the heartbeat's right edge — and thus the
@@ -445,7 +511,7 @@ export default function StatusPage({
                   <div className="mt-3 flex items-end gap-4 sm:hidden">
                     <div className="min-w-0 flex-1">
                       {series.length > 0 && (
-                        <Timeline points={series} timeZone={timezone} range={range} live={s?.up} />
+                        <Timeline points={series} timeZone={timezone} range={range} live={s?.up} uptimePct={uptime} />
                       )}
                     </div>
                     <div className="shrink-0 text-right">{figures}</div>
