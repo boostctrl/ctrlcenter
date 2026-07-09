@@ -8,6 +8,7 @@ import {
   recentPct,
   latencyOverBuckets,
   recentLatency,
+  oldestSampleMs,
   fixedBarsFromReadings,
   fixedBarsFromBuckets,
   loadHistory,
@@ -49,6 +50,7 @@ const g = globalThis as unknown as {
     loaded: boolean;
     store: Map<string, unknown>;
     recent: Map<string, unknown>;
+    downSince: Map<string, unknown>;
   };
 };
 function resetHistoryState() {
@@ -57,6 +59,7 @@ function resetHistoryState() {
     s.loaded = false;
     s.store = new Map();
     s.recent = new Map();
+    s.downSince = new Map();
   }
 }
 
@@ -99,6 +102,48 @@ describe("recentPct", () => {
     expect(recentPct(readings, since)).toBeCloseTo((2 / 3) * 100, 3);
     expect(recentPct(readings, now + MIN)).toBeNull();
     expect(recentPct([], since)).toBeNull();
+  });
+});
+
+describe("oldestSampleMs", () => {
+  it("takes the oldest bucket's start instant when only buckets exist", () => {
+    // Hours out of order: the helper still finds the minimum hour × HOUR_MS.
+    const buckets: Bucket[] = [bkt(5, 1, 0), bkt(2, 1, 0), bkt(9, 1, 0)];
+    expect(oldestSampleMs(buckets, [])).toBe(2 * HOUR);
+  });
+
+  it("takes the oldest reading's `t` when only the recent ring exists", () => {
+    const readings: Reading[] = [
+      { t: 5 * MIN, up: true },
+      { t: 2 * MIN, up: false },
+    ];
+    expect(oldestSampleMs([], readings)).toBe(2 * MIN);
+  });
+
+  it("takes the min across both stores, either one older", () => {
+    // Ring older than the oldest bucket start.
+    expect(
+      oldestSampleMs([bkt(10, 1, 0)], [{ t: 3 * HOUR, up: true }])
+    ).toBe(3 * HOUR);
+    // Bucket start older than the ring.
+    expect(
+      oldestSampleMs([bkt(1, 1, 0)], [{ t: 3 * HOUR, up: true }])
+    ).toBe(HOUR);
+  });
+
+  it("is null when there are no samples at all", () => {
+    expect(oldestSampleMs([], [])).toBeNull();
+  });
+
+  it("prefers the ring's exact instant when it falls in the oldest bucket's hour", () => {
+    // A minutes-old app: its first reading opened the hour-3 bucket at 3h40m.
+    // The bucket alone would claim coverage since 3h sharp — up to an hour the
+    // app never had, which on the 1h range is the whole window.
+    const readings: Reading[] = [
+      { t: 3 * HOUR + 40 * MIN, up: true },
+      { t: 3 * HOUR + 45 * MIN, up: true },
+    ];
+    expect(oldestSampleMs([bkt(3, 2, 0)], readings)).toBe(3 * HOUR + 40 * MIN);
   });
 });
 
@@ -318,6 +363,46 @@ describe("recordResults latency accumulation", () => {
   });
 });
 
+describe("recordResults downSince (current-outage tracking)", () => {
+  beforeEach(resetHistoryState);
+
+  it("marks the first down poll and holds it across consecutive downs", () => {
+    const id = "out";
+    const t0 = Date.now();
+    recordResults([{ id, up: false, status: 503, ms: 5000 }], t0);
+    expect(getHistory([id]).apps[0].downSince).toBe(t0);
+    // A later down poll must NOT move the mark — it's the outage's start, not
+    // the latest failure.
+    recordResults([{ id, up: false, status: 503, ms: 5000 }], t0 + 5 * MIN);
+    expect(getHistory([id]).apps[0].downSince).toBe(t0);
+  });
+
+  it("clears the mark when the app comes back up", () => {
+    const id = "recover";
+    const t0 = Date.now();
+    recordResults([{ id, up: false, status: 503, ms: 5000 }], t0);
+    expect(getHistory([id]).apps[0].downSince).toBe(t0);
+    recordResults([{ id, up: true, status: 200, ms: 100 }], t0 + MIN);
+    expect(getHistory([id]).apps[0].downSince).toBeNull();
+  });
+
+  it("re-marks a fresh outage at the new down time after a recovery", () => {
+    const id = "flap";
+    const t0 = Date.now();
+    recordResults([{ id, up: false, status: 503, ms: 5000 }], t0);
+    recordResults([{ id, up: true, status: 200, ms: 100 }], t0 + MIN);
+    recordResults([{ id, up: false, status: 503, ms: 5000 }], t0 + 2 * MIN);
+    // A new outage gets a new start, not the resurrected old one.
+    expect(getHistory([id]).apps[0].downSince).toBe(t0 + 2 * MIN);
+  });
+
+  it("surfaces null for an app that has only ever been up", () => {
+    const id = "healthy";
+    recordResults([{ id, up: true, status: 200, ms: 100 }], Date.now());
+    expect(getHistory([id]).apps[0].downSince).toBeNull();
+  });
+});
+
 describe("loadHistory / flush persistence", () => {
   let dir: string;
 
@@ -363,5 +448,28 @@ describe("loadHistory / flush persistence", () => {
     expect(h.latency.d1).toEqual({ avg: 200, max: 300 });
     expect(h.latency.h1).toEqual({ avg: 200, max: 300 });
     expect(h.uptime.d1).toBeCloseTo((2 / 3) * 100, 6);
+  });
+
+  it("round-trips downSince (current-outage mark) through flush → load", async () => {
+    const t0 = Date.now();
+    recordResults([{ id: "c", up: false, status: 503, ms: 5000 }], t0);
+    await flush();
+    // Drop the in-memory state (downSince included) and reload from the file.
+    resetHistoryState();
+    await loadHistory();
+    expect(getHistory(["c"]).apps[0].downSince).toBe(t0);
+  });
+
+  it("loads a file without a downSince key with no outage marks", async () => {
+    const now = Date.now();
+    // A down bucket but no downSince key (an older file): the app has history
+    // yet no current-outage mark until the next down poll re-establishes one.
+    await fs.writeFile(
+      path.join(dir, "status-history.json"),
+      JSON.stringify({ apps: { a: { [hourOf(now)]: [0, 2] } }, recent: {} }),
+      "utf8"
+    );
+    await loadHistory();
+    expect(getHistory(["a"]).apps[0].downSince).toBeNull();
   });
 });

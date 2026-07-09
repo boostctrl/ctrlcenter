@@ -25,6 +25,16 @@ here.
   bars carry per-bucket averages in their tooltips — a service that's up
   but getting slower is visible before it breaks. Existing history files
   carry over untouched (they just have no latency until now). (#115)
+- **Uptime percentages now say how much data backs them.** When a service's
+  recorded history covers materially less than the selected range — a
+  freshly added app showing "100.0%" over 90 days — a small "since Jul 4"
+  note under the figure says how far back the data really goes. (#112)
+- **Active outages are now visible at a glance.** Down services say how long
+  they've been down ("Unreachable for 23m", with the exact start time on
+  hover) — and it survives server restarts. Every heartbeat strip also ends
+  in a live "now" pill fed by the latest check, pulsing red during an
+  outage, so "down right now" shows at every time range even when a long
+  range's averaging would wash a fresh outage green. (#113)
 
 ### Changed
 

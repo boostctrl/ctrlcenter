@@ -4,6 +4,7 @@ import {
   matchesStatus,
   statusMessage,
   formatBarLabel,
+  formatSince,
 } from "./status";
 
 const up = { up: true };
@@ -105,5 +106,32 @@ describe("formatBarLabel", () => {
     expect(formatBarLabel("2026-06-25T14:30", "Not/AZone")).toBe(
       "Jun 25, 2:30 PM"
     );
+  });
+});
+
+describe("formatSince", () => {
+  // Jul 4 2026, 22:04 UTC — 5:04 PM in America/Chicago (CDT, UTC-5).
+  const ms = Date.UTC(2026, 6, 4, 22, 4);
+
+  it("shows month + day for the day-scale ranges", () => {
+    expect(formatSince(ms, "UTC", "d90")).toBe("Jul 4");
+    expect(formatSince(ms, "UTC", "d30")).toBe("Jul 4");
+  });
+
+  it("shows a clock time for the 1h range", () => {
+    expect(formatSince(ms, "America/Chicago", "h1")).toBe("5:04 PM");
+    expect(formatSince(ms, "UTC", "h1")).toBe("10:04 PM");
+  });
+
+  it("formats in the given zone, crossing the day boundary", () => {
+    // 02:00 UTC on Jul 4 is the previous evening in Chicago.
+    expect(formatSince(Date.UTC(2026, 6, 4, 2, 0), "America/Chicago", "d30")).toBe(
+      "Jul 3"
+    );
+  });
+
+  it("falls back to UTC when the time zone is invalid", () => {
+    expect(formatSince(ms, "Not/AZone", "h1")).toBe("10:04 PM");
+    expect(formatSince(ms, "Not/AZone", "d90")).toBe("Jul 4");
   });
 });

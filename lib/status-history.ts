@@ -249,6 +249,38 @@ export function recentLatency(
   return count === 0 ? null : { avg: Math.round(sum / count), max: Math.round(max) };
 }
 
+// Epoch ms of the app's oldest recorded sample across both stores, or null when
+// it has none. The hourly buckets and the raw recent ring are independent, so
+// the oldest is the min of a bucket's start instant (its hour × HOUR_MS) and a
+// recent reading's `t`. The client compares this to a range's window start to
+// tell whether the recorded history actually reaches back far enough to back
+// the range's uptime %, and if not, how far back it really goes (the "since …"
+// note on the /status page). It's all already in memory, so this is a plain
+// min over what getHistory already builds.
+export function oldestSampleMs(
+  buckets: Bucket[],
+  readings: Reading[]
+): number | null {
+  let oldestBucketHour: number | null = null;
+  for (const b of buckets) {
+    if (oldestBucketHour === null || b.hour < oldestBucketHour)
+      oldestBucketHour = b.hour;
+  }
+  let oldestReading: number | null = null;
+  for (const r of readings) {
+    if (oldestReading === null || r.t < oldestReading) oldestReading = r.t;
+  }
+  if (oldestBucketHour === null) return oldestReading;
+  // A bucket only knows its hour, so its start instant overstates coverage by
+  // up to an hour — which on the 1h range can claim the whole window a
+  // minutes-old app doesn't have. When the ring's oldest reading falls in that
+  // same hour it's the sample that opened the bucket (or at worst a later one,
+  // erring toward claiming less), so prefer the exact instant.
+  if (oldestReading !== null && hourOf(oldestReading) <= oldestBucketHour)
+    return oldestReading;
+  return oldestBucketHour * HOUR_MS;
+}
+
 // Day-scale windows from the hourly buckets. `h1` is added at read time from the
 // raw recent ring (see getHistory), since the buckets are only hourly.
 function dayWindows(
@@ -286,6 +318,11 @@ type AppBuckets = Map<
 type HistoryState = {
   store: Map<string, AppBuckets>;
   recent: Map<string, Reading[]>; // raw readings (last ~90 min) for the 1h view
+  // Start instant (ms) of each app's *current* outage, held only for apps that
+  // were down at the last poll. Set at the transition into down and cleared on
+  // recovery (see recordResults), so it answers "how long has it been down?"
+  // rather than "when was the last down poll?".
+  downSince: Map<string, number>;
   loaded: boolean;
   flushQueue: Promise<unknown>;
 };
@@ -298,10 +335,12 @@ const g = globalThis as unknown as { __ctrlcenterStatusHistory?: HistoryState };
 const state: HistoryState = (g.__ctrlcenterStatusHistory ??= {
   store: new Map(),
   recent: new Map(),
+  downSince: new Map(),
   loaded: false,
   flushQueue: Promise.resolve(),
 });
 state.recent ??= new Map(); // tolerate a state created by an older build
+state.downSince ??= new Map(); // ditto — added after the recent ring
 
 function historyPath(): string {
   const configPath =
@@ -311,13 +350,15 @@ function historyPath(): string {
 
 // Load the persisted history into memory once (idempotent). Stored shape:
 // { apps:   { [id]: { [hour]: [up, down, msCount, msSum, msMax] } },
-//   recent: { [id]: [[t, up?1:0, ms?], …] } }.
+//   recent: { [id]: [[t, up?1:0, ms?], …] },
+//   downSince: { [id]: ms } }.
 // The latency fields (msCount/msSum/msMax on a bucket, the third `ms` element on
-// a recent entry) were added later, so the loader treats them as optional: a
-// file written before this feature has 2-element bucket tuples and 2-element
-// recent tuples, and those simply load with no latency data (zeros / undefined).
-// Same migration posture as the rest of the config — old files must load without
-// error.
+// a recent entry) and the `downSince` map were all added later, so the loader
+// treats them as optional: a file written before those features has 2-element
+// bucket tuples, 2-element recent tuples, and no `downSince` key, and simply
+// loads with no latency data (zeros / undefined) and no outage marks. Same
+// migration posture as the rest of the config — old files must load without
+// error. `downSince` carries only apps that were down at the last recorded poll.
 export async function loadHistory(): Promise<void> {
   if (state.loaded) return;
   state.loaded = true;
@@ -354,9 +395,16 @@ export async function loadHistory(): Promise<void> {
       if (list.length) recent.set(id, list);
     }
     state.recent = recent;
+    // Current-outage marks. Absent on older files → an empty map (no app is
+    // considered mid-outage until the next down poll re-establishes it).
+    const downSince = new Map<string, number>();
+    for (const [id, ms] of Object.entries(data?.downSince ?? {}))
+      if (typeof ms === "number") downSince.set(id, ms);
+    state.downSince = downSince;
   } catch {
     state.store = new Map();
     state.recent = new Map();
+    state.downSince = new Map();
   }
 }
 
@@ -414,6 +462,15 @@ export function recordResults(results: StatusResult[], at: number): void {
       r.id,
       list.filter((x) => x.t >= recentCutoff)
     );
+
+    // Track the *current* outage's start. Stamp it only on the transition into
+    // the down state — the `has` guard keeps consecutive down polls from
+    // advancing the mark to the latest failure, so it stays the outage's start
+    // — and clear it the moment the app answers, so the map holds exactly the
+    // apps down right now. This is what lets the page say how long an app has
+    // been down (see getHistory / AppHistory.downSince).
+    if (r.up) state.downSince.delete(r.id);
+    else if (!state.downSince.has(r.id)) state.downSince.set(r.id, at);
   }
 }
 
@@ -438,11 +495,16 @@ export function flush(): Promise<void> {
           r.ms == null ? [r.t, r.up ? 1 : 0] : [r.t, r.up ? 1 : 0, r.ms]
         );
     }
+    // Current-outage marks. The map already holds only apps that are down (an up
+    // poll deletes the entry), so this writes just those; on reload they re-arm
+    // the "how long down?" duration without waiting for the next poll.
+    const downSince: Record<string, number> = {};
+    for (const [id, ms] of state.downSince) downSince[id] = ms;
     const file = historyPath();
     const tmp = `${file}.tmp`;
     try {
       await fs.mkdir(path.dirname(file), { recursive: true });
-      await fs.writeFile(tmp, JSON.stringify({ apps, recent }), "utf8");
+      await fs.writeFile(tmp, JSON.stringify({ apps, recent, downSince }), "utf8");
       await fs.rename(tmp, file);
     } catch {
       // best-effort; history is non-critical
@@ -501,6 +563,12 @@ export function getHistory(
         d30: fixedBarsFromBuckets(buckets, now - 30 * DAY_MS, now, TIMELINE_BARS, dayAt),
         d90: fixedBarsFromBuckets(buckets, now - 90 * DAY_MS, now, TIMELINE_BARS, dayAt),
       },
+      // How far back this app's data actually reaches, so the client can flag an
+      // uptime % that covers less range than its toggle claims (see AppHistory).
+      since: oldestSampleMs(buckets, readings),
+      // Start of this app's current outage as the poller sees it, or null when
+      // it was up at the last poll — the page turns this into "Down for 23m".
+      downSince: state.downSince.get(id) ?? null,
     };
   });
   return { generatedAt: Date.now(), apps };

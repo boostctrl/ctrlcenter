@@ -113,6 +113,19 @@ export const STATUS_RANGE_KEYS = STATUS_RANGES.map((r) => r.key) as [
   ...StatusRangeKey[],
 ];
 
+// The window length in milliseconds each range's toggle covers, keyed like
+// STATUS_RANGES. It lives beside the ranges on purpose: the /status page reads
+// it both to know a range's span and to decide whether an app's history is too
+// short to actually back that range's uptime % (the "since …" coverage note in
+// StatusPage). Keeping the durations here means the toggle and that annotation
+// can never disagree about how long "90d" is.
+export const STATUS_RANGE_MS: Record<StatusRangeKey, number> = {
+  h1: 60 * 60 * 1000, // 1 hour
+  d1: 24 * 60 * 60 * 1000, // 24 hours
+  d30: 30 * 24 * 60 * 60 * 1000, // 30 days
+  d90: 90 * 24 * 60 * 60 * 1000, // 90 days
+};
+
 // Every timeline renders this many bars, whatever the range: the server buckets
 // each range's window into the same fixed count so all four views draw an
 // identically-sized heartbeat strip instead of a different length (and pill
@@ -159,6 +172,33 @@ export function formatBarLabel(at: string, timeZone: string): string {
   return fmt(new Date(`${at}T00:00:00Z`), { month: "short", day: "numeric" }, "UTC");
 }
 
+// Format the instant an app's recorded history actually begins, for the
+// "since …" note the /status page shows under a range's uptime % when the data
+// doesn't reach back far enough to fill the selected window (see StatusPage). A
+// day-scale range wants a calendar day — "Jul 4" — while the 1h range, whose
+// whole window is an hour, wants a clock time — "5:04 PM". Formatted in the
+// visitor's zone like formatBarLabel, falling back to UTC when the zone is
+// invalid.
+export function formatSince(
+  sinceMs: number,
+  timeZone: string,
+  range: StatusRangeKey
+): string {
+  const opts: Intl.DateTimeFormatOptions =
+    range === "h1"
+      ? { hour: "numeric", minute: "2-digit", hour12: true }
+      : { month: "short", day: "numeric" };
+  try {
+    return new Intl.DateTimeFormat("en-US", { timeZone, ...opts }).format(
+      new Date(sinceMs)
+    );
+  } catch {
+    return new Intl.DateTimeFormat("en-US", { timeZone: "UTC", ...opts }).format(
+      new Date(sinceMs)
+    );
+  }
+}
+
 export type AppHistory = {
   id: string;
   uptime: UptimeWindows;
@@ -171,6 +211,22 @@ export type AppHistory = {
   // by resampling the raw ring (1h) or the hourly buckets (24h/30d/90d) into
   // equal time buckets — see fixedBars* in status-history.ts.
   series: Record<StatusRangeKey, BarPoint[]>;
+  // Epoch ms of the app's oldest recorded sample, or null when it has none. It
+  // lets the client say how far back the data actually goes when a range asks
+  // for a longer window than exists: an app watched five minutes otherwise
+  // shows "100.0%" over 90d — a figure typographically identical to one with 90
+  // days behind it, claiming a window it doesn't cover. See oldestSampleMs in
+  // status-history.ts.
+  since: number | null;
+  // Epoch ms of the poller-observed start of the app's *current* outage, or null
+  // when the app was up at the last poll. The row's live dot and detail come
+  // from the on-demand /api/status check while the strip and uptime % come from
+  // the background poller, so during an outage the two can contradict each other
+  // (a red "Unreachable" beside a still-green strip); this lets the page answer
+  // "how long has it been down?" straight from the poller's own view. Marked at
+  // the transition into down and held there, so it's the outage's start, not the
+  // latest down poll — see recordResults in status-history.ts.
+  downSince: number | null;
 };
 
 // The /api/status/history payload.

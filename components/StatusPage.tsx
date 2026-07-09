@@ -7,7 +7,9 @@ import {
   summarize,
   statusMessage,
   formatBarLabel,
+  formatSince,
   STATUS_RANGES,
+  STATUS_RANGE_MS,
   type StatusRangeKey,
   type AppStatus,
   type StatusResponse,
@@ -44,6 +46,38 @@ function relativeTime(from: number, now: number): string {
   return `${Math.round(s / 60)}m ago`;
 }
 
+// How long the current outage has run, from its start to `now`, compact by scale
+// so it fits the tight detail line: minutes under an hour ("3m"), hours+minutes
+// under a day ("1h 12m"), days+hours beyond ("2d 4h"). Component-local like
+// relativeTime.
+function downDuration(from: number, now: number): string {
+  const mins = Math.max(0, Math.floor((now - from) / 60_000));
+  if (mins < 1) return "<1m"; // "for 0m" would read like a bug
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ${mins % 60}m`;
+  return `${Math.floor(hrs / 24)}d ${hrs % 24}h`;
+}
+
+// Absolute start of the current outage for the detail line's tooltip: a date +
+// clock time ("Jul 4, 5:04 PM") in the visitor's zone, so hovering "Down for
+// 23m" reveals exactly when it began. Follows the same zone-with-UTC-fallback
+// pattern as formatSince in lib/status.ts.
+function downSinceLabel(from: number, timeZone: string): string {
+  const opts: Intl.DateTimeFormatOptions = {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  };
+  try {
+    return new Intl.DateTimeFormat("en-US", { timeZone, ...opts }).format(new Date(from));
+  } catch {
+    return new Intl.DateTimeFormat("en-US", { timeZone: "UTC", ...opts }).format(new Date(from));
+  }
+}
+
 function uptimeColor(u: number | null): string {
   // No-data bars read as clearly empty slots (much fainter than any colored
   // "has-data" bar) so gaps don't get mistaken for a red "down" reading.
@@ -73,7 +107,18 @@ function StateDot({ status }: { status: AppStatus | undefined }) {
 // selected — the data under it changes, its shape doesn't. Bars share the width
 // evenly (flex-1) and fill the row. Tooltips read in the visitor's time zone
 // (see formatBarLabel), matching the rest of the app.
-function Timeline({ points, timeZone }: { points: BarPoint[]; timeZone: string }) {
+function Timeline({
+  points,
+  timeZone,
+  live,
+}: {
+  points: BarPoint[];
+  timeZone: string;
+  // The live on-demand check's `up`, or undefined before the first check. Drives
+  // the trailing "now" pill (below); separate from the historical bars, which
+  // come from the background poller.
+  live: boolean | undefined;
+}) {
   if (points.length === 0) return null;
   return (
     <div className="flex h-7 items-stretch gap-[3px]">
@@ -96,6 +141,32 @@ function Timeline({ points, timeZone }: { points: BarPoint[]; timeZone: string }
           className={`min-w-0 flex-1 rounded-full ${uptimeColor(p.uptime)}`}
         />
       ))}
+      {/* A dedicated "now" pill fed by the live on-demand check, not the
+          historical buckets. It has to exist as its own cell for two reasons:
+          the buckets can aggregate an active outage down to invisibility (a 90d
+          strip buckets in ~3-day chunks, so a single down poll washes green),
+          and the live status dot and the strip otherwise never meet — the dot
+          says "down now" while the strip's newest bar can still read green. Set
+          off from the history by a slightly wider gap (ml-1 over the strip's
+          gap-[3px]). Always rendered, even before the first check, so every
+          row's strip stays the same length and the right edges line up. Live
+          down pulses in a strong red so it's unmissable at every range. */}
+      <span
+        title={
+          live == null
+            ? "Right now: checking…"
+            : live
+              ? "Right now: up"
+              : "Right now: down"
+        }
+        className={`ml-1 min-w-0 flex-1 rounded-full ${
+          live == null
+            ? "bg-fg/[0.06]"
+            : live
+              ? "bg-emerald-400/80"
+              : "bg-red-400/90 animate-pulse"
+        }`}
+      />
     </div>
   );
 }
@@ -173,6 +244,10 @@ export default function StatusPage({
   const polled = checkedAt !== null && total > 0;
   const fmtPct = (u: number | null) => (u == null ? "—" : `${u.toFixed(1)}%`);
   const rangeLabel = STATUS_RANGES.find((r) => r.key === range)!.label;
+  // The selected range's window length, used to judge whether an app's history
+  // reaches back far enough to actually back its uptime % (see coverageSince
+  // per app below). Same source as the toggle, so the two never disagree.
+  const windowMs = STATUS_RANGE_MS[range];
 
   return (
     <div className="space-y-4">
@@ -241,18 +316,53 @@ export default function StatusPage({
               // range recorded no up-check latency — we render nothing then.
               const latency = h ? h.latency[range as keyof LatencyWindows] : null;
               const series = h?.series[range] ?? [];
+              // How far back this app's data reaches, but only when it's
+              // materially short of the selected window — the data misses more
+              // than 5% of the window's head, so the uptime % covers less range
+              // than the toggle claims (an app watched five minutes reads
+              // "100.0%" over 90d). Null when there's no data at all (since is
+              // null; the % already renders "—") or when coverage is ≥95% of the
+              // window, so a nearly-full window isn't cluttered with the note.
+              const coverageSince =
+                h && h.since != null && h.since - (now - windowMs) > windowMs * 0.05
+                  ? h.since
+                  : null;
+              // The current outage's start as the poller recorded it, but only
+              // when the live check also says down. The live dot/detail come
+              // from the on-demand /api/status check while downSince comes from
+              // the background poller, so for a poll or two they can disagree
+              // (the live check flips first). When the poller hasn't recorded
+              // this outage yet (downSince null) we keep the plain wording rather
+              // than fabricate a duration. `now` ticks, so the duration updates.
+              const outageStart =
+                s && !s.up && h?.downSince != null ? h.downSince : null;
+              const dur = outageStart != null ? downDuration(outageStart, now) : null;
               const detail = !s
                 ? "Checking…"
                 : s.up
                   ? `${s.status ? `HTTP ${s.status}` : "Reachable"} · ${s.ms}ms`
-                  : s.status
-                    ? `Down · HTTP ${s.status}`
-                    : "Unreachable";
+                  : dur
+                    ? s.status
+                      ? `Down for ${dur} · HTTP ${s.status}`
+                      : `Unreachable for ${dur}`
+                    : s.status
+                      ? `Down · HTTP ${s.status}`
+                      : "Unreachable";
               // The uptime % + live detail, used in two places: the fixed-width
               // right column from sm up, and the second row below sm.
               const figures = (
                 <>
                   <p className="font-semibold tabular-nums">{fmtPct(uptime)}</p>
+                  {/* How far back the data actually reaches, shown only when the
+                      selected range asks for a longer window than exists (see
+                      coverageSince above). One short muted line like "since Jul
+                      4" ("since 5:04 PM" for the 1h range), matching the latency
+                      line below; fits the fixed w-32 column without widening it. */}
+                  {coverageSince != null && (
+                    <p className="text-xs text-fg/45">
+                      since {formatSince(coverageSince, timezone, range)}
+                    </p>
+                  )}
                   {/* Range average latency, directly under the uptime % it pairs
                       with. One compact line; rendered only when the range has a
                       sample, so a range with no latency data shows nothing (not a
@@ -263,6 +373,13 @@ export default function StatusPage({
                     </p>
                   )}
                   <p
+                    // Absolute outage start on hover, in the visitor's zone, so
+                    // "Down for 23m" reveals exactly when it began.
+                    title={
+                      outageStart != null
+                        ? `down since ${downSinceLabel(outageStart, timezone)}`
+                        : undefined
+                    }
                     className={`truncate text-xs ${
                       s && !s.up ? "text-red-400" : "text-fg/45"
                     }`}
@@ -298,7 +415,7 @@ export default function StatusPage({
                         line below sm where there's no room for it. */}
                     {series.length > 0 && (
                       <div className="hidden shrink-0 sm:block sm:w-44 lg:w-72">
-                        <Timeline points={series} timeZone={timezone} />
+                        <Timeline points={series} timeZone={timezone} live={s?.up} />
                       </div>
                     )}
                     {/* Fixed width so the heartbeat's right edge — and thus the
@@ -315,7 +432,7 @@ export default function StatusPage({
                   <div className="mt-3 flex items-end gap-4 sm:hidden">
                     <div className="min-w-0 flex-1">
                       {series.length > 0 && (
-                        <Timeline points={series} timeZone={timezone} />
+                        <Timeline points={series} timeZone={timezone} live={s?.up} />
                       )}
                     </div>
                     <div className="shrink-0 text-right">{figures}</div>
