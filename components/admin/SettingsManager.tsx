@@ -62,6 +62,11 @@ const MULTI_CARD_SECTIONS: readonly SettingsSectionId[] = [
   "search",
 ];
 
+// Offered uptime-check intervals (minutes). The schema accepts 1–60, so a
+// hand-edited value can fall outside this list — the control shows it as an
+// extra read-only chip rather than pretending nothing is selected.
+const INTERVAL_PRESETS: readonly number[] = [1, 5, 15];
+
 const TONE_LABELS: Record<string, string> = {
   info: "Info",
   warning: "Warning",
@@ -533,7 +538,7 @@ export default function SettingsManager({
               </p>
             </div>
             <div className="flex shrink-0 overflow-hidden rounded-lg border border-fg/10">
-              {([1, 5, 15] as const).map((m) => (
+              {INTERVAL_PRESETS.map((m) => (
                 <button
                   key={m}
                   type="button"
@@ -547,6 +552,17 @@ export default function SettingsManager({
                   {m} min
                 </button>
               ))}
+              {/* A hand-edited config value (the schema allows 1–60) matches no
+                  preset; surface it as an extra selected chip so the control
+                  never reads as "nothing selected". It vanishes once a preset is
+                  clicked. A span, not a button — it's a readout of the current
+                  value, not a choice; making it clickable-looking-but-inert
+                  would just be a keyboard trap. */}
+              {!INTERVAL_PRESETS.includes(settings.statusInterval) && (
+                <span className="px-3 py-1.5 text-xs bg-fg/15 text-fg">
+                  {settings.statusInterval} min
+                </span>
+              )}
             </div>
           </div>
         )}

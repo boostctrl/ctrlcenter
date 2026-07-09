@@ -74,6 +74,9 @@ export const CHECK_TYPE_KEYS = CHECK_TYPES.map((c) => c.key) as [
 export type UptimeWindows = {
   h1: number | null;
   d1: number | null;
+  // @deprecated No 7d range exists in the UI; this window is computed and
+  // shipped only for API compatibility through 1.9.x and will be removed in
+  // 2.0.0. Don't build new consumers on it.
   d7: number | null;
   d30: number | null;
   d90: number | null;
@@ -93,6 +96,8 @@ export type LatencyStat = { avg: number; max: number };
 export type LatencyWindows = {
   h1: LatencyStat | null;
   d1: LatencyStat | null;
+  // @deprecated Same story as UptimeWindows.d7 — unused by the UI, kept only
+  // for API compatibility through 1.9.x, removed in 2.0.0 alongside it.
   d7: LatencyStat | null;
   d30: LatencyStat | null;
   d90: LatencyStat | null;
@@ -148,7 +153,17 @@ export type BarPoint = { at: string; uptime: number | null; ms: number | null };
 // UTC. The minute/hour bars are real instants and are converted to local time; a
 // daily bar is a UTC calendar date and is shown as-is (converting it would
 // mislabel the bucket). Falls back to UTC if the zone is invalid.
-export function formatBarLabel(at: string, timeZone: string): string {
+//
+// `spanMs` is the bucket's width: a sub-day bucket spans a real interval (48
+// minutes on the 24h view), so passing its width labels the whole RANGE ("Jul
+// 7, 5:54 – 6:42 PM") instead of implying an instant. Only the minute-level
+// (sub-day) bars honour it; a daily bar is already a whole-day bucket and stays
+// a single date whatever `spanMs` says.
+export function formatBarLabel(
+  at: string,
+  timeZone: string,
+  spanMs?: number
+): string {
   const fmt = (instant: Date, opts: Intl.DateTimeFormatOptions, tz = timeZone) => {
     try {
       return new Intl.DateTimeFormat("en-US", { timeZone: tz, ...opts }).format(instant);
@@ -158,9 +173,30 @@ export function formatBarLabel(at: string, timeZone: string): string {
   };
   // Single poll: `YYYY-MM-DDThh:mm` → local date + time.
   if (at.length >= 16) {
-    return fmt(new Date(`${at}:00Z`), {
+    const opts: Intl.DateTimeFormatOptions = {
       month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true,
-    });
+    };
+    const start = new Date(`${at}:00Z`);
+    // With a bucket width, show the range it covers. formatRange collapses the
+    // shared parts ("Jul 7, 5:54 – 6:42 PM") and expands across a day boundary
+    // ("Jul 7, 11:50 PM – Jul 8, 12:20 AM").
+    if (spanMs && spanMs > 0) {
+      const end = new Date(start.getTime() + spanMs);
+      // formatRange separates parts with special spaces (a thin space around the
+      // en dash, a narrow no-break space before AM/PM); normalize them to plain
+      // spaces so the range tooltip matches the rest of the app's labels (which
+      // come from plain .format()).
+      const range = (tz: string) =>
+        new Intl.DateTimeFormat("en-US", { timeZone: tz, ...opts })
+          .formatRange(start, end)
+          .replace(/[\u2009\u202f\u00a0]/g, " ");
+      try {
+        return range(timeZone);
+      } catch {
+        return range("UTC");
+      }
+    }
+    return fmt(start, opts);
   }
   // Hourly bucket: `YYYY-MM-DDThh` → local date + hour.
   if (at.includes("T")) {

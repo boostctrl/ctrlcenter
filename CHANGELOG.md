@@ -12,6 +12,14 @@ here.
 
 ## [Unreleased]
 
+### Deprecated
+
+- **The status history API's unused `d7` (7-day) fields.** The
+  `/api/status/history` payload still carries a 7-day uptime and latency
+  window that nothing in the app displays. They stay for now so existing
+  integrations keep working, but they are deprecated and will be removed
+  in 2.0.0. (#117)
+
 ### Fixed
 
 - **TCP and ping checks now work for apps with an IPv6-literal URL.** An app
@@ -19,6 +27,21 @@ here.
   the brackets URLs use to write an IPv6 address were being passed straight
   through to the connection/ping call, which doesn't understand them. Both
   check types now strip the brackets and reach the address correctly. (#136)
+- **Status tooltips and timings now read honestly.** An offline app's dot now
+  shows the HTTP code it saw ("Offline · HTTP 404") instead of a bare
+  "Offline"; the status page's "Updated" line grows past minutes into hours
+  and days ("2h ago", "3d ago") rather than "1440m ago"; and on the 24h and 1h
+  views each timeline bar's tooltip labels the time range it covers ("Jul 7,
+  5:54 – 6:42 PM") instead of a single instant, so a dip can be pinned to a
+  real window. (#117)
+- **The uptime check interval always shows the value it's set to.** A
+  hand-edited interval that matched none of the 1/5/15-minute presets left the
+  control looking like nothing was selected; it now surfaces the actual value
+  (e.g. "30 min") as its own selected chip. (#117)
+- **Failed status-history recording is now logged.** When the background poller
+  can't read its config or write the history file, it leaves a warning in the
+  server log instead of failing silently, so a stalled uptime history is
+  traceable. (#117)
 
 ## [1.9.1] - 2026-07-08
 

@@ -2,6 +2,7 @@ import { readConfig } from "./config";
 import { checkApp } from "./status-check";
 import { loadHistory, recordResults, flush, lastReadings } from "./status-history";
 import { processAlerts } from "./alerts";
+import { log, errorReason } from "./log";
 import type { StatusResult } from "./status";
 
 // Background uptime poller. Runs in the (single) standalone Node server process,
@@ -32,8 +33,11 @@ async function tick(): Promise<void> {
     recordResults(results, lastRun);
     await flush();
     await processAlerts(results, apps, settings.alerts, prior);
-  } catch {
-    // Best-effort; try again next tick.
+  } catch (e) {
+    // Best-effort; try again next tick. But leave a trace — a persistently
+    // failing config read or history flush would otherwise silently stop the
+    // uptime history from accruing with no sign of why.
+    log.warn("status poll tick failed", { reason: errorReason(e) });
   }
 }
 

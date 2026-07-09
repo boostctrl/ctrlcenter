@@ -107,6 +107,35 @@ describe("formatBarLabel", () => {
       "Jun 25, 2:30 PM"
     );
   });
+
+  it("labels a sub-day bucket's range when given its span", () => {
+    // 48-minute bucket (the 24h view): the shared date and AM/PM collapse.
+    expect(
+      formatBarLabel("2026-07-07T17:54", "UTC", 48 * 60 * 1000)
+    ).toBe("Jul 7, 5:54 – 6:42 PM");
+    // 2-minute bucket (the 1h view).
+    expect(
+      formatBarLabel("2026-06-25T14:30", "UTC", 2 * 60 * 1000)
+    ).toBe("Jun 25, 2:30 – 2:32 PM");
+  });
+
+  it("expands a bucket range across a day boundary", () => {
+    expect(
+      formatBarLabel("2026-07-07T23:50", "UTC", 30 * 60 * 1000)
+    ).toBe("Jul 7, 11:50 PM – Jul 8, 12:20 AM");
+  });
+
+  it("ignores the span for a day-scale bucket (stays a single date)", () => {
+    expect(
+      formatBarLabel("2026-06-25", "America/Chicago", 3 * 24 * 60 * 60 * 1000)
+    ).toBe("Jun 25");
+  });
+
+  it("falls back to UTC for a range label when the time zone is invalid", () => {
+    expect(
+      formatBarLabel("2026-06-25T14:30", "Not/AZone", 2 * 60 * 1000)
+    ).toBe("Jun 25, 2:30 – 2:32 PM");
+  });
 });
 
 describe("formatSince", () => {

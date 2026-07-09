@@ -10,6 +10,7 @@ import {
   formatSince,
   STATUS_RANGES,
   STATUS_RANGE_MS,
+  TIMELINE_BARS,
   type StatusRangeKey,
   type AppStatus,
   type StatusResponse,
@@ -43,7 +44,11 @@ function relativeTime(from: number, now: number): string {
   const s = Math.max(0, Math.round((now - from) / 1000));
   if (s < 5) return "just now";
   if (s < 60) return `${s}s ago`;
-  return `${Math.round(s / 60)}m ago`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.round(h / 24)}d ago`;
 }
 
 // How long the current outage has run, from its start to `now`, compact by scale
@@ -110,16 +115,24 @@ function StateDot({ status }: { status: AppStatus | undefined }) {
 function Timeline({
   points,
   timeZone,
+  range,
   live,
 }: {
   points: BarPoint[];
   timeZone: string;
+  // The range the strip is showing. Sets each bucket's width so a sub-day
+  // bucket's tooltip labels the interval it spans, not a single instant.
+  range: StatusRangeKey;
   // The live on-demand check's `up`, or undefined before the first check. Drives
   // the trailing "now" pill (below); separate from the historical bars, which
   // come from the background poller.
   live: boolean | undefined;
 }) {
   if (points.length === 0) return null;
+  // Each bar covers this slice of the range's window. Passed to formatBarLabel
+  // so a sub-day bucket reads as a range ("Jul 7, 5:54 – 6:42 PM"); day-scale
+  // bars ignore it and stay a single date.
+  const bucketMs = STATUS_RANGE_MS[range] / TIMELINE_BARS;
   return (
     <div className="flex h-7 items-stretch gap-[3px]">
       {points.map((p, i) => (
@@ -131,8 +144,8 @@ function Timeline({
           key={`${p.at}-${i}`}
           title={
             p.uptime == null
-              ? `${formatBarLabel(p.at, timeZone)}: no data`
-              : `${formatBarLabel(p.at, timeZone)}: ${p.uptime.toFixed(1)}% up${
+              ? `${formatBarLabel(p.at, timeZone, bucketMs)}: no data`
+              : `${formatBarLabel(p.at, timeZone, bucketMs)}: ${p.uptime.toFixed(1)}% up${
                   // Append the bar's average latency when it recorded any up
                   // check; omitted for bars with no latency sample.
                   p.ms == null ? "" : ` · avg ${p.ms}ms`
@@ -415,7 +428,7 @@ export default function StatusPage({
                         line below sm where there's no room for it. */}
                     {series.length > 0 && (
                       <div className="hidden shrink-0 sm:block sm:w-44 lg:w-72">
-                        <Timeline points={series} timeZone={timezone} live={s?.up} />
+                        <Timeline points={series} timeZone={timezone} range={range} live={s?.up} />
                       </div>
                     )}
                     {/* Fixed width so the heartbeat's right edge — and thus the
@@ -432,7 +445,7 @@ export default function StatusPage({
                   <div className="mt-3 flex items-end gap-4 sm:hidden">
                     <div className="min-w-0 flex-1">
                       {series.length > 0 && (
-                        <Timeline points={series} timeZone={timezone} live={s?.up} />
+                        <Timeline points={series} timeZone={timezone} range={range} live={s?.up} />
                       )}
                     </div>
                     <div className="shrink-0 text-right">{figures}</div>

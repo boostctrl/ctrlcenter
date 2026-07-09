@@ -62,7 +62,7 @@ export function StatusDot({ id }: { id: string }) {
 
   const title = status.up
     ? `Online${status.status ? ` · HTTP ${status.status}` : ""} · ${status.ms}ms`
-    : "Offline";
+    : `Offline${status.status ? ` · HTTP ${status.status}` : ""}`;
 
   return (
     <span
