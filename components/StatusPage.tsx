@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type KeyboardEvent } from "react";
 import Icon from "./Icon";
+import StatusAnnouncements from "./StatusAnnouncements";
 import { useVisitorPrefs } from "./PrefsProvider";
 import {
   summarize,
@@ -21,6 +22,7 @@ import {
   type UptimeWindows,
   type LatencyWindows,
 } from "@/lib/status";
+import type { StatusAnnouncement } from "@/lib/schema";
 
 export type StatusAppMeta = {
   id: string;
@@ -257,9 +259,11 @@ function Timeline({
 export default function StatusPage({
   apps,
   defaultRange,
+  announcements,
 }: {
   apps: StatusAppMeta[];
   defaultRange: StatusRangeKey;
+  announcements: StatusAnnouncement[];
 }) {
   const [statuses, setStatuses] = useState<Map<string, AppStatus>>(new Map());
   const [history, setHistory] = useState<Map<string, AppHistory>>(new Map());
@@ -363,6 +367,11 @@ export default function StatusPage({
           {loading ? "Refreshing…" : "Refresh"}
         </button>
       </div>
+
+      {/* Maintenance/upcoming-change notices sit between the summary and the
+          rows (the Statuspage pattern, per #118): a planned red patch on a
+          timeline below has its story directly above it. */}
+      <StatusAnnouncements announcements={announcements} />
 
       {/* Per-app rows */}
       {apps.length === 0 ? (

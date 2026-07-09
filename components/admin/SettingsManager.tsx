@@ -1,9 +1,13 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import type { Settings } from "@/lib/schema";
-import { ALERT_TYPES, ANNOUNCEMENT_TONES } from "@/lib/schema";
+import type { Settings, StatusAnnouncementKind } from "@/lib/schema";
+import {
+  ALERT_TYPES,
+  ANNOUNCEMENT_TONES,
+  STATUS_ANNOUNCEMENT_KINDS,
+} from "@/lib/schema";
 import type { ThemePack } from "@/lib/theme";
 import {
   SEARCH_ENGINES,
@@ -11,7 +15,8 @@ import {
   type SearchEngine,
 } from "@/lib/search";
 import { STATUS_RANGES } from "@/lib/status";
-import { supportedTimezones } from "@/lib/prefs";
+import { announcementState } from "@/lib/status-announcements";
+import { supportedTimezones, newThemeId } from "@/lib/prefs";
 import { resolveLayoutWidgets, type LayoutWidgetId } from "@/lib/layout";
 import { TextField } from "./ui";
 import IconField from "./IconField";
@@ -20,6 +25,7 @@ import FeedTest from "./FeedTest";
 import AlertTest from "./AlertTest";
 import CitySearch from "./CitySearch";
 import ChangePassword from "./ChangePassword";
+import { useConfirm } from "./Confirm";
 import { apiErrorMessage } from "./apiError";
 import { useAutosave, SaveStatus, type SaveOptions } from "./useAutosave";
 
@@ -74,6 +80,34 @@ const TONE_LABELS: Record<string, string> = {
   accent: "Accent (theme color)",
 };
 
+const STATUS_KIND_LABELS: Record<StatusAnnouncementKind, string> = {
+  maintenance: "Maintenance",
+  incident: "Incident",
+  info: "Notice",
+};
+
+const STATUS_STATE_LABELS: Record<
+  ReturnType<typeof announcementState>,
+  string
+> = { active: "Active", scheduled: "Scheduled", expired: "Expired" };
+
+// <input type="datetime-local"> shows/edits a local wall-clock string with no
+// zone, but a window is stored as a UTC ISO instant. Convert both directions
+// in the browser's own zone so a value round-trips to the same wall-clock time.
+function isoToLocalInput(iso: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+    .toISOString()
+    .slice(0, 16);
+}
+function localInputToIso(value: string): string {
+  if (!value) return "";
+  const d = new Date(value); // a zone-less datetime-local is parsed as local
+  return Number.isNaN(d.getTime()) ? "" : d.toISOString();
+}
+
 function Section({
   title,
   intro,
@@ -120,8 +154,17 @@ export default function SettingsManager({
     },
   }));
   const [section, setSection] = useState<SettingsSectionId>("general");
+  // A ticking clock so each announcement's derived state chip (Active /
+  // Scheduled / Expired) stays current without a reload, and so `Date.now()`
+  // isn't called impurely during render.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
   // Persistence is automatic: every change debounce-saves via useAutosave.
   const { status, error } = useAutosave(settings, saveSettings);
+  const confirm = useConfirm();
   const zones = useMemo(() => supportedTimezones(), []);
 
   const selectClass =
@@ -221,6 +264,35 @@ export default function SettingsManager({
     setCountdownItems(
       countdown.items.map((item, idx) => (idx === i ? { ...item, ...patch } : item))
     );
+
+  // Status-page announcements: a client-managed list saved through the whole-
+  // settings autosave (each entry carries a client-minted id, like a saved
+  // theme). Start/end are stored as UTC ISO instants; the datetime-local inputs
+  // convert to/from the browser's local wall clock.
+  const statusAnnouncements = settings.statusAnnouncements;
+  const setStatusAnnouncements = (items: Settings["statusAnnouncements"]) =>
+    setSettings((s) => ({ ...s, statusAnnouncements: items }));
+  const updateStatusAnnouncement = (
+    i: number,
+    patch: Partial<Settings["statusAnnouncements"][number]>
+  ) =>
+    setStatusAnnouncements(
+      statusAnnouncements.map((a, idx) => (idx === i ? { ...a, ...patch } : a))
+    );
+  const addStatusAnnouncement = () =>
+    setStatusAnnouncements([
+      ...statusAnnouncements,
+      { id: newThemeId(), title: "", body: "", kind: "info", startsAt: "", endsAt: "" },
+    ]);
+  const removeStatusAnnouncement = async (i: number) => {
+    const ok = await confirm({
+      title: "Remove this announcement?",
+      confirmLabel: "Remove",
+      danger: true,
+    });
+    if (!ok) return;
+    setStatusAnnouncements(statusAnnouncements.filter((_, idx) => idx !== i));
+  };
 
   const bangs = settings.search.bangs;
   const setBangs = (next: Settings["search"]["bangs"]) =>
@@ -938,6 +1010,137 @@ export default function SettingsManager({
             </div>
           </>
         )}
+        </Section>
+        )}
+
+        {section === "monitoring" && (
+        <Section
+          title="Announcements"
+          intro="Maintenance windows and upcoming changes, posted on the status page. An entry with a start time in the future shows as scheduled; once its end time passes it stops showing. Independent of the status checks above — a notice appears even with checks off."
+        >
+        <div className="flex flex-col gap-3">
+          {statusAnnouncements.length === 0 && (
+            <p className="-mt-1 text-xs text-fg/40">
+              No announcements yet. Add one to post a maintenance window or
+              notice on the status page.
+            </p>
+          )}
+          {statusAnnouncements.map((a, i) => {
+            const state = announcementState(a, now);
+            return (
+              <div
+                key={a.id}
+                className="flex flex-col gap-3 rounded-xl border border-fg/10 bg-fg/[0.03] p-4"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-fg/60">
+                      Announcement {i + 1}
+                    </span>
+                    <span className="rounded-full bg-fg/10 px-2 py-0.5 text-[0.7rem] font-medium text-fg/60">
+                      {STATUS_STATE_LABELS[state]}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeStatusAnnouncement(i)}
+                    aria-label={`Remove announcement ${i + 1}`}
+                    className="shrink-0 rounded-md px-2 py-1 text-fg/40 transition-colors hover:bg-fg/10 hover:text-red-400"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <TextField
+                  label="Title"
+                  value={a.title}
+                  onChange={(e) =>
+                    updateStatusAnnouncement(i, { title: e.target.value })
+                  }
+                />
+
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-fg/50">Message</span>
+                  <textarea
+                    value={a.body}
+                    onChange={(e) =>
+                      updateStatusAnnouncement(i, { body: e.target.value })
+                    }
+                    rows={2}
+                    placeholder={"Upgrading the NAS 10–11pm — some services may blip. [details](https://…)"}
+                    className="accent-focus rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-sm leading-relaxed text-fg placeholder-fg/30 outline-none transition-colors"
+                  />
+                  <span className="text-xs text-fg/40">
+                    Supports inline **bold**, *italic*, `code` and
+                    [links](https://…) (http/https only). Raw HTML is shown as
+                    plain text.
+                  </span>
+                </label>
+
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-sm text-fg/50">Kind</span>
+                  <div className="flex overflow-hidden rounded-lg border border-fg/10 text-xs">
+                    {STATUS_ANNOUNCEMENT_KINDS.map((k) => (
+                      <button
+                        key={k}
+                        type="button"
+                        aria-pressed={a.kind === k}
+                        onClick={() => updateStatusAnnouncement(i, { kind: k })}
+                        className={`flex-1 px-2 py-1.5 transition-colors ${
+                          a.kind === k
+                            ? "bg-fg/15 text-fg"
+                            : "text-fg/50 hover:text-fg/80"
+                        }`}
+                      >
+                        {STATUS_KIND_LABELS[k]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="text-fg/50">Starts (optional)</span>
+                    <input
+                      type="datetime-local"
+                      value={isoToLocalInput(a.startsAt)}
+                      onChange={(e) =>
+                        updateStatusAnnouncement(i, {
+                          startsAt: localInputToIso(e.target.value),
+                        })
+                      }
+                      className={selectClass}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="text-fg/50">Ends (optional)</span>
+                    <input
+                      type="datetime-local"
+                      value={isoToLocalInput(a.endsAt)}
+                      onChange={(e) =>
+                        updateStatusAnnouncement(i, {
+                          endsAt: localInputToIso(e.target.value),
+                        })
+                      }
+                      className={selectClass}
+                    />
+                  </label>
+                </div>
+              </div>
+            );
+          })}
+          <button
+            type="button"
+            onClick={addStatusAnnouncement}
+            className="self-start rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10"
+          >
+            + Add announcement
+          </button>
+        </div>
+        <p className="text-xs text-fg/40">
+          Leave both times empty to show a notice until you remove it. Times use
+          this browser&apos;s time zone; visitors see them in their own.
+        </p>
         </Section>
         )}
 

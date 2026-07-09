@@ -462,6 +462,21 @@ export default async function HelpPage() {
             </P>
           </Card>
 
+          <Card title="Status announcements">
+            <P>
+              Tell your household about maintenance and upcoming changes right on
+              the <A href="/status">status page</A>, separate from the site-wide
+              banner. In <strong>Settings → Monitoring → Announcements</strong>{" "}
+              add an entry with a kind (maintenance, incident, or notice — it
+              tints the card), a title, and a message in the same inline markdown
+              subset. An optional start and end schedule it: an entry with a
+              future start shows as <em>scheduled</em> until its window opens,
+              then drops off on its own once the end passes. Times display in
+              each visitor&apos;s own time zone, and the section appears even when
+              status checks are off.
+            </P>
+          </Card>
+
           <Card title="Notes card">
             <P>
               A free-form card for anything worth keeping in view — maintenance

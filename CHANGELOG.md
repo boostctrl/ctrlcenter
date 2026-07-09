@@ -14,6 +14,17 @@ here.
 
 ### Added
 
+- **Announcements on the status page.** Tell your household about a maintenance
+  window or an upcoming change right where they check whether things are up — a
+  dedicated section at the top of `/status`, separate from the site-wide banner.
+  Each notice takes a kind (maintenance, incident, or a general notice) that
+  tints its card, a title, and a message in the same inline markdown. Give one
+  an optional start and end and it schedules itself: it waits as "scheduled"
+  until its window opens, shows while it's on, and disappears on its own once
+  the end passes — all in each visitor's own time zone. The section shows even
+  when status checks are turned off. Add them under Settings → Monitoring →
+  Announcements. (#118)
+
 - **The status page timeline is now reachable with a keyboard and a screen
   reader.** Each uptime heartbeat strip reads as a single control: it announces
   a spoken summary ("24h uptime timeline: 91.7% up, worst Jul 7, 5:54 – 6:42 PM

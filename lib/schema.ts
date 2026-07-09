@@ -184,6 +184,30 @@ export const announcementSchema = z.object({
 });
 export type AnnouncementConfig = z.infer<typeof announcementSchema>;
 
+// Per-service maintenance/incident notices shown on the /status page — distinct
+// from the site-wide `announcement` banner above. Each carries a `kind` that
+// tints its card, a title, an inline-markdown `body` (same safe subset as the
+// banner), and an optional scheduling window (`startsAt`/`endsAt` as UTC ISO
+// instants, empty = unset). A shared helper derives active/scheduled/expired
+// from the window (lib/status-announcements.ts). Every field is `.catch`-guarded
+// so a hand-edited row coerces per-field; `id` is required, so a row missing it
+// is dropped whole by the lenient array below (matching layout `sections`).
+export const STATUS_ANNOUNCEMENT_KINDS = [
+  "maintenance",
+  "incident",
+  "info",
+] as const;
+export type StatusAnnouncementKind = (typeof STATUS_ANNOUNCEMENT_KINDS)[number];
+export const statusAnnouncementSchema = z.object({
+  id: z.string(),
+  title: z.string().catch(""),
+  body: z.string().catch(""),
+  kind: z.enum(STATUS_ANNOUNCEMENT_KINDS).catch("info"),
+  startsAt: z.string().catch(""),
+  endsAt: z.string().catch(""),
+});
+export type StatusAnnouncement = z.infer<typeof statusAnnouncementSchema>;
+
 // The site-wide default theme. Visitors can override every part of this in
 // their own browser (the theme builder / settings page); these values are the
 // baseline an un-customized visitor sees. `background`/`foreground` are optional
@@ -439,6 +463,10 @@ export const settingsSchema = z.object({
   calendar: calendarSchema.default(calendarSchema.parse({})),
   notes: notesSchema.default(notesSchema.parse({})),
   announcement: announcementSchema.default(announcementSchema.parse({})),
+  // Maintenance/upcoming-change notices for the /status page. Lenient like the
+  // layout `sections` list (used directly in this shared schema): one malformed
+  // hand-edited row is dropped rather than failing the whole settings parse.
+  statusAnnouncements: lenientArray(statusAnnouncementSchema).default([]),
   feed: feedSchema.default(feedSchema.parse({})),
   countdown: countdownSchema.default(countdownSchema.parse({})),
   components: componentsSchema.default(componentsSchema.parse({})),
@@ -765,6 +793,10 @@ export const settingsInputSchema = z.object({
   calendar: calendarUpdateSchema.optional(),
   notes: notesUpdateSchema.optional(),
   announcement: announcementUpdateSchema.optional(),
+  // The admin sends the whole list (each entry carries a client-minted id), so
+  // updateSettings replaces it wholesale — it flows through `rest` like the
+  // other plain settings arrays (e.g. bookmarkCategoryOrder).
+  statusAnnouncements: z.array(statusAnnouncementSchema).optional(),
   feed: feedUpdateSchema.optional(),
   countdown: countdownUpdateSchema.optional(),
   components: componentsUpdateSchema.optional(),

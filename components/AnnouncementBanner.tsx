@@ -1,8 +1,10 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
-import { parseInline, type InlineToken } from "@/lib/markdown";
+import { useEffect, useMemo, useState } from "react";
+import { parseInline } from "@/lib/markdown";
 import type { AnnouncementTone } from "@/lib/schema";
+import { ANNOUNCEMENT_TONE_STYLES } from "@/lib/announcement-tones";
+import InlineMarkdown from "./InlineMarkdown";
 
 // Site-wide announcement strip, rendered at the top of every page from the root
 // layout when the admin turns it on. The message is a safe inline-markdown
@@ -12,18 +14,6 @@ import type { AnnouncementTone } from "@/lib/schema";
 // changes the message (the stored marker is the message itself).
 
 const DISMISS_KEY = "ctrlcenter:announcement";
-
-// Per-tone tint + accent color. Backgrounds are set inline (translucent so they
-// read on both light and dark surfaces; the accent tone follows the theme).
-const TONE: Record<AnnouncementTone, { bg: string; color: string }> = {
-  info: { bg: "rgba(56,189,248,0.12)", color: "#38bdf8" },
-  warning: { bg: "rgba(251,191,36,0.14)", color: "#f59e0b" },
-  success: { bg: "rgba(52,211,153,0.13)", color: "#10b981" },
-  accent: {
-    bg: "color-mix(in srgb, var(--accent-from) 14%, transparent)",
-    color: "var(--accent-from)",
-  },
-};
 
 // Small tone glyphs (lucide paths), colored by the tone.
 const ICON: Record<AnnouncementTone, React.ReactNode> = {
@@ -55,47 +45,6 @@ const ICON: Record<AnnouncementTone, React.ReactNode> = {
   ),
 };
 
-function Inline({ tokens }: { tokens: InlineToken[] }) {
-  return tokens.map((t, i) => {
-    switch (t.kind) {
-      case "text":
-        return <Fragment key={i}>{t.text}</Fragment>;
-      case "break":
-        return " ";
-      case "code":
-        return (
-          <code key={i} className="rounded bg-fg/10 px-1 py-0.5 font-mono text-[0.9em]">
-            {t.text}
-          </code>
-        );
-      case "bold":
-        return (
-          <strong key={i} className="font-semibold">
-            <Inline tokens={t.children} />
-          </strong>
-        );
-      case "italic":
-        return (
-          <em key={i}>
-            <Inline tokens={t.children} />
-          </em>
-        );
-      case "link":
-        return (
-          <a
-            key={i}
-            href={t.href}
-            target="_blank"
-            rel="noreferrer"
-            className="font-medium underline decoration-fg/40 underline-offset-2 transition-colors hover:decoration-fg"
-          >
-            <Inline tokens={t.children} />
-          </a>
-        );
-    }
-  });
-}
-
 export default function AnnouncementBanner({
   message,
   tone,
@@ -122,7 +71,7 @@ export default function AnnouncementBanner({
 
   if (text === "" || dismissed) return null;
 
-  const { bg, color } = TONE[tone];
+  const { bg, color } = ANNOUNCEMENT_TONE_STYLES[tone];
   return (
     <div className="border-b border-fg/10" style={{ background: bg }} role="status">
       <div className="mx-auto flex max-w-8xl items-center gap-3 px-6 py-2.5 sm:px-10">
@@ -142,7 +91,7 @@ export default function AnnouncementBanner({
           {ICON[tone]}
         </svg>
         <p className="min-w-0 flex-1 text-sm text-fg/85">
-          <Inline tokens={tokens} />
+          <InlineMarkdown tokens={tokens} />
         </p>
         {dismissible && (
           <button

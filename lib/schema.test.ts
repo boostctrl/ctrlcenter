@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   configSchema,
+  configReadSchema,
   settingsSchema,
   appInputSchema,
   bookmarkInputSchema,
@@ -60,8 +61,42 @@ describe("configSchema defaults", () => {
     expect(config.settings.statusChecks).toBe(false);
     expect(config.settings.statusInterval).toBe(5);
     expect(config.settings.statusDefaultRange).toBe("d1");
+    expect(config.settings.statusAnnouncements).toEqual([]);
     expect(config.settings.weather.enabled).toBe(true);
     expect(config.settings.weather.units).toBe("imperial");
+  });
+
+  it("coerces per-field on a status announcement, keeping the row", () => {
+    // A hand-edited row with a bad kind / non-string title stays, coerced.
+    const config = configSchema.parse({
+      settings: {
+        statusAnnouncements: [
+          { id: "x", kind: "bogus", title: 42, body: "hi" },
+        ],
+      },
+    });
+    expect(config.settings.statusAnnouncements).toEqual([
+      { id: "x", kind: "info", title: "", body: "hi", startsAt: "", endsAt: "" },
+    ]);
+  });
+
+  it("drops a status announcement missing its id without failing the read", () => {
+    // The resilient READ variant must never let one malformed announcement row
+    // fail the whole settings parse (which would 500 every page). A row with no
+    // id can't coerce per-field, so it's dropped whole; the valid row survives.
+    const config = configReadSchema.parse({
+      settings: {
+        title: "Dash",
+        statusAnnouncements: [
+          { title: "no id here" },
+          { id: "keep", title: "Maintenance" },
+        ],
+      },
+    });
+    expect(config.settings.title).toBe("Dash");
+    expect(config.settings.statusAnnouncements.map((a) => a.id)).toEqual([
+      "keep",
+    ]);
   });
 
   it("accepts an optional theme preset pointer", () => {
