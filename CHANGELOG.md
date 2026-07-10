@@ -12,6 +12,17 @@ here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Card grids now collapse based on the card's own width, not the window's.**
+  1.9.3's extra column step still measured the browser window, so a widget
+  narrower than the full page (or a dashboard with UI scale turned up) kept
+  4 tiles across long after they'd become uncomfortably narrow, and each step
+  arrived too late. Applications, bookmarks, and favorites grids now drop a
+  column exactly when their own card would squeeze tiles below a comfortable
+  width — whatever the widget's span, window size, or UI scale, and live as
+  you resize a widget in the layout editor. (#145)
+
 ## [1.9.3] - 2026-07-10
 
 ### Added

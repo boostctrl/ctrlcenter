@@ -167,15 +167,19 @@ const CELL_ALIGN: Partial<Record<LayoutWidgetId, string>> = {
 // How the inner card/bookmark grids reflow. An explicit `cards` override wins;
 // otherwise the count derives from the widget's span (a wide widget, ≥18 of 24
 // columns, fits three cards across; a mid one ≥10 two; narrower stacks — the
-// same output the old bucket thresholds produced). Overrides still collapse on
-// small screens, one column per breakpoint: sm caps at 2 across, md at 3,
-// everything stacks below sm. Complete, static class strings so Tailwind's
-// extractor keeps every variant.
+// same output the old bucket thresholds produced). The count is a cap: the
+// steps are container queries against the widget's own width (the section
+// around each grid is the @container), not viewport media queries — tile width
+// is a function of the card, and span, the page max-width, and the UI scale
+// all move it independently of the viewport (#145). Each rung keeps tiles at
+// roughly ≥215px, and the rem-based thresholds track the UI scale, so a
+// scaled-up dashboard collapses proportionally sooner. Complete, static class
+// strings so Tailwind's extractor keeps every variant.
 const CARD_COLS: Record<number, string> = {
   1: "grid-cols-1",
-  2: "grid-cols-1 sm:grid-cols-2",
-  3: "grid-cols-1 sm:grid-cols-2 md:grid-cols-3",
-  4: "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4",
+  2: "grid-cols-1 @md:grid-cols-2",
+  3: "grid-cols-1 @md:grid-cols-2 @2xl:grid-cols-3",
+  4: "grid-cols-1 @md:grid-cols-2 @2xl:grid-cols-3 @4xl:grid-cols-4",
 };
 const cardsFor = (widget: LayoutWidget): number =>
   widget.cards ?? (widget.span >= 18 ? 3 : widget.span >= 10 ? 2 : 1);
@@ -643,7 +647,7 @@ export default function Dashboard({
         ) : null;
       case "favorites":
         return (!q || editing) && favoriteApps.length > 0 ? (
-          <section>
+          <section className="@container">
             {!widget.hideLabel && <SectionTitle>Favorites</SectionTitle>}
             <div className={cardGridClass(widget, "gap-4")}>
               {favoriteApps.map((app) => (
@@ -655,7 +659,7 @@ export default function Dashboard({
       case "apps": {
         const list = editing ? apps : filteredApps;
         return list.length > 0 ? (
-          <section>
+          <section className="@container">
             {!widget.hideLabel && <SectionTitle>Applications</SectionTitle>}
             <div className={cardGridClass(widget, "gap-4")}>
               {list.map((app) => (
@@ -670,7 +674,7 @@ export default function Dashboard({
           ? groupBookmarks(bookmarks, categoryOrder)
           : filteredGroups;
         return groups.length > 0 ? (
-          <section>
+          <section className="@container">
             {!widget.hideLabel && <SectionTitle>Bookmarks</SectionTitle>}
             <div className={cardGridClass(widget, "gap-6")}>
               {groups.map(([category, items]) => (
