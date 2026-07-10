@@ -124,7 +124,6 @@ const Timeline = memo(function Timeline({
   points,
   timeZone,
   range,
-  live,
   uptimePct,
 }: {
   points: BarPoint[];
@@ -132,10 +131,6 @@ const Timeline = memo(function Timeline({
   // The range the strip is showing. Sets each bucket's width so a sub-day
   // bucket's tooltip labels the interval it spans, not a single instant.
   range: StatusRangeKey;
-  // The live on-demand check's `up`, or undefined before the first check. Drives
-  // the trailing "now" pill (below); separate from the historical bars, which
-  // come from the background poller.
-  live: boolean | undefined;
   // The row's displayed windowed uptime %, quoted in the strip's spoken summary
   // so a screen reader hears the same figure the column shows (the bucket-mean
   // fallback can drift a few tenths from it).
@@ -188,7 +183,7 @@ const Timeline = memo(function Timeline({
           arrow-key traversal below, not from thirty focusable bars. */}
       <div
         role="img"
-        aria-label={timelineSummary(points, timeZone, range, live, uptimePct)}
+        aria-label={timelineSummary(points, timeZone, range, uptimePct)}
         tabIndex={0}
         onKeyDown={onKeyDown}
         onBlur={() => setActive(null)}
@@ -210,40 +205,13 @@ const Timeline = memo(function Timeline({
             }`}
           />
         ))}
-        {/* A dedicated "now" marker fed by the live on-demand check, not the
-            historical buckets. It has to exist as its own cell for two reasons:
-            the buckets can aggregate an active outage down to invisibility (a 90d
-            strip buckets in ~3-day chunks, so a single down poll washes green),
-            and the live status dot and the strip otherwise never meet — the dot
-            says "down now" while the strip's newest bar can still read green.
-            A small centered DOT, not another full-height pill (#137): same
-            flex-1 shape as the bars read as a 31st, mysteriously brighter data
-            bar. The circle borrows the app's dot-means-live-state language
-            (dashboard cards, header row) and its fixed size plus the wider ml-2
-            gap keep it unmistakably outside the history. Always rendered, even
-            before the first check, so every row's strip ends the same way and
-            the right edges line up. Live down pulses red — a 10px dot keeps
-            that legible without the whole-cell flash that competed with the
-            StateDot's ping — gated motion-safe so reduced-motion users get a
-            static red dot. The dot's state is announced through the strip's
-            summary label (", currently up/down"), so it needs no separate text
-            alternative. */}
-        <span
-          title={
-            live == null
-              ? "Right now: checking…"
-              : live
-                ? "Right now: up"
-                : "Right now: down"
-          }
-          className={`ml-2 h-2.5 w-2.5 shrink-0 self-center rounded-full ${
-            live == null
-              ? "bg-fg/20"
-              : live
-                ? "bg-emerald-400/90"
-                : "bg-red-400 motion-safe:animate-pulse"
-          }`}
-        />
+        {/* The strip is history only — no trailing live "now" cell. #113 added
+            one (an active outage can average down to invisibility on long
+            ranges), but whatever its shape it read as part of the data it
+            wasn't part of (#137, then #141: removed). "Down right now" still
+            shows three ways on the row: the StateDot, the red detail line
+            ("Unreachable for 23m" — which is also what screen readers get),
+            and the row's red ring. */}
       </div>
       {/* The active bucket's detail: announced (aria-live) and shown near the
           strip while traversing. Always mounted so the live region is stable;
@@ -505,7 +473,6 @@ export default function StatusPage({
                   points={series}
                   timeZone={timezone}
                   range={range}
-                  live={s?.up}
                   uptimePct={uptime}
                 />
               );

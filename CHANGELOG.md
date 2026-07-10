@@ -12,6 +12,14 @@ here.
 
 ## [Unreleased]
 
+### Removed
+
+- **The live "now" dot at the end of each heartbeat strip.** However it was
+  drawn, a live marker inside the timeline read as part of the history it
+  wasn't part of. The strip now shows history only; whether a service is down
+  *right now* still shows three ways on the same row — the status dot, the
+  red "Unreachable for …" detail, and the row's red tint. (#141)
+
 ## [1.9.2] - 2026-07-09
 
 ### Added
