@@ -24,6 +24,14 @@ here.
 
 ### Fixed
 
+- **Settings and theme-builder polish.** On a phone, the theme builder's tab
+  row now fades out at an edge with more tabs to scroll to, so it's clear the
+  row keeps going. The Appearance mode and Units toggles announce their active
+  choice to screen readers instead of showing it by color alone. "Reset all
+  settings" now says up front that your saved themes and favorites survive it.
+  And a greeting name typed with stray spaces around it no longer keeps them.
+  (#125)
+
 - **Card grids no longer jump from 4 columns straight to 2.** Shrinking the
   window with a 4-across Applications (or bookmarks/favorites) widget now
   passes through a 3-column step on the way down, and 3-across grids reach

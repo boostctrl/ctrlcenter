@@ -6,8 +6,8 @@
 // no class (it's the :root token).
 //
 // To add a font: load it in app/layout.tsx, add a `.font-<id>` rule in
-// app/globals.css, add its id to the inline pre-paint script's list in
-// app/layout.tsx, and add an entry here.
+// app/globals.css, and add an entry here — the inline pre-paint script
+// interpolates FONT_IDS, so it picks the new id up automatically.
 export type FontId =
   | "jakarta"
   | "inter"

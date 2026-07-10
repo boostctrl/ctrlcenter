@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, ChangeEvent, ReactNode } from "react";
 import { useVisitorPrefs } from "./PrefsProvider";
 import { useConfirm } from "./admin/Confirm";
@@ -252,6 +252,34 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
       : "gradient"
   );
 
+  // The tablist scrolls horizontally when the tabs overflow a narrow phone, but
+  // nothing otherwise signals that tabs are clipped off an edge. Track which
+  // side has more to scroll toward so we can fade the row out there. Masking the
+  // row itself (below) rather than laying a gradient overlay on top means the
+  // fade works over any theme surface — an overlay would have to guess the card
+  // color behind it.
+  const tablistRef = useRef<HTMLDivElement>(null);
+  const [tabClip, setTabClip] = useState({ start: false, end: false });
+  const measureTabClip = useCallback(() => {
+    const el = tablistRef.current;
+    if (!el) return;
+    setTabClip({
+      start: el.scrollLeft > 0,
+      end: el.scrollLeft + el.clientWidth < el.scrollWidth - 1,
+    });
+  }, []);
+  useEffect(() => {
+    // Effect-only so it never runs during SSR: the first measure and the
+    // ResizeObserver both need a live element. The tab count is static, but the
+    // viewport isn't — a resize can clip or reveal an edge without a scroll.
+    measureTabClip();
+    const el = tablistRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(measureTabClip);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [measureTabClip]);
+
   // Keep the pickers in sync with the edit mode's colorset. Background/text come
   // from the active look's chosen-mode variant (or that mode's defaults when
   // there's no custom look yet); activeAccent resolves for the edit mode too.
@@ -490,9 +518,26 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
       </div>
 
       <div
+        ref={tablistRef}
         role="tablist"
         aria-label="Theme builder sections"
         className="flex gap-1 overflow-x-auto border-b border-fg/10"
+        onScroll={measureTabClip}
+        style={
+          tabClip.start || tabClip.end
+            ? (() => {
+                // Fade to transparent over ~24px on whichever side is clipped,
+                // opaque across the rest; no mask when nothing is clipped.
+                const mask = `linear-gradient(to right, ${[
+                  tabClip.start ? "transparent 0, black 24px" : "black 0",
+                  tabClip.end
+                    ? "black calc(100% - 24px), transparent 100%"
+                    : "black 100%",
+                ].join(", ")})`;
+                return { maskImage: mask, WebkitMaskImage: mask };
+              })()
+            : undefined
+        }
       >
         {TABS.map((t) => {
           const active = tab === t.id;

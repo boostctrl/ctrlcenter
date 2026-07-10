@@ -63,6 +63,7 @@ export default function SettingsControls() {
               <button
                 key={m}
                 type="button"
+                aria-pressed={theme === m}
                 onClick={() => setTheme(m)}
                 className={`px-4 py-2 text-xs capitalize transition-colors ${
                   theme === m
@@ -83,10 +84,14 @@ export default function SettingsControls() {
           <label htmlFor="greeting-name" className="text-fg/50">
             Greeting name
           </label>
+          {/* Trim on blur, not in setGreetingName: the input is controlled by
+              the persisted value, so trimming there would eat the space while
+              typing a two-word name. */}
           <input
             id="greeting-name"
             value={greetingName}
             onChange={(e) => setGreetingName(e.target.value)}
+            onBlur={() => setGreetingName(greetingName.trim())}
             placeholder="e.g. Elliott"
             maxLength={60}
             className="accent-focus w-full rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-fg outline-none transition-colors"
@@ -164,6 +169,7 @@ export default function SettingsControls() {
                   <button
                     key={u}
                     type="button"
+                    aria-pressed={units === u}
                     onClick={() => setUnits(u)}
                     className={`px-4 py-2 text-xs transition-colors ${
                       units === u
@@ -191,7 +197,7 @@ export default function SettingsControls() {
                 await confirm({
                   title: "Reset all settings?",
                   message:
-                    "Clears your greeting, time zone, units, weather location, appearance mode, and any theme customizations in this browser — including an unsaved look.",
+                    "Clears your greeting, time zone, units, weather location, appearance mode, and any theme customizations in this browser — including an unsaved look. Your saved themes and favorites are kept.",
                   confirmLabel: "Reset everything",
                   danger: true,
                 })
