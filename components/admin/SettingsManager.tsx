@@ -9,6 +9,7 @@ import {
   STATUS_ANNOUNCEMENT_KINDS,
 } from "@/lib/schema";
 import type { ThemePack } from "@/lib/theme";
+import { FONTS, fontVar, type FontId } from "@/lib/fonts";
 import {
   SEARCH_ENGINES,
   SEARCH_ENGINE_KEYS,
@@ -489,6 +490,51 @@ export default function SettingsManager({
             <span className="text-fg/60">Same as default</span> to mirror the
             theme above.
           </span>
+        </label>
+
+        {/* Theme packs deliberately don't carry a font, so the default font is
+            its own control rather than part of the pack selects above. Each
+            option renders in its own face (every font is loaded up front in the
+            root layout, so the variables exist here too). */}
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-fg/50">Default font</span>
+          <select
+            value={theme.font}
+            onChange={(e) => updateTheme({ font: e.target.value as FontId })}
+            className={selectClass}
+            style={{ fontFamily: fontVar(theme.font) }}
+          >
+            {FONTS.map((f) => (
+              <option key={f.id} value={f.id} style={{ fontFamily: fontVar(f.id) }}>
+                {f.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-fg/50">Light mode font</span>
+          <select
+            value={theme.fontLight ?? ""}
+            onChange={(e) =>
+              updateTheme({
+                fontLight: (e.target.value || undefined) as FontId | undefined,
+              })
+            }
+            className={selectClass}
+            style={
+              theme.fontLight
+                ? { fontFamily: fontVar(theme.fontLight) }
+                : undefined
+            }
+          >
+            <option value="">Same as default</option>
+            {FONTS.map((f) => (
+              <option key={f.id} value={f.id} style={{ fontFamily: fontVar(f.id) }}>
+                {f.name}
+              </option>
+            ))}
+          </select>
         </label>
 
         {/* Preview of the default look's dark + light surfaces with the accent. */}

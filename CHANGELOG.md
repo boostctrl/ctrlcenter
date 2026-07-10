@@ -14,6 +14,13 @@ here.
 
 ### Added
 
+- **The site's default font can be set from the admin.** Settings → General →
+  Appearance gains a Default font select — all 12 faces, each shown in its own
+  typeface — plus a Light mode font for giving a separate light look its own
+  face, mirroring how the light design and scene diverge. Previously the only
+  way to change the font every visitor starts with was editing `font:` in
+  `config.yaml` by hand. (#123)
+
 - **Saved themes can now be updated, renamed, and moved between browsers.**
   Saving a look under a name you've already used offers to update that theme in
   place instead of quietly adding a second copy with the same name. Each saved
