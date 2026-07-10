@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { readConfig } from "@/lib/config";
+import { isAdminRequest, visibleApps } from "@/lib/api-auth";
 import { loadHistory, getHistory } from "@/lib/status-history";
 import { isValidTimeZone } from "@/lib/datetime";
 import type { StatusHistory } from "@/lib/status";
@@ -20,8 +21,10 @@ export async function GET(request: NextRequest) {
   await loadHistory();
   const tz = request.nextUrl.searchParams.get("tz") ?? "";
   const timeZone = isValidTimeZone(tz) ? tz : "UTC";
-  // The poll cadence caps how long a 1h reading holds in the timeline.
+  // The poll cadence caps how long a 1h reading holds in the timeline. History
+  // is recorded for every app; only the caller's visible ids are read out.
+  const visible = visibleApps(apps, await isAdminRequest(request));
   return NextResponse.json(
-    getHistory(apps.map((a) => a.id), timeZone, settings.statusInterval)
+    getHistory(visible.map((a) => a.id), timeZone, settings.statusInterval)
   );
 }

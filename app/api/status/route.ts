@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { readConfig } from "@/lib/config";
+import { isAdminRequest, visibleApps } from "@/lib/api-auth";
 import { checkApp } from "@/lib/status-check";
 import type { StatusResult, StatusResponse } from "@/lib/status";
 
@@ -16,15 +17,27 @@ const CACHE_MS = 30_000;
 
 let cache: { at: number; data: StatusResult[] } | null = null;
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const { settings, apps } = await readConfig();
   if (!settings.statusChecks) {
     const empty: StatusResponse = { checkedAt: Date.now(), results: [] };
     return NextResponse.json(empty);
   }
 
+  // The cache always holds every app's result; visibility is applied per
+  // response, so a window filled by an anonymous caller still serves a later
+  // admin request in full.
+  const ids = new Set(
+    visibleApps(apps, await isAdminRequest(request)).map((a) => a.id)
+  );
+  const toCaller = (results: StatusResult[]) =>
+    results.filter((r) => ids.has(r.id));
+
   if (cache && Date.now() - cache.at < CACHE_MS) {
-    const cached: StatusResponse = { checkedAt: cache.at, results: cache.data };
+    const cached: StatusResponse = {
+      checkedAt: cache.at,
+      results: toCaller(cache.data),
+    };
     return NextResponse.json(cached);
   }
 
@@ -32,6 +45,9 @@ export async function GET() {
     apps.map(async (app) => ({ id: app.id, ...(await checkApp(app)) }))
   );
   cache = { at: Date.now(), data: results };
-  const body: StatusResponse = { checkedAt: cache.at, results };
+  const body: StatusResponse = {
+    checkedAt: cache.at,
+    results: toCaller(results),
+  };
   return NextResponse.json(body);
 }

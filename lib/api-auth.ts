@@ -25,3 +25,15 @@ export async function isAdminSession(): Promise<boolean> {
   const { auth } = await readConfig();
   return verifySessionToken(token, auth.passwordHash);
 }
+
+// Apps flagged `private` exist only for the admin session. This is the single
+// filter every public surface applies before app names/URLs leave the server —
+// the home page, /status, and the status APIs. The background poller, history
+// recording, and alerts deliberately bypass it: a private service should still
+// be monitored, it just shouldn't render for guests.
+export function visibleApps<T extends { private: boolean }>(
+  apps: T[],
+  isAdmin: boolean
+): T[] {
+  return isAdmin ? apps : apps.filter((a) => !a.private);
+}

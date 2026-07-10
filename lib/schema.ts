@@ -491,6 +491,9 @@ export const appItemSchema = z.object({
   checkType: z.enum(CHECK_TYPE_KEYS).catch("http").default("http"),
   port: z.number().int().min(1).max(65535).optional(),
   keyword: z.string().default(""),
+  // Render only for the admin session; see visibleApps() for the one filter
+  // every public surface applies. Monitoring and alerts ignore the flag.
+  private: z.boolean().catch(false).default(false),
 });
 
 export const bookmarkItemSchema = z.object({
@@ -580,6 +583,7 @@ export const appInputSchema = z.object({
   checkType: z.enum(CHECK_TYPE_KEYS).optional().default("http"),
   port: z.number().int().min(1).max(65535).optional(),
   keyword: z.string().optional().default(""),
+  private: z.boolean().optional().default(false),
 });
 
 export const bookmarkInputSchema = z.object({
@@ -813,6 +817,7 @@ export const appUpdateSchema = z.object({
   checkType: z.enum(CHECK_TYPE_KEYS).optional(),
   port: z.number().int().min(1).max(65535).optional(),
   keyword: z.string().optional(),
+  private: z.boolean().optional(),
 });
 
 export const bookmarkUpdateSchema = z.object({

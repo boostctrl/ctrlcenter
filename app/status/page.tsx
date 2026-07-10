@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { readConfig } from "@/lib/config";
+import { isAdminSession, visibleApps } from "@/lib/api-auth";
 import StatusPage from "@/components/StatusPage";
 import StatusAnnouncements from "@/components/StatusAnnouncements";
 import BackHome from "@/components/BackHome";
@@ -12,7 +13,9 @@ export const dynamic = "force-dynamic";
 
 export default async function StatusRoute() {
   const { settings, apps } = await readConfig();
-  const items = apps.map((a) => ({
+  // Server-rendered app list, so private apps' names/hosts must be filtered
+  // here — same visibility rule as the home page.
+  const items = visibleApps(apps, await isAdminSession()).map((a) => ({
     id: a.id,
     name: a.name,
     icon: a.icon,

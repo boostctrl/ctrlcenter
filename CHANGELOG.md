@@ -12,6 +12,16 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Apps can be marked "Only show when logged in".** A new checkbox in the
+  application form keeps private services — a router admin, a hypervisor, a
+  backup UI — off the dashboard for anyone who isn't signed in. The app
+  vanishes from the home page, its search results and bang, the status page,
+  and the public status feeds; filtering happens on the server, so nothing
+  about the app reaches a signed-out browser. Monitoring and alerts still
+  cover it. (#133)
+
 ### Fixed
 
 - **Card grids now collapse based on the card's own width, not the window's.**

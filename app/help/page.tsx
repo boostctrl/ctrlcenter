@@ -332,7 +332,9 @@ export default async function HelpPage() {
             <ul className={LIST_CLASS}>
               <li>
                 <strong>Apps</strong> carry a name, optional subtitle, URL, and
-                icon.
+                icon. Mark one <strong>Only show when logged in</strong> to keep
+                an internal service off the dashboard and status page for
+                signed-out visitors — it&apos;s still monitored and alerted on.
               </li>
               <li>
                 <strong>Bookmarks</strong> group under categories you name. Both

@@ -16,6 +16,7 @@ type FormState = {
   subtitle: string;
   url: string;
   icon: string;
+  private: boolean;
   expectStatus: string;
   checkType: CheckType;
   port: string;
@@ -26,6 +27,7 @@ const emptyForm: FormState = {
   subtitle: "",
   url: "",
   icon: "",
+  private: false,
   expectStatus: "",
   checkType: "http",
   port: "",
@@ -75,6 +77,7 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
       subtitle: app.subtitle,
       url: app.url,
       icon: app.icon,
+      private: app.private,
       expectStatus: app.expectStatus ?? "",
       checkType: app.checkType ?? "http",
       port: app.port != null ? String(app.port) : "",
@@ -102,6 +105,7 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
         subtitle: form.subtitle,
         url: form.url,
         icon: form.icon,
+        private: form.private,
         checkType: form.checkType,
         expectStatus: form.checkType === "http" ? form.expectStatus : "",
         keyword: form.checkType === "keyword" ? form.keyword : "",
@@ -207,7 +211,17 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
               </span>
               <Icon icon={app.icon} name={app.name} size={24} />
               <div className="min-w-0">
-                <p className="truncate font-medium">{app.name}</p>
+                <p className="flex items-center gap-2 font-medium">
+                  <span className="truncate">{app.name}</span>
+                  {app.private && (
+                    <span
+                      className="shrink-0 rounded-full border border-fg/15 px-2 py-0.5 text-[10px] font-normal tracking-wide text-fg/45 uppercase"
+                      title="Only shown when logged in"
+                    >
+                      Private
+                    </span>
+                  )}
+                </p>
                 <p className="truncate text-xs text-fg/40">
                   {app.subtitle ? `${app.subtitle} · ${app.url}` : app.url}
                 </p>
@@ -254,6 +268,20 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
           onChange={(v) => setForm({ ...form, icon: v })}
           name={form.name}
         />
+        <div className="flex flex-col gap-2">
+          <label className="flex items-center justify-between gap-4 text-sm">
+            <span className="text-fg/70">Only show when logged in</span>
+            <input
+              type="checkbox"
+              checked={form.private}
+              onChange={(e) => setForm({ ...form, private: e.target.checked })}
+            />
+          </label>
+          <p className="text-xs text-fg/40">
+            Hides this app from signed-out visitors everywhere, including the
+            status page. It&apos;s still monitored and alerted on.
+          </p>
+        </div>
         <div className="flex flex-col gap-2">
           <label htmlFor="check-method" className="text-sm text-fg/50">
             Check method

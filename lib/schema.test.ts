@@ -159,7 +159,18 @@ describe("appInputSchema", () => {
       subtitle: "",
       icon: "",
       expectStatus: "",
+      private: false,
     });
+  });
+
+  it("catches a malformed private flag to false when reading config", () => {
+    const parsed = configReadSchema.parse({
+      apps: [
+        { id: "a", name: "X", url: "https://x.com", private: "yes" },
+        { id: "b", name: "Y", url: "https://y.com", private: true },
+      ],
+    });
+    expect(parsed.apps.map((a) => a.private)).toEqual([false, true]);
   });
 
   it("rejects a missing name", () => {

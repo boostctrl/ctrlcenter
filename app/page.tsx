@@ -10,7 +10,7 @@ import { fetchWeather } from "@/lib/weather";
 import FeedWidget from "@/components/widgets/FeedWidget";
 import { greetingFor, hourIn, shortDate } from "@/lib/datetime";
 import { resolveLayoutWidgets, smallScreenTopGap } from "@/lib/layout";
-import { isAdminSession } from "@/lib/api-auth";
+import { isAdminSession, visibleApps } from "@/lib/api-auth";
 import { navPages } from "@/lib/nav";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +23,17 @@ export default async function HomePage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const config = await readConfig();
-  const { settings, apps, bookmarks } = config;
+  const { settings, bookmarks } = config;
+
+  // Admin state unlocks the layout-editor UI (saves go through the gated
+  // settings API) and reveals private apps; ?edit=1 is the deep link from
+  // admin Settings → Layout.
+  const isAdmin = await isAdminSession();
+
+  // Private apps must be dropped before the payload leaves the server — and
+  // everything derived from the list (search matches, per-app bangs,
+  // favorites) follows from the filtered array for free.
+  const apps = visibleApps(config.apps, isAdmin);
 
   // One poller wraps both the status widgets and the per-app dots; only
   // enable it when status checks are on and there are apps to monitor.
@@ -70,9 +80,6 @@ export default async function HomePage({
   const initialDate = shortDate(nowDate, timeZone);
   const initialGreeting = greetingFor(hourIn(nowDate, timeZone));
 
-  // Admin state only unlocks the layout-editor UI (saves go through the gated
-  // settings API); ?edit=1 is the deep link from admin Settings → Layout.
-  const isAdmin = await isAdminSession();
   const params = await searchParams;
   const initialEditing = isAdmin && params.edit === "1";
 
