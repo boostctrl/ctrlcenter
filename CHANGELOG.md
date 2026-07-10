@@ -12,6 +12,14 @@ here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Card grids no longer jump from 4 columns straight to 2.** Shrinking the
+  window with a 4-across Applications (or bookmarks/favorites) widget now
+  passes through a 3-column step on the way down, and 3-across grids reach
+  their third column one breakpoint sooner. Columns collapse one at a time.
+  (#138)
+
 ### Removed
 
 - **The live "now" dot at the end of each heartbeat strip.** However it was

@@ -168,13 +168,14 @@ const CELL_ALIGN: Partial<Record<LayoutWidgetId, string>> = {
 // otherwise the count derives from the widget's span (a wide widget, ≥18 of 24
 // columns, fits three cards across; a mid one ≥10 two; narrower stacks — the
 // same output the old bucket thresholds produced). Overrides still collapse on
-// small screens: sm caps at 2 across, everything stacks below sm. Complete,
-// static class strings so Tailwind's extractor keeps every variant.
+// small screens, one column per breakpoint: sm caps at 2 across, md at 3,
+// everything stacks below sm. Complete, static class strings so Tailwind's
+// extractor keeps every variant.
 const CARD_COLS: Record<number, string> = {
   1: "grid-cols-1",
   2: "grid-cols-1 sm:grid-cols-2",
-  3: "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3",
-  4: "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4",
+  3: "grid-cols-1 sm:grid-cols-2 md:grid-cols-3",
+  4: "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4",
 };
 const cardsFor = (widget: LayoutWidget): number =>
   widget.cards ?? (widget.span >= 18 ? 3 : widget.span >= 10 ? 2 : 1);
