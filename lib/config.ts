@@ -21,6 +21,12 @@ const CONFIG_PATH =
 // persists in the same mounted volume.
 export const CONFIG_DIR = path.dirname(CONFIG_PATH);
 
+// Safety copy of the outgoing config, written just before an import replaces it
+// (see replaceConfig). One file, overwritten each import, sitting beside the
+// live config so a mistaken import is recoverable. Derived from CONFIG_PATH the
+// same way CONFIG_DIR is, so it lands in the same mounted volume.
+const CONFIG_BAK = `${CONFIG_PATH}.bak`;
+
 // Serializes read-modify-write operations so concurrent admin requests can't
 // clobber each other's changes to the on-disk YAML file.
 let writeQueue: Promise<unknown> = Promise.resolve();
@@ -43,15 +49,21 @@ export async function readConfig(): Promise<Config> {
   return configReadSchema.parse(parsed ?? {});
 }
 
+// Dump a config as YAML to `dest` by writing a temp file then renaming into
+// place (atomic on the same filesystem) so a concurrent reader can never observe
+// a torn, half-written file and throw, and a crash mid-write can't leave a torn
+// artifact. Mirrors the persistence in lib/status-history.ts. Used for both the
+// live config and its .bak safety copy so they serialize identically.
+async function dumpYaml(dest: string, config: Config): Promise<void> {
+  const tmp = `${dest}.tmp`;
+  await fs.mkdir(CONFIG_DIR, { recursive: true });
+  await fs.writeFile(tmp, YAML.dump(config, { lineWidth: 100 }), "utf8");
+  await fs.rename(tmp, dest);
+}
+
 async function writeConfig(config: Config): Promise<void> {
   const validated = configSchema.parse(config);
-  // Write to a temp file then rename into place (atomic on the same filesystem)
-  // so a concurrent readConfig() can never observe a torn, half-written YAML file
-  // and throw. Mirrors the persistence in lib/status-history.ts.
-  const tmp = `${CONFIG_PATH}.tmp`;
-  await fs.mkdir(CONFIG_DIR, { recursive: true });
-  await fs.writeFile(tmp, YAML.dump(validated, { lineWidth: 100 }), "utf8");
-  await fs.rename(tmp, CONFIG_PATH);
+  await dumpYaml(CONFIG_PATH, validated);
 }
 
 async function mutate<T>(fn: (config: Config) => T): Promise<T> {
@@ -90,6 +102,12 @@ export async function replaceConfig(input: unknown): Promise<Config> {
     // overwrite this one's password. Export omits auth for the same reason, so a
     // freshly exported file has none to apply anyway.
     const current = await readConfig();
+    // Snapshot the outgoing config to config.yaml.bak before overwriting it, so
+    // a mistaken or bad import is recoverable. Runs inside the same write queue,
+    // and is written atomically (tmp+rename) like the live file — this .bak is
+    // the only artifact standing between a bad import and lost state, so a crash
+    // mid-write must not leave it torn.
+    await dumpYaml(CONFIG_BAK, current);
     validated.auth = current.auth;
     await writeConfig(validated);
     return validated;

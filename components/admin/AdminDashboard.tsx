@@ -16,7 +16,7 @@ import { resolveThemePacks } from "@/lib/theme";
 import { downloadJson } from "@/lib/download";
 import { Button } from "./ui";
 import { ToastProvider, useToast } from "./Toast";
-import { ConfirmProvider } from "./Confirm";
+import { ConfirmProvider, useConfirm } from "./Confirm";
 import { apiErrorMessage } from "./apiError";
 
 type Tab = "apps" | "bookmarks" | "themes" | "settings";
@@ -56,6 +56,7 @@ function AdminBody({
   const [tab, setTab] = useState<Tab>("apps");
   const fileRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
+  const confirm = useConfirm();
 
   async function handleLogout() {
     await fetch("/api/logout", { method: "POST" });
@@ -76,8 +77,41 @@ function AdminBody({
     const file = e.target.files?.[0];
     e.target.value = ""; // let the same file be picked again later
     if (!file) return;
+    let config: unknown;
     try {
-      const config = JSON.parse(await file.text());
+      config = JSON.parse(await file.text());
+    } catch {
+      toast("Couldn't read that file", "error");
+      return;
+    }
+
+    // Import swaps everything at once, so confirm first with a lenient summary
+    // of the picked file. The server does the real validation; this only reads
+    // the file defensively to preview it, falling back gracefully on anything
+    // odd (bad JSON never reaches here — it was caught above).
+    const c = (config ?? {}) as Record<string, unknown>;
+    const appCount = Array.isArray(c.apps) ? c.apps.length : 0;
+    const bookmarkCount = Array.isArray(c.bookmarks) ? c.bookmarks.length : 0;
+    const settings = (c.settings ?? {}) as Record<string, unknown>;
+    const title =
+      typeof settings.title === "string" ? settings.title.trim() : "";
+    const plural = (n: number, word: string) =>
+      `${n} ${word}${n === 1 ? "" : "s"}`;
+    const titleClause = title ? ` and sets the title to “${title}”` : "";
+    const ok = await confirm({
+      title: "Replace the entire configuration?",
+      message:
+        `This file has ${plural(appCount, "app")} and ` +
+        `${plural(bookmarkCount, "bookmark")}${titleClause}. Importing it ` +
+        "replaces your entire configuration — apps, bookmarks, settings, " +
+        "layout, and themes. Your current configuration is first saved beside " +
+        "the config file as config.yaml.bak, so you can restore it.",
+      confirmLabel: "Replace configuration",
+      danger: true,
+    });
+    if (!ok) return;
+
+    try {
       const res = await fetch("/api/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

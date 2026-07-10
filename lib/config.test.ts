@@ -19,6 +19,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   // Start each test from a clean slate; readConfig recreates defaults on miss.
   await fs.rm(configPath, { force: true });
+  await fs.rm(`${configPath}.bak`, { force: true });
 });
 
 describe("readConfig", () => {
@@ -384,6 +385,59 @@ describe("replaceConfig", () => {
     const reread = await config.readConfig();
     expect(reread.auth).toEqual({ passwordHash: "HASH", passwordSalt: "SALT" });
     expect(reread.settings.title).toBe("Imported");
+  });
+
+  it("snapshots the pre-import config to a .bak beside the config file", async () => {
+    // Seed a distinctive pre-import state, then import over it.
+    await config.createApp({
+      name: "PreImport",
+      subtitle: "",
+      url: "https://pre.example.com",
+      icon: "",
+    });
+    await config.updateSettings({ title: "Before" });
+
+    await config.replaceConfig({
+      settings: { title: "After" },
+      apps: [
+        { id: "n1", name: "New", subtitle: "", url: "https://new.com", icon: "" },
+      ],
+      bookmarks: [],
+    });
+
+    // The .bak sits next to config.yaml and parses back to the PRE-import state.
+    const bak = YAML.load(await fs.readFile(`${configPath}.bak`, "utf8")) as {
+      settings: { title: string };
+      apps: { name: string }[];
+    };
+    expect(bak.settings.title).toBe("Before");
+    expect(bak.apps.map((a) => a.name)).toEqual(["PreImport"]);
+  });
+
+  it("overwrites the .bak with the config current at the time of each import", async () => {
+    await config.replaceConfig({
+      settings: { title: "First" },
+      apps: [
+        { id: "a1", name: "First app", subtitle: "", url: "https://first.com", icon: "" },
+      ],
+      bookmarks: [],
+    });
+    // "First" is now the live config; a second import must back THAT up, not the
+    // original default that the first import backed up.
+    await config.replaceConfig({
+      settings: { title: "Second" },
+      apps: [
+        { id: "a2", name: "Second app", subtitle: "", url: "https://second.com", icon: "" },
+      ],
+      bookmarks: [],
+    });
+
+    const bak = YAML.load(await fs.readFile(`${configPath}.bak`, "utf8")) as {
+      settings: { title: string };
+      apps: { name: string }[];
+    };
+    expect(bak.settings.title).toBe("First");
+    expect(bak.apps.map((a) => a.name)).toEqual(["First app"]);
   });
 
   it("ignores any auth carried in an imported file (can't overwrite the password)", async () => {

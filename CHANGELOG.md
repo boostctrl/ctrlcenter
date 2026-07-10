@@ -33,6 +33,14 @@ here.
   spot in the category order. Renaming a category to the name of an existing one
   merges the two after a quick confirm. (#130)
 
+- **Importing a configuration now confirms first and keeps a safety copy.**
+  Choosing a file to import opens a confirmation that spells out what the file
+  holds — how many apps and bookmarks, and the dashboard title it will set —
+  before anything is replaced, since an import swaps your whole configuration
+  at once. And whatever was live is written to `config.yaml.bak`, beside the
+  config file, right before the import, so a mistaken or unwanted import is
+  recoverable. (#129)
+
 ### Fixed
 
 - **Card grids now collapse based on the card's own width, not the window's.**

@@ -321,7 +321,11 @@ export default async function HelpPage() {
               <strong>Bookmarks</strong>, <strong>Themes</strong>, and{" "}
               <strong>Settings</strong>. Changes save automatically as you make
               them, and the header has one-click <em>Export</em> and{" "}
-              <em>Import</em> of the whole configuration.
+              <em>Import</em> of the whole configuration. Import asks you to
+              confirm first — showing how many apps and bookmarks the file holds,
+              and the title it will set — and saves your previous configuration
+              to <Code>config.yaml.bak</Code> beside the config file, so a
+              mistaken import can be undone.
             </P>
           </Card>
 
