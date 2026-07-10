@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [1.9.2] - 2026-07-09
+
 ### Added
 
 - **Announcements on the status page.** Tell your household about a maintenance
@@ -1509,7 +1511,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.1...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.2...HEAD
+[1.9.2]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.1...v1.9.2
 [1.9.1]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.0...v1.9.1
 [1.9.0]: https://github.com/boostctrl/ctrlcenter/compare/v1.8.5...v1.9.0
 [1.8.5]: https://github.com/boostctrl/ctrlcenter/compare/v1.8.4...v1.8.5
