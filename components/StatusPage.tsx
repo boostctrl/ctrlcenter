@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type KeyboardEvent } from "react";
+import { memo, useCallback, useEffect, useState, type KeyboardEvent } from "react";
 import Icon from "./Icon";
 import StatusAnnouncements from "./StatusAnnouncements";
 import { useVisitorPrefs } from "./PrefsProvider";
@@ -115,7 +115,12 @@ function StateDot({ status }: { status: AppStatus | undefined }) {
 // selected — the data under it changes, its shape doesn't. Bars share the width
 // evenly (flex-1) and fill the row. Tooltips read in the visitor's time zone
 // (see formatBarLabel), matching the rest of the app.
-function Timeline({
+//
+// Memoized: the page re-renders every 10s for its "now" tick, but a strip's
+// props only change on the 30s poll — without memo each tick would rebuild
+// every strip's ~30 tooltip labels, the aria summary, and their Intl
+// formatters (×2, desktop + mobile mounts) for identical output.
+const Timeline = memo(function Timeline({
   points,
   timeZone,
   range,
@@ -254,7 +259,7 @@ function Timeline({
       </p>
     </div>
   );
-}
+});
 
 export default function StatusPage({
   apps,
@@ -493,6 +498,17 @@ export default function StatusPage({
                   </p>
                 </>
               );
+              // One strip element for both layouts (like `figures` above), so
+              // the desktop and mobile mounts can't drift apart prop by prop.
+              const timeline = series.length > 0 && (
+                <Timeline
+                  points={series}
+                  timeZone={timezone}
+                  range={range}
+                  live={s?.up}
+                  uptimePct={uptime}
+                />
+              );
               return (
                 <div
                   key={app.id}
@@ -518,9 +534,9 @@ export default function StatusPage({
                     {/* Heartbeat sits inline with the rest of the row on wider
                         screens (left of the uptime figure); it drops to its own
                         line below sm where there's no room for it. */}
-                    {series.length > 0 && (
+                    {timeline && (
                       <div className="hidden shrink-0 sm:block sm:w-44 lg:w-72">
-                        <Timeline points={series} timeZone={timezone} range={range} live={s?.up} uptimePct={uptime} />
+                        {timeline}
                       </div>
                     )}
                     {/* Fixed width so the heartbeat's right edge — and thus the
@@ -535,11 +551,7 @@ export default function StatusPage({
                     </div>
                   </div>
                   <div className="mt-3 flex items-end gap-4 sm:hidden">
-                    <div className="min-w-0 flex-1">
-                      {series.length > 0 && (
-                        <Timeline points={series} timeZone={timezone} range={range} live={s?.up} uptimePct={uptime} />
-                      )}
-                    </div>
+                    <div className="min-w-0 flex-1">{timeline}</div>
                     <div className="shrink-0 text-right">{figures}</div>
                   </div>
                 </div>

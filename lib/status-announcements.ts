@@ -2,7 +2,27 @@
 // notices (see lib/schema.ts `statusAnnouncementSchema`). Kept separate from the
 // React components so the timing logic is unit-testable in isolation.
 
-import type { StatusAnnouncement } from "./schema";
+import { formatInZone, formatRangeInZone, normalizeIntlSpaces } from "./datetime";
+import type {
+  AnnouncementTone,
+  StatusAnnouncement,
+  StatusAnnouncementKind,
+} from "./schema";
+
+// How each kind presents, in one place so the /status card and the admin
+// editor can never disagree on a kind's name or tint. Tones borrow the site
+// banner's palette (lib/announcement-tones.ts) so the cards read in the same
+// visual language: maintenance is informational (blue), an incident is a
+// warning (amber), a general note takes the accent. The info kind is labelled
+// "Notice" to avoid colliding with the banner's separate "Info" tone name.
+export const STATUS_ANNOUNCEMENT_KIND_META: Record<
+  StatusAnnouncementKind,
+  { label: string; tone: AnnouncementTone }
+> = {
+  maintenance: { label: "Maintenance", tone: "info" },
+  incident: { label: "Incident", tone: "warning" },
+  info: { label: "Notice", tone: "accent" },
+};
 
 // Whether an entry is showing now, still upcoming, or already over. Expired
 // entries never render; active and scheduled do (active first).
@@ -23,17 +43,29 @@ function parseInstant(value: string): number | null {
   return Number.isNaN(ms) ? null : ms;
 }
 
+// An entry's usable window. An end at or before its start is a misconfigured
+// window: keep the start and ignore the end — degrading toward "shown", like
+// unparsable dates above — rather than rendering a backwards range or expiring
+// an entry that never got to run.
+function parseWindow(a: Pick<StatusAnnouncement, "startsAt" | "endsAt">): {
+  start: number | null;
+  end: number | null;
+} {
+  const start = parseInstant(a.startsAt);
+  let end = parseInstant(a.endsAt);
+  if (start !== null && end !== null && end <= start) end = null;
+  return { start, end };
+}
+
 // Derive an entry's state from its window and the current instant. A window is
 // optional: both bounds unset → "active" (shown until removed). Once `endsAt`
 // has passed the entry is "expired"; before `startsAt` it's "scheduled";
-// otherwise "active". Checking end before start keeps a finished window expired
-// even if its start was (mis)configured after its end.
+// otherwise "active".
 export function announcementState(
   a: Pick<StatusAnnouncement, "startsAt" | "endsAt">,
   now: number
 ): AnnouncementState {
-  const start = parseInstant(a.startsAt);
-  const end = parseInstant(a.endsAt);
+  const { start, end } = parseWindow(a);
   if (end !== null && now >= end) return "expired";
   if (start !== null && now < start) return "scheduled";
   return "active";
@@ -59,8 +91,8 @@ export function visibleAnnouncements(
     .sort((a, b) => {
       if (a.state !== b.state) return rank[a.state] - rank[b.state];
       if (a.state === "active") {
-        const ae = parseInstant(a.announcement.endsAt);
-        const be = parseInstant(b.announcement.endsAt);
+        const ae = parseWindow(a.announcement).end;
+        const be = parseWindow(b.announcement).end;
         if (ae === null && be === null) return 0;
         if (ae === null) return 1; // windowless active sinks below timed ones
         if (be === null) return -1;
@@ -68,17 +100,14 @@ export function visibleAnnouncements(
       }
       // scheduled: soonest-starting first
       return (
-        (parseInstant(a.announcement.startsAt) ?? 0) -
-        (parseInstant(b.announcement.startsAt) ?? 0)
+        (parseWindow(a.announcement).start ?? 0) -
+        (parseWindow(b.announcement).start ?? 0)
       );
     });
 }
 
-// One instant, or a start–end range, in the visitor's time zone. Copies the
-// thin-space normalization from formatBarLabel (lib/status.ts) so formatRange's
-// special spaces (thin space around the en dash, narrow no-break space before
-// AM/PM) read as plain spaces like the rest of the app; falls back to UTC when
-// the zone is invalid.
+// The Intl shape every window label uses, formatted in the visitor's zone via
+// the shared zone-degrading helpers in lib/datetime.ts.
 const WINDOW_OPTS: Intl.DateTimeFormatOptions = {
   weekday: "short",
   month: "short",
@@ -88,37 +117,10 @@ const WINDOW_OPTS: Intl.DateTimeFormatOptions = {
   hour12: true,
 };
 
-function normalizeSpaces(s: string): string {
-  return s.replace(/[\u2009\u202f\u00a0]/g, " ");
-}
-
+// Space-normalized like the range form, so "Starts …"/"Until …" lines read
+// with the same plain spaces as "Sat, Jul 11, 8:00 – 10:00 AM".
 function formatInstant(ms: number, timeZone: string): string {
-  const fmt = (tz: string) =>
-    normalizeSpaces(
-      new Intl.DateTimeFormat("en-US", { timeZone: tz, ...WINDOW_OPTS }).format(
-        new Date(ms)
-      )
-    );
-  try {
-    return fmt(timeZone);
-  } catch {
-    return fmt("UTC");
-  }
-}
-
-function formatRange(startMs: number, endMs: number, timeZone: string): string {
-  const fmt = (tz: string) =>
-    normalizeSpaces(
-      new Intl.DateTimeFormat("en-US", {
-        timeZone: tz,
-        ...WINDOW_OPTS,
-      }).formatRange(new Date(startMs), new Date(endMs))
-    );
-  try {
-    return fmt(timeZone);
-  } catch {
-    return fmt("UTC");
-  }
+  return normalizeIntlSpaces(formatInZone(new Date(ms), timeZone, WINDOW_OPTS));
 }
 
 // The window line an entry shows under its body, in the visitor's zone:
@@ -132,10 +134,16 @@ export function announcementWindowLabel(
   state: Exclude<AnnouncementState, "expired">,
   timeZone: string
 ): string {
-  const start = parseInstant(a.startsAt);
-  const end = parseInstant(a.endsAt);
+  const { start, end } = parseWindow(a);
   if (state === "scheduled") {
-    if (start !== null && end !== null) return formatRange(start, end, timeZone);
+    if (start !== null && end !== null) {
+      return formatRangeInZone(
+        new Date(start),
+        new Date(end),
+        timeZone,
+        WINDOW_OPTS
+      );
+    }
     if (start !== null) return `Starts ${formatInstant(start, timeZone)}`;
     return "";
   }

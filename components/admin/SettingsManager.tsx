@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import type { Settings, StatusAnnouncementKind } from "@/lib/schema";
+import type { Settings } from "@/lib/schema";
 import {
   ALERT_TYPES,
   ANNOUNCEMENT_TONES,
@@ -15,7 +15,11 @@ import {
   type SearchEngine,
 } from "@/lib/search";
 import { STATUS_RANGES } from "@/lib/status";
-import { announcementState } from "@/lib/status-announcements";
+import {
+  STATUS_ANNOUNCEMENT_KIND_META,
+  announcementState,
+} from "@/lib/status-announcements";
+import { useNow } from "../useNow";
 import { supportedTimezones, newThemeId } from "@/lib/prefs";
 import { resolveLayoutWidgets, type LayoutWidgetId } from "@/lib/layout";
 import { TextField } from "./ui";
@@ -78,12 +82,6 @@ const TONE_LABELS: Record<string, string> = {
   warning: "Warning",
   success: "Success",
   accent: "Accent (theme color)",
-};
-
-const STATUS_KIND_LABELS: Record<StatusAnnouncementKind, string> = {
-  maintenance: "Maintenance",
-  incident: "Incident",
-  info: "Notice",
 };
 
 const STATUS_STATE_LABELS: Record<
@@ -155,13 +153,8 @@ export default function SettingsManager({
   }));
   const [section, setSection] = useState<SettingsSectionId>("general");
   // A ticking clock so each announcement's derived state chip (Active /
-  // Scheduled / Expired) stays current without a reload, and so `Date.now()`
-  // isn't called impurely during render.
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 30_000);
-    return () => clearInterval(id);
-  }, []);
+  // Scheduled / Expired) stays current without a reload.
+  const now = useNow(30_000);
   // Persistence is automatic: every change debounce-saves via useAutosave.
   const { status, error } = useAutosave(settings, saveSettings);
   const confirm = useConfirm();
@@ -1092,7 +1085,7 @@ export default function SettingsManager({
                             : "text-fg/50 hover:text-fg/80"
                         }`}
                       >
-                        {STATUS_KIND_LABELS[k]}
+                        {STATUS_ANNOUNCEMENT_KIND_META[k].label}
                       </button>
                     ))}
                   </div>

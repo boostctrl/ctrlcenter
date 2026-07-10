@@ -62,18 +62,30 @@ describe("announcementState", () => {
     ).toBe("expired");
   });
 
-  it("treats a future end past its own start as expired (end wins)", () => {
-    // A misconfigured window whose end has already passed reads as over even if
-    // the start was set later still.
+  it("ignores an end at or before its start (misconfigured window)", () => {
+    // A backwards window degrades toward "shown", like unparsable dates: the
+    // start is kept, the end is ignored — the entry must neither expire before
+    // it ever ran nor render a backwards range.
+    const backwards = {
+      startsAt: "2026-07-11T20:00:00.000Z",
+      endsAt: "2026-07-11T06:00:00.000Z",
+    };
+    // Before the start it's scheduled (the past end doesn't expire it)…
+    expect(announcementState(entry(backwards), NOW)).toBe("scheduled");
+    // …and after the start it's active indefinitely.
+    expect(
+      announcementState(entry(backwards), Date.UTC(2026, 6, 11, 21, 0))
+    ).toBe("active");
+    // Zero-length window (end === start): same treatment.
     expect(
       announcementState(
         entry({
-          startsAt: "2026-07-11T20:00:00.000Z",
+          startsAt: "2026-07-11T06:00:00.000Z",
           endsAt: "2026-07-11T06:00:00.000Z",
         }),
         NOW
       )
-    ).toBe("expired");
+    ).toBe("active");
   });
 
   it("ignores an unparsable date (treated as unset → active)", () => {
@@ -200,5 +212,20 @@ describe("announcementWindowLabel", () => {
         "Not/AZone"
       )
     ).toBe("Sat, Jul 11, 1:00 – 3:00 PM");
+  });
+
+  it("labels a backwards window as a bare start, not a reversed range", () => {
+    // The misconfigured end is ignored (see announcementState), so the label
+    // degrades to the start-only form instead of "Jul 20 – Jul 10".
+    expect(
+      announcementWindowLabel(
+        {
+          startsAt: "2026-07-20T13:00:00.000Z",
+          endsAt: "2026-07-10T13:00:00.000Z",
+        },
+        "scheduled",
+        "UTC"
+      )
+    ).toBe("Starts Mon, Jul 20, 1:00 PM");
   });
 });

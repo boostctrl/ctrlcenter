@@ -57,3 +57,42 @@ export function timeString(date: Date, timeZone: string): string {
     timeZone: safeZone(timeZone),
   }).format(date);
 }
+
+// formatRange separates its parts with special spaces — a thin space around
+// the en dash, a narrow no-break space before AM/PM — while the app's plain
+// .format() labels use ordinary spaces. Normalize so ranges read like every
+// other label. Shared by the status timeline tooltips and the announcement
+// window labels.
+export function normalizeIntlSpaces(s: string): string {
+  return s.replace(/[\u2009\u202f\u00a0]/g, " ");
+}
+
+// Format one instant with arbitrary options, degrading an invalid zone to UTC
+// like the fixed-shape formatters above.
+export function formatInZone(
+  instant: Date,
+  timeZone: string,
+  opts: Intl.DateTimeFormatOptions
+): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: safeZone(timeZone),
+    ...opts,
+  }).format(instant);
+}
+
+// Format a start–end range (spaces normalized), same invalid-zone degrade.
+// formatRange collapses the shared parts ("Jul 7, 5:54 – 6:42 PM") and expands
+// across a day boundary ("Jul 7, 11:50 PM – Jul 8, 12:20 AM").
+export function formatRangeInZone(
+  start: Date,
+  end: Date,
+  timeZone: string,
+  opts: Intl.DateTimeFormatOptions
+): string {
+  return normalizeIntlSpaces(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: safeZone(timeZone),
+      ...opts,
+    }).formatRange(start, end)
+  );
+}

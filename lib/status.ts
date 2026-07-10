@@ -2,6 +2,8 @@
 // pings each app URL and returns a StatusResponse; the dashboard dots, the
 // dashboard health pill, and the /status page all consume it.
 
+import { formatInZone, formatRangeInZone } from "./datetime";
+
 // One app's reachability: `up` is false only on a network error or timeout (a
 // reachable host that answers 401/403/5xx still counts as up). `status` is the
 // HTTP code when reachable, `ms` the round-trip time.
@@ -164,48 +166,33 @@ export function formatBarLabel(
   timeZone: string,
   spanMs?: number
 ): string {
-  const fmt = (instant: Date, opts: Intl.DateTimeFormatOptions, tz = timeZone) => {
-    try {
-      return new Intl.DateTimeFormat("en-US", { timeZone: tz, ...opts }).format(instant);
-    } catch {
-      return new Intl.DateTimeFormat("en-US", { timeZone: "UTC", ...opts }).format(instant);
-    }
-  };
   // Single poll: `YYYY-MM-DDThh:mm` → local date + time.
   if (at.length >= 16) {
     const opts: Intl.DateTimeFormatOptions = {
       month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true,
     };
     const start = new Date(`${at}:00Z`);
-    // With a bucket width, show the range it covers. formatRange collapses the
-    // shared parts ("Jul 7, 5:54 – 6:42 PM") and expands across a day boundary
-    // ("Jul 7, 11:50 PM – Jul 8, 12:20 AM").
+    // With a bucket width, show the range it covers instead of an instant.
     if (spanMs && spanMs > 0) {
-      const end = new Date(start.getTime() + spanMs);
-      // formatRange separates parts with special spaces (a thin space around the
-      // en dash, a narrow no-break space before AM/PM); normalize them to plain
-      // spaces so the range tooltip matches the rest of the app's labels (which
-      // come from plain .format()).
-      const range = (tz: string) =>
-        new Intl.DateTimeFormat("en-US", { timeZone: tz, ...opts })
-          .formatRange(start, end)
-          .replace(/[\u2009\u202f\u00a0]/g, " ");
-      try {
-        return range(timeZone);
-      } catch {
-        return range("UTC");
-      }
+      return formatRangeInZone(
+        start,
+        new Date(start.getTime() + spanMs),
+        timeZone,
+        opts
+      );
     }
-    return fmt(start, opts);
+    return formatInZone(start, timeZone, opts);
   }
   // Hourly bucket: `YYYY-MM-DDThh` → local date + hour.
   if (at.includes("T")) {
-    return fmt(new Date(`${at}:00:00Z`), {
+    return formatInZone(new Date(`${at}:00:00Z`), timeZone, {
       month: "short", day: "numeric", hour: "numeric", hour12: true,
     });
   }
   // Daily bucket: a UTC calendar date — prettify it without shifting the zone.
-  return fmt(new Date(`${at}T00:00:00Z`), { month: "short", day: "numeric" }, "UTC");
+  return formatInZone(new Date(`${at}T00:00:00Z`), "UTC", {
+    month: "short", day: "numeric",
+  });
 }
 
 // Build the timeline strip's screen-reader summary from its bars, so the whole

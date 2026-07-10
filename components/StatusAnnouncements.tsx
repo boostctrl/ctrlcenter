@@ -1,34 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { parseInline } from "@/lib/markdown";
 import { useVisitorPrefs } from "./PrefsProvider";
+import { useNow } from "./useNow";
 import InlineMarkdown from "./InlineMarkdown";
 import { ANNOUNCEMENT_TONE_STYLES } from "@/lib/announcement-tones";
 import {
+  STATUS_ANNOUNCEMENT_KIND_META,
   visibleAnnouncements,
   announcementWindowLabel,
 } from "@/lib/status-announcements";
-import type {
-  AnnouncementTone,
-  StatusAnnouncement,
-  StatusAnnouncementKind,
-} from "@/lib/schema";
-
-// Each announcement kind borrows a banner tone so the /status cards read in the
-// same visual language as the site-wide banner: maintenance is informational
-// (blue), an incident is a warning (amber), a general note takes the accent.
-const KIND_TONE: Record<StatusAnnouncementKind, AnnouncementTone> = {
-  maintenance: "info",
-  incident: "warning",
-  info: "accent",
-};
-
-const KIND_LABEL: Record<StatusAnnouncementKind, string> = {
-  maintenance: "Maintenance",
-  incident: "Incident",
-  info: "Notice",
-};
+import type { StatusAnnouncement } from "@/lib/schema";
 
 // The /status page's announcements section: maintenance windows and upcoming
 // changes, rendered above the per-app rows (and above the "checks are off" note
@@ -43,12 +26,7 @@ export default function StatusAnnouncements({
   announcements: StatusAnnouncement[];
 }) {
   const { timezone } = useVisitorPrefs();
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 30_000);
-    return () => clearInterval(id);
-  }, []);
+  const now = useNow(30_000);
 
   const visible = useMemo(
     () => visibleAnnouncements(announcements, now),
@@ -67,7 +45,7 @@ export default function StatusAnnouncements({
       </h2>
       <ul className="space-y-3">
         {visible.map(({ announcement, state }) => {
-          const tone = KIND_TONE[announcement.kind];
+          const { label, tone } = STATUS_ANNOUNCEMENT_KIND_META[announcement.kind];
           const { bg, color } = ANNOUNCEMENT_TONE_STYLES[tone];
           const windowLabel = announcementWindowLabel(
             announcement,
@@ -85,7 +63,7 @@ export default function StatusAnnouncements({
                   className="text-[0.7rem] font-semibold tracking-[0.12em] uppercase"
                   style={{ color }}
                 >
-                  {KIND_LABEL[announcement.kind]}
+                  {label}
                 </span>
                 {state === "scheduled" && (
                   <span className="rounded-full bg-fg/10 px-2 py-0.5 text-[0.7rem] font-medium text-fg/60">
