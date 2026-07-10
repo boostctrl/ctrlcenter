@@ -245,43 +245,68 @@ export function saveActiveTheme(colors: ModeColors | null): void {
   }
 }
 
+// Validate one stored/imported entry into a CustomTheme, or null if it's
+// unusable. Carries the load-time migrations: flat colors wrap into both modes
+// (sanitizeModeColors), pre-designs/scenes themes default to Glass/Aurora, and
+// pre-independent themes fall back to their dark-mode design/scene/font for
+// light. One relaxation over a strict parse — a missing/non-string id is minted
+// rather than dropping the whole entry, so an import that omits ids still lands.
+export function sanitizeCustomTheme(input: unknown): CustomTheme | null {
+  const colors = sanitizeModeColors(input);
+  const t = input as Record<string, unknown> | null;
+  if (!colors || !t || typeof t.name !== "string") return null;
+  const design = isDesignId(t.design) ? t.design : DEFAULT_DESIGN;
+  const scene = isSceneId(t.scene) ? t.scene : DEFAULT_SCENE;
+  const font = isFontId(t.font) ? t.font : DEFAULT_FONT;
+  const designLight = isDesignId(t.designLight) ? t.designLight : design;
+  const sceneLight = isSceneId(t.sceneLight) ? t.sceneLight : scene;
+  const fontLight = isFontId(t.fontLight) ? t.fontLight : font;
+  return {
+    id: typeof t.id === "string" ? t.id : newThemeId(),
+    name: t.name.slice(0, 40),
+    design,
+    scene,
+    font,
+    designLight,
+    sceneLight,
+    fontLight,
+    ...colors,
+  };
+}
+
 export function loadThemes(): CustomTheme[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(THEMES_KEY);
     const arr = raw ? JSON.parse(raw) : [];
     if (!Array.isArray(arr)) return [];
-    return arr.flatMap((t): CustomTheme[] => {
-      const colors = sanitizeModeColors(t);
-      if (colors && t && typeof t.id === "string" && typeof t.name === "string") {
-        // Themes saved before designs/scenes existed default to Glass/Aurora.
-        const design = isDesignId(t.design) ? t.design : DEFAULT_DESIGN;
-        const scene = isSceneId(t.scene) ? t.scene : DEFAULT_SCENE;
-        const font = isFontId(t.font) ? t.font : DEFAULT_FONT;
-        // Themes saved before light/dark were independent fall back to the
-        // dark-mode parts for the light mode too.
-        const designLight = isDesignId(t.designLight) ? t.designLight : design;
-        const sceneLight = isSceneId(t.sceneLight) ? t.sceneLight : scene;
-        const fontLight = isFontId(t.fontLight) ? t.fontLight : font;
-        return [
-          {
-            id: t.id,
-            name: t.name.slice(0, 40),
-            design,
-            scene,
-            font,
-            designLight,
-            sceneLight,
-            fontLight,
-            ...colors,
-          },
-        ];
-      }
-      return [];
+    return arr.flatMap((t) => {
+      const theme = sanitizeCustomTheme(t);
+      return theme ? [theme] : [];
     });
   } catch {
     return [];
   }
+}
+
+// Parse a themes-export file into sanitized themes, forgiving about the exact
+// shape: a bare array of themes (what our own export writes), a single theme
+// object, or an object with a `themes` array. Every id is re-minted — ids from a
+// file can collide with themes already in this browser's list, and the importer
+// de-dupes on content, not id. Returns [] for anything unusable.
+export function parseThemesExport(input: unknown): CustomTheme[] {
+  const obj = input && typeof input === "object" ? (input as Record<string, unknown>) : null;
+  const list: unknown[] = Array.isArray(input)
+    ? input
+    : obj && Array.isArray(obj.themes)
+      ? obj.themes
+      : obj
+        ? [obj]
+        : [];
+  return list.flatMap((t) => {
+    const theme = sanitizeCustomTheme(t);
+    return theme ? [{ ...theme, id: newThemeId() }] : [];
+  });
 }
 
 // Returns whether the write landed, so the theme builder can tell the visitor

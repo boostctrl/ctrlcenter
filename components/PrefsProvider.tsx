@@ -253,9 +253,18 @@ type PrefsValue = {
   // Set or clear one mode's standalone accent (light and dark are independent).
   setAccentOverride: (accent: AccentColors | null, mode: Mode) => void;
   // Returns false when the theme couldn't be persisted (storage unavailable).
-  saveNamedTheme: (name: string) => boolean;
+  // With `overwriteId`, replaces that saved theme in place (same id and list
+  // position) instead of appending a second copy.
+  saveNamedTheme: (name: string, overwriteId?: string) => boolean;
   applyNamedTheme: (id: string) => void;
+  // Rename a saved theme in place. Returns false for an empty name, an unknown
+  // id, or a failed write.
+  renameNamedTheme: (id: string, name: string) => boolean;
   deleteNamedTheme: (id: string) => void;
+  // Append already-sanitized imported themes, skipping any that duplicate an
+  // existing or just-imported one. Returns the number added (0 when all were
+  // duplicates), or null when the write couldn't be persisted.
+  importNamedThemes: (themes: CustomTheme[]) => number | null;
   clearCustomTheme: () => void;
   resetTheme: () => void;
   reset: () => void;
@@ -632,7 +641,7 @@ export function PrefsProvider({
   // as a saved theme, baking each mode's effective accent into its colorset so it
   // restores exactly as shown.
   const saveNamedTheme = useCallback(
-    (name: string) => {
+    (name: string, overwriteId?: string) => {
       const look =
         activeLook ?? { dark: seedColorSet(true), light: seedColorSet(false) };
       // Bake each mode's own effective accent into its colorset.
@@ -640,8 +649,14 @@ export function PrefsProvider({
         const a = resolveAccent(overrideFor(accentOverride, dark), cs, defaultAccent);
         return { ...cs, accentFrom: a.from, accentTo: a.to };
       };
+      // Overwriting keeps the target's id (and its slot in the list); everything
+      // else — name and both modes' design/scene/font/colors — is recaptured
+      // fresh, exactly as a new save would.
+      const existing = overwriteId
+        ? customThemes.find((t) => t.id === overwriteId)
+        : undefined;
       const entry: CustomTheme = {
-        id: newThemeId(),
+        id: existing ? existing.id : newThemeId(),
         name: name.trim().slice(0, 40) || "Custom",
         design: resolveDesign(true),
         scene: resolveScene(true),
@@ -654,7 +669,9 @@ export function PrefsProvider({
       };
       // Persist before committing to state: a theme that can't be stored would
       // vanish on reload, so report the failure instead of showing it.
-      const next = [...customThemes, entry];
+      const next = existing
+        ? customThemes.map((t) => (t.id === existing.id ? entry : t))
+        : [...customThemes, entry];
       if (!saveThemes(next)) return false;
       setCustomThemes(next);
       return true;
@@ -705,6 +722,48 @@ export function PrefsProvider({
       return next;
     });
   }, []);
+
+  // Rename one saved theme in place, leaving the rest of its look untouched.
+  const renameNamedTheme = useCallback(
+    (id: string, name: string) => {
+      const trimmed = name.trim().slice(0, 40);
+      if (!trimmed || !customThemes.some((t) => t.id === id)) return false;
+      const next = customThemes.map((t) =>
+        t.id === id ? { ...t, name: trimmed } : t
+      );
+      // Persist before committing (see saveNamedTheme).
+      if (!saveThemes(next)) return false;
+      setCustomThemes(next);
+      return true;
+    },
+    [customThemes]
+  );
+
+  // Append imported themes (already sanitized by parseThemesExport), skipping
+  // any that duplicate one already saved or an earlier one in the same import.
+  // Ids differ by construction, so de-dupe on content with the id stripped.
+  const importNamedThemes = useCallback(
+    (themes: CustomTheme[]) => {
+      const keyOf = (t: CustomTheme) => JSON.stringify({ ...t, id: "" });
+      const seen = new Set(customThemes.map(keyOf));
+      const added: CustomTheme[] = [];
+      for (const t of themes) {
+        const key = keyOf(t);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        added.push(t);
+      }
+      // Nothing new: the stored list is already correct, so this is a success
+      // with a zero count, not a storage failure.
+      if (added.length === 0) return 0;
+      const next = [...customThemes, ...added];
+      // Persist before committing (see saveNamedTheme).
+      if (!saveThemes(next)) return null;
+      setCustomThemes(next);
+      return added.length;
+    },
+    [customThemes]
+  );
 
   const clearCustomTheme = useCallback(() => {
     setActiveLook(null);
@@ -1082,7 +1141,9 @@ export function PrefsProvider({
       setAccentOverride,
       saveNamedTheme,
       applyNamedTheme,
+      renameNamedTheme,
       deleteNamedTheme,
+      importNamedThemes,
       clearCustomTheme,
       resetTheme,
       reset,
@@ -1124,7 +1185,9 @@ export function PrefsProvider({
     setAccentOverride,
     saveNamedTheme,
     applyNamedTheme,
+    renameNamedTheme,
     deleteNamedTheme,
+    importNamedThemes,
     clearCustomTheme,
     resetTheme,
     reset,

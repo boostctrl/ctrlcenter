@@ -8,6 +8,8 @@ import {
   saveFont,
   loadThemes,
   saveThemes,
+  sanitizeCustomTheme,
+  parseThemesExport,
   newThemeId,
   loadFavorites,
   saveFavorites,
@@ -257,5 +259,93 @@ describe("saveThemes", () => {
       throw new Error("quota");
     };
     expect(saveThemes([theme])).toBe(false);
+  });
+});
+
+// A complete, current-shape saved theme, shared by the sanitize/parse suites.
+const validEntry: CustomTheme = {
+  id: "abc",
+  name: "Mine",
+  design: "flat",
+  scene: "dots",
+  font: "inter",
+  designLight: "paper",
+  sceneLight: "waves",
+  fontLight: "lora",
+  dark: {
+    background: "#000000",
+    foreground: "#ffffff",
+    accentFrom: "#a78bfa",
+    accentTo: "#22d3ee",
+  },
+  light: {
+    background: "#ffffff",
+    foreground: "#000000",
+    accentFrom: "#a78bfa",
+    accentTo: "#22d3ee",
+  },
+};
+
+describe("sanitizeCustomTheme", () => {
+  it("round-trips a valid entry unchanged", () => {
+    expect(sanitizeCustomTheme(validEntry)).toEqual(validEntry);
+  });
+
+  it("rejects an entry with malformed colors", () => {
+    expect(
+      sanitizeCustomTheme({
+        ...validEntry,
+        dark: { ...validEntry.dark, background: "red" },
+      })
+    ).toBeNull();
+    expect(sanitizeCustomTheme({ name: "no colors" })).toBeNull();
+  });
+
+  it("mints an id when the id isn't a string", () => {
+    const out = sanitizeCustomTheme({ ...validEntry, id: 42 });
+    expect(typeof out?.id).toBe("string");
+    expect(out?.id).not.toBe("42");
+    // Everything else survives the mint.
+    expect(out?.name).toBe("Mine");
+  });
+
+  it("slices an over-long name to 40 characters", () => {
+    const out = sanitizeCustomTheme({ ...validEntry, name: "x".repeat(60) });
+    expect(out?.name).toHaveLength(40);
+  });
+});
+
+describe("parseThemesExport", () => {
+  it("accepts a bare array of themes", () => {
+    const out = parseThemesExport([validEntry]);
+    expect(out).toHaveLength(1);
+    expect(out[0].name).toBe("Mine");
+  });
+
+  it("accepts a single theme object", () => {
+    expect(parseThemesExport(validEntry)).toHaveLength(1);
+  });
+
+  it("accepts a { themes: [...] } wrapper", () => {
+    expect(parseThemesExport({ themes: [validEntry, validEntry] })).toHaveLength(2);
+  });
+
+  it("returns [] for empty wrappers, garbage, and non-objects", () => {
+    expect(parseThemesExport({ themes: [] })).toEqual([]);
+    expect(parseThemesExport("nope")).toEqual([]);
+    expect(parseThemesExport(null)).toEqual([]);
+    expect(parseThemesExport(42)).toEqual([]);
+  });
+
+  it("drops invalid entries but keeps the valid ones", () => {
+    const out = parseThemesExport([validEntry, { name: "no colors" }]);
+    expect(out).toHaveLength(1);
+  });
+
+  it("re-mints every id, so an import can't collide with the saved list", () => {
+    const [one] = parseThemesExport([validEntry]);
+    expect(one.id).not.toBe(validEntry.id);
+    const [a, b] = parseThemesExport([validEntry, validEntry]);
+    expect(a.id).not.toBe(b.id);
   });
 });

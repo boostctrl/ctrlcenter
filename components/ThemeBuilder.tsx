@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, ChangeEvent, ReactNode } from "react";
 import { useVisitorPrefs } from "./PrefsProvider";
 import { useConfirm } from "./admin/Confirm";
 import { BASE_THEMES, DESIGNS, SCENES } from "@/lib/theme";
 import type { DesignId, ModeColors, SceneId, ThemePack } from "@/lib/theme";
 import { buttonClasses } from "@/lib/buttons";
 import { FONTS, fontVar } from "@/lib/fonts";
-import type { ThemeColors } from "@/lib/prefs";
+import { parseThemesExport } from "@/lib/prefs";
+import type { CustomTheme, ThemeColors } from "@/lib/prefs";
 import { deepenForLight } from "./scenes/color";
 
 const DESIGN_NAMES = Object.fromEntries(
@@ -191,7 +192,9 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
     setAccentOverride,
     saveNamedTheme,
     applyNamedTheme,
+    renameNamedTheme,
     deleteNamedTheme,
+    importNamedThemes,
     resetTheme,
     resolvedMode,
     setPreviewMode,
@@ -232,6 +235,14 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
   // Saving a theme can fail when the browser blocks local storage (private
   // mode, quota); say so instead of a button that silently does nothing.
   const [saveFailed, setSaveFailed] = useState(false);
+  // Which saved theme's card is showing its inline rename field (null = none).
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  // Escape must cancel a rename, but blur fires right after it — this flag lets
+  // the blur handler tell an Escape-driven unmount from a real commit.
+  const cancelRename = useRef(false);
+  // The outcome of the last import, shown in the Your-themes section.
+  const [importStatus, setImportStatus] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   // Whether the accent editor shows one color well or a from→to pair. Solid is
   // just a gradient with two equal stops, so this is purely a UI simplification
   // for the common "I want one color" case.
@@ -291,13 +302,91 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
     }
   }
 
-  function saveTheme() {
-    if (!name.trim()) return;
+  async function saveTheme() {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    // Saving under a name that's already taken updates that theme in place
+    // (after confirming) rather than piling up a second copy under one name.
+    const existing = customThemes.find(
+      (t) => t.name.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (existing) {
+      const ok = await confirm({
+        title: `Update “${existing.name}”?`,
+        message:
+          "A saved theme with this name already exists — its saved look will be replaced with the one on screen now.",
+        confirmLabel: "Update",
+      });
+      // Declined: keep the typed name so they can rename before saving.
+      if (!ok) return;
+      const saved = saveNamedTheme(name, existing.id);
+      setSaveFailed(!saved);
+      if (saved) setName("");
+      return;
+    }
     // Captures the full current look — both modes' design, scene, font and
     // colors — so it restores as two complete, independent themes.
     const ok = saveNamedTheme(name);
     setSaveFailed(!ok);
     if (ok) setName("");
+  }
+
+  // Commit an inline rename on Enter/blur. Escape (via cancelRename) or an empty
+  // field cancels, leaving the saved name untouched.
+  function commitRename(id: string, value: string) {
+    if (cancelRename.current) {
+      cancelRename.current = false;
+      setRenamingId(null);
+      return;
+    }
+    const next = value.trim();
+    if (next) renameNamedTheme(id, next);
+    setRenamingId(null);
+  }
+
+  // Download the saved themes as a JSON file the visitor can carry to another
+  // browser (or back it up). A temporary object URL is the only client-side way
+  // to hand the browser a file with no server round-trip.
+  function exportThemes() {
+    const blob = new Blob([JSON.stringify(customThemes, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "ctrlcenter-themes.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleImportFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // Reset first so picking the same file again still fires onChange.
+    e.target.value = "";
+    if (!file) return;
+    let themes: CustomTheme[] = [];
+    try {
+      themes = parseThemesExport(JSON.parse(await file.text()));
+    } catch {
+      // Not JSON at all — treated the same as a file with no themes in it.
+      themes = [];
+    }
+    if (themes.length === 0) {
+      setImportStatus("That file doesn't contain any saved themes.");
+      return;
+    }
+    const added = importNamedThemes(themes);
+    if (added === null) {
+      setImportStatus(
+        "Couldn't import — your browser is blocking local storage (private mode or full storage)."
+      );
+    } else if (added === 0) {
+      setImportStatus("Those themes are already saved.");
+    } else {
+      setImportStatus(`Imported ${added} theme${added === 1 ? "" : "s"}.`);
+    }
   }
 
   // A full-look swatch (surface bg + accent glow) for the current mode — used
@@ -465,53 +554,147 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
               </OptionCard>
             ))}
           </div>
-          {customThemes.length > 0 && (
-            <div className="space-y-2">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-[10px] font-semibold tracking-[0.15em] text-fg/45 uppercase">
                 Your themes
               </span>
+              {/* Import always (so an empty list can still receive a file);
+                  export only once there's something to export. */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className={buttonClasses("ghost")}
+                >
+                  Import
+                </button>
+                {customThemes.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={exportThemes}
+                    className={buttonClasses("ghost")}
+                  >
+                    Export
+                  </button>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/json,.json"
+                  onChange={handleImportFile}
+                  aria-label="Import themes file"
+                  className="hidden"
+                />
+              </div>
+            </div>
+            {customThemes.length === 0 && (
+              <p className="text-xs text-fg/40">
+                Import a themes file exported from another browser.
+              </p>
+            )}
+            {importStatus && (
+              <p role="status" className="text-xs text-fg/50">
+                {importStatus}
+              </p>
+            )}
+            {customThemes.length > 0 && (
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-                {customThemes.map((t) => (
-                  <div key={t.id} className="group/theme relative">
-                    <OptionCard
-                      onClick={() => applyNamedTheme(t.id)}
-                      name={t.name}
-                      title={`${t.name} · ${DESIGN_NAMES[t.design]}`}
+                {customThemes.map((t) =>
+                  renamingId === t.id ? (
+                    // An input can't live inside the OptionCard <button>, so while
+                    // renaming we swap in a div styled like the card.
+                    <div
+                      key={t.id}
+                      className="flex w-full flex-col gap-1.5 rounded-lg border border-fg/10 p-2"
                     >
                       <span
                         className="block h-10 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
                         style={{ background: lookSwatch(t) }}
                         aria-hidden
                       />
-                    </OptionCard>
-                    {/* Always visible (hover-revealed meant touch users couldn't
-                        delete at all — tapping the card applies the theme), and
-                        confirmed: a saved theme is two full modes of work with
-                        no undo (#121). */}
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (
-                          await confirm({
-                            title: `Delete “${t.name}”?`,
-                            message:
-                              "This saved theme is stored only in this browser and can't be recovered.",
-                            confirmLabel: "Delete",
-                            danger: true,
-                          })
-                        )
-                          deleteNamedTheme(t.id);
-                      }}
-                      aria-label={`Delete ${t.name}`}
-                      className="absolute top-1 right-1 rounded-md bg-background/70 px-1 text-xs text-fg/50 transition-colors hover:text-red-400"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
+                      <input
+                        autoFocus
+                        defaultValue={t.name}
+                        maxLength={40}
+                        aria-label={`Rename ${t.name}`}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") e.currentTarget.blur();
+                          else if (e.key === "Escape") {
+                            cancelRename.current = true;
+                            setRenamingId(null);
+                          }
+                        }}
+                        onBlur={(e) => commitRename(t.id, e.target.value)}
+                        className="accent-focus min-w-0 rounded-md border border-fg/10 bg-fg/5 px-2 py-1 text-xs text-fg outline-none"
+                      />
+                    </div>
+                  ) : (
+                    <div key={t.id} className="group/theme relative">
+                      <OptionCard
+                        onClick={() => applyNamedTheme(t.id)}
+                        name={t.name}
+                        title={`${t.name} · ${DESIGN_NAMES[t.design]}`}
+                      >
+                        <span
+                          className="block h-10 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
+                          style={{ background: lookSwatch(t) }}
+                          aria-hidden
+                        />
+                      </OptionCard>
+                      {/* Rename + delete both stay visible (hover-revealed meant
+                          touch users couldn't reach them — tapping the card
+                          applies the theme). Delete is confirmed: a saved theme
+                          is two full modes of work with no undo (#121). */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          cancelRename.current = false;
+                          setRenamingId(t.id);
+                        }}
+                        aria-label={`Rename ${t.name}`}
+                        className="absolute top-1 right-7 rounded-md bg-background/70 px-1 py-1 text-fg/50 transition-colors hover:text-fg/90"
+                      >
+                        <svg
+                          width="11"
+                          height="11"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden
+                        >
+                          <path d="M12 20h9" />
+                          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (
+                            await confirm({
+                              title: `Delete “${t.name}”?`,
+                              message:
+                                "This saved theme is stored only in this browser and can't be recovered.",
+                              confirmLabel: "Delete",
+                              danger: true,
+                            })
+                          )
+                            deleteNamedTheme(t.id);
+                        }}
+                        aria-label={`Delete ${t.name}`}
+                        className="absolute top-1 right-1 rounded-md bg-background/70 px-1 text-xs text-fg/50 transition-colors hover:text-red-400"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )
+                )}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
 
@@ -793,7 +976,9 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && saveTheme()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void saveTheme();
+          }}
           placeholder="Name this look to save it — both modes included"
           className="accent-focus min-w-0 flex-1 basis-56 rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-fg outline-none transition-colors"
         />

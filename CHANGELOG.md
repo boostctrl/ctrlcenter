@@ -12,6 +12,16 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Saved themes can now be updated, renamed, and moved between browsers.**
+  Saving a look under a name you've already used offers to update that theme in
+  place instead of quietly adding a second copy with the same name. Each saved
+  theme has a pencil button to rename it without re-saving. And a new Export
+  button downloads your saved themes as a file that an Import button on another
+  browser (or after clearing this one) reads back in — duplicates are skipped,
+  so re-importing the same file is safe. (#124)
+
 ### Fixed
 
 - **Card grids no longer jump from 4 columns straight to 2.** Shrinking the
