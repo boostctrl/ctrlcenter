@@ -6,6 +6,7 @@ import { orderCategories } from "@/lib/bookmarks";
 import Icon from "@/components/Icon";
 import { TextField, Button, MoveButtons } from "./ui";
 import IconField from "./IconField";
+import { useReorder, dropIndicatorClass } from "./useReorder";
 import { useToast } from "./Toast";
 import { useConfirm } from "./Confirm";
 import { apiErrorMessage } from "./apiError";
@@ -108,14 +109,10 @@ export default function BookmarksManager({
     }
   }
 
-  // Reorder within a single category, rebuilding the flat list while leaving
-  // other categories' positions untouched.
-  function moveWithinCategory(category: string, from: number, to: number) {
-    const group = bookmarks.filter((b) => b.category === category);
-    if (to < 0 || to >= group.length) return;
-    const reordered = [...group];
-    const [moved] = reordered.splice(from, 1);
-    reordered.splice(to, 0, moved);
+  // Commit a category's newly ordered items, rebuilding the flat list while
+  // leaving other categories' positions untouched. Shared by drag-and-drop and
+  // the up/down buttons (both go through a per-category `useReorder`).
+  function commitGroup(category: string, reordered: BookmarkItem[]) {
     let gi = 0;
     persistOrder(
       bookmarks.map((b) => (b.category === category ? reordered[gi++] : b))
@@ -152,13 +149,18 @@ export default function BookmarksManager({
   ]);
   const categories = [...present].sort();
 
-  function moveCategory(from: number, to: number) {
-    if (to < 0 || to >= orderedCategories.length) return;
-    const next = [...orderedCategories];
-    const [moved] = next.splice(from, 1);
-    next.splice(to, 0, moved);
-    persistCategoryOrder(next);
-  }
+  // Drag-and-drop for the category headings themselves. The per-category bookmark
+  // rows use their own `useReorder` inside `CategoryGroup` (hooks can't run in a
+  // loop). The heading is its own drop zone, so a row drag never bleeds into the
+  // category order.
+  const {
+    handlers: catHandlers,
+    grip: catGrip,
+    dragIndex: catDragIndex,
+    overIndex: catOverIndex,
+    dropEdge: catDropEdge,
+    move: moveCategory,
+  } = useReorder(orderedCategories, persistCategoryOrder);
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_minmax(320px,380px)]">
@@ -168,49 +170,42 @@ export default function BookmarksManager({
         )}
         {groups.map(([category, items], catIndex) => (
           <div key={category} className="space-y-2">
-            <div className="flex items-center gap-2">
+            <div
+              {...catHandlers(catIndex)}
+              className={`flex items-center gap-2 transition-colors ${dropIndicatorClass(
+                catIndex,
+                {
+                  dragIndex: catDragIndex,
+                  overIndex: catOverIndex,
+                  dropEdge: catDropEdge,
+                }
+              )} ${catDragIndex === catIndex ? "opacity-50" : ""}`}
+            >
               <MoveButtons
                 index={catIndex}
                 count={groups.length}
                 label={`category ${category}`}
                 onMove={moveCategory}
               />
+              <span
+                className="hidden cursor-grab text-fg/30 select-none active:cursor-grabbing sm:inline"
+                aria-hidden
+                title="Drag to reorder"
+                {...catGrip(catIndex)}
+              >
+                ⠿
+              </span>
               <h3 className="text-xs font-semibold tracking-[0.18em] text-fg/50 uppercase">
                 {category}
               </h3>
             </div>
-            {items.map((bookmark, index) => (
-              <div
-                key={bookmark.id}
-                className="flex items-center justify-between gap-4 rounded-xl border border-fg/10 bg-fg/[0.03] px-4 py-3"
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <MoveButtons
-                    index={index}
-                    count={items.length}
-                    label={bookmark.name}
-                    onMove={(from, to) => moveWithinCategory(category, from, to)}
-                  />
-                  <Icon icon={bookmark.icon} name={bookmark.name} size={24} />
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{bookmark.name}</p>
-                    <p className="truncate text-xs text-fg/40">{bookmark.url}</p>
-                  </div>
-                </div>
-                <div className="flex shrink-0 gap-2">
-                  <Button variant="ghost" type="button" onClick={() => startEdit(bookmark)}>
-                    Edit
-                  </Button>
-                  <Button
-                    variant="danger"
-                    type="button"
-                    onClick={() => handleDelete(bookmark.id)}
-                  >
-                    Delete
-                  </Button>
-                </div>
-              </div>
-            ))}
+            <CategoryGroup
+              category={category}
+              items={items}
+              onReorder={commitGroup}
+              onEdit={startEdit}
+              onDelete={handleDelete}
+            />
           </div>
         ))}
       </div>
@@ -264,5 +259,78 @@ export default function BookmarksManager({
         </div>
       </form>
     </div>
+  );
+}
+
+// One category's bookmark rows, with drag-reorder scoped to this category (the
+// edit form handles moving a bookmark to a different category). Extracted so it
+// can own a `useReorder` — hooks can't be called per-iteration in the parent's
+// group loop. `onReorder` hands the category's newly ordered items back to the
+// parent, which rebuilds the flat bookmark list.
+function CategoryGroup({
+  category,
+  items,
+  onReorder,
+  onEdit,
+  onDelete,
+}: {
+  category: string;
+  items: BookmarkItem[];
+  onReorder: (category: string, next: BookmarkItem[]) => void;
+  onEdit: (bookmark: BookmarkItem) => void;
+  onDelete: (id: string) => void;
+}) {
+  const { handlers, grip, dragIndex, overIndex, dropEdge, move } = useReorder(
+    items,
+    (next) => onReorder(category, next)
+  );
+
+  return (
+    <>
+      {items.map((bookmark, index) => (
+        <div
+          key={bookmark.id}
+          {...handlers(index)}
+          className={`flex items-center justify-between gap-4 rounded-xl border border-fg/10 bg-fg/[0.03] px-4 py-3 transition-colors ${dropIndicatorClass(
+            index,
+            { dragIndex, overIndex, dropEdge }
+          )} ${dragIndex === index ? "opacity-50" : ""}`}
+        >
+          <div className="flex min-w-0 items-center gap-3">
+            <MoveButtons
+              index={index}
+              count={items.length}
+              label={bookmark.name}
+              onMove={move}
+            />
+            <span
+              className="hidden cursor-grab text-fg/30 select-none active:cursor-grabbing sm:inline"
+              aria-hidden
+              title="Drag to reorder"
+              {...grip(index)}
+            >
+              ⠿
+            </span>
+            <Icon icon={bookmark.icon} name={bookmark.name} size={24} />
+            <div className="min-w-0">
+              <p className="truncate font-medium">{bookmark.name}</p>
+              <p className="truncate text-xs text-fg/40">{bookmark.url}</p>
+            </div>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <Button variant="ghost" type="button" onClick={() => onEdit(bookmark)}>
+              Edit
+            </Button>
+            <Button
+              variant="danger"
+              type="button"
+              onClick={() => onDelete(bookmark.id)}
+            >
+              Delete
+            </Button>
+          </div>
+        </div>
+      ))}
+    </>
   );
 }

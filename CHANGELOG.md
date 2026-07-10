@@ -22,6 +22,11 @@ here.
   about the app reaches a signed-out browser. Monitoring and alerts still
   cover it. (#133)
 
+- **Bookmarks reorder by dragging, just like applications.** Grab the ⠿ grip on
+  a bookmark to drag it into a new spot within its category, or grab a category
+  heading's grip to reorder whole categories. The ▲ / ▼ arrows are still there
+  for keyboard and touch. (#127)
+
 ### Fixed
 
 - **Card grids now collapse based on the card's own width, not the window's.**
@@ -32,6 +37,10 @@ here.
   column exactly when their own card would squeeze tiles below a comfortable
   width — whatever the widget's span, window size, or UI scale, and live as
   you resize a widget in the layout editor. (#145)
+
+- **Selecting an application's URL no longer starts a drag.** In the admin
+  applications list, dragging across a row's text with the mouse now selects
+  it as expected; reordering happens only from the ⠿ grip. (#127)
 
 ## [1.9.3] - 2026-07-10
 

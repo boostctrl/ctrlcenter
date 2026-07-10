@@ -6,7 +6,7 @@ import { CHECK_TYPES, type CheckType } from "@/lib/status";
 import Icon from "@/components/Icon";
 import { TextField, Button, MoveButtons } from "./ui";
 import IconField from "./IconField";
-import { useReorder } from "./useReorder";
+import { useReorder, dropIndicatorClass } from "./useReorder";
 import { useToast } from "./Toast";
 import { useConfirm } from "./Confirm";
 import { apiErrorMessage } from "./apiError";
@@ -175,7 +175,7 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
     }
   }
 
-  const { handlers, dragIndex, overIndex, dropEdge, move } = useReorder(
+  const { handlers, grip, dragIndex, overIndex, dropEdge, move } = useReorder(
     apps,
     persistOrder
   );
@@ -190,15 +190,10 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
           <div
             key={app.id}
             {...handlers(index)}
-            className={`flex items-center justify-between gap-4 rounded-xl border border-fg/10 bg-fg/[0.03] px-4 py-3 transition-colors ${
-              overIndex === index && dragIndex !== index && dropEdge === "top"
-                ? "border-t-2 border-t-violet-400"
-                : overIndex === index &&
-                    dragIndex !== index &&
-                    dropEdge === "bottom"
-                  ? "border-b-2 border-b-violet-400"
-                  : ""
-            } ${dragIndex === index ? "opacity-50" : ""}`}
+            className={`flex items-center justify-between gap-4 rounded-xl border border-fg/10 bg-fg/[0.03] px-4 py-3 transition-colors ${dropIndicatorClass(
+              index,
+              { dragIndex, overIndex, dropEdge }
+            )} ${dragIndex === index ? "opacity-50" : ""}`}
           >
             <div className="flex min-w-0 items-center gap-3">
               <MoveButtons index={index} count={apps.length} label={app.name} onMove={move} />
@@ -206,6 +201,7 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
                 className="hidden cursor-grab text-fg/30 select-none active:cursor-grabbing sm:inline"
                 aria-hidden
                 title="Drag to reorder"
+                {...grip(index)}
               >
                 ⠿
               </span>

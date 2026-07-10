@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { reorder } from "./useReorder";
+import { reorder, dropIndicatorClass } from "./useReorder";
 
 const L = ["A", "B", "C", "D"];
 
@@ -28,5 +28,37 @@ describe("reorder", () => {
     const copy = [...L];
     expect(reorder(L, 1, 1)).toEqual(L);
     expect(L).toEqual(copy);
+  });
+});
+
+describe("dropIndicatorClass", () => {
+  it("draws the top line on the hovered row when the drop lands above it", () => {
+    expect(
+      dropIndicatorClass(2, { dragIndex: 3, overIndex: 2, dropEdge: "top" })
+    ).toBe("border-t-2 border-t-violet-400");
+  });
+
+  it("draws the bottom line on the hovered row when the drop lands below it", () => {
+    expect(
+      dropIndicatorClass(2, { dragIndex: 0, overIndex: 2, dropEdge: "bottom" })
+    ).toBe("border-b-2 border-b-violet-400");
+  });
+
+  it("is empty for rows other than the hovered one", () => {
+    expect(
+      dropIndicatorClass(1, { dragIndex: 0, overIndex: 2, dropEdge: "bottom" })
+    ).toBe("");
+  });
+
+  it("is empty for the row being dragged even when it is the hovered row", () => {
+    expect(
+      dropIndicatorClass(2, { dragIndex: 2, overIndex: 2, dropEdge: "top" })
+    ).toBe("");
+  });
+
+  it("is empty when nothing is being dragged", () => {
+    expect(
+      dropIndicatorClass(2, { dragIndex: null, overIndex: null, dropEdge: null })
+    ).toBe("");
   });
 });
