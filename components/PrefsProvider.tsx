@@ -637,6 +637,15 @@ export function PrefsProvider({
     [accentOverride, displayTheme, defaultAccent, activeLook, resolveLook]
   );
 
+  // Persist-before-commit for every saved-themes mutation: a list that can't
+  // be stored would vanish on reload, so state only advances (and true is only
+  // returned) when the write lands.
+  const commitThemes = useCallback((next: CustomTheme[]) => {
+    if (!saveThemes(next)) return false;
+    setCustomThemes(next);
+    return true;
+  }, []);
+
   // Capture the current full look — both modes' design/scene/font and colors —
   // as a saved theme, baking each mode's effective accent into its colorset so it
   // restores exactly as shown.
@@ -667,17 +676,15 @@ export function PrefsProvider({
         dark: withAccent(look.dark, true),
         light: withAccent(look.light, false),
       };
-      // Persist before committing to state: a theme that can't be stored would
-      // vanish on reload, so report the failure instead of showing it.
-      const next = existing
-        ? customThemes.map((t) => (t.id === existing.id ? entry : t))
-        : [...customThemes, entry];
-      if (!saveThemes(next)) return false;
-      setCustomThemes(next);
-      return true;
+      return commitThemes(
+        existing
+          ? customThemes.map((t) => (t.id === existing.id ? entry : t))
+          : [...customThemes, entry]
+      );
     },
     [
       customThemes,
+      commitThemes,
       activeLook,
       seedColorSet,
       accentOverride,
@@ -728,23 +735,38 @@ export function PrefsProvider({
     (id: string, name: string) => {
       const trimmed = name.trim().slice(0, 40);
       if (!trimmed || !customThemes.some((t) => t.id === id)) return false;
-      const next = customThemes.map((t) =>
-        t.id === id ? { ...t, name: trimmed } : t
+      return commitThemes(
+        customThemes.map((t) => (t.id === id ? { ...t, name: trimmed } : t))
       );
-      // Persist before committing (see saveNamedTheme).
-      if (!saveThemes(next)) return false;
-      setCustomThemes(next);
-      return true;
     },
-    [customThemes]
+    [customThemes, commitThemes]
   );
 
   // Append imported themes (already sanitized by parseThemesExport), skipping
   // any that duplicate one already saved or an earlier one in the same import.
-  // Ids differ by construction, so de-dupe on content with the id stripped.
+  // Ids differ by construction, so de-dupe on content with the id excluded —
+  // field by field, not JSON of the whole object, so the key can't silently
+  // start depending on key insertion order across the places themes are built.
   const importNamedThemes = useCallback(
     (themes: CustomTheme[]) => {
-      const keyOf = (t: CustomTheme) => JSON.stringify({ ...t, id: "" });
+      const colorKey = (c: ColorSet) => [
+        c.background,
+        c.foreground,
+        c.accentFrom,
+        c.accentTo,
+      ];
+      const keyOf = (t: CustomTheme) =>
+        JSON.stringify([
+          t.name,
+          t.design,
+          t.scene,
+          t.font,
+          t.designLight,
+          t.sceneLight,
+          t.fontLight,
+          colorKey(t.dark),
+          colorKey(t.light),
+        ]);
       const seen = new Set(customThemes.map(keyOf));
       const added: CustomTheme[] = [];
       for (const t of themes) {
@@ -756,13 +778,9 @@ export function PrefsProvider({
       // Nothing new: the stored list is already correct, so this is a success
       // with a zero count, not a storage failure.
       if (added.length === 0) return 0;
-      const next = [...customThemes, ...added];
-      // Persist before committing (see saveNamedTheme).
-      if (!saveThemes(next)) return null;
-      setCustomThemes(next);
-      return added.length;
+      return commitThemes([...customThemes, ...added]) ? added.length : null;
     },
-    [customThemes]
+    [customThemes, commitThemes]
   );
 
   const clearCustomTheme = useCallback(() => {

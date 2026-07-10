@@ -10,6 +10,7 @@ import { buttonClasses } from "@/lib/buttons";
 import { FONTS, fontVar } from "@/lib/fonts";
 import { parseThemesExport } from "@/lib/prefs";
 import type { CustomTheme, ThemeColors } from "@/lib/prefs";
+import { downloadJson } from "@/lib/download";
 import { deepenForLight } from "./scenes/color";
 
 const DESIGN_NAMES = Object.fromEntries(
@@ -263,10 +264,14 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
   const measureTabClip = useCallback(() => {
     const el = tablistRef.current;
     if (!el) return;
-    setTabClip({
-      start: el.scrollLeft > 0,
-      end: el.scrollLeft + el.clientWidth < el.scrollWidth - 1,
-    });
+    const start = el.scrollLeft > 0;
+    const end = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+    // Scroll fires this many times per swipe; returning the previous object
+    // when nothing changed lets React bail out instead of re-rendering the
+    // whole builder per event.
+    setTabClip((prev) =>
+      prev.start === start && prev.end === end ? prev : { start, end }
+    );
   }, []);
   useEffect(() => {
     // Effect-only so it never runs during SSR: the first measure and the
@@ -347,20 +352,17 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
       });
       // Declined: keep the typed name so they can rename before saving.
       if (!ok) return;
-      const saved = saveNamedTheme(name, existing.id);
-      setSaveFailed(!saved);
-      if (saved) setName("");
-      return;
     }
     // Captures the full current look — both modes' design, scene, font and
     // colors — so it restores as two complete, independent themes.
-    const ok = saveNamedTheme(name);
-    setSaveFailed(!ok);
-    if (ok) setName("");
+    const saved = saveNamedTheme(name, existing?.id);
+    setSaveFailed(!saved);
+    if (saved) setName("");
   }
 
   // Commit an inline rename on Enter/blur. Escape (via cancelRename) or an empty
-  // field cancels, leaving the saved name untouched.
+  // field cancels, leaving the saved name untouched. A failed write surfaces the
+  // same storage-blocked notice the save path uses.
   function commitRename(id: string, value: string) {
     if (cancelRename.current) {
       cancelRename.current = false;
@@ -368,25 +370,14 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
       return;
     }
     const next = value.trim();
-    if (next) renameNamedTheme(id, next);
+    if (next) setSaveFailed(!renameNamedTheme(id, next));
     setRenamingId(null);
   }
 
   // Download the saved themes as a JSON file the visitor can carry to another
-  // browser (or back it up). A temporary object URL is the only client-side way
-  // to hand the browser a file with no server round-trip.
+  // browser (or back it up).
   function exportThemes() {
-    const blob = new Blob([JSON.stringify(customThemes, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "ctrlcenter-themes.json";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    downloadJson("ctrlcenter-themes.json", customThemes);
   }
 
   async function handleImportFile(e: ChangeEvent<HTMLInputElement>) {
@@ -416,6 +407,17 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
       setImportStatus(`Imported ${added} theme${added === 1 ? "" : "s"}.`);
     }
   }
+
+  // Fade the tablist to transparent over ~24px on whichever side is clipped,
+  // opaque across the rest; no mask at all when nothing is clipped.
+  const tabMask = `linear-gradient(to right, ${[
+    tabClip.start ? "transparent 0, black 24px" : "black 0",
+    tabClip.end ? "black calc(100% - 24px), transparent 100%" : "black 100%",
+  ].join(", ")})`;
+  const tabMaskStyle: CSSProperties | undefined =
+    tabClip.start || tabClip.end
+      ? { maskImage: tabMask, WebkitMaskImage: tabMask }
+      : undefined;
 
   // A full-look swatch (surface bg + accent glow) for the current mode — used
   // for the theme packs and saved themes, which restyle the mode being edited.
@@ -523,21 +525,7 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
         aria-label="Theme builder sections"
         className="flex gap-1 overflow-x-auto border-b border-fg/10"
         onScroll={measureTabClip}
-        style={
-          tabClip.start || tabClip.end
-            ? (() => {
-                // Fade to transparent over ~24px on whichever side is clipped,
-                // opaque across the rest; no mask when nothing is clipped.
-                const mask = `linear-gradient(to right, ${[
-                  tabClip.start ? "transparent 0, black 24px" : "black 0",
-                  tabClip.end
-                    ? "black calc(100% - 24px), transparent 100%"
-                    : "black 100%",
-                ].join(", ")})`;
-                return { maskImage: mask, WebkitMaskImage: mask };
-              })()
-            : undefined
-        }
+        style={tabMaskStyle}
       >
         {TABS.map((t) => {
           const active = tab === t.id;

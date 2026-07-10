@@ -13,6 +13,7 @@ import SettingsManager from "./SettingsManager";
 import ThemesManager from "./ThemesManager";
 import BackHome from "@/components/BackHome";
 import { resolveThemePacks } from "@/lib/theme";
+import { downloadJson } from "@/lib/download";
 import { Button } from "./ui";
 import { ToastProvider, useToast } from "./Toast";
 import { ConfirmProvider } from "./Confirm";
@@ -65,16 +66,7 @@ function AdminBody({
     try {
       const res = await fetch("/api/config");
       if (!res.ok) throw new Error();
-      const data = await res.json();
-      const blob = new Blob([JSON.stringify(data, null, 2)], {
-        type: "application/json",
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "ctrlcenter-config.json";
-      a.click();
-      URL.revokeObjectURL(url);
+      downloadJson("ctrlcenter-config.json", await res.json());
     } catch {
       toast("Export failed", "error");
     }
