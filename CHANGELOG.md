@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [1.9.4] - 2026-07-10
+
 ### Added
 
 - **Apps can be marked "Only show when logged in".** A new checkbox in the
@@ -1598,7 +1600,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.3...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.4...HEAD
+[1.9.4]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.3...v1.9.4
 [1.9.3]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.2...v1.9.3
 [1.9.2]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.1...v1.9.2
 [1.9.1]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.0...v1.9.1
