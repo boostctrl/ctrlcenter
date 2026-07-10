@@ -10,20 +10,28 @@ import { readConfig } from "./config";
 // single prefix in the proxy can't express it. Mirrors the proxy's verification
 // (token signed against the current password hash, so a password change revokes
 // outstanding sessions).
-export async function isAdminRequest(request: NextRequest): Promise<boolean> {
+//
+// Callers that already hold the config pass `passwordHash` so the check doesn't
+// read and parse config.yaml a second time in the same request — the status
+// APIs are polled by every open dashboard tab, so the double read adds up.
+export async function isAdminRequest(
+  request: NextRequest,
+  passwordHash?: string
+): Promise<boolean> {
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
-  const { auth } = await readConfig();
-  return verifySessionToken(token, auth.passwordHash);
+  const hash = passwordHash ?? (await readConfig()).auth.passwordHash;
+  return verifySessionToken(token, hash);
 }
 
 // Same check for server components (no NextRequest there — the cookie comes
 // from next/headers). Lets a page decide whether to offer admin affordances
 // like the home-page layout editor; the APIs those affordances call are still
-// gated by the proxy, so this is presentation-only trust.
-export async function isAdminSession(): Promise<boolean> {
+// gated by the proxy, so this is presentation-only trust. Same optional
+// `passwordHash` fast path as isAdminRequest.
+export async function isAdminSession(passwordHash?: string): Promise<boolean> {
   const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
-  const { auth } = await readConfig();
-  return verifySessionToken(token, auth.passwordHash);
+  const hash = passwordHash ?? (await readConfig()).auth.passwordHash;
+  return verifySessionToken(token, hash);
 }
 
 // Apps flagged `private` exist only for the admin session. This is the single

@@ -98,3 +98,20 @@ export function MoveButtons({
     </div>
   );
 }
+
+// The ⠿ handle that starts a drag-reorder; spread a useReorder `grip(index)`
+// onto it. MoveButtons' mouse-only sibling: hidden below sm, where touch rules
+// and the buttons are the reorder path. One component so the three reorderable
+// lists (apps, bookmarks, category headings) can't drift apart.
+export function DragGrip(props: React.ComponentProps<"span">) {
+  return (
+    <span
+      className="hidden cursor-grab text-fg/30 select-none active:cursor-grabbing sm:inline"
+      aria-hidden
+      title="Drag to reorder"
+      {...props}
+    >
+      ⠿
+    </span>
+  );
+}

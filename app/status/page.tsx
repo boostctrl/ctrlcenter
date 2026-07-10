@@ -12,10 +12,10 @@ export const metadata: Metadata = { title: "Status" };
 export const dynamic = "force-dynamic";
 
 export default async function StatusRoute() {
-  const { settings, apps } = await readConfig();
+  const { settings, apps, auth } = await readConfig();
   // Server-rendered app list, so private apps' names/hosts must be filtered
   // here — same visibility rule as the home page.
-  const items = visibleApps(apps, await isAdminSession()).map((a) => ({
+  const items = visibleApps(apps, await isAdminSession(auth.passwordHash)).map((a) => ({
     id: a.id,
     name: a.name,
     icon: a.icon,

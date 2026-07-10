@@ -28,7 +28,7 @@ export default async function HomePage({
   // Admin state unlocks the layout-editor UI (saves go through the gated
   // settings API) and reveals private apps; ?edit=1 is the deep link from
   // admin Settings → Layout.
-  const isAdmin = await isAdminSession();
+  const isAdmin = await isAdminSession(config.auth.passwordHash);
 
   // Private apps must be dropped before the payload leaves the server — and
   // everything derived from the list (search matches, per-app bangs,

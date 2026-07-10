@@ -4,7 +4,7 @@ import { useRef, useState, type FormEvent } from "react";
 import type { BookmarkItem } from "@/lib/schema";
 import { orderCategories } from "@/lib/bookmarks";
 import Icon from "@/components/Icon";
-import { TextField, Button, MoveButtons } from "./ui";
+import { TextField, Button, MoveButtons, DragGrip } from "./ui";
 import IconField from "./IconField";
 import { useReorder, dropIndicatorClass } from "./useReorder";
 import { useToast } from "./Toast";
@@ -183,7 +183,9 @@ export default function BookmarksManager({
     } catch {
       toast("Failed to rename", "error");
     } finally {
-      setRenamingCategory(null);
+      // Only close OUR rename field: the fetch yielded, and the user may have
+      // already opened a rename on another category in the meantime.
+      setRenamingCategory((cur) => (cur === from ? null : cur));
     }
   }
 
@@ -241,14 +243,7 @@ export default function BookmarksManager({
                 label={`category ${category}`}
                 onMove={moveCategory}
               />
-              <span
-                className="hidden cursor-grab text-fg/30 select-none active:cursor-grabbing sm:inline"
-                aria-hidden
-                title="Drag to reorder"
-                {...catGrip(catIndex)}
-              >
-                ⠿
-              </span>
+              <DragGrip {...catGrip(catIndex)} />
               {renamingCategory === category ? (
                 <input
                   autoFocus
@@ -405,14 +400,7 @@ function CategoryGroup({
               label={bookmark.name}
               onMove={move}
             />
-            <span
-              className="hidden cursor-grab text-fg/30 select-none active:cursor-grabbing sm:inline"
-              aria-hidden
-              title="Drag to reorder"
-              {...grip(index)}
-            >
-              ⠿
-            </span>
+            <DragGrip {...grip(index)} />
             <Icon icon={bookmark.icon} name={bookmark.name} size={24} />
             <div className="min-w-0">
               <p className="truncate font-medium">{bookmark.name}</p>

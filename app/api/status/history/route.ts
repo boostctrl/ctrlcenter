@@ -12,19 +12,28 @@ import type { StatusHistory } from "@/lib/status";
 // day (validated; falls back to UTC).
 export const dynamic = "force-dynamic";
 
+// Session-dependent since private apps are filtered per caller, and Next sends
+// no Cache-Control of its own — keep shared caches from serving an admin's
+// body to guests (same as /api/status).
+const NO_SHARED_CACHE = { "cache-control": "private, no-store" };
+
 export async function GET(request: NextRequest) {
-  const { settings, apps } = await readConfig();
+  const { settings, apps, auth } = await readConfig();
   if (!settings.statusChecks) {
     const empty: StatusHistory = { generatedAt: Date.now(), apps: [] };
-    return NextResponse.json(empty);
+    return NextResponse.json(empty, { headers: NO_SHARED_CACHE });
   }
   await loadHistory();
   const tz = request.nextUrl.searchParams.get("tz") ?? "";
   const timeZone = isValidTimeZone(tz) ? tz : "UTC";
   // The poll cadence caps how long a 1h reading holds in the timeline. History
   // is recorded for every app; only the caller's visible ids are read out.
-  const visible = visibleApps(apps, await isAdminRequest(request));
+  const visible = visibleApps(
+    apps,
+    await isAdminRequest(request, auth.passwordHash)
+  );
   return NextResponse.json(
-    getHistory(visible.map((a) => a.id), timeZone, settings.statusInterval)
+    getHistory(visible.map((a) => a.id), timeZone, settings.statusInterval),
+    { headers: NO_SHARED_CACHE }
   );
 }

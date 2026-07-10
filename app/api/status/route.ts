@@ -17,18 +17,26 @@ const CACHE_MS = 30_000;
 
 let cache: { at: number; data: StatusResult[] } | null = null;
 
+// The response now varies with the caller's session (private apps are filtered
+// out for guests), and Next sends no Cache-Control of its own here — a shared
+// cache in front of the app could legally store an admin's body and serve it
+// to anonymous visitors. Forbid that explicitly on every response.
+const NO_SHARED_CACHE = { "cache-control": "private, no-store" };
+
 export async function GET(request: NextRequest) {
-  const { settings, apps } = await readConfig();
+  const { settings, apps, auth } = await readConfig();
   if (!settings.statusChecks) {
     const empty: StatusResponse = { checkedAt: Date.now(), results: [] };
-    return NextResponse.json(empty);
+    return NextResponse.json(empty, { headers: NO_SHARED_CACHE });
   }
 
   // The cache always holds every app's result; visibility is applied per
   // response, so a window filled by an anonymous caller still serves a later
   // admin request in full.
   const ids = new Set(
-    visibleApps(apps, await isAdminRequest(request)).map((a) => a.id)
+    visibleApps(apps, await isAdminRequest(request, auth.passwordHash)).map(
+      (a) => a.id
+    )
   );
   const toCaller = (results: StatusResult[]) =>
     results.filter((r) => ids.has(r.id));
@@ -38,7 +46,7 @@ export async function GET(request: NextRequest) {
       checkedAt: cache.at,
       results: toCaller(cache.data),
     };
-    return NextResponse.json(cached);
+    return NextResponse.json(cached, { headers: NO_SHARED_CACHE });
   }
 
   const results: StatusResult[] = await Promise.all(
@@ -49,5 +57,5 @@ export async function GET(request: NextRequest) {
     checkedAt: cache.at,
     results: toCaller(results),
   };
-  return NextResponse.json(body);
+  return NextResponse.json(body, { headers: NO_SHARED_CACHE });
 }

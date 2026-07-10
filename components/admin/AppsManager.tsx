@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import type { AppItem } from "@/lib/schema";
 import { CHECK_TYPES, type CheckType } from "@/lib/status";
 import Icon from "@/components/Icon";
-import { TextField, Button, MoveButtons } from "./ui";
+import { TextField, Button, MoveButtons, DragGrip } from "./ui";
 import IconField from "./IconField";
 import { useReorder, dropIndicatorClass } from "./useReorder";
 import { useToast } from "./Toast";
@@ -197,18 +197,13 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
           >
             <div className="flex min-w-0 items-center gap-3">
               <MoveButtons index={index} count={apps.length} label={app.name} onMove={move} />
-              <span
-                className="hidden cursor-grab text-fg/30 select-none active:cursor-grabbing sm:inline"
-                aria-hidden
-                title="Drag to reorder"
-                {...grip(index)}
-              >
-                ⠿
-              </span>
+              <DragGrip {...grip(index)} />
               <Icon icon={app.icon} name={app.name} size={24} />
               <div className="min-w-0">
                 <p className="flex items-center gap-2 font-medium">
-                  <span className="truncate">{app.name}</span>
+                  {/* min-w-0: a flex item won't shrink below its content, so
+                      truncate can't clip without it */}
+                  <span className="min-w-0 truncate">{app.name}</span>
                   {app.private && (
                     <span
                       className="shrink-0 rounded-full border border-fg/15 px-2 py-0.5 text-[10px] font-normal tracking-wide text-fg/45 uppercase"
