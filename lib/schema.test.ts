@@ -9,6 +9,7 @@ import {
   weatherUpdateSchema,
   themesInputSchema,
   layoutSchema,
+  bookmarkCategoryRenameSchema,
 } from "./schema";
 
 describe("themesInputSchema", () => {
@@ -197,6 +198,34 @@ describe("bookmarkInputSchema", () => {
         name: "A",
         url: "https://a.com",
       }).success
+    ).toBe(true);
+  });
+});
+
+describe("bookmarkCategoryRenameSchema", () => {
+  it("keeps `from` verbatim (stored names may carry whitespace) and trims `to`", () => {
+    const parsed = bookmarkCategoryRenameSchema.parse({
+      from: "  Media ",
+      to: " Streaming ",
+    });
+    expect(parsed).toEqual({ from: "  Media ", to: "Streaming" });
+  });
+
+  it("requires `to` non-empty after trimming (trim runs BEFORE the min check)", () => {
+    expect(
+      bookmarkCategoryRenameSchema.safeParse({ from: "X", to: "   " }).success
+    ).toBe(false);
+  });
+
+  it("rejects a no-op rename (from === trimmed to)", () => {
+    expect(
+      bookmarkCategoryRenameSchema.safeParse({ from: "Media", to: "Media" })
+        .success
+    ).toBe(false);
+    // A whitespace-cleanup rename (" Media " → "Media") is a real rename.
+    expect(
+      bookmarkCategoryRenameSchema.safeParse({ from: " Media ", to: "Media" })
+        .success
     ).toBe(true);
   });
 });

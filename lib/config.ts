@@ -300,3 +300,39 @@ export async function reorderBookmarks(ids: string[]): Promise<BookmarkItem[]> {
     return config.bookmarks;
   });
 }
+
+// Rename a whole bookmark category in one atomic write: retag every bookmark
+// with category `from` to `to`, and rewrite `bookmarkCategoryOrder` in place so
+// the renamed group keeps its display position instead of falling back to
+// first-seen order. Renaming onto a name that already exists (or is already in
+// the order) merges the two — the duplicate is dropped from the order, keeping
+// the earlier position. Throws when no bookmark carries `from` (the route maps
+// that to a 404, mirroring updateBookmark).
+export async function renameBookmarkCategory(
+  from: string,
+  to: string
+): Promise<{ bookmarks: BookmarkItem[]; bookmarkCategoryOrder: string[] }> {
+  return mutate((config) => {
+    const matches = config.bookmarks.filter((b) => b.category === from);
+    if (matches.length === 0) throw new Error("Category not found");
+    for (const b of config.bookmarks) {
+      if (b.category === from) b.category = to;
+    }
+    // Replace `from` with `to` in the display order, then de-duplicate so a
+    // merge collapses to a single entry at the earlier of the two positions.
+    const seen = new Set<string>();
+    config.settings.bookmarkCategoryOrder =
+      config.settings.bookmarkCategoryOrder.reduce<string[]>((acc, name) => {
+        const renamed = name === from ? to : name;
+        if (!seen.has(renamed)) {
+          seen.add(renamed);
+          acc.push(renamed);
+        }
+        return acc;
+      }, []);
+    return {
+      bookmarks: config.bookmarks,
+      bookmarkCategoryOrder: config.settings.bookmarkCategoryOrder,
+    };
+  });
+}

@@ -338,7 +338,9 @@ export default async function HelpPage() {
               </li>
               <li>
                 <strong>Bookmarks</strong> group under categories you name. Both
-                the bookmarks and the category order are drag-sortable.
+                the bookmarks and the category order are drag-sortable, and a
+                category can be renamed from its heading — every bookmark in it
+                moves across at once.
               </li>
               <li>
                 <strong>Icons</strong> come from a large built-in set (pick by

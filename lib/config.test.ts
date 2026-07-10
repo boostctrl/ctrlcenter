@@ -262,6 +262,92 @@ describe("reorderApps", () => {
   });
 });
 
+describe("renameBookmarkCategory", () => {
+  async function seed() {
+    await config.createBookmark({
+      category: "Media",
+      name: "Plex",
+      url: "https://plex.example.com",
+      icon: "",
+    });
+    await config.createBookmark({
+      category: "Media",
+      name: "Jellyfin",
+      url: "https://jelly.example.com",
+      icon: "",
+    });
+    await config.createBookmark({
+      category: "Dev",
+      name: "GitHub",
+      url: "https://github.com",
+      icon: "",
+    });
+    await config.updateSettings({ bookmarkCategoryOrder: ["Dev", "Media"] });
+  }
+
+  it("retags every bookmark in the category and updates the order in place", async () => {
+    await seed();
+    const result = await config.renameBookmarkCategory("Media", "Streaming");
+    // Only the Media rows change category; Dev is untouched.
+    expect(
+      result.bookmarks
+        .filter((b) => b.category === "Streaming")
+        .map((b) => b.name)
+    ).toEqual(["Plex", "Jellyfin"]);
+    expect(result.bookmarks.some((b) => b.category === "Media")).toBe(false);
+    // The renamed category keeps its slot in the order array rather than
+    // dropping to first-seen order.
+    expect(result.bookmarkCategoryOrder).toEqual(["Dev", "Streaming"]);
+
+    // Persisted to disk.
+    const reread = await config.readConfig();
+    expect(reread.settings.bookmarkCategoryOrder).toEqual(["Dev", "Streaming"]);
+    expect(reread.bookmarks.filter((b) => b.category === "Streaming")).toHaveLength(
+      2
+    );
+  });
+
+  it("merges into an existing category, keeping the earlier position", async () => {
+    await config.createBookmark({
+      category: "Dev",
+      name: "GitHub",
+      url: "https://github.com",
+      icon: "",
+    });
+    await config.createBookmark({
+      category: "Media",
+      name: "Plex",
+      url: "https://plex.example.com",
+      icon: "",
+    });
+    await config.createBookmark({
+      category: "Docs",
+      name: "Wiki",
+      url: "https://wiki.example.com",
+      icon: "",
+    });
+    await config.updateSettings({
+      bookmarkCategoryOrder: ["Dev", "Media", "Docs"],
+    });
+
+    // Dev (index 0) is earlier than Media (index 1), so merging Dev into Media
+    // collapses to a single "Media" at index 0 and drops the duplicate.
+    const result = await config.renameBookmarkCategory("Dev", "Media");
+    expect(result.bookmarkCategoryOrder).toEqual(["Media", "Docs"]);
+    expect(
+      result.bookmarks.filter((b) => b.category === "Media")
+    ).toHaveLength(2);
+    expect(result.bookmarks.some((b) => b.category === "Dev")).toBe(false);
+  });
+
+  it("throws when no bookmark carries the source category", async () => {
+    await seed();
+    await expect(
+      config.renameBookmarkCategory("Nope", "Whatever")
+    ).rejects.toThrow();
+  });
+});
+
 describe("replaceConfig", () => {
   it("validates and replaces the whole config", async () => {
     await config.createApp({ name: "Old", subtitle: "", url: "https://old.com", icon: "" });

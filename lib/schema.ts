@@ -827,6 +827,24 @@ export const bookmarkUpdateSchema = z.object({
   icon: z.string().optional(),
 });
 
+// Rename a bookmark category across its bookmarks (PATCH /api/bookmarks/category).
+// `from` is NOT trimmed — it must match the stored category verbatim, and stored
+// names can carry stray whitespace (bookmark input doesn't trim); trimming here
+// would make such a category permanently unrenameable. `to` is trimmed and must
+// be non-empty after trimming (trim BEFORE the min check, so "   " is rejected
+// rather than passing on its untrimmed length). A no-op rename (from === to) is
+// rejected as a 400 — the client cancels it before ever calling here, so this
+// only guards a direct request.
+export const bookmarkCategoryRenameSchema = z
+  .object({
+    from: z.string().min(1),
+    to: z.string().trim().min(1),
+  })
+  .refine((v) => v.from !== v.to, {
+    message: "New category name must differ from the old one",
+    path: ["to"],
+  });
+
 // Reorder (PATCH): an ordered list of existing ids.
 export const reorderSchema = z.object({
   ids: z.array(z.string()),

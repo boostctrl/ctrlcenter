@@ -27,6 +27,12 @@ here.
   heading's grip to reorder whole categories. The ▲ / ▼ arrows are still there
   for keyboard and touch. (#127)
 
+- **Bookmark categories can be renamed in place.** A pencil button on each
+  category heading in the admin Bookmarks tab turns it into a text box — rename
+  the category and every bookmark in it moves across in one step, keeping its
+  spot in the category order. Renaming a category to the name of an existing one
+  merges the two after a quick confirm. (#130)
+
 ### Fixed
 
 - **Card grids now collapse based on the card's own width, not the window's.**
