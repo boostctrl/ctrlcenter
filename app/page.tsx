@@ -4,11 +4,12 @@ import CalendarWidget from "@/components/CalendarWidget";
 import { StatusProvider } from "@/components/StatusProvider";
 import { EditModeProvider } from "@/components/EditMode";
 import { fetchCalendar, fetchCalendarRange } from "@/lib/calendar";
-import { fetchFeed } from "@/lib/feed";
+import { fetchFeeds } from "@/lib/feed";
 import { fetchWeather } from "@/lib/weather";
 import FeedWidget from "@/components/widgets/FeedWidget";
 import { greetingFor, hourIn, shortDate } from "@/lib/datetime";
 import { resolveLayoutWidgets, smallScreenTopGap } from "@/lib/layout";
+import { feedUrls } from "@/lib/schema";
 import { readPublicConfig } from "@/lib/api-auth";
 import { navPages } from "@/lib/nav";
 
@@ -43,7 +44,8 @@ export default async function HomePage({
   // in any time zone.
   const calEnabled = cal.enabled && cal.url.trim() !== "";
   const feedCfg = settings.feed;
-  const feedEnabled = feedCfg.enabled && feedCfg.url.trim() !== "";
+  const feedList = feedUrls(feedCfg);
+  const feedEnabled = feedCfg.enabled && feedList.length > 0;
   const weather = settings.weather;
 
   // Fetch the three third-party widgets (calendar, RSS feed, weather)
@@ -57,7 +59,7 @@ export default async function HomePage({
         ? fetchCalendarRange(cal.url, now - 40 * DAY, now + 40 * DAY, calAuth)
         : fetchCalendar(cal.url, cal.count, calAuth)
       : Promise.resolve([]),
-    feedEnabled ? fetchFeed(feedCfg.url, feedCfg.count) : Promise.resolve(null),
+    feedEnabled ? fetchFeeds(feedList, feedCfg.count) : Promise.resolve(null),
     weather.enabled
       ? fetchWeather(weather.latitude, weather.longitude, weather.units)
       : Promise.resolve(null),

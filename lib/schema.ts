@@ -129,16 +129,33 @@ export const calendarSchema = z.object({
 });
 export type CalendarConfig = z.infer<typeof calendarSchema>;
 
-// RSS/Atom feed widget fed by a public feed URL. Stored leniently; the URL is
-// validated on the admin path.
+// RSS/Atom feed widget fed by one or more public feed URLs, merged newest-first.
+// Stored leniently; URLs are validated on the admin path.
 export const feedSchema = z.object({
   enabled: z.boolean().default(false),
+  // @deprecated Pre-1.9.6 single-feed URL. Still read — feedUrls() folds it into
+  // a one-entry list so an existing config loads unchanged — but no longer
+  // written by the admin UI, which saves `urls`. Removed with a one-time
+  // migration in 2.0.0 (removal ledger #152). Prefer `urls`.
   url: z.string().default(""),
+  // The feed URLs to merge, rendered newest-first. Supersedes `url`.
+  urls: z.array(z.string()).default([]),
   count: z.number().int().min(1).max(15).default(6),
-  // Card title override; empty uses the feed's own title.
+  // Card title override; empty uses the first feed's own title.
   title: z.string().default(""),
 });
 export type FeedConfig = z.infer<typeof feedSchema>;
+
+// The effective feed URL list: `urls` when it has any entries, otherwise the
+// deprecated single `url` as a one-entry list (a pre-1.9.6 config). Blank
+// entries are trimmed out. Shared by the home page, the admin editor's seed,
+// and the fetch layer so the legacy shape is folded in exactly one way.
+export function feedUrls(feed: Pick<FeedConfig, "url" | "urls">): string[] {
+  const list = feed.urls.map((u) => u.trim()).filter((u) => u !== "");
+  if (list.length > 0) return list;
+  const legacy = feed.url.trim();
+  return legacy !== "" ? [legacy] : [];
+}
 
 // Countdown widget: labeled dates rendered as "in N days" rows. Stored
 // leniently (a half-typed row never fails the config load); rows without a
@@ -723,18 +740,20 @@ export const worldClocksUpdateSchema = z.object({
   items: z.array(z.object({ label: z.string(), timeZone: z.string() })),
 });
 
-// The admin sends the whole feed object. The URL is optional (the widget stays
-// inert until set) but must be http(s) when present.
+// The admin sends the whole feed object. The URL list may be empty (the widget
+// stays inert until set) and blank rows are allowed (trimmed on read), but every
+// non-empty entry must be http(s). The admin UI writes `urls`; the deprecated
+// single `url` is not sent (it lingers in a pre-1.9.6 config until 2.0.0).
 export const feedUpdateSchema = z
   .object({
     enabled: z.boolean(),
-    url: z.string(),
+    urls: z.array(z.string()),
     count: z.number().int().min(1).max(15),
     title: z.string(),
   })
   .refine(
-    (f) => f.url.trim() === "" || /^https?:\/\//i.test(f.url.trim()),
-    { message: "Feed URL must start with http(s)", path: ["url"] }
+    (f) => f.urls.every((u) => u.trim() === "" || /^https?:\/\//i.test(u.trim())),
+    { message: "Every feed URL must start with http(s)", path: ["urls"] }
   );
 
 // The admin sends the whole theme object (not a partial), so updateSettings

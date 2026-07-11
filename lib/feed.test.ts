@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseFeed } from "./feed";
+import { mergeFeeds, parseFeed, type Feed } from "./feed";
 
 const RSS = `<?xml version="1.0"?>
 <rss version="2.0">
@@ -102,5 +102,62 @@ describe("parseFeed", () => {
       title: "",
       items: [],
     });
+  });
+});
+
+describe("mergeFeeds", () => {
+  const dated = (title: string, ms: number) => ({
+    title,
+    url: `https://x/${title}`,
+    publishedAt: ms,
+  });
+  const undated = (title: string) => ({
+    title,
+    url: `https://x/${title}`,
+    publishedAt: null,
+  });
+  const feed = (title: string, items: Feed["items"]): Feed => ({ title, items });
+  const src = (f: Feed) => ({ feed: f, source: f.title });
+
+  it("interleaves dated items newest-first and stamps each source", () => {
+    const a = feed("Blog A", [dated("a2", 200), dated("a1", 100)]);
+    const b = feed("Blog B", [dated("b3", 300), dated("b1", 150)]);
+    const merged = mergeFeeds([src(a), src(b)], 10);
+    expect(merged.items.map((i) => i.title)).toEqual(["b3", "a2", "b1", "a1"]);
+    expect(merged.items.map((i) => i.source)).toEqual([
+      "Blog B",
+      "Blog A",
+      "Blog B",
+      "Blog A",
+    ]);
+    // Title falls back to the first feed's own title.
+    expect(merged.title).toBe("Blog A");
+  });
+
+  it("does not label items when only one feed contributes", () => {
+    const merged = mergeFeeds([src(feed("Solo", [dated("x", 1)]))], 10);
+    expect(merged.items[0].source).toBeUndefined();
+  });
+
+  it("keeps an undated item beside its feed's neighbours, not at the end", () => {
+    // Feed A runs newest-first: dated 300, an undated item (inherits 300), then
+    // dated 100. Feed B has one item at 200. The undated item must land right
+    // after its dated predecessor, above B's 200 — never dumped last.
+    const a = feed("A", [dated("a-new", 300), undated("a-mid"), dated("a-old", 100)]);
+    const b = feed("B", [dated("b", 200)]);
+    const merged = mergeFeeds([src(a), src(b)], 10);
+    expect(merged.items.map((i) => i.title)).toEqual([
+      "a-new",
+      "a-mid",
+      "b",
+      "a-old",
+    ]);
+  });
+
+  it("caps the merged list at count", () => {
+    const a = feed("A", [dated("a3", 300), dated("a1", 100)]);
+    const b = feed("B", [dated("b2", 200)]);
+    const merged = mergeFeeds([src(a), src(b)], 2);
+    expect(merged.items.map((i) => i.title)).toEqual(["a3", "b2"]);
   });
 });

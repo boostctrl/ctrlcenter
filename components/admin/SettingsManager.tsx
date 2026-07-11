@@ -7,6 +7,7 @@ import {
   ALERT_TYPES,
   ANNOUNCEMENT_TONES,
   STATUS_ANNOUNCEMENT_KINDS,
+  feedUrls,
 } from "@/lib/schema";
 import type { ThemePack } from "@/lib/theme";
 import { FONTS, fontVar, type FontId } from "@/lib/fonts";
@@ -23,7 +24,8 @@ import {
 import { useNow } from "../useNow";
 import { supportedTimezones, newThemeId } from "@/lib/prefs";
 import { resolveLayoutWidgets, type LayoutWidgetId } from "@/lib/layout";
-import { TextField } from "./ui";
+import { TextField, MoveButtons } from "./ui";
+import { reorder } from "./useReorder";
 import IconField from "./IconField";
 import CalendarTest from "./CalendarTest";
 import FeedTest from "./FeedTest";
@@ -118,6 +120,13 @@ function useKeyedRows<T>(items: T[], setItems: (next: T[]) => void) {
       setItems(items.filter((_, idx) => idx !== i));
       setKeys((k) => k.filter((_, idx) => idx !== i));
     },
+    // Reorder items and their keys together so a moved row keeps its identity
+    // (focus/IME) instead of the value sliding under a stale key.
+    move: (from: number, to: number) => {
+      if (from === to || to < 0 || to >= items.length) return;
+      setItems(reorder(items, from, to));
+      setKeys((k) => reorder(k, from, to));
+    },
   };
 }
 
@@ -176,6 +185,12 @@ export default function SettingsManager({
         initialSettings.layout.sections,
         initialSettings.components
       ),
+    },
+    // Fold the deprecated single feed `url` into the `urls` list up front, so a
+    // pre-1.9.6 config shows its feed in the editor and autosaves the new shape.
+    feed: {
+      ...initialSettings.feed,
+      urls: feedUrls(initialSettings.feed),
     },
   }));
   // The URL seeds the active section (?tab=settings&section=widgets is a
@@ -294,6 +309,10 @@ export default function SettingsManager({
   const feed = settings.feed;
   const updateFeed = (patch: Partial<Settings["feed"]>) =>
     setSettings((s) => ({ ...s, feed: { ...s.feed, ...patch } }));
+  const setFeedUrls = (urls: string[]) => updateFeed({ urls });
+  const feedUrlRows = useKeyedRows(feed.urls, setFeedUrls);
+  const updateFeedUrl = (i: number, url: string) =>
+    setFeedUrls(feed.urls.map((u, idx) => (idx === i ? url : u)));
 
   const countdown = settings.countdown;
   const setCountdownItems = (items: Settings["countdown"]["items"]) =>
@@ -1004,9 +1023,10 @@ export default function SettingsManager({
           <div>
             <span className="text-sm text-fg/70">Feed widget</span>
             <p className="text-xs text-fg/40">
-              Show the latest entries from an RSS or Atom feed. Fetched
-              server-side and cached for a few minutes. Ships hidden — show the
-              card in the home-page layout editor once configured.
+              Show the latest entries from one or more RSS or Atom feeds, merged
+              newest-first. Fetched server-side and cached for a few minutes.
+              Ships hidden — show the card in the home-page layout editor once
+              configured.
             </p>
           </div>
           <label className="flex shrink-0 items-center gap-2 text-sm">
@@ -1021,14 +1041,51 @@ export default function SettingsManager({
 
         {feed.enabled && (
           <>
+            <div className="flex flex-col gap-2">
+              <span className="text-sm text-fg/50">Feed URLs (RSS or Atom)</span>
+              {feed.urls.map((url, i) => (
+                <div
+                  key={feedUrlRows.keys[i] ?? i}
+                  className="flex flex-col gap-1.5"
+                >
+                  <div className="flex items-center gap-2">
+                    {feed.urls.length > 1 && (
+                      <MoveButtons
+                        index={i}
+                        count={feed.urls.length}
+                        label={`feed ${i + 1}`}
+                        onMove={feedUrlRows.move}
+                      />
+                    )}
+                    <input
+                      value={url}
+                      onChange={(e) => updateFeedUrl(i, e.target.value)}
+                      placeholder="https://example.com/feed.xml"
+                      aria-label={`Feed ${i + 1} URL`}
+                      className={`${selectClass} min-w-0 flex-1`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => feedUrlRows.removeAt(i)}
+                      aria-label={`Remove feed ${i + 1}`}
+                      className="shrink-0 rounded-md px-2 py-1 text-fg/40 transition-colors hover:bg-fg/10 hover:text-red-400"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  {url.trim() !== "" && <FeedTest url={url} />}
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => feedUrlRows.add("")}
+                className="self-start rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10"
+              >
+                + Add feed
+              </button>
+            </div>
             <TextField
-              label="Feed URL (RSS or Atom)"
-              placeholder="https://example.com/feed.xml"
-              value={feed.url}
-              onChange={(e) => updateFeed({ url: e.target.value })}
-            />
-            <TextField
-              label="Card title (optional — defaults to the feed's own)"
+              label="Card title (optional — defaults to the first feed's own)"
               placeholder=""
               value={feed.title}
               onChange={(e) => updateFeed({ title: e.target.value })}
@@ -1051,7 +1108,10 @@ export default function SettingsManager({
                 className={`${selectClass} w-20 text-center`}
               />
             </label>
-            <FeedTest url={feed.url} />
+            <p className="text-xs text-fg/40">
+              With several feeds, each entry shows its source. The count caps the
+              combined list.
+            </p>
           </>
         )}
         </Section>

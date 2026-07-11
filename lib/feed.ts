@@ -15,11 +15,15 @@ export type FeedItem = {
   url: string;
   // Publish time (epoch ms), or null when missing/unparsable.
   publishedAt: number | null;
+  // The source feed's label (its title, else its host), stamped at merge time so
+  // an interleaved multi-feed list stays scannable. Absent on freshly parsed
+  // items and when only one feed contributed (the label would be redundant).
+  source?: string;
 };
 
 export type Feed = {
   // The feed's own title ("" when absent); the widget prefers the admin's
-  // override.
+  // override, else the first merged feed's title.
   title: string;
   items: FeedItem[];
 };
@@ -159,10 +163,11 @@ async function requestFeed(
   }
 }
 
-// Fetch + parse a feed, cached for a few minutes; `count` caps the items.
-// Returns null for a non-http(s) URL; on a fetch/parse failure serves the last
-// good cache if there is one, else null. Never throws.
-export async function fetchFeed(url: string, count: number): Promise<Feed | null> {
+// Fetch + parse one feed, cached for a few minutes; `cap` limits the items so a
+// single feed can't crowd out the others in the merge. Returns null for a
+// non-http(s) URL; on a fetch/parse failure serves the last good cache if there
+// is one, else null. Never throws.
+async function fetchOneFeed(url: string, cap: number): Promise<Feed | null> {
   const target = url.trim();
   if (!/^https?:\/\//i.test(target)) return null;
   const now = Date.now();
@@ -177,7 +182,72 @@ export async function fetchFeed(url: string, count: number): Promise<Feed | null
     // On failure, keep serving the stale cache (feed stays as cached?.feed).
   }
   if (!feed) return null;
-  return { ...feed, items: feed.items.slice(0, count) };
+  return { ...feed, items: feed.items.slice(0, cap) };
+}
+
+// Merge several parsed feeds into one list, newest-first. Dated items sort by
+// publish time descending; an undated item inherits the timestamp of the most
+// recent dated item above it in ITS OWN feed (feeds run newest-first), so it
+// stays beside its neighbours instead of being dumped at the end. A stable sort
+// keeps ties in feed-then-document order. Each item is stamped with its source
+// feed's label only when more than one feed contributed, so a single feed shows
+// no redundant labels. `count` caps the result; the title falls back to the
+// first feed's own title. Exported for unit testing the interleave.
+export function mergeFeeds(
+  sources: { feed: Feed; source: string }[],
+  count: number
+): Feed {
+  const label = sources.length > 1;
+  type Tagged = { item: FeedItem; effective: number; order: number };
+  const tagged: Tagged[] = [];
+  let order = 0;
+  for (const { feed, source } of sources) {
+    // Feeds run newest-first, so an undated item inherits the date of the most
+    // recent dated item seen so far in this feed (or +∞ before any, keeping it
+    // at the top of its feed's run).
+    let inherited = Number.POSITIVE_INFINITY;
+    for (const item of feed.items) {
+      if (item.publishedAt !== null) inherited = item.publishedAt;
+      tagged.push({
+        item: label ? { ...item, source } : item,
+        effective: inherited,
+        order: order++,
+      });
+    }
+  }
+  tagged.sort((a, b) =>
+    a.effective === b.effective ? a.order - b.order : b.effective - a.effective
+  );
+  return {
+    title: sources[0]?.feed.title ?? "",
+    items: tagged.slice(0, count).map((t) => t.item),
+  };
+}
+
+// Fetch every configured feed URL concurrently and merge them newest-first.
+// One slow or dead feed degrades to nothing from that feed rather than emptying
+// the widget or delaying the page (each fetch is independently time-boxed and
+// cached). `count` caps the merged list. Returns null when no URL is usable or
+// none resolved. Never throws.
+export async function fetchFeeds(
+  urls: string[],
+  count: number
+): Promise<Feed | null> {
+  const targets = urls
+    .map((u) => u.trim())
+    .filter((u) => /^https?:\/\//i.test(u));
+  if (targets.length === 0) return null;
+  const results = await Promise.all(
+    targets.map(async (u) => {
+      const feed = await fetchOneFeed(u, count);
+      return feed ? { feed, source: feed.title.trim() || hostOf(u) } : null;
+    })
+  );
+  const resolved = results.filter(
+    (r): r is { feed: Feed; source: string } => r !== null
+  );
+  if (resolved.length === 0) return null;
+  return mergeFeeds(resolved, count);
 }
 
 // Fresh (uncached) reachability check for the admin's "Test feed" button.

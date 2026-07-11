@@ -40,8 +40,15 @@ export default function FeedWidget({
               const date = dateLabel(item.publishedAt);
               const row = (
                 <>
-                  <span className="min-w-0 flex-1 truncate text-sm text-fg/80">
-                    {item.title}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm text-fg/80">
+                      {item.title}
+                    </span>
+                    {item.source && (
+                      <span className="block truncate text-xs text-fg/40">
+                        {item.source}
+                      </span>
+                    )}
                   </span>
                   {date && (
                     <span className="shrink-0 text-xs text-fg/40 tabular-nums">

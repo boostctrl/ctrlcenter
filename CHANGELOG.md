@@ -22,6 +22,24 @@ here.
   ships hidden, so switch it on in the home-page layout editor once it's set
   up. (#79)
 
+### Changed
+
+- **The RSS feed widget can follow several feeds at once.** Add more than one
+  RSS or Atom URL under Settings → Widgets → RSS feed and the card shows a
+  single list merged newest-first, with each entry labelled by its source so a
+  combined list stays readable. A slow or unreachable feed no longer empties or
+  delays the card — it shows whatever the reachable feeds returned. The entries
+  count now caps the combined list, and the card title falls back to the first
+  feed's own title. (#107)
+
+### Deprecated
+
+- **The old single-feed RSS setting.** A dashboard that pointed the RSS widget
+  at a single URL keeps working untouched — that URL is read as a one-entry
+  feed list — but the setting is superseded by the new feed list and will be
+  removed in 2.0.0, which migrates any remaining single-feed config
+  automatically. (#107)
+
 ### Fixed
 
 - **Card grids drop a column before tile names get cut off.** When an
