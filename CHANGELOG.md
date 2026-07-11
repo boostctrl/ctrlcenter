@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [1.9.5] - 2026-07-11
+
 ### Added
 
 - **A saved theme can be promoted to the site theme.** Signed-in admins get a
@@ -1666,7 +1668,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.4...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.5...HEAD
+[1.9.5]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.4...v1.9.5
 [1.9.4]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.3...v1.9.4
 [1.9.3]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.2...v1.9.3
 [1.9.2]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.1...v1.9.2
