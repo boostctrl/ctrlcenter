@@ -19,11 +19,14 @@ export default function AppCard({ app }: { app: AppItem }) {
         <Icon icon={app.icon} name={app.name} size={26} />
       </div>
       <div className="min-w-0 flex-1">
+        {/* Two lines before ellipsizing: the column ladder keeps tiles wide
+            enough for most names, and wrapping absorbs the rest, so a name
+            like "Password Manager" never shows as "Passw…" (#145). */}
         <a
           href={app.url}
           target="_blank"
           rel="noreferrer"
-          className="block truncate font-semibold text-fg/90 outline-none after:absolute after:inset-0 after:rounded-[inherit] group-hover:text-fg focus-visible:underline"
+          className="line-clamp-2 break-words font-semibold text-fg/90 outline-none after:absolute after:inset-0 after:rounded-[inherit] group-hover:text-fg focus-visible:underline"
         >
           {app.name}
         </a>

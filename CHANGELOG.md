@@ -24,6 +24,12 @@ here.
 
 ### Fixed
 
+- **App tile names no longer truncate to half a word.** A tile's name now
+  wraps to a second line before it ellipsizes, and the card grid steps down
+  to three and four columns a little later, so an app called "Password
+  Manager" reads as "Password Manager" — not "Passw…" — at every width.
+  (#145)
+
 - **Editing an app or bookmark now reports the real reason a save failed.** When
   saving a change to an application, a bookmark, or a bookmark category's name
   couldn't be written for a reason other than the item being gone — a full disk,

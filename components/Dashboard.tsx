@@ -171,15 +171,18 @@ const CELL_ALIGN: Partial<Record<LayoutWidgetId, string>> = {
 // steps are container queries against the widget's own width (the section
 // around each grid is the @container), not viewport media queries — tile width
 // is a function of the card, and span, the page max-width, and the UI scale
-// all move it independently of the viewport (#145). Each rung keeps tiles at
-// roughly ≥215px, and the rem-based thresholds track the UI scale, so a
-// scaled-up dashboard collapses proportionally sooner. Complete, static class
-// strings so Tailwind's extractor keeps every variant.
+// all move it independently of the viewport (#145). The 3- and 4-column rungs
+// keep tiles at roughly ≥235px — derived from the tile's CONTENT (an icon
+// plus a two-word name), not just its box — and titles get a second line
+// before ellipsizing (see AppCard), so the 2-column floor can stay denser.
+// Rem-based thresholds track the UI scale, so a scaled-up dashboard collapses
+// proportionally sooner. Complete, static class strings so Tailwind's
+// extractor keeps every variant.
 const CARD_COLS: Record<number, string> = {
   1: "grid-cols-1",
   2: "grid-cols-1 @md:grid-cols-2",
-  3: "grid-cols-1 @md:grid-cols-2 @2xl:grid-cols-3",
-  4: "grid-cols-1 @md:grid-cols-2 @2xl:grid-cols-3 @4xl:grid-cols-4",
+  3: "grid-cols-1 @md:grid-cols-2 @3xl:grid-cols-3",
+  4: "grid-cols-1 @md:grid-cols-2 @3xl:grid-cols-3 @5xl:grid-cols-4",
 };
 const cardsFor = (widget: LayoutWidget): number =>
   widget.cards ?? (widget.span >= 18 ? 3 : widget.span >= 10 ? 2 : 1);
