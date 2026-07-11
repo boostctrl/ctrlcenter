@@ -22,6 +22,17 @@ here.
   bookmarks are all private disappears with them; filtering happens on the
   server, so nothing about the bookmark reaches a signed-out browser. (#149)
 
+### Changed
+
+- **Admin Settings is a shorter, single-column layout.** The settings rail is
+  down to five entries — General, Home layout, Widgets, Announcement, and
+  Security — and each opens a single top-to-bottom column of cards at a
+  comfortable reading width instead of a two-column shuffle. Everything that
+  configures a home-page widget now lives under **Widgets**: the search engine
+  and custom bangs, weather, calendar, RSS feed, notes, countdown, and the
+  status row with its alerts and status-page announcements, all in one place.
+  (#134)
+
 ### Fixed
 
 - **App tile names no longer truncate to half a word.** A tile's name now

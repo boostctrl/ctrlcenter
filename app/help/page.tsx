@@ -477,7 +477,7 @@ export default async function HelpPage() {
             <P>
               Tell your household about maintenance and upcoming changes right on
               the <A href="/status">status page</A>, separate from the site-wide
-              banner. In <strong>Settings → Monitoring → Announcements</strong>{" "}
+              banner. In <strong>Settings → Widgets → Announcements</strong>{" "}
               add an entry with a kind (maintenance, incident, or notice — it
               tints the card), a title, and a message in the same inline markdown
               subset. An optional start and end schedule it: an entry with a
@@ -492,7 +492,7 @@ export default async function HelpPage() {
             <P>
               A free-form card for anything worth keeping in view — maintenance
               reminders, runbook snippets, a message for the household. Write it
-              in <strong>Settings → Notes</strong> using a safe markdown subset
+              in <strong>Settings → Widgets → Notes</strong> using a safe markdown subset
               (headings, bold and italic, links, lists, quotes, and code
               blocks), then show the card from the home-page layout editor. Raw
               HTML is displayed as text, never rendered.
@@ -503,7 +503,7 @@ export default async function HelpPage() {
             <P>
               Show the latest headlines from any RSS or Atom feed — a news
               site, a blog, release notes. Point{" "}
-              <strong>Settings → RSS feed</strong> at the feed URL (the{" "}
+              <strong>Settings → Widgets → RSS feed</strong> at the feed URL (the{" "}
               <strong>Test feed</strong> button confirms it&apos;s readable),
               pick how many entries to show, then show the card from the
               home-page layout editor. Entries are fetched server-side and
@@ -515,7 +515,7 @@ export default async function HelpPage() {
             <P>
               Labeled dates shown as &ldquo;in N days&rdquo; rows — domain
               renewals, birthdays, deadlines. Add them in{" "}
-              <strong>Settings → Countdown</strong>, then show the card from
+              <strong>Settings → Widgets → Countdown</strong>, then show the card from
               the home-page layout editor. Days count in each visitor&apos;s
               own time zone; today and tomorrow get an accent chip, and past
               dates dim and sink below the upcoming ones.

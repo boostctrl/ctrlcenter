@@ -47,31 +47,20 @@ async function saveSettings(settings: Settings, opts?: SaveOptions): Promise<voi
   }
 }
 
-// One nav entry per settings group; a single group shows at a time. Related
-// settings are grouped so the rail stays short: Appearance folds into General,
-// the content-card widgets share Widgets, and Status + Alerts share Monitoring.
+// One nav entry per settings group; a single group shows at a time. The rail
+// stays short by grouping under one rule: everything that configures a
+// home-page widget lives under Widgets — the search bar, weather, calendar,
+// feed, notes, countdown, and the status row together with its alerts and
+// status-page announcements. Appearance folds into General; the site-wide
+// Announcement banner and Security stand on their own.
 const SETTINGS_SECTIONS = [
   { id: "general", label: "General" },
   { id: "layout", label: "Home layout" },
   { id: "widgets", label: "Widgets" },
-  { id: "weather", label: "Weather" },
-  { id: "monitoring", label: "Monitoring" },
-  { id: "search", label: "Search" },
   { id: "announcement", label: "Announcement" },
   { id: "security", label: "Security" },
 ] as const;
 type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]["id"];
-
-// Groups that render more than one card: their cards flow into a two-column
-// masonry so they fill the width. The rest are single, simpler forms and are
-// centered at a comfortable reading width instead of stranded on the left.
-const MULTI_CARD_SECTIONS: readonly SettingsSectionId[] = [
-  "general",
-  "layout",
-  "widgets",
-  "monitoring",
-  "search",
-];
 
 // Offered uptime-check intervals (minutes). The schema accepts 1–60, so a
 // hand-edited value can fall outside this list — the control shows it as an
@@ -116,8 +105,16 @@ function Section({
   intro?: ReactNode;
   children: ReactNode;
 }) {
+  // A stable, title-derived anchor so a card can be deep-linked
+  // (e.g. #settings-card-alerts).
+  const id =
+    "settings-card-" +
+    title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "");
   return (
-    <section className="glass-card mb-4 flex break-inside-avoid flex-col gap-4 p-5">
+    <section id={id} className="glass-card mb-4 flex flex-col gap-4 p-5">
       <div>
         <h3 className="text-xs font-semibold tracking-[0.15em] text-fg/45 uppercase">
           {title}
@@ -376,15 +373,10 @@ export default function SettingsManager({
           <SaveStatus status={status} error={error} />
         </div>
 
-        {/* Multi-card groups flow into two masonry columns to fill the width;
-            single-card groups are centered at a comfortable reading width. */}
-        <div
-          className={
-            MULTI_CARD_SECTIONS.includes(section)
-              ? "lg:columns-2 lg:gap-4"
-              : "lg:mx-auto lg:w-full lg:max-w-2xl"
-          }
-        >
+        {/* Every group is a single top-to-bottom column, centered at a
+            comfortable reading width. Card order within a group is meaningful:
+            related cards sit adjacent. */}
+        <div className="lg:mx-auto lg:w-full lg:max-w-2xl">
         {section === "general" && (
         <Section title="General">
         <TextField
@@ -565,7 +557,7 @@ export default function SettingsManager({
         {section === "layout" && (
         <Section
           title="Visible widgets"
-          intro="Show or hide home-page widgets. Weather, the status row, and the calendar are toggled in their own sections; the split clock/weather/status widgets are managed in the home-page editor."
+          intro="Show or hide home-page widgets. Weather, the status row, and the calendar are toggled in the Widgets section; the split clock/weather/status widgets are managed in the home-page editor."
         >
         <div className="flex flex-col gap-2.5">
           {widgetToggles.map((t) => (
@@ -618,101 +610,7 @@ export default function SettingsManager({
         </Section>
         )}
 
-        {section === "monitoring" && (
-        <Section title="Status">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <span className="text-sm text-fg/70">Service status indicators</span>
-            <p className="text-xs text-fg/40">
-              Show an online/offline dot on each app. The server pings every app
-              URL, so leave off if your apps aren&apos;t reachable from it.
-            </p>
-          </div>
-          <label className="flex shrink-0 items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={settings.statusChecks}
-              onChange={(e) =>
-                setSettings({ ...settings, statusChecks: e.target.checked })
-              }
-            />
-            Enabled
-          </label>
-        </div>
-
-        {settings.statusChecks && (
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <span className="text-sm text-fg/70">Uptime check interval</span>
-              <p className="text-xs text-fg/40">
-                How often the server records each app&apos;s up/down for the
-                90-day history on the status page.
-              </p>
-            </div>
-            <div className="flex shrink-0 overflow-hidden rounded-lg border border-fg/10">
-              {INTERVAL_PRESETS.map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  aria-pressed={settings.statusInterval === m}
-                  onClick={() => setSettings({ ...settings, statusInterval: m })}
-                  className={`px-3 py-1.5 text-xs transition-colors ${
-                    settings.statusInterval === m
-                      ? "bg-fg/15 text-fg"
-                      : "text-fg/50 hover:text-fg/80"
-                  }`}
-                >
-                  {m} min
-                </button>
-              ))}
-              {/* A hand-edited config value (the schema allows 1–60) matches no
-                  preset; surface it as an extra selected chip so the control
-                  never reads as "nothing selected". It vanishes once a preset is
-                  clicked. A span, not a button — it's a readout of the current
-                  value, not a choice; making it clickable-looking-but-inert
-                  would just be a keyboard trap. */}
-              {!INTERVAL_PRESETS.includes(settings.statusInterval) && (
-                <span className="px-3 py-1.5 text-xs bg-fg/15 text-fg">
-                  {settings.statusInterval} min
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-
-        {settings.statusChecks && (
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <span className="text-sm text-fg/70">Default status range</span>
-              <p className="text-xs text-fg/40">
-                Which time range the status page opens on.
-              </p>
-            </div>
-            <div className="flex shrink-0 overflow-hidden rounded-lg border border-fg/10">
-              {STATUS_RANGES.map((r) => (
-                <button
-                  key={r.key}
-                  type="button"
-                  aria-pressed={settings.statusDefaultRange === r.key}
-                  onClick={() =>
-                    setSettings({ ...settings, statusDefaultRange: r.key })
-                  }
-                  className={`px-3 py-1.5 text-xs transition-colors ${
-                    settings.statusDefaultRange === r.key
-                      ? "bg-fg/15 text-fg"
-                      : "text-fg/50 hover:text-fg/80"
-                  }`}
-                >
-                  {r.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        </Section>
-        )}
-
-        {section === "search" && (
+        {section === "widgets" && (
         <Section title="Search engine">
         <div className="flex flex-col gap-2">
           <label className="flex flex-col gap-1 text-sm">
@@ -755,7 +653,7 @@ export default function SettingsManager({
         </Section>
         )}
 
-        {section === "search" && (
+        {section === "widgets" && (
         <Section title="Custom bangs">
         <div className="flex flex-col gap-2">
           <p className="-mt-1 text-xs text-fg/40">
@@ -808,386 +706,13 @@ export default function SettingsManager({
         </Section>
         )}
 
-        {section === "monitoring" && (
-        <Section title="Alerts">
+        {section === "widgets" && (
+        <Section title="Weather">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <span className="text-sm text-fg/70">Uptime alerts</span>
-            <p className="text-xs text-fg/40">
-              Notify a webhook and/or email when an app goes down or recovers.
-              Requires service status indicators (the{" "}
-              <span className="text-fg/60">Status</span> section) to be on.
-            </p>
+            <span className="text-sm text-fg/70">Weather widget</span>
           </div>
           <label className="flex shrink-0 items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={alerts.enabled}
-              onChange={(e) => updateAlerts({ enabled: e.target.checked })}
-            />
-            Enabled
-          </label>
-        </div>
-
-        {alerts.enabled && (
-          <>
-            <label className="flex items-center justify-between text-sm">
-              <span className="text-fg/50">Notify on recovery</span>
-              <input
-                type="checkbox"
-                checked={alerts.notifyOnRecovery}
-                onChange={(e) => updateAlerts({ notifyOnRecovery: e.target.checked })}
-              />
-            </label>
-
-            <label className="flex items-center justify-between gap-4 text-sm">
-              <span className="text-fg/50">
-                Confirmations before down
-                <span className="block text-xs text-fg/40">
-                  Consecutive failed checks required first.
-                </span>
-              </span>
-              <input
-                type="number"
-                min={1}
-                max={10}
-                value={alerts.confirmations}
-                onChange={(e) => {
-                  const v = parseInt(e.target.value, 10);
-                  updateAlerts({
-                    confirmations: Number.isNaN(v)
-                      ? alerts.confirmations
-                      : Math.min(10, Math.max(1, v)),
-                  });
-                }}
-                className={`${selectClass} w-20 text-center`}
-              />
-            </label>
-
-            {/* Two independent channels, each with its own toggle — enable
-                either, both, or neither. */}
-            <div className="mt-1 flex flex-col gap-3 border-t border-fg/10 pt-4">
-              <label className="flex items-start justify-between gap-4 text-sm">
-                <span className="text-fg/50">
-                  Webhook
-                  <span className="block text-xs text-fg/40">
-                    Post to a generic JSON endpoint, Discord, Slack, or ntfy.
-                  </span>
-                </span>
-                <input
-                  type="checkbox"
-                  className="mt-0.5 shrink-0"
-                  checked={alerts.webhookEnabled}
-                  onChange={(e) =>
-                    updateAlerts({ webhookEnabled: e.target.checked })
-                  }
-                />
-              </label>
-              {alerts.webhookEnabled && (
-                <div className="flex flex-col gap-3">
-                  <label className="flex flex-col gap-1 text-sm">
-                    <span className="text-fg/50">Notify via</span>
-                    <select
-                      value={alerts.type}
-                      onChange={(e) =>
-                        updateAlerts({
-                          type: e.target.value as Settings["alerts"]["type"],
-                        })
-                      }
-                      className={selectClass}
-                    >
-                      {ALERT_TYPES.map((t) => (
-                        <option key={t} value={t}>
-                          {alertTypeLabel[t]}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <TextField
-                    label="Webhook URL"
-                    placeholder={alertUrlPlaceholder[alerts.type]}
-                    value={alerts.webhookUrl}
-                    onChange={(e) => updateAlerts({ webhookUrl: e.target.value })}
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-3 border-t border-fg/10 pt-4">
-              <label className="flex items-start justify-between gap-4 text-sm">
-                <span className="text-fg/50">
-                  Email (SMTP)
-                  <span className="block text-xs text-fg/40">
-                    Optional — email on down/recovery, independent of the webhook.
-                    Works with any SMTP service (SMTP2GO, Gmail, Fastmail, a relay).
-                  </span>
-                </span>
-                <input
-                  type="checkbox"
-                  className="mt-0.5 shrink-0"
-                  checked={alerts.email.enabled}
-                  onChange={(e) => updateAlertEmail({ enabled: e.target.checked })}
-                />
-              </label>
-
-              {alerts.email.enabled && (
-                <div className="flex flex-col gap-3">
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="col-span-2">
-                      <TextField
-                        label="SMTP host"
-                        placeholder="mail.smtp2go.com"
-                        value={alerts.email.host}
-                        onChange={(e) => updateAlertEmail({ host: e.target.value })}
-                      />
-                    </div>
-                    <label className="flex flex-col gap-1 text-sm">
-                      <span className="text-fg/50">Port</span>
-                      <input
-                        type="number"
-                        min={1}
-                        max={65535}
-                        value={alerts.email.port}
-                        onChange={(e) => {
-                          const v = parseInt(e.target.value, 10);
-                          updateAlertEmail({
-                            port: Number.isNaN(v)
-                              ? alerts.email.port
-                              : Math.min(65535, Math.max(1, v)),
-                          });
-                        }}
-                        className={selectClass}
-                      />
-                    </label>
-                  </div>
-
-                  <label className="flex items-center justify-between text-sm">
-                    <span className="text-fg/50">
-                      Implicit TLS (port 465)
-                      <span className="block text-xs text-fg/40">
-                        Leave off for 587/STARTTLS.
-                      </span>
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={alerts.email.secure}
-                      onChange={(e) => updateAlertEmail({ secure: e.target.checked })}
-                    />
-                  </label>
-
-                  <TextField
-                    label="Username"
-                    autoComplete="off"
-                    value={alerts.email.user}
-                    onChange={(e) => updateAlertEmail({ user: e.target.value })}
-                  />
-                  <div>
-                    <TextField
-                      label="Password"
-                      type="password"
-                      autoComplete="new-password"
-                      value={alerts.email.pass}
-                      onChange={(e) => updateAlertEmail({ pass: e.target.value })}
-                    />
-                    <p className="mt-1 text-xs text-fg/40">
-                      Stored in config.yaml. Set the CTRLCENTER_SMTP_PASS env var
-                      to keep it out of the file instead.
-                    </p>
-                  </div>
-                  <TextField
-                    label="From address"
-                    placeholder="ctrlcenter@yourdomain.com"
-                    value={alerts.email.from}
-                    onChange={(e) => updateAlertEmail({ from: e.target.value })}
-                  />
-                  <TextField
-                    label="To address"
-                    placeholder="you@example.com"
-                    value={alerts.email.to}
-                    onChange={(e) => updateAlertEmail({ to: e.target.value })}
-                  />
-                  <div>
-                    <TextField
-                      label="Subject"
-                      placeholder="{service} is {status}"
-                      value={alerts.email.subject}
-                      onChange={(e) =>
-                        updateAlertEmail({ subject: e.target.value })
-                      }
-                    />
-                    <p className="mt-1 text-xs text-fg/40">
-                      Variables: <code>{"{service}"}</code> and{" "}
-                      <code>{"{status}"}</code> (down/up). Blank uses the default.
-                    </p>
-                  </div>
-                  {!(
-                    alerts.email.host.trim() &&
-                    alerts.email.from.trim() &&
-                    alerts.email.to.trim()
-                  ) && (
-                    <p className="text-xs text-amber-400/80">
-                      Add an SMTP host and from/to addresses to start sending —
-                      email stays off until then.
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="border-t border-fg/10 pt-4">
-              <AlertTest
-                webhookConfigured={
-                  alerts.webhookEnabled && alerts.webhookUrl.trim() !== ""
-                }
-                emailConfigured={
-                  alerts.email.enabled &&
-                  alerts.email.host.trim() !== "" &&
-                  alerts.email.from.trim() !== "" &&
-                  alerts.email.to.trim() !== ""
-                }
-              />
-            </div>
-          </>
-        )}
-        </Section>
-        )}
-
-        {section === "monitoring" && (
-        <Section
-          title="Announcements"
-          intro="Maintenance windows and upcoming changes, posted on the status page. An entry with a start time in the future shows as scheduled; once its end time passes it stops showing. Independent of the status checks above — a notice appears even with checks off."
-        >
-        <div className="flex flex-col gap-3">
-          {statusAnnouncements.length === 0 && (
-            <p className="-mt-1 text-xs text-fg/40">
-              No announcements yet. Add one to post a maintenance window or
-              notice on the status page.
-            </p>
-          )}
-          {statusAnnouncements.map((a, i) => {
-            const state = announcementState(a, now);
-            return (
-              <div
-                key={a.id}
-                className="flex flex-col gap-3 rounded-xl border border-fg/10 bg-fg/[0.03] p-4"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-fg/60">
-                      Announcement {i + 1}
-                    </span>
-                    <span className="rounded-full bg-fg/10 px-2 py-0.5 text-[0.7rem] font-medium text-fg/60">
-                      {STATUS_STATE_LABELS[state]}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removeStatusAnnouncement(i)}
-                    aria-label={`Remove announcement ${i + 1}`}
-                    className="shrink-0 rounded-md px-2 py-1 text-fg/40 transition-colors hover:bg-fg/10 hover:text-red-400"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <TextField
-                  label="Title"
-                  value={a.title}
-                  onChange={(e) =>
-                    updateStatusAnnouncement(i, { title: e.target.value })
-                  }
-                />
-
-                <label className="flex flex-col gap-1 text-sm">
-                  <span className="text-fg/50">Message</span>
-                  <textarea
-                    value={a.body}
-                    onChange={(e) =>
-                      updateStatusAnnouncement(i, { body: e.target.value })
-                    }
-                    rows={2}
-                    placeholder={"Upgrading the NAS 10–11pm — some services may blip. [details](https://…)"}
-                    className="accent-focus rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-sm leading-relaxed text-fg placeholder-fg/30 outline-none transition-colors"
-                  />
-                  <span className="text-xs text-fg/40">
-                    Supports inline **bold**, *italic*, `code` and
-                    [links](https://…) (http/https only). Raw HTML is shown as
-                    plain text.
-                  </span>
-                </label>
-
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-sm text-fg/50">Kind</span>
-                  <div className="flex overflow-hidden rounded-lg border border-fg/10 text-xs">
-                    {STATUS_ANNOUNCEMENT_KINDS.map((k) => (
-                      <button
-                        key={k}
-                        type="button"
-                        aria-pressed={a.kind === k}
-                        onClick={() => updateStatusAnnouncement(i, { kind: k })}
-                        className={`flex-1 px-2 py-1.5 transition-colors ${
-                          a.kind === k
-                            ? "bg-fg/15 text-fg"
-                            : "text-fg/50 hover:text-fg/80"
-                        }`}
-                      >
-                        {STATUS_ANNOUNCEMENT_KIND_META[k].label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="flex flex-col gap-1 text-sm">
-                    <span className="text-fg/50">Starts (optional)</span>
-                    <input
-                      type="datetime-local"
-                      value={isoToLocalInput(a.startsAt)}
-                      onChange={(e) =>
-                        updateStatusAnnouncement(i, {
-                          startsAt: localInputToIso(e.target.value),
-                        })
-                      }
-                      className={selectClass}
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1 text-sm">
-                    <span className="text-fg/50">Ends (optional)</span>
-                    <input
-                      type="datetime-local"
-                      value={isoToLocalInput(a.endsAt)}
-                      onChange={(e) =>
-                        updateStatusAnnouncement(i, {
-                          endsAt: localInputToIso(e.target.value),
-                        })
-                      }
-                      className={selectClass}
-                    />
-                  </label>
-                </div>
-              </div>
-            );
-          })}
-          <button
-            type="button"
-            onClick={addStatusAnnouncement}
-            className="self-start rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10"
-          >
-            + Add announcement
-          </button>
-        </div>
-        <p className="text-xs text-fg/40">
-          Leave both times empty to show a notice until you remove it. Times use
-          this browser&apos;s time zone; visitors see them in their own.
-        </p>
-        </Section>
-        )}
-
-        {section === "weather" && (
-        <Section title="Weather">
-        <label className="flex items-center justify-between text-sm">
-          <span className="text-fg/50">Weather widget</span>
-          <span className="flex items-center gap-2">
             <input
               type="checkbox"
               checked={settings.weather.enabled}
@@ -1199,8 +724,8 @@ export default function SettingsManager({
               }
             />
             Enabled
-          </span>
-        </label>
+          </label>
+        </div>
 
         <div className="flex flex-col gap-1.5">
           <span className="text-sm text-fg/50">Default location</span>
@@ -1491,6 +1016,538 @@ export default function SettingsManager({
         </Section>
         )}
 
+        {section === "widgets" && (
+        <Section
+          title="Countdown"
+          intro="Labeled dates shown as “in N days” rows — renewals, birthdays, deadlines. Ships hidden — show the card in the home-page layout editor once dates are added."
+        >
+          <TextField
+            label="Card title"
+            placeholder="Countdown"
+            value={countdown.title}
+            onChange={(e) =>
+              setSettings((s) => ({
+                ...s,
+                countdown: { ...s.countdown, title: e.target.value },
+              }))
+            }
+          />
+          <div className="flex flex-col gap-2">
+            <span className="text-sm text-fg/50">Dates</span>
+            {countdown.items.map((item, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input
+                  value={item.label}
+                  onChange={(e) => updateCountdownItem(i, { label: e.target.value })}
+                  placeholder="Renew domain"
+                  aria-label={`Countdown ${i + 1} label`}
+                  className={`${selectClass} min-w-0 flex-1`}
+                />
+                <input
+                  type="date"
+                  value={item.date}
+                  onChange={(e) => updateCountdownItem(i, { date: e.target.value })}
+                  aria-label={`Countdown ${i + 1} date`}
+                  className={`${selectClass} shrink-0`}
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCountdownItems(countdown.items.filter((_, idx) => idx !== i))
+                  }
+                  aria-label={`Remove countdown ${i + 1}`}
+                  className="shrink-0 rounded-md px-2 py-1 text-fg/40 transition-colors hover:bg-fg/10 hover:text-red-400"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() =>
+                setCountdownItems([...countdown.items, { label: "", date: "" }])
+              }
+              className="self-start rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10"
+            >
+              + Add date
+            </button>
+          </div>
+          <p className="text-xs text-fg/40">
+            Days count in each visitor&apos;s own time zone. Past dates dim and
+            sink below the upcoming ones.
+          </p>
+        </Section>
+        )}
+
+        {section === "widgets" && (
+        <Section title="Status">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <span className="text-sm text-fg/70">Service status indicators</span>
+            <p className="text-xs text-fg/40">
+              Show an online/offline dot on each app. The server pings every app
+              URL, so leave off if your apps aren&apos;t reachable from it.
+            </p>
+          </div>
+          <label className="flex shrink-0 items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={settings.statusChecks}
+              onChange={(e) =>
+                setSettings({ ...settings, statusChecks: e.target.checked })
+              }
+            />
+            Enabled
+          </label>
+        </div>
+
+        {settings.statusChecks && (
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <span className="text-sm text-fg/70">Uptime check interval</span>
+              <p className="text-xs text-fg/40">
+                How often the server records each app&apos;s up/down for the
+                90-day history on the status page.
+              </p>
+            </div>
+            <div className="flex shrink-0 overflow-hidden rounded-lg border border-fg/10">
+              {INTERVAL_PRESETS.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  aria-pressed={settings.statusInterval === m}
+                  onClick={() => setSettings({ ...settings, statusInterval: m })}
+                  className={`px-3 py-1.5 text-xs transition-colors ${
+                    settings.statusInterval === m
+                      ? "bg-fg/15 text-fg"
+                      : "text-fg/50 hover:text-fg/80"
+                  }`}
+                >
+                  {m} min
+                </button>
+              ))}
+              {/* A hand-edited config value (the schema allows 1–60) matches no
+                  preset; surface it as an extra selected chip so the control
+                  never reads as "nothing selected". It vanishes once a preset is
+                  clicked. A span, not a button — it's a readout of the current
+                  value, not a choice; making it clickable-looking-but-inert
+                  would just be a keyboard trap. */}
+              {!INTERVAL_PRESETS.includes(settings.statusInterval) && (
+                <span className="px-3 py-1.5 text-xs bg-fg/15 text-fg">
+                  {settings.statusInterval} min
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {settings.statusChecks && (
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <span className="text-sm text-fg/70">Default status range</span>
+              <p className="text-xs text-fg/40">
+                Which time range the status page opens on.
+              </p>
+            </div>
+            <div className="flex shrink-0 overflow-hidden rounded-lg border border-fg/10">
+              {STATUS_RANGES.map((r) => (
+                <button
+                  key={r.key}
+                  type="button"
+                  aria-pressed={settings.statusDefaultRange === r.key}
+                  onClick={() =>
+                    setSettings({ ...settings, statusDefaultRange: r.key })
+                  }
+                  className={`px-3 py-1.5 text-xs transition-colors ${
+                    settings.statusDefaultRange === r.key
+                      ? "bg-fg/15 text-fg"
+                      : "text-fg/50 hover:text-fg/80"
+                  }`}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        </Section>
+        )}
+
+        {section === "widgets" && (
+        <Section title="Alerts">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <span className="text-sm text-fg/70">Uptime alerts</span>
+            <p className="text-xs text-fg/40">
+              Notify a webhook and/or email when an app goes down or recovers.
+              Requires service status indicators (the{" "}
+              <span className="text-fg/60">Status</span> card) to be on.
+            </p>
+          </div>
+          <label className="flex shrink-0 items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={alerts.enabled}
+              onChange={(e) => updateAlerts({ enabled: e.target.checked })}
+            />
+            Enabled
+          </label>
+        </div>
+
+        {alerts.enabled && (
+          <>
+            <label className="flex items-center justify-between text-sm">
+              <span className="text-fg/50">Notify on recovery</span>
+              <input
+                type="checkbox"
+                checked={alerts.notifyOnRecovery}
+                onChange={(e) => updateAlerts({ notifyOnRecovery: e.target.checked })}
+              />
+            </label>
+
+            <label className="flex items-center justify-between gap-4 text-sm">
+              <span className="text-fg/50">
+                Confirmations before down
+                <span className="block text-xs text-fg/40">
+                  Consecutive failed checks required first.
+                </span>
+              </span>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={alerts.confirmations}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10);
+                  updateAlerts({
+                    confirmations: Number.isNaN(v)
+                      ? alerts.confirmations
+                      : Math.min(10, Math.max(1, v)),
+                  });
+                }}
+                className={`${selectClass} w-20 text-center`}
+              />
+            </label>
+
+            {/* Two independent channels, each with its own toggle — enable
+                either, both, or neither. */}
+            <div className="mt-1 flex flex-col gap-3 border-t border-fg/10 pt-4">
+              <label className="flex items-start justify-between gap-4 text-sm">
+                <span className="text-fg/50">
+                  Webhook
+                  <span className="block text-xs text-fg/40">
+                    Post to a generic JSON endpoint, Discord, Slack, or ntfy.
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  className="mt-0.5 shrink-0"
+                  checked={alerts.webhookEnabled}
+                  onChange={(e) =>
+                    updateAlerts({ webhookEnabled: e.target.checked })
+                  }
+                />
+              </label>
+              {alerts.webhookEnabled && (
+                <div className="flex flex-col gap-3">
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="text-fg/50">Notify via</span>
+                    <select
+                      value={alerts.type}
+                      onChange={(e) =>
+                        updateAlerts({
+                          type: e.target.value as Settings["alerts"]["type"],
+                        })
+                      }
+                      className={selectClass}
+                    >
+                      {ALERT_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {alertTypeLabel[t]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <TextField
+                    label="Webhook URL"
+                    placeholder={alertUrlPlaceholder[alerts.type]}
+                    value={alerts.webhookUrl}
+                    onChange={(e) => updateAlerts({ webhookUrl: e.target.value })}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-3 border-t border-fg/10 pt-4">
+              <label className="flex items-start justify-between gap-4 text-sm">
+                <span className="text-fg/50">
+                  Email (SMTP)
+                  <span className="block text-xs text-fg/40">
+                    Optional — email on down/recovery, independent of the webhook.
+                    Works with any SMTP service (SMTP2GO, Gmail, Fastmail, a relay).
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  className="mt-0.5 shrink-0"
+                  checked={alerts.email.enabled}
+                  onChange={(e) => updateAlertEmail({ enabled: e.target.checked })}
+                />
+              </label>
+
+              {alerts.email.enabled && (
+                <div className="flex flex-col gap-3">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="col-span-2">
+                      <TextField
+                        label="SMTP host"
+                        placeholder="mail.smtp2go.com"
+                        value={alerts.email.host}
+                        onChange={(e) => updateAlertEmail({ host: e.target.value })}
+                      />
+                    </div>
+                    <label className="flex flex-col gap-1 text-sm">
+                      <span className="text-fg/50">Port</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={65535}
+                        value={alerts.email.port}
+                        onChange={(e) => {
+                          const v = parseInt(e.target.value, 10);
+                          updateAlertEmail({
+                            port: Number.isNaN(v)
+                              ? alerts.email.port
+                              : Math.min(65535, Math.max(1, v)),
+                          });
+                        }}
+                        className={selectClass}
+                      />
+                    </label>
+                  </div>
+
+                  <label className="flex items-center justify-between text-sm">
+                    <span className="text-fg/50">
+                      Implicit TLS (port 465)
+                      <span className="block text-xs text-fg/40">
+                        Leave off for 587/STARTTLS.
+                      </span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={alerts.email.secure}
+                      onChange={(e) => updateAlertEmail({ secure: e.target.checked })}
+                    />
+                  </label>
+
+                  <TextField
+                    label="Username"
+                    autoComplete="off"
+                    value={alerts.email.user}
+                    onChange={(e) => updateAlertEmail({ user: e.target.value })}
+                  />
+                  <div>
+                    <TextField
+                      label="Password"
+                      type="password"
+                      autoComplete="new-password"
+                      value={alerts.email.pass}
+                      onChange={(e) => updateAlertEmail({ pass: e.target.value })}
+                    />
+                    <p className="mt-1 text-xs text-fg/40">
+                      Stored in config.yaml. Set the CTRLCENTER_SMTP_PASS env var
+                      to keep it out of the file instead.
+                    </p>
+                  </div>
+                  <TextField
+                    label="From address"
+                    placeholder="ctrlcenter@yourdomain.com"
+                    value={alerts.email.from}
+                    onChange={(e) => updateAlertEmail({ from: e.target.value })}
+                  />
+                  <TextField
+                    label="To address"
+                    placeholder="you@example.com"
+                    value={alerts.email.to}
+                    onChange={(e) => updateAlertEmail({ to: e.target.value })}
+                  />
+                  <div>
+                    <TextField
+                      label="Subject"
+                      placeholder="{service} is {status}"
+                      value={alerts.email.subject}
+                      onChange={(e) =>
+                        updateAlertEmail({ subject: e.target.value })
+                      }
+                    />
+                    <p className="mt-1 text-xs text-fg/40">
+                      Variables: <code>{"{service}"}</code> and{" "}
+                      <code>{"{status}"}</code> (down/up). Blank uses the default.
+                    </p>
+                  </div>
+                  {!(
+                    alerts.email.host.trim() &&
+                    alerts.email.from.trim() &&
+                    alerts.email.to.trim()
+                  ) && (
+                    <p className="text-xs text-amber-400/80">
+                      Add an SMTP host and from/to addresses to start sending —
+                      email stays off until then.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-fg/10 pt-4">
+              <AlertTest
+                webhookConfigured={
+                  alerts.webhookEnabled && alerts.webhookUrl.trim() !== ""
+                }
+                emailConfigured={
+                  alerts.email.enabled &&
+                  alerts.email.host.trim() !== "" &&
+                  alerts.email.from.trim() !== "" &&
+                  alerts.email.to.trim() !== ""
+                }
+              />
+            </div>
+          </>
+        )}
+        </Section>
+        )}
+
+        {section === "widgets" && (
+        <Section
+          title="Announcements"
+          intro="Maintenance windows and upcoming changes, posted on the status page. An entry with a start time in the future shows as scheduled; once its end time passes it stops showing. Independent of the status checks above — a notice appears even with checks off."
+        >
+        <div className="flex flex-col gap-3">
+          {statusAnnouncements.length === 0 && (
+            <p className="-mt-1 text-xs text-fg/40">
+              No announcements yet. Add one to post a maintenance window or
+              notice on the status page.
+            </p>
+          )}
+          {statusAnnouncements.map((a, i) => {
+            const state = announcementState(a, now);
+            return (
+              <div
+                key={a.id}
+                className="flex flex-col gap-3 rounded-xl border border-fg/10 bg-fg/[0.03] p-4"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-fg/60">
+                      Announcement {i + 1}
+                    </span>
+                    <span className="rounded-full bg-fg/10 px-2 py-0.5 text-[0.7rem] font-medium text-fg/60">
+                      {STATUS_STATE_LABELS[state]}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeStatusAnnouncement(i)}
+                    aria-label={`Remove announcement ${i + 1}`}
+                    className="shrink-0 rounded-md px-2 py-1 text-fg/40 transition-colors hover:bg-fg/10 hover:text-red-400"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <TextField
+                  label="Title"
+                  value={a.title}
+                  onChange={(e) =>
+                    updateStatusAnnouncement(i, { title: e.target.value })
+                  }
+                />
+
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-fg/50">Message</span>
+                  <textarea
+                    value={a.body}
+                    onChange={(e) =>
+                      updateStatusAnnouncement(i, { body: e.target.value })
+                    }
+                    rows={2}
+                    placeholder={"Upgrading the NAS 10–11pm — some services may blip. [details](https://…)"}
+                    className="accent-focus rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-sm leading-relaxed text-fg placeholder-fg/30 outline-none transition-colors"
+                  />
+                  <span className="text-xs text-fg/40">
+                    Supports inline **bold**, *italic*, `code` and
+                    [links](https://…) (http/https only). Raw HTML is shown as
+                    plain text.
+                  </span>
+                </label>
+
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-sm text-fg/50">Kind</span>
+                  <div className="flex overflow-hidden rounded-lg border border-fg/10 text-xs">
+                    {STATUS_ANNOUNCEMENT_KINDS.map((k) => (
+                      <button
+                        key={k}
+                        type="button"
+                        aria-pressed={a.kind === k}
+                        onClick={() => updateStatusAnnouncement(i, { kind: k })}
+                        className={`flex-1 px-2 py-1.5 transition-colors ${
+                          a.kind === k
+                            ? "bg-fg/15 text-fg"
+                            : "text-fg/50 hover:text-fg/80"
+                        }`}
+                      >
+                        {STATUS_ANNOUNCEMENT_KIND_META[k].label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="text-fg/50">Starts (optional)</span>
+                    <input
+                      type="datetime-local"
+                      value={isoToLocalInput(a.startsAt)}
+                      onChange={(e) =>
+                        updateStatusAnnouncement(i, {
+                          startsAt: localInputToIso(e.target.value),
+                        })
+                      }
+                      className={selectClass}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span className="text-fg/50">Ends (optional)</span>
+                    <input
+                      type="datetime-local"
+                      value={isoToLocalInput(a.endsAt)}
+                      onChange={(e) =>
+                        updateStatusAnnouncement(i, {
+                          endsAt: localInputToIso(e.target.value),
+                        })
+                      }
+                      className={selectClass}
+                    />
+                  </label>
+                </div>
+              </div>
+            );
+          })}
+          <button
+            type="button"
+            onClick={addStatusAnnouncement}
+            className="self-start rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10"
+          >
+            + Add announcement
+          </button>
+        </div>
+        <p className="text-xs text-fg/40">
+          Leave both times empty to show a notice until you remove it. Times use
+          this browser&apos;s time zone; visitors see them in their own.
+        </p>
+        </Section>
+        )}
+
         {section === "announcement" && (
         <Section
           title="Announcement"
@@ -1564,69 +1621,6 @@ export default function SettingsManager({
               }
             />
           </label>
-        </Section>
-        )}
-
-        {section === "widgets" && (
-        <Section
-          title="Countdown"
-          intro="Labeled dates shown as “in N days” rows — renewals, birthdays, deadlines. Ships hidden — show the card in the home-page layout editor once dates are added."
-        >
-          <TextField
-            label="Card title"
-            placeholder="Countdown"
-            value={countdown.title}
-            onChange={(e) =>
-              setSettings((s) => ({
-                ...s,
-                countdown: { ...s.countdown, title: e.target.value },
-              }))
-            }
-          />
-          <div className="flex flex-col gap-2">
-            <span className="text-sm text-fg/50">Dates</span>
-            {countdown.items.map((item, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <input
-                  value={item.label}
-                  onChange={(e) => updateCountdownItem(i, { label: e.target.value })}
-                  placeholder="Renew domain"
-                  aria-label={`Countdown ${i + 1} label`}
-                  className={`${selectClass} min-w-0 flex-1`}
-                />
-                <input
-                  type="date"
-                  value={item.date}
-                  onChange={(e) => updateCountdownItem(i, { date: e.target.value })}
-                  aria-label={`Countdown ${i + 1} date`}
-                  className={`${selectClass} shrink-0`}
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    setCountdownItems(countdown.items.filter((_, idx) => idx !== i))
-                  }
-                  aria-label={`Remove countdown ${i + 1}`}
-                  className="shrink-0 rounded-md px-2 py-1 text-fg/40 transition-colors hover:bg-fg/10 hover:text-red-400"
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() =>
-                setCountdownItems([...countdown.items, { label: "", date: "" }])
-              }
-              className="self-start rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10"
-            >
-              + Add date
-            </button>
-          </div>
-          <p className="text-xs text-fg/40">
-            Days count in each visitor&apos;s own time zone. Past dates dim and
-            sink below the upcoming ones.
-          </p>
         </Section>
         )}
 
