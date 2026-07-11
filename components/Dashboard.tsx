@@ -735,13 +735,13 @@ export default function Dashboard({
       case "calendar":
         return "The calendar is disabled, or it has no upcoming events to show.";
       case "notes":
-        return "The note is empty — write it in admin Settings → Notes.";
+        return "The note is empty — write it in admin Settings → Widgets → Notes.";
       case "feed":
-        return "The RSS feed is off or has no URL — set it up in admin Settings → RSS feed.";
+        return "The RSS feed is off or has no feeds — set it up in admin Settings → Widgets → RSS feed.";
       case "countdown":
-        return "No dates yet — add them in admin Settings → Countdown.";
+        return "No dates yet — add them in admin Settings → Widgets → Countdown.";
       case "worldClocks":
-        return "No time zones yet — add them in admin Settings → Widgets.";
+        return "No time zones yet — add them in admin Settings → Widgets → World clocks.";
       case "favorites":
         return "No pinned favorites yet.";
       case "apps":

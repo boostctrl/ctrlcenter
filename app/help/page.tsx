@@ -353,10 +353,13 @@ export default async function HelpPage() {
                 signed-out visitors too.
               </li>
               <li>
-                <strong>Icons</strong> come from a large built-in set (pick by
-                name) or your own upload: PNG, JPG, WebP, GIF, SVG, or ICO up to
-                512&nbsp;KB, auto-squared so it sits cleanly. The browser-tab{" "}
-                <strong>favicon</strong> is set the same way.
+                <strong>Icons</strong> are matched by name against the
+                dashboard-icons project and fetched from its CDN as the page
+                loads, so name-picked icons need an internet connection — an
+                offline install shows only the icons you upload yourself: PNG,
+                JPG, WebP, GIF, SVG, or ICO up to 512&nbsp;KB, auto-squared so it
+                sits cleanly. The browser-tab <strong>favicon</strong> is set the
+                same way.
               </li>
             </ul>
           </Card>
@@ -428,32 +431,54 @@ export default async function HelpPage() {
 
           <Card title="Home-page components">
             <P>
-              Toggle what appears on the dashboard: the greeting, clock, search
-              box, apps, bookmarks, the favorites row, and the floating
-              navigation menu. Reorder sections by dragging the{" "}
-              <strong>⠿</strong> grip (or the move arrows), and resize a card by
-              dragging its right edge to set the <strong>width</strong> or its
-              bottom edge to set the <strong>height</strong> — the steppers do
-              the same by exact steps. When a widget doesn&apos;t reach the end
-              of its row, a <strong>Fill</strong> button widens it to close the
-              gap. Cards pack up their columns and{" "}
-              <strong>the editor previews exactly what the live page shows</strong>
-              , staying in the order you place them. An explicit{" "}
-              <strong>height</strong> makes a card taller than its content to
-              give it presence (the greeting and header card center in it,
-              restoring the classic header) or shorter so a long list scrolls
-              inside. The <strong>More</strong> menu on each card adds{" "}
-              <strong>space on any side</strong> (above, below, or beside a card
-              sharing its row), sets cards-per-row, and hides a section&apos;s
-              heading; the toolbar&apos;s <strong>card gap</strong> control
-              sets the gap between all cards and <strong>top gap</strong> the
-              space above the first row. Missteps are recoverable:{" "}
-              <strong>Undo</strong> (Ctrl+Z) takes back the last change,{" "}
-              <strong>Revert</strong> restores the layout you started the
-              session with, and <strong>Reset</strong> returns the whole
-              arrangement to its out-of-the-box defaults. Weather, the status
-              row, and the calendar have their own enables alongside their
-              setup.
+              The dashboard is a grid of widgets you arrange in place. Toggle
+              what appears — the greeting, clock, search box, apps, bookmarks,
+              the favorites row, and the floating navigation menu — then shape
+              the layout directly on the page.
+            </P>
+            <ul className={LIST_CLASS}>
+              <li>
+                <strong>Reorder.</strong> Drag a card by its{" "}
+                <strong>⠿</strong> grip, or use the move arrows.
+              </li>
+              <li>
+                <strong>Resize.</strong> Drag a card&apos;s right edge to set its{" "}
+                <strong>width</strong> in columns, or its bottom edge to set its{" "}
+                <strong>height</strong>; the steppers do the same in exact steps.
+                A <strong>Fill</strong> button widens a card to close the gap
+                when it doesn&apos;t reach the end of its row.
+              </li>
+              <li>
+                <strong>Explicit height.</strong> Making a card taller than its
+                content gives it presence — the greeting and header card center
+                in it, restoring the classic header — while a shorter height
+                scrolls a long list inside.
+              </li>
+              <li>
+                <strong>The More menu</strong> on each card adds{" "}
+                <strong>space on any side</strong> (above, below, or beside a
+                card sharing its row), sets <strong>cards per row</strong> for
+                the app and bookmark grids, and hides a section&apos;s heading.
+              </li>
+              <li>
+                <strong>Toolbar controls</strong> set the{" "}
+                <strong>card gap</strong> between all cards, the{" "}
+                <strong>top gap</strong> above the first row, and the{" "}
+                <strong>UI scale</strong> that sizes the whole dashboard up or
+                down.
+              </li>
+              <li>
+                <strong>Undo any misstep.</strong> <strong>Undo</strong> (
+                <Kbd>Ctrl</Kbd>+<Kbd>Z</Kbd>) takes back the last change,{" "}
+                <strong>Revert</strong> restores the layout you started the
+                session with, and <strong>Reset</strong> returns the whole
+                arrangement to its out-of-the-box defaults.
+              </li>
+            </ul>
+            <P>
+              The editor previews exactly what the live page shows, keeping cards
+              in the order you place them. Weather, the status row, and the
+              calendar have their own enables alongside their setup.
             </P>
           </Card>
 
@@ -463,12 +488,7 @@ export default async function HelpPage() {
               windows, or a heads-up for the household. Turn it on in{" "}
               <strong>Settings → Announcement</strong> and write the message
               using inline <strong>bold</strong>, <em>italic</em> and{" "}
-              <a
-                href="https://example.com"
-                className="underline hover:text-fg/70"
-              >
-                links
-              </a>{" "}
+              <span className="underline underline-offset-2">links</span>{" "}
               (http/https only; raw HTML is never rendered). Pick a tone — info,
               warning, success, or your accent color — and optionally let
               visitors dismiss it, in which case it reappears whenever you change
@@ -504,13 +524,16 @@ export default async function HelpPage() {
 
           <Card title="RSS feed card">
             <P>
-              Show the latest headlines from any RSS or Atom feed — a news
-              site, a blog, release notes. Point{" "}
-              <strong>Settings → Widgets → RSS feed</strong> at the feed URL (the{" "}
-              <strong>Test feed</strong> button confirms it&apos;s readable),
-              pick how many entries to show, then show the card from the
-              home-page layout editor. Entries are fetched server-side and
-              cached for a few minutes.
+              Show the latest headlines from one or more RSS or Atom feeds — news
+              sites, blogs, release notes — merged into a single list,
+              newest-first. Add feed URLs in{" "}
+              <strong>Settings → Widgets → RSS feed</strong> (the{" "}
+              <strong>Test feed</strong> button confirms each is readable), pick
+              how many entries to show, then show the card from the home-page
+              layout editor. With several feeds each entry is labelled by its
+              source; entries are fetched server-side and cached for a few
+              minutes, and a slow or unreachable feed drops out rather than
+              emptying the card.
             </P>
           </Card>
 
@@ -522,6 +545,16 @@ export default async function HelpPage() {
               the home-page layout editor. Days count in each visitor&apos;s
               own time zone; today and tomorrow get an accent chip, and past
               dates dim and sink below the upcoming ones.
+            </P>
+          </Card>
+
+          <Card title="World clocks card">
+            <P>
+              Live clocks for the time zones you follow — one row each with its
+              current time and its own local date. Add zones in{" "}
+              <strong>Settings → Widgets → World clocks</strong> (each takes an
+              optional label; leave it blank to use the zone&apos;s city name),
+              then show the card from the home-page layout editor.
             </P>
           </Card>
 
@@ -539,6 +572,12 @@ export default async function HelpPage() {
               file, and <em>Import</em> restores it. The admin password is never
               included in the export, and importing a file can&apos;t change or
               clear it. Password changes only happen through the flow below.
+            </P>
+            <P>
+              <strong>Treat a backup file as a secret.</strong> It holds your
+              whole configuration in clear text, which includes any calendar
+              Basic-auth credentials and SMTP password you&apos;ve set — the
+              admin password is the one thing left out.
             </P>
             <P>
               Icons you uploaded are bundled into the export and restored on

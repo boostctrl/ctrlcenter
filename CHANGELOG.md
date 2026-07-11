@@ -32,6 +32,13 @@ here.
   count now caps the combined list, and the card title falls back to the first
   feed's own title. (#107)
 
+- **The in-app Help page is clearer and up to date.** The layout-editor
+  section is now a scannable list (and documents the UI-scale control), the
+  RSS and new World Clocks cards are described, and a few stale details are
+  corrected: icons are fetched from an online set (so they need internet), and
+  a note reminds you that a backup file holds your calendar and SMTP
+  credentials in clear text. (#131)
+
 ### Deprecated
 
 - **The old single-feed RSS setting.** A dashboard that pointed the RSS widget
