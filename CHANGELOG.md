@@ -14,6 +14,15 @@ here.
 
 ### Added
 
+- **A saved theme can be promoted to the site theme.** Signed-in admins get a
+  globe button on each saved theme in the theme builder: one click (behind a
+  confirmation) makes that look — colors, design, scene, and font, in both
+  light and dark — the default every visitor sees. The promotion is a copy,
+  so editing the saved theme afterwards doesn't silently restyle the site,
+  and visitors' own customizations still apply on top. The site default can
+  now also carry separate light-mode accent colors, so a theme with
+  different accents per mode promotes faithfully. (#142)
+
 - **Bookmarks can be marked "Only show when logged in", just like apps.** The
   bookmark form gains the same checkbox apps got in 1.9.4, for links that
   shouldn't be advertised to every visitor — an internal wiki, a router's

@@ -234,10 +234,15 @@ export const themeSchema = z.object({
   fontLight: z.enum(FONT_IDS).optional().catch(undefined),
   accentFrom: hexColor.default("#a78bfa"),
   accentTo: hexColor.default("#22d3ee"),
+  // Optional light-mode accent pair. Only honored on the custom-colors path
+  // below (a promoted theme carries per-mode accents, #142); when omitted,
+  // light mode shares the accent above, as it always has.
+  accentFromLight: hexColor.optional(),
+  accentToLight: hexColor.optional(),
   // Optional custom default surface colors. `background`/`foreground` are the
-  // dark-mode pair; `backgroundLight`/`foregroundLight` the light-mode pair (the
-  // accent above is shared). Set together so the default look reads cohesively
-  // in both modes; light falls back to the dark pair if omitted.
+  // dark-mode pair; `backgroundLight`/`foregroundLight` the light-mode pair.
+  // Set together so the default look reads cohesively in both modes; light
+  // falls back to the dark pair if omitted.
   background: hexColor.optional(),
   foreground: hexColor.optional(),
   backgroundLight: hexColor.optional(),
@@ -726,6 +731,8 @@ export const themeInputSchema = z.object({
   fontLight: z.enum(FONT_IDS).optional(),
   accentFrom: hexColor,
   accentTo: hexColor,
+  accentFromLight: hexColor.optional(),
+  accentToLight: hexColor.optional(),
   background: hexColor.optional(),
   foreground: hexColor.optional(),
   backgroundLight: hexColor.optional(),

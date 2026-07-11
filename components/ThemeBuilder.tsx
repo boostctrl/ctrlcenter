@@ -176,7 +176,18 @@ function OptionCard({
   );
 }
 
-export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
+// `promote` is only passed for an admin session: it enables "set as site
+// theme" on each saved theme and carries the site default's current mode,
+// which promotion must preserve (the settings API replaces the whole theme
+// object). Promotion is a snapshot — later edits to the saved theme don't
+// follow it.
+export default function ThemeBuilder({
+  packs,
+  promote,
+}: {
+  packs: ThemePack[];
+  promote?: { siteMode: "system" | "light" | "dark" };
+}) {
   const {
     designFor,
     setDesign,
@@ -243,6 +254,9 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
   const cancelRename = useRef(false);
   // The outcome of the last import, shown in the Your-themes section.
   const [importStatus, setImportStatus] = useState<string | null>(null);
+  // Outcome of the last "set as site theme" (admin only), same treatment.
+  const [promoteStatus, setPromoteStatus] = useState<string | null>(null);
+  const [promoting, setPromoting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Whether the accent editor shows one color well or a from→to pair. Solid is
   // just a gradient with two equal stops, so this is purely a UI simplification
@@ -376,6 +390,61 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
 
   // Download the saved themes as a JSON file the visitor can carry to another
   // browser (or back it up).
+  // Snapshot a saved theme into the site default every visitor sees (#142).
+  // The saved theme maps 1:1 onto the theme fields the layout reads — dark
+  // parts to the base fields, light parts to the *Light fields, including the
+  // per-mode accent pair. `preset`/`presetLight` are deliberately omitted:
+  // the settings API replaces the theme wholesale, so the admin Appearance
+  // picker correctly reads "Custom" afterwards. The API is admin-gated; the
+  // button only renders when the server said this session is an admin.
+  async function promoteTheme(t: CustomTheme) {
+    if (!promote || promoting) return;
+    const ok = await confirm({
+      title: `Make “${t.name}” the site theme?`,
+      message:
+        "This look becomes the default every visitor sees, in both light " +
+        "and dark. It's a copy — later edits to this saved theme won't " +
+        "follow — and visitors' own customizations still apply on top.",
+      confirmLabel: "Set site theme",
+    });
+    if (!ok) return;
+    setPromoting(true);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          theme: {
+            mode: promote.siteMode,
+            design: t.design,
+            scene: t.scene,
+            font: t.font,
+            designLight: t.designLight,
+            sceneLight: t.sceneLight,
+            fontLight: t.fontLight,
+            accentFrom: t.dark.accentFrom,
+            accentTo: t.dark.accentTo,
+            accentFromLight: t.light.accentFrom,
+            accentToLight: t.light.accentTo,
+            background: t.dark.background,
+            foreground: t.dark.foreground,
+            backgroundLight: t.light.background,
+            foregroundLight: t.light.foreground,
+          },
+        }),
+      });
+      setPromoteStatus(
+        res.ok
+          ? `“${t.name}” is now the site theme.`
+          : "Couldn't set the site theme."
+      );
+    } catch {
+      setPromoteStatus("Couldn't set the site theme.");
+    } finally {
+      setPromoting(false);
+    }
+  }
+
   function exportThemes() {
     downloadJson("ctrlcenter-themes.json", customThemes);
   }
@@ -631,6 +700,11 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
                 {importStatus}
               </p>
             )}
+            {promoteStatus && (
+              <p role="status" className="text-xs text-fg/50">
+                {promoteStatus}
+              </p>
+            )}
             {customThemes.length > 0 && (
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
                 {customThemes.map((t) =>
@@ -679,6 +753,32 @@ export default function ThemeBuilder({ packs }: { packs: ThemePack[] }) {
                           touch users couldn't reach them — tapping the card
                           applies the theme). Delete is confirmed: a saved theme
                           is two full modes of work with no undo (#121). */}
+                      {promote && (
+                        <button
+                          type="button"
+                          onClick={() => promoteTheme(t)}
+                          disabled={promoting}
+                          aria-label={`Set ${t.name} as the site theme`}
+                          title="Set as site theme"
+                          className="absolute top-1 right-13 rounded-md bg-background/70 px-1 py-1 text-fg/50 transition-colors hover:text-fg/90 disabled:opacity-40"
+                        >
+                          <svg
+                            width="11"
+                            height="11"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden
+                          >
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="2" y1="12" x2="22" y2="12" />
+                            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                          </svg>
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => {

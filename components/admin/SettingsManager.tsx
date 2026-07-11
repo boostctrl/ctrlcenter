@@ -337,7 +337,8 @@ export default function SettingsManager({
   // concrete design/scene/colors into the theme fields the layout actually reads.
   // This seeds BOTH modes from the one pack (dark parts + the pack's own light
   // surfaces) and clears any separate light-mode override, so light follows dark
-  // unless the admin diverges it below.
+  // unless the admin diverges it below. The light accent pair (only ever set by
+  // promoting a saved theme, #142) is cleared for the same reason.
   function applyDefaultTheme(name: string) {
     const pack = themePacks.find((p) => p.name === name);
     if (!pack) return;
@@ -347,6 +348,8 @@ export default function SettingsManager({
       scene: pack.scene,
       accentFrom: pack.dark.accentFrom,
       accentTo: pack.dark.accentTo,
+      accentFromLight: undefined,
+      accentToLight: undefined,
       background: pack.dark.background,
       foreground: pack.dark.foreground,
       presetLight: undefined,
@@ -367,6 +370,8 @@ export default function SettingsManager({
         presetLight: undefined,
         designLight: undefined,
         sceneLight: undefined,
+        accentFromLight: undefined,
+        accentToLight: undefined,
         backgroundLight: darkPack?.light.background,
         foregroundLight: darkPack?.light.foreground,
       });
@@ -378,6 +383,8 @@ export default function SettingsManager({
       presetLight: pack.name,
       designLight: pack.design,
       sceneLight: pack.scene,
+      accentFromLight: undefined,
+      accentToLight: undefined,
       backgroundLight: pack.light.background,
       foregroundLight: pack.light.foreground,
     });

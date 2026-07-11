@@ -261,7 +261,10 @@ export default async function HelpPage() {
             <P>
               Light and dark can carry wholly independent looks. Like the rest of
               your preferences, everything stays on your device, so each visitor
-              gets their own.
+              gets their own. Signed-in admins get one extra control here: the
+              globe on a saved theme makes that look the site-wide default every
+              visitor starts from — a copy, so editing the saved theme later
+              doesn&apos;t change the site.
             </P>
           </Card>
 

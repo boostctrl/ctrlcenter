@@ -302,6 +302,8 @@ export type DefaultTheme = {
   fontLight?: FontId;
   accentFrom: string;
   accentTo: string;
+  accentFromLight?: string;
+  accentToLight?: string;
   background?: string;
   foreground?: string;
   backgroundLight?: string;
@@ -325,8 +327,9 @@ export function PrefsProvider({
     () => ({ from: defaultTheme.accentFrom, to: defaultTheme.accentTo }),
     [defaultTheme.accentFrom, defaultTheme.accentTo]
   );
-  // The admin custom default colors as a light+dark pair (accent shared). Light
-  // falls back to the dark surface colors if the admin only set one mode.
+  // The admin custom default colors as a light+dark pair. Light falls back to
+  // the dark surface colors — and to the shared accent, unless the default
+  // theme carries its own light accents (a promoted theme does, #142).
   const adminLook: ModeColors | null = useMemo(() => {
     if (!defaultTheme.background || !defaultTheme.foreground) return null;
     const accentFrom = defaultTheme.accentFrom;
@@ -341,8 +344,8 @@ export function PrefsProvider({
       light: {
         background: defaultTheme.backgroundLight ?? defaultTheme.background,
         foreground: defaultTheme.foregroundLight ?? defaultTheme.foreground,
-        accentFrom,
-        accentTo,
+        accentFrom: defaultTheme.accentFromLight ?? accentFrom,
+        accentTo: defaultTheme.accentToLight ?? accentTo,
       },
     };
   }, [
@@ -352,6 +355,8 @@ export function PrefsProvider({
     defaultTheme.foregroundLight,
     defaultTheme.accentFrom,
     defaultTheme.accentTo,
+    defaultTheme.accentFromLight,
+    defaultTheme.accentToLight,
   ]);
   // Start empty so the first client render matches the server (which only knows
   // the admin defaults); detection/overrides are applied after mount.

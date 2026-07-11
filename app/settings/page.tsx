@@ -15,6 +15,7 @@ export const metadata: Metadata = { title: "Settings" };
 export default async function SettingsPage() {
   const {
     config: { settings, themes },
+    isAdmin,
   } = await readPublicConfig();
   const packs = resolveThemePacks(themes);
   return (
@@ -66,7 +67,13 @@ export default async function SettingsPage() {
           </div>
 
           <div className="glass-card p-6">
-            <ThemeBuilder packs={packs} />
+            {/* The admin session unlocks "set as site theme" on saved themes;
+                the current default's mode rides along so promotion preserves
+                it (the settings API replaces the theme object wholesale). */}
+            <ThemeBuilder
+              packs={packs}
+              promote={isAdmin ? { siteMode: settings.theme.mode } : undefined}
+            />
           </div>
         </div>
       </ConfirmProvider>
