@@ -1,7 +1,8 @@
 import type { NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { SESSION_COOKIE_NAME, verifySessionToken } from "./auth";
-import { readConfig } from "./config";
+import { readConfigInternal, stripAuth } from "./config";
+import type { Config } from "./schema";
 
 // Route-level admin check for endpoints the proxy's path-prefix allowlist can't
 // gate. The icons API is the case: individual icons (GET /api/icons/[name]) must
@@ -19,7 +20,7 @@ export async function isAdminRequest(
   passwordHash?: string
 ): Promise<boolean> {
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
-  const hash = passwordHash ?? (await readConfig()).auth.passwordHash;
+  const hash = passwordHash ?? (await readConfigInternal()).auth.passwordHash;
   return verifySessionToken(token, hash);
 }
 
@@ -30,18 +31,45 @@ export async function isAdminRequest(
 // `passwordHash` fast path as isAdminRequest.
 export async function isAdminSession(passwordHash?: string): Promise<boolean> {
   const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
-  const hash = passwordHash ?? (await readConfig()).auth.passwordHash;
+  const hash = passwordHash ?? (await readConfigInternal()).auth.passwordHash;
   return verifySessionToken(token, hash);
 }
 
-// Apps flagged `private` exist only for the admin session. This is the single
-// filter every public surface applies before app names/URLs leave the server —
-// the home page, /status, and the status APIs. The background poller, history
-// recording, and alerts deliberately bypass it: a private service should still
-// be monitored, it just shouldn't render for guests.
-export function visibleApps<T extends { private: boolean }>(
-  apps: T[],
+// Items flagged `private` (apps and bookmarks) exist only for the admin
+// session. Public pages get this applied for free via readPublicConfig below;
+// the status APIs call it directly because they filter per response over a
+// shared all-apps cache. The background poller, history recording, and alerts
+// deliberately bypass it: a private service should still be monitored, it
+// just shouldn't render for guests.
+export function visibleItems<T extends { private: boolean }>(
+  items: T[],
   isAdmin: boolean
 ): T[] {
-  return isAdmin ? apps : apps.filter((a) => !a.private);
+  return isAdmin ? items : items.filter((i) => !i.private);
+}
+
+// The one config accessor for anything a signed-out visitor might see (#147).
+// Private apps and bookmarks are already filtered out for guests, and the
+// admin credential never leaves — so a new public page or endpoint built on
+// this can't leak them by forgetting a filter. Route handlers pass their
+// NextRequest (the isAdminRequest path); server components omit it (the
+// isAdminSession path). Surfaces that genuinely need the full list — the
+// poller, alerts, admin routes — use readConfigInternal, and a test pins
+// which files under app/ may do so.
+export async function readPublicConfig(request?: NextRequest): Promise<{
+  config: Omit<Config, "auth">;
+  isAdmin: boolean;
+}> {
+  const config = await readConfigInternal();
+  const isAdmin = request
+    ? await isAdminRequest(request, config.auth.passwordHash)
+    : await isAdminSession(config.auth.passwordHash);
+  return {
+    config: {
+      ...stripAuth(config),
+      apps: visibleItems(config.apps, isAdmin),
+      bookmarks: visibleItems(config.bookmarks, isAdmin),
+    },
+    isAdmin,
+  };
 }

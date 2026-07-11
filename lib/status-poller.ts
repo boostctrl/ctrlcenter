@@ -1,4 +1,4 @@
-import { readConfig } from "./config";
+import { readConfigInternal } from "./config";
 import { checkApp } from "./status-check";
 import { loadHistory, recordResults, flush, lastReadings } from "./status-history";
 import { processAlerts } from "./alerts";
@@ -19,7 +19,7 @@ const FIRST_DELAY_MS = 8_000;
 // takes effect without restarting the timer.
 async function tick(): Promise<void> {
   try {
-    const { settings, apps } = await readConfig();
+    const { settings, apps } = await readConfigInternal();
     if (!settings.statusChecks || apps.length === 0) return;
     const intervalMs = (settings.statusInterval ?? 5) * 60_000;
     if (Date.now() - lastRun < intervalMs) return;

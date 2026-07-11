@@ -17,14 +17,14 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  // Start each test from a clean slate; readConfig recreates defaults on miss.
+  // Start each test from a clean slate; readConfigInternal recreates defaults on miss.
   await fs.rm(configPath, { force: true });
   await fs.rm(`${configPath}.bak`, { force: true });
 });
 
-describe("readConfig", () => {
+describe("readConfigInternal", () => {
   it("creates a default config when the file is missing", async () => {
-    const result = await config.readConfig();
+    const result = await config.readConfigInternal();
     expect(result.apps).toEqual([]);
     expect(result.settings.title).toBe("Home");
     // The file should now exist on disk.
@@ -45,7 +45,7 @@ describe("readConfig", () => {
       }),
       "utf8"
     );
-    const result = await config.readConfig();
+    const result = await config.readConfigInternal();
     expect(result.apps.map((a) => a.id)).toEqual(["a"]);
   });
 });
@@ -195,7 +195,7 @@ describe("updateSettings partial merge", () => {
       }),
       "utf8"
     );
-    const loaded = await config.readConfig();
+    const loaded = await config.readConfigInternal();
     expect(loaded.settings.layout.sections).toEqual([{ id: "apps", span: 12 }]);
 
     // Any write re-parses the whole config, persisting the span shape and the
@@ -224,7 +224,7 @@ describe("updateSettings partial merge", () => {
       }),
       "utf8"
     );
-    const loaded = await config.readConfig();
+    const loaded = await config.readConfigInternal();
     expect(loaded.settings.layout.sections).toEqual([
       { id: "apps", span: 12, hidden: false },
       { id: "search", span: 24, hidden: false },
@@ -233,7 +233,7 @@ describe("updateSettings partial merge", () => {
     // A write persists the migrated spans + marker; re-reading must not
     // double them a second time.
     await config.updateSettings({ title: "Dash" });
-    const reloaded = await config.readConfig();
+    const reloaded = await config.readConfigInternal();
     expect(reloaded.settings.layout.sections).toEqual([
       { id: "apps", span: 12, hidden: false },
       { id: "search", span: 24, hidden: false },
@@ -303,7 +303,7 @@ describe("renameBookmarkCategory", () => {
     expect(result.bookmarkCategoryOrder).toEqual(["Dev", "Streaming"]);
 
     // Persisted to disk.
-    const reread = await config.readConfig();
+    const reread = await config.readConfigInternal();
     expect(reread.settings.bookmarkCategoryOrder).toEqual(["Dev", "Streaming"]);
     expect(reread.bookmarks.filter((b) => b.category === "Streaming")).toHaveLength(
       2
@@ -371,7 +371,7 @@ describe("replaceConfig", () => {
     expect(replaced.apps.map((a) => a.name)).toEqual(["New"]);
 
     // Persisted to disk and readable back.
-    const reread = await config.readConfig();
+    const reread = await config.readConfigInternal();
     expect(reread.apps.map((a) => a.name)).toEqual(["New"]);
   });
 
@@ -392,7 +392,7 @@ describe("replaceConfig", () => {
     });
     expect(replaced.auth).toEqual({ passwordHash: "HASH", passwordSalt: "SALT" });
 
-    const reread = await config.readConfig();
+    const reread = await config.readConfigInternal();
     expect(reread.auth).toEqual({ passwordHash: "HASH", passwordSalt: "SALT" });
     expect(reread.settings.title).toBe("Imported");
   });
@@ -467,7 +467,7 @@ describe("replaceConfig", () => {
 describe("stripAuth", () => {
   it("removes the credential from the exported config surface", async () => {
     await config.setPasswordHash("HASH", "SALT");
-    const full = await config.readConfig();
+    const full = await config.readConfigInternal();
     expect(full.auth.passwordHash).toBe("HASH"); // present on disk
 
     const exported = config.stripAuth(full);
@@ -478,7 +478,7 @@ describe("stripAuth", () => {
   });
 
   it("does not mutate the config it's given", async () => {
-    const full = await config.readConfig();
+    const full = await config.readConfigInternal();
     config.stripAuth(full);
     expect(full.auth).toBeTruthy();
   });
@@ -503,5 +503,50 @@ describe("write queue serialization", () => {
     expect(apps).toHaveLength(10);
     // All ids should be unique.
     expect(new Set(apps.map((a) => a.id)).size).toBe(10);
+  });
+});
+
+// Structural guard for #147: private apps/bookmarks are pre-filtered by
+// readPublicConfig (lib/api-auth.ts), so the raw read must stay off public
+// surfaces. Every file under app/ that touches readConfigInternal has to be
+// pinned here; a new public page or endpoint reaching for it fails this test
+// and gets pointed at the safe accessor instead.
+describe("readConfigInternal stays off public surfaces", () => {
+  const ALLOWED = [
+    // Admin-only (proxy-gated) pages and routes.
+    "app/admin/page.tsx",
+    "app/api/alerts/test/route.ts",
+    "app/api/config/route.ts",
+    "app/api/password/route.ts",
+    // Auth itself: verifies the password / issues the session.
+    "app/api/login/route.ts",
+    // Public, but their shared cache must hold every app; each filters per
+    // response via visibleItems.
+    "app/api/status/route.ts",
+    "app/api/status/history/route.ts",
+  ];
+
+  it("only allowlisted files under app/ use the unfiltered read", async () => {
+    const appDir = path.join(__dirname, "..", "app");
+    const found: string[] = [];
+    async function walk(dir: string) {
+      for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) await walk(full);
+        else if (/\.(ts|tsx)$/.test(entry.name)) {
+          const source = await fs.readFile(full, "utf8");
+          if (source.includes("readConfigInternal")) {
+            found.push(path.relative(path.join(__dirname, ".."), full));
+          }
+        }
+      }
+    }
+    await walk(appDir);
+    expect(
+      found.sort(),
+      "A public surface must read config through readPublicConfig " +
+        "(lib/api-auth.ts), which filters private items; extend the " +
+        "allowlist only for admin-gated or deliberately unfiltered surfaces."
+    ).toEqual([...ALLOWED].sort());
   });
 });

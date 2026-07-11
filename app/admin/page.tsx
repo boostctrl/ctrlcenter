@@ -1,10 +1,10 @@
-import { readConfig } from "@/lib/config";
+import { readConfigInternal } from "@/lib/config";
 import AdminDashboard from "@/components/admin/AdminDashboard";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
-  const config = await readConfig();
+  const config = await readConfigInternal();
 
   return (
     <AdminDashboard

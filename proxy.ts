@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySessionToken, SESSION_COOKIE_NAME } from "@/lib/auth";
-import { readConfig } from "@/lib/config";
+import { readConfigInternal } from "@/lib/config";
 import { contentSecurityPolicy } from "@/lib/csp";
 
 // Run on every routed request (HTML + API), excluding Next internals and static
@@ -49,7 +49,7 @@ export async function proxy(request: NextRequest) {
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   // Verify against the current password hash so a password change revokes the
   // session (the proxy runs in the Node runtime, so it can read config).
-  const { auth } = await readConfig();
+  const { auth } = await readConfigInternal();
   if (await verifySessionToken(token, auth.passwordHash)) return pass();
 
   if (pathname.startsWith("/api/")) {

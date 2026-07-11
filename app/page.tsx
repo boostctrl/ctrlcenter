@@ -1,4 +1,3 @@
-import { readConfig } from "@/lib/config";
 import Dashboard from "@/components/Dashboard";
 import FloatingNav from "@/components/FloatingNav";
 import CalendarWidget from "@/components/CalendarWidget";
@@ -10,7 +9,7 @@ import { fetchWeather } from "@/lib/weather";
 import FeedWidget from "@/components/widgets/FeedWidget";
 import { greetingFor, hourIn, shortDate } from "@/lib/datetime";
 import { resolveLayoutWidgets, smallScreenTopGap } from "@/lib/layout";
-import { isAdminSession, visibleApps } from "@/lib/api-auth";
+import { readPublicConfig } from "@/lib/api-auth";
 import { navPages } from "@/lib/nav";
 
 export const dynamic = "force-dynamic";
@@ -22,21 +21,13 @@ export default async function HomePage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const config = await readConfig();
-  const { settings } = config;
-
-  // Admin state unlocks the layout-editor UI (saves go through the gated
-  // settings API) and reveals private apps; ?edit=1 is the deep link from
-  // admin Settings → Layout.
-  const isAdmin = await isAdminSession(config.auth.passwordHash);
-
-  // Private apps and bookmarks must be dropped before the payload leaves the
-  // server — and everything derived from the lists (search matches, per-app
-  // bangs, category grouping) follows from the filtered arrays for free. A
-  // category whose bookmarks are all private never enters the grouping map,
-  // so its heading vanishes for guests with them.
-  const apps = visibleApps(config.apps, isAdmin);
-  const bookmarks = visibleApps(config.bookmarks, isAdmin);
+  // readPublicConfig already dropped private apps/bookmarks for guests, and
+  // everything derived from the lists (search matches, per-app bangs, category
+  // grouping) follows from the filtered arrays for free. `isAdmin` also
+  // unlocks the layout-editor UI (saves go through the gated settings API);
+  // ?edit=1 is the deep link from admin Settings → Layout.
+  const { config, isAdmin } = await readPublicConfig();
+  const { settings, apps, bookmarks } = config;
 
   // One poller wraps both the status widgets and the per-app dots; only
   // enable it when status checks are on and there are apps to monitor.

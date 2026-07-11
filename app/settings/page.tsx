@@ -5,7 +5,7 @@ import ThemeBuilder from "@/components/ThemeBuilder";
 import { ConfirmProvider } from "@/components/admin/Confirm";
 import BackHome from "@/components/BackHome";
 import FloatingNav from "@/components/FloatingNav";
-import { readConfig } from "@/lib/config";
+import { readPublicConfig } from "@/lib/api-auth";
 import { resolveThemePacks } from "@/lib/theme";
 import { buttonClasses } from "@/lib/buttons";
 import { navPages } from "@/lib/nav";
@@ -13,7 +13,9 @@ import { navPages } from "@/lib/nav";
 export const metadata: Metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
-  const { settings, themes } = await readConfig();
+  const {
+    config: { settings, themes },
+  } = await readPublicConfig();
   const packs = resolveThemePacks(themes);
   return (
     <>

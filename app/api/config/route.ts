@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readConfig, replaceConfig, stripAuth } from "@/lib/config";
+import { readConfigInternal, replaceConfig, stripAuth } from "@/lib/config";
 import { configSchema } from "@/lib/schema";
 import {
   exportIcons,
@@ -20,7 +20,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const config = await readConfig();
+  const config = await readConfigInternal();
   const uploads = await exportIcons();
   const body =
     uploads.length > 0

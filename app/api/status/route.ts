@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { readConfig } from "@/lib/config";
-import { isAdminRequest, visibleApps } from "@/lib/api-auth";
+import { readConfigInternal } from "@/lib/config";
+import { isAdminRequest, visibleItems } from "@/lib/api-auth";
 import { checkApp } from "@/lib/status-check";
 import type { StatusResult, StatusResponse } from "@/lib/status";
 
@@ -24,7 +24,7 @@ let cache: { at: number; data: StatusResult[] } | null = null;
 const NO_SHARED_CACHE = { "cache-control": "private, no-store" };
 
 export async function GET(request: NextRequest) {
-  const { settings, apps, auth } = await readConfig();
+  const { settings, apps, auth } = await readConfigInternal();
   if (!settings.statusChecks) {
     const empty: StatusResponse = { checkedAt: Date.now(), results: [] };
     return NextResponse.json(empty, { headers: NO_SHARED_CACHE });
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
   // response, so a window filled by an anonymous caller still serves a later
   // admin request in full.
   const ids = new Set(
-    visibleApps(apps, await isAdminRequest(request, auth.passwordHash)).map(
+    visibleItems(apps, await isAdminRequest(request, auth.passwordHash)).map(
       (a) => a.id
     )
   );

@@ -7,7 +7,7 @@ import {
   sessionCookieOptions,
   SESSION_COOKIE_NAME,
 } from "@/lib/auth";
-import { readConfig, setPasswordHash } from "@/lib/config";
+import { readConfigInternal, setPasswordHash } from "@/lib/config";
 import { passwordChangeSchema } from "@/lib/schema";
 
 // Admin-only (gated by the proxy matcher). Changing the password still requires
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   }
   const { current, next } = parsed.data;
 
-  const { auth } = await readConfig();
+  const { auth } = await readConfigInternal();
   const ok = auth.passwordHash
     ? await verifyPasswordHash(current, auth.passwordHash, auth.passwordSalt)
     : verifyEnvPassword(current);

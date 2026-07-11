@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { readConfig } from "@/lib/config";
-import { isAdminRequest, visibleApps } from "@/lib/api-auth";
+import { readConfigInternal } from "@/lib/config";
+import { isAdminRequest, visibleItems } from "@/lib/api-auth";
 import { loadHistory, getHistory } from "@/lib/status-history";
 import { isValidTimeZone } from "@/lib/datetime";
 import type { StatusHistory } from "@/lib/status";
@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 const NO_SHARED_CACHE = { "cache-control": "private, no-store" };
 
 export async function GET(request: NextRequest) {
-  const { settings, apps, auth } = await readConfig();
+  const { settings, apps, auth } = await readConfigInternal();
   if (!settings.statusChecks) {
     const empty: StatusHistory = { generatedAt: Date.now(), apps: [] };
     return NextResponse.json(empty, { headers: NO_SHARED_CACHE });
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
   const timeZone = isValidTimeZone(tz) ? tz : "UTC";
   // The poll cadence caps how long a 1h reading holds in the timeline. History
   // is recorded for every app; only the caller's visible ids are read out.
-  const visible = visibleApps(
+  const visible = visibleItems(
     apps,
     await isAdminRequest(request, auth.passwordHash)
   );

@@ -6,7 +6,7 @@ import {
   sessionCookieOptions,
   SESSION_COOKIE_NAME,
 } from "@/lib/auth";
-import { readConfig } from "@/lib/config";
+import { readConfigInternal } from "@/lib/config";
 import { rateLimit, pruneRateLimit } from "@/lib/rate-limit";
 
 // Allow a small burst of attempts per client, then lock that source out for the
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
 
   // Prefer a password set through the UI (stored hash); otherwise fall back to
   // the ADMIN_PASSWORD env var.
-  const { auth } = await readConfig();
+  const { auth } = await readConfigInternal();
   const ok = auth.passwordHash
     ? await verifyPasswordHash(password, auth.passwordHash, auth.passwordSalt)
     : verifyEnvPassword(password);

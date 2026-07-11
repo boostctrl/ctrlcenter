@@ -491,8 +491,9 @@ export const appItemSchema = z.object({
   checkType: z.enum(CHECK_TYPE_KEYS).catch("http").default("http"),
   port: z.number().int().min(1).max(65535).optional(),
   keyword: z.string().default(""),
-  // Render only for the admin session; see visibleApps() for the one filter
-  // every public surface applies. Monitoring and alerts ignore the flag.
+  // Render only for the admin session; readPublicConfig() (lib/api-auth.ts)
+  // filters flagged items out of every public surface. Monitoring and alerts
+  // ignore the flag.
   private: z.boolean().catch(false).default(false),
 });
 

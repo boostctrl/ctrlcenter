@@ -32,6 +32,16 @@ here.
   error, and "Not found" is reserved for an item that genuinely no longer
   exists. (#148)
 
+### Security
+
+- **Private items are now filtered at one enforced chokepoint instead of
+  per-page convention.** Public pages read their configuration through a
+  single accessor that has already removed private apps and bookmarks (and
+  never carries the admin credential), and a test pins the short list of
+  server paths allowed to see the unfiltered data — so a future page or API
+  can't accidentally leak a private item by forgetting a filter. No behavior
+  changes today; this hardens the guarantee the private flag makes. (#147)
+
 ## [1.9.4] - 2026-07-10
 
 ### Added

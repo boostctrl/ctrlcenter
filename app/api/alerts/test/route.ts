@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/lib/api-auth";
-import { readConfig } from "@/lib/config";
+import { readConfigInternal } from "@/lib/config";
 import { sendTestAlert } from "@/lib/alerts";
 
 // Admin-only: send a synthetic "down" alert through the real webhook/email
@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
   if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const config = await readConfig();
+  const config = await readConfigInternal();
   const result = await sendTestAlert(config.settings.alerts);
   return NextResponse.json(result);
 }

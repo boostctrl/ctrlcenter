@@ -40,7 +40,12 @@ async function ensureConfigExists(): Promise<void> {
   }
 }
 
-export async function readConfig(): Promise<Config> {
+// The raw, unfiltered config — private apps/bookmarks and the admin credential
+// included. "Internal" is deliberate: anything rendering for a possibly
+// signed-out visitor must go through readPublicConfig() (lib/api-auth.ts),
+// which pre-filters private items, so a public surface can't reach the full
+// list by accident. A test pins which files under app/ may import this.
+export async function readConfigInternal(): Promise<Config> {
   await ensureConfigExists();
   const raw = await fs.readFile(CONFIG_PATH, "utf8");
   const parsed = YAML.load(raw);
@@ -73,7 +78,7 @@ export class NotFoundError extends Error {}
 
 async function mutate<T>(fn: (config: Config) => T): Promise<T> {
   const result = writeQueue.then(async () => {
-    const config = await readConfig();
+    const config = await readConfigInternal();
     const out = fn(config);
     await writeConfig(config);
     return out;
@@ -106,7 +111,7 @@ export async function replaceConfig(input: unknown): Promise<Config> {
     // (falling back to ADMIN_PASSWORD), and a backup from another instance would
     // overwrite this one's password. Export omits auth for the same reason, so a
     // freshly exported file has none to apply anyway.
-    const current = await readConfig();
+    const current = await readConfigInternal();
     // Snapshot the outgoing config to config.yaml.bak before overwriting it, so
     // a mistaken or bad import is recoverable. Runs inside the same write queue,
     // and is written atomically (tmp+rename) like the live file — this .bak is
@@ -131,7 +136,7 @@ export async function setPasswordHash(
 }
 
 export async function getSettings(): Promise<Settings> {
-  return (await readConfig()).settings;
+  return (await readConfigInternal()).settings;
 }
 
 // zod's .partial() can produce own keys with an explicit `undefined` value
@@ -217,7 +222,7 @@ export async function updateSettings(
 // Admin overrides of the built-in theme packs. Pair with resolveThemePacks()
 // (lib/theme.ts) to get the packs visitors actually see.
 export async function getThemeOverrides(): Promise<ThemePackConfig[]> {
-  return (await readConfig()).themes;
+  return (await readConfigInternal()).themes;
 }
 
 // Replace the whole overrides array (the admin Themes editor sends all edited
@@ -232,7 +237,7 @@ export async function setThemeOverrides(
 }
 
 export async function listApps(): Promise<AppItem[]> {
-  return (await readConfig()).apps;
+  return (await readConfigInternal()).apps;
 }
 
 export async function createApp(input: Omit<AppItem, "id">): Promise<AppItem> {
@@ -286,7 +291,7 @@ export async function reorderApps(ids: string[]): Promise<AppItem[]> {
 }
 
 export async function listBookmarks(): Promise<BookmarkItem[]> {
-  return (await readConfig()).bookmarks;
+  return (await readConfigInternal()).bookmarks;
 }
 
 export async function createBookmark(
