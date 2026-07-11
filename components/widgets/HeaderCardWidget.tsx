@@ -8,6 +8,13 @@ import type { CurrentWeather } from "@/lib/weather";
 // editor's span stepper visibly resizes it; `@container` lets the inner
 // time/weather row adapt to the cell's actual width (side by side when wide,
 // stacked when narrow) instead of clipping.
+//
+// The card's content is capped and centered (max-w-xl) so a very wide card —
+// e.g. a span-8 cell that goes full-width when the grid collapses below `lg`,
+// the awkward tablet range — shows a balanced cluster instead of flinging the
+// weather and clock to opposite edges across a sparse expanse. The cap has no
+// effect on the narrow desktop cell or a phone, which are both already below
+// it; it only reins in the in-between widths.
 export default function HeaderCardWidget({
   initialDate,
   initialWeather,
@@ -31,13 +38,15 @@ export default function HeaderCardWidget({
   if (!showTimeWeather) return <StatusSummary apps={apps} variant="card" />;
   return (
     <div className="glass-card @container flex w-full flex-col overflow-hidden">
-      <TimeWeather
-        initialDate={initialDate}
-        weatherEnabled={weatherEnabled}
-        showClock={showClock}
-        initial={initialWeather}
-      />
-      {statusEnabled && <StatusSummary apps={apps} />}
+      <div className="mx-auto flex w-full max-w-xl flex-col">
+        <TimeWeather
+          initialDate={initialDate}
+          weatherEnabled={weatherEnabled}
+          showClock={showClock}
+          initial={initialWeather}
+        />
+        {statusEnabled && <StatusSummary apps={apps} />}
+      </div>
     </div>
   );
 }

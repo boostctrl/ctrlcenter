@@ -49,6 +49,12 @@ here.
 
 ### Fixed
 
+- **The clock/weather/status header card scales cleanly at every width.** In
+  the range between a desktop and a phone — where the card widens to fill the
+  screen — the weather and clock no longer fly to opposite edges across a
+  sparse gap; the card's contents stay a balanced, centered cluster. The
+  narrow desktop card and the phone layout are unchanged. (#154)
+
 - **Card grids drop a column before tile names get cut off.** When an
   applications, favorites, or bookmarks card is set to show several cards per
   row (or on a wide default dashboard), the grid now steps down to fewer,
