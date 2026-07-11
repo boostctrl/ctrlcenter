@@ -24,6 +24,16 @@ here.
 
 ### Changed
 
+- **The admin portal remembers where you are.** The active tab — and inside
+  Settings, the active section — now lives in the page address, so a refresh
+  no longer bounces you back to Applications, and a link like
+  `/admin?tab=settings&section=widgets` opens exactly that view. Alongside
+  that, three small admin fixes: a login lockout now says how long to wait
+  ("Try again in 4 minutes") instead of just "later"; the password dialog
+  opens with its first field focused and keeps Tab inside the dialog (the
+  confirmation dialog traps Tab too); and removing a middle custom-bang or
+  countdown row can no longer confuse the rows below it. (#132)
+
 - **Admin Settings is a shorter, single-column layout.** The settings rail is
   down to five entries — General, Home layout, Widgets, Announcement, and
   Security — and each opens a single top-to-bottom column of cards at a

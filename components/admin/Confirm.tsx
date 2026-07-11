@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { Button } from "./ui";
+import { useFocusTrap } from "./useFocusTrap";
 
 type ConfirmOptions = {
   title: string;
@@ -31,6 +32,7 @@ export function useConfirm() {
 // resolves true/false. A single dialog host is rendered by the provider.
 export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<Pending | null>(null);
+  const trapRef = useFocusTrap<HTMLDivElement>(pending !== null);
 
   const confirm = useCallback(
     (opts: ConfirmOptions) =>
@@ -67,6 +69,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
           onMouseDown={() => settle(false)}
         >
           <div
+            ref={trapRef}
             role="alertdialog"
             aria-label={pending.title}
             className="glass-card w-full max-w-sm space-y-4 p-5"

@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState, type ChangeEvent } from "react";
+import { Suspense, useRef, useState, type ChangeEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import type {
   AppItem,
   BookmarkItem,
@@ -37,14 +38,31 @@ type Props = {
 
 export default function AdminDashboard(props: Props) {
   // ToastProvider wraps the body so every child (including managers) can call
-  // useToast(); the body itself must live inside it to do the same.
+  // useToast(); the body itself must live inside it to do the same. Suspense
+  // is the App Router's requirement for useSearchParams (the tab and settings
+  // section initialize from the URL); /admin renders dynamically, so the
+  // boundary never actually shows a fallback.
   return (
     <ToastProvider>
       <ConfirmProvider>
-        <AdminBody {...props} />
+        <Suspense>
+          <AdminBody {...props} />
+        </Suspense>
       </ConfirmProvider>
     </ToastProvider>
   );
+}
+
+// Mirror the active tab (and, off the settings tab, drop the section) into the
+// query string with a native history replace: refresh restores the view and
+// the URL is shareable, with no server round-trip, scroll reset, or history
+// entry per click. SettingsManager owns the `section` param the same way.
+export function replaceUrlParams(
+  mutate: (params: URLSearchParams) => void
+): void {
+  const url = new URL(window.location.href);
+  mutate(url.searchParams);
+  window.history.replaceState(null, "", url);
 }
 
 function AdminBody({
@@ -53,10 +71,25 @@ function AdminBody({
   initialSettings,
   initialThemes,
 }: Props) {
-  const [tab, setTab] = useState<Tab>("apps");
+  // The URL is the initial source of truth (?tab=settings deep-links and
+  // survives refresh); an unknown value falls back to the first tab.
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<Tab>(() => {
+    const fromUrl = searchParams.get("tab");
+    return TABS.some((t) => t.key === fromUrl) ? (fromUrl as Tab) : "apps";
+  });
   const fileRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
   const confirm = useConfirm();
+
+  function selectTab(next: Tab) {
+    setTab(next);
+    replaceUrlParams((params) => {
+      params.set("tab", next);
+      // `section` belongs to the settings tab alone.
+      if (next !== "settings") params.delete("section");
+    });
+  }
 
   async function handleLogout() {
     await fetch("/api/logout", { method: "POST" });
@@ -173,7 +206,7 @@ function AdminBody({
           <button
             key={t.key}
             type="button"
-            onClick={() => setTab(t.key)}
+            onClick={() => selectTab(t.key)}
             className={`shrink-0 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
               tab === t.key ? "bg-fg/10 text-fg" : "text-fg/50 hover:text-fg/80"
             }`}

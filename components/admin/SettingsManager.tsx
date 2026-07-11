@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import type { Settings } from "@/lib/schema";
 import {
   ALERT_TYPES,
@@ -31,6 +32,7 @@ import AlertTest from "./AlertTest";
 import CitySearch from "./CitySearch";
 import ChangePassword from "./ChangePassword";
 import { useConfirm } from "./Confirm";
+import { replaceUrlParams } from "./AdminDashboard";
 import { apiErrorMessage } from "./apiError";
 import { useAutosave, SaveStatus, type SaveOptions } from "./useAutosave";
 
@@ -96,6 +98,22 @@ function localInputToIso(value: string): string {
   return Number.isNaN(d.getTime()) ? "" : d.toISOString();
 }
 
+// Stable React keys for editable rows whose stored shape has no id (custom
+// bangs, countdown dates — the persisted schema stays id-free on purpose).
+// Index keys mis-attach focus/IME state when a middle row is removed, so the
+// list operations mirror the item operations: append on add, removeAt on
+// delete. In-place edits don't change row identity.
+function useRowKeys(initialCount: number) {
+  const [keys, setKeys] = useState<string[]>(() =>
+    Array.from({ length: initialCount }, () => crypto.randomUUID())
+  );
+  return {
+    keys,
+    append: () => setKeys((k) => [...k, crypto.randomUUID()]),
+    removeAt: (i: number) => setKeys((k) => k.filter((_, idx) => idx !== i)),
+  };
+}
+
 function Section({
   title,
   intro,
@@ -149,7 +167,29 @@ export default function SettingsManager({
       ),
     },
   }));
-  const [section, setSection] = useState<SettingsSectionId>("general");
+  // The URL seeds the active section (?tab=settings&section=widgets is a
+  // shareable deep link that survives refresh); rail clicks mirror it back
+  // with a history replace. AdminDashboard owns the `tab` param the same way.
+  const searchParams = useSearchParams();
+  const [section, setSection] = useState<SettingsSectionId>(() => {
+    const fromUrl = searchParams.get("section");
+    return SETTINGS_SECTIONS.some((s) => s.id === fromUrl)
+      ? (fromUrl as SettingsSectionId)
+      : "general";
+  });
+
+  function selectSection(next: SettingsSectionId) {
+    setSection(next);
+    replaceUrlParams((params) => params.set("section", next));
+  }
+
+  // Honor a #settings-card-… hash once on mount (the anchors each card
+  // carries), so a link can point at one card inside a long section.
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash.startsWith("#settings-card-")) return;
+    document.getElementById(hash.slice(1))?.scrollIntoView();
+  }, []);
   // A ticking clock so each announcement's derived state chip (Active /
   // Scheduled / Expired) stays current without a reload.
   const now = useNow(30_000);
@@ -246,6 +286,7 @@ export default function SettingsManager({
     setSettings((s) => ({ ...s, feed: { ...s.feed, ...patch } }));
 
   const countdown = settings.countdown;
+  const countdownKeys = useRowKeys(countdown.items.length);
   const setCountdownItems = (items: Settings["countdown"]["items"]) =>
     setSettings((s) => ({ ...s, countdown: { ...s.countdown, items } }));
   const updateCountdownItem = (
@@ -286,6 +327,7 @@ export default function SettingsManager({
   };
 
   const bangs = settings.search.bangs;
+  const bangKeys = useRowKeys(bangs.length);
   const setBangs = (next: Settings["search"]["bangs"]) =>
     setSettings((s) => ({ ...s, search: { ...s.search, bangs: next } }));
   const updateBang = (i: number, patch: Partial<Settings["search"]["bangs"][number]>) =>
@@ -355,7 +397,7 @@ export default function SettingsManager({
           <button
             key={s.id}
             type="button"
-            onClick={() => setSection(s.id)}
+            onClick={() => selectSection(s.id)}
             className={`shrink-0 rounded-lg px-3 py-2 text-left text-sm whitespace-nowrap transition-colors ${
               section === s.id
                 ? "bg-fg/10 font-medium text-fg"
@@ -665,7 +707,7 @@ export default function SettingsManager({
             subtitles work already.
           </p>
           {bangs.map((b, i) => (
-            <div key={i} className="flex items-center gap-2">
+            <div key={bangKeys.keys[i] ?? i} className="flex items-center gap-2">
               <span className="text-fg/40">!</span>
               <input
                 value={b.key}
@@ -687,7 +729,10 @@ export default function SettingsManager({
               />
               <button
                 type="button"
-                onClick={() => setBangs(bangs.filter((_, idx) => idx !== i))}
+                onClick={() => {
+                  setBangs(bangs.filter((_, idx) => idx !== i));
+                  bangKeys.removeAt(i);
+                }}
                 aria-label={`Remove bang ${i + 1}`}
                 className="shrink-0 rounded-md px-2 py-1 text-fg/40 transition-colors hover:bg-fg/10 hover:text-red-400"
               >
@@ -697,7 +742,10 @@ export default function SettingsManager({
           ))}
           <button
             type="button"
-            onClick={() => setBangs([...bangs, { key: "", url: "" }])}
+            onClick={() => {
+              setBangs([...bangs, { key: "", url: "" }]);
+              bangKeys.append();
+            }}
             className="self-start rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10"
           >
             + Add bang
@@ -1035,7 +1083,10 @@ export default function SettingsManager({
           <div className="flex flex-col gap-2">
             <span className="text-sm text-fg/50">Dates</span>
             {countdown.items.map((item, i) => (
-              <div key={i} className="flex items-center gap-2">
+              <div
+                key={countdownKeys.keys[i] ?? i}
+                className="flex items-center gap-2"
+              >
                 <input
                   value={item.label}
                   onChange={(e) => updateCountdownItem(i, { label: e.target.value })}
@@ -1052,9 +1103,12 @@ export default function SettingsManager({
                 />
                 <button
                   type="button"
-                  onClick={() =>
-                    setCountdownItems(countdown.items.filter((_, idx) => idx !== i))
-                  }
+                  onClick={() => {
+                    setCountdownItems(
+                      countdown.items.filter((_, idx) => idx !== i)
+                    );
+                    countdownKeys.removeAt(i);
+                  }}
                   aria-label={`Remove countdown ${i + 1}`}
                   className="shrink-0 rounded-md px-2 py-1 text-fg/40 transition-colors hover:bg-fg/10 hover:text-red-400"
                 >
@@ -1064,9 +1118,10 @@ export default function SettingsManager({
             ))}
             <button
               type="button"
-              onClick={() =>
-                setCountdownItems([...countdown.items, { label: "", date: "" }])
-              }
+              onClick={() => {
+                setCountdownItems([...countdown.items, { label: "", date: "" }]);
+                countdownKeys.append();
+              }}
               className="self-start rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10"
             >
               + Add date

@@ -32,6 +32,18 @@ function LoginForm() {
     setLoading(false);
     if (!res.ok) {
       const data = await res.json().catch(() => null);
+      // A 429 carries Retry-After (seconds); turn the lockout into an
+      // instruction instead of the body's bare "try again later".
+      const retryAfter = Number(res.headers.get("Retry-After"));
+      if (res.status === 429 && Number.isFinite(retryAfter) && retryAfter > 0) {
+        const minutes = Math.ceil(retryAfter / 60);
+        setError(
+          `Too many attempts. Try again in ${
+            minutes === 1 ? "1 minute" : `${minutes} minutes`
+          }.`
+        );
+        return;
+      }
       setError(data?.error || "Incorrect password");
       return;
     }

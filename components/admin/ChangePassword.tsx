@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { TextField, Button } from "./ui";
 import { useToast } from "./Toast";
+import { useFocusTrap } from "./useFocusTrap";
 import { apiErrorMessage } from "./apiError";
 
 export default function ChangePassword() {
@@ -12,6 +13,7 @@ export default function ChangePassword() {
   const [confirm, setConfirm] = useState("");
   const [saving, setSaving] = useState(false);
   const toast = useToast();
+  const trapRef = useFocusTrap<HTMLFormElement>(open);
 
   useEffect(() => {
     if (!open) return;
@@ -81,6 +83,7 @@ export default function ChangePassword() {
           aria-label="Reset admin password"
         >
           <form
+            ref={trapRef}
             onSubmit={handleSubmit}
             onMouseDown={(e) => e.stopPropagation()}
             className="glass-card flex w-full max-w-md flex-col gap-4 p-6 text-left"
@@ -90,6 +93,7 @@ export default function ChangePassword() {
               label="Current password"
               type="password"
               autoComplete="current-password"
+              autoFocus
               required
               value={current}
               onChange={(e) => setCurrent(e.target.value)}
