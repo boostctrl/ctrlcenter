@@ -245,6 +245,36 @@ export function saveActiveTheme(colors: ModeColors | null): void {
   }
 }
 
+// Map a saved theme onto the site-default theme object for promotion (#142):
+// dark parts fill the base fields, light parts the *Light fields, including
+// the per-mode accent pair. The pack presets are deliberately absent — the
+// settings API replaces the theme wholesale, so omitting them clears them and
+// the admin Appearance picker correctly reads "Custom" afterwards. A test
+// pins this mapping against the settings schema's key list, so a new theme
+// field can't be silently dropped from promotion.
+export function siteThemeFromCustomTheme(
+  theme: CustomTheme,
+  mode: "system" | "light" | "dark"
+) {
+  return {
+    mode,
+    design: theme.design,
+    scene: theme.scene,
+    font: theme.font,
+    designLight: theme.designLight,
+    sceneLight: theme.sceneLight,
+    fontLight: theme.fontLight,
+    accentFrom: theme.dark.accentFrom,
+    accentTo: theme.dark.accentTo,
+    accentFromLight: theme.light.accentFrom,
+    accentToLight: theme.light.accentTo,
+    background: theme.dark.background,
+    foreground: theme.dark.foreground,
+    backgroundLight: theme.light.background,
+    foregroundLight: theme.light.foreground,
+  };
+}
+
 // Validate one stored/imported entry into a CustomTheme, or null if it's
 // unusable. Carries the load-time migrations: flat colors wrap into both modes
 // (sanitizeModeColors), pre-designs/scenes themes default to Glass/Aurora, and

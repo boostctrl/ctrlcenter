@@ -8,8 +8,9 @@ import { BASE_THEMES, DESIGNS, SCENES } from "@/lib/theme";
 import type { DesignId, ModeColors, SceneId, ThemePack } from "@/lib/theme";
 import { buttonClasses } from "@/lib/buttons";
 import { FONTS, fontVar } from "@/lib/fonts";
-import { parseThemesExport } from "@/lib/prefs";
+import { parseThemesExport, siteThemeFromCustomTheme } from "@/lib/prefs";
 import type { CustomTheme, ThemeColors } from "@/lib/prefs";
+import { apiErrorMessage } from "./admin/apiError";
 import { downloadJson } from "@/lib/download";
 import { deepenForLight } from "./scenes/color";
 
@@ -388,14 +389,9 @@ export default function ThemeBuilder({
     setRenamingId(null);
   }
 
-  // Download the saved themes as a JSON file the visitor can carry to another
-  // browser (or back it up).
   // Snapshot a saved theme into the site default every visitor sees (#142).
-  // The saved theme maps 1:1 onto the theme fields the layout reads — dark
-  // parts to the base fields, light parts to the *Light fields, including the
-  // per-mode accent pair. `preset`/`presetLight` are deliberately omitted:
-  // the settings API replaces the theme wholesale, so the admin Appearance
-  // picker correctly reads "Custom" afterwards. The API is admin-gated; the
+  // The field mapping lives in lib/prefs.ts (siteThemeFromCustomTheme), where
+  // a test pins it against the settings schema. The API is admin-gated; the
   // button only renders when the server said this session is an admin.
   async function promoteTheme(t: CustomTheme) {
     if (!promote || promoting) return;
@@ -414,30 +410,15 @@ export default function ThemeBuilder({
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          theme: {
-            mode: promote.siteMode,
-            design: t.design,
-            scene: t.scene,
-            font: t.font,
-            designLight: t.designLight,
-            sceneLight: t.sceneLight,
-            fontLight: t.fontLight,
-            accentFrom: t.dark.accentFrom,
-            accentTo: t.dark.accentTo,
-            accentFromLight: t.light.accentFrom,
-            accentToLight: t.light.accentTo,
-            background: t.dark.background,
-            foreground: t.dark.foreground,
-            backgroundLight: t.light.background,
-            foregroundLight: t.light.foreground,
-          },
+          theme: siteThemeFromCustomTheme(t, promote.siteMode),
         }),
       });
-      setPromoteStatus(
-        res.ok
-          ? `“${t.name}” is now the site theme.`
-          : "Couldn't set the site theme."
-      );
+      if (res.ok) {
+        setPromoteStatus(`“${t.name}” is now the site theme.`);
+      } else {
+        const data = await res.json().catch(() => null);
+        setPromoteStatus(apiErrorMessage(data, "Couldn't set the site theme."));
+      }
     } catch {
       setPromoteStatus("Couldn't set the site theme.");
     } finally {
@@ -445,6 +426,8 @@ export default function ThemeBuilder({
     }
   }
 
+  // Download the saved themes as a JSON file the visitor can carry to another
+  // browser (or back it up).
   function exportThemes() {
     downloadJson("ctrlcenter-themes.json", customThemes);
   }

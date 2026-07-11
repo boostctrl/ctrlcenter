@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import type { Settings } from "@/lib/schema";
 import {
   ALERT_TYPES,
@@ -32,7 +31,7 @@ import AlertTest from "./AlertTest";
 import CitySearch from "./CitySearch";
 import ChangePassword from "./ChangePassword";
 import { useConfirm } from "./Confirm";
-import { replaceUrlParams } from "./AdminDashboard";
+import { replaceUrlParams } from "./urlState";
 import { apiErrorMessage } from "./apiError";
 import { useAutosave, SaveStatus, type SaveOptions } from "./useAutosave";
 
@@ -100,17 +99,25 @@ function localInputToIso(value: string): string {
 
 // Stable React keys for editable rows whose stored shape has no id (custom
 // bangs, countdown dates — the persisted schema stays id-free on purpose).
-// Index keys mis-attach focus/IME state when a middle row is removed, so the
-// list operations mirror the item operations: append on add, removeAt on
-// delete. In-place edits don't change row identity.
-function useRowKeys(initialCount: number) {
+// Index keys mis-attach focus/IME state when a middle row is removed, so add
+// and removeAt update the items and their keys in one call — the pairing
+// can't be forgotten at a call site. In-place edits keep row identity. Keys
+// come from newThemeId(), not crypto.randomUUID directly: plain-HTTP LAN
+// hosting is a non-secure context, where randomUUID doesn't exist.
+function useKeyedRows<T>(items: T[], setItems: (next: T[]) => void) {
   const [keys, setKeys] = useState<string[]>(() =>
-    Array.from({ length: initialCount }, () => crypto.randomUUID())
+    Array.from({ length: items.length }, () => newThemeId())
   );
   return {
     keys,
-    append: () => setKeys((k) => [...k, crypto.randomUUID()]),
-    removeAt: (i: number) => setKeys((k) => k.filter((_, idx) => idx !== i)),
+    add: (item: T) => {
+      setItems([...items, item]);
+      setKeys((k) => [...k, newThemeId()]);
+    },
+    removeAt: (i: number) => {
+      setItems(items.filter((_, idx) => idx !== i));
+      setKeys((k) => k.filter((_, idx) => idx !== i));
+    },
   };
 }
 
@@ -147,9 +154,13 @@ function Section({
 export default function SettingsManager({
   initialSettings,
   themePacks,
+  initialSection,
 }: {
   initialSettings: Settings;
   themePacks: ThemePack[];
+  // The ?section deep-link param, read server-side by /admin's page (see
+  // AdminDashboard's matching prop for why useSearchParams is avoided).
+  initialSection?: string;
 }) {
   // Resolve the layout up front: stored entries can omit `hidden` (the legacy
   // components toggles fold in at resolve time), but this form autosaves the
@@ -170,13 +181,11 @@ export default function SettingsManager({
   // The URL seeds the active section (?tab=settings&section=widgets is a
   // shareable deep link that survives refresh); rail clicks mirror it back
   // with a history replace. AdminDashboard owns the `tab` param the same way.
-  const searchParams = useSearchParams();
-  const [section, setSection] = useState<SettingsSectionId>(() => {
-    const fromUrl = searchParams.get("section");
-    return SETTINGS_SECTIONS.some((s) => s.id === fromUrl)
-      ? (fromUrl as SettingsSectionId)
-      : "general";
-  });
+  const [section, setSection] = useState<SettingsSectionId>(() =>
+    SETTINGS_SECTIONS.some((s) => s.id === initialSection)
+      ? (initialSection as SettingsSectionId)
+      : "general"
+  );
 
   function selectSection(next: SettingsSectionId) {
     setSection(next);
@@ -286,9 +295,9 @@ export default function SettingsManager({
     setSettings((s) => ({ ...s, feed: { ...s.feed, ...patch } }));
 
   const countdown = settings.countdown;
-  const countdownKeys = useRowKeys(countdown.items.length);
   const setCountdownItems = (items: Settings["countdown"]["items"]) =>
     setSettings((s) => ({ ...s, countdown: { ...s.countdown, items } }));
+  const countdownRows = useKeyedRows(countdown.items, setCountdownItems);
   const updateCountdownItem = (
     i: number,
     patch: Partial<Settings["countdown"]["items"][number]>
@@ -327,9 +336,9 @@ export default function SettingsManager({
   };
 
   const bangs = settings.search.bangs;
-  const bangKeys = useRowKeys(bangs.length);
   const setBangs = (next: Settings["search"]["bangs"]) =>
     setSettings((s) => ({ ...s, search: { ...s.search, bangs: next } }));
+  const bangRows = useKeyedRows(bangs, setBangs);
   const updateBang = (i: number, patch: Partial<Settings["search"]["bangs"][number]>) =>
     setBangs(bangs.map((b, idx) => (idx === i ? { ...b, ...patch } : b)));
 
@@ -714,7 +723,7 @@ export default function SettingsManager({
             subtitles work already.
           </p>
           {bangs.map((b, i) => (
-            <div key={bangKeys.keys[i] ?? i} className="flex items-center gap-2">
+            <div key={bangRows.keys[i] ?? i} className="flex items-center gap-2">
               <span className="text-fg/40">!</span>
               <input
                 value={b.key}
@@ -736,10 +745,7 @@ export default function SettingsManager({
               />
               <button
                 type="button"
-                onClick={() => {
-                  setBangs(bangs.filter((_, idx) => idx !== i));
-                  bangKeys.removeAt(i);
-                }}
+                onClick={() => bangRows.removeAt(i)}
                 aria-label={`Remove bang ${i + 1}`}
                 className="shrink-0 rounded-md px-2 py-1 text-fg/40 transition-colors hover:bg-fg/10 hover:text-red-400"
               >
@@ -749,10 +755,7 @@ export default function SettingsManager({
           ))}
           <button
             type="button"
-            onClick={() => {
-              setBangs([...bangs, { key: "", url: "" }]);
-              bangKeys.append();
-            }}
+            onClick={() => bangRows.add({ key: "", url: "" })}
             className="self-start rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10"
           >
             + Add bang
@@ -1091,7 +1094,7 @@ export default function SettingsManager({
             <span className="text-sm text-fg/50">Dates</span>
             {countdown.items.map((item, i) => (
               <div
-                key={countdownKeys.keys[i] ?? i}
+                key={countdownRows.keys[i] ?? i}
                 className="flex items-center gap-2"
               >
                 <input
@@ -1110,12 +1113,7 @@ export default function SettingsManager({
                 />
                 <button
                   type="button"
-                  onClick={() => {
-                    setCountdownItems(
-                      countdown.items.filter((_, idx) => idx !== i)
-                    );
-                    countdownKeys.removeAt(i);
-                  }}
+                  onClick={() => countdownRows.removeAt(i)}
                   aria-label={`Remove countdown ${i + 1}`}
                   className="shrink-0 rounded-md px-2 py-1 text-fg/40 transition-colors hover:bg-fg/10 hover:text-red-400"
                 >
@@ -1125,10 +1123,7 @@ export default function SettingsManager({
             ))}
             <button
               type="button"
-              onClick={() => {
-                setCountdownItems([...countdown.items, { label: "", date: "" }]);
-                countdownKeys.append();
-              }}
+              onClick={() => countdownRows.add({ label: "", date: "" })}
               className="self-start rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10"
             >
               + Add date

@@ -1,7 +1,6 @@
 "use client";
 
-import { Suspense, useRef, useState, type ChangeEvent } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRef, useState, type ChangeEvent } from "react";
 import type {
   AppItem,
   BookmarkItem,
@@ -18,6 +17,7 @@ import { downloadJson } from "@/lib/download";
 import { Button } from "./ui";
 import { ToastProvider, useToast } from "./Toast";
 import { ConfirmProvider, useConfirm } from "./Confirm";
+import { replaceUrlParams } from "./urlState";
 import { apiErrorMessage } from "./apiError";
 
 type Tab = "apps" | "bookmarks" | "themes" | "settings";
@@ -34,35 +34,24 @@ type Props = {
   initialBookmarks: BookmarkItem[];
   initialSettings: Settings;
   initialThemes: ThemePackConfig[];
+  // The ?tab / ?section deep-link params, read server-side by the page (NOT
+  // useSearchParams here — that would demand a Suspense boundary whose
+  // streamed segment can be left orphaned in the DOM). Unvalidated strings;
+  // unknown values fall back to the defaults.
+  initialTab?: string;
+  initialSection?: string;
 };
 
 export default function AdminDashboard(props: Props) {
   // ToastProvider wraps the body so every child (including managers) can call
-  // useToast(); the body itself must live inside it to do the same. Suspense
-  // is the App Router's requirement for useSearchParams (the tab and settings
-  // section initialize from the URL); /admin renders dynamically, so the
-  // boundary never actually shows a fallback.
+  // useToast(); the body itself must live inside it to do the same.
   return (
     <ToastProvider>
       <ConfirmProvider>
-        <Suspense>
-          <AdminBody {...props} />
-        </Suspense>
+        <AdminBody {...props} />
       </ConfirmProvider>
     </ToastProvider>
   );
-}
-
-// Mirror the active tab (and, off the settings tab, drop the section) into the
-// query string with a native history replace: refresh restores the view and
-// the URL is shareable, with no server round-trip, scroll reset, or history
-// entry per click. SettingsManager owns the `section` param the same way.
-export function replaceUrlParams(
-  mutate: (params: URLSearchParams) => void
-): void {
-  const url = new URL(window.location.href);
-  mutate(url.searchParams);
-  window.history.replaceState(null, "", url);
 }
 
 function AdminBody({
@@ -70,14 +59,14 @@ function AdminBody({
   initialBookmarks,
   initialSettings,
   initialThemes,
+  initialTab,
+  initialSection,
 }: Props) {
   // The URL is the initial source of truth (?tab=settings deep-links and
   // survives refresh); an unknown value falls back to the first tab.
-  const searchParams = useSearchParams();
-  const [tab, setTab] = useState<Tab>(() => {
-    const fromUrl = searchParams.get("tab");
-    return TABS.some((t) => t.key === fromUrl) ? (fromUrl as Tab) : "apps";
-  });
+  const [tab, setTab] = useState<Tab>(() =>
+    TABS.some((t) => t.key === initialTab) ? (initialTab as Tab) : "apps"
+  );
   const fileRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
   const confirm = useConfirm();
@@ -228,6 +217,7 @@ function AdminBody({
         <SettingsManager
           initialSettings={initialSettings}
           themePacks={resolveThemePacks(initialThemes)}
+          initialSection={initialSection}
         />
       )}
     </div>
