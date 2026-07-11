@@ -254,6 +254,7 @@ export default function SettingsManager({
     { id: "search", label: "Search bar" },
     { id: "notes", label: "Notes card" },
     { id: "countdown", label: "Countdown card" },
+    { id: "worldClocks", label: "World clocks card" },
     { id: "apps", label: "Applications" },
     { id: "bookmarks", label: "Bookmarks" },
     { id: "favorites", label: "Favorites row" },
@@ -304,6 +305,18 @@ export default function SettingsManager({
   ) =>
     setCountdownItems(
       countdown.items.map((item, idx) => (idx === i ? { ...item, ...patch } : item))
+    );
+
+  const worldClocks = settings.worldClocks;
+  const setWorldClockItems = (items: Settings["worldClocks"]["items"]) =>
+    setSettings((s) => ({ ...s, worldClocks: { ...s.worldClocks, items } }));
+  const worldClockRows = useKeyedRows(worldClocks.items, setWorldClockItems);
+  const updateWorldClockItem = (
+    i: number,
+    patch: Partial<Settings["worldClocks"]["items"][number]>
+  ) =>
+    setWorldClockItems(
+      worldClocks.items.map((item, idx) => (idx === i ? { ...item, ...patch } : item))
     );
 
   // Status-page announcements: a client-managed list saved through the whole-
@@ -1132,6 +1145,69 @@ export default function SettingsManager({
           <p className="text-xs text-fg/40">
             Days count in each visitor&apos;s own time zone. Past dates dim and
             sink below the upcoming ones.
+          </p>
+        </Section>
+        )}
+
+        {section === "widgets" && (
+        <Section
+          title="World clocks"
+          intro="Live clocks for the time zones you follow. Ships hidden — show the card in the home-page layout editor once zones are added."
+        >
+          <TextField
+            label="Card title"
+            placeholder="World clocks"
+            value={worldClocks.title}
+            onChange={(e) =>
+              setSettings((s) => ({
+                ...s,
+                worldClocks: { ...s.worldClocks, title: e.target.value },
+              }))
+            }
+          />
+          <div className="flex flex-col gap-2">
+            <span className="text-sm text-fg/50">Time zones</span>
+            {worldClocks.items.map((item, i) => (
+              <div
+                key={worldClockRows.keys[i] ?? i}
+                className="flex items-center gap-2"
+              >
+                <input
+                  value={item.label}
+                  onChange={(e) => updateWorldClockItem(i, { label: e.target.value })}
+                  placeholder="Label (optional)"
+                  aria-label={`World clock ${i + 1} label`}
+                  className={`${selectClass} min-w-0 flex-1`}
+                />
+                <input
+                  list="settings-tz"
+                  value={item.timeZone}
+                  onChange={(e) => updateWorldClockItem(i, { timeZone: e.target.value })}
+                  placeholder="Time zone…"
+                  aria-label={`World clock ${i + 1} time zone`}
+                  className={`${selectClass} min-w-0 flex-1`}
+                />
+                <button
+                  type="button"
+                  onClick={() => worldClockRows.removeAt(i)}
+                  aria-label={`Remove world clock ${i + 1}`}
+                  className="shrink-0 rounded-md px-2 py-1 text-fg/40 transition-colors hover:bg-fg/10 hover:text-red-400"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => worldClockRows.add({ label: "", timeZone: "" })}
+              className="self-start rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10"
+            >
+              + Add time zone
+            </button>
+          </div>
+          <p className="text-xs text-fg/40">
+            Each clock shows the current time in its own zone. Leave the label
+            blank to use the zone&apos;s city name.
           </p>
         </Section>
         )}

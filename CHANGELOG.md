@@ -12,6 +12,16 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **A World Clocks widget.** A new home-page card that shows the current time
+  in the time zones you follow — one row per zone with its live clock and its
+  own local date, so a glance tells you it's already tomorrow in Tokyo. Add
+  zones (each with an optional label; leave it blank to use the zone's city
+  name) under Settings → Widgets → World clocks. Like the other newer cards it
+  ships hidden, so switch it on in the home-page layout editor once it's set
+  up. (#79)
+
 ### Fixed
 
 - **Card grids drop a column before tile names get cut off.** When an

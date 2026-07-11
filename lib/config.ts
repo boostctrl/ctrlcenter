@@ -161,6 +161,7 @@ export async function updateSettings(
       announcement: announcementPartial,
       feed: feedPartial,
       countdown: countdownPartial,
+      worldClocks: worldClocksPartial,
       components: componentsPartial,
       theme: themePartial,
       layout: layoutPartial,
@@ -200,6 +201,10 @@ export async function updateSettings(
       countdown: {
         ...config.settings.countdown,
         ...withoutUndefined(countdownPartial ?? {}),
+      },
+      worldClocks: {
+        ...config.settings.worldClocks,
+        ...withoutUndefined(worldClocksPartial ?? {}),
       },
       components: {
         ...config.settings.components,

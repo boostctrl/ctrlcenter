@@ -116,6 +116,8 @@ export default async function HomePage({
             statusEnabled={statusEnabled}
             notes={settings.notes}
             countdown={settings.countdown}
+            worldClocks={settings.worldClocks}
+            initialNow={nowDate.toISOString()}
             feed={
               feedEnabled ? (
                 <FeedWidget feed={feed} titleOverride={feedCfg.title} />

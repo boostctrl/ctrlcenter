@@ -153,6 +153,19 @@ export const countdownSchema = z.object({
 });
 export type CountdownConfig = z.infer<typeof countdownSchema>;
 
+// World-clocks widget: labeled IANA time zones rendered as live clocks. Stored
+// leniently (a half-typed row never fails the config load); rows without a
+// valid time zone are ignored at render time (lib/datetime isValidTimeZone).
+export const worldClockItemSchema = z.object({
+  label: z.string().default(""),
+  timeZone: z.string().default(""),
+});
+export const worldClocksSchema = z.object({
+  title: z.string().default("World clocks"),
+  items: z.array(worldClockItemSchema).default([]),
+});
+export type WorldClocksConfig = z.infer<typeof worldClocksSchema>;
+
 // The Notes widget's content: a title and a markdown body (safe subset,
 // rendered by lib/markdown.ts — never as raw HTML). No `enabled` flag: the
 // widget's layout `hidden` flag governs visibility, and an empty body renders
@@ -474,6 +487,7 @@ export const settingsSchema = z.object({
   statusAnnouncements: lenientArray(statusAnnouncementSchema).default([]),
   feed: feedSchema.default(feedSchema.parse({})),
   countdown: countdownSchema.default(countdownSchema.parse({})),
+  worldClocks: worldClocksSchema.default(worldClocksSchema.parse({})),
   components: componentsSchema.default(componentsSchema.parse({})),
   layout: layoutSchema.default(layoutSchema.parse({})),
 });
@@ -702,6 +716,13 @@ export const countdownUpdateSchema = z.object({
   items: z.array(z.object({ label: z.string(), date: z.string() })),
 });
 
+// The admin sends the whole worldClocks object. Rows stay lenient (a half-typed
+// zone must not block autosave); invalid zones are simply not rendered.
+export const worldClocksUpdateSchema = z.object({
+  title: z.string(),
+  items: z.array(z.object({ label: z.string(), timeZone: z.string() })),
+});
+
 // The admin sends the whole feed object. The URL is optional (the widget stays
 // inert until set) but must be http(s) when present.
 export const feedUpdateSchema = z
@@ -814,6 +835,7 @@ export const settingsInputSchema = z.object({
   statusAnnouncements: z.array(statusAnnouncementSchema).optional(),
   feed: feedUpdateSchema.optional(),
   countdown: countdownUpdateSchema.optional(),
+  worldClocks: worldClocksUpdateSchema.optional(),
   components: componentsUpdateSchema.optional(),
   layout: layoutUpdateSchema.optional(),
 });

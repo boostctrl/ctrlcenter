@@ -23,6 +23,10 @@ import CountdownWidget, {
   isValidCountdownDate,
   type CountdownItem,
 } from "./widgets/CountdownWidget";
+import WorldClocksWidget, {
+  type WorldClockItem,
+} from "./widgets/WorldClocksWidget";
+import { isValidTimeZone } from "@/lib/datetime";
 import {
   buildSearchUrl,
   engineLabel,
@@ -213,6 +217,8 @@ export default function Dashboard({
   notes,
   feed = null,
   countdown,
+  worldClocks,
+  initialNow,
 }: {
   // The resolved widget arrangement (order + span + hidden), server-resolved so
   // legacy configs render unchanged.
@@ -248,6 +254,11 @@ export default function Dashboard({
   feed?: React.ReactNode;
   // The Countdown widget's admin-authored title + dated rows.
   countdown: { title: string; items: CountdownItem[] };
+  // The World Clocks widget's admin-authored title + labeled time zones.
+  worldClocks: { title: string; items: WorldClockItem[] };
+  // The server's request instant (ISO), seeding the World Clocks widget so its
+  // clocks render with the right time before the client tick takes over.
+  initialNow: string;
 }) {
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -653,6 +664,15 @@ export default function Dashboard({
             showTitle={!widget.hideLabel}
           />
         ) : null;
+      case "worldClocks":
+        return worldClocks.items.some((i) => isValidTimeZone(i.timeZone.trim())) ? (
+          <WorldClocksWidget
+            title={worldClocks.title}
+            items={worldClocks.items}
+            initialNow={initialNow}
+            showTitle={!widget.hideLabel}
+          />
+        ) : null;
       case "favorites":
         return (!q || editing) && favoriteApps.length > 0 ? (
           <section className="@container">
@@ -720,6 +740,8 @@ export default function Dashboard({
         return "The RSS feed is off or has no URL — set it up in admin Settings → RSS feed.";
       case "countdown":
         return "No dates yet — add them in admin Settings → Countdown.";
+      case "worldClocks":
+        return "No time zones yet — add them in admin Settings → Widgets.";
       case "favorites":
         return "No pinned favorites yet.";
       case "apps":
