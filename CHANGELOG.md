@@ -12,6 +12,17 @@ here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Card grids drop a column before tile names get cut off.** When an
+  applications, favorites, or bookmarks card is set to show several cards per
+  row (or on a wide default dashboard), the grid now steps down to fewer,
+  wider tiles as the card narrows instead of holding the column count until
+  names ellipsize to half a word. A multi-word name like "Network Attached
+  Storage" wraps onto a second line rather than being clipped. The earlier
+  1.9.5 fix moved this to measure the card's own width, but the steps still
+  fired too late; each step now leaves noticeably more room. (#145)
+
 ## [1.9.5] - 2026-07-11
 
 ### Added
