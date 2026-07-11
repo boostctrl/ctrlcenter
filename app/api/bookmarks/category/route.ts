@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { renameBookmarkCategory } from "@/lib/config";
+import { itemMutationErrorResponse } from "@/lib/api-errors";
 import { bookmarkCategoryRenameSchema } from "@/lib/schema";
 
 // Rename a whole bookmark category across its bookmarks. The `/api/bookmarks`
@@ -15,7 +16,7 @@ export async function PATCH(request: NextRequest) {
   try {
     const result = await renameBookmarkCategory(parsed.data.from, parsed.data.to);
     return NextResponse.json(result);
-  } catch {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  } catch (error) {
+    return itemMutationErrorResponse(error);
   }
 }

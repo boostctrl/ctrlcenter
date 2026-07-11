@@ -82,8 +82,10 @@ describe("apps CRUD", () => {
     });
   });
 
-  it("throws when updating a non-existent app", async () => {
-    await expect(config.updateApp("missing", { name: "x" })).rejects.toThrow();
+  it("throws NotFoundError when updating a non-existent app", async () => {
+    await expect(
+      config.updateApp("missing", { name: "x" })
+    ).rejects.toBeInstanceOf(config.NotFoundError);
   });
 
   it("deletes an app", async () => {
@@ -341,11 +343,19 @@ describe("renameBookmarkCategory", () => {
     expect(result.bookmarks.some((b) => b.category === "Dev")).toBe(false);
   });
 
-  it("throws when no bookmark carries the source category", async () => {
+  it("throws NotFoundError when no bookmark carries the source category", async () => {
     await seed();
     await expect(
       config.renameBookmarkCategory("Nope", "Whatever")
-    ).rejects.toThrow();
+    ).rejects.toBeInstanceOf(config.NotFoundError);
+  });
+});
+
+describe("updateBookmark", () => {
+  it("throws NotFoundError when updating a non-existent bookmark", async () => {
+    await expect(
+      config.updateBookmark("missing", { name: "x" })
+    ).rejects.toBeInstanceOf(config.NotFoundError);
   });
 });
 

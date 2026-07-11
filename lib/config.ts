@@ -66,6 +66,11 @@ async function writeConfig(config: Config): Promise<void> {
   await dumpYaml(CONFIG_PATH, validated);
 }
 
+// Thrown by an item mutator when the target id/category isn't in the config, so
+// a route can answer 404 for that case alone and not mislabel a genuine write
+// failure (a full disk, a permissions problem, failed validation) the same way.
+export class NotFoundError extends Error {}
+
 async function mutate<T>(fn: (config: Config) => T): Promise<T> {
   const result = writeQueue.then(async () => {
     const config = await readConfig();
@@ -244,7 +249,7 @@ export async function updateApp(
 ): Promise<AppItem> {
   return mutate((config) => {
     const idx = config.apps.findIndex((a) => a.id === id);
-    if (idx === -1) throw new Error("App not found");
+    if (idx === -1) throw new NotFoundError("App not found");
     config.apps[idx] = { ...config.apps[idx], ...withoutUndefined(input) };
     return config.apps[idx];
   });
@@ -300,7 +305,7 @@ export async function updateBookmark(
 ): Promise<BookmarkItem> {
   return mutate((config) => {
     const idx = config.bookmarks.findIndex((b) => b.id === id);
-    if (idx === -1) throw new Error("Bookmark not found");
+    if (idx === -1) throw new NotFoundError("Bookmark not found");
     config.bookmarks[idx] = { ...config.bookmarks[idx], ...withoutUndefined(input) };
     return config.bookmarks[idx];
   });
@@ -332,7 +337,7 @@ export async function renameBookmarkCategory(
 ): Promise<{ bookmarks: BookmarkItem[]; bookmarkCategoryOrder: string[] }> {
   return mutate((config) => {
     const matches = config.bookmarks.filter((b) => b.category === from);
-    if (matches.length === 0) throw new Error("Category not found");
+    if (matches.length === 0) throw new NotFoundError("Category not found");
     for (const b of config.bookmarks) {
       if (b.category === from) b.category = to;
     }

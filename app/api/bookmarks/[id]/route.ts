@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { updateBookmark, deleteBookmark } from "@/lib/config";
+import { itemMutationErrorResponse } from "@/lib/api-errors";
 import { bookmarkUpdateSchema } from "@/lib/schema";
 
 export async function PUT(
@@ -15,8 +16,8 @@ export async function PUT(
   try {
     const bookmark = await updateBookmark(id, parsed.data);
     return NextResponse.json(bookmark);
-  } catch {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  } catch (error) {
+    return itemMutationErrorResponse(error);
   }
 }
 

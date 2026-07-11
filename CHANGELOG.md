@@ -12,6 +12,16 @@ here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Editing an app or bookmark now reports the real reason a save failed.** When
+  saving a change to an application, a bookmark, or a bookmark category's name
+  couldn't be written for a reason other than the item being gone — a full disk,
+  a permissions problem — the admin used to see a misleading "Not found" for an
+  item that was plainly still in the list. These now surface a proper save
+  error, and "Not found" is reserved for an item that genuinely no longer
+  exists. (#148)
+
 ## [1.9.4] - 2026-07-10
 
 ### Added
