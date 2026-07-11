@@ -502,6 +502,8 @@ export const bookmarkItemSchema = z.object({
   name: z.string().min(1),
   url: httpUrl,
   icon: z.string().default(""),
+  // Render only for the admin session, same contract as the app flag above.
+  private: z.boolean().catch(false).default(false),
 });
 
 // Optional stored admin credential (PBKDF2). Empty means "no UI password set"
@@ -591,6 +593,7 @@ export const bookmarkInputSchema = z.object({
   name: z.string().min(1),
   url: httpUrl,
   icon: z.string().optional().default(""),
+  private: z.boolean().optional().default(false),
 });
 
 // "Update" schemas (PUT / partial merge): every field is plain-optional with
@@ -825,6 +828,7 @@ export const bookmarkUpdateSchema = z.object({
   name: z.string().min(1).optional(),
   url: httpUrl.optional(),
   icon: z.string().optional(),
+  private: z.boolean().optional(),
 });
 
 // Rename a bookmark category across its bookmarks (PATCH /api/bookmarks/category).

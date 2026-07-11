@@ -12,6 +12,16 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Bookmarks can be marked "Only show when logged in", just like apps.** The
+  bookmark form gains the same checkbox apps got in 1.9.4, for links that
+  shouldn't be advertised to every visitor — an internal wiki, a router's
+  admin page, a billing portal. A private bookmark disappears from the home
+  page and its search results for signed-out visitors, and a category whose
+  bookmarks are all private disappears with them; filtering happens on the
+  server, so nothing about the bookmark reaches a signed-out browser. (#149)
+
 ### Fixed
 
 - **Editing an app or bookmark now reports the real reason a save failed.** When

@@ -344,7 +344,10 @@ export default async function HelpPage() {
                 <strong>Bookmarks</strong> group under categories you name. Both
                 the bookmarks and the category order are drag-sortable, and a
                 category can be renamed from its heading — every bookmark in it
-                moves across at once.
+                moves across at once. Bookmarks take the same{" "}
+                <strong>Only show when logged in</strong> flag as apps; a
+                category whose bookmarks are all private disappears for
+                signed-out visitors too.
               </li>
               <li>
                 <strong>Icons</strong> come from a large built-in set (pick by

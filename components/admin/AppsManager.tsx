@@ -4,7 +4,14 @@ import { useState, type FormEvent } from "react";
 import type { AppItem } from "@/lib/schema";
 import { CHECK_TYPES, type CheckType } from "@/lib/status";
 import Icon from "@/components/Icon";
-import { TextField, Button, MoveButtons, DragGrip } from "./ui";
+import {
+  TextField,
+  Button,
+  MoveButtons,
+  DragGrip,
+  PrivateChip,
+  PrivateToggle,
+} from "./ui";
 import IconField from "./IconField";
 import { useReorder, dropIndicatorClass } from "./useReorder";
 import { useToast } from "./Toast";
@@ -204,14 +211,7 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
                   {/* min-w-0: a flex item won't shrink below its content, so
                       truncate can't clip without it */}
                   <span className="min-w-0 truncate">{app.name}</span>
-                  {app.private && (
-                    <span
-                      className="shrink-0 rounded-full border border-fg/15 px-2 py-0.5 text-[10px] font-normal tracking-wide text-fg/45 uppercase"
-                      title="Only shown when logged in"
-                    >
-                      Private
-                    </span>
-                  )}
+                  {app.private && <PrivateChip />}
                 </p>
                 <p className="truncate text-xs text-fg/40">
                   {app.subtitle ? `${app.subtitle} · ${app.url}` : app.url}
@@ -259,20 +259,11 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
           onChange={(v) => setForm({ ...form, icon: v })}
           name={form.name}
         />
-        <div className="flex flex-col gap-2">
-          <label className="flex items-center justify-between gap-4 text-sm">
-            <span className="text-fg/70">Only show when logged in</span>
-            <input
-              type="checkbox"
-              checked={form.private}
-              onChange={(e) => setForm({ ...form, private: e.target.checked })}
-            />
-          </label>
-          <p className="text-xs text-fg/40">
-            Hides this app from signed-out visitors everywhere, including the
-            status page. It&apos;s still monitored and alerted on.
-          </p>
-        </div>
+        <PrivateToggle
+          checked={form.private}
+          onChange={(v) => setForm({ ...form, private: v })}
+          hint="Hides this app from signed-out visitors everywhere, including the status page. It's still monitored and alerted on."
+        />
         <div className="flex flex-col gap-2">
           <label htmlFor="check-method" className="text-sm text-fg/50">
             Check method

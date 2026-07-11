@@ -4,15 +4,34 @@ import { useRef, useState, type FormEvent } from "react";
 import type { BookmarkItem } from "@/lib/schema";
 import { orderCategories } from "@/lib/bookmarks";
 import Icon from "@/components/Icon";
-import { TextField, Button, MoveButtons, DragGrip } from "./ui";
+import {
+  TextField,
+  Button,
+  MoveButtons,
+  DragGrip,
+  PrivateChip,
+  PrivateToggle,
+} from "./ui";
 import IconField from "./IconField";
 import { useReorder, dropIndicatorClass } from "./useReorder";
 import { useToast } from "./Toast";
 import { useConfirm } from "./Confirm";
 import { apiErrorMessage } from "./apiError";
 
-type FormState = { name: string; category: string; url: string; icon: string };
-const emptyForm: FormState = { name: "", category: "", url: "", icon: "" };
+type FormState = {
+  name: string;
+  category: string;
+  url: string;
+  icon: string;
+  private: boolean;
+};
+const emptyForm: FormState = {
+  name: "",
+  category: "",
+  url: "",
+  icon: "",
+  private: false,
+};
 
 export default function BookmarksManager({
   initialBookmarks,
@@ -41,6 +60,7 @@ export default function BookmarksManager({
       category: bookmark.category,
       url: bookmark.url,
       icon: bookmark.icon,
+      private: bookmark.private,
     });
   }
 
@@ -344,6 +364,11 @@ export default function BookmarksManager({
           onChange={(v) => setForm({ ...form, icon: v })}
           name={form.name}
         />
+        <PrivateToggle
+          checked={form.private}
+          onChange={(v) => setForm({ ...form, private: v })}
+          hint="Hides this bookmark from signed-out visitors. A category whose bookmarks are all private disappears with them."
+        />
         <div className="flex gap-2">
           <Button type="submit" disabled={saving}>
             {editingId ? "Save changes" : "Add"}
@@ -403,7 +428,12 @@ function CategoryGroup({
             <DragGrip {...grip(index)} />
             <Icon icon={bookmark.icon} name={bookmark.name} size={24} />
             <div className="min-w-0">
-              <p className="truncate font-medium">{bookmark.name}</p>
+              <p className="flex items-center gap-2 font-medium">
+                {/* min-w-0: a flex item won't shrink below its content, so
+                    truncate can't clip without it */}
+                <span className="min-w-0 truncate">{bookmark.name}</span>
+                {bookmark.private && <PrivateChip />}
+              </p>
               <p className="truncate text-xs text-fg/40">{bookmark.url}</p>
             </div>
           </div>

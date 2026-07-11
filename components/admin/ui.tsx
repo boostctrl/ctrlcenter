@@ -99,6 +99,45 @@ export function MoveButtons({
   );
 }
 
+// Row badge for items flagged "Only show when logged in". Shared by the app
+// and bookmark managers so the two lists can't drift apart.
+export function PrivateChip() {
+  return (
+    <span
+      className="shrink-0 rounded-full border border-fg/15 px-2 py-0.5 text-[10px] font-normal tracking-wide text-fg/45 uppercase"
+      title="Only shown when logged in"
+    >
+      Private
+    </span>
+  );
+}
+
+// The matching form control. The hint differs per item kind (apps are still
+// monitored while hidden; bookmarks just disappear), so callers supply it.
+export function PrivateToggle({
+  checked,
+  onChange,
+  hint,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  hint: string;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <label className="flex items-center justify-between gap-4 text-sm">
+        <span className="text-fg/70">Only show when logged in</span>
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+        />
+      </label>
+      <p className="text-xs text-fg/40">{hint}</p>
+    </div>
+  );
+}
+
 // The ⠿ handle that starts a drag-reorder; spread a useReorder `grip(index)`
 // onto it. MoveButtons' mouse-only sibling: hidden below sm, where touch rules
 // and the buttons are the reorder path. One component so the three reorderable

@@ -23,17 +23,20 @@ export default async function HomePage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const config = await readConfig();
-  const { settings, bookmarks } = config;
+  const { settings } = config;
 
   // Admin state unlocks the layout-editor UI (saves go through the gated
   // settings API) and reveals private apps; ?edit=1 is the deep link from
   // admin Settings → Layout.
   const isAdmin = await isAdminSession(config.auth.passwordHash);
 
-  // Private apps must be dropped before the payload leaves the server — and
-  // everything derived from the list (search matches, per-app bangs,
-  // favorites) follows from the filtered array for free.
+  // Private apps and bookmarks must be dropped before the payload leaves the
+  // server — and everything derived from the lists (search matches, per-app
+  // bangs, category grouping) follows from the filtered arrays for free. A
+  // category whose bookmarks are all private never enters the grouping map,
+  // so its heading vanishes for guests with them.
   const apps = visibleApps(config.apps, isAdmin);
+  const bookmarks = visibleApps(config.bookmarks, isAdmin);
 
   // One poller wraps both the status widgets and the per-app dots; only
   // enable it when status checks are on and there are apps to monitor.
