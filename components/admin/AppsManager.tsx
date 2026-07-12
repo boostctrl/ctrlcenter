@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import type { AppItem } from "@/lib/schema";
 import { CHECK_TYPES, type CheckType } from "@/lib/status";
 import Icon from "@/components/Icon";
+import { ChipGroup } from "@/components/ChipGroup";
 import {
   TextField,
   Button,
@@ -313,42 +314,32 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
         {form.checkType === "http" && (
         <div className="flex flex-col gap-2">
           <span className="text-sm text-fg/50">Counts as up when</span>
-          <div className="flex overflow-hidden rounded-lg border border-fg/10 text-xs">
-            {(
+          <ChipGroup
+            label="Counts as up when"
+            equal
+            options={
               [
-                { key: "any", label: "Any response" },
-                { key: "ok", label: "2xx & 3xx" },
-                { key: "custom", label: "Custom" },
+                { value: "any", label: "Any response" },
+                { value: "ok", label: "2xx & 3xx" },
+                { value: "custom", label: "Custom" },
               ] as const
-            ).map((opt) => (
-              <button
-                key={opt.key}
-                type="button"
-                aria-pressed={upMode === opt.key}
-                onClick={() => {
-                  setUpMode(opt.key);
-                  if (opt.key === "any") setForm({ ...form, expectStatus: "" });
-                  else if (opt.key === "ok")
-                    setForm({ ...form, expectStatus: "200-399" });
-                  else
-                    setForm({
-                      ...form,
-                      expectStatus:
-                        modeFromExpect(form.expectStatus) === "custom"
-                          ? form.expectStatus
-                          : "200-299",
-                    });
-                }}
-                className={`flex-1 px-2 py-1.5 transition-colors ${
-                  upMode === opt.key
-                    ? "bg-fg/15 text-fg"
-                    : "text-fg/50 hover:text-fg/80"
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
+            }
+            value={upMode}
+            onChange={(key) => {
+              setUpMode(key);
+              if (key === "any") setForm({ ...form, expectStatus: "" });
+              else if (key === "ok")
+                setForm({ ...form, expectStatus: "200-399" });
+              else
+                setForm({
+                  ...form,
+                  expectStatus:
+                    modeFromExpect(form.expectStatus) === "custom"
+                      ? form.expectStatus
+                      : "200-299",
+                });
+            }}
+          />
           {upMode === "custom" && (
             <input
               value={form.expectStatus}

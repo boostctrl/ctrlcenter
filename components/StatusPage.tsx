@@ -3,6 +3,7 @@
 import { memo, useCallback, useEffect, useState, type KeyboardEvent } from "react";
 import Icon from "./Icon";
 import StatusAnnouncements from "./StatusAnnouncements";
+import { ChipGroup } from "./ChipGroup";
 import { useVisitorPrefs } from "./PrefsProvider";
 import {
   summarize,
@@ -353,23 +354,16 @@ export default function StatusPage({
         <>
           <div className="flex items-center justify-between gap-2 px-1">
             <span className="text-xs text-fg/40">Uptime over {rangeLabel}</span>
-            <div className="flex overflow-hidden rounded-lg border border-fg/10">
-              {STATUS_RANGES.map((r) => (
-                <button
-                  key={r.key}
-                  type="button"
-                  aria-pressed={range === r.key}
-                  onClick={() => setRange(r.key)}
-                  className={`px-2.5 py-1 text-xs transition-colors ${
-                    range === r.key
-                      ? "bg-fg/15 text-fg"
-                      : "text-fg/50 hover:text-fg/80"
-                  }`}
-                >
-                  {r.label}
-                </button>
-              ))}
-            </div>
+            <ChipGroup
+              label="Uptime range"
+              size="xs"
+              options={STATUS_RANGES.map((r) => ({
+                value: r.key,
+                label: r.label,
+              }))}
+              value={range}
+              onChange={setRange}
+            />
           </div>
 
           <div className="space-y-3">

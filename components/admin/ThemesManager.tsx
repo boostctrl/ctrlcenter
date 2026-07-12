@@ -12,6 +12,7 @@ import {
   type ThemePack,
 } from "@/lib/theme";
 import type { ThemePackConfig } from "@/lib/schema";
+import { ChipGroup } from "@/components/ChipGroup";
 import { apiErrorMessage } from "./apiError";
 import { useConfirm } from "./Confirm";
 import { useAutosave, SaveStatus, type SaveOptions } from "./useAutosave";
@@ -222,21 +223,17 @@ function PackEditor({
         </label>
       </div>
 
-      <div className="flex overflow-hidden rounded-lg border border-fg/10 text-xs">
-        {(["dark", "light"] as const).map((m) => (
-          <button
-            key={m}
-            type="button"
-            onClick={() => setMode(m)}
-            aria-pressed={mode === m}
-            className={`flex-1 px-2 py-1.5 capitalize transition-colors ${
-              mode === m ? "bg-fg/15 text-fg" : "text-fg/50 hover:text-fg/80"
-            }`}
-          >
-            {m}
-          </button>
-        ))}
-      </div>
+      <ChipGroup
+        label="Editing mode"
+        equal
+        capitalize
+        options={(["dark", "light"] as const).map((m) => ({
+          value: m,
+          label: m,
+        }))}
+        value={mode}
+        onChange={setMode}
+      />
 
       <div className="grid grid-cols-2 gap-2">
         {COLOR_FIELDS.map((f) => (

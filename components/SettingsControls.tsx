@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useVisitorPrefs } from "./PrefsProvider";
+import { ChipGroup } from "./ChipGroup";
 import CitySearch from "./admin/CitySearch";
 import { useConfirm } from "./admin/Confirm";
 import { supportedTimezones } from "@/lib/prefs";
@@ -58,23 +59,18 @@ export default function SettingsControls() {
       <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
         <div className="space-y-1.5">
           <span className="text-fg/50">Appearance mode</span>
-          <div className="flex w-fit overflow-hidden rounded-lg border border-fg/10">
-            {(["system", "light", "dark"] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                aria-pressed={theme === m}
-                onClick={() => setTheme(m)}
-                className={`px-4 py-2 text-xs capitalize transition-colors ${
-                  theme === m
-                    ? "bg-fg/15 text-fg"
-                    : "text-fg/50 hover:text-fg/80"
-                }`}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
+          <ChipGroup
+            label="Appearance mode"
+            size="md"
+            fit
+            capitalize
+            options={(["system", "light", "dark"] as const).map((m) => ({
+              value: m,
+              label: m,
+            }))}
+            value={theme}
+            onChange={setTheme}
+          />
           <p className="text-xs text-fg/40">
             Light, dark, or follow your device.
           </p>
@@ -164,23 +160,17 @@ export default function SettingsControls() {
 
             <div className="space-y-1.5">
               <span className="text-fg/50">Units</span>
-              <div className="flex w-fit overflow-hidden rounded-lg border border-fg/10">
-                {(["imperial", "metric"] as const).map((u) => (
-                  <button
-                    key={u}
-                    type="button"
-                    aria-pressed={units === u}
-                    onClick={() => setUnits(u)}
-                    className={`px-4 py-2 text-xs transition-colors ${
-                      units === u
-                        ? "bg-fg/15 text-fg"
-                        : "text-fg/50 hover:text-fg/80"
-                    }`}
-                  >
-                    {u === "imperial" ? "°F" : "°C"}
-                  </button>
-                ))}
-              </div>
+              <ChipGroup
+                label="Units"
+                size="md"
+                fit
+                options={(["imperial", "metric"] as const).map((u) => ({
+                  value: u,
+                  label: u === "imperial" ? "°F" : "°C",
+                }))}
+                value={units}
+                onChange={setUnits}
+              />
             </div>
           </>
         )}

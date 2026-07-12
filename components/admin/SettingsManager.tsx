@@ -26,6 +26,7 @@ import { useNow } from "../useNow";
 import { supportedTimezones, newThemeId } from "@/lib/prefs";
 import { resolveLayoutWidgets, type LayoutWidgetId } from "@/lib/layout";
 import { TextField, MoveButtons } from "./ui";
+import { ChipGroup } from "@/components/ChipGroup";
 import { reorder } from "./useReorder";
 import IconField from "./IconField";
 import CalendarTest from "./CalendarTest";
@@ -515,23 +516,16 @@ export default function SettingsManager({
 
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm text-fg/50">Default mode</span>
-          <div className="flex overflow-hidden rounded-lg border border-fg/10">
-            {(["system", "light", "dark"] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                aria-pressed={theme.mode === m}
-                onClick={() => updateTheme({ mode: m })}
-                className={`px-3 py-1.5 text-xs capitalize transition-colors ${
-                  theme.mode === m
-                    ? "bg-fg/15 text-fg"
-                    : "text-fg/50 hover:text-fg/80"
-                }`}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
+          <ChipGroup
+            label="Default mode"
+            capitalize
+            options={(["system", "light", "dark"] as const).map((m) => ({
+              value: m,
+              label: m,
+            }))}
+            value={theme.mode}
+            onChange={(mode) => updateTheme({ mode })}
+          />
         </div>
 
         <label className="flex flex-col gap-1 text-sm">
@@ -1314,34 +1308,20 @@ export default function SettingsManager({
                 90-day history on the status page.
               </p>
             </div>
-            <div className="flex shrink-0 overflow-hidden rounded-lg border border-fg/10">
-              {INTERVAL_PRESETS.map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  aria-pressed={settings.statusInterval === m}
-                  onClick={() => setSettings({ ...settings, statusInterval: m })}
-                  className={`px-3 py-1.5 text-xs transition-colors ${
-                    settings.statusInterval === m
-                      ? "bg-fg/15 text-fg"
-                      : "text-fg/50 hover:text-fg/80"
-                  }`}
-                >
-                  {m} min
-                </button>
-              ))}
-              {/* A hand-edited config value (the schema allows 1–60) matches no
-                  preset; surface it as an extra selected chip so the control
-                  never reads as "nothing selected". It vanishes once a preset is
-                  clicked. A span, not a button — it's a readout of the current
-                  value, not a choice; making it clickable-looking-but-inert
-                  would just be a keyboard trap. */}
-              {!INTERVAL_PRESETS.includes(settings.statusInterval) && (
-                <span className="px-3 py-1.5 text-xs bg-fg/15 text-fg">
-                  {settings.statusInterval} min
-                </span>
-              )}
-            </div>
+            {/* A hand-edited config value (the schema allows 1–60) matches no
+                preset; `offLabel` surfaces it as a read-only chip so the control
+                never reads as "nothing selected". */}
+            <ChipGroup
+              label="Uptime check interval"
+              shrink
+              options={INTERVAL_PRESETS.map((m) => ({
+                value: m,
+                label: `${m} min`,
+              }))}
+              value={settings.statusInterval}
+              onChange={(m) => setSettings({ ...settings, statusInterval: m })}
+              offLabel={(m) => `${m} min`}
+            />
           </div>
         )}
 
@@ -1353,25 +1333,18 @@ export default function SettingsManager({
                 Which time range the status page opens on.
               </p>
             </div>
-            <div className="flex shrink-0 overflow-hidden rounded-lg border border-fg/10">
-              {STATUS_RANGES.map((r) => (
-                <button
-                  key={r.key}
-                  type="button"
-                  aria-pressed={settings.statusDefaultRange === r.key}
-                  onClick={() =>
-                    setSettings({ ...settings, statusDefaultRange: r.key })
-                  }
-                  className={`px-3 py-1.5 text-xs transition-colors ${
-                    settings.statusDefaultRange === r.key
-                      ? "bg-fg/15 text-fg"
-                      : "text-fg/50 hover:text-fg/80"
-                  }`}
-                >
-                  {r.label}
-                </button>
-              ))}
-            </div>
+            <ChipGroup
+              label="Default status range"
+              shrink
+              options={STATUS_RANGES.map((r) => ({
+                value: r.key,
+                label: r.label,
+              }))}
+              value={settings.statusDefaultRange}
+              onChange={(r) =>
+                setSettings({ ...settings, statusDefaultRange: r })
+              }
+            />
           </div>
         )}
         </Section>
@@ -1687,23 +1660,16 @@ export default function SettingsManager({
 
                 <div className="flex flex-col gap-1.5">
                   <span className="text-sm text-fg/50">Kind</span>
-                  <div className="flex overflow-hidden rounded-lg border border-fg/10 text-xs">
-                    {STATUS_ANNOUNCEMENT_KINDS.map((k) => (
-                      <button
-                        key={k}
-                        type="button"
-                        aria-pressed={a.kind === k}
-                        onClick={() => updateStatusAnnouncement(i, { kind: k })}
-                        className={`flex-1 px-2 py-1.5 transition-colors ${
-                          a.kind === k
-                            ? "bg-fg/15 text-fg"
-                            : "text-fg/50 hover:text-fg/80"
-                        }`}
-                      >
-                        {STATUS_ANNOUNCEMENT_KIND_META[k].label}
-                      </button>
-                    ))}
-                  </div>
+                  <ChipGroup
+                    label="Announcement kind"
+                    equal
+                    options={STATUS_ANNOUNCEMENT_KINDS.map((k) => ({
+                      value: k,
+                      label: STATUS_ANNOUNCEMENT_KIND_META[k].label,
+                    }))}
+                    value={a.kind}
+                    onChange={(kind) => updateStatusAnnouncement(i, { kind })}
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">

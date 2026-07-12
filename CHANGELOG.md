@@ -14,6 +14,14 @@ here.
 
 ### Changed
 
+- **The app's segmented toggles are now one consistent control.** The status
+  page's range picker, the appearance-mode and units switches, the uptime-check
+  interval and default-range pickers, the announcement kind, and the theme
+  builder's mode and accent switches all share a single implementation, so they
+  look and behave the same everywhere. As a bonus, any of them now shows a
+  read-only chip when a hand-edited config value matches none of the presets —
+  the control never looks like nothing is selected. (#140)
+
 - **More horizontal strips fade at a clipped edge.** The admin tab row and the
   hourly forecast strip now fade out on whichever side has more to scroll to —
   the same cue the theme builder's tabs already used — so it's clear there's

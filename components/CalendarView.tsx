@@ -3,6 +3,7 @@
 import { useState } from "react";
 import CalendarMonth from "./CalendarMonth";
 import AgendaList from "./AgendaList";
+import { ChipGroup } from "./ChipGroup";
 import type { CalendarEvent } from "@/lib/calendar";
 
 type View = "month" | "agenda";
@@ -27,20 +28,18 @@ export default function CalendarView({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex w-fit overflow-hidden rounded-lg border border-fg/10 text-sm">
-        {(["month", "agenda"] as const).map((v) => (
-          <button
-            key={v}
-            type="button"
-            onClick={() => setView(v)}
-            className={`px-4 py-2 capitalize transition-colors ${
-              view === v ? "bg-fg/15 text-fg" : "text-fg/50 hover:text-fg/80"
-            }`}
-          >
-            {v}
-          </button>
-        ))}
-      </div>
+      <ChipGroup
+        label="Calendar view"
+        size="lg"
+        fit
+        capitalize
+        options={(["month", "agenda"] as const).map((v) => ({
+          value: v,
+          label: v,
+        }))}
+        value={view}
+        onChange={setView}
+      />
 
       {view === "month" ? (
         <section className="glass-card p-4 sm:p-6">
