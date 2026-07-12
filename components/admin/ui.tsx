@@ -1,6 +1,10 @@
 "use client";
 
-import type { InputHTMLAttributes, ButtonHTMLAttributes } from "react";
+import type {
+  InputHTMLAttributes,
+  ButtonHTMLAttributes,
+  Ref,
+} from "react";
 import { buttonClasses, type ButtonVariant } from "@/lib/buttons";
 
 export function TextField({
@@ -21,10 +25,15 @@ export function TextField({
 export function Button({
   variant = "primary",
   className = "",
+  ref,
   ...props
-}: { variant?: ButtonVariant } & ButtonHTMLAttributes<HTMLButtonElement>) {
+}: { variant?: ButtonVariant; ref?: Ref<HTMLButtonElement> } & ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
-    <button {...props} className={`${buttonClasses(variant)} ${className}`} />
+    <button
+      {...props}
+      ref={ref}
+      className={`${buttonClasses(variant)} ${className}`}
+    />
   );
 }
 

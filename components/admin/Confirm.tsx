@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -33,6 +34,7 @@ export function useConfirm() {
 export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<Pending | null>(null);
   const trapRef = useFocusTrap<HTMLDivElement>(pending !== null);
+  const acceptRef = useRef<HTMLButtonElement>(null);
 
   const confirm = useCallback(
     (opts: ConfirmOptions) =>
@@ -52,12 +54,28 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!pending) return;
+    // Guard against the keystroke that OPENED the dialog also accepting it. When
+    // a "press Enter → confirm" flow opens us, React can flush this effect
+    // synchronously mid-keydown, so an Enter listener attached now still catches
+    // that same Enter (bubbling up, or its trailing keyup) and self-approves —
+    // and React's `autoFocus` would focus the confirm button right into the
+    // keystroke's path too. So both accepting Enter and seeding focus wait a
+    // task, by which point the opening keystroke is fully over (#146). Callers no
+    // longer need a per-site preventDefault guard.
+    let ready = false;
+    const arm = setTimeout(() => {
+      ready = true;
+      acceptRef.current?.focus();
+    }, 0);
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") settle(false);
-      if (e.key === "Enter") settle(true);
+      else if (e.key === "Enter" && ready) settle(true);
     }
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    return () => {
+      clearTimeout(arm);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [pending, settle]);
 
   return (
@@ -84,9 +102,9 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                 Cancel
               </Button>
               <Button
+                ref={acceptRef}
                 variant={pending.danger ? "danger" : "primary"}
                 type="button"
-                autoFocus
                 onClick={() => settle(true)}
               >
                 {pending.confirmLabel ?? "Confirm"}

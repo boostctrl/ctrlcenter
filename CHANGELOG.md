@@ -12,6 +12,15 @@ here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A confirmation dialog can't be accepted by the keypress that opened it.**
+  Pressing Enter to commit an action that then asks you to confirm — for
+  example renaming a bookmark category onto an existing one, which asks before
+  merging — now reliably opens the dialog and waits for a deliberate response,
+  instead of that same in-flight Enter occasionally approving it on its own.
+  (#146)
+
 ## [1.9.6] - 2026-07-12
 
 ### Added
