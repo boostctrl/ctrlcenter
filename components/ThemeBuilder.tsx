@@ -1,8 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, ChangeEvent, ReactNode } from "react";
 import { useVisitorPrefs } from "./PrefsProvider";
+import { ChipGroup } from "./ChipGroup";
+import { RenameButton, RenameField } from "./InlineRename";
+import { useEdgeFade } from "./useEdgeFade";
 import { useConfirm } from "./admin/Confirm";
 import { BASE_THEMES, DESIGNS, SCENES } from "@/lib/theme";
 import type { DesignId, ModeColors, SceneId, ThemePack } from "@/lib/theme";
@@ -104,10 +107,16 @@ function scenePreview(id: SceneId, from: string, to: string): string {
   }
 }
 
+// The card box shared by every option tile and by its rename state, so a shell
+// restyle (padding, radius, gap) can't leave one behind (#144).
+const CARD_SHELL = "flex w-full flex-col gap-1.5 rounded-lg border p-2";
+
 // The shared shape of every option tile: swatch on top (children), name +
 // optional description below, an optional corner badge, and an accent check
 // when it's the active choice. Options that are one-shot actions rather than
-// state (packs, palettes) simply omit `selected`.
+// state (packs, palettes) simply omit `selected`. Pass `editingField` to render
+// the same shell as a non-interactive card with an inline rename input where the
+// name would be — an input can't live inside the tile's <button> (#144).
 function OptionCard({
   onClick,
   name,
@@ -117,8 +126,9 @@ function OptionCard({
   badge,
   nameStyle,
   children,
+  editingField,
 }: {
-  onClick: () => void;
+  onClick?: () => void;
   name: string;
   selected?: boolean;
   desc?: string;
@@ -126,14 +136,23 @@ function OptionCard({
   badge?: string;
   nameStyle?: CSSProperties;
   children: ReactNode;
+  editingField?: ReactNode;
 }) {
+  if (editingField) {
+    return (
+      <div className={`${CARD_SHELL} border-fg/10`}>
+        {children}
+        {editingField}
+      </div>
+    );
+  }
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={selected}
       title={title}
-      className={`group relative flex w-full flex-col gap-1.5 rounded-lg border p-2 text-left transition-colors ${
+      className={`group relative ${CARD_SHELL} text-left transition-colors ${
         selected ? "border-[color:var(--accent-from)]" : "border-fg/10 hover:border-fg/30"
       }`}
     >
@@ -250,9 +269,6 @@ export default function ThemeBuilder({
   const [saveFailed, setSaveFailed] = useState(false);
   // Which saved theme's card is showing its inline rename field (null = none).
   const [renamingId, setRenamingId] = useState<string | null>(null);
-  // Escape must cancel a rename, but blur fires right after it — this flag lets
-  // the blur handler tell an Escape-driven unmount from a real commit.
-  const cancelRename = useRef(false);
   // The outcome of the last import, shown in the Your-themes section.
   const [importStatus, setImportStatus] = useState<string | null>(null);
   // Outcome of the last "set as site theme" (admin only), same treatment.
@@ -268,37 +284,13 @@ export default function ThemeBuilder({
       : "gradient"
   );
 
-  // The tablist scrolls horizontally when the tabs overflow a narrow phone, but
-  // nothing otherwise signals that tabs are clipped off an edge. Track which
-  // side has more to scroll toward so we can fade the row out there. Masking the
-  // row itself (below) rather than laying a gradient overlay on top means the
-  // fade works over any theme surface — an overlay would have to guess the card
-  // color behind it.
-  const tablistRef = useRef<HTMLDivElement>(null);
-  const [tabClip, setTabClip] = useState({ start: false, end: false });
-  const measureTabClip = useCallback(() => {
-    const el = tablistRef.current;
-    if (!el) return;
-    const start = el.scrollLeft > 0;
-    const end = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
-    // Scroll fires this many times per swipe; returning the previous object
-    // when nothing changed lets React bail out instead of re-rendering the
-    // whole builder per event.
-    setTabClip((prev) =>
-      prev.start === start && prev.end === end ? prev : { start, end }
-    );
-  }, []);
-  useEffect(() => {
-    // Effect-only so it never runs during SSR: the first measure and the
-    // ResizeObserver both need a live element. The tab count is static, but the
-    // viewport isn't — a resize can clip or reveal an edge without a scroll.
-    measureTabClip();
-    const el = tablistRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(measureTabClip);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [measureTabClip]);
+  // The tablist scrolls horizontally when the tabs overflow a narrow phone; the
+  // shared edge fade signals which side is clipped (#143).
+  const {
+    ref: tablistRef,
+    onScroll: measureTabClip,
+    style: tabMaskStyle,
+  } = useEdgeFade<HTMLDivElement>();
 
   // Keep the pickers in sync with the edit mode's colorset. Background/text come
   // from the active look's chosen-mode variant (or that mode's defaults when
@@ -375,19 +367,24 @@ export default function ThemeBuilder({
     if (saved) setName("");
   }
 
-  // Commit an inline rename on Enter/blur. Escape (via cancelRename) or an empty
-  // field cancels, leaving the saved name untouched. A failed write surfaces the
-  // same storage-blocked notice the save path uses.
+  // Commit an inline rename. An empty field leaves the saved name untouched; a
+  // failed write surfaces the same storage-blocked notice the save path uses.
+  // RenameField suppresses the commit on an Escape cancel, so this only runs on
+  // a real commit.
   function commitRename(id: string, value: string) {
-    if (cancelRename.current) {
-      cancelRename.current = false;
-      setRenamingId(null);
-      return;
-    }
     const next = value.trim();
     if (next) setSaveFailed(!renameNamedTheme(id, next));
     setRenamingId(null);
   }
+
+  // Pre-1.9.3 saves could pile two cards under one name; flag it so Save's
+  // update-in-place stays unambiguous (#144).
+  const nameCounts = new Map<string, number>();
+  for (const t of customThemes) {
+    const key = t.name.trim().toLowerCase();
+    nameCounts.set(key, (nameCounts.get(key) ?? 0) + 1);
+  }
+  const hasDuplicateNames = [...nameCounts.values()].some((n) => n > 1);
 
   // Snapshot a saved theme into the site default every visitor sees (#142).
   // The field mapping lives in lib/prefs.ts (siteThemeFromCustomTheme), where
@@ -460,17 +457,6 @@ export default function ThemeBuilder({
     }
   }
 
-  // Fade the tablist to transparent over ~24px on whichever side is clipped,
-  // opaque across the rest; no mask at all when nothing is clipped.
-  const tabMask = `linear-gradient(to right, ${[
-    tabClip.start ? "transparent 0, black 24px" : "black 0",
-    tabClip.end ? "black calc(100% - 24px), transparent 100%" : "black 100%",
-  ].join(", ")})`;
-  const tabMaskStyle: CSSProperties | undefined =
-    tabClip.start || tabClip.end
-      ? { maskImage: tabMask, WebkitMaskImage: tabMask }
-      : undefined;
-
   // A full-look swatch (surface bg + accent glow) for the current mode — used
   // for the theme packs and saved themes, which restyle the mode being edited.
   const lookSwatch = (look: ModeColors) => {
@@ -527,43 +513,40 @@ export default function ThemeBuilder({
         <div className="flex flex-col items-end gap-1">
           <div className="flex items-center gap-2">
             <span className="text-xs text-fg/50">Editing</span>
-            <div className="flex overflow-hidden rounded-lg border border-fg/10">
-              {(["dark", "light"] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setPreviewMode(m)}
-                  aria-pressed={editMode === m}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs capitalize transition-colors ${
-                    editMode === m
-                      ? "bg-fg/15 text-fg"
-                      : "text-fg/50 hover:text-fg/80"
-                  }`}
-                >
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden
-                  >
-                    {m === "dark" ? (
-                      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                    ) : (
-                      <>
-                        <circle cx="12" cy="12" r="5" />
-                        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-                      </>
-                    )}
-                  </svg>
-                  {m}
-                </button>
-              ))}
-            </div>
+            <ChipGroup
+              label="Editing mode"
+              capitalize
+              options={(["dark", "light"] as const).map((m) => ({
+                value: m,
+                label: (
+                  <>
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden
+                    >
+                      {m === "dark" ? (
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                      ) : (
+                        <>
+                          <circle cx="12" cy="12" r="5" />
+                          <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                        </>
+                      )}
+                    </svg>
+                    {m}
+                  </>
+                ),
+              }))}
+              value={editMode}
+              onChange={setPreviewMode}
+            />
           </div>
           <p className="text-[10px] text-fg/40">
             Previews live — your saved Appearance mode is untouched.
@@ -688,37 +671,44 @@ export default function ThemeBuilder({
                 {promoteStatus}
               </p>
             )}
+            {/* Pre-1.9.3, Save always appended, so a name could land on two
+                cards. Rename updates in place by id, but Save-under-a-name looks
+                up by name and would recapture into the first match — nudge the
+                user to give duplicates distinct names so Save is unambiguous
+                (#144). */}
+            {hasDuplicateNames && (
+              <p className="text-[11px] text-fg/45">
+                Some saved themes share a name — rename them so saving updates the
+                one you mean.
+              </p>
+            )}
             {customThemes.length > 0 && (
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-                {customThemes.map((t) =>
-                  renamingId === t.id ? (
-                    // An input can't live inside the OptionCard <button>, so while
-                    // renaming we swap in a div styled like the card.
-                    <div
+                {customThemes.map((t) => {
+                  const swatch = (
+                    <span
+                      className="block h-10 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
+                      style={{ background: lookSwatch(t) }}
+                      aria-hidden
+                    />
+                  );
+                  return renamingId === t.id ? (
+                    <OptionCard
                       key={t.id}
-                      className="flex w-full flex-col gap-1.5 rounded-lg border border-fg/10 p-2"
+                      name={t.name}
+                      editingField={
+                        <RenameField
+                          initialValue={t.name}
+                          maxLength={40}
+                          label={`Rename ${t.name}`}
+                          onCommit={(v) => commitRename(t.id, v)}
+                          onCancel={() => setRenamingId(null)}
+                          className="accent-focus min-w-0 rounded-md border border-fg/10 bg-fg/5 px-2 py-1 text-xs text-fg outline-none"
+                        />
+                      }
                     >
-                      <span
-                        className="block h-10 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
-                        style={{ background: lookSwatch(t) }}
-                        aria-hidden
-                      />
-                      <input
-                        autoFocus
-                        defaultValue={t.name}
-                        maxLength={40}
-                        aria-label={`Rename ${t.name}`}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") e.currentTarget.blur();
-                          else if (e.key === "Escape") {
-                            cancelRename.current = true;
-                            setRenamingId(null);
-                          }
-                        }}
-                        onBlur={(e) => commitRename(t.id, e.target.value)}
-                        className="accent-focus min-w-0 rounded-md border border-fg/10 bg-fg/5 px-2 py-1 text-xs text-fg outline-none"
-                      />
-                    </div>
+                      {swatch}
+                    </OptionCard>
                   ) : (
                     <div key={t.id} className="group/theme relative">
                       <OptionCard
@@ -726,11 +716,7 @@ export default function ThemeBuilder({
                         name={t.name}
                         title={`${t.name} · ${DESIGN_NAMES[t.design]}`}
                       >
-                        <span
-                          className="block h-10 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
-                          style={{ background: lookSwatch(t) }}
-                          aria-hidden
-                        />
+                        {swatch}
                       </OptionCard>
                       {/* Rename + delete both stay visible (hover-revealed meant
                           touch users couldn't reach them — tapping the card
@@ -762,30 +748,11 @@ export default function ThemeBuilder({
                           </svg>
                         </button>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          cancelRename.current = false;
-                          setRenamingId(t.id);
-                        }}
-                        aria-label={`Rename ${t.name}`}
+                      <RenameButton
+                        label={`Rename ${t.name}`}
+                        onClick={() => setRenamingId(t.id)}
                         className="absolute top-1 right-7 rounded-md bg-background/70 px-1 py-1 text-fg/50 transition-colors hover:text-fg/90"
-                      >
-                        <svg
-                          width="11"
-                          height="11"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden
-                        >
-                          <path d="M12 20h9" />
-                          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-                        </svg>
-                      </button>
+                      />
                       <button
                         type="button"
                         onClick={async () => {
@@ -806,8 +773,8 @@ export default function ThemeBuilder({
                         ✕
                       </button>
                     </div>
-                  )
-                )}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -912,23 +879,18 @@ export default function ThemeBuilder({
                   <span className="text-[11px] font-medium text-fg/55">
                     Accent — {editMode} theme only
                   </span>
-                  <div className="flex overflow-hidden rounded-md border border-fg/10">
-                    {(["gradient", "solid"] as const).map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => chooseAccentStyle(s)}
-                        aria-pressed={accentStyle === s}
-                        className={`px-2.5 py-1 text-[10px] capitalize transition-colors ${
-                          accentStyle === s
-                            ? "bg-fg/15 text-fg"
-                            : "text-fg/50 hover:text-fg/80"
-                        }`}
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
+                  <ChipGroup
+                    label="Accent style"
+                    size="2xs"
+                    rounded="md"
+                    capitalize
+                    options={(["gradient", "solid"] as const).map((s) => ({
+                      value: s,
+                      label: s,
+                    }))}
+                    value={accentStyle}
+                    onChange={chooseAccentStyle}
+                  />
                 </div>
                 {/* The accent editor IS the gradient: a bar with a color well at
                     each end (or one centered well when solid). */}
