@@ -12,6 +12,13 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **More horizontal strips fade at a clipped edge.** The admin tab row and the
+  hourly forecast strip now fade out on whichever side has more to scroll to —
+  the same cue the theme builder's tabs already used — so it's clear there's
+  more content just off-screen. (#143)
+
 ### Fixed
 
 - **A confirmation dialog can't be accepted by the keypress that opened it.**

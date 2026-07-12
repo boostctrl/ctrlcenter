@@ -12,6 +12,7 @@ import BookmarksManager from "./BookmarksManager";
 import SettingsManager from "./SettingsManager";
 import ThemesManager from "./ThemesManager";
 import BackHome from "@/components/BackHome";
+import { useEdgeFade } from "@/components/useEdgeFade";
 import { resolveThemePacks } from "@/lib/theme";
 import { downloadJson } from "@/lib/download";
 import { Button } from "./ui";
@@ -70,6 +71,11 @@ function AdminBody({
   const fileRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
   const confirm = useConfirm();
+  const {
+    ref: tabFadeRef,
+    onScroll: onTabScroll,
+    style: tabFadeStyle,
+  } = useEdgeFade<HTMLDivElement>();
 
   function selectTab(next: Tab) {
     setTab(next);
@@ -189,8 +195,14 @@ function AdminBody({
       </div>
 
       {/* The row scrolls (not the page) when the tabs outgrow a phone-width
-          viewport; shrink-0 keeps each tab intact instead of squashing. */}
-      <div className="flex gap-2 overflow-x-auto border-b border-fg/10 pb-2">
+          viewport; shrink-0 keeps each tab intact instead of squashing, and the
+          shared edge fade signals a clipped side (#143). */}
+      <div
+        ref={tabFadeRef}
+        onScroll={onTabScroll}
+        style={tabFadeStyle}
+        className="flex gap-2 overflow-x-auto border-b border-fg/10 pb-2"
+      >
         {TABS.map((t) => (
           <button
             key={t.key}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { useVisitorPrefs } from "./PrefsProvider";
+import { useEdgeFade } from "./useEdgeFade";
 import WeatherEffects from "./WeatherEffects";
 import {
   fetchForecast,
@@ -191,6 +192,13 @@ export default function WeatherDetails({
     return () => clearInterval(timer);
   }, []);
 
+  // Fade the hourly strip's clipped edge like the app's other scrollers (#143).
+  const {
+    ref: hourlyRef,
+    onScroll: onHourlyScroll,
+    style: hourlyStyle,
+  } = useEdgeFade<HTMLDivElement>();
+
   const forecast = fetched ?? initial;
   if (!forecast) {
     return <p className="text-fg/50">Couldn&apos;t load the forecast.</p>;
@@ -309,7 +317,12 @@ export default function WeatherDetails({
           <h2 className="mb-3 text-xs font-semibold tracking-[0.18em] text-fg/50 uppercase">
             Hourly forecast
           </h2>
-          <div className="flex gap-4 overflow-x-auto pb-1">
+          <div
+            ref={hourlyRef}
+            onScroll={onHourlyScroll}
+            style={hourlyStyle}
+            className="flex gap-4 overflow-x-auto pb-1"
+          >
             {hourly.map((h) => (
               <div
                 key={h.time}
