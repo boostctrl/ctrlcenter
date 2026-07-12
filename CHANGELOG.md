@@ -36,6 +36,11 @@ here.
   instead of that same in-flight Enter occasionally approving it on its own.
   (#146)
 
+- **Duplicate saved-theme names are pointed out.** If two saved themes share a
+  name (which older versions allowed), the theme builder now nudges you to
+  rename them, so saving a look under that name updates the theme you mean
+  rather than silently recapturing into whichever one came first. (#144)
+
 ## [1.9.6] - 2026-07-12
 
 ### Added

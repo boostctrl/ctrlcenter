@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import type { BookmarkItem } from "@/lib/schema";
 import { orderCategories } from "@/lib/bookmarks";
 import Icon from "@/components/Icon";
+import { RenameButton, RenameField } from "@/components/InlineRename";
 import {
   TextField,
   Button,
@@ -47,9 +48,6 @@ export default function BookmarksManager({
   const [saving, setSaving] = useState(false);
   // Which category heading is showing its inline rename field (null = none).
   const [renamingCategory, setRenamingCategory] = useState<string | null>(null);
-  // Escape must cancel a rename, but blur fires right after it — this flag lets
-  // the blur handler tell an Escape-driven unmount from a real commit.
-  const cancelRename = useRef(false);
   const toast = useToast();
   const confirm = useConfirm();
 
@@ -158,16 +156,13 @@ export default function BookmarksManager({
     }
   }
 
-  // Commit an inline category rename on Enter/blur. Escape (via cancelRename) or
-  // an empty/unchanged field cancels, leaving everything untouched. Renaming onto
-  // an existing category merges the two, gated behind a confirm. The server
-  // rewrites every affected bookmark and the category order in one action.
+  // Commit an inline category rename. An empty/unchanged field leaves everything
+  // untouched. Renaming onto an existing category merges the two, gated behind a
+  // confirm; the server rewrites every affected bookmark and the category order
+  // in one action. RenameField suppresses the commit on an Escape cancel, so
+  // this only runs on a real commit — and the confirm dialog ignores the Enter
+  // that opened it (#146), so no local keystroke guard is needed here.
   async function commitRename(from: string, value: string) {
-    if (cancelRename.current) {
-      cancelRename.current = false;
-      setRenamingCategory(null);
-      return;
-    }
     const to = value.trim();
     if (!to || to === from) {
       setRenamingCategory(null);
@@ -265,23 +260,11 @@ export default function BookmarksManager({
               />
               <DragGrip {...catGrip(catIndex)} />
               {renamingCategory === category ? (
-                <input
-                  autoFocus
-                  defaultValue={category}
-                  aria-label={`Rename category ${category}`}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      // Suppress the trailing keypress so, when this commit opens
-                      // the merge confirm, that same Enter can't land on the
-                      // dialog's autofocused button and accept it unprompted.
-                      e.preventDefault();
-                      e.currentTarget.blur();
-                    } else if (e.key === "Escape") {
-                      cancelRename.current = true;
-                      setRenamingCategory(null);
-                    }
-                  }}
-                  onBlur={(e) => commitRename(category, e.target.value)}
+                <RenameField
+                  initialValue={category}
+                  label={`Rename category ${category}`}
+                  onCommit={(v) => commitRename(category, v)}
+                  onCancel={() => setRenamingCategory(null)}
                   className="accent-focus min-w-0 rounded-md border border-fg/15 bg-fg/5 px-1.5 py-0.5 text-xs font-semibold tracking-[0.18em] text-fg uppercase outline-none"
                 />
               ) : (
@@ -289,30 +272,11 @@ export default function BookmarksManager({
                   <h3 className="text-xs font-semibold tracking-[0.18em] text-fg/50 uppercase">
                     {category}
                   </h3>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      cancelRename.current = false;
-                      setRenamingCategory(category);
-                    }}
-                    aria-label={`Rename category ${category}`}
+                  <RenameButton
+                    label={`Rename category ${category}`}
+                    onClick={() => setRenamingCategory(category)}
                     className="shrink-0 rounded-md p-1 text-fg/40 transition-colors hover:bg-fg/10 hover:text-fg/80"
-                  >
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden
-                    >
-                      <path d="M12 20h9" />
-                      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-                    </svg>
-                  </button>
+                  />
                 </>
               )}
             </div>
