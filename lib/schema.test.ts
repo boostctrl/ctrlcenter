@@ -10,7 +10,60 @@ import {
   themesInputSchema,
   layoutSchema,
   bookmarkCategoryRenameSchema,
+  feedUrls,
+  feedUpdateSchema,
+  MAX_FEED_URLS,
 } from "./schema";
+
+describe("feedUrls", () => {
+  it("prefers the urls list and trims blank entries", () => {
+    expect(
+      feedUrls({ url: "https://old", urls: ["https://a", "  ", " https://b "] })
+    ).toEqual(["https://a", "https://b"]);
+  });
+
+  it("folds the deprecated single url in when urls is empty", () => {
+    expect(feedUrls({ url: "  https://old  ", urls: [] })).toEqual([
+      "https://old",
+    ]);
+  });
+
+  it("returns nothing when both the list and the legacy url are blank", () => {
+    expect(feedUrls({ url: "  ", urls: [] })).toEqual([]);
+  });
+});
+
+describe("feedUpdateSchema", () => {
+  it("rejects a non-http(s) url and more than the cap", () => {
+    expect(
+      feedUpdateSchema.safeParse({
+        enabled: true,
+        urls: ["ftp://nope"],
+        count: 6,
+        title: "",
+      }).success
+    ).toBe(false);
+    expect(
+      feedUpdateSchema.safeParse({
+        enabled: true,
+        urls: Array.from({ length: MAX_FEED_URLS + 1 }, (_, i) => `https://a${i}.example`),
+        count: 6,
+        title: "",
+      }).success
+    ).toBe(false);
+  });
+
+  it("accepts blank rows (trimmed on read) up to the cap", () => {
+    expect(
+      feedUpdateSchema.safeParse({
+        enabled: true,
+        urls: ["https://a.example", ""],
+        count: 6,
+        title: "",
+      }).success
+    ).toBe(true);
+  });
+});
 
 describe("themesInputSchema", () => {
   const pack = {

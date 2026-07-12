@@ -160,4 +160,13 @@ describe("mergeFeeds", () => {
     const merged = mergeFeeds([src(a), src(b)], 2);
     expect(merged.items.map((i) => i.title)).toEqual(["a3", "b2"]);
   });
+
+  it("sinks an all-undated feed below dated items instead of floating it up", () => {
+    // The undated feed is listed FIRST; it must still land below the dated
+    // feed's real timestamps, not pin its items to the top of "newest-first".
+    const undatedFeed = feed("Blog", [undated("u1"), undated("u2")]);
+    const datedFeed = feed("News", [dated("n2", 200), dated("n1", 100)]);
+    const merged = mergeFeeds([src(undatedFeed), src(datedFeed)], 10);
+    expect(merged.items.map((i) => i.title)).toEqual(["n2", "n1", "u1", "u2"]);
+  });
 });

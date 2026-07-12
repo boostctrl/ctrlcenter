@@ -121,6 +121,24 @@ describe("updateSettings partial merge", () => {
     expect(settings.timezone).toBe("America/Chicago");
   });
 
+  it("clears the deprecated feed url on save so a deleted feed stays deleted", async () => {
+    // A pre-1.9.6 config: a single legacy `url`, no `urls` list yet.
+    await fs.writeFile(
+      configPath,
+      YAML.dump({
+        settings: { feed: { enabled: true, url: "https://old.example/rss" } },
+      }),
+      "utf8"
+    );
+    // The admin edits feeds and deletes the (folded-in) row, saving an empty list.
+    const settings = await config.updateSettings({
+      feed: { enabled: true, urls: [], count: 6, title: "" },
+    });
+    // The stale legacy url is cleared, so feedUrls() can't resurrect the feed.
+    expect(settings.feed.url).toBe("");
+    expect(settings.feed.urls).toEqual([]);
+  });
+
   it("merges nested weather fields without dropping siblings", async () => {
     await config.updateSettings({
       weather: { latitude: 40, longitude: -75 },

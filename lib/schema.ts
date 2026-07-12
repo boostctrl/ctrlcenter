@@ -129,6 +129,12 @@ export const calendarSchema = z.object({
 });
 export type CalendarConfig = z.infer<typeof calendarSchema>;
 
+// Cap on how many feed URLs one widget can fan out to. Each is a separate
+// server-side fetch per home-page render (the page is force-dynamic), so the
+// list is bounded — generous for real use, a guard against a hand-edited or
+// imported config turning the widget into an unbounded outbound-request source.
+export const MAX_FEED_URLS = 10;
+
 // RSS/Atom feed widget fed by one or more public feed URLs, merged newest-first.
 // Stored leniently; URLs are validated on the admin path.
 export const feedSchema = z.object({
@@ -747,7 +753,7 @@ export const worldClocksUpdateSchema = z.object({
 export const feedUpdateSchema = z
   .object({
     enabled: z.boolean(),
-    urls: z.array(z.string()),
+    urls: z.array(z.string()).max(MAX_FEED_URLS),
     count: z.number().int().min(1).max(15),
     title: z.string(),
   })

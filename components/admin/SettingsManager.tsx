@@ -8,6 +8,7 @@ import {
   ANNOUNCEMENT_TONES,
   STATUS_ANNOUNCEMENT_KINDS,
   feedUrls,
+  MAX_FEED_URLS,
 } from "@/lib/schema";
 import type { ThemePack } from "@/lib/theme";
 import { FONTS, fontVar, type FontId } from "@/lib/fonts";
@@ -1076,13 +1077,15 @@ export default function SettingsManager({
                   {url.trim() !== "" && <FeedTest url={url} />}
                 </div>
               ))}
-              <button
-                type="button"
-                onClick={() => feedUrlRows.add("")}
-                className="self-start rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10"
-              >
-                + Add feed
-              </button>
+              {feed.urls.length < MAX_FEED_URLS && (
+                <button
+                  type="button"
+                  onClick={() => feedUrlRows.add("")}
+                  className="self-start rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10"
+                >
+                  + Add feed
+                </button>
+              )}
             </div>
             <TextField
               label="Card title (optional — defaults to the first feed's own)"
@@ -1232,6 +1235,14 @@ export default function SettingsManager({
                 key={worldClockRows.keys[i] ?? i}
                 className="flex items-center gap-2"
               >
+                {worldClocks.items.length > 1 && (
+                  <MoveButtons
+                    index={i}
+                    count={worldClocks.items.length}
+                    label={`world clock ${i + 1}`}
+                    onMove={worldClockRows.move}
+                  />
+                )}
                 <input
                   value={item.label}
                   onChange={(e) => updateWorldClockItem(i, { label: e.target.value })}

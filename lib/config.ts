@@ -197,6 +197,13 @@ export async function updateSettings(
       feed: {
         ...config.settings.feed,
         ...withoutUndefined(feedPartial ?? {}),
+        // The admin UI saves the new `urls` list; whenever it writes the feed,
+        // clear the deprecated single `url` so a stale legacy value can't
+        // resurrect a feed the admin just deleted (feedUrls() falls back to
+        // `url` only while `urls` is empty). The value is already folded into
+        // `urls` on the editor's first load, so nothing is lost. Removing the
+        // field itself is 2.0.0's job (ledger #152).
+        ...(feedPartial ? { url: "" } : {}),
       },
       countdown: {
         ...config.settings.countdown,

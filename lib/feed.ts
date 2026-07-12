@@ -1,5 +1,6 @@
 import { readCapped } from "./fetch-body";
 import { log, hostOf, errorReason } from "./log";
+import { MAX_FEED_URLS } from "./schema";
 
 // Minimal RSS 2.0 / Atom reader for the home-page Feed widget. Hand-rolled (no
 // dependency) and deliberately forgiving: it pulls each entry's title, link and
@@ -202,10 +203,14 @@ export function mergeFeeds(
   const tagged: Tagged[] = [];
   let order = 0;
   for (const { feed, source } of sources) {
-    // Feeds run newest-first, so an undated item inherits the date of the most
-    // recent dated item seen so far in this feed (or +∞ before any, keeping it
-    // at the top of its feed's run).
-    let inherited = Number.POSITIVE_INFINITY;
+    // Undated items before any dated one in a newest-first feed seed from the
+    // feed's newest dated item, so they rank near their own feed's top rather
+    // than jumping ahead of every other feed's real dates. A feed with NO dates
+    // at all seeds at -∞, sinking below every dated item (in feed-then-document
+    // order) instead of floating to the very top of the merged list.
+    let inherited =
+      feed.items.find((i) => i.publishedAt !== null)?.publishedAt ??
+      Number.NEGATIVE_INFINITY;
     for (const item of feed.items) {
       if (item.publishedAt !== null) inherited = item.publishedAt;
       tagged.push({
@@ -235,7 +240,11 @@ export async function fetchFeeds(
 ): Promise<Feed | null> {
   const targets = urls
     .map((u) => u.trim())
-    .filter((u) => /^https?:\/\//i.test(u));
+    .filter((u) => /^https?:\/\//i.test(u))
+    // Bound the fan-out even if a hand-edited or imported config exceeds the
+    // admin-path cap: the widget must never become an unbounded per-render
+    // source of outbound requests.
+    .slice(0, MAX_FEED_URLS);
   if (targets.length === 0) return null;
   const results = await Promise.all(
     targets.map(async (u) => {
