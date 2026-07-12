@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [1.9.6] - 2026-07-12
+
 ### Added
 
 - **A World Clocks widget.** A new home-page card that shows the current time
@@ -1720,7 +1722,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.5...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.6...HEAD
+[1.9.6]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.5...v1.9.6
 [1.9.5]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.4...v1.9.5
 [1.9.4]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.3...v1.9.4
 [1.9.3]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.2...v1.9.3
