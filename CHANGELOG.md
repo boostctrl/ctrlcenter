@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [1.9.7] - 2026-07-12
+
 ### Changed
 
 - **The app's segmented toggles are now one consistent control.** The status
@@ -1751,7 +1753,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.6...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.7...HEAD
+[1.9.7]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.6...v1.9.7
 [1.9.6]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.5...v1.9.6
 [1.9.5]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.4...v1.9.5
 [1.9.4]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.3...v1.9.4
