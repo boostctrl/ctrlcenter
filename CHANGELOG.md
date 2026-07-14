@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [1.9.8] - 2026-07-14
+
 ### Added
 
 - **A precipitation reading on the weather page.** The full forecast's stat
@@ -1771,7 +1773,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.7...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.8...HEAD
+[1.9.8]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.7...v1.9.8
 [1.9.7]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.6...v1.9.7
 [1.9.6]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.5...v1.9.6
 [1.9.5]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.4...v1.9.5
