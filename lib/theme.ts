@@ -369,10 +369,6 @@ export const THEME_PACKS: ThemePack[] = [
 // these over the built-ins; a reset removes the override.
 export type ThemePackOverride = ThemePack & { key?: string };
 
-// The names of the built-in packs the admin can override. Exposed so the
-// schema/editor can validate against them.
-export const THEME_PACK_NAMES = THEME_PACKS.map((p) => p.name);
-
 // Built-in packs with any admin overrides applied (matched to a built-in by
 // `key`, falling back to `name`; order preserved). The override's `name` becomes
 // the display label, so renamed packs show their new name. Stale overrides that

@@ -11,17 +11,6 @@ export function hexToRgb(hex: string): [number, number, number] | null {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
-// Linear blend of two #rrggbb colors as an "r, g, b" string; t=0 → a, t=1 → b.
-export function mixHex(a: string, b: string, t: number): string {
-  const ca = hexToRgb(a) ?? [150, 180, 240];
-  const cb = hexToRgb(b) ?? [0, 0, 0];
-  const k = Math.max(0, Math.min(1, t));
-  const r = Math.round(ca[0] + (cb[0] - ca[0]) * k);
-  const g = Math.round(ca[1] + (cb[1] - ca[1]) * k);
-  const bl = Math.round(ca[2] + (cb[2] - ca[2]) * k);
-  return `${r}, ${g}, ${bl}`;
-}
-
 // Deepen + saturate a #rrggbb color for the light surface: keep the hue, drop
 // the lightness and push saturation so the tone reads as a vivid burst rather
 // than a pale wash. Returns an "r, g, b" string. (HSL counterpart of the OKLCH
