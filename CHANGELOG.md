@@ -19,6 +19,17 @@ here.
   inches), next to the existing chance-of-precip figure — the reading was
   already being fetched but had never been displayed. (#156)
 
+### Fixed
+
+- **The hourly forecast strip fills the full width of its card.** On wide
+  screens the next 24 hours now spread edge to edge instead of leaving empty
+  space on the right; narrower screens still scroll the strip as before. (#156)
+
+### Removed
+
+- **The weather page's visibility tile,** so the stat grid keeps the same
+  compact size now that the precipitation reading has taken a slot. (#156)
+
 ## [1.9.7] - 2026-07-12
 
 ### Changed
