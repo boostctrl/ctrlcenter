@@ -8,6 +8,7 @@ import {
   fetchForecast,
   unitSymbol,
   windUnitLabel,
+  precipUnitLabel,
   windDirectionLabel,
   uvLabel,
   formatClock,
@@ -274,6 +275,17 @@ export default function WeatherDetails({
           label="Chance of precip"
           value={`${current.precipProbability}%`}
           sub={today ? `${today.precipProbabilityMax}% today` : undefined}
+        />
+        <StatTile
+          label="Precipitation"
+          value={
+            <>
+              {current.precipitation.toFixed(1)}{" "}
+              <span className="text-sm font-normal text-fg/50">
+                {precipUnitLabel(units)}
+              </span>
+            </>
+          }
         />
         <StatTile label="Humidity" value={`${Math.round(current.humidity)}%`} />
         <StatTile

@@ -12,6 +12,13 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **A precipitation reading on the weather page.** The full forecast's stat
+  tiles now show the current precipitation amount in your selected units (mm or
+  inches), next to the existing chance-of-precip figure — the reading was
+  already being fetched but had never been displayed. (#156)
+
 ## [1.9.7] - 2026-07-12
 
 ### Changed
