@@ -125,4 +125,13 @@ describe("checkApp · icmp", () => {
     expect(r.up).toBe(false);
     expect(execFileMock).not.toHaveBeenCalled();
   });
+
+  it("is down without invoking ping when the hostname begins with a dash (#159)", async () => {
+    // `new URL("http://-f/")` yields hostname "-f"; hostFromUrl rejects it so a
+    // leading-dash value can never be handed to ping as an option instead of a
+    // destination.
+    const r = await checkApp({ ...base, url: "http://-f/", checkType: "icmp" });
+    expect(r.up).toBe(false);
+    expect(execFileMock).not.toHaveBeenCalled();
+  });
 });

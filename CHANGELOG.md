@@ -23,6 +23,9 @@ here.
   login.** The global limit that guards against brute-force attempts now counts
   only failed logins, so the correct password always signs you in — even while
   someone else is hammering the form from elsewhere. (#158)
+- **Uptime checks reject a malformed service address** (a host beginning with a
+  dash) instead of handing it to the system `ping` command, closing a small
+  hardening gap in the reachability probes. (#159)
 
 ## [1.9.8] - 2026-07-14
 

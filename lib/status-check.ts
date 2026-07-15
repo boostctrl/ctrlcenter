@@ -119,8 +119,15 @@ function hostFromUrl(raw: string): { host: string; urlPort: number | null; https
     // IPv6 literals come back bracketed ("[::1]"); every caller here wants the
     // bare address (net.isIP, socket.connect, and ping don't understand
     // brackets), so strip them once instead of leaving each check to do it.
+    const host = u.hostname.replace(/^\[(.+)\]$/, "$1");
+    // A hostname can't legitimately begin with "-" (RFC 1123 labels), but
+    // `new URL("http://-x/")` yields hostname "-x", which checkIcmp would hand to
+    // `ping` as the final argv entry — where a leading dash reads as an option,
+    // not a destination. Reject it here so no reachability check (ping via
+    // execFile, or the socket/resolver) ever receives a bare flag (#159).
+    if (host.startsWith("-")) return { host: "", urlPort: null, https: false };
     return {
-      host: u.hostname.replace(/^\[(.+)\]$/, "$1"),
+      host,
       urlPort: u.port ? Number(u.port) : null,
       https: u.protocol === "https:",
     };
