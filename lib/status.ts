@@ -134,6 +134,11 @@ export const STATUS_RANGE_MS: Record<StatusRangeKey, number> = {
 // footprint — fewer, wider pills read more cleanly than a dense comb.
 export const TIMELINE_BARS = 30;
 
+// The per-service detail page's large graph resolution (#150): the full-width
+// canvas affords finer buckets than the row strip's 30 — 90 on the 24h view is
+// a 16-minute bucket. Same fixed-count-per-range rule as TIMELINE_BARS.
+export const DETAIL_BARS = 90;
+
 // One bar in a timeline: uptime % for that bucket, or null if nothing was
 // recorded (server off, or before this app existed). `at` is `YYYY-MM-DD` for a
 // daily bar, `YYYY-MM-DDThh` for an hourly one, or `YYYY-MM-DDThh:mm` for a
@@ -219,7 +224,10 @@ export function timelineSummary(
   const avg = withData.reduce((sum, p) => sum + p.uptime, 0) / withData.length;
   const pct = windowPct ?? avg;
   const worst = withData.reduce((w, p) => (p.uptime < w.uptime ? p : w));
-  const bucketMs = STATUS_RANGE_MS[range] / TIMELINE_BARS;
+  // Bucket width from the strip actually given: the row strips are
+  // TIMELINE_BARS long but the detail page's large graph is DETAIL_BARS, and
+  // the worst-bucket callout must span what its bar really covers.
+  const bucketMs = STATUS_RANGE_MS[range] / points.length;
   const worstLabel = formatBarLabel(worst.at, timeZone, bucketMs);
   return `${rangeLabel} uptime timeline: ${pct.toFixed(1)}% up, worst ${worstLabel} at ${worst.uptime.toFixed(1)}% up`;
 }
@@ -283,6 +291,26 @@ export type AppHistory = {
 
 // The /api/status/history payload.
 export type StatusHistory = { generatedAt: number; apps: AppHistory[] };
+
+// One entry in the detail page's outage log: a period the recorded history
+// shows the app down. `startMs`/`endMs` bound the period (endMs null while the
+// outage is ongoing); `downMs` estimates the downtime inside it (an
+// hour-bucket period can contain partial downtime). `exact` says whether the
+// bounds come from poll-resolution data (the recent ring / the persisted
+// outage mark) or are hour-granular bucket bounds — the log labels the latter
+// as approximate rather than implying to-the-minute knowledge it doesn't have.
+export type OutageEntry = {
+  startMs: number;
+  endMs: number | null;
+  downMs: number;
+  exact: boolean;
+};
+
+// The /api/status/history/[id] payload (#150): the same fields as the row's
+// AppHistory — series at the detail resolution (DETAIL_BARS) — plus the
+// derived outage log.
+export type AppDetail = AppHistory & { outages: OutageEntry[] };
+export type StatusDetailResponse = { generatedAt: number; app: AppDetail };
 
 // The summary line for the status banner / dashboard pill. Names the single down
 // service; collapses to "Multiple services down" beyond one.

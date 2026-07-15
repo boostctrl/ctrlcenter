@@ -282,7 +282,10 @@ export default async function HelpPage() {
               <li>
                 <A href="/status">Status</A> reports per-service uptime over a
                 range you pick, with a 90-day timeline for each monitored
-                service.
+                service. Click a service&apos;s name to open its detail view: a
+                larger, finer-grained uptime graph, response-time analytics,
+                every range&apos;s uptime at once, an outage log, and how the
+                check is configured.
               </li>
               <li>
                 <A href="/calendar">Calendar</A> shows your full upcoming agenda

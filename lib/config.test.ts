@@ -568,9 +568,10 @@ describe("readConfigInternal stays off public surfaces", () => {
     // Auth itself: verifies the password / issues the session.
     "app/api/login/route.ts",
     // Public, but their shared cache must hold every app; each filters per
-    // response via visibleItems.
+    // response via visibleItems (the [id] detail route 404s non-visible ids).
     "app/api/status/route.ts",
     "app/api/status/history/route.ts",
+    "app/api/status/history/[id]/route.ts",
   ];
 
   it("only allowlisted files under app/ use the unfiltered read", async () => {

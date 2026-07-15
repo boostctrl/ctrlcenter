@@ -11,10 +11,12 @@ import {
   oldestSampleMs,
   fixedBarsFromReadings,
   fixedBarsFromBuckets,
+  extractOutages,
   loadHistory,
   flush,
   recordResults,
   getHistory,
+  getAppDetail,
   type Bucket,
   type Reading,
 } from "./status-history";
@@ -471,5 +473,184 @@ describe("loadHistory / flush persistence", () => {
     );
     await loadHistory();
     expect(getHistory(["a"]).apps[0].downSince).toBeNull();
+  });
+});
+
+describe("extractOutages", () => {
+  const HOUR = 3_600_000;
+  const MIN = 60_000;
+  // A quiet, data-carrying hour bucket (no downtime).
+  const upHour = (hour: number): Bucket => ({
+    hour, up: 12, down: 0, msCount: 12, msSum: 240, msMax: 40,
+  });
+  const downHour = (hour: number, down: number): Bucket => ({
+    hour, up: 12 - down, down, msCount: 12 - down, msSum: 200, msMax: 40,
+  });
+
+  it("returns nothing for a clean history", () => {
+    const now = 100 * HOUR;
+    const buckets = [upHour(96), upHour(97), upHour(98)];
+    const readings: Reading[] = [
+      { t: now - 10 * MIN, up: true, ms: 20 },
+      { t: now - 5 * MIN, up: true, ms: 22 },
+    ];
+    expect(extractOutages(buckets, readings, null, now, 5)).toEqual([]);
+  });
+
+  it("derives a poll-exact completed outage from the recent ring", () => {
+    const now = 100 * HOUR;
+    const readings: Reading[] = [
+      { t: now - 40 * MIN, up: true, ms: 20 },
+      { t: now - 35 * MIN, up: false },
+      { t: now - 30 * MIN, up: false },
+      { t: now - 25 * MIN, up: true, ms: 21 },
+      { t: now - 20 * MIN, up: true, ms: 20 },
+    ];
+    expect(extractOutages([], readings, null, now, 5)).toEqual([
+      {
+        startMs: now - 35 * MIN,
+        endMs: now - 25 * MIN,
+        downMs: 10 * MIN,
+        exact: true,
+      },
+    ]);
+  });
+
+  it("represents the ongoing outage once, from the persisted downSince mark", () => {
+    const now = 100 * HOUR;
+    const downSince = now - 50 * MIN; // pre-dates the ring's oldest reading
+    const readings: Reading[] = [
+      { t: now - 30 * MIN, up: false },
+      { t: now - 25 * MIN, up: false },
+      { t: now - 20 * MIN, up: false },
+    ];
+    // The down readings inside the ongoing outage must not become a second row.
+    expect(extractOutages([], readings, downSince, now, 5)).toEqual([
+      { startMs: downSince, endMs: null, downMs: 50 * MIN, exact: true },
+    ]);
+  });
+
+  it("falls back to the ring for an ongoing outage without a mark (old file)", () => {
+    const now = 100 * HOUR;
+    const readings: Reading[] = [
+      { t: now - 20 * MIN, up: true, ms: 20 },
+      { t: now - 15 * MIN, up: false },
+      { t: now - 10 * MIN, up: false },
+    ];
+    expect(extractOutages([], readings, null, now, 5)).toEqual([
+      { startMs: now - 15 * MIN, endMs: null, downMs: 15 * MIN, exact: true },
+    ]);
+  });
+
+  it("derives hour-granular outages from old buckets, with estimated downtime", () => {
+    const now = 200 * HOUR;
+    // Downtime across two consecutive hours (3 + 6 down checks at 5min each),
+    // then a clean hour, then one more bad hour.
+    const buckets = [
+      downHour(100, 3),
+      downHour(101, 6),
+      upHour(102),
+      downHour(103, 2),
+      upHour(104),
+    ];
+    expect(extractOutages(buckets, [], null, now, 5)).toEqual([
+      // Newest first.
+      {
+        startMs: 103 * HOUR,
+        endMs: 104 * HOUR,
+        downMs: 2 * 5 * MIN,
+        exact: false,
+      },
+      {
+        startMs: 100 * HOUR,
+        endMs: 102 * HOUR,
+        downMs: 9 * 5 * MIN,
+        exact: false,
+      },
+    ]);
+  });
+
+  it("breaks a bucket run at an unwatched hour instead of bridging the gap", () => {
+    const now = 200 * HOUR;
+    // Hours 100 and 102 saw downtime; hour 101 has NO bucket (server off) — an
+    // unwatched gap must not read as one long outage.
+    const buckets = [downHour(100, 2), downHour(102, 2)];
+    const out = extractOutages(buckets, [], null, now, 5);
+    expect(out).toHaveLength(2);
+    expect(out[0].startMs).toBe(102 * HOUR);
+    expect(out[1].startMs).toBe(100 * HOUR);
+  });
+
+  it("does not re-list bucket hours the ring already covers", () => {
+    const now = 100 * HOUR + 30 * MIN;
+    // The current hour's bucket recorded the same downtime the ring shows.
+    const buckets = [downHour(100, 2)];
+    const readings: Reading[] = [
+      { t: 100 * HOUR + 5 * MIN, up: true, ms: 20 },
+      { t: 100 * HOUR + 10 * MIN, up: false },
+      { t: 100 * HOUR + 15 * MIN, up: false },
+      { t: 100 * HOUR + 20 * MIN, up: true, ms: 21 },
+    ];
+    expect(extractOutages(buckets, readings, null, now, 5)).toEqual([
+      {
+        startMs: 100 * HOUR + 10 * MIN,
+        endMs: 100 * HOUR + 20 * MIN,
+        downMs: 10 * MIN,
+        exact: true,
+      },
+    ]);
+  });
+
+  it("merges one outage straddling the bucket/ring seam into a single entry", () => {
+    const now = 101 * HOUR + 30 * MIN;
+    // Bucket hour 100 ends at 101h; the ring starts at 101h with the SAME
+    // outage still down, recovering at 101h+10m. Two runs, one real outage.
+    const buckets = [downHour(100, 6)];
+    const readings: Reading[] = [
+      { t: 101 * HOUR, up: false },
+      { t: 101 * HOUR + 5 * MIN, up: false },
+      { t: 101 * HOUR + 10 * MIN, up: true, ms: 20 },
+    ];
+    const out = extractOutages(buckets, readings, null, now, 5);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toEqual({
+      startMs: 100 * HOUR,
+      endMs: 101 * HOUR + 10 * MIN,
+      downMs: 6 * 5 * MIN + 10 * MIN,
+      exact: false, // one side is hour-granular, so the whole entry is
+    });
+  });
+
+  it("caps the list and returns newest first", () => {
+    const now = 500 * HOUR;
+    // 25 isolated bad hours, separated by clean gaps.
+    const buckets: Bucket[] = [];
+    for (let i = 0; i < 25; i++) buckets.push(downHour(100 + i * 2, 1));
+    const out = extractOutages(buckets, [], null, now, 5);
+    expect(out).toHaveLength(20);
+    expect(out[0].startMs).toBe((100 + 24 * 2) * HOUR);
+    expect(out[0].startMs).toBeGreaterThan(out[19].startMs);
+  });
+});
+
+describe("getAppDetail", () => {
+  it("returns detail-resolution series plus the outage log", async () => {
+    resetHistoryState();
+    await loadHistory();
+    const now = Date.now();
+    recordResults([{ id: "a", up: true, status: 200, ms: 30 }], now - 10 * 60_000);
+    recordResults([{ id: "a", up: false, status: null, ms: 5000 }], now - 5 * 60_000);
+    recordResults([{ id: "a", up: true, status: 200, ms: 32 }], now - 60_000);
+    const detail = getAppDetail("a", "UTC", 5);
+    expect(detail.id).toBe("a");
+    expect(detail.series.h1).toHaveLength(90);
+    expect(detail.series.d90).toHaveLength(90);
+    expect(detail.outages).toHaveLength(1);
+    expect(detail.outages[0]).toMatchObject({
+      startMs: now - 5 * 60_000,
+      endMs: now - 60_000,
+      exact: true,
+    });
+    expect(detail.downSince).toBeNull();
   });
 });

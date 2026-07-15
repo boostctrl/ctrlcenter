@@ -148,18 +148,18 @@ describe("timelineSummary", () => {
   });
 
   it("summarizes average uptime and calls out the worst bucket by its range", () => {
-    // Two 48-minute (24h view) buckets: 100% and 0%; the 0% one is the worst and
-    // reads as the range it spans.
+    // Bucket width derives from the strip given: two buckets over the 24h view
+    // are 12h each, and the worst one reads as the range it really spans.
     const points = [bar("2026-07-07T17:06", 100), bar("2026-07-07T17:54", 0)];
     expect(timelineSummary(points, "UTC", "d1")).toBe(
-      "24h uptime timeline: 50.0% up, worst Jul 7, 5:54 – 6:42 PM at 0.0% up"
+      "24h uptime timeline: 50.0% up, worst Jul 7, 5:54 PM – Jul 8, 5:54 AM at 0.0% up"
     );
   });
 
   it("averages only the buckets that carry data, ignoring no-data gaps", () => {
     const points = [bar("2026-07-07T17:06", 100), bar("2026-07-07T17:54", null)];
     expect(timelineSummary(points, "UTC", "d1")).toBe(
-      "24h uptime timeline: 100.0% up, worst Jul 7, 5:06 – 5:54 PM at 100.0% up"
+      "24h uptime timeline: 100.0% up, worst Jul 7, 5:06 PM – Jul 8, 5:06 AM at 100.0% up"
     );
   });
 
@@ -175,11 +175,11 @@ describe("timelineSummary", () => {
     // sample counts) says 90.5% — the spoken summary must match the visible one.
     const points = [bar("2026-07-07T17:06", 100), bar("2026-07-07T17:54", 0)];
     expect(timelineSummary(points, "UTC", "d1", 90.5)).toBe(
-      "24h uptime timeline: 90.5% up, worst Jul 7, 5:54 – 6:42 PM at 0.0% up"
+      "24h uptime timeline: 90.5% up, worst Jul 7, 5:54 PM – Jul 8, 5:54 AM at 0.0% up"
     );
     // A null windowed % (no data for the range) falls back to the bucket mean.
     expect(timelineSummary(points, "UTC", "d1", null)).toBe(
-      "24h uptime timeline: 50.0% up, worst Jul 7, 5:54 – 6:42 PM at 0.0% up"
+      "24h uptime timeline: 50.0% up, worst Jul 7, 5:54 PM – Jul 8, 5:54 AM at 0.0% up"
     );
   });
 
@@ -187,7 +187,7 @@ describe("timelineSummary", () => {
     // The strip is history; live state is the row's detail line's job.
     const points = [bar("2026-07-07T17:06", 100)];
     expect(timelineSummary(points, "UTC", "d1")).toBe(
-      "24h uptime timeline: 100.0% up, worst Jul 7, 5:06 – 5:54 PM at 100.0% up"
+      "24h uptime timeline: 100.0% up, worst Jul 7, 5:06 PM – Jul 8, 5:06 PM at 100.0% up"
     );
     expect(timelineSummary([], "UTC", "d1")).toBe("24h uptime timeline: no data yet");
   });

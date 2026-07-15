@@ -14,6 +14,17 @@ here.
 
 ### Added
 
+- **Every monitored service now has its own status detail page.** Click a
+  service's name on the status page to open a deep-linkable view with a
+  larger, three-times-finer uptime graph, a response-time chart over the same
+  window, every range's uptime percentage side by side (each with its own
+  "since …" note when the data doesn't reach back that far), an outage log —
+  poll-exact for recent outages, hour-approximate for older ones, with the
+  ongoing outage ticking live — and a read-only summary of how the check is
+  configured. The service rows themselves stay lean; deeper analytics live
+  here from now on. A service marked private shows its detail only to the
+  admin — for anyone else the page doesn't exist. (#150)
+
 - **A System stats widget.** A new home-page card with a meter for each
   reading: CPU load, memory pressure, and how full your disks are, refreshed
   on every page load. The card says what it's measuring, because the two are

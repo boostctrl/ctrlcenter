@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
-import { TIMELINE_BARS } from "./status";
+import { TIMELINE_BARS, DETAIL_BARS } from "./status";
 import type {
   StatusResult,
   StatusHistory,
@@ -8,6 +8,9 @@ import type {
   UptimeWindows,
   LatencyStat,
   LatencyWindows,
+  AppHistory,
+  AppDetail,
+  OutageEntry,
 } from "./status";
 
 // Persisted uptime history for the /status page. The background poller
@@ -281,6 +284,123 @@ export function oldestSampleMs(
   return oldestBucketHour * HOUR_MS;
 }
 
+// Derive the detail page's outage log (#150) from the recorded history. Three
+// sources with different resolutions, stitched newest-wins:
+//
+// - The ONGOING outage comes from `downSinceMs` (the poller's persisted mark —
+//   exact, and it can pre-date everything else). Recorded data at/after it is
+//   the same outage and is not re-listed.
+// - Completed outages inside the recent ring's coverage are poll-exact: a run
+//   of consecutive down readings, ended by the next up reading.
+// - Older outages come from the hourly buckets: a run of consecutive hours
+//   each containing downtime. Bounds are hour-granular (`exact: false`) and
+//   `downMs` is estimated from the down-check count × the poll interval. An
+//   hour with no bucket at all breaks a run — the server wasn't watching, and
+//   an unwatched gap must not be presented as one long outage.
+//
+// A final merge pass joins adjacent entries closer than the poll hold (a
+// boundary artifact where one real outage straddles the ring/bucket seam), and
+// the list is returned newest-first, capped at `maxEntries`.
+export function extractOutages(
+  buckets: Bucket[],
+  readings: Reading[],
+  downSinceMs: number | null,
+  now: number,
+  intervalMinutes: number,
+  maxEntries = 20
+): OutageEntry[] {
+  const holdMs = 2 * intervalMinutes * MIN_MS;
+  const sorted = [...readings].sort((a, b) => a.t - b.t);
+  const ringStart = sorted.length > 0 ? sorted[0].t : null;
+  // Everything from the ongoing outage's start onward belongs to its single
+  // entry; historical runs are clipped to strictly-before it.
+  const historyEnd = downSinceMs ?? Infinity;
+  const entries: OutageEntry[] = [];
+
+  // Ring runs (poll-exact). A run that reaches the ring's end without an
+  // observed recovery is the current outage — represented by the downSince
+  // entry below when the mark exists, or as ongoing from its first down
+  // reading when it doesn't (an old history file without the mark).
+  let runStart: number | null = null;
+  for (const r of sorted) {
+    if (!r.up && runStart === null) runStart = r.t;
+    if (r.up && runStart !== null) {
+      if (runStart < historyEnd) {
+        entries.push({
+          startMs: runStart,
+          endMs: r.t,
+          downMs: r.t - runStart,
+          exact: true,
+        });
+      }
+      runStart = null;
+    }
+  }
+  if (runStart !== null && downSinceMs === null) {
+    entries.push({ startMs: runStart, endMs: null, downMs: now - runStart, exact: true });
+  }
+
+  // Bucket runs (hour-granular), only for hours the ring doesn't already
+  // cover — and never past the ongoing outage's start.
+  const bucketCutoffHour = Math.min(
+    ringStart !== null ? hourOf(ringStart) : Infinity,
+    downSinceMs !== null ? hourOf(downSinceMs) : Infinity
+  );
+  const downHours = buckets
+    .filter((b) => b.down > 0 && b.hour < bucketCutoffHour)
+    .sort((a, b) => a.hour - b.hour);
+  let run: { first: number; last: number; downChecks: number } | null = null;
+  const flushRun = () => {
+    if (!run) return;
+    const startMs = run.first * HOUR_MS;
+    const endMs = (run.last + 1) * HOUR_MS;
+    entries.push({
+      startMs,
+      endMs,
+      downMs: Math.min(run.downChecks * intervalMinutes * MIN_MS, endMs - startMs),
+      exact: false,
+    });
+    run = null;
+  };
+  for (const b of downHours) {
+    if (run && b.hour === run.last + 1) {
+      run.last = b.hour;
+      run.downChecks += b.down;
+    } else {
+      flushRun();
+      run = { first: b.hour, last: b.hour, downChecks: b.down };
+    }
+  }
+  flushRun();
+
+  // The ongoing outage, from the persisted mark (exact even when it started
+  // before the ring's oldest reading).
+  if (downSinceMs !== null) {
+    entries.push({
+      startMs: downSinceMs,
+      endMs: null,
+      downMs: now - downSinceMs,
+      exact: true,
+    });
+  }
+
+  // Merge adjacent entries closer than the poll hold: one real outage can
+  // straddle the bucket/ring seam and arrive here as two touching runs.
+  entries.sort((a, b) => a.startMs - b.startMs);
+  const merged: OutageEntry[] = [];
+  for (const e of entries) {
+    const prev = merged[merged.length - 1];
+    if (prev && prev.endMs !== null && e.startMs - prev.endMs <= holdMs) {
+      prev.endMs = e.endMs;
+      prev.downMs += e.downMs;
+      prev.exact = prev.exact && e.exact;
+    } else {
+      merged.push({ ...e });
+    }
+  }
+  return merged.reverse().slice(0, maxEntries);
+}
+
 // Day-scale windows from the hourly buckets. `h1` is added at read time from the
 // raw recent ring (see getHistory), since the buckets are only hourly.
 function dayWindows(
@@ -511,63 +631,102 @@ export function flush(): Promise<void> {
   return state.flushQueue as Promise<void>;
 }
 
-// Read history for the given app ids (preserving order) as the API payload:
-// uptime windows (h1 from the raw ring, the rest from the hourly buckets) plus
-// one fixed-length bar strip per range. Every strip is TIMELINE_BARS long — the
-// 1h view resamples the raw ring, the day-scale views resample the hourly
-// buckets — so all four ranges draw an identically-sized heartbeat. The day
-// labels use `timeZone`'s calendar date; defaults to UTC when no zone is given.
-// `intervalMinutes` is the poller cadence: a 1h reading holds for up to twice
-// that, so normal polling paints a continuous strip while a stalled poller
-// still shows a gap.
+// One app's stored data as plain arrays (empty when the id has none).
+function appData(id: string): { buckets: Bucket[]; readings: Reading[] } {
+  const m = state.store.get(id);
+  const buckets: Bucket[] = m
+    ? [...m].map(([hour, b]) => ({
+        hour,
+        up: b.up,
+        down: b.down,
+        msCount: b.msCount,
+        msSum: b.msSum,
+        msMax: b.msMax,
+      }))
+    : [];
+  return { buckets, readings: state.recent.get(id) ?? [] };
+}
+
+// One app's history payload: uptime/latency windows (h1 from the raw ring, the
+// rest from the hourly buckets) plus one `bars`-long strip per range. The day
+// labels use `timeZone`'s calendar date. `intervalMinutes` is the poller
+// cadence: a 1h reading holds for up to twice that, so normal polling paints a
+// continuous strip while a stalled poller still shows a gap.
+function appHistory(
+  id: string,
+  now: number,
+  timeZone: string,
+  intervalMinutes: number,
+  bars: number
+): AppHistory {
+  const nowHour = hourOf(now);
+  const recentSince = now - RECENT_VIEW_MS;
+  const holdMs = 2 * intervalMinutes * MIN_MS;
+  const dayAt = (ms: number) => localDayStr(ms, timeZone);
+  const { buckets, readings } = appData(id);
+  return {
+    id,
+    uptime: {
+      h1: recentPct(readings, recentSince),
+      ...dayWindows(buckets, nowHour),
+    },
+    // Latency windows parallel to `uptime`: h1 from the recent ring over the
+    // same RECENT_VIEW_MS window, the day scales from the hourly buckets.
+    latency: {
+      h1: recentLatency(readings, recentSince),
+      ...latencyDayWindows(buckets, nowHour),
+    },
+    series: {
+      h1: fixedBarsFromReadings(readings, recentSince, now, bars, holdMs),
+      d1: fixedBarsFromBuckets(buckets, now - DAY_MS, now, bars, minuteStr),
+      d30: fixedBarsFromBuckets(buckets, now - 30 * DAY_MS, now, bars, dayAt),
+      d90: fixedBarsFromBuckets(buckets, now - 90 * DAY_MS, now, bars, dayAt),
+    },
+    // How far back this app's data actually reaches, so the client can flag an
+    // uptime % that covers less range than its toggle claims (see AppHistory).
+    since: oldestSampleMs(buckets, readings),
+    // Start of this app's current outage as the poller sees it, or null when
+    // it was up at the last poll — the page turns this into "Down for 23m".
+    downSince: state.downSince.get(id) ?? null,
+  };
+}
+
+// Read history for the given app ids (preserving order) as the API payload.
+// Every strip is TIMELINE_BARS long — the 1h view resamples the raw ring, the
+// day-scale views resample the hourly buckets — so all four ranges draw an
+// identically-sized heartbeat.
 export function getHistory(
   ids: string[],
   timeZone = "UTC",
   intervalMinutes = 5
 ): StatusHistory {
   const now = Date.now();
-  const nowHour = hourOf(now);
-  const recentSince = now - RECENT_VIEW_MS;
-  const holdMs = 2 * intervalMinutes * MIN_MS;
-  const dayAt = (ms: number) => localDayStr(ms, timeZone);
-  const apps = ids.map((id) => {
-    const m = state.store.get(id);
-    const buckets: Bucket[] = m
-      ? [...m].map(([hour, b]) => ({
-          hour,
-          up: b.up,
-          down: b.down,
-          msCount: b.msCount,
-          msSum: b.msSum,
-          msMax: b.msMax,
-        }))
-      : [];
-    const readings = state.recent.get(id) ?? [];
-    return {
-      id,
-      uptime: {
-        h1: recentPct(readings, recentSince),
-        ...dayWindows(buckets, nowHour),
-      },
-      // Latency windows parallel to `uptime`: h1 from the recent ring over the
-      // same RECENT_VIEW_MS window, the day scales from the hourly buckets.
-      latency: {
-        h1: recentLatency(readings, recentSince),
-        ...latencyDayWindows(buckets, nowHour),
-      },
-      series: {
-        h1: fixedBarsFromReadings(readings, recentSince, now, TIMELINE_BARS, holdMs),
-        d1: fixedBarsFromBuckets(buckets, now - DAY_MS, now, TIMELINE_BARS, minuteStr),
-        d30: fixedBarsFromBuckets(buckets, now - 30 * DAY_MS, now, TIMELINE_BARS, dayAt),
-        d90: fixedBarsFromBuckets(buckets, now - 90 * DAY_MS, now, TIMELINE_BARS, dayAt),
-      },
-      // How far back this app's data actually reaches, so the client can flag an
-      // uptime % that covers less range than its toggle claims (see AppHistory).
-      since: oldestSampleMs(buckets, readings),
-      // Start of this app's current outage as the poller sees it, or null when
-      // it was up at the last poll — the page turns this into "Down for 23m".
-      downSince: state.downSince.get(id) ?? null,
-    };
-  });
-  return { generatedAt: Date.now(), apps };
+  return {
+    generatedAt: now,
+    apps: ids.map((id) =>
+      appHistory(id, now, timeZone, intervalMinutes, TIMELINE_BARS)
+    ),
+  };
+}
+
+// One app's detail payload (#150): the same history shape at the detail
+// page's higher resolution, plus the derived outage log. Visibility is the
+// caller's job — the API route 404s ids the caller may not see.
+export function getAppDetail(
+  id: string,
+  timeZone = "UTC",
+  intervalMinutes = 5
+): AppDetail {
+  const now = Date.now();
+  const { buckets, readings } = appData(id);
+  return {
+    ...appHistory(id, now, timeZone, intervalMinutes, DETAIL_BARS),
+    outages: extractOutages(
+      buckets,
+      readings,
+      state.downSince.get(id) ?? null,
+      now,
+      intervalMinutes
+    ),
+  };
 }
