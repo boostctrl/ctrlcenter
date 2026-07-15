@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [1.9.9] - 2026-07-14
+
 ### Security
 
 - **The calendar and uptime-alert credentials never leave the server.** The
@@ -1788,7 +1790,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.8...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.9...HEAD
+[1.9.9]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.8...v1.9.9
 [1.9.8]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.7...v1.9.8
 [1.9.7]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.6...v1.9.7
 [1.9.6]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.5...v1.9.6
