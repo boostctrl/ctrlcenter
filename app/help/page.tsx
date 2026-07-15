@@ -357,11 +357,13 @@ export default async function HelpPage() {
               </li>
               <li>
                 <strong>Icons</strong> are matched by name against the
-                dashboard-icons project and fetched from its CDN as the page
-                loads, so name-picked icons need an internet connection — an
-                offline install shows only the icons you upload yourself: PNG,
-                JPG, WebP, GIF, SVG, or ICO up to 512&nbsp;KB, auto-squared so it
-                sits cleanly. The browser-tab <strong>favicon</strong> is set the
+                dashboard-icons project. The server fetches each icon once and
+                keeps a copy in its data folder, so every icon in use keeps
+                rendering with no internet at all — only <em>browsing</em> the
+                full set in the icon picker needs a connection. On a fully
+                offline install you can still upload your own: PNG, JPG, WebP,
+                GIF, SVG, or ICO up to 512&nbsp;KB, auto-squared so it sits
+                cleanly. The browser-tab <strong>favicon</strong> is set the
                 same way.
               </li>
             </ul>

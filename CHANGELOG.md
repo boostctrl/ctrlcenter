@@ -25,6 +25,14 @@ here.
   here from now on. A service marked private shows its detail only to the
   admin — for anyone else the page doesn't exist. (#150)
 
+- **Name-picked icons now work offline.** The server fetches each
+  dashboard-icons icon once, keeps a copy in its data folder, and serves it
+  locally from then on — so every icon your dashboard actually uses keeps
+  rendering with no internet connection, and a CDN hiccup can no longer blank
+  random icons. Visitors' browsers stop talking to the CDN entirely; only
+  browsing the full set in the admin icon picker still needs a connection.
+  Light/dark icon variants are cached the same way. (#128)
+
 - **A System stats widget.** A new home-page card with a meter for each
   reading: CPU load, memory pressure, and how full your disks are, refreshed
   on every page load. The card says what it's measuring, because the two are
@@ -53,6 +61,11 @@ here.
   reading that field are affected. (#152)
 
 ### Fixed
+
+- **A missing icon shows its letter fallback instead of a broken-image
+  glyph.** When an icon failed to load before the page finished waking up,
+  the browser's broken-image icon could stick in the tile; the fallback
+  letter now takes over no matter when the failure happens. (#128)
 
 - **Two admin changes saved at the same moment can no longer overwrite each
   other.** Edits arriving through different admin endpoints at once — say a

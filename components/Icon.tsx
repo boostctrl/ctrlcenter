@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   loadIconMetadata,
   resolveIconUrl,
@@ -27,6 +27,7 @@ export default function Icon({ icon, name, size = 28, className = "" }: IconProp
   // (e.g. editing the slug in the admin icon field) the new src is retried
   // instead of staying stuck on the fallback letter.
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
     if (sharedMetadata) return;
@@ -46,6 +47,24 @@ export default function Icon({ icon, name, size = 28, className = "" }: IconProp
     ? resolveThemedIconUrl(icon, metadata, surfaceIsLight)
     : resolveIconUrl(icon);
 
+  // onError alone misses a failure that completes BEFORE React hydrates: the
+  // server-rendered <img> 404s (fast now that slug icons come from this app's
+  // own proxy, #128), the error event fires with no listener attached, and the
+  // broken-image glyph sticks. decode() settles the same way whenever it's
+  // called — it rejects for an image that failed (or goes on to fail) and
+  // resolves for one that rendered — so run it once per URL after mount.
+  useEffect(() => {
+    const el = imgRef.current;
+    if (!el || !url) return;
+    let active = true;
+    el.decode().catch(() => {
+      if (active) setFailedUrl(url);
+    });
+    return () => {
+      active = false;
+    };
+  }, [url]);
+
   if (!url || failedUrl === url) {
     return (
       <div
@@ -61,6 +80,7 @@ export default function Icon({ icon, name, size = 28, className = "" }: IconProp
   return (
     // eslint-disable-next-line @next/next/no-img-element -- external, arbitrary-domain icon URLs aren't statically known for next/image
     <img
+      ref={imgRef}
       src={url}
       alt=""
       width={size}

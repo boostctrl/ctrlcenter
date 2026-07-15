@@ -2,10 +2,16 @@
 //
 // An icon value is either:
 //  - a full URL (http/https) supplied by the user as a custom icon, or
-//  - a slug looked up against the dashboard-icons CDN, a large community-
-//    maintained set of self-hosted app/service logos (svg).
-const ICON_CDN_BASE =
-  "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@main/svg";
+//  - a slug from the dashboard-icons set, a large community-maintained
+//    collection of self-hosted app/service logos (svg).
+//
+// Slugs resolve to this app's own proxy-cache route (#128), not the CDN: the
+// server fetches an icon once, stores it in the data volume, and serves it
+// locally from then on — so icons in use render offline and a CDN hiccup
+// can't blank them. Only the picker's BROWSE list (tree.json below) still
+// reaches the CDN directly, since browsing the whole set is inherently an
+// online activity.
+const ICON_PROXY_BASE = "/api/icons/cdn";
 
 // Lightweight index of every available icon slug (the repo's tree.json lists
 // the svg filenames). Fetched once and cached for the admin icon browser.
@@ -15,8 +21,8 @@ const ICON_TREE_URL =
 // Per-icon metadata; the `colors` field names the variant slugs to use on a
 // light or dark background (when an icon ships themed variants), so logos stay
 // legible in both themes. Most icons have no variants and just use the base.
-const ICON_METADATA_URL =
-  "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@main/metadata.json";
+// Served through the same server-side cache as the icons.
+const ICON_METADATA_URL = "/api/icons/metadata";
 
 let cachedSlugs: string[] | null = null;
 
@@ -62,7 +68,7 @@ export function resolveIconUrl(icon: string): string | null {
   const trimmed = icon.trim();
   if (!trimmed) return null;
   if (isCustomIconUrl(trimmed)) return trimmed;
-  return `${ICON_CDN_BASE}/${slugify(trimmed)}.svg`;
+  return `${ICON_PROXY_BASE}/${slugify(trimmed)}`;
 }
 
 // Like resolveIconUrl, but picks the icon's themed variant for the current
@@ -80,7 +86,7 @@ export function resolveThemedIconUrl(
   if (isCustomIconUrl(trimmed)) return trimmed;
   const slug = slugify(trimmed);
   const variant = metadata[slug]?.colors?.[surfaceIsLight ? "dark" : "light"];
-  return `${ICON_CDN_BASE}/${variant || slug}.svg`;
+  return `${ICON_PROXY_BASE}/${variant || slug}`;
 }
 
 function slugify(value: string): string {
