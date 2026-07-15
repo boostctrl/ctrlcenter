@@ -24,23 +24,6 @@ export type LayoutWidgetId = (typeof LAYOUT_WIDGET_IDS)[number];
 
 export const GRID_COLUMNS = 24;
 
-// The 1.3 grid was 12 columns. Stored spans from that era double onto today's
-// 24-column grid; a `columns` marker on the persisted layout says which grid a
-// config's spans were saved against (absent = 12).
-export const LEGACY_GRID_COLUMNS = 12;
-
-// Legacy pre-1.3 widths (the old 6-column grid), still accepted when reading a
-// stored config or an old export; they map onto 24-column spans below.
-export const SECTION_WIDTHS = ["full", "twoThirds", "half", "third"] as const;
-export type SectionWidth = (typeof SECTION_WIDTHS)[number];
-
-export const WIDTH_TO_SPAN: Record<SectionWidth, number> = {
-  full: 24,
-  twoThirds: 16,
-  half: 12,
-  third: 8,
-};
-
 // How many cards a widget's inner grid may show side by side (apps/bookmarks/
 // favorites). `cards` on a layout entry is an explicit override; absent means
 // "auto" — derived from the widget's span (see cardGridClass in Dashboard).
@@ -143,8 +126,7 @@ export type LayoutWidget = {
   // Explicit card height in px (the card is exactly this tall); absent = auto.
   height?: number;
   // Extra space (px, beyond the grid gap) on any side of the card; absent sides
-  // and an absent object both mean none. Replaces the pre-1.8.1 `spaceBelow`,
-  // which resolves into `space.bottom`.
+  // and an absent object both mean none.
   space?: WidgetSpace;
 };
 
@@ -263,12 +245,6 @@ function isWidgetId(v: unknown): v is LayoutWidgetId {
   );
 }
 
-function isWidth(v: unknown): v is SectionWidth {
-  return (
-    typeof v === "string" && (SECTION_WIDTHS as readonly string[]).includes(v)
-  );
-}
-
 function isSpan(v: unknown): v is number {
   return (
     typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= GRID_COLUMNS
@@ -324,27 +300,25 @@ function legacyHidden(
 }
 
 // Normalize a stored/partial layout into a concrete, complete widget list: keep
-// the saved order, drop unknown ids and duplicates, coerce a bad span (via a
-// legacy width when present, else the widget's default), keep a valid `cards`
-// override, and resolve `hidden` (explicit boolean > folded legacy components
-// toggle > visible-when-listed). Widgets the saved layout is missing are added
-// — header widgets prepended, body widgets appended — with their defaults
-// (legacy toggles still folded), so a config from any earlier version renders
-// unchanged and a widget added in a future version still shows. Spans are
-// expected on the 24-column grid — the schema layer doubles pre-24 configs
-// before this runs. Mirrors applyOrder in lib/config.ts.
+// the saved order, drop unknown ids and duplicates, coerce a bad span to the
+// widget's default, keep a valid `cards` override, and resolve `hidden`
+// (explicit boolean > folded legacy components toggle > visible-when-listed).
+// Widgets the saved layout is missing are added — header widgets prepended,
+// body widgets appended — with their defaults (legacy toggles still folded), so
+// a config from any earlier version renders unchanged and a widget added in a
+// future version still shows. Spans are expected on the 24-column grid — the
+// one-time shape migration (lib/config-migrate.ts) rewrites pre-24 configs
+// before anything parses them. Mirrors applyOrder in lib/config.ts.
 export function resolveLayoutWidgets(
   saved:
     | readonly {
         id?: unknown;
         span?: unknown;
-        width?: unknown;
         hidden?: unknown;
         cards?: unknown;
         hideLabel?: unknown;
         height?: unknown;
         space?: unknown;
-        spaceBelow?: unknown;
       }[]
     | undefined,
   components?: LegacyComponentToggles
@@ -355,22 +329,12 @@ export function resolveLayoutWidgets(
     const id = item?.id;
     if (!isWidgetId(id) || seen.has(id)) continue;
     seen.add(id);
-    const span = isSpan(item.span)
-      ? item.span
-      : isWidth(item.width)
-        ? WIDTH_TO_SPAN[item.width]
-        : DEFAULT_BY_ID[id].span;
+    const span = isSpan(item.span) ? item.span : DEFAULT_BY_ID[id].span;
     const hidden =
       typeof item.hidden === "boolean"
         ? item.hidden
         : (legacyHidden(id, components) ?? false);
-    // A valid `space` wins; otherwise migrate a legacy pre-1.8.1 `spaceBelow`
-    // into `space.bottom` so older configs keep their spacing.
-    const space =
-      coerceSpace(item.space) ??
-      (isSpaceValue(item.spaceBelow)
-        ? { bottom: item.spaceBelow as number }
-        : undefined);
+    const space = coerceSpace(item.space);
     listed.push({
       id,
       span,

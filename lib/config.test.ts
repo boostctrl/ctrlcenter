@@ -121,7 +121,7 @@ describe("updateSettings partial merge", () => {
     expect(settings.timezone).toBe("America/Chicago");
   });
 
-  it("clears the deprecated feed url on save so a deleted feed stays deleted", async () => {
+  it("keeps a deleted feed deleted after migrating a legacy single-url config", async () => {
     // A pre-1.9.6 config: a single legacy `url`, no `urls` list yet.
     await fs.writeFile(
       configPath,
@@ -130,13 +130,20 @@ describe("updateSettings partial merge", () => {
       }),
       "utf8"
     );
-    // The admin edits feeds and deletes the (folded-in) row, saving an empty list.
+    // The migration folds the url into the list…
+    const loaded = await config.readConfigInternal();
+    expect(loaded.settings.feed.urls).toEqual(["https://old.example/rss"]);
+    // …and the admin then deletes the row, saving an empty list. Nothing is
+    // left on disk for a later read to resurrect the feed from.
     const settings = await config.updateSettings({
       feed: { enabled: true, urls: [], count: 6, title: "" },
     });
-    // The stale legacy url is cleared, so feedUrls() can't resurrect the feed.
-    expect(settings.feed.url).toBe("");
     expect(settings.feed.urls).toEqual([]);
+    const onDisk = YAML.load(await fs.readFile(configPath, "utf8")) as {
+      settings: { feed: Record<string, unknown> };
+    };
+    expect("url" in onDisk.settings.feed).toBe(false);
+    expect(onDisk.settings.feed.urls).toEqual([]);
   });
 
   it("merges nested weather fields without dropping siblings", async () => {
@@ -202,28 +209,26 @@ describe("updateSettings partial merge", () => {
     expect(settings.layout.scale).toBe(110);
   });
 
-  it("migrates a legacy width layout to spans on the next write", async () => {
+  it("rewrites a legacy width layout to spans on the first read, with a .bak", async () => {
     // A pre-1.3 config on disk, arranged with the old width enum.
-    await fs.writeFile(
-      configPath,
-      YAML.dump({
-        settings: {
-          layout: { sections: [{ id: "apps", width: "half" }] },
-        },
-      }),
-      "utf8"
-    );
+    const legacy = {
+      settings: {
+        layout: { sections: [{ id: "apps", width: "half" }] },
+      },
+    };
+    await fs.writeFile(configPath, YAML.dump(legacy), "utf8");
     const loaded = await config.readConfigInternal();
     expect(loaded.settings.layout.sections).toEqual([{ id: "apps", span: 12 }]);
 
-    // Any write re-parses the whole config, persisting the span shape and the
-    // 24-column grid marker.
-    await config.updateSettings({ title: "Dash" });
+    // The read itself persisted the span shape and the 24-column grid marker…
     const onDisk = YAML.load(await fs.readFile(configPath, "utf8")) as {
       settings: { layout: { sections: unknown; columns: number } };
     };
     expect(onDisk.settings.layout.sections).toEqual([{ id: "apps", span: 12 }]);
     expect(onDisk.settings.layout.columns).toBe(24);
+    // …after snapshotting the pre-migration file verbatim to the .bak.
+    const bak = YAML.load(await fs.readFile(`${configPath}.bak`, "utf8"));
+    expect(bak).toEqual(legacy);
   });
 
   it("doubles a 1.3-era 12-column span layout once, and never again", async () => {
@@ -248,8 +253,8 @@ describe("updateSettings partial merge", () => {
       { id: "search", span: 24, hidden: false },
     ]);
 
-    // A write persists the migrated spans + marker; re-reading must not
-    // double them a second time.
+    // The first read persisted the doubled spans + marker; later reads and
+    // writes must not double them a second time.
     await config.updateSettings({ title: "Dash" });
     const reloaded = await config.readConfigInternal();
     expect(reloaded.settings.layout.sections).toEqual([
@@ -257,6 +262,30 @@ describe("updateSettings partial merge", () => {
       { id: "search", span: 24, hidden: false },
     ]);
     expect(reloaded.settings.layout.columns).toBe(24);
+  });
+
+  it("migrates a pre-2.0 backup file on import", async () => {
+    // An export taken before 2.0.0 carries the legacy shapes; replaceConfig
+    // must fold them exactly like the on-disk migration does.
+    const replaced = await config.replaceConfig({
+      settings: {
+        feed: { enabled: true, url: "https://old.example/rss" },
+        layout: {
+          sections: [
+            { id: "apps", span: 6, hidden: false },
+            { id: "bookmarks", width: "half", spaceBelow: 40 },
+          ],
+        },
+      },
+      apps: [],
+      bookmarks: [],
+    });
+    expect(replaced.settings.feed.urls).toEqual(["https://old.example/rss"]);
+    expect(replaced.settings.layout.sections).toEqual([
+      { id: "apps", span: 12, hidden: false },
+      { id: "bookmarks", span: 12, space: { bottom: 40 } },
+    ]);
+    expect(replaced.settings.layout.columns).toBe(24);
   });
 });
 

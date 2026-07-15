@@ -5,11 +5,8 @@ import { SEARCH_ENGINE_KEYS, isValidCustomUrl } from "./search";
 import { STATUS_RANGE_KEYS, CHECK_TYPE_KEYS } from "./status";
 import {
   LAYOUT_WIDGET_IDS,
-  SECTION_WIDTHS,
-  WIDTH_TO_SPAN,
   DEFAULT_WIDGETS,
   GRID_COLUMNS,
-  LEGACY_GRID_COLUMNS,
   MAX_CARD_COLUMNS,
   MIN_WIDGET_HEIGHT,
   MAX_WIDGET_HEIGHT,
@@ -139,12 +136,9 @@ export const MAX_FEED_URLS = 10;
 // Stored leniently; URLs are validated on the admin path.
 export const feedSchema = z.object({
   enabled: z.boolean().default(false),
-  // @deprecated Pre-1.9.6 single-feed URL. Still read — feedUrls() folds it into
-  // a one-entry list so an existing config loads unchanged — but no longer
-  // written by the admin UI, which saves `urls`. Removed with a one-time
-  // migration in 2.0.0 (removal ledger #152). Prefer `urls`.
-  url: z.string().default(""),
-  // The feed URLs to merge, rendered newest-first. Supersedes `url`.
+  // The feed URLs to merge, rendered newest-first. The pre-1.9.6 single `url`
+  // is folded into this list by the one-time shape migration
+  // (lib/config-migrate.ts, ledger #152).
   urls: z.array(z.string()).default([]),
   count: z.number().int().min(1).max(15).default(6),
   // Card title override; empty uses the first feed's own title.
@@ -152,15 +146,11 @@ export const feedSchema = z.object({
 });
 export type FeedConfig = z.infer<typeof feedSchema>;
 
-// The effective feed URL list: `urls` when it has any entries, otherwise the
-// deprecated single `url` as a one-entry list (a pre-1.9.6 config). Blank
-// entries are trimmed out. Shared by the home page, the admin editor's seed,
-// and the fetch layer so the legacy shape is folded in exactly one way.
-export function feedUrls(feed: Pick<FeedConfig, "url" | "urls">): string[] {
-  const list = feed.urls.map((u) => u.trim()).filter((u) => u !== "");
-  if (list.length > 0) return list;
-  const legacy = feed.url.trim();
-  return legacy !== "" ? [legacy] : [];
+// The effective feed URL list: `urls` with blank entries trimmed out. Shared by
+// the home page, the admin editor's seed, and the fetch layer so a half-typed
+// row is skipped in exactly one way.
+export function feedUrls(feed: Pick<FeedConfig, "urls">): string[] {
+  return feed.urls.map((u) => u.trim()).filter((u) => u !== "");
 }
 
 // Countdown widget: labeled dates rendered as "in N days" rows. Stored
@@ -322,14 +312,13 @@ function lenientArray<T extends z.ZodTypeAny>(item: T) {
 
 // Home-page widget arrangement: an ordered list of widgets, each with a column
 // span on the 24-column grid, a hidden flag, and (for the card-grid widgets) an
-// optional cards-per-row override. The legacy pre-1.3 shape
-// ({ id, width: full|twoThirds|half|third }) still parses — the transform maps
-// a width to its span, and since writeConfig re-parses on every save, a stored
-// config migrates to the span shape on its next write (the transform is
-// idempotent). `hidden` deliberately stays absent (not defaulted) when a stored
-// entry omits it, so resolveLayoutWidgets (lib/layout.ts) can fold the legacy
-// components visibility toggles in; that resolver also rebuilds whatever this
-// lenient per-row parse drops.
+// optional cards-per-row override. Pre-2.0 shapes (`width` enums, `spaceBelow`,
+// 12-column spans) are rewritten by the one-time shape migration before this
+// schema ever sees them (lib/config-migrate.ts, ledger #152). `hidden`
+// deliberately stays absent (not defaulted) when a stored entry omits it, so
+// resolveLayoutWidgets (lib/layout.ts) can fold the legacy components
+// visibility toggles in; that resolver also rebuilds whatever this lenient
+// per-row parse drops.
 // One side's spacing value (px). Reused by the lenient and strict space schemas.
 const spaceSideSchema = z.number().int().min(1).max(MAX_WIDGET_SPACE);
 // Per-side extra space around a card. Lenient variant catches a bad side to
@@ -362,7 +351,6 @@ export const layoutWidgetSchema = z
   .object({
     id: z.enum(LAYOUT_WIDGET_IDS),
     span: z.number().int().min(1).max(GRID_COLUMNS).optional().catch(undefined),
-    width: z.enum(SECTION_WIDTHS).optional().catch(undefined),
     hidden: z.boolean().optional().catch(undefined),
     cards: z
       .number()
@@ -380,20 +368,16 @@ export const layoutWidgetSchema = z
       .optional()
       .catch(undefined),
     space: lenientSpaceSchema.optional().catch(undefined),
-    // Pre-1.8.1 single-sided spacing; migrated into `space.bottom` below.
-    spaceBelow: spaceSideSchema.optional().catch(undefined),
   })
   .transform(
     ({
       id,
       span,
-      width,
       hidden,
       cards,
       hideLabel,
       height,
       space,
-      spaceBelow,
     }): {
       id: LayoutWidgetId;
       span: number;
@@ -403,13 +387,10 @@ export const layoutWidgetSchema = z
       height?: number;
       space?: WidgetSpace;
     } => {
-      // A valid `space` wins; else migrate a legacy `spaceBelow` to the bottom.
-      const resolvedSpace =
-        cleanSpace(space) ??
-        (spaceBelow === undefined ? undefined : { bottom: spaceBelow });
+      const resolvedSpace = cleanSpace(space);
       return {
         id,
-        span: span ?? (width ? WIDTH_TO_SPAN[width] : defaultSpanFor(id)),
+        span: span ?? defaultSpanFor(id),
         ...(hidden === undefined ? {} : { hidden }),
         ...(cards === undefined ? {} : { cards }),
         ...(hideLabel === undefined ? {} : { hideLabel }),
@@ -419,67 +400,40 @@ export const layoutWidgetSchema = z
     }
   );
 
-// Spans saved against the 1.3 12-column grid double onto today's 24-column
-// one. This must run BEFORE the per-widget parse: that parse fills missing
-// spans from legacy widths/defaults which are already 24-based and must not be
-// doubled. Only plausible 12-based spans are touched; anything else falls
-// through to the per-widget validation. Idempotent because the output layout
-// always carries `columns: 24`.
-function migrateLayoutColumns(raw: unknown): unknown {
-  if (typeof raw !== "object" || raw === null) return raw;
-  const obj = raw as { sections?: unknown; columns?: unknown };
-  if (obj.columns === GRID_COLUMNS || !Array.isArray(obj.sections)) {
-    return { ...obj, columns: GRID_COLUMNS };
-  }
-  const sections = obj.sections.map((row) => {
-    if (typeof row !== "object" || row === null) return row;
-    const span = (row as { span?: unknown }).span;
-    return typeof span === "number" &&
-      Number.isInteger(span) &&
-      span >= 1 &&
-      span <= LEGACY_GRID_COLUMNS
-      ? { ...row, span: span * 2 }
-      : row;
-  });
-  return { ...obj, sections, columns: GRID_COLUMNS };
-}
-
-export const layoutSchema = z.preprocess(
-  migrateLayoutColumns,
-  z.object({
-    sections: lenientArray(layoutWidgetSchema).default(DEFAULT_WIDGETS),
-    // Which grid the stored spans are for — always 24 after the preprocess;
-    // persisting it is what keeps the doubling from re-applying.
-    columns: z.literal(GRID_COLUMNS).catch(GRID_COLUMNS).default(GRID_COLUMNS),
-    // Site-wide UI scale (percent). Rendered as font-size on <html>, so the
-    // whole rem-based UI scales uniformly.
-    scale: z
-      .number()
-      .int()
-      .min(MIN_UI_SCALE)
-      .max(MAX_UI_SCALE)
-      .catch(DEFAULT_UI_SCALE)
-      .default(DEFAULT_UI_SCALE),
-    // Vertical gap (px) between cards on the grid.
-    gap: z
-      .number()
-      .int()
-      .min(MIN_GRID_GAP)
-      .max(MAX_GRID_GAP)
-      .catch(DEFAULT_GRID_GAP)
-      .default(DEFAULT_GRID_GAP),
-    // Gap (px) between the top of the page and the first row of widgets.
-    // Applied as-is on large screens, capped at the small-screen stock value
-    // below them (see smallScreenTopGap in lib/layout.ts).
-    topGap: z
-      .number()
-      .int()
-      .min(MIN_TOP_GAP)
-      .max(MAX_TOP_GAP)
-      .catch(DEFAULT_TOP_GAP)
-      .default(DEFAULT_TOP_GAP),
-  })
-);
+export const layoutSchema = z.object({
+  sections: lenientArray(layoutWidgetSchema).default(DEFAULT_WIDGETS),
+  // Which grid the stored spans are for. Always 24 today — the one-time shape
+  // migration doubles 12-column spans and stamps this marker; keeping it
+  // persisted is what tells that migration a file is already current.
+  columns: z.literal(GRID_COLUMNS).catch(GRID_COLUMNS).default(GRID_COLUMNS),
+  // Site-wide UI scale (percent). Rendered as font-size on <html>, so the
+  // whole rem-based UI scales uniformly.
+  scale: z
+    .number()
+    .int()
+    .min(MIN_UI_SCALE)
+    .max(MAX_UI_SCALE)
+    .catch(DEFAULT_UI_SCALE)
+    .default(DEFAULT_UI_SCALE),
+  // Vertical gap (px) between cards on the grid.
+  gap: z
+    .number()
+    .int()
+    .min(MIN_GRID_GAP)
+    .max(MAX_GRID_GAP)
+    .catch(DEFAULT_GRID_GAP)
+    .default(DEFAULT_GRID_GAP),
+  // Gap (px) between the top of the page and the first row of widgets.
+  // Applied as-is on large screens, capped at the small-screen stock value
+  // below them (see smallScreenTopGap in lib/layout.ts).
+  topGap: z
+    .number()
+    .int()
+    .min(MIN_TOP_GAP)
+    .max(MAX_TOP_GAP)
+    .catch(DEFAULT_TOP_GAP)
+    .default(DEFAULT_TOP_GAP),
+});
 export type LayoutConfig = z.infer<typeof layoutSchema>;
 
 export const settingsSchema = z.object({
@@ -748,8 +702,7 @@ export const worldClocksUpdateSchema = z.object({
 
 // The admin sends the whole feed object. The URL list may be empty (the widget
 // stays inert until set) and blank rows are allowed (trimmed on read), but every
-// non-empty entry must be http(s). The admin UI writes `urls`; the deprecated
-// single `url` is not sent (it lingers in a pre-1.9.6 config until 2.0.0).
+// non-empty entry must be http(s).
 export const feedUpdateSchema = z
   .object({
     enabled: z.boolean(),

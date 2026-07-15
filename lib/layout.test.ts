@@ -41,27 +41,15 @@ describe("resolveLayoutWidgets", () => {
     expect(out.map((w) => w.id).sort()).toEqual([...LAYOUT_WIDGET_IDS].sort());
   });
 
-  it("maps legacy widths to spans (full/twoThirds/half/third → 24/16/12/8)", () => {
+  it("renders a body-sections-only layout exactly like the old page", () => {
+    // A pre-widget config: only body sections saved (spans via the one-time
+    // shape migration), header fixed on top.
     const out = resolveLayoutWidgets([
-      { id: "search", width: "full" },
-      { id: "apps", width: "twoThirds" },
-      { id: "bookmarks", width: "half" },
-      { id: "calendar", width: "third" },
-    ]);
-    expect(out.find((w) => w.id === "search")?.span).toBe(24);
-    expect(out.find((w) => w.id === "apps")?.span).toBe(16);
-    expect(out.find((w) => w.id === "bookmarks")?.span).toBe(12);
-    expect(out.find((w) => w.id === "calendar")?.span).toBe(8);
-  });
-
-  it("renders a legacy 5-section layout exactly like the old page", () => {
-    // A pre-widget config: only body sections saved, header fixed on top.
-    const out = resolveLayoutWidgets([
-      { id: "search", width: "full" },
-      { id: "calendar", width: "half" },
-      { id: "favorites", width: "full" },
-      { id: "apps", width: "full" },
-      { id: "bookmarks", width: "half" },
+      { id: "search", span: 24 },
+      { id: "calendar", span: 12 },
+      { id: "favorites", span: 24 },
+      { id: "apps", span: 24 },
+      { id: "bookmarks", span: 12 },
     ]);
     expect(out.map((w) => w.id)).toEqual([
       "greeting",
@@ -152,24 +140,12 @@ describe("resolveLayoutWidgets", () => {
     expect("space" in out.find((w) => w.id === "notes")!).toBe(false);
   });
 
-  it("migrates a legacy spaceBelow into space.bottom", () => {
-    const out = resolveLayoutWidgets([
-      { id: "apps", span: 24, spaceBelow: 40 },
-      { id: "bookmarks", span: 24, spaceBelow: 0 }, // not >= 1 — dropped
-      // An explicit `space` wins over a legacy spaceBelow on the same entry.
-      { id: "feed", span: 24, space: { top: 8 }, spaceBelow: 40 },
-    ]);
-    expect(out.find((w) => w.id === "apps")?.space).toEqual({ bottom: 40 });
-    expect("space" in out.find((w) => w.id === "bookmarks")!).toBe(false);
-    expect(out.find((w) => w.id === "feed")?.space).toEqual({ top: 8 });
-  });
-
   it("folds legacy components toggles into hidden for entries without one", () => {
     const components = { greeting: false, apps: false, search: true };
     const out = resolveLayoutWidgets(
       [
-        { id: "search", width: "full" },
-        { id: "apps", width: "full" }, // no hidden — folds components.apps
+        { id: "search", span: 24 },
+        { id: "apps", span: 24 }, // no hidden — folds components.apps
       ],
       components
     );
@@ -246,49 +222,14 @@ describe("layout schema", () => {
     expect(layout.scale).toBe(100);
   });
 
-  it("transforms the legacy width shape to a span (and re-parses idempotently)", () => {
+  it("parses spans as-is and re-parses idempotently (pre-24 shapes are the migration's job)", () => {
     const once = layoutSchema.parse({
-      sections: [{ id: "apps", width: "half" }],
-    });
-    expect(once.sections).toEqual([{ id: "apps", span: 12 }]);
-    // Re-parsing the output (as writeConfig does) is a no-op.
-    expect(layoutSchema.parse(once)).toEqual(once);
-  });
-
-  it("doubles spans saved on the 12-column grid exactly once", () => {
-    // A 1.3-era config: spans on the 12-column grid, no `columns` marker.
-    const once = layoutSchema.parse({
-      sections: [
-        { id: "apps", span: 6 },
-        { id: "search", span: 12, hidden: true },
-      ],
-    });
-    expect(once.sections).toEqual([
-      { id: "apps", span: 12 },
-      { id: "search", span: 24, hidden: true },
-    ]);
-    expect(once.columns).toBe(24);
-    // Re-parsing (as writeConfig does on every save) must not double again.
-    expect(layoutSchema.parse(once)).toEqual(once);
-  });
-
-  it("leaves 24-based spans alone when the columns marker is present", () => {
-    const parsed = layoutSchema.parse({
       sections: [{ id: "apps", span: 7 }],
       columns: 24,
     });
-    expect(parsed.sections).toEqual([{ id: "apps", span: 7 }]);
-  });
-
-  it("doesn't double legacy width rows (they map straight to 24-based spans)", () => {
-    const parsed = layoutSchema.parse({
-      sections: [
-        { id: "apps", span: 6 },
-        { id: "bookmarks", width: "third" },
-      ],
-    });
-    expect(parsed.sections.find((w) => w.id === "apps")?.span).toBe(12);
-    expect(parsed.sections.find((w) => w.id === "bookmarks")?.span).toBe(8);
+    expect(once.sections).toEqual([{ id: "apps", span: 7 }]);
+    // Re-parsing the output (as writeConfig does) is a no-op.
+    expect(layoutSchema.parse(once)).toEqual(once);
   });
 
   it("keeps a valid scale and coerces an out-of-range one to the default", () => {
@@ -309,11 +250,10 @@ describe("layout schema", () => {
     expect(parsed.sections[1]).toEqual({ id: "bookmarks", span: 24 });
   });
 
-  it("keeps a valid per-side space and migrates a legacy spaceBelow", () => {
+  it("keeps a valid per-side space and drops one with no valid side", () => {
     const parsed = layoutSchema.parse({
       sections: [
         { id: "apps", span: 24, space: { top: 24, bottom: 16 } },
-        { id: "bookmarks", span: 24, spaceBelow: 40 }, // legacy → space.bottom
         { id: "feed", span: 24, space: { top: 0 } }, // no valid side — dropped
       ],
       columns: 24,
@@ -323,12 +263,7 @@ describe("layout schema", () => {
       span: 24,
       space: { top: 24, bottom: 16 },
     });
-    expect(parsed.sections[1]).toEqual({
-      id: "bookmarks",
-      span: 24,
-      space: { bottom: 40 },
-    });
-    expect(parsed.sections[2]).toEqual({ id: "feed", span: 24 });
+    expect(parsed.sections[1]).toEqual({ id: "feed", span: 24 });
   });
 
   it("keeps hidden absent when a stored entry omits it, present when not", () => {

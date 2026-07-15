@@ -16,20 +16,16 @@ import {
 } from "./schema";
 
 describe("feedUrls", () => {
-  it("prefers the urls list and trims blank entries", () => {
-    expect(
-      feedUrls({ url: "https://old", urls: ["https://a", "  ", " https://b "] })
-    ).toEqual(["https://a", "https://b"]);
-  });
-
-  it("folds the deprecated single url in when urls is empty", () => {
-    expect(feedUrls({ url: "  https://old  ", urls: [] })).toEqual([
-      "https://old",
+  it("trims entries and drops blank rows", () => {
+    expect(feedUrls({ urls: ["https://a", "  ", " https://b "] })).toEqual([
+      "https://a",
+      "https://b",
     ]);
   });
 
-  it("returns nothing when both the list and the legacy url are blank", () => {
-    expect(feedUrls({ url: "  ", urls: [] })).toEqual([]);
+  it("returns nothing when the list is empty or blank-only", () => {
+    expect(feedUrls({ urls: [] })).toEqual([]);
+    expect(feedUrls({ urls: ["  ", ""] })).toEqual([]);
   });
 });
 

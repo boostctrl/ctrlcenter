@@ -289,7 +289,6 @@ function dayWindows(
 ): Omit<UptimeWindows, "h1"> {
   return {
     d1: uptimePct(buckets, nowHour - 24),
-    d7: uptimePct(buckets, nowHour - 24 * 7),
     d30: uptimePct(buckets, nowHour - 24 * 30),
     d90: uptimePct(buckets, nowHour - 24 * 90),
   };
@@ -303,7 +302,6 @@ function latencyDayWindows(
 ): Omit<LatencyWindows, "h1"> {
   return {
     d1: latencyOverBuckets(buckets, nowHour - 24),
-    d7: latencyOverBuckets(buckets, nowHour - 24 * 7),
     d30: latencyOverBuckets(buckets, nowHour - 24 * 30),
     d90: latencyOverBuckets(buckets, nowHour - 24 * 90),
   };

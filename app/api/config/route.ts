@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readConfigInternal, replaceConfig, stripAuth } from "@/lib/config";
+import { migrateConfigShape } from "@/lib/config-migrate";
 import { configSchema } from "@/lib/schema";
 import {
   exportIcons,
@@ -35,7 +36,11 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
-  const parsed = configSchema.safeParse(body);
+  // Upgrade a pre-2.0 backup BEFORE validating: zod strips keys it doesn't
+  // know, so parsing the raw body first would silently launder the legacy
+  // fields (single feed url, width/spaceBelow rows, 12-column spans) out of
+  // the file instead of migrating them.
+  const parsed = configSchema.safeParse(migrateConfigShape(body).value);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "That doesn't look like a valid ctrlcenter config file." },

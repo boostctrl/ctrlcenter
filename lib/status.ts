@@ -76,10 +76,6 @@ export const CHECK_TYPE_KEYS = CHECK_TYPES.map((c) => c.key) as [
 export type UptimeWindows = {
   h1: number | null;
   d1: number | null;
-  // @deprecated No 7d range exists in the UI; this window is computed and
-  // shipped only for API compatibility through 1.9.x and will be removed in
-  // 2.0.0. Don't build new consumers on it.
-  d7: number | null;
   d30: number | null;
   d90: number | null;
 };
@@ -98,9 +94,6 @@ export type LatencyStat = { avg: number; max: number };
 export type LatencyWindows = {
   h1: LatencyStat | null;
   d1: LatencyStat | null;
-  // @deprecated Same story as UptimeWindows.d7 — unused by the UI, kept only
-  // for API compatibility through 1.9.x, removed in 2.0.0 alongside it.
-  d7: LatencyStat | null;
   d30: LatencyStat | null;
   d90: LatencyStat | null;
 };

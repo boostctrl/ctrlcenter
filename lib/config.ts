@@ -2,6 +2,8 @@ import fs from "fs/promises";
 import path from "path";
 import YAML from "js-yaml";
 import { GRID_COLUMNS } from "./layout";
+import { migrateConfigShape } from "./config-migrate";
+import { log, errorReason } from "./log";
 import {
   configSchema,
   configReadSchema,
@@ -28,8 +30,25 @@ export const CONFIG_DIR = path.dirname(CONFIG_PATH);
 const CONFIG_BAK = `${CONFIG_PATH}.bak`;
 
 // Serializes read-modify-write operations so concurrent admin requests can't
-// clobber each other's changes to the on-disk YAML file.
-let writeQueue: Promise<unknown> = Promise.resolve();
+// clobber each other's changes to the on-disk YAML file. Held on globalThis so
+// every route's module graph shares ONE queue — Next bundles lib/* separately
+// per entry, so a plain module-level variable here would give each API route
+// its own "serialization" and let writes from different endpoints interleave
+// (same duplication the alert/status/calendar/feed singletons work around).
+// The one-time shape migration's state rides along for the same reason: one
+// attempt and one warn per process, not per route bundle.
+const g = globalThis as unknown as {
+  __ctrlcenterConfigWrites?: {
+    queue: Promise<unknown>;
+    migrationTask: Promise<void> | null;
+    migrationFailed: boolean;
+  };
+};
+const writes = (g.__ctrlcenterConfigWrites ??= {
+  queue: Promise.resolve(),
+  migrationTask: null,
+  migrationFailed: false,
+});
 
 async function ensureConfigExists(): Promise<void> {
   try {
@@ -40,30 +59,103 @@ async function ensureConfigExists(): Promise<void> {
   }
 }
 
+// Read + migrate + leniently parse the on-disk file. The pre-2.0 shape
+// migration (lib/config-migrate.ts) is applied in memory on every read, so a
+// legacy file serves correctly even before (or without) the one-time rewrite
+// below; `changed` tells the caller whether the file itself still carries a
+// legacy shape.
+async function loadMigrated(): Promise<{ config: Config; changed: boolean }> {
+  await ensureConfigExists();
+  const raw = await fs.readFile(CONFIG_PATH, "utf8");
+  const { value, changed } = migrateConfigShape(YAML.load(raw) ?? {});
+  // Lenient read: a single malformed row is dropped rather than 500-ing every
+  // page on a hand-edited file (see configReadSchema). Writes/imports stay strict.
+  return { config: configReadSchema.parse(value), changed };
+}
+
 // The raw, unfiltered config — private apps/bookmarks and the admin credential
 // included. "Internal" is deliberate: anything rendering for a possibly
 // signed-out visitor must go through readPublicConfig() (lib/api-auth.ts),
 // which pre-filters private items, so a public surface can't reach the full
 // list by accident. A test pins which files under app/ may import this.
+//
+// The first read of a pre-2.0 file also rewrites it to the current shape
+// (through the write queue, after snapshotting the original to config.yaml.bak).
+// Queue-internal readers (mutate, replaceConfig) must use readConfigInQueue
+// instead — awaiting a queued rewrite from inside the queue would deadlock, and
+// their own write normalizes the file anyway.
 export async function readConfigInternal(): Promise<Config> {
-  await ensureConfigExists();
-  const raw = await fs.readFile(CONFIG_PATH, "utf8");
-  const parsed = YAML.load(raw);
-  // Lenient read: a single malformed row is dropped rather than 500-ing every
-  // page on a hand-edited file (see configReadSchema). Writes/imports stay strict.
-  return configReadSchema.parse(parsed ?? {});
+  const { config, changed } = await loadMigrated();
+  if (changed) await persistShapeMigration();
+  return config;
 }
 
-// Dump a config as YAML to `dest` by writing a temp file then renaming into
-// place (atomic on the same filesystem) so a concurrent reader can never observe
-// a torn, half-written file and throw, and a crash mid-write can't leave a torn
-// artifact. Mirrors the persistence in lib/status-history.ts. Used for both the
-// live config and its .bak safety copy so they serialize identically.
-async function dumpYaml(dest: string, config: Config): Promise<void> {
+// The read used inside write-queue tasks: same migration folds in memory, no
+// persist (see readConfigInternal).
+async function readConfigInQueue(): Promise<Config> {
+  return (await loadMigrated()).config;
+}
+
+// Rewrite a pre-2.0 config file to the current shape, once. Deliberately does
+// NOT launder the file through the schemas: only the legacy keys are rewritten,
+// so unknown fields and rows the lenient read drops survive on disk — an
+// unprompted background rewrite must never destroy data an admin didn't ask to
+// change. The original file is snapshotted verbatim to config.yaml.bak first,
+// same recovery contract as an import (#129).
+//
+// Runs once per process: while an attempt is in flight, concurrent reads share
+// it instead of enqueueing their own (a first page load fans out several reads
+// at once), and once the rewrite fails (say, a read-only volume) it isn't
+// re-attempted until the next process start — reads keep working off the
+// in-memory folds either way.
+function persistShapeMigration(): Promise<void> {
+  if (writes.migrationFailed) return Promise.resolve();
+  if (!writes.migrationTask) {
+    const task = writes.queue.then(async () => {
+      // Re-read inside the queue: a write that landed since detection has
+      // already normalized the file, making this a no-op.
+      const raw = await fs.readFile(CONFIG_PATH, "utf8");
+      const { value, changed } = migrateConfigShape(YAML.load(raw) ?? {});
+      if (!changed) return;
+      await writeFileAtomic(CONFIG_BAK, raw);
+      await writeFileAtomic(CONFIG_PATH, YAML.dump(value, { lineWidth: 100 }));
+      log.info("migrated config.yaml to the 2.0 shape", {
+        backup: CONFIG_BAK,
+      });
+    });
+    writes.queue = task.catch(() => undefined);
+    writes.migrationTask = task.then(
+      () => {
+        // Success: clear the memo so a legacy shape hand-edited in later can
+        // still trigger a fresh rewrite (a stray re-trigger is a no-op).
+        writes.migrationTask = null;
+      },
+      (e) => {
+        writes.migrationFailed = true;
+        log.warn("config shape migration failed; serving the legacy file as-is", {
+          reason: errorReason(e),
+        });
+      }
+    );
+  }
+  return writes.migrationTask;
+}
+
+// Write `text` to `dest` via a temp file renamed into place (atomic on the same
+// filesystem), so a concurrent reader can never observe a torn, half-written
+// file and a crash mid-write can't leave a torn artifact. Mirrors the
+// persistence in lib/status-history.ts.
+async function writeFileAtomic(dest: string, text: string): Promise<void> {
   const tmp = `${dest}.tmp`;
   await fs.mkdir(CONFIG_DIR, { recursive: true });
-  await fs.writeFile(tmp, YAML.dump(config, { lineWidth: 100 }), "utf8");
+  await fs.writeFile(tmp, text, "utf8");
   await fs.rename(tmp, dest);
+}
+
+// Dump a config as YAML to `dest`, atomically. Used for both the live config
+// and its .bak safety copy so they serialize identically.
+async function dumpYaml(dest: string, config: Config): Promise<void> {
+  await writeFileAtomic(dest, YAML.dump(config, { lineWidth: 100 }));
 }
 
 async function writeConfig(config: Config): Promise<void> {
@@ -77,15 +169,15 @@ async function writeConfig(config: Config): Promise<void> {
 export class NotFoundError extends Error {}
 
 async function mutate<T>(fn: (config: Config) => T): Promise<T> {
-  const result = writeQueue.then(async () => {
-    const config = await readConfigInternal();
+  const result = writes.queue.then(async () => {
+    const config = await readConfigInQueue();
     const out = fn(config);
     await writeConfig(config);
     return out;
   });
   // Keep the queue alive even if this mutation failed, but don't let one
   // rejection take down all subsequent operations.
-  writeQueue = result.catch(() => undefined);
+  writes.queue = result.catch(() => undefined);
   return result;
 }
 
@@ -131,17 +223,18 @@ export function stripSecrets<T extends { settings: Settings }>(config: T): T {
 
 // Validate and write a whole config, replacing what's on disk (used by import).
 // Goes through the same serialized write queue as mutate() so it can't race
-// with concurrent edits.
+// with concurrent edits. The shape migration runs on the input first, so a
+// backup exported before 2.0.0 imports cleanly.
 export async function replaceConfig(input: unknown): Promise<Config> {
-  const validated = configSchema.parse(input);
-  const result = writeQueue.then(async () => {
+  const validated = configSchema.parse(migrateConfigShape(input).value);
+  const result = writes.queue.then(async () => {
     // Preserve the admin credential across an import. A backup file must not be
     // able to change or wipe the password: an older or hand-made config carries
     // no auth, which would otherwise silently drop this instance to passwordless
     // (falling back to ADMIN_PASSWORD), and a backup from another instance would
     // overwrite this one's password. Export omits auth for the same reason, so a
     // freshly exported file has none to apply anyway.
-    const current = await readConfigInternal();
+    const current = await readConfigInQueue();
     // Snapshot the outgoing config to config.yaml.bak before overwriting it, so
     // a mistaken or bad import is recoverable. Runs inside the same write queue,
     // and is written atomically (tmp+rename) like the live file — this .bak is
@@ -152,7 +245,7 @@ export async function replaceConfig(input: unknown): Promise<Config> {
     await writeConfig(validated);
     return validated;
   });
-  writeQueue = result.catch(() => undefined);
+  writes.queue = result.catch(() => undefined);
   return result;
 }
 
@@ -241,13 +334,6 @@ export async function updateSettings(
       feed: {
         ...config.settings.feed,
         ...withoutUndefined(feedPartial ?? {}),
-        // The admin UI saves the new `urls` list; whenever it writes the feed,
-        // clear the deprecated single `url` so a stale legacy value can't
-        // resurrect a feed the admin just deleted (feedUrls() falls back to
-        // `url` only while `urls` is empty). The value is already folded into
-        // `urls` on the editor's first load, so nothing is lost. Removing the
-        // field itself is 2.0.0's job (ledger #152).
-        ...(feedPartial ? { url: "" } : {}),
       },
       countdown: {
         ...config.settings.countdown,

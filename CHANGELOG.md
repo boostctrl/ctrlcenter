@@ -12,6 +12,30 @@ here.
 
 ## [Unreleased]
 
+### Removed
+
+- **Config settings retired during 1.9.x are removed — an older config file
+  now upgrades itself.** The first start on 2.0.0 rewrites an out-of-date
+  `config.yaml` to the current shape automatically: the old single-URL RSS
+  setting becomes a one-entry feed list, and home-page layouts saved by much
+  older versions (width presets, 12-column spans, the old below-card spacing
+  value) become their modern equivalents. Before anything is rewritten, the
+  untouched original is snapshotted to `config.yaml.bak` — the same safety net
+  an import uses. Importing a backup exported by any earlier version keeps
+  working too; it's upgraded the same way as it's restored. (#152)
+- **The status history API's unused 7-day (`d7`) fields.** Deprecated in
+  1.9.2, they're no longer part of the `/api/status/history` payload. The
+  status page never displayed a 7-day window, so only external integrations
+  reading that field are affected. (#152)
+
+### Fixed
+
+- **Two admin changes saved at the same moment can no longer overwrite each
+  other.** Edits arriving through different admin endpoints at once — say a
+  settings autosave landing while an app edit saves — used to be guarded by
+  separate write locks, so one save could clobber the other's change to the
+  config file. All config writes now share a single queue. (#152)
+
 ## [1.9.9] - 2026-07-14
 
 ### Security
