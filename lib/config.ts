@@ -99,6 +99,36 @@ export function stripAuth(config: Config): Omit<Config, "auth"> {
   return rest;
 }
 
+// Blank the secret-bearing settings fields so a signed-out visitor can never
+// receive them: the calendar Basic-auth credentials and the alert webhook URL /
+// SMTP credentials. stripAuth only removes the top-level admin credential; these
+// secrets live inside `settings`, where they'd otherwise ride along in anything
+// serialized from a public surface. readPublicConfig (lib/api-auth.ts) applies
+// this so its result is genuinely safe to hand to a client component (#157). The
+// server-side consumers that need the real values read them separately — the
+// calendar fetcher via getCalendarAuth, the alert poller via readConfigInternal.
+export function stripSecrets<T extends { settings: Settings }>(config: T): T {
+  return {
+    ...config,
+    settings: {
+      ...config.settings,
+      calendar: { ...config.settings.calendar, username: "", password: "" },
+      alerts: {
+        ...config.settings.alerts,
+        webhookUrl: "",
+        email: {
+          ...config.settings.alerts.email,
+          user: "",
+          pass: "",
+          host: "",
+          from: "",
+          to: "",
+        },
+      },
+    },
+  };
+}
+
 // Validate and write a whole config, replacing what's on disk (used by import).
 // Goes through the same serialized write queue as mutate() so it can't race
 // with concurrent edits.
@@ -137,6 +167,20 @@ export async function setPasswordHash(
 
 export async function getSettings(): Promise<Settings> {
   return (await readConfigInternal()).settings;
+}
+
+// Server-only accessor for the calendar Basic-auth credentials. readPublicConfig
+// redacts these (stripSecrets), so the home page — a public surface that fetches
+// a private CalDAV/ICS feed server-side — reads them here instead of from the
+// config it hands to client components, keeping them off any client-serializable
+// object (#157). The CTRLCENTER_CALDAV_PASS env override is applied downstream in
+// lib/calendar; this returns the stored values as-is.
+export async function getCalendarAuth(): Promise<{
+  username: string;
+  password: string;
+}> {
+  const { calendar } = (await readConfigInternal()).settings;
+  return { username: calendar.username, password: calendar.password };
 }
 
 // zod's .partial() can produce own keys with an explicit `undefined` value

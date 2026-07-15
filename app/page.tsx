@@ -10,6 +10,7 @@ import FeedWidget from "@/components/widgets/FeedWidget";
 import { greetingFor, hourIn, shortDate } from "@/lib/datetime";
 import { resolveLayoutWidgets, smallScreenTopGap } from "@/lib/layout";
 import { feedUrls } from "@/lib/schema";
+import { getCalendarAuth } from "@/lib/config";
 import { readPublicConfig } from "@/lib/api-auth";
 import { navPages } from "@/lib/nav";
 
@@ -35,7 +36,6 @@ export default async function HomePage({
   const statusEnabled = settings.statusChecks && apps.length > 0;
 
   const cal = settings.calendar;
-  const calAuth = { username: cal.username, password: cal.password };
   const nowDate = new Date();
   const now = nowDate.getTime();
   // The month widget needs every event across the current month grid (a range),
@@ -43,6 +43,13 @@ export default async function HomePage({
   // side of now covers the current month plus its leading/trailing neighbour days
   // in any time zone.
   const calEnabled = cal.enabled && cal.url.trim() !== "";
+  // Calendar credentials are redacted from the public config (stripSecrets), so
+  // read them from the server-only accessor for the server-side fetch below —
+  // they must never reach a client component. Only when the widget is actually
+  // configured, so an unused calendar costs no extra config read.
+  const calAuth = calEnabled
+    ? await getCalendarAuth()
+    : { username: "", password: "" };
   const feedCfg = settings.feed;
   const feedList = feedUrls(feedCfg);
   const feedEnabled = feedCfg.enabled && feedList.length > 0;

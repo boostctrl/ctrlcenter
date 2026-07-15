@@ -12,6 +12,14 @@ here.
 
 ## [Unreleased]
 
+### Security
+
+- **The calendar and uptime-alert credentials never leave the server.** The
+  shared accessor behind every public page now strips the calendar's username
+  and password and the alert webhook and SMTP details before the page is built,
+  so they can't be exposed to a signed-out visitor — they stay server-side where
+  the calendar fetch and outage notifications use them. (#157)
+
 ## [1.9.8] - 2026-07-14
 
 ### Added

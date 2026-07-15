@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { SESSION_COOKIE_NAME, verifySessionToken } from "./auth";
-import { readConfigInternal, stripAuth } from "./config";
+import { readConfigInternal, stripAuth, stripSecrets } from "./config";
 import type { Config } from "./schema";
 
 // Route-level admin check for endpoints the proxy's path-prefix allowlist can't
@@ -48,14 +48,17 @@ export function visibleItems<T extends { private: boolean }>(
   return isAdmin ? items : items.filter((i) => !i.private);
 }
 
-// The one config accessor for anything a signed-out visitor might see (#147).
-// Private apps and bookmarks are already filtered out for guests, and the
-// admin credential never leaves — so a new public page or endpoint built on
-// this can't leak them by forgetting a filter. Route handlers pass their
-// NextRequest (the isAdminRequest path); server components omit it (the
-// isAdminSession path). Surfaces that genuinely need the full list — the
-// poller, alerts, admin routes — use readConfigInternal, and a test pins
-// which files under app/ may do so.
+// The one config accessor for anything a signed-out visitor might see (#147,
+// #157). Private apps and bookmarks are filtered out for guests; the admin
+// credential (stripAuth) and the settings-embedded secrets — calendar
+// credentials, alert webhook/SMTP (stripSecrets) — are stripped too. So a new
+// public page or endpoint built on this can't leak any of them by forgetting a
+// filter: the object returned is safe to serialize to a client component. Route
+// handlers pass their NextRequest (the isAdminRequest path); server components
+// omit it (the isAdminSession path). Surfaces that genuinely need the full list
+// or the real secrets — the poller, alerts, the calendar fetch (getCalendarAuth),
+// admin routes — use readConfigInternal, and a test pins which files under app/
+// may do so.
 export async function readPublicConfig(request?: NextRequest): Promise<{
   config: Omit<Config, "auth">;
   isAdmin: boolean;
@@ -66,7 +69,7 @@ export async function readPublicConfig(request?: NextRequest): Promise<{
     : await isAdminSession(config.auth.passwordHash);
   return {
     config: {
-      ...stripAuth(config),
+      ...stripSecrets(stripAuth(config)),
       apps: visibleItems(config.apps, isAdmin),
       bookmarks: visibleItems(config.bookmarks, isAdmin),
     },

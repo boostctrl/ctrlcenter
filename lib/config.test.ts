@@ -568,3 +568,72 @@ describe("readConfigInternal stays off public surfaces", () => {
     ).toEqual([...ALLOWED].sort());
   });
 });
+
+// #157: the secrets embedded in settings (calendar credentials, alert
+// webhook/SMTP) must be blanked by stripSecrets so readPublicConfig's result is
+// safe to serialize, while the server-only getCalendarAuth still yields the real
+// values for the home-page fetch.
+describe("settings-secret redaction", () => {
+  const withSecrets = {
+    calendar: {
+      enabled: true,
+      url: "https://cal.example.com/private.ics",
+      count: 5,
+      homeView: "agenda" as const,
+      hideWhenEmpty: false,
+      username: "alice",
+      password: "cal-secret",
+    },
+    alerts: {
+      enabled: true,
+      type: "generic" as const,
+      webhookUrl: "https://hooks.example.com/T0/B0/xyz",
+      notifyOnRecovery: true,
+      confirmations: 2,
+      email: {
+        enabled: true,
+        host: "smtp.example.com",
+        port: 587,
+        secure: false,
+        subject: "",
+        user: "mailer",
+        pass: "smtp-secret",
+        from: "alerts@example.com",
+        to: "me@example.com",
+      },
+    },
+  };
+
+  it("stripSecrets blanks every credential while keeping non-secret fields", async () => {
+    await config.updateSettings(withSecrets);
+    const full = await config.readConfigInternal();
+
+    const pub = config.stripSecrets(config.stripAuth(full));
+    expect(pub.settings.calendar.username).toBe("");
+    expect(pub.settings.calendar.password).toBe("");
+    expect(pub.settings.alerts.webhookUrl).toBe("");
+    expect(pub.settings.alerts.email.user).toBe("");
+    expect(pub.settings.alerts.email.pass).toBe("");
+    expect(pub.settings.alerts.email.host).toBe("");
+    expect(pub.settings.alerts.email.from).toBe("");
+    expect(pub.settings.alerts.email.to).toBe("");
+
+    // Non-secret fields survive so the widgets/nav still render and fetch.
+    expect(pub.settings.calendar.url).toBe(withSecrets.calendar.url);
+    expect(pub.settings.calendar.enabled).toBe(true);
+    expect(pub.settings.alerts.enabled).toBe(true);
+    expect(pub.settings.alerts.email.port).toBe(587);
+
+    // Redaction doesn't mutate the source config.
+    expect(full.settings.calendar.password).toBe("cal-secret");
+    expect(full.settings.alerts.email.pass).toBe("smtp-secret");
+  });
+
+  it("getCalendarAuth still returns the real credentials server-side", async () => {
+    await config.updateSettings(withSecrets);
+    expect(await config.getCalendarAuth()).toEqual({
+      username: "alice",
+      password: "cal-secret",
+    });
+  });
+});
