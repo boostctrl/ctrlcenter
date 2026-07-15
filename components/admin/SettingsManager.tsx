@@ -9,6 +9,7 @@ import {
   STATUS_ANNOUNCEMENT_KINDS,
   feedUrls,
   MAX_FEED_URLS,
+  MAX_STAT_DISKS,
 } from "@/lib/schema";
 import type { ThemePack } from "@/lib/theme";
 import { FONTS, fontVar, type FontId } from "@/lib/fonts";
@@ -272,6 +273,7 @@ export default function SettingsManager({
     { id: "notes", label: "Notes card" },
     { id: "countdown", label: "Countdown card" },
     { id: "worldClocks", label: "World clocks card" },
+    { id: "systemStats", label: "System stats card" },
     { id: "apps", label: "Applications" },
     { id: "bookmarks", label: "Bookmarks" },
     { id: "favorites", label: "Favorites row" },
@@ -338,6 +340,18 @@ export default function SettingsManager({
   ) =>
     setWorldClockItems(
       worldClocks.items.map((item, idx) => (idx === i ? { ...item, ...patch } : item))
+    );
+
+  const systemStats = settings.systemStats;
+  const setStatDisks = (disks: Settings["systemStats"]["disks"]) =>
+    setSettings((s) => ({ ...s, systemStats: { ...s.systemStats, disks } }));
+  const statDiskRows = useKeyedRows(systemStats.disks, setStatDisks);
+  const updateStatDisk = (
+    i: number,
+    patch: Partial<Settings["systemStats"]["disks"][number]>
+  ) =>
+    setStatDisks(
+      systemStats.disks.map((d, idx) => (idx === i ? { ...d, ...patch } : d))
     );
 
   // Status-page announcements: a client-managed list saved through the whole-
@@ -1273,6 +1287,79 @@ export default function SettingsManager({
           <p className="text-xs text-fg/40">
             Each clock shows the current time in its own zone. Leave the label
             blank to use the zone&apos;s city name.
+          </p>
+        </Section>
+        )}
+
+        {section === "widgets" && (
+        <Section
+          title="System stats"
+          intro="CPU, memory and disk usage of whatever runs the app. Ships hidden — show the card in the home-page layout editor. The card itself says whether it's measuring this container or the host machine."
+        >
+          <TextField
+            label="Card title"
+            placeholder="System stats"
+            value={systemStats.title}
+            onChange={(e) =>
+              setSettings((s) => ({
+                ...s,
+                systemStats: { ...s.systemStats, title: e.target.value },
+              }))
+            }
+          />
+          <div className="flex flex-col gap-2">
+            <span className="text-sm text-fg/50">Extra disks</span>
+            {systemStats.disks.map((disk, i) => (
+              <div
+                key={statDiskRows.keys[i] ?? i}
+                className="flex items-center gap-2"
+              >
+                {systemStats.disks.length > 1 && (
+                  <MoveButtons
+                    index={i}
+                    count={systemStats.disks.length}
+                    label={`disk ${i + 1}`}
+                    onMove={statDiskRows.move}
+                  />
+                )}
+                <input
+                  value={disk.label}
+                  onChange={(e) => updateStatDisk(i, { label: e.target.value })}
+                  placeholder="Label (optional)"
+                  aria-label={`Disk ${i + 1} label`}
+                  className={`${selectClass} min-w-0 flex-1`}
+                />
+                <input
+                  value={disk.path}
+                  onChange={(e) => updateStatDisk(i, { path: e.target.value })}
+                  placeholder="/mnt/media"
+                  aria-label={`Disk ${i + 1} path`}
+                  className={`${selectClass} min-w-0 flex-1`}
+                />
+                <button
+                  type="button"
+                  onClick={() => statDiskRows.removeAt(i)}
+                  aria-label={`Remove disk ${i + 1}`}
+                  className="shrink-0 rounded-md px-2 py-1 text-fg/40 transition-colors hover:bg-fg/10 hover:text-red-400"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            {systemStats.disks.length < MAX_STAT_DISKS && (
+              <button
+                type="button"
+                onClick={() => statDiskRows.add({ label: "", path: "" })}
+                className="self-start rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10"
+              >
+                + Add disk
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-fg/40">
+            The data volume is always shown. A path here has to be mounted into
+            the app&apos;s container to be measurable; a path that isn&apos;t is
+            simply skipped.
           </p>
         </Section>
         )}

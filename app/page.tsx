@@ -6,6 +6,7 @@ import { EditModeProvider } from "@/components/EditMode";
 import { fetchCalendar, fetchCalendarRange } from "@/lib/calendar";
 import { fetchFeeds } from "@/lib/feed";
 import { fetchWeather } from "@/lib/weather";
+import { collectSystemStats } from "@/lib/system-stats";
 import FeedWidget from "@/components/widgets/FeedWidget";
 import { greetingFor, hourIn, shortDate } from "@/lib/datetime";
 import { resolveLayoutWidgets, smallScreenTopGap } from "@/lib/layout";
@@ -55,12 +56,23 @@ export default async function HomePage({
   const feedEnabled = feedCfg.enabled && feedList.length > 0;
   const weather = settings.weather;
 
-  // Fetch the three third-party widgets (calendar, RSS feed, weather)
-  // concurrently rather than in series, so a slow upstream only costs its own
-  // time, not the sum. Each fetch is independently time-boxed and returns
-  // null/[] on failure, so one unresponsive service can never hang the render —
-  // the page loads and that widget simply degrades or fills in client-side.
-  const [events, feed, initialWeather] = await Promise.all([
+  // Resolved before the fetches: the system-stats collection below is gated on
+  // the widget actually being shown (or the admin editing, where every widget
+  // previews), so a hidden card costs no reads on a guest render.
+  const widgets = resolveLayoutWidgets(
+    settings.layout.sections,
+    settings.components
+  );
+  const statsShown =
+    isAdmin || widgets.some((w) => w.id === "systemStats" && !w.hidden);
+
+  // Fetch the widgets' server-side data (calendar, RSS feed, weather, system
+  // stats) concurrently rather than in series, so a slow upstream only costs
+  // its own time, not the sum. Each fetch is independently time-boxed and
+  // returns null/[] on failure, so one unresponsive service can never hang the
+  // render — the page loads and that widget simply degrades or fills in
+  // client-side.
+  const [events, feed, initialWeather, systemStats] = await Promise.all([
     calEnabled
       ? cal.homeView === "month"
         ? fetchCalendarRange(cal.url, now - 40 * DAY, now + 40 * DAY, calAuth)
@@ -69,6 +81,9 @@ export default async function HomePage({
     feedEnabled ? fetchFeeds(feedList, feedCfg.count) : Promise.resolve(null),
     weather.enabled
       ? fetchWeather(weather.latitude, weather.longitude, weather.units)
+      : Promise.resolve(null),
+    statsShown
+      ? collectSystemStats(settings.systemStats.disks)
       : Promise.resolve(null),
   ]);
 
@@ -85,11 +100,6 @@ export default async function HomePage({
 
   const params = await searchParams;
   const initialEditing = isAdmin && params.edit === "1";
-
-  const widgets = resolveLayoutWidgets(
-    settings.layout.sections,
-    settings.components
-  );
 
   // The gap above the first row of widgets, tunable from the layout editor
   // (Dashboard keeps these variables live while editing). The stored value
@@ -126,6 +136,7 @@ export default async function HomePage({
             notes={settings.notes}
             countdown={settings.countdown}
             worldClocks={settings.worldClocks}
+            systemStats={{ title: settings.systemStats.title, stats: systemStats }}
             initialNow={nowDate.toISOString()}
             feed={
               feedEnabled ? (

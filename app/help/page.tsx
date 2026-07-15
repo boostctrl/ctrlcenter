@@ -558,6 +558,32 @@ export default async function HelpPage() {
             </P>
           </Card>
 
+          <Card title="System stats card">
+            <P>
+              CPU load, memory pressure, and disk fill of whatever runs the
+              app, refreshed on each page load. Show the card from the
+              home-page layout editor; its title and extra disk rows live in{" "}
+              <strong>Settings → Widgets → System stats</strong>.
+            </P>
+            <P>
+              The card names what it measures, because the two are genuinely
+              different. In a container (the usual Docker install) it reads{" "}
+              <em>this container&apos;s</em> CPU and memory against its
+              configured limits — a container can&apos;t see the rest of the
+              machine, and the card won&apos;t pretend it does. Run directly on
+              a machine and it reads the whole host. To get host numbers from
+              inside a container, mount the host&apos;s <code>/proc</code>{" "}
+              read-only at <code>/host/proc</code> (see the README&apos;s
+              deployment notes) and the card switches to host mode by itself.
+            </P>
+            <P>
+              Disks are per-path either way: the app&apos;s data volume is
+              always listed, and any extra path you add has to be mounted into
+              the container to be measurable. If the card is on a public
+              dashboard, remember signed-out visitors see these numbers too.
+            </P>
+          </Card>
+
           <Card title="Themes">
             <P>
               The <strong>Themes</strong> tab edits the built-in theme packs

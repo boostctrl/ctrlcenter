@@ -12,6 +12,19 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **A System stats widget.** A new home-page card with a meter for each
+  reading: CPU load, memory pressure, and how full your disks are, refreshed
+  on every page load. The card says what it's measuring, because the two are
+  genuinely different: in a container (the usual Docker install) it reports
+  the container's own resources against its limits, while on a bare machine —
+  or with the host's `/proc` mounted into the container (one read-only bind
+  mount, see the README) — it reports the whole host. The app's data volume
+  is always listed, and more disks can be added under Settings → Widgets →
+  System stats. Like the other newer cards it ships hidden; switch it on in
+  the home-page layout editor. (#153)
+
 ### Removed
 
 - **Config settings retired during 1.9.x are removed — an older config file

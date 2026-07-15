@@ -179,6 +179,29 @@ export const worldClocksSchema = z.object({
 });
 export type WorldClocksConfig = z.infer<typeof worldClocksSchema>;
 
+// Cap on admin-configured extra disk rows for the System Stats widget (the
+// default data-dir row rides on top). Each is one statfs per render — bounded
+// like MAX_FEED_URLS, a guard against a hand-edited config fanning the
+// collector out. Lives here (not lib/system-stats.ts) because the collector
+// imports lib/config.ts, which imports this file — the constant would cycle.
+export const MAX_STAT_DISKS = 8;
+
+// System Stats widget: CPU / memory / disk usage of the machine (or container)
+// running the app. The metrics themselves come from lib/system-stats.ts at
+// render time; the config carries only the card title and the admin's extra
+// disk rows (the data volume is always shown). Stored leniently (a half-typed
+// row never fails the config load); rows with a blank path are skipped at
+// collection time, and unmountable paths are skipped per-row.
+export const systemStatsDiskSchema = z.object({
+  label: z.string().default(""),
+  path: z.string().default(""),
+});
+export const systemStatsSchema = z.object({
+  title: z.string().default("System stats"),
+  disks: z.array(systemStatsDiskSchema).default([]),
+});
+export type SystemStatsConfig = z.infer<typeof systemStatsSchema>;
+
 // The Notes widget's content: a title and a markdown body (safe subset,
 // rendered by lib/markdown.ts — never as raw HTML). No `enabled` flag: the
 // widget's layout `hidden` flag governs visibility, and an empty body renders
@@ -465,6 +488,7 @@ export const settingsSchema = z.object({
   feed: feedSchema.default(feedSchema.parse({})),
   countdown: countdownSchema.default(countdownSchema.parse({})),
   worldClocks: worldClocksSchema.default(worldClocksSchema.parse({})),
+  systemStats: systemStatsSchema.default(systemStatsSchema.parse({})),
   components: componentsSchema.default(componentsSchema.parse({})),
   layout: layoutSchema.default(layoutSchema.parse({})),
 });
@@ -700,6 +724,16 @@ export const worldClocksUpdateSchema = z.object({
   items: z.array(z.object({ label: z.string(), timeZone: z.string() })),
 });
 
+// The admin sends the whole systemStats object. Rows stay lenient (a
+// half-typed path must not block autosave; an unmountable one is skipped at
+// collection time), but the row count is capped — each is a per-render statfs.
+export const systemStatsUpdateSchema = z.object({
+  title: z.string(),
+  disks: z
+    .array(z.object({ label: z.string(), path: z.string() }))
+    .max(MAX_STAT_DISKS),
+});
+
 // The admin sends the whole feed object. The URL list may be empty (the widget
 // stays inert until set) and blank rows are allowed (trimmed on read), but every
 // non-empty entry must be http(s).
@@ -814,6 +848,7 @@ export const settingsInputSchema = z.object({
   feed: feedUpdateSchema.optional(),
   countdown: countdownUpdateSchema.optional(),
   worldClocks: worldClocksUpdateSchema.optional(),
+  systemStats: systemStatsUpdateSchema.optional(),
   components: componentsUpdateSchema.optional(),
   layout: layoutUpdateSchema.optional(),
 });

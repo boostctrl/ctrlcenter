@@ -23,6 +23,8 @@ import CountdownWidget, {
   isValidCountdownDate,
   type CountdownItem,
 } from "./widgets/CountdownWidget";
+import SystemStatsWidget from "./widgets/SystemStatsWidget";
+import type { SystemStats } from "@/lib/system-stats";
 import WorldClocksWidget, {
   type WorldClockItem,
 } from "./widgets/WorldClocksWidget";
@@ -218,6 +220,7 @@ export default function Dashboard({
   feed = null,
   countdown,
   worldClocks,
+  systemStats,
   initialNow,
 }: {
   // The resolved widget arrangement (order + span + hidden), server-resolved so
@@ -256,6 +259,9 @@ export default function Dashboard({
   countdown: { title: string; items: CountdownItem[] };
   // The World Clocks widget's admin-authored title + labeled time zones.
   worldClocks: { title: string; items: WorldClockItem[] };
+  // The System Stats widget's title + the server-collected snapshot; null when
+  // collection was skipped (widget hidden for a guest) or failed.
+  systemStats: { title: string; stats: SystemStats | null };
   // The server's request instant (ISO), seeding the World Clocks widget so its
   // clocks render with the right time before the client tick takes over.
   initialNow: string;
@@ -673,6 +679,14 @@ export default function Dashboard({
             showTitle={!widget.hideLabel}
           />
         ) : null;
+      case "systemStats":
+        return systemStats.stats ? (
+          <SystemStatsWidget
+            title={systemStats.title}
+            stats={systemStats.stats}
+            showTitle={!widget.hideLabel}
+          />
+        ) : null;
       case "favorites":
         return (!q || editing) && favoriteApps.length > 0 ? (
           <section className="@container">
@@ -742,6 +756,8 @@ export default function Dashboard({
         return "No dates yet — add them in admin Settings → Widgets → Countdown.";
       case "worldClocks":
         return "No time zones yet — add them in admin Settings → Widgets → World clocks.";
+      case "systemStats":
+        return "System stats couldn't be read on this server — check the server logs.";
       case "favorites":
         return "No pinned favorites yet.";
       case "apps":
