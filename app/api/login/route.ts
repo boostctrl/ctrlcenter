@@ -10,8 +10,11 @@ import { readConfigInternal } from "@/lib/config";
 import { rateLimit, pruneRateLimit } from "@/lib/rate-limit";
 
 // Allow a small burst of attempts per client, then lock that source out for the
-// window. A separate, higher global cap backstops it so a flood of spoofed
-// source IPs still can't run unbounded (PBKDF2-heavy) password checks.
+// window — the primary gate, checked before any password hashing. A separate,
+// higher global cap backstops a distributed brute force, but it counts only
+// FAILED attempts and is enforced only after a wrong password: a correct
+// password is never charged against it, so an attacker can't exhaust the shared
+// budget to lock the real admin out of login (#158).
 const MAX_ATTEMPTS = 5;
 const GLOBAL_MAX_ATTEMPTS = 50;
 const WINDOW_MS = 5 * 60 * 1000;
@@ -39,22 +42,18 @@ function clientKey(request: NextRequest): string {
 
 export async function POST(request: NextRequest) {
   pruneRateLimit();
-  // Per-client first; only consume the global budget when the client is still
-  // within its own limit, so a single spoofed flood is what trips the backstop.
+  // Per-client throttle first — checked and consumed before any PBKDF2 work, so
+  // one source can't run unbounded password hashing, and behind the documented
+  // reverse proxy the key is the real client IP (not the spoofable X-Forwarded-For
+  // prefix). This is the gate that stops a single attacker; the global backstop
+  // below only counts failures so it can't lock the real admin out.
   const perClient = rateLimit(clientKey(request), MAX_ATTEMPTS, WINDOW_MS);
-  const global = perClient.allowed
-    ? rateLimit("login:global", GLOBAL_MAX_ATTEMPTS, WINDOW_MS)
-    : null;
-  if (!perClient.allowed || (global && !global.allowed)) {
-    const retryAfterSeconds = Math.max(
-      perClient.retryAfterSeconds,
-      global?.retryAfterSeconds ?? 0
-    );
+  if (!perClient.allowed) {
     return NextResponse.json(
       { error: "Too many attempts. Try again later." },
       {
         status: 429,
-        headers: { "Retry-After": String(retryAfterSeconds) },
+        headers: { "Retry-After": String(perClient.retryAfterSeconds) },
       }
     );
   }
@@ -74,6 +73,21 @@ export async function POST(request: NextRequest) {
     : verifyEnvPassword(password);
 
   if (!ok) {
+    // Charge the global backstop only on a wrong password, and enforce it only
+    // here — a correct password never reaches this branch, so the shared budget
+    // can't be used to deny the legitimate admin. The cap still bounds a
+    // distributed brute force: once too many failures land in the window,
+    // further wrong guesses are refused regardless of source (#158).
+    const global = rateLimit("login:global", GLOBAL_MAX_ATTEMPTS, WINDOW_MS);
+    if (!global.allowed) {
+      return NextResponse.json(
+        { error: "Too many attempts. Try again later." },
+        {
+          status: 429,
+          headers: { "Retry-After": String(global.retryAfterSeconds) },
+        }
+      );
+    }
     return NextResponse.json({ error: "Invalid password" }, { status: 401 });
   }
 

@@ -19,6 +19,10 @@ here.
   and password and the alert webhook and SMTP details before the page is built,
   so they can't be exposed to a signed-out visitor — they stay server-side where
   the calendar fetch and outage notifications use them. (#157)
+- **A stranger guessing your password can no longer lock you out of the admin
+  login.** The global limit that guards against brute-force attempts now counts
+  only failed logins, so the correct password always signs you in — even while
+  someone else is hammering the form from elsewhere. (#158)
 
 ## [1.9.8] - 2026-07-14
 
