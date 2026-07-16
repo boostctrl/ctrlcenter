@@ -156,9 +156,19 @@ export function feedUrls(feed: Pick<FeedConfig, "urls">): string[] {
 // Countdown widget: labeled dates rendered as "in N days" rows. Stored
 // leniently (a half-typed row never fails the config load); rows without a
 // valid YYYY-MM-DD date are ignored at render time.
+//
+// The date needs a preprocess: YAML parses an unquoted `date: 2026-09-01` in a
+// hand-edited file as a JS Date (its timestamp type), and a plain z.string()
+// would then fail the WHOLE config load — every page 500s over one countdown
+// row. Fold it back to the calendar date the admin wrote (YAML timestamps
+// parse as UTC midnight, so the ISO slice is that same date); anything else
+// non-string degrades to an empty date rather than an error.
 export const countdownItemSchema = z.object({
   label: z.string().default(""),
-  date: z.string().default(""),
+  date: z.preprocess(
+    (v) => (v instanceof Date ? v.toISOString().slice(0, 10) : v),
+    z.string().catch("").default("")
+  ),
 });
 export const countdownSchema = z.object({
   title: z.string().default("Countdown"),

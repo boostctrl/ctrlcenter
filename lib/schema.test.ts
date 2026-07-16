@@ -405,3 +405,26 @@ describe("settingsInputSchema partial merge semantics", () => {
     ).toBe(false);
   });
 });
+
+describe("countdown date resilience", () => {
+  it("folds a YAML-parsed Date back to the calendar string instead of failing", () => {
+    // A hand-edited config's unquoted `date: 2026-09-01` reaches the schema as
+    // a JS Date (YAML's timestamp type); one such row must not 500 every page.
+    const config = configSchema.parse({
+      settings: {
+        countdown: {
+          items: [
+            { label: "Renewal", date: new Date("2026-09-01") },
+            { label: "Typed", date: "2026-10-15" },
+            { label: "Junk", date: 42 },
+          ],
+        },
+      },
+    });
+    expect(config.settings.countdown.items).toEqual([
+      { label: "Renewal", date: "2026-09-01" },
+      { label: "Typed", date: "2026-10-15" },
+      { label: "Junk", date: "" },
+    ]);
+  });
+});

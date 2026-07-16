@@ -85,6 +85,12 @@ here.
 
 ### Fixed
 
+- **A hand-edited countdown date can no longer break the whole dashboard.**
+  Writing a countdown date in `config.yaml` without quotes
+  (`date: 2026-09-01`) — the natural way to type one — made every page fail
+  to load, because YAML treats the bare value as a timestamp rather than
+  text. The date is now read back as the text you wrote. (#162)
+
 - **A missing icon shows its letter fallback instead of a broken-image
   glyph.** When an icon failed to load before the page finished waking up,
   the browser's broken-image icon could stick in the tile; the fallback
