@@ -231,6 +231,43 @@ describe("updateSettings partial merge", () => {
     expect(bak).toEqual(legacy);
   });
 
+  it("snapshots the original to .bak when a mutation is the first op on a legacy file", async () => {
+    // A pre-2.0 config reaches disk (e.g. an upgrade) and the very first
+    // operation is a WRITE — a direct API mutation before any page read
+    // triggered the read-path migration + backup. The mutation still migrates
+    // the file, so it must take the same .bak snapshot itself.
+    const legacy = { settings: { feed: { enabled: true, url: "https://old.example/rss" } } };
+    const legacyText = YAML.dump(legacy);
+    await fs.writeFile(configPath, legacyText, "utf8");
+
+    // createApp() is the first read-or-write this process makes on the file.
+    await config.createApp({
+      name: "First", subtitle: "", url: "https://first.example.com", icon: "",
+    });
+
+    // The untouched original was snapshotted verbatim before the rewrite…
+    expect(await fs.readFile(`${configPath}.bak`, "utf8")).toBe(legacyText);
+    // …and the live file is migrated (feed folded) with the mutation applied.
+    const onDisk = YAML.load(await fs.readFile(configPath, "utf8")) as {
+      settings: { feed: Record<string, unknown> };
+      apps: { name: string }[];
+    };
+    expect("url" in onDisk.settings.feed).toBe(false);
+    expect(onDisk.settings.feed.urls).toEqual(["https://old.example/rss"]);
+    expect(onDisk.apps.map((a) => a.name)).toEqual(["First"]);
+  });
+
+  it("does not write a spurious .bak when mutating a current-shape config", async () => {
+    // A mutation on an already-current file must NOT snapshot — otherwise every
+    // write would clobber a real import backup with the live config.
+    await config.updateSettings({ title: "Current" });
+    await fs.rm(`${configPath}.bak`, { force: true });
+    await config.createApp({
+      name: "X", subtitle: "", url: "https://x.example.com", icon: "",
+    });
+    await expect(fs.access(`${configPath}.bak`)).rejects.toBeTruthy();
+  });
+
   it("doubles a 1.3-era 12-column span layout once, and never again", async () => {
     // A 1.3 config on disk: spans on the 12-column grid, no `columns` marker.
     await fs.writeFile(
@@ -469,6 +506,17 @@ describe("replaceConfig", () => {
     };
     expect(bak.settings.title).toBe("Before");
     expect(bak.apps.map((a) => a.name)).toEqual(["PreImport"]);
+  });
+
+  it("snapshots the raw pre-import bytes, keeping hand-added keys the schema would strip", async () => {
+    // A hand-edited config can carry keys the schema doesn't know; the .bak is
+    // the only recovery artifact, so it must preserve them verbatim rather than
+    // save a parsed (key-stripped) copy.
+    const handEdited = "settings:\n  title: Hand\n  myCustomNote: keep-me\napps: []\nbookmarks: []\n";
+    await fs.writeFile(configPath, handEdited, "utf8");
+    await config.replaceConfig({ settings: { title: "Imported" }, apps: [], bookmarks: [] });
+    // Byte-identical original, unknown key intact.
+    expect(await fs.readFile(`${configPath}.bak`, "utf8")).toBe(handEdited);
   });
 
   it("overwrites the .bak with the config current at the time of each import", async () => {

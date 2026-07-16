@@ -63,14 +63,19 @@ async function ensureConfigExists(): Promise<void> {
 // migration (lib/config-migrate.ts) is applied in memory on every read, so a
 // legacy file serves correctly even before (or without) the one-time rewrite
 // below; `changed` tells the caller whether the file itself still carries a
-// legacy shape.
-async function loadMigrated(): Promise<{ config: Config; changed: boolean }> {
+// legacy shape, and `raw` is the untouched on-disk text (for the .bak
+// snapshot a queue-internal writer takes before it rewrites a legacy file).
+async function loadMigrated(): Promise<{
+  config: Config;
+  changed: boolean;
+  raw: string;
+}> {
   await ensureConfigExists();
   const raw = await fs.readFile(CONFIG_PATH, "utf8");
   const { value, changed } = migrateConfigShape(YAML.load(raw) ?? {});
   // Lenient read: a single malformed row is dropped rather than 500-ing every
   // page on a hand-edited file (see configReadSchema). Writes/imports stay strict.
-  return { config: configReadSchema.parse(value), changed };
+  return { config: configReadSchema.parse(value), changed, raw };
 }
 
 // The raw, unfiltered config — private apps/bookmarks and the admin credential
@@ -81,19 +86,13 @@ async function loadMigrated(): Promise<{ config: Config; changed: boolean }> {
 //
 // The first read of a pre-2.0 file also rewrites it to the current shape
 // (through the write queue, after snapshotting the original to config.yaml.bak).
-// Queue-internal readers (mutate, replaceConfig) must use readConfigInQueue
-// instead — awaiting a queued rewrite from inside the queue would deadlock, and
-// their own write normalizes the file anyway.
+// Queue-internal writers (mutate, replaceConfig) read via loadMigrated directly
+// — awaiting a queued rewrite from inside the queue would deadlock — and take
+// the same .bak snapshot themselves before their own write normalizes the file.
 export async function readConfigInternal(): Promise<Config> {
   const { config, changed } = await loadMigrated();
   if (changed) await persistShapeMigration();
   return config;
-}
-
-// The read used inside write-queue tasks: same migration folds in memory, no
-// persist (see readConfigInternal).
-async function readConfigInQueue(): Promise<Config> {
-  return (await loadMigrated()).config;
 }
 
 // Rewrite a pre-2.0 config file to the current shape, once. Deliberately does
@@ -170,7 +169,15 @@ export class NotFoundError extends Error {}
 
 async function mutate<T>(fn: (config: Config) => T): Promise<T> {
   const result = writes.queue.then(async () => {
-    const config = await readConfigInQueue();
+    const { config, changed, raw } = await loadMigrated();
+    // writeConfig below rewrites the file in the current shape, so if the
+    // on-disk file is still a pre-2.0 shape this mutation IS the one-time
+    // migration — snapshot the untouched original to config.yaml.bak first,
+    // the same recovery contract the read-path migration and imports uphold.
+    // A mutation can be the first operation on a legacy file (a direct API
+    // write before any page read triggered persistShapeMigration), so the
+    // backup can't be left only to the read path.
+    if (changed) await writeFileAtomic(CONFIG_BAK, raw);
     const out = fn(config);
     await writeConfig(config);
     return out;
@@ -234,13 +241,15 @@ export async function replaceConfig(input: unknown): Promise<Config> {
     // (falling back to ADMIN_PASSWORD), and a backup from another instance would
     // overwrite this one's password. Export omits auth for the same reason, so a
     // freshly exported file has none to apply anyway.
-    const current = await readConfigInQueue();
+    const { config: current, raw } = await loadMigrated();
     // Snapshot the outgoing config to config.yaml.bak before overwriting it, so
-    // a mistaken or bad import is recoverable. Runs inside the same write queue,
-    // and is written atomically (tmp+rename) like the live file — this .bak is
-    // the only artifact standing between a bad import and lost state, so a crash
+    // a mistaken or bad import is recoverable. Save the untouched on-disk BYTES
+    // (not the parsed config, which would strip any unknown/hand-added keys and
+    // lose them from the only recovery artifact). Runs inside the same write
+    // queue, written atomically (tmp+rename) like the live file — this .bak is
+    // the only thing standing between a bad import and lost state, so a crash
     // mid-write must not leave it torn.
-    await dumpYaml(CONFIG_BAK, current);
+    await writeFileAtomic(CONFIG_BAK, raw);
     validated.auth = current.auth;
     await writeConfig(validated);
     return validated;
