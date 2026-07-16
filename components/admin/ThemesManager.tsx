@@ -121,7 +121,9 @@ export default function ThemesManager({
         <SaveStatus status={status} error={error} />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      {/* Three across once the shell affords it (#161) — pack cards are
+          compact editors that read fine at ~430px. */}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {THEME_PACKS.map((p) => (
           <PackEditor
             key={p.name}

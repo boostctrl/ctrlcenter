@@ -151,7 +151,13 @@ function Section({
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)/g, "");
   return (
-    <section id={id} className="glass-card mb-4 flex flex-col gap-4 p-5">
+    // break-inside-avoid: the settings groups flow into CSS columns at wide
+    // widths (see the content wrapper below), and a card must never be split
+    // across a column break.
+    <section
+      id={id}
+      className="glass-card mb-4 flex break-inside-avoid flex-col gap-4 p-5"
+    >
       <div>
         <h3 className="text-xs font-semibold tracking-[0.15em] text-fg/45 uppercase">
           {title}
@@ -479,10 +485,14 @@ export default function SettingsManager({
           <SaveStatus status={status} error={error} />
         </div>
 
-        {/* Every group is a single top-to-bottom column, centered at a
-            comfortable reading width. Card order within a group is meaningful:
-            related cards sit adjacent. */}
-        <div className="lg:mx-auto lg:w-full lg:max-w-2xl">
+        {/* The group's cards use the whole content cell (#161): one column at
+            a comfortable width normally, flowing into two side-by-side columns
+            once the cell is wide enough that each column still gets ~500px+
+            (container query, so the split follows the actual cell, not the
+            viewport). Card order within a group is meaningful — CSS columns
+            keep it, reading down the first column then the second. */}
+        <div className="@container">
+        <div className="gap-4 @5xl:columns-2">
         {section === "general" && (
         <Section title="General">
         <TextField
@@ -1889,6 +1899,7 @@ export default function SettingsManager({
           <ChangePassword />
         </Section>
         )}
+        </div>
         </div>
       </div>
     </div>
