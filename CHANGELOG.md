@@ -14,6 +14,12 @@ here.
 
 ### Changed
 
+- **The admin settings page uses the full width of your screen.** Instead of a
+  single narrow column stranded in the middle of a wide monitor, the settings
+  cards now flow into two columns on a wide display (and the Themes tab shows
+  three across), so far more is visible at once without scrolling. Narrow
+  screens and phones are unchanged. (#161)
+
 - **The weather page's hero effects got a realism pass.** Rain now falls as a
   layered field — a soft, slow sheet in the distance behind sharper, faster
   streaks up front — swaying with slowly gusting wind instead of a fixed
