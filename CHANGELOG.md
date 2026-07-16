@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-07-16
+
 ### Changed
 
 - **The admin settings page uses the full width of your screen.** Instead of a
@@ -1893,7 +1895,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.9...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.9...v2.0.0
 [1.9.9]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.8...v1.9.9
 [1.9.8]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.7...v1.9.8
 [1.9.7]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.6...v1.9.7
