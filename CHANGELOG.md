@@ -18,7 +18,10 @@ here.
   layered field — a soft, slow sheet in the distance behind sharper, faster
   streaks up front — swaying with slowly gusting wind instead of a fixed
   slant, and drops near the front land as small splash rings at the card's
-  bottom edge (storms gust harder; drizzle stays fine and splashless). And
+  bottom edge (storms gust harder; drizzle stays fine and splashless).
+  Thunderstorms actually strike now: branched lightning with a glowing hot
+  core forks down through the rain every few seconds — sometimes twice at
+  once — and the whole card flickers with the flash. And
   the light now comes from where the light is: every glow radiates from
   behind the hero's condition icon at the top left, so on a clear day the sun
   icon is visibly the source of the warm glow and its slow-turning rays, a

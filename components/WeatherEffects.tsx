@@ -152,9 +152,13 @@ export default function WeatherEffects({
     let splashes: Splash[] = [];
     const MAX_SPLASHES = 16;
     const SPLASH_MS = 340;
-    // Lightning state: when the next strike fires, and the current bolt.
-    let strikeAt = 2000 + Math.random() * 4000;
-    let bolt: { points: [number, number][]; born: number } | null = null;
+    // Lightning state: when the next strike fires, and the current strike's
+    // bolts (a main channel plus its branches; sometimes a second channel).
+    // The first strike comes early so a storm reads as one within moments of
+    // the page opening, not only to whoever stares for six seconds.
+    const BOLT_MS = 520;
+    let strikeAt = 1200 + Math.random() * 1800;
+    let bolt: { paths: [number, number][][]; born: number } | null = null;
 
     const rand = (lo: number, hi: number) => lo + Math.random() * (hi - lo);
 
@@ -197,17 +201,41 @@ export default function WeatherEffects({
       };
     };
 
-    const makeBolt = (): [number, number][] => {
-      const points: [number, number][] = [];
-      let x = rand(w * 0.25, w * 0.8);
-      let y = -4 * dpr;
-      points.push([x, y]);
-      while (y < h * 0.7) {
-        x += rand(-1, 1) * w * 0.035;
-        y += rand(0.6, 1.2) * h * 0.12;
+    // One jagged channel from (x0, y0) down to yEnd, with finer segments than
+    // the old bolt so it kinks like a real discharge.
+    const makeChannel = (
+      x0: number,
+      y0: number,
+      yEnd: number,
+      wander: number
+    ): [number, number][] => {
+      const points: [number, number][] = [[x0, y0]];
+      let x = x0;
+      let y = y0;
+      while (y < yEnd) {
+        x += rand(-1, 1) * w * wander;
+        y += rand(0.4, 0.9) * h * 0.08;
         points.push([x, y]);
       }
       return points;
+    };
+
+    // A strike: a main channel from the cloud base to below mid-card, plus one
+    // or two shorter branches forking off its upper half — and occasionally a
+    // sibling channel, the double-strike real storms throw.
+    const makeStrike = (): [number, number][][] => {
+      const paths: [number, number][][] = [];
+      const main = makeChannel(rand(w * 0.25, w * 0.8), -4 * dpr, h * 0.72, 0.03);
+      paths.push(main);
+      const branches = 1 + (Math.random() < 0.5 ? 1 : 0);
+      for (let b = 0; b < branches && main.length > 3; b++) {
+        const at = main[1 + Math.floor(rand(0, main.length * 0.5))];
+        paths.push(makeChannel(at[0], at[1], at[1] + h * rand(0.18, 0.35), 0.045));
+      }
+      if (Math.random() < 0.3) {
+        paths.push(makeChannel(rand(w * 0.2, w * 0.85), -4 * dpr, h * 0.5, 0.03));
+      }
+      return paths;
     };
 
     const resize = () => {
@@ -428,31 +456,56 @@ export default function WeatherEffects({
       }
     };
 
-    const drawLightning = (still: boolean) => {
-      if (still) return; // no flashes in a reduced-motion still frame
-      if (!bolt && t >= strikeAt) bolt = { points: makeBolt(), born: t };
-      if (!bolt) return;
-      const age = t - bolt.born;
-      if (age > 420) {
-        bolt = null;
-        strikeAt = t + 3000 + Math.random() * 6000;
-        return;
-      }
-      // Two quick pulses fading out, like a strike and its afterglow.
-      const p = age / 420;
-      const pulse = Math.max(0, Math.sin(p * Math.PI * 2.5)) * (1 - p);
-      ctx.fillStyle = `rgba(${colors.bolt}, ${0.1 * pulse})`;
-      ctx.fillRect(0, 0, w, h);
-      ctx.lineJoin = "round";
-      ctx.lineCap = "round";
-      ctx.strokeStyle = `rgba(${colors.bolt}, ${0.85 * pulse})`;
-      ctx.lineWidth = 1.6 * dpr;
+    const strokePath = (
+      points: [number, number][],
+      width: number,
+      alpha: number
+    ) => {
+      ctx.strokeStyle = `rgba(${colors.bolt}, ${alpha})`;
+      ctx.lineWidth = width;
       ctx.beginPath();
-      for (const [i, [x, y]] of bolt.points.entries()) {
+      for (const [i, [x, y]] of points.entries()) {
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       }
       ctx.stroke();
+    };
+
+    const drawLightning = (still: boolean) => {
+      if (still) return; // no flashes in a reduced-motion still frame
+      if (!bolt && t >= strikeAt) bolt = { paths: makeStrike(), born: t };
+      if (!bolt) return;
+      const age = t - bolt.born;
+      if (age > BOLT_MS) {
+        bolt = null;
+        strikeAt = t + 2500 + Math.random() * 4500;
+        return;
+      }
+      // Two quick pulses fading out, like a strike and its afterglow.
+      const p = age / BOLT_MS;
+      const pulse = Math.max(0, Math.sin(p * Math.PI * 2.5)) * (1 - p);
+      // The strike lights the whole scene: a stronger sky flash plus a glow
+      // pooled around the main channel's origin, so the card visibly flickers
+      // the way a room does when a storm is close.
+      ctx.fillStyle = `rgba(${colors.bolt}, ${0.16 * pulse})`;
+      ctx.fillRect(0, 0, w, h);
+      const [ox] = bolt.paths[0][0];
+      const glow = ctx.createRadialGradient(ox, 0, 0, ox, 0, h * 0.9);
+      glow.addColorStop(0, `rgba(${colors.bolt}, ${0.22 * pulse})`);
+      glow.addColorStop(1, `rgba(${colors.bolt}, 0)`);
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, w, h);
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      // Each channel renders in three passes — wide soft corona, mid halo,
+      // thin hot core — so the bolt reads as light, not a pen stroke.
+      // Branches (every path after the main channel) are slighter.
+      for (const [i, path] of bolt.paths.entries()) {
+        const scale = i === 0 ? 1 : 0.55;
+        strokePath(path, 7 * scale * dpr, 0.18 * pulse);
+        strokePath(path, 3 * scale * dpr, 0.4 * pulse);
+        strokePath(path, 1.4 * scale * dpr, 0.95 * pulse);
+      }
     };
 
     const drawFrame = (dt: number, still: boolean) => {
