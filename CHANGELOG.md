@@ -85,6 +85,13 @@ here.
 
 ### Fixed
 
+- **Adding several rows quickly in a settings list no longer loses some of
+  them.** Clicking "+ Add" a few times in a row to line up entries — for a
+  handful of world clocks, countdown dates, feed URLs, disks, bangs, or status
+  announcements — could collapse those clicks into a single row, so it looked
+  like the widget only accepted one. Every one of them now keeps all the rows
+  you add. (#163)
+
 - **A hand-edited countdown date can no longer break the whole dashboard.**
   Writing a countdown date in `config.yaml` without quotes
   (`date: 2026-09-01`) — the natural way to type one — made every page fail

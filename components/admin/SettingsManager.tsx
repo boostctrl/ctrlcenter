@@ -109,25 +109,37 @@ function localInputToIso(value: string): string {
 // can't be forgotten at a call site. In-place edits keep row identity. Keys
 // come from newThemeId(), not crypto.randomUUID directly: plain-HTTP LAN
 // hosting is a non-secure context, where randomUUID doesn't exist.
-function useKeyedRows<T>(items: T[], setItems: (next: T[]) => void) {
+//
+// `setItems` takes an UPDATER, not a concrete array, and add/removeAt/move
+// compose off `prev` rather than the render-captured `items`. React batches
+// several mutations that land in one tick (clicking "+ Add" a few times faster
+// than a repaint to line up rows), and a snapshot-based add would then compute
+// every new array from the same pre-batch list — so all but the last collapse
+// and rows silently vanish. The updater form composes each mutation on the
+// latest state, and keeps the parallel `keys` in lockstep. `items` is still
+// read for `move`'s bounds check (a discrete click, never batched).
+function useKeyedRows<T>(
+  items: T[],
+  setItems: (update: (prev: T[]) => T[]) => void
+) {
   const [keys, setKeys] = useState<string[]>(() =>
     Array.from({ length: items.length }, () => newThemeId())
   );
   return {
     keys,
     add: (item: T) => {
-      setItems([...items, item]);
+      setItems((prev) => [...prev, item]);
       setKeys((k) => [...k, newThemeId()]);
     },
     removeAt: (i: number) => {
-      setItems(items.filter((_, idx) => idx !== i));
+      setItems((prev) => prev.filter((_, idx) => idx !== i));
       setKeys((k) => k.filter((_, idx) => idx !== i));
     },
     // Reorder items and their keys together so a moved row keeps its identity
     // (focus/IME) instead of the value sliding under a stale key.
     move: (from: number, to: number) => {
       if (from === to || to < 0 || to >= items.length) return;
-      setItems(reorder(items, from, to));
+      setItems((prev) => reorder(prev, from, to));
       setKeys((k) => reorder(k, from, to));
     },
   };
@@ -316,48 +328,67 @@ export default function SettingsManager({
       announcement: { ...s.announcement, ...patch },
     }));
 
+  // Every list editor below threads a FUNCTIONAL updater through setSettings
+  // (update off the latest sub-array, never a render-captured snapshot), so a
+  // batched pair of row mutations can't drop data — see useKeyedRows.
   const feed = settings.feed;
   const updateFeed = (patch: Partial<Settings["feed"]>) =>
     setSettings((s) => ({ ...s, feed: { ...s.feed, ...patch } }));
-  const setFeedUrls = (urls: string[]) => updateFeed({ urls });
+  const setFeedUrls = (update: (prev: string[]) => string[]) =>
+    setSettings((s) => ({ ...s, feed: { ...s.feed, urls: update(s.feed.urls) } }));
   const feedUrlRows = useKeyedRows(feed.urls, setFeedUrls);
   const updateFeedUrl = (i: number, url: string) =>
-    setFeedUrls(feed.urls.map((u, idx) => (idx === i ? url : u)));
+    setFeedUrls((urls) => urls.map((u, idx) => (idx === i ? url : u)));
 
   const countdown = settings.countdown;
-  const setCountdownItems = (items: Settings["countdown"]["items"]) =>
-    setSettings((s) => ({ ...s, countdown: { ...s.countdown, items } }));
+  const setCountdownItems = (
+    update: (prev: Settings["countdown"]["items"]) => Settings["countdown"]["items"]
+  ) =>
+    setSettings((s) => ({
+      ...s,
+      countdown: { ...s.countdown, items: update(s.countdown.items) },
+    }));
   const countdownRows = useKeyedRows(countdown.items, setCountdownItems);
   const updateCountdownItem = (
     i: number,
     patch: Partial<Settings["countdown"]["items"][number]>
   ) =>
-    setCountdownItems(
-      countdown.items.map((item, idx) => (idx === i ? { ...item, ...patch } : item))
+    setCountdownItems((items) =>
+      items.map((item, idx) => (idx === i ? { ...item, ...patch } : item))
     );
 
   const worldClocks = settings.worldClocks;
-  const setWorldClockItems = (items: Settings["worldClocks"]["items"]) =>
-    setSettings((s) => ({ ...s, worldClocks: { ...s.worldClocks, items } }));
+  const setWorldClockItems = (
+    update: (prev: Settings["worldClocks"]["items"]) => Settings["worldClocks"]["items"]
+  ) =>
+    setSettings((s) => ({
+      ...s,
+      worldClocks: { ...s.worldClocks, items: update(s.worldClocks.items) },
+    }));
   const worldClockRows = useKeyedRows(worldClocks.items, setWorldClockItems);
   const updateWorldClockItem = (
     i: number,
     patch: Partial<Settings["worldClocks"]["items"][number]>
   ) =>
-    setWorldClockItems(
-      worldClocks.items.map((item, idx) => (idx === i ? { ...item, ...patch } : item))
+    setWorldClockItems((items) =>
+      items.map((item, idx) => (idx === i ? { ...item, ...patch } : item))
     );
 
   const systemStats = settings.systemStats;
-  const setStatDisks = (disks: Settings["systemStats"]["disks"]) =>
-    setSettings((s) => ({ ...s, systemStats: { ...s.systemStats, disks } }));
+  const setStatDisks = (
+    update: (prev: Settings["systemStats"]["disks"]) => Settings["systemStats"]["disks"]
+  ) =>
+    setSettings((s) => ({
+      ...s,
+      systemStats: { ...s.systemStats, disks: update(s.systemStats.disks) },
+    }));
   const statDiskRows = useKeyedRows(systemStats.disks, setStatDisks);
   const updateStatDisk = (
     i: number,
     patch: Partial<Settings["systemStats"]["disks"][number]>
   ) =>
-    setStatDisks(
-      systemStats.disks.map((d, idx) => (idx === i ? { ...d, ...patch } : d))
+    setStatDisks((disks) =>
+      disks.map((d, idx) => (idx === i ? { ...d, ...patch } : d))
     );
 
   // Status-page announcements: a client-managed list saved through the whole-
@@ -365,18 +396,23 @@ export default function SettingsManager({
   // theme). Start/end are stored as UTC ISO instants; the datetime-local inputs
   // convert to/from the browser's local wall clock.
   const statusAnnouncements = settings.statusAnnouncements;
-  const setStatusAnnouncements = (items: Settings["statusAnnouncements"]) =>
-    setSettings((s) => ({ ...s, statusAnnouncements: items }));
+  const setStatusAnnouncements = (
+    update: (prev: Settings["statusAnnouncements"]) => Settings["statusAnnouncements"]
+  ) =>
+    setSettings((s) => ({
+      ...s,
+      statusAnnouncements: update(s.statusAnnouncements),
+    }));
   const updateStatusAnnouncement = (
     i: number,
     patch: Partial<Settings["statusAnnouncements"][number]>
   ) =>
-    setStatusAnnouncements(
-      statusAnnouncements.map((a, idx) => (idx === i ? { ...a, ...patch } : a))
+    setStatusAnnouncements((items) =>
+      items.map((a, idx) => (idx === i ? { ...a, ...patch } : a))
     );
   const addStatusAnnouncement = () =>
-    setStatusAnnouncements([
-      ...statusAnnouncements,
+    setStatusAnnouncements((items) => [
+      ...items,
       { id: newThemeId(), title: "", body: "", kind: "info", startsAt: "", endsAt: "" },
     ]);
   const removeStatusAnnouncement = async (i: number) => {
@@ -386,15 +422,17 @@ export default function SettingsManager({
       danger: true,
     });
     if (!ok) return;
-    setStatusAnnouncements(statusAnnouncements.filter((_, idx) => idx !== i));
+    setStatusAnnouncements((items) => items.filter((_, idx) => idx !== i));
   };
 
   const bangs = settings.search.bangs;
-  const setBangs = (next: Settings["search"]["bangs"]) =>
-    setSettings((s) => ({ ...s, search: { ...s.search, bangs: next } }));
+  const setBangs = (
+    update: (prev: Settings["search"]["bangs"]) => Settings["search"]["bangs"]
+  ) =>
+    setSettings((s) => ({ ...s, search: { ...s.search, bangs: update(s.search.bangs) } }));
   const bangRows = useKeyedRows(bangs, setBangs);
   const updateBang = (i: number, patch: Partial<Settings["search"]["bangs"][number]>) =>
-    setBangs(bangs.map((b, idx) => (idx === i ? { ...b, ...patch } : b)));
+    setBangs((list) => list.map((b, idx) => (idx === i ? { ...b, ...patch } : b)));
 
   // Apply a theme pack as the site default: record it as the preset and copy its
   // concrete design/scene/colors into the theme fields the layout actually reads.
