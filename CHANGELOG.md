@@ -12,7 +12,27 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **The weather page's hero effects got a realism pass.** Rain now falls as a
+  layered field — a soft, slow sheet in the distance behind sharper, faster
+  streaks up front — swaying with slowly gusting wind instead of a fixed
+  slant, and drops near the front land as small splash rings at the card's
+  bottom edge (storms gust harder; drizzle stays fine and splashless). And
+  the light now comes from where the light is: every glow radiates from
+  behind the hero's condition icon at the top left, so on a clear day the sun
+  icon is visibly the source of the warm glow and its slow-turning rays, a
+  clear night glows moonlight from behind a moon icon — the icon itself now
+  switches to a moon after dark — and cloud puffs take their highlight from
+  the same corner. Visitors who prefer reduced motion keep a still frame, as
+  before. (#160)
+
 ### Added
+
+- **The server's weather can come from your own Open-Meteo.** Set
+  `CTRLCENTER_WEATHER_API` to a self-hosted Open-Meteo instance and the
+  server sends its weather requests there instead of the public API — handy
+  for keeping traffic on your own network. (#160)
 
 - **Every monitored service now has its own status detail page.** Click a
   service's name on the status page to open a deep-linkable view with a

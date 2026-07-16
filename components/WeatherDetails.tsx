@@ -231,7 +231,7 @@ export default function WeatherDetails({
           />
           <div className="relative flex flex-wrap items-center gap-x-6 gap-y-3">
             <span className="text-7xl leading-none" aria-hidden>
-              {weatherCodeToIcon(current.code)}
+              {weatherCodeToIcon(current.code, current.isDay)}
             </span>
             <div>
               <p className="text-6xl font-bold tracking-tight tabular-nums">
@@ -328,7 +328,7 @@ export default function WeatherDetails({
               >
                 <span className="text-xs text-fg/50">{hourLabel(h.time)}</span>
                 <span className="text-xl" aria-hidden>
-                  {weatherCodeToIcon(h.code)}
+                  {weatherCodeToIcon(h.code, h.isDay)}
                 </span>
                 <span className="text-sm font-medium tabular-nums">
                   {Math.round(h.temperature)}

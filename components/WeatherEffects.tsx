@@ -2,14 +2,21 @@
 
 import { useEffect, useRef } from "react";
 
-// Animated condition effects for the weather-page hero card: rain streaks,
-// drifting snow, storm lightning, rolling fog, drifting clouds, a warm sun
-// glow with slow-turning rays, or twinkling stars — picked from the current
-// WMO weather code and day/night flag. Draws on a card-sized canvas layered
-// between the hero's condition wash and its text; colors are muted
-// naturalistic tones tuned per surface (`light`) so they read on both the
-// near-white and dark cards. Honours prefers-reduced-motion by rendering a
-// single still frame, matching the backdrop scenes.
+// Animated condition effects for the weather-page hero card: layered rain with
+// gusting wind and bottom-edge splashes, drifting snow, storm lightning,
+// rolling fog, clouds lit from above, a warm sun glow with slow-turning rays,
+// or twinkling moonlight — picked from the current WMO weather code and
+// day/night flag. Draws on a card-sized canvas layered between the hero's
+// condition wash and its text; colors are muted naturalistic tones tuned per
+// surface (`light`) so they read on both the near-white and dark cards.
+// Honours prefers-reduced-motion by rendering a single still frame, matching
+// the backdrop scenes.
+//
+// Light direction (#160): every light source anchors to the TOP LEFT, where
+// the hero's condition icon sits — the canvas paints beneath the text layer,
+// so the sun/moon glow radiates out from behind the icon and the icon reads
+// as being the source. Anything lit (cloud shading) takes its highlight from
+// the same corner.
 
 type EffectKind = "sun" | "stars" | "clouds" | "fog" | "rain" | "snow" | "storm";
 
@@ -62,13 +69,25 @@ function palette(light: boolean) {
       };
 }
 
+// One raindrop / snowflake / star. `depth` (far 0 → near 1) scales size,
+// speed, and alpha together, which is what sells the depth-of-field: the back
+// of the field is a soft slow sheet, the front is a few sharp fast streaks.
+// `lenF`/`speedF` add per-drop variation WITHIN a depth so a layer doesn't
+// read as a uniform comb of identical strokes.
 type Particle = {
   x: number;
   y: number;
-  depth: number; // far (0) → near (1)
+  depth: number;
   phase: number;
   speed: number;
+  lenF: number;
+  speedF: number;
 };
+
+// A rain impact at the bottom edge: a small ring that expands and fades where
+// a near-field drop landed, so drops visibly end somewhere instead of sliding
+// off the card.
+type Splash = { x: number; born: number; depth: number };
 
 type Cloud = {
   x: number;
@@ -103,17 +122,36 @@ export default function WeatherEffects({
     const colors = palette(light);
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const dpr = window.devicePixelRatio || 1;
-    const slant = 0.16; // shared wind angle so precipitation reads as one system
     let w = 0;
     let h = 0;
     let raf = 0;
     let last = 0;
     let t = 0; // animation clock (ms), advances only while animating
 
+    // Where the light lives: behind the hero's condition icon — 24px card
+    // padding plus half the text-7xl emoji, clamped in for very small cards.
+    // drawSun/drawStars radiate from here, and cloud shading highlights toward
+    // it, so the icon in the text layer above reads as the source.
+    const lightX = () => Math.min(62 * dpr, w * 0.18);
+    const lightY = () => Math.min(60 * dpr, h * 0.45);
+
+    // The wind: a shared, slowly-gusting slant (horizontal drift per unit of
+    // fall) so all precipitation sways as one weather system instead of
+    // falling at a fixed angle. Two incommensurate sines make the gusts feel
+    // irregular; storms swing harder via `amp`. A still frame reads it at
+    // t = 0 — a fixed, believable lean.
+    const gustAmp = kind === "storm" ? 1.6 : 1;
+    const slantAt = (tt: number) =>
+      0.13 +
+      gustAmp * (0.09 * Math.sin(tt * 0.00033) + 0.05 * Math.sin(tt * 0.0011 + 1.7));
+
     let drops: Particle[] = [];
     let flakes: Particle[] = [];
     let clouds: Cloud[] = [];
     let stars: Particle[] = [];
+    let splashes: Splash[] = [];
+    const MAX_SPLASHES = 16;
+    const SPLASH_MS = 340;
     // Lightning state: when the next strike fires, and the current bolt.
     let strikeAt = 2000 + Math.random() * 4000;
     let bolt: { points: [number, number][]; born: number } | null = null;
@@ -121,11 +159,14 @@ export default function WeatherEffects({
     const rand = (lo: number, hi: number) => lo + Math.random() * (hi - lo);
 
     const spawnDrop = (): Particle => ({
-      x: rand(-h * slant, w),
+      // The gust swings both ways, so seed beyond both side edges.
+      x: rand(-h * 0.3, w + h * 0.3),
       y: rand(0, h),
       depth: Math.random(),
       phase: 0,
       speed: 0,
+      lenF: rand(0.7, 1.35),
+      speedF: rand(0.85, 1.2),
     });
 
     const spawnFlake = (): Particle => ({
@@ -134,6 +175,8 @@ export default function WeatherEffects({
       depth: Math.random(),
       phase: rand(0, Math.PI * 2),
       speed: rand(0.5, 1.4),
+      lenF: 1,
+      speedF: 1,
     });
 
     const spawnCloud = (i: number, count: number): Cloud => {
@@ -176,8 +219,9 @@ export default function WeatherEffects({
       const cssW = rect.width;
       drops = flakes = stars = [];
       clouds = [];
+      splashes = [];
       if (kind === "rain" || kind === "storm") {
-        const count = Math.min(150, Math.round((cssW / 6) * intensity));
+        const count = Math.min(170, Math.round((cssW / 5.5) * intensity));
         drops = Array.from({ length: count }, spawnDrop);
       } else if (kind === "snow") {
         const count = Math.min(110, Math.round((cssW / 8) * intensity));
@@ -193,38 +237,77 @@ export default function WeatherEffects({
           depth: Math.random(),
           phase: rand(0, Math.PI * 2),
           speed: rand(0.0006, 0.002),
+          lenF: 1,
+          speedF: 1,
         }));
       }
       if (reduced) drawFrame(0, true);
     };
 
+    // Rain with a depth of field: depth scales length, fall speed, weight and
+    // alpha together (far drops are a soft slow sheet, near ones are sharp
+    // fast streaks), per-drop lenF/speedF break up uniformity, and the shared
+    // gust sways the whole field. A near drop that reaches the bottom edge
+    // lands as a splash ring rather than sliding off.
     const drawRain = (dt: number, still: boolean, heavy: boolean) => {
+      const slant = still ? slantAt(0) : slantAt(t);
       ctx.lineCap = "round";
       for (const d of drops) {
-        const len = (heavy ? 14 : 9) * (1 + d.depth * 1.6) * dpr;
+        const len =
+          (heavy ? 15 : 10) * (0.55 + d.depth * 1.9) * d.lenF * dpr;
         if (!still) {
-          const vy = (2 + d.depth * (heavy ? 5 : 3.5)) * dpr * (dt / 16);
+          const vy =
+            (1.7 + d.depth * (heavy ? 5.2 : 3.6)) * d.speedF * dpr * (dt / 16);
           d.y += vy;
           d.x += vy * slant;
           if (d.y - len > h) {
+            // Only the near field is close enough for its impact to read;
+            // drizzle is too fine to splash at all.
+            if (!still && d.depth > 0.55 && intensity >= 0.45) {
+              splashes.push({ x: d.x, born: t, depth: d.depth });
+              if (splashes.length > MAX_SPLASHES) splashes.shift();
+            }
             Object.assign(d, spawnDrop(), { y: -len });
           }
         }
         ctx.beginPath();
         ctx.moveTo(d.x, d.y);
         ctx.lineTo(d.x - len * slant, d.y - len);
-        ctx.lineWidth = (0.8 + d.depth * 0.6) * dpr;
-        ctx.strokeStyle = `rgba(${colors.rain}, ${0.14 + d.depth * 0.26})`;
+        ctx.lineWidth = (0.6 + d.depth * 0.9) * dpr;
+        ctx.strokeStyle = `rgba(${colors.rain}, ${0.1 + d.depth * 0.32})`;
+        ctx.stroke();
+      }
+      if (!still) drawSplashes();
+    };
+
+    // Expanding, fading impact rings pinned to the bottom edge — squashed
+    // ellipses so they read as rings on the ground plane seen edge-on.
+    const drawSplashes = () => {
+      const y = h - 2 * dpr;
+      splashes = splashes.filter((s) => t - s.born <= SPLASH_MS);
+      for (const s of splashes) {
+        const p = (t - s.born) / SPLASH_MS;
+        const rx = (1.5 + p * 9 * (0.5 + s.depth * 0.7)) * dpr;
+        ctx.beginPath();
+        ctx.ellipse(s.x, y, rx, rx * 0.32, 0, 0, Math.PI * 2);
+        ctx.lineWidth = 0.9 * dpr;
+        ctx.strokeStyle = `rgba(${colors.rain}, ${(1 - p) * 0.5 * (0.4 + s.depth * 0.6)})`;
         ctx.stroke();
       }
     };
 
     const drawSnow = (dt: number, still: boolean) => {
+      const slant = still ? slantAt(0) : slantAt(t);
       for (const f of flakes) {
         const r = (0.8 + f.depth * 1.8) * dpr;
         if (!still) {
-          f.y += (0.25 + f.depth * 0.55) * f.speed * dpr * (dt / 16);
-          f.x += Math.sin(t * 0.0012 * f.speed + f.phase) * 0.25 * dpr * (dt / 16);
+          const vy = (0.25 + f.depth * 0.55) * f.speed * dpr * (dt / 16);
+          f.y += vy;
+          // Per-flake flutter plus a fraction of the shared gust, so the snow
+          // and any storm on the next refresh lean the same way.
+          f.x +=
+            Math.sin(t * 0.0012 * f.speed + f.phase) * 0.25 * dpr * (dt / 16) +
+            vy * slant * 0.6;
           if (f.y - r > h) {
             Object.assign(f, spawnFlake(), { y: -r });
           }
@@ -236,6 +319,9 @@ export default function WeatherEffects({
       }
     };
 
+    // Clouds are lit from the top left like everything else: each puff's
+    // gradient centers toward the light anchor, so the up-light side glows
+    // and the far side falls off — round volumes instead of flat blobs.
     const drawClouds = (dt: number, still: boolean) => {
       for (const c of clouds) {
         const width = 120 * c.scale * dpr;
@@ -247,12 +333,17 @@ export default function WeatherEffects({
           const r = p.r * c.scale * dpr;
           const px = c.x + p.dx * c.scale * dpr;
           const py = c.y + p.dy * c.scale * dpr;
-          const grad = ctx.createRadialGradient(px, py, 0, px, py, r);
-          grad.addColorStop(0, `rgba(${colors.cloud}, ${0.1 * c.alpha * intensity})`);
+          // Highlight offset: a fixed fraction of the puff radius toward the
+          // light corner (direction is what matters, not exact geometry).
+          const hx = px - r * 0.3;
+          const hy = py - r * 0.3;
+          const grad = ctx.createRadialGradient(hx, hy, 0, px, py, r * 1.1);
+          grad.addColorStop(0, `rgba(${colors.cloud}, ${0.14 * c.alpha * intensity})`);
+          grad.addColorStop(0.55, `rgba(${colors.cloud}, ${0.07 * c.alpha * intensity})`);
           grad.addColorStop(1, `rgba(${colors.cloud}, 0)`);
           ctx.fillStyle = grad;
           ctx.beginPath();
-          ctx.arc(px, py, r, 0, Math.PI * 2);
+          ctx.arc(px, py, r * 1.1, 0, Math.PI * 2);
           ctx.fill();
         }
       }
@@ -284,28 +375,29 @@ export default function WeatherEffects({
     };
 
     const drawSun = (still: boolean) => {
-      // Warm glow breathing in the hero's open top-right corner, with slow rays.
-      const cx = w * 0.84;
-      const cy = h * 0.18;
+      // Warm glow breathing behind the hero's sun icon (top left), with slow
+      // rays turning around it — the icon above the canvas IS the source.
+      const cx = lightX();
+      const cy = lightY();
       const breathe = still ? 1 : 1 + 0.05 * Math.sin(t * 0.0012);
-      const r = h * 0.85 * breathe * intensity;
+      const r = Math.max(h * 0.95, w * 0.45) * breathe * intensity;
       const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-      glow.addColorStop(0, `rgba(${colors.sun}, ${0.28 * intensity})`);
-      glow.addColorStop(0.5, `rgba(${colors.sun}, ${0.08 * intensity})`);
+      glow.addColorStop(0, `rgba(${colors.sun}, ${0.3 * intensity})`);
+      glow.addColorStop(0.45, `rgba(${colors.sun}, ${0.09 * intensity})`);
       glow.addColorStop(1, `rgba(${colors.sun}, 0)`);
       ctx.fillStyle = glow;
       ctx.fillRect(0, 0, w, h);
       const spin = still ? 0.4 : t * 0.00008;
       for (let i = 0; i < 6; i++) {
         const a = spin + (i * Math.PI) / 3;
-        const len = h * 1.1;
+        const len = Math.max(h * 1.2, w * 0.55);
         const grad = ctx.createLinearGradient(
           cx,
           cy,
           cx + Math.cos(a) * len,
           cy + Math.sin(a) * len
         );
-        grad.addColorStop(0, `rgba(${colors.sun}, ${0.06 * intensity})`);
+        grad.addColorStop(0, `rgba(${colors.sun}, ${0.07 * intensity})`);
         grad.addColorStop(1, `rgba(${colors.sun}, 0)`);
         ctx.strokeStyle = grad;
         ctx.lineWidth = 26 * dpr;
@@ -317,11 +409,12 @@ export default function WeatherEffects({
     };
 
     const drawStars = (still: boolean) => {
-      // Soft moonlight in the top-right corner plus twinkling stars.
-      const mx = w * 0.84;
-      const my = h * 0.22;
-      const moon = ctx.createRadialGradient(mx, my, 0, mx, my, h * 0.6);
-      moon.addColorStop(0, `rgba(${colors.star}, ${0.14 * intensity})`);
+      // Soft moonlight behind the hero's moon icon (top left, same anchor as
+      // the sun) plus twinkling stars across the card.
+      const mx = lightX();
+      const my = lightY();
+      const moon = ctx.createRadialGradient(mx, my, 0, mx, my, h * 0.7);
+      moon.addColorStop(0, `rgba(${colors.star}, ${0.16 * intensity})`);
       moon.addColorStop(1, `rgba(${colors.star}, 0)`);
       ctx.fillStyle = moon;
       ctx.fillRect(0, 0, w, h);

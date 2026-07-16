@@ -5,6 +5,14 @@ import { log, hostOf, errorReason } from "./log";
 
 export type Units = "imperial" | "metric";
 
+// Where the server sends its weather requests. Open-Meteo is self-hostable, so
+// CTRLCENTER_WEATHER_API lets an instance point at its own deployment (it must
+// speak the same /v1/forecast API). Server-side only: in the browser bundle
+// the env access compiles to undefined, so a visitor's client-side re-fetch
+// (for their own location) still goes to the public API.
+const WEATHER_API_BASE =
+  process.env.CTRLCENTER_WEATHER_API || "https://api.open-meteo.com";
+
 // Cap every weather request so an unresponsive Open-Meteo can't hang the
 // server-rendered home page (or the /weather page) — without this the fetch has
 // no timeout and blocks the render until the socket eventually gives up. Kept
@@ -32,7 +40,7 @@ export async function fetchWeather(
     timezone: "auto",
   });
 
-  const url = `https://api.open-meteo.com/v1/forecast?${params}`;
+  const url = `${WEATHER_API_BASE}/v1/forecast?${params}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), WEATHER_TIMEOUT_MS);
   try {
@@ -138,7 +146,7 @@ export async function fetchForecast(
     forecast_days: "7",
   });
 
-  const url = `https://api.open-meteo.com/v1/forecast?${params}`;
+  const url = `${WEATHER_API_BASE}/v1/forecast?${params}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), WEATHER_TIMEOUT_MS);
   try {
@@ -273,9 +281,12 @@ export function weatherCodeLabel(code: number): string {
   return "—";
 }
 
-export function weatherCodeToIcon(code: number): string {
-  if (code === 0) return "☀️";
-  if (code === 1 || code === 2) return "🌤️";
+// `isDay` swaps the clear-sky sun for a moon at night, so the hero icon and
+// the moonlight glowing behind it (#160) tell the same story. Callers without
+// a day flag (the lean header widget) default to the day icon, as before.
+export function weatherCodeToIcon(code: number, isDay = true): string {
+  if (code === 0) return isDay ? "☀️" : "🌙";
+  if (code === 1 || code === 2) return isDay ? "🌤️" : "🌙";
   if (code === 3) return "☁️";
   if (code === 45 || code === 48) return "🌫️";
   if ([51, 53, 55, 56, 57].includes(code)) return "🌦️";
