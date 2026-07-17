@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [2.0.3] - 2026-07-17
+
 ### Security
 
 - **The icon cache can no longer be driven to exhaust server memory.** To
@@ -2000,7 +2002,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.0.2...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.0.3...HEAD
+[2.0.3]: https://github.com/boostctrl/ctrlcenter/compare/v2.0.2...v2.0.3
 [2.0.2]: https://github.com/boostctrl/ctrlcenter/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/boostctrl/ctrlcenter/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/boostctrl/ctrlcenter/compare/v1.9.9...v2.0.0
