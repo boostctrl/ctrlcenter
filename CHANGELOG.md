@@ -24,6 +24,14 @@ here.
 
 ### Changed
 
+- **The help page is reorganized and brought current.** The admin material
+  is grouped by task — content & search, monitoring, the home page,
+  appearance & operations — instead of one long wall of cards, and a new
+  "Getting around" card explains the navigation strip, the floating menu,
+  and the header's status entry. The guide now covers this release's
+  features too: exact outage times, incident notes, and the fully
+  clickable status cards. (#178)
+
 - **The whole service card on the status page is now clickable.** Anywhere
   on a card opens that service's detail page, not just its name — the card
   highlights under the pointer like the link it now is. The heartbeat strip

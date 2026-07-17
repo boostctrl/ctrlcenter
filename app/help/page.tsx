@@ -130,6 +130,21 @@ export default async function HelpPage() {
           title="For everyone"
           note="Works in any browser. Nothing here needs the admin password."
         >
+          <Card title="Getting around">
+            <P>
+              Every page outside the home dashboard opens with the same slim
+              navigation strip: a link back to the dashboard, then the
+              site&apos;s pages with the one you&apos;re on highlighted. The
+              floating menu in the corner holds the same destinations and works
+              everywhere, the dashboard included.
+            </P>
+            <P>
+              The status glance in the dashboard&apos;s header card — the pulse
+              dot with <em>Uptime &amp; outages</em> beside it — is the quick
+              way into the <A href="/status">status page</A>.
+            </P>
+          </Card>
+
           <Card title="Search">
             <P>
               Start typing to filter your apps and bookmarks at once. It matches
@@ -282,10 +297,11 @@ export default async function HelpPage() {
               <li>
                 <A href="/status">Status</A> reports per-service uptime over a
                 range you pick, with a 90-day timeline for each monitored
-                service. Click a service&apos;s name to open its detail view: a
-                larger, finer-grained uptime graph, response-time analytics,
-                every range&apos;s uptime at once, an outage log, and how the
-                check is configured.
+                service. Click anywhere on a service&apos;s card to open its
+                detail view: a larger, finer-grained uptime graph,
+                response-time analytics, every range&apos;s uptime at once, the
+                outage log — exact start and end times, with any note the admin
+                has attached to an incident — and how the check is configured.
               </li>
               <li>
                 <A href="/calendar">Calendar</A> shows your full upcoming agenda
@@ -316,9 +332,13 @@ export default async function HelpPage() {
           </Card>
         </Section>
 
+        {/* The admin material is grouped by what the admin is trying to do —
+            content, monitoring, the home page, operations — so each section
+            stays a handful of comparable cards and a new feature lands as its
+            own card in the group it belongs to (#178). */}
         <Section
-          title="For admins"
-          note="Running and configuring the instance. These need the admin password."
+          title="For admins: content & search"
+          note="What the dashboard shows. Everything from here down needs the admin password."
         >
           <Card title="The admin portal">
             <P>
@@ -382,6 +402,25 @@ export default async function HelpPage() {
             </P>
           </Card>
 
+          <Card title="Calendar feed">
+            <P>
+              Point the calendar at a published <Code>.ics</Code> feed or a
+              CalDAV URL (a <Code>webcal://</Code> address works too), with
+              optional Basic-auth credentials for a private feed. The{" "}
+              <strong>Test feed</strong> button reports whether it&apos;s
+              reachable and how many upcoming events it sees.
+            </P>
+            <P>
+              A <em>Hide when no upcoming events</em> option drops the home
+              &ldquo;Upcoming&rdquo; card entirely when the agenda is empty.
+            </P>
+          </Card>
+        </Section>
+
+        <Section
+          title="For admins: monitoring"
+          note="Health checks, the status page, and letting people know what happened."
+        >
           <Card title="Uptime monitoring">
             <P>
               Give any app a health check and its results show on{" "}
@@ -406,7 +445,28 @@ export default async function HelpPage() {
             </ul>
             <P>
               A background poller records history on its own schedule, so uptime
-              accrues even when no one has the page open.
+              accrues even when no one has the page open. Completed outages are
+              recorded with the exact moment the check failed and the moment it
+              recovered, and each service&apos;s detail page lists them for 90
+              days.
+            </P>
+          </Card>
+
+          <Card title="Incident notes">
+            <P>
+              Explain an outage where people will look for the explanation.
+              While signed in, open a service&apos;s detail page from{" "}
+              <A href="/status">/status</A>: every recorded outage in the log
+              offers <em>Add note</em> (or a pencil beside an existing note).
+              Type the reason — &ldquo;planned maintenance&rdquo;, &ldquo;ISP
+              fault&rdquo; — and press <Kbd>Enter</Kbd>; clearing the text
+              deletes the note after a confirmation. Visitors see a note
+              wherever they can see the service itself.
+            </P>
+            <P>
+              Notes are stored with the recorded uptime history, not the
+              configuration, so they stay out of config export and import —
+              same as the outage history they annotate.
             </P>
           </Card>
 
@@ -420,20 +480,40 @@ export default async function HelpPage() {
             </P>
           </Card>
 
-          <Card title="Calendar feed">
+          <Card title="Announcement banner">
             <P>
-              Point the calendar at a published <Code>.ics</Code> feed or a
-              CalDAV URL (a <Code>webcal://</Code> address works too), with
-              optional Basic-auth credentials for a private feed. The{" "}
-              <strong>Test feed</strong> button reports whether it&apos;s
-              reachable and how many upcoming events it sees.
-            </P>
-            <P>
-              A <em>Hide when no upcoming events</em> option drops the home
-              &ldquo;Upcoming&rdquo; card entirely when the agenda is empty.
+              A banner across the top of every page for notices, maintenance
+              windows, or a heads-up for the household. Turn it on in{" "}
+              <strong>Settings → Announcement</strong> and write the message
+              using inline <strong>bold</strong>, <em>italic</em> and{" "}
+              <span className="underline underline-offset-2">links</span>{" "}
+              (http/https only; raw HTML is never rendered). Pick a tone — info,
+              warning, success, or your accent color — and optionally let
+              visitors dismiss it, in which case it reappears whenever you change
+              the message.
             </P>
           </Card>
 
+          <Card title="Status announcements">
+            <P>
+              Tell your household about maintenance and upcoming changes right on
+              the <A href="/status">status page</A>, separate from the site-wide
+              banner. In <strong>Settings → Widgets → Announcements</strong>{" "}
+              add an entry with a kind (maintenance, incident, or notice — it
+              tints the card), a title, and a message in the same inline markdown
+              subset. An optional start and end schedule it: an entry with a
+              future start shows as <em>scheduled</em> until its window opens,
+              then drops off on its own once the end passes. Times display in
+              each visitor&apos;s own time zone, and the section appears even when
+              status checks are off.
+            </P>
+          </Card>
+        </Section>
+
+        <Section
+          title="For admins: the home page"
+          note="Arranging the dashboard and the cards that can live on it."
+        >
           <Card title="Home-page components">
             <P>
               The dashboard is a grid of widgets you arrange in place. Toggle
@@ -484,35 +564,6 @@ export default async function HelpPage() {
               The editor previews exactly what the live page shows, keeping cards
               in the order you place them. Weather, the status row, and the
               calendar have their own enables alongside their setup.
-            </P>
-          </Card>
-
-          <Card title="Announcement banner">
-            <P>
-              A banner across the top of every page for notices, maintenance
-              windows, or a heads-up for the household. Turn it on in{" "}
-              <strong>Settings → Announcement</strong> and write the message
-              using inline <strong>bold</strong>, <em>italic</em> and{" "}
-              <span className="underline underline-offset-2">links</span>{" "}
-              (http/https only; raw HTML is never rendered). Pick a tone — info,
-              warning, success, or your accent color — and optionally let
-              visitors dismiss it, in which case it reappears whenever you change
-              the message.
-            </P>
-          </Card>
-
-          <Card title="Status announcements">
-            <P>
-              Tell your household about maintenance and upcoming changes right on
-              the <A href="/status">status page</A>, separate from the site-wide
-              banner. In <strong>Settings → Widgets → Announcements</strong>{" "}
-              add an entry with a kind (maintenance, incident, or notice — it
-              tints the card), a title, and a message in the same inline markdown
-              subset. An optional start and end schedule it: an entry with a
-              future start shows as <em>scheduled</em> until its window opens,
-              then drops off on its own once the end passes. Times display in
-              each visitor&apos;s own time zone, and the section appears even when
-              status checks are off.
             </P>
           </Card>
 
@@ -589,6 +640,12 @@ export default async function HelpPage() {
             </P>
           </Card>
 
+        </Section>
+
+        <Section
+          title="For admins: appearance & operations"
+          note="Site-wide looks, backups, and running the instance safely."
+        >
           <Card title="Themes">
             <P>
               The <strong>Themes</strong> tab edits the built-in theme packs
