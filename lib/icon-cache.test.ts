@@ -108,6 +108,20 @@ describe("getCdnIcon", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("bounds the negative cache so a flood of distinct bogus slugs can't grow it without limit", async () => {
+    const fetchMock = vi.fn(async () => new Response("nope", { status: 404 }));
+    vi.stubGlobal("fetch", fetchMock);
+    // Far more distinct failing slugs than the 4096-entry cap.
+    for (let i = 0; i < 5000; i++) {
+      expect(await cache.getCdnIcon(`missing-${i}`)).toBeNull();
+    }
+    const negativeUntil = g.__ctrlcenterIconCache!.negativeUntil;
+    expect(negativeUntil.size).toBeLessThanOrEqual(4096);
+    // The most recent failures are the ones kept (oldest were evicted).
+    expect(negativeUntil.has("missing-4999")).toBe(true);
+    expect(negativeUntil.has("missing-0")).toBe(false);
+  });
+
   it("deduplicates concurrent requests for the same slug into one fetch", async () => {
     let resolveBody: (() => void) | null = null;
     const gate = new Promise<void>((r) => (resolveBody = r));

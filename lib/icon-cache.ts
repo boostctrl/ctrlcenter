@@ -34,6 +34,14 @@ const FETCH_TIMEOUT_MS = 5_000;
 // an offline install (or a typo'd slug on every render) from re-fetching per
 // request, while recovering reasonably fast once connectivity returns.
 const NEGATIVE_TTL_MS = 5 * 60_000;
+// Hard cap on remembered failures. /api/icons/cdn/<slug> is public, and every
+// well-formed slug the CDN doesn't have adds a negative-cache entry — so an
+// unauthenticated visitor hitting a stream of DISTINCT bogus (but slug-shaped)
+// names would otherwise grow this map without bound (memory-exhaustion DoS).
+// The cap is far above any real dashboard's distinct-icon count, so bounding
+// it only ever bites under that abuse, where evicting the oldest failures is
+// the right trade: at worst an evicted bogus slug is re-fetched once.
+const MAX_NEGATIVE_ENTRIES = 4096;
 // How long a fetched metadata.json is considered fresh; after that the next
 // request revalidates it (and keeps serving the stale copy if the CDN is
 // unreachable — stale variants beat no variants).
@@ -74,6 +82,27 @@ const state = (g.__ctrlcenterIconCache ??= {
   waiters: [] as (() => void)[],
 });
 
+// Remember a slug the CDN didn't serve, so the next request degrades instead
+// of re-fetching for NEGATIVE_TTL_MS — bounding the map so a flood of distinct
+// bogus slugs can't grow it without limit. At the cap, drop already-expired
+// entries first (dead weight the hot path ignores anyway); if it's still full
+// of live entries, evict oldest-inserted (Map keeps insertion order) until
+// under the cap. Re-setting an existing slug keeps its position, which is fine.
+function rememberNegative(slug: string): void {
+  const now = Date.now();
+  if (!state.negativeUntil.has(slug) && state.negativeUntil.size >= MAX_NEGATIVE_ENTRIES) {
+    for (const [k, until] of state.negativeUntil) {
+      if (until <= now) state.negativeUntil.delete(k);
+    }
+    while (state.negativeUntil.size >= MAX_NEGATIVE_ENTRIES) {
+      const oldest = state.negativeUntil.keys().next().value;
+      if (oldest === undefined) break;
+      state.negativeUntil.delete(oldest);
+    }
+  }
+  state.negativeUntil.set(slug, now + NEGATIVE_TTL_MS);
+}
+
 // Run `fn` holding one of the MAX_UPSTREAM_FETCHES slots; callers past the cap
 // queue and are released one per completion.
 async function withUpstreamSlot<T>(fn: () => Promise<T>): Promise<T> {
@@ -109,7 +138,7 @@ async function fetchAndStore(slug: string, file: string): Promise<Uint8Array | n
       redirect: "error",
     });
     if (!res.ok) {
-      state.negativeUntil.set(slug, Date.now() + NEGATIVE_TTL_MS);
+      rememberNegative(slug);
       return null;
     }
     const bytes = new Uint8Array(await res.arrayBuffer());
@@ -121,7 +150,7 @@ async function fetchAndStore(slug: string, file: string): Promise<Uint8Array | n
       bytes.byteLength > MAX_CDN_ICON_BYTES ||
       !(head.startsWith("<svg") || head.startsWith("<?xml"))
     ) {
-      state.negativeUntil.set(slug, Date.now() + NEGATIVE_TTL_MS);
+      rememberNegative(slug);
       return null;
     }
     await writeFileAtomic(file, bytes);
@@ -129,7 +158,7 @@ async function fetchAndStore(slug: string, file: string): Promise<Uint8Array | n
   } catch (e) {
     // Network failure (offline, timeout): negative-cache and degrade — the
     // client's letter-avatar fallback takes over.
-    state.negativeUntil.set(slug, Date.now() + NEGATIVE_TTL_MS);
+    rememberNegative(slug);
     log.debug("icon fetch failed", { host: hostOf(url), slug, reason: errorReason(e) });
     return null;
   }

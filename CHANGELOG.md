@@ -12,6 +12,18 @@ here.
 
 ## [Unreleased]
 
+### Security
+
+- **The icon cache can no longer be driven to exhaust server memory.** To
+  make the dashboard work offline, the app caches each service icon on the
+  server the first time it's needed, and remembers which icon names the
+  source didn't have so it doesn't re-request them on every page render. That
+  "known-missing" list is now capped: a visitor firing off a stream of
+  made-up icon names can no longer grow it without bound and push the server
+  out of memory. Part of the security review of the features added in 2.0.0
+  (status detail pages, the system-stats widget, and this offline icon
+  cache). (#155)
+
 ## [2.0.2] - 2026-07-17
 
 ### Added
