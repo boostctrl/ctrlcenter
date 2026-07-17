@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import type { Settings } from "@/lib/schema";
 import {
@@ -26,7 +26,23 @@ import {
 import { useNow } from "../useNow";
 import { supportedTimezones, newThemeId } from "@/lib/prefs";
 import { resolveLayoutWidgets, type LayoutWidgetId } from "@/lib/layout";
-import { TextField, MoveButtons } from "./ui";
+import { buttonClasses } from "@/lib/buttons";
+import {
+  AddButton,
+  Card,
+  ControlRow,
+  Hint,
+  MoveButtons,
+  NumberField,
+  NumberRow,
+  RemoveButton,
+  SelectField,
+  TextArea,
+  TextField,
+  ToggleRow,
+  controlClasses,
+  subCardClasses,
+} from "./ui";
 import { ChipGroup } from "@/components/ChipGroup";
 import { reorder } from "./useReorder";
 import IconField from "./IconField";
@@ -53,20 +69,54 @@ async function saveSettings(settings: Settings, opts?: SaveOptions): Promise<voi
   }
 }
 
-// One nav entry per settings group; a single group shows at a time. The rail
-// stays short by grouping under one rule: everything that configures a
-// home-page widget lives under Widgets — the search bar, weather, calendar,
-// feed, notes, countdown, and the status row together with its alerts and
-// status-page announcements. Appearance folds into General; the site-wide
-// Announcement banner and Security stand on their own.
+// One nav entry per settings group; a single group shows at a time. The
+// grouping rule (#180), ordered identity → layout → content → operations →
+// communication → account: General is the site's identity and default look;
+// Home layout is which widgets show and how they're arranged; a card lives
+// under Widgets iff it configures what a home-page widget SHOWS; Monitoring
+// is the uptime infrastructure — status checks and their alerts are a
+// service, not widget content; Announcements gathers the two "tell visitors
+// something" surfaces (the site-wide banner and the status page's notices).
+// The blurb renders under the section header in the content pane.
 const SETTINGS_SECTIONS = [
-  { id: "general", label: "General" },
-  { id: "layout", label: "Home layout" },
-  { id: "widgets", label: "Widgets" },
-  { id: "announcement", label: "Announcement" },
-  { id: "security", label: "Security" },
+  {
+    id: "general",
+    label: "General",
+    blurb: "Site identity and the default look visitors see.",
+  },
+  {
+    id: "layout",
+    label: "Home layout",
+    blurb: "Which widgets show on the home page, and how they're arranged.",
+  },
+  {
+    id: "widgets",
+    label: "Widgets",
+    blurb: "What each home-page widget shows.",
+  },
+  {
+    id: "monitoring",
+    label: "Monitoring",
+    blurb: "Uptime checks on your apps, and alerts when one goes down.",
+  },
+  {
+    id: "announcements",
+    label: "Announcements",
+    blurb: "Notices to visitors — a site-wide banner, or updates on the status page.",
+  },
+  {
+    id: "security",
+    label: "Security",
+    blurb: "The password that guards this portal.",
+  },
 ] as const;
 type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]["id"];
+
+// The banner section used to be "announcement" (singular, pre-#180); keep
+// saved deep links to it working.
+const LEGACY_SECTION_ALIASES: Record<string, SettingsSectionId> = {
+  announcement: "announcements",
+};
 
 // Offered uptime-check intervals (minutes). The schema accepts 1–60, so a
 // hand-edited value can fall outside this list — the control shows it as an
@@ -101,6 +151,18 @@ function localInputToIso(value: string): string {
   const d = new Date(value); // a zone-less datetime-local is parsed as local
   return Number.isNaN(d.getTime()) ? "" : d.toISOString();
 }
+
+// Time-zone suggestions are browser data: Node's ICU zone list can differ
+// from the browser's (417 vs 418 entries in practice), so server-rendering
+// the datalist makes hydration flag a mismatch on every load. Serve an empty
+// list and fill in the browser's own after mount (useSyncExternalStore's
+// server/client snapshot split) — the suggestions are pure progressive
+// enhancement. The snapshots are cached: getSnapshot must be referentially
+// stable or the store re-syncs forever.
+const NO_ZONES: string[] = [];
+let zonesCache: string[] | null = null;
+const getBrowserZones = () => (zonesCache ??= supportedTimezones());
+const subscribeZonesNever = () => () => {};
 
 // Stable React keys for editable rows whose stored shape has no id (custom
 // bangs, countdown dates — the persisted schema stays id-free on purpose).
@@ -145,42 +207,6 @@ function useKeyedRows<T>(
   };
 }
 
-function Section({
-  title,
-  intro,
-  children,
-}: {
-  title: string;
-  intro?: ReactNode;
-  children: ReactNode;
-}) {
-  // A stable, title-derived anchor so a card can be deep-linked
-  // (e.g. #settings-card-alerts).
-  const id =
-    "settings-card-" +
-    title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "");
-  return (
-    // break-inside-avoid: the settings groups flow into CSS columns at wide
-    // widths (see the content wrapper below), and a card must never be split
-    // across a column break.
-    <section
-      id={id}
-      className="glass-card mb-4 flex break-inside-avoid flex-col gap-4 p-5"
-    >
-      <div>
-        <h3 className="text-xs font-semibold tracking-[0.15em] text-fg/45 uppercase">
-          {title}
-        </h3>
-        {intro && <p className="mt-1.5 text-xs text-fg/40">{intro}</p>}
-      </div>
-      {children}
-    </section>
-  );
-}
-
 export default function SettingsManager({
   initialSettings,
   themePacks,
@@ -217,11 +243,13 @@ export default function SettingsManager({
   // The URL seeds the active section (?tab=settings&section=widgets is a
   // shareable deep link that survives refresh); rail clicks mirror it back
   // with a history replace. AdminDashboard owns the `tab` param the same way.
-  const [section, setSection] = useState<SettingsSectionId>(() =>
-    SETTINGS_SECTIONS.some((s) => s.id === initialSection)
-      ? (initialSection as SettingsSectionId)
-      : "general"
-  );
+  const [section, setSection] = useState<SettingsSectionId>(() => {
+    if (SETTINGS_SECTIONS.some((s) => s.id === initialSection))
+      return initialSection as SettingsSectionId;
+    return (initialSection && LEGACY_SECTION_ALIASES[initialSection]) || "general";
+  });
+  const activeSection =
+    SETTINGS_SECTIONS.find((s) => s.id === section) ?? SETTINGS_SECTIONS[0];
 
   function selectSection(next: SettingsSectionId) {
     setSection(next);
@@ -241,10 +269,13 @@ export default function SettingsManager({
   // Persistence is automatic: every change debounce-saves via useAutosave.
   const { status, error } = useAutosave(settings, saveSettings);
   const confirm = useConfirm();
-  const zones = useMemo(() => supportedTimezones(), []);
-
-  const selectClass =
-    "accent-focus rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-fg outline-none transition-colors";
+  // Empty on the server and during hydration, the browser's own list after
+  // mount — see the NO_ZONES/getBrowserZones comment above.
+  const zones = useSyncExternalStore(
+    subscribeZonesNever,
+    getBrowserZones,
+    () => NO_ZONES
+  );
 
   const theme = settings.theme;
   const updateTheme = (patch: Partial<Settings["theme"]>) =>
@@ -497,9 +528,17 @@ export default function SettingsManager({
     // the width, so any setting is one click away instead of somewhere down a
     // masonry flow.
     <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[12rem_minmax(0,1fr)] lg:gap-x-8">
+      {/* Shared zone suggestions for every `list="settings-tz"` input — the
+          default time zone (General) and the world clocks (Widgets) — so it
+          can't be stranded in one section's DOM. */}
+      <datalist id="settings-tz">
+        {zones.map((z) => (
+          <option key={z} value={z} />
+        ))}
+      </datalist>
       <nav
         aria-label="Settings sections"
-        className="flex flex-wrap gap-1 lg:sticky lg:top-6 lg:flex-col lg:flex-nowrap lg:self-start lg:pt-7"
+        className="flex flex-wrap gap-1 lg:sticky lg:top-6 lg:flex-col lg:flex-nowrap lg:self-start"
       >
         {SETTINGS_SECTIONS.map((s) => (
           <button
@@ -517,55 +556,57 @@ export default function SettingsManager({
         ))}
       </nav>
 
-      <div className="flex min-w-0 flex-col gap-3">
-        {/* h-4 + gap-3 ≈ the nav's lg:pt-7, keeping rail and card tops level. */}
-        <div className="flex h-4 items-center justify-end">
+      <div className="flex min-w-0 flex-col gap-4">
+        {/* Section header: which group is open (the rail is far away on
+            phones), its one-line scope, and the autosave state on the right. */}
+        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
+          <div>
+            <h2 className="text-lg font-semibold">{activeSection.label}</h2>
+            <p className="text-xs text-fg/40">{activeSection.blurb}</p>
+          </div>
           <SaveStatus status={status} error={error} />
         </div>
 
-        {/* The group's cards use the whole content cell (#161): one column at
-            a comfortable width normally, flowing into two side-by-side columns
-            once the cell is wide enough that each column still gets ~500px+
+        {/* The group's cards use the whole content cell (#161) on a GRID: one
+            column normally, two side-by-side once the cell gives each ~500px+
             (container query, so the split follows the actual cell, not the
-            viewport). Card order within a group is meaningful — CSS columns
-            keep it, reading down the first column then the second. */}
+            viewport). A grid, not CSS columns (#134/#180): DOM order is
+            reading order — left-right, top-bottom — and a card growing
+            (enabling a feature) never re-positions its neighbors. items-start
+            keeps each card its own height; the whitespace beside a taller
+            card is the price of that predictability. */}
         <div className="@container">
-        <div className="gap-4 @5xl:columns-2">
+        <div className="grid grid-cols-1 items-start gap-4 @5xl:grid-cols-2">
         {section === "general" && (
-        <Section title="General">
-        <TextField
-          label="Page title"
-          value={settings.title}
-          onChange={(e) => setSettings({ ...settings, title: e.target.value })}
-        />
-        <IconField
-          label="Favicon (slug or image URL)"
-          name={settings.title || "favicon"}
-          value={settings.favicon}
-          onChange={(favicon) => setSettings({ ...settings, favicon })}
-        />
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-fg/50">Default time zone</span>
-          <input
-            list="settings-tz"
-            value={settings.timezone}
-            onChange={(e) =>
-              setSettings({ ...settings, timezone: e.target.value })
-            }
-            placeholder="Search a time zone…"
-            className={selectClass}
+        <Card title="Site">
+          <TextField
+            label="Page title"
+            value={settings.title}
+            onChange={(e) => setSettings({ ...settings, title: e.target.value })}
           />
-          <datalist id="settings-tz">
-            {zones.map((z) => (
-              <option key={z} value={z} />
-            ))}
-          </datalist>
-        </label>
-        </Section>
+          <IconField
+            label="Favicon (slug or image URL)"
+            name={settings.title || "favicon"}
+            value={settings.favicon}
+            onChange={(favicon) => setSettings({ ...settings, favicon })}
+          />
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-fg/50">Default time zone</span>
+            <input
+              list="settings-tz"
+              value={settings.timezone}
+              onChange={(e) =>
+                setSettings({ ...settings, timezone: e.target.value })
+              }
+              placeholder="Search a time zone…"
+              className={controlClasses}
+            />
+          </label>
+        </Card>
         )}
 
         {section === "general" && (
-        <Section
+        <Card
           title="Appearance"
           intro={
             <>
@@ -575,27 +616,24 @@ export default function SettingsManager({
             </>
           }
         >
+          <ControlRow label="Default mode">
+            <ChipGroup
+              label="Default mode"
+              capitalize
+              shrink
+              options={(["system", "light", "dark"] as const).map((m) => ({
+                value: m,
+                label: m,
+              }))}
+              value={theme.mode}
+              onChange={(mode) => updateTheme({ mode })}
+            />
+          </ControlRow>
 
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-sm text-fg/50">Default mode</span>
-          <ChipGroup
-            label="Default mode"
-            capitalize
-            options={(["system", "light", "dark"] as const).map((m) => ({
-              value: m,
-              label: m,
-            }))}
-            value={theme.mode}
-            onChange={(mode) => updateTheme({ mode })}
-          />
-        </div>
-
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-fg/50">Default theme</span>
-          <select
+          <SelectField
+            label="Default theme"
             value={theme.preset ?? ""}
             onChange={(e) => applyDefaultTheme(e.target.value)}
-            className={selectClass}
           >
             {!theme.preset && (
               <option value="" disabled>
@@ -607,15 +645,19 @@ export default function SettingsManager({
                 {p.name}
               </option>
             ))}
-          </select>
-        </label>
+          </SelectField>
 
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-fg/50">Light mode look</span>
-          <select
+          <SelectField
+            label="Light mode look"
             value={theme.presetLight ?? ""}
             onChange={(e) => applyLightDefault(e.target.value)}
-            className={selectClass}
+            hint={
+              <>
+                Give light mode its own design, scene &amp; colors — leave on{" "}
+                <span className="text-fg/60">Same as default</span> to mirror
+                the theme above.
+              </>
+            }
           >
             <option value="">Same as default</option>
             {themePacks.map((p) => (
@@ -623,24 +665,16 @@ export default function SettingsManager({
                 {p.name}
               </option>
             ))}
-          </select>
-          <span className="text-xs text-fg/40">
-            Give light mode its own design, scene &amp; colors — leave on{" "}
-            <span className="text-fg/60">Same as default</span> to mirror the
-            theme above.
-          </span>
-        </label>
+          </SelectField>
 
-        {/* Theme packs deliberately don't carry a font, so the default font is
-            its own control rather than part of the pack selects above. Each
-            option renders in its own face (every font is loaded up front in the
-            root layout, so the variables exist here too). */}
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-fg/50">Default font</span>
-          <select
+          {/* Theme packs deliberately don't carry a font, so the default font
+              is its own control rather than part of the pack selects above.
+              Each option renders in its own face (every font is loaded up
+              front in the root layout, so the variables exist here too). */}
+          <SelectField
+            label="Default font"
             value={theme.font}
             onChange={(e) => updateTheme({ font: e.target.value as FontId })}
-            className={selectClass}
             style={{ fontFamily: fontVar(theme.font) }}
           >
             {FONTS.map((f) => (
@@ -648,19 +682,16 @@ export default function SettingsManager({
                 {f.name}
               </option>
             ))}
-          </select>
-        </label>
+          </SelectField>
 
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-fg/50">Light mode font</span>
-          <select
+          <SelectField
+            label="Light mode font"
             value={theme.fontLight ?? ""}
             onChange={(e) =>
               updateTheme({
                 fontLight: (e.target.value || undefined) as FontId | undefined,
               })
             }
-            className={selectClass}
             style={
               theme.fontLight
                 ? { fontFamily: fontVar(theme.fontLight) }
@@ -673,112 +704,94 @@ export default function SettingsManager({
                 {f.name}
               </option>
             ))}
-          </select>
-        </label>
+          </SelectField>
 
-        {/* Preview of the default look's dark + light surfaces with the accent. */}
-        <div className="grid grid-cols-2 gap-2">
-          {(["dark", "light"] as const).map((m) => {
-            const bg =
-              m === "light"
-                ? theme.backgroundLight ?? "#eceef3"
-                : theme.background ?? "#06070d";
-            return (
-              <div
-                key={m}
-                className="flex h-12 items-end justify-start overflow-hidden rounded-lg p-1.5 ring-1 ring-fg/10"
-                style={{
-                  background: `radial-gradient(120% 100% at 50% -10%, ${theme.accentFrom}, transparent 60%), ${bg}`,
-                }}
-              >
-                <span className="rounded bg-black/20 px-1 text-[9px] text-white/80 capitalize">
-                  {m}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-        </Section>
+          {/* Preview of the default look's dark + light surfaces with the accent. */}
+          <div className="grid grid-cols-2 gap-2">
+            {(["dark", "light"] as const).map((m) => {
+              const bg =
+                m === "light"
+                  ? theme.backgroundLight ?? "#eceef3"
+                  : theme.background ?? "#06070d";
+              return (
+                <div
+                  key={m}
+                  className="flex h-12 items-end justify-start overflow-hidden rounded-lg p-1.5 ring-1 ring-fg/10"
+                  style={{
+                    background: `radial-gradient(120% 100% at 50% -10%, ${theme.accentFrom}, transparent 60%), ${bg}`,
+                  }}
+                >
+                  <span className="rounded bg-black/20 px-1 text-[9px] text-white/80 capitalize">
+                    {m}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
         )}
 
         {section === "layout" && (
-        <Section
+        <Card
           title="Visible widgets"
-          intro="Show or hide home-page widgets. Weather, the status row, and the calendar are toggled in the Widgets section; the split clock/weather/status widgets are managed in the home-page editor."
+          intro="Show or hide home-page widgets. Weather and the calendar are toggled under Widgets, the status row under Monitoring; the split clock/weather/status widgets are managed in the home-page editor."
         >
-        <div className="flex flex-col gap-2.5">
-          {widgetToggles.map((t) => (
-            <label
-              key={t.id}
-              className="flex items-center justify-between gap-4 text-sm"
-            >
-              <span className="text-fg/70">{t.label}</span>
-              <input
-                type="checkbox"
+          <div className="flex flex-col gap-2.5">
+            {widgetToggles.map((t) => (
+              <ToggleRow
+                key={t.id}
+                label={t.label}
                 checked={isWidgetShown(t.id)}
-                onChange={(e) => setWidgetShown(t.id, e.target.checked)}
+                onChange={(shown) => setWidgetShown(t.id, shown)}
               />
-            </label>
-          ))}
-          {componentToggles.map((t) => (
-            <label
-              key={t.key}
-              className="flex items-center justify-between gap-4 text-sm"
-            >
-              <span className="text-fg/70">{t.label}</span>
-              <input
-                type="checkbox"
+            ))}
+            {componentToggles.map((t) => (
+              <ToggleRow
+                key={t.key}
+                label={t.label}
                 checked={components[t.key]}
-                onChange={(e) => setComponent(t.key, e.target.checked)}
+                onChange={(value) => setComponent(t.key, value)}
               />
-            </label>
-          ))}
-        </div>
-        {!components.settingsButton && (
-          <p className="text-xs text-fg/40">
-            With the floating navigation menu off, reach this page directly at
-            /admin.
-          </p>
-        )}
-        </Section>
+            ))}
+          </div>
+          {!components.settingsButton && (
+            <Hint>
+              With the floating navigation menu off, reach this page directly at
+              /admin.
+            </Hint>
+          )}
+        </Card>
         )}
 
         {section === "layout" && (
-        <Section
+        <Card
           title="Arrangement"
           intro="Widgets are arranged directly on the home page: drag to reorder, resize by dragging a card's edges, and show or hide everything in place — including swapping the header card for the split clock, weather, and status widgets."
         >
-          <Link
-            href="/?edit=1"
-            className="inline-block rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10"
-          >
+          <Link href="/?edit=1" className={`${buttonClasses("ghost", "sm")} self-start`}>
             Arrange the home page
           </Link>
-        </Section>
+        </Card>
         )}
 
         {section === "widgets" && (
-        <Section title="Search engine">
-        <div className="flex flex-col gap-2">
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-fg/50">Search bar engine</span>
-            <select
-              value={settings.search.engine}
-              onChange={(e) =>
-                setSettings({
-                  ...settings,
-                  search: { ...settings.search, engine: e.target.value as SearchEngine },
-                })
-              }
-              className={selectClass}
-            >
-              {SEARCH_ENGINE_KEYS.map((key) => (
-                <option key={key} value={key}>
-                  {key === "custom" ? "Custom…" : SEARCH_ENGINES[key].label}
-                </option>
-              ))}
-            </select>
-          </label>
+        <Card title="Search engine">
+          <SelectField
+            label="Search bar engine"
+            value={settings.search.engine}
+            onChange={(e) =>
+              setSettings({
+                ...settings,
+                search: { ...settings.search, engine: e.target.value as SearchEngine },
+              })
+            }
+          >
+            {SEARCH_ENGINE_KEYS.map((key) => (
+              <option key={key} value={key}>
+                {key === "custom" ? "Custom…" : SEARCH_ENGINES[key].label}
+              </option>
+            ))}
+          </SelectField>
           {settings.search.engine === "custom" && (
             <TextField
               label="Custom search URL (use %s for the query)"
@@ -792,145 +805,130 @@ export default function SettingsManager({
               }
             />
           )}
-          <p className="text-xs text-fg/40">
+          <Hint>
             Pressing Enter in the search bar opens the top match, or searches
             here when nothing matches.
-          </p>
-        </div>
-        </Section>
+          </Hint>
+        </Card>
         )}
 
         {section === "widgets" && (
-        <Section title="Custom bangs">
-        <div className="flex flex-col gap-2">
-          <p className="-mt-1 text-xs text-fg/40">
-            Type <span className="text-fg/60">!key term</span> in the search bar
-            to jump to a site (use <span className="text-fg/60">%s</span> for the
-            term). Built-ins (<span className="text-fg/60">!yt</span>,{" "}
-            <span className="text-fg/60">!gh</span>,{" "}
-            <span className="text-fg/60">!w</span>…) plus your app names and
-            subtitles work already.
-          </p>
-          {bangs.map((b, i) => (
-            <div key={bangRows.keys[i] ?? i} className="flex items-center gap-2">
-              <span className="text-fg/40">!</span>
-              <input
-                value={b.key}
-                onChange={(e) =>
-                  updateBang(i, {
-                    key: e.target.value.replace(/[^a-z0-9]/gi, "").toLowerCase(),
-                  })
-                }
-                placeholder="key"
-                aria-label={`Bang ${i + 1} key`}
-                className={`${selectClass} w-24`}
-              />
-              <input
-                value={b.url}
-                onChange={(e) => updateBang(i, { url: e.target.value })}
-                placeholder="https://example.com/search?q=%s"
-                aria-label={`Bang ${i + 1} URL`}
-                className={`${selectClass} min-w-0 flex-1`}
-              />
-              <button
-                type="button"
-                onClick={() => bangRows.removeAt(i)}
-                aria-label={`Remove bang ${i + 1}`}
-                className="shrink-0 rounded-md px-2 py-1 text-fg/40 transition-colors hover:bg-fg/10 hover:text-red-400"
-              >
-                ✕
-              </button>
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={() => bangRows.add({ key: "", url: "" })}
-            className="self-start rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10"
-          >
-            + Add bang
-          </button>
-        </div>
-        </Section>
-        )}
-
-        {section === "widgets" && (
-        <Section title="Weather">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <span className="text-sm text-fg/70">Weather widget</span>
+        <Card
+          title="Custom bangs"
+          intro={
+            <>
+              Type <span className="text-fg/60">!key term</span> in the search
+              bar to jump to a site (use <span className="text-fg/60">%s</span>{" "}
+              for the term). Built-ins (<span className="text-fg/60">!yt</span>,{" "}
+              <span className="text-fg/60">!gh</span>,{" "}
+              <span className="text-fg/60">!w</span>…) plus your app names and
+              subtitles work already.
+            </>
+          }
+        >
+          <div className="flex flex-col gap-2">
+            {bangs.map((b, i) => (
+              <div key={bangRows.keys[i] ?? i} className="flex items-center gap-2">
+                <span className="text-fg/40">!</span>
+                <input
+                  value={b.key}
+                  onChange={(e) =>
+                    updateBang(i, {
+                      key: e.target.value.replace(/[^a-z0-9]/gi, "").toLowerCase(),
+                    })
+                  }
+                  placeholder="key"
+                  aria-label={`Bang ${i + 1} key`}
+                  className={`${controlClasses} w-24`}
+                />
+                <input
+                  value={b.url}
+                  onChange={(e) => updateBang(i, { url: e.target.value })}
+                  placeholder="https://example.com/search?q=%s"
+                  aria-label={`Bang ${i + 1} URL`}
+                  className={`${controlClasses} min-w-0 flex-1`}
+                />
+                <RemoveButton
+                  label={`Remove bang ${i + 1}`}
+                  onClick={() => bangRows.removeAt(i)}
+                />
+              </div>
+            ))}
+            <AddButton onClick={() => bangRows.add({ key: "", url: "" })}>
+              + Add bang
+            </AddButton>
           </div>
-          <label className="flex shrink-0 items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={settings.weather.enabled}
-              onChange={(e) =>
+        </Card>
+        )}
+
+        {section === "widgets" && (
+        <Card
+          title="Weather"
+          toggle={{
+            checked: settings.weather.enabled,
+            onChange: (enabled) =>
+              setSettings({
+                ...settings,
+                weather: { ...settings.weather, enabled },
+              }),
+          }}
+        >
+          <div className="flex flex-col gap-1.5">
+            <span className="text-sm text-fg/50">Default location</span>
+            <CitySearch
+              onSelect={(latitude, longitude) =>
                 setSettings({
                   ...settings,
-                  weather: { ...settings.weather, enabled: e.target.checked },
+                  weather: { ...settings.weather, latitude, longitude },
                 })
               }
             />
-            Enabled
-          </label>
-        </div>
+            <Hint>
+              Search a city to set the coordinates, or enter them manually.
+            </Hint>
+          </div>
 
-        <div className="flex flex-col gap-1.5">
-          <span className="text-sm text-fg/50">Default location</span>
-          <CitySearch
-            onSelect={(latitude, longitude) =>
-              setSettings({
-                ...settings,
-                weather: { ...settings.weather, latitude, longitude },
-              })
-            }
-          />
-          <p className="text-xs text-fg/40">
-            Search a city to set the coordinates, or enter them manually.
-          </p>
-        </div>
+          <div className="grid grid-cols-2 gap-4">
+            <TextField
+              label="Latitude"
+              type="number"
+              step="any"
+              min={-90}
+              max={90}
+              value={settings.weather.latitude}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                setSettings({
+                  ...settings,
+                  weather: {
+                    ...settings.weather,
+                    latitude: Number.isNaN(v) ? settings.weather.latitude : v,
+                  },
+                });
+              }}
+            />
+            <TextField
+              label="Longitude"
+              type="number"
+              step="any"
+              min={-180}
+              max={180}
+              value={settings.weather.longitude}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                setSettings({
+                  ...settings,
+                  weather: {
+                    ...settings.weather,
+                    longitude: Number.isNaN(v) ? settings.weather.longitude : v,
+                  },
+                });
+              }}
+            />
+          </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <TextField
-            label="Latitude"
-            type="number"
-            step="any"
-            min={-90}
-            max={90}
-            value={settings.weather.latitude}
-            onChange={(e) => {
-              const v = parseFloat(e.target.value);
-              setSettings({
-                ...settings,
-                weather: {
-                  ...settings.weather,
-                  latitude: Number.isNaN(v) ? settings.weather.latitude : v,
-                },
-              });
-            }}
-          />
-          <TextField
-            label="Longitude"
-            type="number"
-            step="any"
-            min={-180}
-            max={180}
-            value={settings.weather.longitude}
-            onChange={(e) => {
-              const v = parseFloat(e.target.value);
-              setSettings({
-                ...settings,
-                weather: {
-                  ...settings.weather,
-                  longitude: Number.isNaN(v) ? settings.weather.longitude : v,
-                },
-              });
-            }}
-          />
-        </div>
-
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-fg/50">Units</span>
-          <select
+          <SelectField
+            label="Units"
             value={settings.weather.units}
             onChange={(e) =>
               setSettings({
@@ -941,245 +939,177 @@ export default function SettingsManager({
                 },
               })
             }
-            className={selectClass}
           >
             <option value="imperial">Imperial (°F)</option>
             <option value="metric">Metric (°C)</option>
-          </select>
-        </label>
-        </Section>
+          </SelectField>
+        </Card>
         )}
 
         {section === "widgets" && (
-        <Section title="Calendar">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <span className="text-sm text-fg/70">Agenda widget</span>
-            <p className="text-xs text-fg/40">
-              Show upcoming events from a published iCal (.ics) URL — or a private
-              CalDAV/WebDAV calendar (e.g. a Nextcloud DAV URL) with credentials.
-            </p>
-          </div>
-          <label className="flex shrink-0 items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={calendar.enabled}
-              onChange={(e) => updateCalendar({ enabled: e.target.checked })}
-            />
-            Enabled
-          </label>
-        </div>
-
-        {calendar.enabled && (
-          <>
-            <TextField
-              label="Calendar URL (.ics or CalDAV/WebDAV)"
-              placeholder="https://calendar.google.com/…/basic.ics"
-              value={calendar.url}
-              onChange={(e) => updateCalendar({ url: e.target.value })}
-            />
-            <div className="grid grid-cols-2 gap-3">
+        <Card
+          title="Calendar"
+          intro="Show upcoming events from a published iCal (.ics) URL — or a private CalDAV/WebDAV calendar (e.g. a Nextcloud DAV URL) with credentials."
+          toggle={{
+            checked: calendar.enabled,
+            onChange: (enabled) => updateCalendar({ enabled }),
+          }}
+        >
+          {calendar.enabled && (
+            <>
               <TextField
-                label="Username (optional)"
-                autoComplete="off"
-                value={calendar.username}
-                onChange={(e) => updateCalendar({ username: e.target.value })}
+                label="Calendar URL (.ics or CalDAV/WebDAV)"
+                placeholder="https://calendar.google.com/…/basic.ics"
+                value={calendar.url}
+                onChange={(e) => updateCalendar({ url: e.target.value })}
               />
-              <TextField
-                label="Password (optional)"
-                type="password"
-                autoComplete="new-password"
-                value={calendar.password}
-                onChange={(e) => updateCalendar({ password: e.target.value })}
-              />
-            </div>
-            <label className="flex items-center justify-between gap-4 text-sm">
-              <span className="text-fg/50">
-                Home widget view
-                <span className="block text-xs text-fg/40">
-                  Agenda lists upcoming events; Month shows a mini calendar that
-                  links through. The /calendar page always opens on the month view.
-                </span>
-              </span>
-              <select
+              <div className="grid grid-cols-2 gap-3">
+                <TextField
+                  label="Username (optional)"
+                  autoComplete="off"
+                  value={calendar.username}
+                  onChange={(e) => updateCalendar({ username: e.target.value })}
+                />
+                <TextField
+                  label="Password (optional)"
+                  type="password"
+                  autoComplete="new-password"
+                  value={calendar.password}
+                  onChange={(e) => updateCalendar({ password: e.target.value })}
+                />
+              </div>
+              <SelectField
+                label="Home widget view"
                 value={calendar.homeView}
                 onChange={(e) =>
                   updateCalendar({
                     homeView: e.target.value as "agenda" | "month",
                   })
                 }
-                className={`${selectClass} shrink-0`}
+                hint="Agenda lists upcoming events; Month shows a mini calendar that links through. The /calendar page always opens on the month view."
               >
                 <option value="agenda">Agenda</option>
                 <option value="month">Month</option>
-              </select>
-            </label>
-            {calendar.homeView === "agenda" && (
-              <label className="flex items-center justify-between gap-4 text-sm">
-                <span className="text-fg/50">Events to show</span>
-                <input
-                  type="number"
+              </SelectField>
+              {calendar.homeView === "agenda" && (
+                <NumberRow
+                  label="Events to show"
                   min={1}
                   max={20}
                   value={calendar.count}
-                  onChange={(e) => {
-                    const v = parseInt(e.target.value, 10);
-                    updateCalendar({
-                      count: Number.isNaN(v) ? calendar.count : Math.min(20, Math.max(1, v)),
-                    });
-                  }}
-                  className={`${selectClass} w-20 text-center`}
+                  onChange={(count) => updateCalendar({ count })}
                 />
-              </label>
-            )}
-            <label className="flex items-center justify-between gap-4 text-sm">
-              <span className="text-fg/50">
-                Hide when no upcoming events
-                <span className="block text-xs text-fg/40">
-                  Drop the home-page card when the agenda is empty. The{" "}
-                  /calendar page is unaffected.
-                </span>
-              </span>
-              <input
-                type="checkbox"
-                className="shrink-0"
-                checked={calendar.hideWhenEmpty}
-                onChange={(e) =>
-                  updateCalendar({ hideWhenEmpty: e.target.checked })
-                }
-              />
-            </label>
-            <CalendarTest
-              url={calendar.url}
-              username={calendar.username}
-              password={calendar.password}
-            />
-            {calendar.username.trim() !== "" &&
-              /^http:\/\//i.test(calendar.url.trim()) && (
-                <p className="text-xs text-amber-400/80">
-                  This URL is plain http, so the credentials are sent in
-                  cleartext. Use https where possible.
-                </p>
               )}
-            <p className="text-xs text-fg/40">
-              For a private calendar, paste its CalDAV/WebDAV collection URL and
-              credentials (a Nextcloud app password is recommended); the events are
-              fetched server-side. The password can instead come from the
-              CTRLCENTER_CALDAV_PASS env var. Times show in each visitor&apos;s
-              time zone; repeating events expand for common rules
-              (daily/weekly/monthly).
-            </p>
-          </>
-        )}
-        </Section>
+              <ToggleRow
+                label="Hide when no upcoming events"
+                hint={
+                  <>
+                    Drop the home-page card when the agenda is empty. The{" "}
+                    /calendar page is unaffected.
+                  </>
+                }
+                checked={calendar.hideWhenEmpty}
+                onChange={(hideWhenEmpty) => updateCalendar({ hideWhenEmpty })}
+              />
+              <CalendarTest
+                url={calendar.url}
+                username={calendar.username}
+                password={calendar.password}
+              />
+              {calendar.username.trim() !== "" &&
+                /^http:\/\//i.test(calendar.url.trim()) && (
+                  <p className="text-xs text-amber-400/80">
+                    This URL is plain http, so the credentials are sent in
+                    cleartext. Use https where possible.
+                  </p>
+                )}
+              <Hint>
+                For a private calendar, paste its CalDAV/WebDAV collection URL
+                and credentials (a Nextcloud app password is recommended); the
+                events are fetched server-side. The password can instead come
+                from the CTRLCENTER_CALDAV_PASS env var. Times show in each
+                visitor&apos;s time zone; repeating events expand for common
+                rules (daily/weekly/monthly).
+              </Hint>
+            </>
+          )}
+        </Card>
         )}
 
         {section === "widgets" && (
-        <Section title="RSS feed">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <span className="text-sm text-fg/70">Feed widget</span>
-            <p className="text-xs text-fg/40">
-              Show the latest entries from one or more RSS or Atom feeds, merged
-              newest-first. Fetched server-side and cached for a few minutes.
-              Ships hidden — show the card in the home-page layout editor once
-              configured.
-            </p>
-          </div>
-          <label className="flex shrink-0 items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={feed.enabled}
-              onChange={(e) => updateFeed({ enabled: e.target.checked })}
-            />
-            Enabled
-          </label>
-        </div>
-
-        {feed.enabled && (
-          <>
-            <div className="flex flex-col gap-2">
-              <span className="text-sm text-fg/50">Feed URLs (RSS or Atom)</span>
-              {feed.urls.map((url, i) => (
-                <div
-                  key={feedUrlRows.keys[i] ?? i}
-                  className="flex flex-col gap-1.5"
-                >
-                  <div className="flex items-center gap-2">
-                    {feed.urls.length > 1 && (
-                      <MoveButtons
-                        index={i}
-                        count={feed.urls.length}
-                        label={`feed ${i + 1}`}
-                        onMove={feedUrlRows.move}
+        <Card
+          title="RSS feed"
+          intro="Show the latest entries from one or more RSS or Atom feeds, merged newest-first. Fetched server-side and cached for a few minutes. Ships hidden — show the card in the home-page layout editor once configured."
+          toggle={{
+            checked: feed.enabled,
+            onChange: (enabled) => updateFeed({ enabled }),
+          }}
+        >
+          {feed.enabled && (
+            <>
+              <div className="flex flex-col gap-2">
+                <span className="text-sm text-fg/50">Feed URLs (RSS or Atom)</span>
+                {feed.urls.map((url, i) => (
+                  <div
+                    key={feedUrlRows.keys[i] ?? i}
+                    className="flex flex-col gap-1.5"
+                  >
+                    <div className="flex items-center gap-2">
+                      {feed.urls.length > 1 && (
+                        <MoveButtons
+                          index={i}
+                          count={feed.urls.length}
+                          label={`feed ${i + 1}`}
+                          onMove={feedUrlRows.move}
+                        />
+                      )}
+                      <input
+                        value={url}
+                        onChange={(e) => updateFeedUrl(i, e.target.value)}
+                        placeholder="https://example.com/feed.xml"
+                        aria-label={`Feed ${i + 1} URL`}
+                        className={`${controlClasses} min-w-0 flex-1`}
                       />
-                    )}
-                    <input
-                      value={url}
-                      onChange={(e) => updateFeedUrl(i, e.target.value)}
-                      placeholder="https://example.com/feed.xml"
-                      aria-label={`Feed ${i + 1} URL`}
-                      className={`${selectClass} min-w-0 flex-1`}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => feedUrlRows.removeAt(i)}
-                      aria-label={`Remove feed ${i + 1}`}
-                      className="shrink-0 rounded-md px-2 py-1 text-fg/40 transition-colors hover:bg-fg/10 hover:text-red-400"
-                    >
-                      ✕
-                    </button>
+                      <RemoveButton
+                        label={`Remove feed ${i + 1}`}
+                        onClick={() => feedUrlRows.removeAt(i)}
+                      />
+                    </div>
+                    {url.trim() !== "" && <FeedTest url={url} />}
                   </div>
-                  {url.trim() !== "" && <FeedTest url={url} />}
-                </div>
-              ))}
-              {feed.urls.length < MAX_FEED_URLS && (
-                <button
-                  type="button"
-                  onClick={() => feedUrlRows.add("")}
-                  className="self-start rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10"
-                >
-                  + Add feed
-                </button>
-              )}
-            </div>
-            <TextField
-              label="Card title (optional — defaults to the first feed's own)"
-              placeholder=""
-              value={feed.title}
-              onChange={(e) => updateFeed({ title: e.target.value })}
-            />
-            <label className="flex items-center justify-between gap-4 text-sm">
-              <span className="text-fg/50">Entries to show</span>
-              <input
-                type="number"
+                ))}
+                {feed.urls.length < MAX_FEED_URLS && (
+                  <AddButton onClick={() => feedUrlRows.add("")}>
+                    + Add feed
+                  </AddButton>
+                )}
+              </div>
+              <TextField
+                label="Card title (optional — defaults to the first feed's own)"
+                placeholder=""
+                value={feed.title}
+                onChange={(e) => updateFeed({ title: e.target.value })}
+              />
+              <NumberRow
+                label="Entries to show"
                 min={1}
                 max={15}
                 value={feed.count}
-                onChange={(e) => {
-                  const v = parseInt(e.target.value, 10);
-                  updateFeed({
-                    count: Number.isNaN(v)
-                      ? feed.count
-                      : Math.min(15, Math.max(1, v)),
-                  });
-                }}
-                className={`${selectClass} w-20 text-center`}
+                onChange={(count) => updateFeed({ count })}
               />
-            </label>
-            <p className="text-xs text-fg/40">
-              With several feeds, each entry shows its source. The count caps the
-              combined list.
-            </p>
-          </>
-        )}
-        </Section>
+              <Hint>
+                With several feeds, each entry shows its source. The count caps
+                the combined list.
+              </Hint>
+            </>
+          )}
+        </Card>
         )}
 
         {section === "widgets" && (
-        <Section
+        <Card
           title="Notes"
-          intro="A free-form note card for the home page. Ships hidden — show it in the home-page layout editor (or the Layout section above) once there's something to say."
+          intro="A free-form note card for the home page. Ships hidden — show it in the home-page layout editor (or the Home layout section) once there's something to say."
         >
           <TextField
             label="Card title"
@@ -1187,27 +1117,25 @@ export default function SettingsManager({
             value={notes.title}
             onChange={(e) => updateNotes({ title: e.target.value })}
           />
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-fg/50">Note (markdown)</span>
-            <textarea
-              value={notes.content}
-              onChange={(e) => updateNotes({ content: e.target.value })}
-              rows={10}
-              placeholder={"# Homelab\n- Renew certs **June 12**\n- `docker compose pull` after backups"}
-              className="accent-focus rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 font-mono text-xs leading-relaxed text-fg placeholder-fg/30 outline-none transition-colors"
-            />
-          </label>
-          <p className="text-xs text-fg/40">
+          <TextArea
+            label="Note (markdown)"
+            mono
+            value={notes.content}
+            onChange={(e) => updateNotes({ content: e.target.value })}
+            rows={10}
+            placeholder={"# Homelab\n- Renew certs **June 12**\n- `docker compose pull` after backups"}
+          />
+          <Hint>
             Supports a safe markdown subset: # ## ### headings, **bold**,
             *italic*, `code`, [links](https://…) (http/https only), - and 1.
             lists, &gt; quotes, ``` code blocks and --- rules. Raw HTML is shown
             as plain text, never rendered.
-          </p>
-        </Section>
+          </Hint>
+        </Card>
         )}
 
         {section === "widgets" && (
-        <Section
+        <Card
           title="Countdown"
           intro="Labeled dates shown as “in N days” rows — renewals, birthdays, deadlines. Ships hidden — show the card in the home-page layout editor once dates are added."
         >
@@ -1234,42 +1162,34 @@ export default function SettingsManager({
                   onChange={(e) => updateCountdownItem(i, { label: e.target.value })}
                   placeholder="Renew domain"
                   aria-label={`Countdown ${i + 1} label`}
-                  className={`${selectClass} min-w-0 flex-1`}
+                  className={`${controlClasses} min-w-0 flex-1`}
                 />
                 <input
                   type="date"
                   value={item.date}
                   onChange={(e) => updateCountdownItem(i, { date: e.target.value })}
                   aria-label={`Countdown ${i + 1} date`}
-                  className={`${selectClass} shrink-0`}
+                  className={`${controlClasses} shrink-0`}
                 />
-                <button
-                  type="button"
+                <RemoveButton
+                  label={`Remove countdown ${i + 1}`}
                   onClick={() => countdownRows.removeAt(i)}
-                  aria-label={`Remove countdown ${i + 1}`}
-                  className="shrink-0 rounded-md px-2 py-1 text-fg/40 transition-colors hover:bg-fg/10 hover:text-red-400"
-                >
-                  ✕
-                </button>
+                />
               </div>
             ))}
-            <button
-              type="button"
-              onClick={() => countdownRows.add({ label: "", date: "" })}
-              className="self-start rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10"
-            >
+            <AddButton onClick={() => countdownRows.add({ label: "", date: "" })}>
               + Add date
-            </button>
+            </AddButton>
           </div>
-          <p className="text-xs text-fg/40">
+          <Hint>
             Days count in each visitor&apos;s own time zone. Past dates dim and
             sink below the upcoming ones.
-          </p>
-        </Section>
+          </Hint>
+        </Card>
         )}
 
         {section === "widgets" && (
-        <Section
+        <Card
           title="World clocks"
           intro="Live clocks for the time zones you follow. Ships hidden — show the card in the home-page layout editor once zones are added."
         >
@@ -1304,7 +1224,7 @@ export default function SettingsManager({
                   onChange={(e) => updateWorldClockItem(i, { label: e.target.value })}
                   placeholder="Label (optional)"
                   aria-label={`World clock ${i + 1} label`}
-                  className={`${selectClass} min-w-0 flex-1`}
+                  className={`${controlClasses} min-w-0 flex-1`}
                 />
                 <input
                   list="settings-tz"
@@ -1312,35 +1232,29 @@ export default function SettingsManager({
                   onChange={(e) => updateWorldClockItem(i, { timeZone: e.target.value })}
                   placeholder="Time zone…"
                   aria-label={`World clock ${i + 1} time zone`}
-                  className={`${selectClass} min-w-0 flex-1`}
+                  className={`${controlClasses} min-w-0 flex-1`}
                 />
-                <button
-                  type="button"
+                <RemoveButton
+                  label={`Remove world clock ${i + 1}`}
                   onClick={() => worldClockRows.removeAt(i)}
-                  aria-label={`Remove world clock ${i + 1}`}
-                  className="shrink-0 rounded-md px-2 py-1 text-fg/40 transition-colors hover:bg-fg/10 hover:text-red-400"
-                >
-                  ✕
-                </button>
+                />
               </div>
             ))}
-            <button
-              type="button"
+            <AddButton
               onClick={() => worldClockRows.add({ label: "", timeZone: "" })}
-              className="self-start rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10"
             >
               + Add time zone
-            </button>
+            </AddButton>
           </div>
-          <p className="text-xs text-fg/40">
+          <Hint>
             Each clock shows the current time in its own zone. Leave the label
             blank to use the zone&apos;s city name.
-          </p>
-        </Section>
+          </Hint>
+        </Card>
         )}
 
         {section === "widgets" && (
-        <Section
+        <Card
           title="System stats"
           intro="CPU, memory and disk usage of whatever runs the app. Ships hidden — show the card in the home-page layout editor. The card itself says whether it's measuring this container or the host machine."
         >
@@ -1375,315 +1289,216 @@ export default function SettingsManager({
                   onChange={(e) => updateStatDisk(i, { label: e.target.value })}
                   placeholder="Label (optional)"
                   aria-label={`Disk ${i + 1} label`}
-                  className={`${selectClass} min-w-0 flex-1`}
+                  className={`${controlClasses} min-w-0 flex-1`}
                 />
                 <input
                   value={disk.path}
                   onChange={(e) => updateStatDisk(i, { path: e.target.value })}
                   placeholder="/mnt/media"
                   aria-label={`Disk ${i + 1} path`}
-                  className={`${selectClass} min-w-0 flex-1`}
+                  className={`${controlClasses} min-w-0 flex-1`}
                 />
-                <button
-                  type="button"
+                <RemoveButton
+                  label={`Remove disk ${i + 1}`}
                   onClick={() => statDiskRows.removeAt(i)}
-                  aria-label={`Remove disk ${i + 1}`}
-                  className="shrink-0 rounded-md px-2 py-1 text-fg/40 transition-colors hover:bg-fg/10 hover:text-red-400"
-                >
-                  ✕
-                </button>
+                />
               </div>
             ))}
             {systemStats.disks.length < MAX_STAT_DISKS && (
-              <button
-                type="button"
-                onClick={() => statDiskRows.add({ label: "", path: "" })}
-                className="self-start rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10"
-              >
+              <AddButton onClick={() => statDiskRows.add({ label: "", path: "" })}>
                 + Add disk
-              </button>
+              </AddButton>
             )}
           </div>
-          <p className="text-xs text-fg/40">
+          <Hint>
             The data volume is always shown. A path here has to be mounted into
             the app&apos;s container to be measurable; a path that isn&apos;t is
             simply skipped.
-          </p>
-        </Section>
+          </Hint>
+        </Card>
         )}
 
-        {section === "widgets" && (
-        <Section title="Status">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <span className="text-sm text-fg/70">Service status indicators</span>
-            <p className="text-xs text-fg/40">
-              Show an online/offline dot on each app. The server pings every app
-              URL, so leave off if your apps aren&apos;t reachable from it.
-            </p>
-          </div>
-          <label className="flex shrink-0 items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={settings.statusChecks}
-              onChange={(e) =>
-                setSettings({ ...settings, statusChecks: e.target.checked })
-              }
-            />
-            Enabled
-          </label>
-        </div>
+        {section === "monitoring" && (
+        <Card
+          title="Status checks"
+          intro="Show an online/offline dot on each app and record its uptime. The server pings every app URL, so leave off if your apps aren't reachable from it."
+          toggle={{
+            checked: settings.statusChecks,
+            onChange: (statusChecks) =>
+              setSettings({ ...settings, statusChecks }),
+          }}
+        >
+          {settings.statusChecks && (
+            <>
+              {/* A hand-edited config value (the schema allows 1–60) matches
+                  no preset; `offLabel` surfaces it as a read-only chip so the
+                  control never reads as "nothing selected". */}
+              <ControlRow
+                label="Uptime check interval"
+                hint="How often the server records each app's up/down for the 90-day history on the status page."
+              >
+                <ChipGroup
+                  label="Uptime check interval"
+                  shrink
+                  options={INTERVAL_PRESETS.map((m) => ({
+                    value: m,
+                    label: `${m} min`,
+                  }))}
+                  value={settings.statusInterval}
+                  onChange={(m) => setSettings({ ...settings, statusInterval: m })}
+                  offLabel={(m) => `${m} min`}
+                />
+              </ControlRow>
 
-        {settings.statusChecks && (
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <span className="text-sm text-fg/70">Uptime check interval</span>
-              <p className="text-xs text-fg/40">
-                How often the server records each app&apos;s up/down for the
-                90-day history on the status page.
-              </p>
-            </div>
-            {/* A hand-edited config value (the schema allows 1–60) matches no
-                preset; `offLabel` surfaces it as a read-only chip so the control
-                never reads as "nothing selected". */}
-            <ChipGroup
-              label="Uptime check interval"
-              shrink
-              options={INTERVAL_PRESETS.map((m) => ({
-                value: m,
-                label: `${m} min`,
-              }))}
-              value={settings.statusInterval}
-              onChange={(m) => setSettings({ ...settings, statusInterval: m })}
-              offLabel={(m) => `${m} min`}
-            />
-          </div>
+              <ControlRow
+                label="Default status range"
+                hint="Which time range the status page opens on."
+              >
+                <ChipGroup
+                  label="Default status range"
+                  shrink
+                  options={STATUS_RANGES.map((r) => ({
+                    value: r.key,
+                    label: r.label,
+                  }))}
+                  value={settings.statusDefaultRange}
+                  onChange={(r) =>
+                    setSettings({ ...settings, statusDefaultRange: r })
+                  }
+                />
+              </ControlRow>
+            </>
+          )}
+        </Card>
         )}
 
-        {settings.statusChecks && (
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <span className="text-sm text-fg/70">Default status range</span>
-              <p className="text-xs text-fg/40">
-                Which time range the status page opens on.
-              </p>
-            </div>
-            <ChipGroup
-              label="Default status range"
-              shrink
-              options={STATUS_RANGES.map((r) => ({
-                value: r.key,
-                label: r.label,
-              }))}
-              value={settings.statusDefaultRange}
-              onChange={(r) =>
-                setSettings({ ...settings, statusDefaultRange: r })
-              }
-            />
-          </div>
-        )}
-        </Section>
-        )}
-
-        {section === "widgets" && (
-        <Section title="Alerts">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <span className="text-sm text-fg/70">Uptime alerts</span>
-            <p className="text-xs text-fg/40">
-              Notify a webhook and/or email when an app goes down or recovers.
-              Requires service status indicators (the{" "}
-              <span className="text-fg/60">Status</span> card) to be on.
-            </p>
-          </div>
-          <label className="flex shrink-0 items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={alerts.enabled}
-              onChange={(e) => updateAlerts({ enabled: e.target.checked })}
-            />
-            Enabled
-          </label>
-        </div>
-
-        {alerts.enabled && (
-          <>
-            <label className="flex items-center justify-between text-sm">
-              <span className="text-fg/50">Notify on recovery</span>
-              <input
-                type="checkbox"
+        {section === "monitoring" && (
+        <Card
+          title="Alerts"
+          intro="Notify a webhook and/or email when an app goes down or recovers. Requires the status checks to be on."
+          toggle={{
+            checked: alerts.enabled,
+            onChange: (enabled) => updateAlerts({ enabled }),
+          }}
+        >
+          {alerts.enabled && (
+            <>
+              <ToggleRow
+                label="Notify on recovery"
                 checked={alerts.notifyOnRecovery}
-                onChange={(e) => updateAlerts({ notifyOnRecovery: e.target.checked })}
+                onChange={(notifyOnRecovery) =>
+                  updateAlerts({ notifyOnRecovery })
+                }
               />
-            </label>
 
-            <label className="flex items-center justify-between gap-4 text-sm">
-              <span className="text-fg/50">
-                Confirmations before down
-                <span className="block text-xs text-fg/40">
-                  Consecutive failed checks required first.
-                </span>
-              </span>
-              <input
-                type="number"
+              <NumberRow
+                label="Confirmations before down"
+                hint="Consecutive failed checks required first."
                 min={1}
                 max={10}
                 value={alerts.confirmations}
-                onChange={(e) => {
-                  const v = parseInt(e.target.value, 10);
-                  updateAlerts({
-                    confirmations: Number.isNaN(v)
-                      ? alerts.confirmations
-                      : Math.min(10, Math.max(1, v)),
-                  });
-                }}
-                className={`${selectClass} w-20 text-center`}
+                onChange={(confirmations) => updateAlerts({ confirmations })}
               />
-            </label>
 
-            {/* Two independent channels, each with its own toggle — enable
-                either, both, or neither. */}
-            <div className="mt-1 flex flex-col gap-3 border-t border-fg/10 pt-4">
-              <label className="flex items-start justify-between gap-4 text-sm">
-                <span className="text-fg/50">
-                  Webhook
-                  <span className="block text-xs text-fg/40">
-                    Post to a generic JSON endpoint, Discord, Slack, or ntfy.
-                  </span>
-                </span>
-                <input
-                  type="checkbox"
-                  className="mt-0.5 shrink-0"
+              {/* Two independent channels, each with its own toggle — enable
+                  either, both, or neither. */}
+              <div className="mt-1 flex flex-col gap-3 border-t border-fg/10 pt-4">
+                <ToggleRow
+                  label="Webhook"
+                  hint="Post to a generic JSON endpoint, Discord, Slack, or ntfy."
                   checked={alerts.webhookEnabled}
-                  onChange={(e) =>
-                    updateAlerts({ webhookEnabled: e.target.checked })
+                  onChange={(webhookEnabled) =>
+                    updateAlerts({ webhookEnabled })
                   }
                 />
-              </label>
-              {alerts.webhookEnabled && (
-                <div className="flex flex-col gap-3">
-                  <label className="flex flex-col gap-1 text-sm">
-                    <span className="text-fg/50">Notify via</span>
-                    <select
+                {alerts.webhookEnabled && (
+                  <div className="flex flex-col gap-3">
+                    <SelectField
+                      label="Notify via"
                       value={alerts.type}
                       onChange={(e) =>
                         updateAlerts({
                           type: e.target.value as Settings["alerts"]["type"],
                         })
                       }
-                      className={selectClass}
                     >
                       {ALERT_TYPES.map((t) => (
                         <option key={t} value={t}>
                           {alertTypeLabel[t]}
                         </option>
                       ))}
-                    </select>
-                  </label>
-                  <TextField
-                    label="Webhook URL"
-                    placeholder={alertUrlPlaceholder[alerts.type]}
-                    value={alerts.webhookUrl}
-                    onChange={(e) => updateAlerts({ webhookUrl: e.target.value })}
-                  />
-                </div>
-              )}
-            </div>
+                    </SelectField>
+                    <TextField
+                      label="Webhook URL"
+                      placeholder={alertUrlPlaceholder[alerts.type]}
+                      value={alerts.webhookUrl}
+                      onChange={(e) => updateAlerts({ webhookUrl: e.target.value })}
+                    />
+                  </div>
+                )}
+              </div>
 
-            <div className="flex flex-col gap-3 border-t border-fg/10 pt-4">
-              <label className="flex items-start justify-between gap-4 text-sm">
-                <span className="text-fg/50">
-                  Email (SMTP)
-                  <span className="block text-xs text-fg/40">
-                    Optional — email on down/recovery, independent of the webhook.
-                    Works with any SMTP service (SMTP2GO, Gmail, Fastmail, a relay).
-                  </span>
-                </span>
-                <input
-                  type="checkbox"
-                  className="mt-0.5 shrink-0"
+              <div className="flex flex-col gap-3 border-t border-fg/10 pt-4">
+                <ToggleRow
+                  label="Email (SMTP)"
+                  hint="Optional — email on down/recovery, independent of the webhook. Works with any SMTP service (SMTP2GO, Gmail, Fastmail, a relay)."
                   checked={alerts.email.enabled}
-                  onChange={(e) => updateAlertEmail({ enabled: e.target.checked })}
+                  onChange={(enabled) => updateAlertEmail({ enabled })}
                 />
-              </label>
 
-              {alerts.email.enabled && (
-                <div className="flex flex-col gap-3">
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="col-span-2">
-                      <TextField
-                        label="SMTP host"
-                        placeholder="mail.smtp2go.com"
-                        value={alerts.email.host}
-                        onChange={(e) => updateAlertEmail({ host: e.target.value })}
-                      />
-                    </div>
-                    <label className="flex flex-col gap-1 text-sm">
-                      <span className="text-fg/50">Port</span>
-                      <input
-                        type="number"
+                {alerts.email.enabled && (
+                  <div className="flex flex-col gap-3">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="col-span-2">
+                        <TextField
+                          label="SMTP host"
+                          placeholder="mail.smtp2go.com"
+                          value={alerts.email.host}
+                          onChange={(e) => updateAlertEmail({ host: e.target.value })}
+                        />
+                      </div>
+                      <NumberField
+                        label="Port"
                         min={1}
                         max={65535}
                         value={alerts.email.port}
-                        onChange={(e) => {
-                          const v = parseInt(e.target.value, 10);
-                          updateAlertEmail({
-                            port: Number.isNaN(v)
-                              ? alerts.email.port
-                              : Math.min(65535, Math.max(1, v)),
-                          });
-                        }}
-                        className={selectClass}
+                        onChange={(port) => updateAlertEmail({ port })}
                       />
-                    </label>
-                  </div>
+                    </div>
 
-                  <label className="flex items-center justify-between text-sm">
-                    <span className="text-fg/50">
-                      Implicit TLS (port 465)
-                      <span className="block text-xs text-fg/40">
-                        Leave off for 587/STARTTLS.
-                      </span>
-                    </span>
-                    <input
-                      type="checkbox"
+                    <ToggleRow
+                      label="Implicit TLS (port 465)"
+                      hint="Leave off for 587/STARTTLS."
                       checked={alerts.email.secure}
-                      onChange={(e) => updateAlertEmail({ secure: e.target.checked })}
+                      onChange={(secure) => updateAlertEmail({ secure })}
                     />
-                  </label>
 
-                  <TextField
-                    label="Username"
-                    autoComplete="off"
-                    value={alerts.email.user}
-                    onChange={(e) => updateAlertEmail({ user: e.target.value })}
-                  />
-                  <div>
+                    <TextField
+                      label="Username"
+                      autoComplete="off"
+                      value={alerts.email.user}
+                      onChange={(e) => updateAlertEmail({ user: e.target.value })}
+                    />
                     <TextField
                       label="Password"
                       type="password"
                       autoComplete="new-password"
                       value={alerts.email.pass}
                       onChange={(e) => updateAlertEmail({ pass: e.target.value })}
+                      hint="Stored in config.yaml. Set the CTRLCENTER_SMTP_PASS env var to keep it out of the file instead."
                     />
-                    <p className="mt-1 text-xs text-fg/40">
-                      Stored in config.yaml. Set the CTRLCENTER_SMTP_PASS env var
-                      to keep it out of the file instead.
-                    </p>
-                  </div>
-                  <TextField
-                    label="From address"
-                    placeholder="ctrlcenter@yourdomain.com"
-                    value={alerts.email.from}
-                    onChange={(e) => updateAlertEmail({ from: e.target.value })}
-                  />
-                  <TextField
-                    label="To address"
-                    placeholder="you@example.com"
-                    value={alerts.email.to}
-                    onChange={(e) => updateAlertEmail({ to: e.target.value })}
-                  />
-                  <div>
+                    <TextField
+                      label="From address"
+                      placeholder="ctrlcenter@yourdomain.com"
+                      value={alerts.email.from}
+                      onChange={(e) => updateAlertEmail({ from: e.target.value })}
+                    />
+                    <TextField
+                      label="To address"
+                      placeholder="you@example.com"
+                      value={alerts.email.to}
+                      onChange={(e) => updateAlertEmail({ to: e.target.value })}
+                    />
                     <TextField
                       label="Subject"
                       placeholder="{service} is {status}"
@@ -1691,251 +1506,205 @@ export default function SettingsManager({
                       onChange={(e) =>
                         updateAlertEmail({ subject: e.target.value })
                       }
+                      hint={
+                        <>
+                          Variables: <code>{"{service}"}</code> and{" "}
+                          <code>{"{status}"}</code> (down/up). Blank uses the
+                          default.
+                        </>
+                      }
                     />
-                    <p className="mt-1 text-xs text-fg/40">
-                      Variables: <code>{"{service}"}</code> and{" "}
-                      <code>{"{status}"}</code> (down/up). Blank uses the default.
-                    </p>
+                    {!(
+                      alerts.email.host.trim() &&
+                      alerts.email.from.trim() &&
+                      alerts.email.to.trim()
+                    ) && (
+                      <p className="text-xs text-amber-400/80">
+                        Add an SMTP host and from/to addresses to start sending —
+                        email stays off until then.
+                      </p>
+                    )}
                   </div>
-                  {!(
-                    alerts.email.host.trim() &&
-                    alerts.email.from.trim() &&
-                    alerts.email.to.trim()
-                  ) && (
-                    <p className="text-xs text-amber-400/80">
-                      Add an SMTP host and from/to addresses to start sending —
-                      email stays off until then.
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
+                )}
+              </div>
 
-            <div className="border-t border-fg/10 pt-4">
-              <AlertTest
-                webhookConfigured={
-                  alerts.webhookEnabled && alerts.webhookUrl.trim() !== ""
-                }
-                emailConfigured={
-                  alerts.email.enabled &&
-                  alerts.email.host.trim() !== "" &&
-                  alerts.email.from.trim() !== "" &&
-                  alerts.email.to.trim() !== ""
-                }
-              />
-            </div>
-          </>
-        )}
-        </Section>
-        )}
-
-        {section === "widgets" && (
-        <Section
-          title="Announcements"
-          intro="Maintenance windows and upcoming changes, posted on the status page. An entry with a start time in the future shows as scheduled; once its end time passes it stops showing. Independent of the status checks above — a notice appears even with checks off."
-        >
-        <div className="flex flex-col gap-3">
-          {statusAnnouncements.length === 0 && (
-            <p className="-mt-1 text-xs text-fg/40">
-              No announcements yet. Add one to post a maintenance window or
-              notice on the status page.
-            </p>
-          )}
-          {statusAnnouncements.map((a, i) => {
-            const state = announcementState(a, now);
-            return (
-              <div
-                key={a.id}
-                className="flex flex-col gap-3 rounded-xl border border-fg/10 bg-fg/[0.03] p-4"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-fg/60">
-                      Announcement {i + 1}
-                    </span>
-                    <span className="rounded-full bg-fg/10 px-2 py-0.5 text-[0.7rem] font-medium text-fg/60">
-                      {STATUS_STATE_LABELS[state]}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removeStatusAnnouncement(i)}
-                    aria-label={`Remove announcement ${i + 1}`}
-                    className="shrink-0 rounded-md px-2 py-1 text-fg/40 transition-colors hover:bg-fg/10 hover:text-red-400"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <TextField
-                  label="Title"
-                  value={a.title}
-                  onChange={(e) =>
-                    updateStatusAnnouncement(i, { title: e.target.value })
+              <div className="border-t border-fg/10 pt-4">
+                <AlertTest
+                  webhookConfigured={
+                    alerts.webhookEnabled && alerts.webhookUrl.trim() !== ""
+                  }
+                  emailConfigured={
+                    alerts.email.enabled &&
+                    alerts.email.host.trim() !== "" &&
+                    alerts.email.from.trim() !== "" &&
+                    alerts.email.to.trim() !== ""
                   }
                 />
+              </div>
+            </>
+          )}
+        </Card>
+        )}
 
-                <label className="flex flex-col gap-1 text-sm">
-                  <span className="text-fg/50">Message</span>
-                  <textarea
+        {section === "announcements" && (
+        <Card
+          title="Site-wide banner"
+          intro="A banner across the top of every page — maintenance windows, notices, a heads-up for the household. Turn it on, write the message, and it shows site-wide until you turn it off."
+          toggle={{
+            checked: announcement.enabled,
+            onChange: (enabled) => updateAnnouncement({ enabled }),
+          }}
+        >
+          <TextArea
+            label="Message"
+            value={announcement.message}
+            onChange={(e) => updateAnnouncement({ message: e.target.value })}
+            rows={3}
+            placeholder={"**Maintenance tonight** 10–11pm — [status](https://…)"}
+            hint="Supports inline **bold**, *italic*, `code` and [links](https://…) (http/https only). Raw HTML is shown as plain text, never rendered."
+          />
+
+          <SelectField
+            label="Tone"
+            value={announcement.tone}
+            onChange={(e) =>
+              updateAnnouncement({
+                tone: e.target.value as Settings["announcement"]["tone"],
+              })
+            }
+          >
+            {ANNOUNCEMENT_TONES.map((t) => (
+              <option key={t} value={t}>
+                {TONE_LABELS[t]}
+              </option>
+            ))}
+          </SelectField>
+
+          <ToggleRow
+            label="Dismissible"
+            hint="Let visitors close it; it returns if you change the message."
+            checked={announcement.dismissible}
+            onChange={(dismissible) => updateAnnouncement({ dismissible })}
+          />
+        </Card>
+        )}
+
+        {section === "announcements" && (
+        <Card
+          title="Status page announcements"
+          intro="Maintenance windows and upcoming changes, posted on the status page. An entry with a start time in the future shows as scheduled; once its end time passes it stops showing. Independent of the status checks — a notice appears even with checks off."
+        >
+          <div className="flex flex-col gap-3">
+            {statusAnnouncements.length === 0 && (
+              <Hint>
+                No announcements yet. Add one to post a maintenance window or
+                notice on the status page.
+              </Hint>
+            )}
+            {statusAnnouncements.map((a, i) => {
+              const state = announcementState(a, now);
+              return (
+                <div
+                  key={a.id}
+                  className={`${subCardClasses} flex flex-col gap-3 p-4`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-fg/60">
+                        Announcement {i + 1}
+                      </span>
+                      <span className="rounded-full bg-fg/10 px-2 py-0.5 text-[0.7rem] font-medium text-fg/60">
+                        {STATUS_STATE_LABELS[state]}
+                      </span>
+                    </div>
+                    <RemoveButton
+                      label={`Remove announcement ${i + 1}`}
+                      onClick={() => removeStatusAnnouncement(i)}
+                    />
+                  </div>
+
+                  <TextField
+                    label="Title"
+                    value={a.title}
+                    onChange={(e) =>
+                      updateStatusAnnouncement(i, { title: e.target.value })
+                    }
+                  />
+
+                  <TextArea
+                    label="Message"
                     value={a.body}
                     onChange={(e) =>
                       updateStatusAnnouncement(i, { body: e.target.value })
                     }
                     rows={2}
                     placeholder={"Upgrading the NAS 10–11pm — some services may blip. [details](https://…)"}
-                    className="accent-focus rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-sm leading-relaxed text-fg placeholder-fg/30 outline-none transition-colors"
+                    hint="Supports inline **bold**, *italic*, `code` and [links](https://…) (http/https only). Raw HTML is shown as plain text."
                   />
-                  <span className="text-xs text-fg/40">
-                    Supports inline **bold**, *italic*, `code` and
-                    [links](https://…) (http/https only). Raw HTML is shown as
-                    plain text.
-                  </span>
-                </label>
 
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-sm text-fg/50">Kind</span>
-                  <ChipGroup
-                    label="Announcement kind"
-                    equal
-                    options={STATUS_ANNOUNCEMENT_KINDS.map((k) => ({
-                      value: k,
-                      label: STATUS_ANNOUNCEMENT_KIND_META[k].label,
-                    }))}
-                    value={a.kind}
-                    onChange={(kind) => updateStatusAnnouncement(i, { kind })}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="flex flex-col gap-1 text-sm">
-                    <span className="text-fg/50">Starts (optional)</span>
-                    <input
-                      type="datetime-local"
-                      value={isoToLocalInput(a.startsAt)}
-                      onChange={(e) =>
-                        updateStatusAnnouncement(i, {
-                          startsAt: localInputToIso(e.target.value),
-                        })
-                      }
-                      className={selectClass}
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-sm text-fg/50">Kind</span>
+                    <ChipGroup
+                      label="Announcement kind"
+                      equal
+                      options={STATUS_ANNOUNCEMENT_KINDS.map((k) => ({
+                        value: k,
+                        label: STATUS_ANNOUNCEMENT_KIND_META[k].label,
+                      }))}
+                      value={a.kind}
+                      onChange={(kind) => updateStatusAnnouncement(i, { kind })}
                     />
-                  </label>
-                  <label className="flex flex-col gap-1 text-sm">
-                    <span className="text-fg/50">Ends (optional)</span>
-                    <input
-                      type="datetime-local"
-                      value={isoToLocalInput(a.endsAt)}
-                      onChange={(e) =>
-                        updateStatusAnnouncement(i, {
-                          endsAt: localInputToIso(e.target.value),
-                        })
-                      }
-                      className={selectClass}
-                    />
-                  </label>
-                </div>
-              </div>
-            );
-          })}
-          <button
-            type="button"
-            onClick={addStatusAnnouncement}
-            className="self-start rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10"
-          >
-            + Add announcement
-          </button>
-        </div>
-        <p className="text-xs text-fg/40">
-          Leave both times empty to show a notice until you remove it. Times use
-          this browser&apos;s time zone; visitors see them in their own.
-        </p>
-        </Section>
-        )}
+                  </div>
 
-        {section === "announcement" && (
-        <Section
-          title="Announcement"
-          intro="A banner across the top of every page — maintenance windows, notices, a heads-up for the household. Turn it on, write the message, and it shows site-wide until you turn it off."
-        >
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <span className="text-sm text-fg/70">Show the banner</span>
-              <p className="text-xs text-fg/40">
-                Appears at the top of every page while enabled.
-              </p>
-            </div>
-            <label className="flex shrink-0 items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={announcement.enabled}
-                onChange={(e) =>
-                  updateAnnouncement({ enabled: e.target.checked })
-                }
-              />
-              Enabled
-            </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="flex flex-col gap-1 text-sm">
+                      <span className="text-fg/50">Starts (optional)</span>
+                      <input
+                        type="datetime-local"
+                        value={isoToLocalInput(a.startsAt)}
+                        onChange={(e) =>
+                          updateStatusAnnouncement(i, {
+                            startsAt: localInputToIso(e.target.value),
+                          })
+                        }
+                        className={controlClasses}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-sm">
+                      <span className="text-fg/50">Ends (optional)</span>
+                      <input
+                        type="datetime-local"
+                        value={isoToLocalInput(a.endsAt)}
+                        onChange={(e) =>
+                          updateStatusAnnouncement(i, {
+                            endsAt: localInputToIso(e.target.value),
+                          })
+                        }
+                        className={controlClasses}
+                      />
+                    </label>
+                  </div>
+                </div>
+              );
+            })}
+            <AddButton onClick={addStatusAnnouncement}>
+              + Add announcement
+            </AddButton>
           </div>
-
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-fg/50">Message</span>
-            <textarea
-              value={announcement.message}
-              onChange={(e) => updateAnnouncement({ message: e.target.value })}
-              rows={3}
-              placeholder={"**Maintenance tonight** 10–11pm — [status](https://…)"}
-              className="accent-focus rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-sm leading-relaxed text-fg placeholder-fg/30 outline-none transition-colors"
-            />
-          </label>
-          <p className="text-xs text-fg/40">
-            Supports inline **bold**, *italic*, `code` and [links](https://…)
-            (http/https only). Raw HTML is shown as plain text, never rendered.
-          </p>
-
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-fg/50">Tone</span>
-            <select
-              value={announcement.tone}
-              onChange={(e) =>
-                updateAnnouncement({
-                  tone: e.target.value as Settings["announcement"]["tone"],
-                })
-              }
-              className={selectClass}
-            >
-              {ANNOUNCEMENT_TONES.map((t) => (
-                <option key={t} value={t}>
-                  {TONE_LABELS[t]}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="flex items-center justify-between gap-4 text-sm">
-            <div>
-              <span className="text-fg/70">Dismissible</span>
-              <p className="text-xs text-fg/40">
-                Let visitors close it; it returns if you change the message.
-              </p>
-            </div>
-            <input
-              type="checkbox"
-              checked={announcement.dismissible}
-              onChange={(e) =>
-                updateAnnouncement({ dismissible: e.target.checked })
-              }
-            />
-          </label>
-        </Section>
+          <Hint>
+            Leave both times empty to show a notice until you remove it. Times
+            use this browser&apos;s time zone; visitors see them in their own.
+          </Hint>
+        </Card>
         )}
 
         {section === "security" && (
-        <Section
-          title="Security"
+        <Card
+          title="Password"
           intro="The password used to sign in to this admin portal."
         >
           <ChangePassword />
-        </Section>
+        </Card>
         )}
         </div>
         </div>

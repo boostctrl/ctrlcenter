@@ -484,7 +484,7 @@ export default async function HelpPage() {
             <P>
               A banner across the top of every page for notices, maintenance
               windows, or a heads-up for the household. Turn it on in{" "}
-              <strong>Settings → Announcement</strong> and write the message
+              <strong>Settings → Announcements</strong> and write the message
               using inline <strong>bold</strong>, <em>italic</em> and{" "}
               <span className="underline underline-offset-2">links</span>{" "}
               (http/https only; raw HTML is never rendered). Pick a tone — info,
@@ -498,7 +498,7 @@ export default async function HelpPage() {
             <P>
               Tell your household about maintenance and upcoming changes right on
               the <A href="/status">status page</A>, separate from the site-wide
-              banner. In <strong>Settings → Widgets → Announcements</strong>{" "}
+              banner. In <strong>Settings → Announcements</strong>{" "}
               add an entry with a kind (maintenance, incident, or notice — it
               tints the card), a title, and a message in the same inline markdown
               subset. An optional start and end schedule it: an entry with a

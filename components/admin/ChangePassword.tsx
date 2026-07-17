@@ -66,13 +66,14 @@ export default function ChangePassword() {
           environment variable is used.
         </p>
       </div>
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        className="shrink-0"
         onClick={() => setOpen(true)}
-        className="shrink-0 rounded-lg border border-fg/10 bg-fg/5 px-4 py-2 text-sm text-fg/80 transition-colors hover:bg-fg/10"
       >
         Reset password
-      </button>
+      </Button>
 
       {open && (
         <div

@@ -6,12 +6,21 @@
 
 export type ButtonVariant = "primary" | "ghost" | "danger";
 
-export function buttonClasses(variant: ButtonVariant = "primary"): string {
+// "md" is the standalone button; "sm" is the compact in-card action (the
+// "+ Add …" rows and card-level links), sized to sit inside a form flow
+// rather than end one.
+export type ButtonSize = "md" | "sm";
+
+export function buttonClasses(
+  variant: ButtonVariant = "primary",
+  size: ButtonSize = "md"
+): string {
   // Rounding comes from the active design's --control-radius token (see
   // app/globals.css) so button corners follow the design's personality —
   // square on Bold, pills on Soft — independent of the card radius.
-  const base =
-    "rounded-[var(--control-radius)] px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+  const geometry =
+    size === "sm" ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm font-medium";
+  const base = `rounded-[var(--control-radius)] ${geometry} transition-colors disabled:opacity-50 disabled:cursor-not-allowed`;
   const variants: Record<ButtonVariant, string> = {
     primary: "btn-accent",
     ghost: "border border-fg/10 bg-fg/5 text-fg/80 hover:bg-fg/10",
