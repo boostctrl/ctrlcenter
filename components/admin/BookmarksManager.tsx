@@ -234,7 +234,7 @@ export default function BookmarksManager({
   } = useReorder(orderedCategories, persistCategoryOrder);
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1fr_minmax(320px,380px)]">
+    <div className="grid gap-8 lg:grid-cols-[1fr_minmax(320px,380px)] xl:grid-cols-[1fr_minmax(360px,440px)]">
       <div className="space-y-6">
         {bookmarks.length === 0 && (
           <p className="text-sm text-fg/40">No bookmarks yet. Add your first one.</p>

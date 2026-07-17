@@ -12,6 +12,14 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **The Add bookmark and Add application forms get more room on wide
+  screens.** On the full-width admin page the form card no longer stays
+  pinned at its narrow width; on displays 1280px and wider it grows a little
+  so fields like URL have more breathing room. Smaller screens keep the
+  previous size. (#161)
+
 ## [2.0.0] - 2026-07-16
 
 ### Changed

@@ -189,7 +189,7 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
   );
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1fr_minmax(320px,380px)]">
+    <div className="grid gap-8 lg:grid-cols-[1fr_minmax(320px,380px)] xl:grid-cols-[1fr_minmax(360px,440px)]">
       <div className="space-y-3">
         {apps.length === 0 && (
           <p className="text-sm text-fg/40">No applications yet. Add your first one.</p>
