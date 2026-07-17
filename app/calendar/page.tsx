@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getSettings } from "@/lib/config";
 import { fetchCalendar, fetchCalendarRange } from "@/lib/calendar";
 import CalendarView from "@/components/CalendarView";
-import BackHome from "@/components/BackHome";
+import PageNav from "@/components/PageNav";
 import FloatingNav from "@/components/FloatingNav";
 import { navPages } from "@/lib/nav";
 
@@ -36,7 +36,7 @@ export default async function CalendarPage() {
     <>
       <main className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 py-12 sm:px-10 lg:py-16">
         <div>
-          <BackHome />
+          <PageNav current="calendar" {...navPages(settings)} />
           <h1 className="mt-3 text-3xl font-bold">Calendar</h1>
         </div>
 

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { readPublicConfig } from "@/lib/api-auth";
 import StatusDetail from "@/components/StatusDetail";
+import PageNav from "@/components/PageNav";
 import FloatingNav from "@/components/FloatingNav";
 import { navPages } from "@/lib/nav";
 
@@ -35,12 +36,10 @@ export default async function StatusDetailRoute({ params }: Params) {
     <>
       <main className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 py-12 sm:px-10 lg:py-16">
         <div>
-          <Link
-            href="/status"
-            className="text-sm text-fg/50 transition-colors hover:text-fg/80"
-          >
-            Status
-          </Link>
+          {/* The strip's emphasized (unlinked) Status entry would strand a
+              detail page without a way back up, so here — one level below a
+              listed page — it stays a link and nothing is current. */}
+          <PageNav current={null} {...navPages(settings)} />
           <h1 className="mt-3 text-3xl font-bold">{app.name}</h1>
         </div>
 

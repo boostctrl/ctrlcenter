@@ -1,11 +1,19 @@
 import Link from "next/link";
 
-// The standard "return to the dashboard" control. Every page outside the home
-// dashboard (settings, weather, status, admin, login) renders this same one so
-// the affordance — icon, label, hover treatment — is identical everywhere and
-// no page is left without a way home. The arrow is a drawn glyph (not the "←"
-// character) so it renders the same under every selectable font.
-export default function BackHome({ className = "" }: { className?: string }) {
+// The standard "return to the dashboard" control. It leads the PageNav strip
+// on every page outside the home dashboard (label "Dashboard" there), and
+// stands alone on the admin login screen — an auth gate wants a way out, not
+// a menu — so the affordance — icon, label, hover treatment — is identical
+// everywhere and no page is left without a way home. The arrow is a drawn
+// glyph (not the "←" character) so it renders the same under every selectable
+// font.
+export default function BackHome({
+  className = "",
+  label = "Back to dashboard",
+}: {
+  className?: string;
+  label?: string;
+}) {
   return (
     <Link
       href="/"
@@ -25,7 +33,7 @@ export default function BackHome({ className = "" }: { className?: string }) {
         <path d="M19 12H5" />
         <path d="m12 19-7-7 7-7" />
       </svg>
-      Back to dashboard
+      {label}
     </Link>
   );
 }

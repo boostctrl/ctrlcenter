@@ -11,9 +11,10 @@ import AppsManager from "./AppsManager";
 import BookmarksManager from "./BookmarksManager";
 import SettingsManager from "./SettingsManager";
 import ThemesManager from "./ThemesManager";
-import BackHome from "@/components/BackHome";
+import PageNav from "@/components/PageNav";
 import { useEdgeFade } from "@/components/useEdgeFade";
 import { resolveThemePacks } from "@/lib/theme";
+import { navPages } from "@/lib/nav";
 import { downloadJson } from "@/lib/download";
 import { Button } from "./ui";
 import { ToastProvider, useToast } from "./Toast";
@@ -160,7 +161,11 @@ function AdminBody({
   return (
     <div className="mx-auto flex w-full max-w-8xl flex-col gap-8 px-6 py-12 sm:px-10">
       <div>
-        <BackHome />
+        {/* The admin portal isn't one of the strip's listed pages (it's a
+            gated portal, reachable from the floating menu and /settings), so
+            nothing is current here. Flags come from the server-rendered
+            settings; a feature toggled this session updates on reload. */}
+        <PageNav current={null} {...navPages(initialSettings)} />
         <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-3xl font-bold">Manage your dashboard</h1>
           <div className="flex flex-wrap items-center gap-3">

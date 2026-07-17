@@ -3,7 +3,7 @@ import Link from "next/link";
 import SettingsControls from "@/components/SettingsControls";
 import ThemeBuilder from "@/components/ThemeBuilder";
 import { ConfirmProvider } from "@/components/admin/Confirm";
-import BackHome from "@/components/BackHome";
+import PageNav from "@/components/PageNav";
 import FloatingNav from "@/components/FloatingNav";
 import { readPublicConfig } from "@/lib/api-auth";
 import { resolveThemePacks } from "@/lib/theme";
@@ -22,7 +22,7 @@ export default async function SettingsPage() {
     <>
       <main className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 py-12 sm:px-10 lg:py-16">
       <div>
-        <BackHome />
+        <PageNav current="settings" {...navPages(settings)} />
         <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold">Settings</h1>

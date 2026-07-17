@@ -3,7 +3,7 @@ import Link from "next/link";
 import { readPublicConfig } from "@/lib/api-auth";
 import StatusPage from "@/components/StatusPage";
 import StatusAnnouncements from "@/components/StatusAnnouncements";
-import BackHome from "@/components/BackHome";
+import PageNav from "@/components/PageNav";
 import FloatingNav from "@/components/FloatingNav";
 import { navPages } from "@/lib/nav";
 
@@ -27,7 +27,7 @@ export default async function StatusRoute() {
     <>
       <main className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 py-12 sm:px-10 lg:py-16">
         <div>
-          <BackHome />
+          <PageNav current="status" {...navPages(settings)} />
           <h1 className="mt-3 text-3xl font-bold">Status</h1>
         </div>
 

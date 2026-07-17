@@ -14,6 +14,15 @@ here.
 
 ### Changed
 
+- **Navigation is consistent across the site.** Every page outside the home
+  dashboard — weather, status and its detail pages, calendar, help, settings,
+  and the admin portal — now opens with the same slim navigation strip: the
+  dashboard link plus the site's pages, with the page you're on highlighted.
+  Jumping between pages no longer means going home first or opening the
+  corner menu, and each page's one-off back links are gone. The dashboard
+  itself stays exactly as it was, and the floating corner menu still works
+  everywhere. (#164)
+
 - **Status page rows are calmer, especially during an outage.** The figures
   beside each uptime strip now show just the essentials — the uptime
   percentage with its average latency, and a short red "Down for 23m" while a
