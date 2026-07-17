@@ -14,6 +14,18 @@ here.
 
 ### Changed
 
+- **The weather hero's light now truly comes from the icon, and every
+  condition got a realism pass.** The sun/moon glow is measured to the
+  condition icon's actual position instead of a fixed corner offset, so it no
+  longer pops out above the icon. Sunlight was redrawn: layered warm glow and
+  soft, uneven light beams that shimmer and slowly turn — replacing the six
+  rigid spokes that read as a pinwheel. Clouds are now flat-based cumulus
+  shapes with brighter tops and shading that follows the light. Clear nights
+  get a hazier layered moonglow and an occasional shooting star. Fog banks
+  breathe vertically and pool along the bottom edge, and near snowflakes
+  flutter more than the far sheet. Rain, splashes, and lightning keep their
+  2.0.0 behavior. (#173)
+
 - **The Add bookmark and Add application forms get more room on wide
   screens.** On the full-width admin page the form card no longer stays
   pinned at its narrow width; on displays 1280px and wider it grows a little

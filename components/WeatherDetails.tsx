@@ -230,7 +230,7 @@ export default function WeatherDetails({
             light={surfaceIsLight}
           />
           <div className="relative flex flex-wrap items-center gap-x-6 gap-y-3">
-            <span className="text-7xl leading-none" aria-hidden>
+            <span className="text-7xl leading-none" data-weather-fx-anchor aria-hidden>
               {weatherCodeToIcon(current.code, current.isDay)}
             </span>
             <div>

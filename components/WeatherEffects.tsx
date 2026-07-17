@@ -12,11 +12,13 @@ import { useEffect, useRef } from "react";
 // Honours prefers-reduced-motion by rendering a single still frame, matching
 // the backdrop scenes.
 //
-// Light direction (#160): every light source anchors to the TOP LEFT, where
-// the hero's condition icon sits — the canvas paints beneath the text layer,
-// so the sun/moon glow radiates out from behind the icon and the icon reads
-// as being the source. Anything lit (cloud shading) takes its highlight from
-// the same corner.
+// Light direction (#160, #173): every light source anchors to the hero's
+// condition icon — the canvas paints beneath the text layer, so the sun/moon
+// glow radiates out from behind the icon and the icon reads as being the
+// source. The anchor is measured from the icon's rendered box (the hero row
+// is items-center, so a fixed top offset drifts as the card grows — that was
+// #173's "glow pops out above the icon"). Anything lit (cloud shading) takes
+// its highlight from the same anchor.
 
 type EffectKind = "sun" | "stars" | "clouds" | "fog" | "rain" | "snow" | "storm";
 
@@ -95,7 +97,9 @@ type Cloud = {
   scale: number;
   speed: number;
   alpha: number;
-  puffs: { dx: number; dy: number; r: number }[];
+  // `lit` brightens the top puffs relative to the base row — sky light comes
+  // from above, so a cloud's crown catches more of it than its flat base.
+  puffs: { dx: number; dy: number; r: number; lit: number }[];
 };
 
 export default function WeatherEffects({
@@ -128,12 +132,24 @@ export default function WeatherEffects({
     let last = 0;
     let t = 0; // animation clock (ms), advances only while animating
 
-    // Where the light lives: behind the hero's condition icon — 24px card
-    // padding plus half the text-7xl emoji, clamped in for very small cards.
-    // drawSun/drawStars radiate from here, and cloud shading highlights toward
-    // it, so the icon in the text layer above reads as the source.
-    const lightX = () => Math.min(62 * dpr, w * 0.18);
-    const lightY = () => Math.min(60 * dpr, h * 0.45);
+    // Where the light lives: behind the hero's condition icon. Measured from
+    // the icon's rendered box (see the header comment); the padding heuristic
+    // is only the fallback for a host without the marker span.
+    let ax = 0;
+    let ay = 0;
+    const measureAnchor = (hostRect: DOMRect) => {
+      const icon = host.parentElement?.querySelector("[data-weather-fx-anchor]");
+      if (icon) {
+        const r = icon.getBoundingClientRect();
+        ax = (r.left + r.width / 2 - hostRect.left) * dpr;
+        ay = (r.top + r.height / 2 - hostRect.top) * dpr;
+      } else {
+        ax = Math.min(62 * dpr, w * 0.18);
+        ay = Math.min(60 * dpr, h * 0.45);
+      }
+    };
+    const lightX = () => ax;
+    const lightY = () => ay;
 
     // The wind: a shared, slowly-gusting slant (horizontal drift per unit of
     // fall) so all precipitation sways as one weather system instead of
@@ -162,6 +178,29 @@ export default function WeatherEffects({
 
     const rand = (lo: number, hi: number) => lo + Math.random() * (hi - lo);
 
+    // Per-run ray table for the sun: uneven angles and per-ray length/width/
+    // brightness/shimmer-phase, so the fan reads as scattered light instead of
+    // a pinwheel of identical spokes (#173).
+    const rays = Array.from({ length: 10 }, (_, i) => ({
+      angle: (i * Math.PI * 2) / 10 + rand(-0.16, 0.16),
+      len: rand(0.55, 1.15),
+      width: rand(0.5, 1),
+      alpha: rand(0.5, 1),
+      shimmer: rand(0, Math.PI * 2),
+    }));
+
+    // Shooting-star state for clear nights: rare, brief, one at a time. The
+    // heading is stored as a unit vector — always downward, either sideways.
+    const METEOR_MS = 700;
+    let meteorAt = 6000 + Math.random() * 8000;
+    let meteor: {
+      x0: number;
+      y0: number;
+      ux: number;
+      uy: number;
+      born: number;
+    } | null = null;
+
     const spawnDrop = (): Particle => ({
       // The gust swings both ways, so seed beyond both side edges.
       x: rand(-h * 0.3, w + h * 0.3),
@@ -185,6 +224,21 @@ export default function WeatherEffects({
 
     const spawnCloud = (i: number, count: number): Cloud => {
       const scale = rand(0.7, 1.15) * (0.6 + 0.4 * intensity);
+      // A cumulus silhouette instead of the old uniform caterpillar: a row of
+      // base puffs sitting on a common flat bottom, with one or two taller
+      // puffs riding the top (#173).
+      const base = Array.from({ length: 3 }, (_, p) => ({
+        dx: (p - 1) * rand(30, 42),
+        dy: rand(2, 8),
+        r: rand(28, 40),
+        lit: rand(0.8, 0.95),
+      }));
+      const tops = Array.from({ length: 1 + (Math.random() < 0.6 ? 1 : 0) }, () => ({
+        dx: rand(-26, 26),
+        dy: -rand(14, 24),
+        r: rand(24, 34),
+        lit: rand(1.05, 1.25),
+      }));
       return {
         // Stagger starting positions across (and beyond) the card so the sky
         // doesn't pop in empty, then drift and wrap.
@@ -193,11 +247,7 @@ export default function WeatherEffects({
         scale,
         speed: rand(0.006, 0.016) * (2 - scale), // far/small clouds drift slower
         alpha: rand(0.5, 0.9),
-        puffs: Array.from({ length: 4 }, (_, p) => ({
-          dx: (p - 1.5) * rand(28, 40),
-          dy: rand(-12, 10),
-          r: rand(26, 44),
-        })),
+        puffs: [...base, ...tops],
       };
     };
 
@@ -244,6 +294,7 @@ export default function WeatherEffects({
       h = canvas.height = Math.max(1, Math.round(rect.height * dpr));
       canvas.style.width = `${rect.width}px`;
       canvas.style.height = `${rect.height}px`;
+      measureAnchor(rect);
       const cssW = rect.width;
       drops = flakes = stars = [];
       clouds = [];
@@ -332,9 +383,14 @@ export default function WeatherEffects({
           const vy = (0.25 + f.depth * 0.55) * f.speed * dpr * (dt / 16);
           f.y += vy;
           // Per-flake flutter plus a fraction of the shared gust, so the snow
-          // and any storm on the next refresh lean the same way.
+          // and any storm on the next refresh lean the same way. Flutter
+          // amplitude scales with depth — near flakes visibly wander, the far
+          // sheet barely stirs, which reads as air resistance at scale.
           f.x +=
-            Math.sin(t * 0.0012 * f.speed + f.phase) * 0.25 * dpr * (dt / 16) +
+            Math.sin(t * 0.0012 * f.speed + f.phase) *
+              (0.12 + 0.3 * f.depth) *
+              dpr *
+              (dt / 16) +
             vy * slant * 0.6;
           if (f.y - r > h) {
             Object.assign(f, spawnFlake(), { y: -r });
@@ -347,10 +403,14 @@ export default function WeatherEffects({
       }
     };
 
-    // Clouds are lit from the top left like everything else: each puff's
-    // gradient centers toward the light anchor, so the up-light side glows
-    // and the far side falls off — round volumes instead of flat blobs.
+    // Clouds are lit like everything else: each puff's gradient centers toward
+    // the light anchor, so the lit side glows and the far side falls off —
+    // round volumes instead of flat blobs. The vertical component is clamped
+    // upward: even when a cloud drifts below the anchor, ambient sky light
+    // still comes from above, and an under-lit cloud reads as wrong.
     const drawClouds = (dt: number, still: boolean) => {
+      const lx = lightX();
+      const ly = lightY();
       for (const c of clouds) {
         const width = 120 * c.scale * dpr;
         if (!still) {
@@ -361,13 +421,15 @@ export default function WeatherEffects({
           const r = p.r * c.scale * dpr;
           const px = c.x + p.dx * c.scale * dpr;
           const py = c.y + p.dy * c.scale * dpr;
-          // Highlight offset: a fixed fraction of the puff radius toward the
-          // light corner (direction is what matters, not exact geometry).
-          const hx = px - r * 0.3;
-          const hy = py - r * 0.3;
+          const dx = lx - px;
+          const dy = ly - py;
+          const dist = Math.hypot(dx, dy) || 1;
+          const hx = px + (dx / dist) * r * 0.35;
+          const hy = py + Math.min(dy / dist, -0.15) * r * 0.35;
+          const a = 0.18 * c.alpha * intensity * p.lit;
           const grad = ctx.createRadialGradient(hx, hy, 0, px, py, r * 1.1);
-          grad.addColorStop(0, `rgba(${colors.cloud}, ${0.14 * c.alpha * intensity})`);
-          grad.addColorStop(0.55, `rgba(${colors.cloud}, ${0.07 * c.alpha * intensity})`);
+          grad.addColorStop(0, `rgba(${colors.cloud}, ${a})`);
+          grad.addColorStop(0.55, `rgba(${colors.cloud}, ${a * 0.5})`);
           grad.addColorStop(1, `rgba(${colors.cloud}, 0)`);
           ctx.fillStyle = grad;
           ctx.beginPath();
@@ -378,17 +440,19 @@ export default function WeatherEffects({
     };
 
     const drawFog = (still: boolean) => {
-      // Three broad haze bands sliding in alternating directions; a still frame
-      // just renders them where the clock stopped.
+      // Three broad haze bands sliding in alternating directions, each rising
+      // and settling a little as it goes — fog banks breathe vertically, they
+      // don't ride rails. A still frame renders them where the clock stopped.
       for (let i = 0; i < 3; i++) {
         const dir = i % 2 === 0 ? 1 : -1;
         const drift = still ? 0 : (t * (0.008 + i * 0.004)) % (w * 2);
+        const bob = still ? 0 : Math.sin(t * 0.00022 + i * 2.4) * h * 0.03;
         const cx = ((w * (0.3 + i * 0.35) + dir * drift + w * 2) % (w * 2)) - w * 0.5;
-        const cy = h * (0.3 + i * 0.28);
+        const cy = h * (0.3 + i * 0.28) + bob;
         const rx = w * 0.55;
         const ry = h * 0.26;
         const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rx);
-        grad.addColorStop(0, `rgba(${colors.fog}, ${0.1 - i * 0.015})`);
+        grad.addColorStop(0, `rgba(${colors.fog}, ${0.13 - i * 0.015})`);
         grad.addColorStop(1, `rgba(${colors.fog}, 0)`);
         ctx.save();
         ctx.translate(cx, cy);
@@ -400,49 +464,92 @@ export default function WeatherEffects({
         ctx.fill();
         ctx.restore();
       }
+      // Ground fog: a slightly denser band pooled along the bottom edge, the
+      // layer real fog settles into.
+      const gx = w * 0.5 + (still ? 0 : Math.sin(t * 0.00013) * w * 0.08);
+      const gy = h * 0.96;
+      const grx = w * 0.75;
+      const gry = h * 0.16;
+      const ground = ctx.createRadialGradient(gx, gy, 0, gx, gy, grx);
+      ground.addColorStop(0, `rgba(${colors.fog}, 0.13)`);
+      ground.addColorStop(1, `rgba(${colors.fog}, 0)`);
+      ctx.save();
+      ctx.translate(gx, gy);
+      ctx.scale(1, gry / grx);
+      ctx.translate(-gx, -gy);
+      ctx.fillStyle = ground;
+      ctx.beginPath();
+      ctx.arc(gx, gy, grx, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
     };
 
     const drawSun = (still: boolean) => {
-      // Warm glow breathing behind the hero's sun icon (top left), with slow
-      // rays turning around it — the icon above the canvas IS the source.
+      // Sunlight as light in air, not a drawn sun: a layered glow breathing
+      // behind the hero's sun icon, and soft crepuscular beams — tapered
+      // translucent wedges at uneven angles that widen with distance and
+      // dissolve into the haze, each shimmering independently and all turning
+      // together, very slowly. The old six 26px rotating strokes read as a
+      // pinwheel (#173).
       const cx = lightX();
       const cy = lightY();
-      const breathe = still ? 1 : 1 + 0.05 * Math.sin(t * 0.0012);
-      const r = Math.max(h * 0.95, w * 0.45) * breathe * intensity;
-      const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-      glow.addColorStop(0, `rgba(${colors.sun}, ${0.3 * intensity})`);
-      glow.addColorStop(0.45, `rgba(${colors.sun}, ${0.09 * intensity})`);
+      const breathe = still ? 1 : 1 + 0.04 * Math.sin(t * 0.0009);
+      // Three falloffs — hot core hugging the icon, mid bloom, wide wash —
+      // where the old two-stop gradient read as a flat disc.
+      const R = Math.max(h * 1.05, w * 0.5) * breathe * intensity;
+      const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
+      glow.addColorStop(0, `rgba(${colors.sun}, ${0.34 * intensity})`);
+      glow.addColorStop(0.12, `rgba(${colors.sun}, ${0.2 * intensity})`);
+      glow.addColorStop(0.4, `rgba(${colors.sun}, ${0.07 * intensity})`);
       glow.addColorStop(1, `rgba(${colors.sun}, 0)`);
       ctx.fillStyle = glow;
       ctx.fillRect(0, 0, w, h);
-      const spin = still ? 0.4 : t * 0.00008;
-      for (let i = 0; i < 6; i++) {
-        const a = spin + (i * Math.PI) / 3;
-        const len = Math.max(h * 1.2, w * 0.55);
-        const grad = ctx.createLinearGradient(
-          cx,
-          cy,
-          cx + Math.cos(a) * len,
-          cy + Math.sin(a) * len
-        );
-        grad.addColorStop(0, `rgba(${colors.sun}, ${0.07 * intensity})`);
+      const spin = still ? 0.4 : t * 0.00003;
+      const maxLen = Math.max(h * 1.25, w * 0.6);
+      for (const ray of rays) {
+        const a = spin + ray.angle;
+        const len = maxLen * ray.len;
+        const shim = still
+          ? 0.8
+          : 0.65 + 0.35 * Math.sin(t * 0.00045 + ray.shimmer);
+        const alpha = 0.09 * intensity * ray.alpha * shim;
+        const cos = Math.cos(a);
+        const sin = Math.sin(a);
+        // Perpendicular unit vector for the wedge's half-widths.
+        const px = -sin;
+        const py = cos;
+        const base = 16 * dpr; // beams start just outside the icon
+        const baseHalf = 4 * dpr;
+        const endHalf = (12 + 18 * ray.width) * dpr;
+        const bx = cx + cos * base;
+        const by = cy + sin * base;
+        const tx = cx + cos * len;
+        const ty = cy + sin * len;
+        const grad = ctx.createLinearGradient(bx, by, tx, ty);
+        grad.addColorStop(0, `rgba(${colors.sun}, ${alpha})`);
+        grad.addColorStop(0.65, `rgba(${colors.sun}, ${alpha * 0.35})`);
         grad.addColorStop(1, `rgba(${colors.sun}, 0)`);
-        ctx.strokeStyle = grad;
-        ctx.lineWidth = 26 * dpr;
+        ctx.fillStyle = grad;
         ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(cx + Math.cos(a) * len, cy + Math.sin(a) * len);
-        ctx.stroke();
+        ctx.moveTo(bx + px * baseHalf, by + py * baseHalf);
+        ctx.lineTo(tx + px * endHalf, ty + py * endHalf);
+        ctx.lineTo(tx - px * endHalf, ty - py * endHalf);
+        ctx.lineTo(bx - px * baseHalf, by - py * baseHalf);
+        ctx.closePath();
+        ctx.fill();
       }
     };
 
     const drawStars = (still: boolean) => {
-      // Soft moonlight behind the hero's moon icon (top left, same anchor as
-      // the sun) plus twinkling stars across the card.
+      // Soft moonlight behind the hero's moon icon (same measured anchor as
+      // the sun) plus twinkling stars across the card. The glow gets the same
+      // layered falloff as the sun — a close halo inside a wide wash — so the
+      // moon reads as a body in haze rather than a flat disc of light.
       const mx = lightX();
       const my = lightY();
-      const moon = ctx.createRadialGradient(mx, my, 0, mx, my, h * 0.7);
-      moon.addColorStop(0, `rgba(${colors.star}, ${0.16 * intensity})`);
+      const moon = ctx.createRadialGradient(mx, my, 0, mx, my, h * 0.8);
+      moon.addColorStop(0, `rgba(${colors.star}, ${0.2 * intensity})`);
+      moon.addColorStop(0.25, `rgba(${colors.star}, ${0.1 * intensity})`);
       moon.addColorStop(1, `rgba(${colors.star}, 0)`);
       ctx.fillStyle = moon;
       ctx.fillRect(0, 0, w, h);
@@ -454,6 +561,50 @@ export default function WeatherEffects({
         ctx.fillStyle = `rgba(${colors.star}, ${(0.25 + s.depth * 0.55) * tw})`;
         ctx.fill();
       }
+      drawMeteor(still);
+    };
+
+    // A shooting star every so often: a brief thin streak with a fading tail,
+    // rare enough to be a small event when it happens. Skipped in still frames
+    // (a frozen streak just looks like a scratch).
+    const drawMeteor = (still: boolean) => {
+      if (still) return;
+      if (!meteor && t >= meteorAt) {
+        // Down-and-across at a shallow-ish angle, either direction.
+        const a = rand(0.45, 0.85);
+        const side = Math.random() < 0.5 ? 1 : -1;
+        meteor = {
+          x0: rand(w * 0.15, w * 0.8),
+          y0: rand(h * 0.05, h * 0.3),
+          ux: Math.cos(a) * side,
+          uy: Math.sin(a),
+          born: t,
+        };
+      }
+      if (!meteor) return;
+      const p = (t - meteor.born) / METEOR_MS;
+      if (p >= 1) {
+        meteor = null;
+        meteorAt = t + 9000 + Math.random() * 12000;
+        return;
+      }
+      const travel = h * 0.55 * p;
+      const hx = meteor.x0 + meteor.ux * travel;
+      const hy = meteor.y0 + meteor.uy * travel;
+      const tail = h * 0.16 * Math.min(1, p * 3);
+      const txx = hx - meteor.ux * tail;
+      const tyy = hy - meteor.uy * tail;
+      const fade = (1 - p) * 0.55;
+      const grad = ctx.createLinearGradient(hx, hy, txx, tyy);
+      grad.addColorStop(0, `rgba(${colors.star}, ${fade})`);
+      grad.addColorStop(1, `rgba(${colors.star}, 0)`);
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = 1.2 * dpr;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(hx, hy);
+      ctx.lineTo(txx, tyy);
+      ctx.stroke();
     };
 
     const strokePath = (
