@@ -24,6 +24,14 @@ here.
 
 ### Changed
 
+- **The README caught up with the app.** The feature list now covers the
+  status detail pages with their response-time analytics and outage log,
+  incident notes, status announcements, private apps and bookmarks, the
+  world-clocks and system-stats widgets, the in-app help page, and the
+  shared navigation strip; the configuration sample gained the status
+  default range and an honest pointer to the settings sections it omits.
+  (#179)
+
 - **The help page is reorganized and brought current.** The admin material
   is grouped by task — content & search, monitoring, the home page,
   appearance & operations — instead of one long wall of cards, and a new

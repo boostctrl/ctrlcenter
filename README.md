@@ -2,8 +2,9 @@
 
 A self-hosted start page and service dashboard: a searchable home for the apps
 and bookmarks you run, with optional status checks and alerts, weather, an
-agenda, notes, countdowns, an RSS feed, and a theming system. Configured with a
-single YAML file (or the built-in admin UI) and shipped as one container.
+agenda, notes, countdowns, world clocks, system stats, an RSS feed, and a
+theming system. Configured with a single YAML file (or the built-in admin UI)
+and shipped as one container.
 
 Built with Next.js 16, React 19, and Tailwind v4.
 
@@ -27,11 +28,20 @@ Built with Next.js 16, React 19, and Tailwind v4.
     light/dark variants auto-pick the legible one for the active surface.
   - **Drag-to-reorder** apps and bookmark categories from the admin UI
     (keyboard- and touch-friendly, not just mouse drag).
+  - **Private items** — mark an app or bookmark **Only show when logged in**
+    and it disappears for signed-out visitors (from the dashboard, search, and
+    the status page alike) while staying monitored and alerted on.
 
 - **Uptime, status & alerts.** Optional reachability checks put an online/offline
   dot on each app and power a dedicated **/status** page with per-service **uptime
   %** and a **90-day daily timeline** (Statuspage / UptimeRobot style), recorded by
-  a background poller independent of page views. Each service picks a **check
+  a background poller independent of page views. Every service card clicks
+  through to its **detail page**: a finer-grained uptime graph, **response-time
+  analytics** (average and max latency per range), and an **outage log** with
+  exact start and end times — where a signed-in admin can attach **incident
+  notes** ("planned maintenance", "ISP fault") that visitors see beside the
+  entry. **Status announcements** post maintenance windows and notices on the
+  status page itself, with optional scheduling. Each service picks a **check
   method** — HTTP (choose which status codes count as up, so a `404` reads as
   **down**), **TCP port**, **keyword** in the response body, **DNS** resolution, or
   **ICMP ping** — so non-web services can be monitored too. **Alerts** fire when a
@@ -70,10 +80,12 @@ Built with Next.js 16, React 19, and Tailwind v4.
   visitor's own time zone.
 
 - **More home widgets.** A **Notes** card (a safe markdown subset), a
-  **Countdown** card ("in N days" to labeled dates), and an **RSS/Atom feed**
-  card — each optional and placed from the layout editor. Plus a site-wide
-  **announcement banner** for notices or maintenance windows, with a tone and an
-  optional visitor dismiss.
+  **Countdown** card ("in N days" to labeled dates), **World clocks** (live
+  times and dates for the zones you follow), **System stats** (CPU, memory, and
+  disk fill — container-aware, with an opt-in host mode), and an **RSS/Atom
+  feed** card — each optional and placed from the layout editor. Plus a
+  site-wide **announcement banner** for notices or maintenance windows, with a
+  tone and an optional visitor dismiss.
 
 - **Per-visitor personalization, no accounts.** Each visitor sets a greeting name,
   timezone, weather location/units, and their whole theme from **/settings** — all
@@ -94,7 +106,10 @@ Built with Next.js 16, React 19, and Tailwind v4.
   whole config (uploaded icons included).
 
 - **Self-hosted & simple.** A single YAML config, a prebuilt multi-arch Docker
-  image, an installable PWA manifest, and `/api/health` for orchestrators.
+  image, an installable PWA manifest, `/api/health` for orchestrators, and an
+  in-app **/help** page that documents every feature where visitors will look
+  for it. Every page outside the dashboard opens with the same slim navigation
+  strip, so weather, status, calendar, help, and settings stay one click apart.
 
 ## AI disclaimer
 
@@ -152,6 +167,7 @@ settings:
     # foregroundLight: '#181b24'
   statusChecks: false       # ping app URLs, show online/offline dots + /status
   statusInterval: 5         # minutes between background uptime checks (1–60)
+  statusDefaultRange: d1    # range /status opens on: h1 | d1 | d30 | d90 (= 1h/24h/30d/90d)
   search:
     engine: duckduckgo      # duckduckgo | google | bing | brave | custom
     customUrl: ""           # used when engine: custom; must contain %s
@@ -180,6 +196,10 @@ settings:
     enabled: false
     url: ""                 # a published iCal (.ics) URL
     count: 5                # how many upcoming events to show (1–20)
+  # Further sections mirror the admin UI one-to-one and are easiest to edit
+  # there: favicon, announcement (the site-wide banner), statusAnnouncements,
+  # notes, feed (the RSS card), countdown, worldClocks, systemStats, and
+  # bookmarkCategoryOrder.
   components:
     clock: true             # the date/time row inside the header card
     settingsButton: true    # the floating corner navigation menu
@@ -295,8 +315,9 @@ changelog, issue hygiene — live in [CLAUDE.md](CLAUDE.md).
 - [`lib/calendar.ts`](lib/calendar.ts) fetches and parses the iCal agenda feed
   (with recurrence expansion); [`lib/search.ts`](lib/search.ts) resolves search
   bangs.
-- `app/api/` holds the admin CRUD/reorder routes plus `status`, `status/history`,
-  and `health`.
+- `app/api/` holds the admin CRUD/reorder routes plus `status`,
+  `status/history` (the list, each service's detail with its outage log, and
+  the admin's incident notes), and `health`.
 
 ## License
 
