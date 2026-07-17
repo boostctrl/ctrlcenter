@@ -24,6 +24,12 @@ here.
 
 ### Changed
 
+- **The whole service card on the status page is now clickable.** Anywhere
+  on a card opens that service's detail page, not just its name — the card
+  highlights under the pointer like the link it now is. The heartbeat strip
+  keeps its own touch and keyboard interaction: tapping a pill still shows
+  its readout instead of navigating. (#181)
+
 - **The status page is easier to find from the home page.** The status
   glance in the header card now names its destination — a quiet
   "Uptime & outages" label at the end of the row — so it reads as the link

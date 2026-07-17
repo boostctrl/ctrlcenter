@@ -276,7 +276,7 @@ export default function StatusPage({
               return (
                 <div
                   key={app.id}
-                  className={`glass-card px-5 py-4 ${
+                  className={`glass-card relative px-5 py-4 transition-colors hover:bg-fg/[0.03] ${
                     s && !s.up ? "ring-1 ring-red-400/30" : ""
                   }`}
                 >
@@ -286,15 +286,22 @@ export default function StatusPage({
                       <Icon icon={app.icon} name={app.name} size={24} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      {/* The identity block links to the per-service detail
-                          view (#150) — the name, not the whole card, so the
-                          strip's tap/keyboard traversal stays its own thing. */}
+                      {/* The whole card opens the per-service detail view
+                          (#150/#181): the name link stays the single tab stop
+                          and stretches its hit area over the card (the card is
+                          `relative`, the link's ::after overlays it), while
+                          the heartbeat strip re-raises itself below so its
+                          per-pill tap/keyboard readouts (#116) keep receiving
+                          their own events instead of the link's. The name
+                          underlines from the link's own hover — which the
+                          overlay extends to the whole card — not the card's,
+                          so it stays quiet while a visitor works the strip. */}
                       <Link
                         href={`/status/${app.id}`}
                         aria-label={`${app.name} — uptime details`}
-                        className="accent-focus rounded-sm outline-none"
+                        className="group/name accent-focus rounded-sm outline-none after:absolute after:inset-0"
                       >
-                        <p className="truncate font-semibold text-fg/90 underline-offset-4 hover:underline">
+                        <p className="truncate font-semibold text-fg/90 underline-offset-4 group-hover/name:underline group-focus-visible/name:underline">
                           {app.name}
                         </p>
                       </Link>
@@ -306,9 +313,12 @@ export default function StatusPage({
                     </div>
                     {/* Heartbeat sits inline with the rest of the row on wider
                         screens (left of the uptime figure); it drops to its own
-                        line below sm where there's no room for it. */}
+                        line below sm where there's no room for it. `relative`
+                        lifts the strip above the stretched link's overlay (same
+                        painting layer, later in the DOM), keeping the pills'
+                        own pointer/keyboard interaction. */}
                     {timeline && (
-                      <div className="hidden shrink-0 sm:block sm:w-44 lg:w-72">
+                      <div className="relative hidden shrink-0 sm:block sm:w-44 lg:w-72">
                         {timeline}
                       </div>
                     )}
@@ -324,7 +334,11 @@ export default function StatusPage({
                     </div>
                   </div>
                   <div className="mt-3 flex items-end gap-4 sm:hidden">
-                    <div className="min-w-0 flex-1">{timeline}</div>
+                    {/* Same `relative` lift as the desktop strip mount. The
+                        figures stay under the overlay on purpose: they're
+                        display text, and a tap there should open the detail
+                        page like the rest of the card. */}
+                    <div className="relative min-w-0 flex-1">{timeline}</div>
                     <div className="shrink-0 text-right">{figures}</div>
                   </div>
                 </div>
