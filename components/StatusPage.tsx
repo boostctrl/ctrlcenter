@@ -207,19 +207,14 @@ export default function StatusPage({
               const outageStart =
                 s && !s.up && h?.downSince != null ? h.downSince : null;
               const dur = outageStart != null ? downDuration(outageStart, now) : null;
-              const detail = !s
-                ? "Checking…"
-                : s.up
-                  ? `${s.status ? `HTTP ${s.status}` : "Reachable"} · ${s.ms}ms`
-                  : dur
-                    ? s.status
-                      ? `Down for ${dur} · HTTP ${s.status}`
-                      : `Unreachable for ${dur}`
-                    : s.status
-                      ? `Down · HTTP ${s.status}`
-                      : "Unreachable";
-              // The uptime % + live detail, used in two places: the fixed-width
-              // right column from sm up, and the second row below sm.
+              // The row's figures, used in two places: the fixed-width right
+              // column from sm up, and the second row below sm. Deliberately
+              // lean (#174): the HTTP status, live latency, and
+              // "Unreachable"/"Checking…" wording that used to render here now
+              // live only on the service's detail page (#150) — the list is
+              // for the glance, the detail page for the diagnosis. The StateDot
+              // already tells up from down at a glance; the one extra thing an
+              // outage shows here is how long it's been going.
               const figures = (
                 <>
                   {/* Uptime % and its range-average latency share one line
@@ -250,24 +245,22 @@ export default function StatusPage({
                       since {formatSince(coverageSince, timezone, range)}
                     </p>
                   )}
-                  <p
-                    // Absolute outage start on hover, in the visitor's zone, so
-                    // "Down for 23m" reveals exactly when it began.
-                    title={
-                      outageStart != null
-                        ? `down since ${instantLabel(outageStart, timezone)}`
-                        : undefined
-                    }
-                    // Wraps rather than truncates: an hour-scale outage's
-                    // "Unreachable for 11h 23m" overflows the w-32 column, and
-                    // cutting off the duration hides exactly the number this
-                    // line exists to show (#137).
-                    className={`text-xs ${
-                      s && !s.up ? "text-red-400" : "text-fg/45"
-                    }`}
-                  >
-                    {detail}
-                  </p>
+                  {s && !s.up && (
+                    <p
+                      // Absolute outage start on hover, in the visitor's zone,
+                      // so "Down for 23m" reveals exactly when it began. Before
+                      // the poller records the outage there's no honest
+                      // duration yet, so it's just "Down".
+                      title={
+                        outageStart != null
+                          ? `down since ${instantLabel(outageStart, timezone)}`
+                          : undefined
+                      }
+                      className="text-xs text-red-400"
+                    >
+                      {dur ? `Down for ${dur}` : "Down"}
+                    </p>
+                  )}
                 </>
               );
               // One strip element for both layouts (like `figures` above), so

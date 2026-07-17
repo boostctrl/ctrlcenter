@@ -14,6 +14,13 @@ here.
 
 ### Changed
 
+- **Status page rows are calmer, especially during an outage.** The figures
+  beside each uptime strip now show just the essentials — the uptime
+  percentage with its average latency, and a short red "Down for 23m" while a
+  service is out. The HTTP status codes and live check latency that used to
+  crowd the row (and wrap onto extra lines mid-outage) moved to where the
+  diagnosis lives: click the service's name for its detail page. (#174)
+
 - **The weather hero's light now truly comes from the icon, and every
   condition got a realism pass.** The sun/moon glow is measured to the
   condition icon's actual position instead of a fixed corner offset, so it no
