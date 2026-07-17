@@ -24,6 +24,11 @@ const MIN_MS = 60_000;
 const RETENTION_HOURS = 90 * 24;
 const RECENT_KEEP_MS = 90 * MIN_MS; // ring of raw readings kept for the 1h view
 const RECENT_VIEW_MS = 60 * MIN_MS; // window the 1h view / h1 % actually show
+// Completed-outage records kept per app (#175). Records follow the same 90-day
+// retention as the buckets; the count cap only exists so a service flapping
+// every poll can't grow the file without bound. Oldest records fall off first,
+// and anything dropped degrades gracefully to the hour-bucket reconstruction.
+const MAX_OUTAGES = 500;
 const HISTORY_FILE = "status-history.json";
 
 // --- Pure aggregation helpers (unit-tested) ---
@@ -74,6 +79,14 @@ function minuteStr(ts: number): string {
 // time-to-failure, excluded from latency the same way it is in the buckets);
 // undefined on down readings and on pre-upgrade entries loaded from an old file.
 export type Reading = { t: number; up: boolean; ms?: number };
+
+// One completed outage as the poller recorded it (#175): the exact down- and
+// up-transition instants (ms). Written at the moment of recovery from the
+// persisted `downSince` mark, so the pair stays poll-exact at any age instead
+// of degrading to hour-bucket bounds when the recent ring ages it out. The
+// start instant doubles as the outage's stable identity (with the app id) —
+// the anchor incident notes attach to (#176).
+export type RecordedOutage = { start: number; end: number };
 
 // Resample raw readings into `bars` equal time buckets over [startMs, endMs),
 // oldest → newest, for the 1h view. A reading is a step, not a point: between
@@ -284,24 +297,30 @@ export function oldestSampleMs(
   return oldestBucketHour * HOUR_MS;
 }
 
-// Derive the detail page's outage log (#150) from the recorded history. Three
-// sources with different resolutions, stitched newest-wins:
+// Derive the detail page's outage log (#150) from the recorded history.
+// Sources with different resolutions, stitched newest-wins:
 //
 // - The ONGOING outage comes from `downSinceMs` (the poller's persisted mark —
 //   exact, and it can pre-date everything else). Recorded data at/after it is
 //   the same outage and is not re-listed.
-// - Completed outages inside the recent ring's coverage are poll-exact: a run
-//   of consecutive down readings, ended by the next up reading.
-// - Older outages come from the hourly buckets: a run of consecutive hours
-//   each containing downtime. Bounds are hour-granular (`exact: false`) and
-//   `downMs` is estimated from the down-check count × the poll interval. An
-//   hour with no bucket at all breaks a run — the server wasn't watching, and
-//   an unwatched gap must not be presented as one long outage.
+// - Completed outages come from `recorded` (#175): the exact transition pairs
+//   the poller persisted at each recovery. Exact at any age.
+// - Both fallbacks below exist only for history from before recording began —
+//   pre-upgrade files — so they are clipped to strictly-before the first
+//   recorded outage (they'd re-derive the same outages otherwise):
+//   - Completed outages inside the recent ring's coverage are poll-exact: a
+//     run of consecutive down readings, ended by the next up reading.
+//   - Older outages come from the hourly buckets: a run of consecutive hours
+//     each containing downtime. Bounds are hour-granular (`exact: false`) and
+//     `downMs` is estimated from the down-check count × the poll interval. An
+//     hour with no bucket at all breaks a run — the server wasn't watching,
+//     and an unwatched gap must not be presented as one long outage.
 //
 // A final merge pass joins adjacent entries closer than the poll hold (a
 // boundary artifact where one real outage straddles the ring/bucket seam), and
 // the list is returned newest-first, capped at `maxEntries`.
 export function extractOutages(
+  recorded: RecordedOutage[],
   buckets: Bucket[],
   readings: Reading[],
   downSinceMs: number | null,
@@ -317,15 +336,35 @@ export function extractOutages(
   const historyEnd = downSinceMs ?? Infinity;
   const entries: OutageEntry[] = [];
 
-  // Ring runs (poll-exact). A run that reaches the ring's end without an
-  // observed recovery is the current outage — represented by the downSince
-  // entry below when the mark exists, or as ongoing from its first down
-  // reading when it doesn't (an old history file without the mark).
+  // Recorded outages (poll-exact at any age). Retention is enforced here as
+  // well as at record/load time so a long-running server's in-memory records
+  // age out on the same 90-day horizon as the buckets they sit beside.
+  const retentionCutoff = now - RETENTION_HOURS * HOUR_MS;
+  const recSorted = recorded
+    .filter((o) => o.end >= retentionCutoff && o.start < historyEnd)
+    .sort((a, b) => a.start - b.start);
+  const firstRecordedMs = recSorted.length > 0 ? recSorted[0].start : Infinity;
+  for (const o of recSorted) {
+    entries.push({
+      startMs: o.start,
+      endMs: o.end,
+      downMs: o.end - o.start,
+      exact: true,
+    });
+  }
+
+  // Ring runs (poll-exact), clipped to before recording began — a completed
+  // run the poller observed after that is already a recorded entry, and
+  // re-listing it would double the outage in the merge pass. A run that
+  // reaches the ring's end without an observed recovery is the current
+  // outage — represented by the downSince entry below when the mark exists,
+  // or as ongoing from its first down reading when it doesn't (an old history
+  // file without the mark).
   let runStart: number | null = null;
   for (const r of sorted) {
     if (!r.up && runStart === null) runStart = r.t;
     if (r.up && runStart !== null) {
-      if (runStart < historyEnd) {
+      if (runStart < historyEnd && runStart < firstRecordedMs) {
         entries.push({
           startMs: runStart,
           endMs: r.t,
@@ -340,11 +379,13 @@ export function extractOutages(
     entries.push({ startMs: runStart, endMs: null, downMs: now - runStart, exact: true });
   }
 
-  // Bucket runs (hour-granular), only for hours the ring doesn't already
-  // cover — and never past the ongoing outage's start.
+  // Bucket runs (hour-granular), only for hours neither the ring nor the
+  // recorded entries already cover — and never past the ongoing outage's
+  // start.
   const bucketCutoffHour = Math.min(
     ringStart !== null ? hourOf(ringStart) : Infinity,
-    downSinceMs !== null ? hourOf(downSinceMs) : Infinity
+    downSinceMs !== null ? hourOf(downSinceMs) : Infinity,
+    firstRecordedMs !== Infinity ? hourOf(firstRecordedMs) : Infinity
   );
   const downHours = buckets
     .filter((b) => b.down > 0 && b.hour < bucketCutoffHour)
@@ -441,6 +482,9 @@ type HistoryState = {
   // recovery (see recordResults), so it answers "how long has it been down?"
   // rather than "when was the last down poll?".
   downSince: Map<string, number>;
+  // Completed outages per app (#175), oldest first: the exact {start, end}
+  // pairs the poller persisted at each recovery. See RecordedOutage.
+  outages: Map<string, RecordedOutage[]>;
   loaded: boolean;
   flushQueue: Promise<unknown>;
 };
@@ -454,11 +498,13 @@ const state: HistoryState = (g.__ctrlcenterStatusHistory ??= {
   store: new Map(),
   recent: new Map(),
   downSince: new Map(),
+  outages: new Map(),
   loaded: false,
   flushQueue: Promise.resolve(),
 });
 state.recent ??= new Map(); // tolerate a state created by an older build
 state.downSince ??= new Map(); // ditto — added after the recent ring
+state.outages ??= new Map(); // ditto — added with the recorded outages (#175)
 
 function historyPath(): string {
   const configPath =
@@ -469,14 +515,16 @@ function historyPath(): string {
 // Load the persisted history into memory once (idempotent). Stored shape:
 // { apps:   { [id]: { [hour]: [up, down, msCount, msSum, msMax] } },
 //   recent: { [id]: [[t, up?1:0, ms?], …] },
-//   downSince: { [id]: ms } }.
+//   downSince: { [id]: ms },
+//   outages: { [id]: [[start, end], …] } }.
 // The latency fields (msCount/msSum/msMax on a bucket, the third `ms` element on
-// a recent entry) and the `downSince` map were all added later, so the loader
-// treats them as optional: a file written before those features has 2-element
-// bucket tuples, 2-element recent tuples, and no `downSince` key, and simply
-// loads with no latency data (zeros / undefined) and no outage marks. Same
-// migration posture as the rest of the config — old files must load without
-// error. `downSince` carries only apps that were down at the last recorded poll.
+// a recent entry), the `downSince` map, and the `outages` records (#175) were
+// all added later, so the loader treats them as optional: a file written before
+// those features has 2-element bucket tuples, 2-element recent tuples, and no
+// `downSince`/`outages` keys, and simply loads with no latency data (zeros /
+// undefined), no outage marks, and no outage records. Same migration posture as
+// the rest of the config — old files must load without error. `downSince`
+// carries only apps that were down at the last recorded poll.
 export async function loadHistory(): Promise<void> {
   if (state.loaded) return;
   state.loaded = true;
@@ -519,10 +567,28 @@ export async function loadHistory(): Promise<void> {
     for (const [id, ms] of Object.entries(data?.downSince ?? {}))
       if (typeof ms === "number") downSince.set(id, ms);
     state.downSince = downSince;
+    // Recorded outages (#175). Absent on older files → empty; those files'
+    // completed outages surface via the ring/bucket fallbacks instead. Prune
+    // to the retention window on the way in, same as the buckets.
+    const outages = new Map<string, RecordedOutage[]>();
+    const outageCutoff = Date.now() - RETENTION_HOURS * HOUR_MS;
+    for (const [id, rows] of Object.entries(data?.outages ?? {})) {
+      const list = (rows as number[][])
+        .filter(
+          (o) =>
+            typeof o?.[0] === "number" &&
+            typeof o?.[1] === "number" &&
+            o[1] >= outageCutoff
+        )
+        .map((o) => ({ start: o[0], end: o[1] }));
+      if (list.length) outages.set(id, list);
+    }
+    state.outages = outages;
   } catch {
     state.store = new Map();
     state.recent = new Map();
     state.downSince = new Map();
+    state.outages = new Map();
   }
 }
 
@@ -587,8 +653,27 @@ export function recordResults(results: StatusResult[], at: number): void {
     // — and clear it the moment the app answers, so the map holds exactly the
     // apps down right now. This is what lets the page say how long an app has
     // been down (see getHistory / AppHistory.downSince).
-    if (r.up) state.downSince.delete(r.id);
-    else if (!state.downSince.has(r.id)) state.downSince.set(r.id, at);
+    //
+    // The up transition is also where a completed outage becomes history
+    // (#175): the mark and the recovery instant are persisted as an exact
+    // {start, end} record, so the outage log never has to re-guess the bounds
+    // from hourly tallies after the ring ages the readings out. If the server
+    // was off when the app recovered, `at` is the first poll that saw it up
+    // again — the closest observed bound, same as the mark's own semantics.
+    if (r.up) {
+      const since = state.downSince.get(r.id);
+      if (since !== undefined) {
+        const list = state.outages.get(r.id) ?? [];
+        list.push({ start: since, end: at });
+        state.outages.set(
+          r.id,
+          list
+            .filter((o) => o.end >= at - RETENTION_HOURS * HOUR_MS)
+            .slice(-MAX_OUTAGES)
+        );
+        state.downSince.delete(r.id);
+      }
+    } else if (!state.downSince.has(r.id)) state.downSince.set(r.id, at);
   }
 }
 
@@ -618,11 +703,19 @@ export function flush(): Promise<void> {
     // the "how long down?" duration without waiting for the next poll.
     const downSince: Record<string, number> = {};
     for (const [id, ms] of state.downSince) downSince[id] = ms;
+    // Recorded outages (#175) as compact [start, end] tuples.
+    const outages: Record<string, number[][]> = {};
+    for (const [id, list] of state.outages)
+      if (list.length) outages[id] = list.map((o) => [o.start, o.end]);
     const file = historyPath();
     const tmp = `${file}.tmp`;
     try {
       await fs.mkdir(path.dirname(file), { recursive: true });
-      await fs.writeFile(tmp, JSON.stringify({ apps, recent, downSince }), "utf8");
+      await fs.writeFile(
+        tmp,
+        JSON.stringify({ apps, recent, downSince, outages }),
+        "utf8"
+      );
       await fs.rename(tmp, file);
     } catch {
       // best-effort; history is non-critical
@@ -722,6 +815,7 @@ export function getAppDetail(
   return {
     ...appHistory(id, now, timeZone, intervalMinutes, DETAIL_BARS),
     outages: extractOutages(
+      state.outages.get(id) ?? [],
       buckets,
       readings,
       state.downSince.get(id) ?? null,

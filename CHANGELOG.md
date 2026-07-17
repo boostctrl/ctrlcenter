@@ -12,6 +12,16 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **The outage log keeps exact times.** A completed outage is now recorded
+  the moment the service recovers, with the exact start and end the checker
+  observed, and stays that way for the full 90-day history window. Outage
+  entries no longer degrade to hour-granular bounds with an "approximate"
+  tag about 90 minutes after the outage ends; the tag now only appears on
+  outages from before this version, which exist only as hourly tallies.
+  (#175)
+
 ## [2.0.1] - 2026-07-17
 
 ### Changed
