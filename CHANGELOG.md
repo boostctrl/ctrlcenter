@@ -12,6 +12,16 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Incident notes on the outage log.** On a service's detail page, a
+  signed-in admin can attach a short note to any recorded outage — "planned
+  maintenance", "ISP fault" — right where the outage is listed, and every
+  visitor who can see the service sees the note alongside the duration.
+  Notes live with the recorded outage history (not the config file), so
+  they survive restarts and follow the same 90-day window as the log
+  itself. (#176)
+
 ### Changed
 
 - **The outage log keeps exact times.** A completed outage is now recorded

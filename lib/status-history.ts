@@ -85,8 +85,8 @@ export type Reading = { t: number; up: boolean; ms?: number };
 // persisted `downSince` mark, so the pair stays poll-exact at any age instead
 // of degrading to hour-bucket bounds when the recent ring ages it out. The
 // start instant doubles as the outage's stable identity (with the app id) —
-// the anchor incident notes attach to (#176).
-export type RecordedOutage = { start: number; end: number };
+// which is what the admin's incident `note` (#176) anchors to.
+export type RecordedOutage = { start: number; end: number; note?: string };
 
 // Resample raw readings into `bars` equal time buckets over [startMs, endMs),
 // oldest → newest, for the 1h view. A reading is a step, not a point: between
@@ -345,12 +345,15 @@ export function extractOutages(
     .sort((a, b) => a.start - b.start);
   const firstRecordedMs = recSorted.length > 0 ? recSorted[0].start : Infinity;
   for (const o of recSorted) {
-    entries.push({
+    const entry: OutageEntry = {
       startMs: o.start,
       endMs: o.end,
       downMs: o.end - o.start,
       exact: true,
-    });
+      recorded: true,
+    };
+    if (o.note != null) entry.note = o.note;
+    entries.push(entry);
   }
 
   // Ring runs (poll-exact), clipped to before recording began — a completed
@@ -427,11 +430,21 @@ export function extractOutages(
 
   // Merge adjacent entries closer than the poll hold: one real outage can
   // straddle the bucket/ring seam and arrive here as two touching runs.
+  // Recorded entries never take part — a recorded pair is one whole outage by
+  // construction (the poller saw an up between two records, so two records
+  // are two real outages), and each must stay its own row so its identity
+  // (startMs) remains addressable for incident notes (#176).
   entries.sort((a, b) => a.startMs - b.startMs);
   const merged: OutageEntry[] = [];
   for (const e of entries) {
     const prev = merged[merged.length - 1];
-    if (prev && prev.endMs !== null && e.startMs - prev.endMs <= holdMs) {
+    if (
+      prev &&
+      !prev.recorded &&
+      !e.recorded &&
+      prev.endMs !== null &&
+      e.startMs - prev.endMs <= holdMs
+    ) {
       prev.endMs = e.endMs;
       prev.downMs += e.downMs;
       prev.exact = prev.exact && e.exact;
@@ -516,7 +529,7 @@ function historyPath(): string {
 // { apps:   { [id]: { [hour]: [up, down, msCount, msSum, msMax] } },
 //   recent: { [id]: [[t, up?1:0, ms?], …] },
 //   downSince: { [id]: ms },
-//   outages: { [id]: [[start, end], …] } }.
+//   outages: { [id]: [[start, end, note?], …] } }.
 // The latency fields (msCount/msSum/msMax on a bucket, the third `ms` element on
 // a recent entry), the `downSince` map, and the `outages` records (#175) were
 // all added later, so the loader treats them as optional: a file written before
@@ -573,14 +586,22 @@ export async function loadHistory(): Promise<void> {
     const outages = new Map<string, RecordedOutage[]>();
     const outageCutoff = Date.now() - RETENTION_HOURS * HOUR_MS;
     for (const [id, rows] of Object.entries(data?.outages ?? {})) {
-      const list = (rows as number[][])
+      const list = (rows as unknown[][])
         .filter(
           (o) =>
             typeof o?.[0] === "number" &&
             typeof o?.[1] === "number" &&
-            o[1] >= outageCutoff
+            (o[1] as number) >= outageCutoff
         )
-        .map((o) => ({ start: o[0], end: o[1] }));
+        .map((o) => {
+          const rec: RecordedOutage = {
+            start: o[0] as number,
+            end: o[1] as number,
+          };
+          // Third element is the incident note (#176), present only when set.
+          if (typeof o[2] === "string" && o[2] !== "") rec.note = o[2];
+          return rec;
+        });
       if (list.length) outages.set(id, list);
     }
     state.outages = outages;
@@ -703,10 +724,15 @@ export function flush(): Promise<void> {
     // the "how long down?" duration without waiting for the next poll.
     const downSince: Record<string, number> = {};
     for (const [id, ms] of state.downSince) downSince[id] = ms;
-    // Recorded outages (#175) as compact [start, end] tuples.
-    const outages: Record<string, number[][]> = {};
+    // Recorded outages (#175) as compact [start, end] tuples; the incident
+    // note (#176) rides as a third element only where one is set, same
+    // omit-when-absent posture as the recent ring's ms.
+    const outages: Record<string, (number | string)[][]> = {};
     for (const [id, list] of state.outages)
-      if (list.length) outages[id] = list.map((o) => [o.start, o.end]);
+      if (list.length)
+        outages[id] = list.map((o) =>
+          o.note == null ? [o.start, o.end] : [o.start, o.end, o.note]
+        );
     const file = historyPath();
     const tmp = `${file}.tmp`;
     try {
@@ -722,6 +748,25 @@ export function flush(): Promise<void> {
     }
   });
   return state.flushQueue as Promise<void>;
+}
+
+// Set, replace, or clear (empty string) the incident note on one recorded
+// outage (#176), anchored by the app id + the record's exact start instant.
+// Notes live with the outage records in status-history.json — server-recorded
+// state, not config — so they don't travel with config export/import, same as
+// the outage history they annotate. Returns false when no record of `id`
+// starts at `startMs` (unknown app, a legacy pre-#175 entry, or a record that
+// aged out): there is nothing stable to anchor the note to. The caller flushes.
+export function setOutageNote(
+  id: string,
+  startMs: number,
+  note: string
+): boolean {
+  const rec = state.outages.get(id)?.find((o) => o.start === startMs);
+  if (!rec) return false;
+  if (note === "") delete rec.note;
+  else rec.note = note;
+  return true;
 }
 
 // One app's stored data as plain arrays (empty when the id has none).

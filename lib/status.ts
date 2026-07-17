@@ -304,6 +304,14 @@ export type OutageEntry = {
   endMs: number | null;
   downMs: number;
   exact: boolean;
+  // Present only on entries backed by a first-class outage record (#175).
+  // Recorded entries are the ones an admin can annotate (#176) — the note API
+  // anchors on the app id + `startMs` — so the client keys its edit
+  // affordance off this flag rather than guessing from `exact`.
+  recorded?: boolean;
+  // The admin's incident note for a recorded outage ("planned maintenance",
+  // "ISP fault", …), shown to every visitor who can see the app.
+  note?: string;
 };
 
 // The /api/status/history/[id] payload (#150): the same fields as the row's

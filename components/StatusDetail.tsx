@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Icon from "./Icon";
 import { ChipGroup } from "./ChipGroup";
+import { ConfirmProvider, useConfirm } from "./admin/Confirm";
+import { RenameButton, RenameField } from "./InlineRename";
 import { useVisitorPrefs } from "./PrefsProvider";
 import {
   StatusTimeline,
@@ -100,35 +102,110 @@ function OutageRow({
   outage,
   now,
   timeZone,
+  isAdmin,
+  onSaveNote,
 }: {
   outage: OutageEntry;
   now: number;
   timeZone: string;
+  isAdmin: boolean;
+  onSaveNote: (startMs: number, note: string) => Promise<boolean>;
 }) {
   const ongoing = outage.endMs === null;
+  const [editing, setEditing] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const confirm = useConfirm();
+  // Notes anchor to recorded outages (#175) by their exact start instant;
+  // approximate entries and the ongoing one have no stable identity yet, so
+  // they get no affordance (a live incident is what announcements are for).
+  const editable = isAdmin && outage.recorded === true;
+  const noteLabel = `incident note for the outage of ${instantLabel(outage.startMs, timeZone)}`;
+
+  const beginEdit = () => {
+    setFailed(false);
+    setEditing(true);
+  };
+
+  const commit = async (raw: string) => {
+    const note = raw.trim();
+    setEditing(false);
+    if (note === (outage.note ?? "")) return;
+    if (note === "") {
+      const ok = await confirm({
+        title: "Delete this note?",
+        message: "The outage entry itself stays in the log.",
+        confirmLabel: "Delete",
+        danger: true,
+      });
+      if (!ok) return;
+    }
+    setFailed(!(await onSaveNote(outage.startMs, note)));
+  };
+
   return (
-    <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2.5 first:pt-0 last:pb-0">
-      <span className="text-sm text-fg/80">
-        {instantLabel(outage.startMs, timeZone)}
-        {" – "}
-        {ongoing ? (
-          <span className="text-red-400">ongoing</span>
-        ) : (
-          instantLabel(outage.endMs!, timeZone)
-        )}
-        {/* Hour-granular entries derived from old buckets say so instead of
-            implying to-the-minute knowledge the data doesn't have. */}
-        {!outage.exact && (
-          <span className="text-xs text-fg/40"> · approximate</span>
-        )}
-      </span>
-      <span
-        className={`text-sm tabular-nums ${
-          ongoing ? "text-red-400" : "text-fg/55"
-        }`}
-      >
-        down {ongoing ? downDuration(outage.startMs, now) : fmtDuration(outage.downMs)}
-      </span>
+    <li className="space-y-1 py-2.5 first:pt-0 last:pb-0">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <span className="text-sm text-fg/80">
+          {instantLabel(outage.startMs, timeZone)}
+          {" – "}
+          {ongoing ? (
+            <span className="text-red-400">ongoing</span>
+          ) : (
+            instantLabel(outage.endMs!, timeZone)
+          )}
+          {/* Hour-granular entries derived from old buckets say so instead of
+              implying to-the-minute knowledge the data doesn't have. */}
+          {!outage.exact && (
+            <span className="text-xs text-fg/40"> · approximate</span>
+          )}
+        </span>
+        <span
+          className={`text-sm tabular-nums ${
+            ongoing ? "text-red-400" : "text-fg/55"
+          }`}
+        >
+          down {ongoing ? downDuration(outage.startMs, now) : fmtDuration(outage.downMs)}
+        </span>
+      </div>
+      {editing ? (
+        <RenameField
+          initialValue={outage.note ?? ""}
+          onCommit={commit}
+          onCancel={() => setEditing(false)}
+          label={`Edit ${noteLabel}`}
+          maxLength={500}
+          placeholder="What happened? e.g. planned maintenance"
+          className="accent-focus w-full max-w-md rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-sm text-fg placeholder-fg/30 outline-none"
+        />
+      ) : (
+        (outage.note || editable) && (
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            {outage.note ? (
+              <>
+                <p className="text-sm text-fg/55">{outage.note}</p>
+                {editable && (
+                  <RenameButton
+                    label={`Edit ${noteLabel}`}
+                    onClick={beginEdit}
+                    className="shrink-0 self-center text-fg/35 hover:text-fg/80"
+                  />
+                )}
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={beginEdit}
+                className="text-xs text-fg/40 underline decoration-fg/20 underline-offset-2 hover:text-fg/75"
+              >
+                Add note
+              </button>
+            )}
+            {failed && (
+              <p className="text-xs text-red-400">Couldn&apos;t save the note.</p>
+            )}
+          </div>
+        )
+      )}
     </li>
   );
 }
@@ -137,11 +214,15 @@ export default function StatusDetail({
   app,
   check,
   defaultRange,
+  isAdmin,
 }: {
   app: StatusAppMeta;
   // Read-only check context: how this app's reachability is measured.
   check: { type: CheckType; expectStatus: string; port: number | null };
   defaultRange: StatusRangeKey;
+  // Unlocks the incident-note editor on the outage log (#176). Presentation-
+  // only trust decided server-side; the note API re-checks every write.
+  isAdmin: boolean;
 }) {
   const [detail, setDetail] = useState<AppDetail | null>(null);
   const [live, setLive] = useState<AppStatus | undefined>(undefined);
@@ -173,6 +254,27 @@ export default function StatusDetail({
       // Leave the previous data in place on a network hiccup.
     }
   }, [app.id, timezone]);
+
+  // Write one outage's incident note (#176) and refresh the log so the row
+  // shows what the server accepted. `false` surfaces as the row's inline
+  // "couldn't save" notice — an expired session or an entry that aged out.
+  const saveNote = useCallback(
+    async (startMs: number, note: string) => {
+      try {
+        const res = await fetch(`/api/status/history/${app.id}/note`, {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ start: startMs, note }),
+        });
+        if (!res.ok) return false;
+        await load();
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [app.id, load]
+  );
 
   useEffect(() => {
     // Initial fetch on mount, then the same 30s poll cadence as /status.
@@ -326,26 +428,31 @@ export default function StatusDetail({
         <LatencyChart points={series} timeZone={timezone} range={range} />
       </div>
 
-      {/* Outage log, newest first. */}
-      <div className="glass-card px-5 py-4">
-        <p className="mb-2 text-sm text-fg/70">Outages</p>
-        {detail && detail.outages.length > 0 ? (
-          <ul className="divide-y divide-fg/10">
-            {detail.outages.map((o) => (
-              <OutageRow
-                key={`${o.startMs}`}
-                outage={o}
-                now={now}
-                timeZone={timezone}
-              />
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-fg/40">
-            No outages in the recorded history.
-          </p>
-        )}
-      </div>
+      {/* Outage log, newest first. The ConfirmProvider hosts the note
+          editor's delete confirmation; it renders nothing until asked. */}
+      <ConfirmProvider>
+        <div className="glass-card px-5 py-4">
+          <p className="mb-2 text-sm text-fg/70">Outages</p>
+          {detail && detail.outages.length > 0 ? (
+            <ul className="divide-y divide-fg/10">
+              {detail.outages.map((o) => (
+                <OutageRow
+                  key={`${o.startMs}`}
+                  outage={o}
+                  now={now}
+                  timeZone={timezone}
+                  isAdmin={isAdmin}
+                  onSaveNote={saveNote}
+                />
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-fg/40">
+              No outages in the recorded history.
+            </p>
+          )}
+        </div>
+      </ConfirmProvider>
 
       {/* How this app is checked — read-only context for the graphs above. */}
       <div className="glass-card px-5 py-4">

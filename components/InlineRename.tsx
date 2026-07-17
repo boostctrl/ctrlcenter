@@ -53,6 +53,7 @@ export function RenameField({
   label,
   className,
   maxLength,
+  placeholder,
 }: {
   initialValue: string;
   onCommit: (value: string) => void;
@@ -60,6 +61,7 @@ export function RenameField({
   label: string;
   className?: string;
   maxLength?: number;
+  placeholder?: string;
 }) {
   const cancelled = useRef(false);
   return (
@@ -67,6 +69,7 @@ export function RenameField({
       autoFocus
       defaultValue={initialValue}
       maxLength={maxLength}
+      placeholder={placeholder}
       aria-label={label}
       onKeyDown={(e) => {
         if (e.key === "Enter") e.currentTarget.blur();

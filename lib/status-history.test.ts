@@ -15,6 +15,7 @@ import {
   loadHistory,
   flush,
   recordResults,
+  setOutageNote,
   getHistory,
   getAppDetail,
   type Bucket,
@@ -418,7 +419,7 @@ describe("recordResults completed-outage records (#175)", () => {
     recordResults([{ id, up: true, status: 200, ms: 100 }], t0 + 10 * MIN);
     // One entry, not one recorded + one re-derived from the ring.
     expect(getAppDetail(id, "UTC", 5).outages).toEqual([
-      { startMs: t0, endMs: t0 + 10 * MIN, downMs: 10 * MIN, exact: true },
+      { startMs: t0, endMs: t0 + 10 * MIN, downMs: 10 * MIN, exact: true, recorded: true },
     ]);
   });
 
@@ -432,7 +433,7 @@ describe("recordResults completed-outage records (#175)", () => {
     // before #175 the outage degraded to hour-granular bucket bounds here.
     recordResults([{ id, up: true, status: 200, ms: 100 }], now);
     expect(getAppDetail(id, "UTC", 5).outages).toEqual([
-      { startMs: t0, endMs: t0 + 10 * MIN, downMs: 10 * MIN, exact: true },
+      { startMs: t0, endMs: t0 + 10 * MIN, downMs: 10 * MIN, exact: true, recorded: true },
     ]);
   });
 
@@ -531,8 +532,21 @@ describe("loadHistory / flush persistence", () => {
     resetHistoryState();
     await loadHistory();
     expect(getAppDetail("d", "UTC", 5).outages).toEqual([
-      { startMs: t0, endMs: t0 + 5 * MIN, downMs: 5 * MIN, exact: true },
+      { startMs: t0, endMs: t0 + 5 * MIN, downMs: 5 * MIN, exact: true, recorded: true },
     ]);
+  });
+
+  it("round-trips an incident note through flush → load (#176)", async () => {
+    const t0 = Date.now() - 30 * MIN;
+    recordResults([{ id: "e", up: false, status: 503, ms: 5000 }], t0);
+    recordResults([{ id: "e", up: true, status: 200, ms: 100 }], t0 + 5 * MIN);
+    expect(setOutageNote("e", t0, "planned maintenance")).toBe(true);
+    await flush();
+    resetHistoryState();
+    await loadHistory();
+    expect(getAppDetail("e", "UTC", 5).outages[0].note).toBe(
+      "planned maintenance"
+    );
   });
 
   it("loads a file without an outages key; bucket reconstruction still applies", async () => {
@@ -568,7 +582,7 @@ describe("loadHistory / flush persistence", () => {
     );
     await loadHistory();
     expect(getAppDetail("a", "UTC", 5).outages).toEqual([
-      { startMs: now - 60 * MIN, endMs: now - 50 * MIN, downMs: 10 * MIN, exact: true },
+      { startMs: now - 60 * MIN, endMs: now - 50 * MIN, downMs: 10 * MIN, exact: true, recorded: true },
     ]);
   });
 });
@@ -739,6 +753,7 @@ describe("extractOutages", () => {
         endMs: 100 * HOUR + 23 * MIN,
         downMs: 16 * MIN,
         exact: true,
+        recorded: true,
       },
     ]);
   });
@@ -756,6 +771,7 @@ describe("extractOutages", () => {
         endMs: 100 * HOUR + 40 * MIN,
         downMs: 30 * MIN,
         exact: true,
+        recorded: true,
       },
     ]);
   });
@@ -775,6 +791,7 @@ describe("extractOutages", () => {
         endMs: now - 25 * MIN,
         downMs: 10 * MIN,
         exact: true,
+        recorded: true,
       },
     ]);
   });
@@ -791,6 +808,7 @@ describe("extractOutages", () => {
         endMs: 200 * HOUR + 15 * MIN,
         downMs: 10 * MIN,
         exact: true,
+        recorded: true,
       },
       {
         startMs: 100 * HOUR,
@@ -810,6 +828,58 @@ describe("extractOutages", () => {
     const out = extractOutages(recorded, [], [], null, now, 5);
     expect(out).toHaveLength(1);
     expect(out[0].startMs).toBe(99 * 24 * HOUR);
+  });
+
+  it("carries the incident note on a recorded entry (#176)", () => {
+    const now = 200 * HOUR;
+    const recorded = [
+      { start: 100 * HOUR, end: 100 * HOUR + 10 * MIN, note: "ISP fault" },
+      { start: 150 * HOUR, end: 150 * HOUR + 5 * MIN },
+    ];
+    const out = extractOutages(recorded, [], [], null, now, 5);
+    expect(out[0].note).toBeUndefined(); // newest first, no note set
+    expect(out[1].note).toBe("ISP fault");
+  });
+
+  it("keeps recorded outages separate even within the poll hold (#176)", () => {
+    const now = 200 * HOUR;
+    // Two real outages one poll apart. The seam merge must not fold them into
+    // one row: each carries its own identity (startMs) for its note.
+    const recorded = [
+      { start: 100 * HOUR, end: 100 * HOUR + 5 * MIN, note: "first" },
+      { start: 100 * HOUR + 10 * MIN, end: 100 * HOUR + 15 * MIN, note: "second" },
+    ];
+    const out = extractOutages(recorded, [], [], null, now, 5);
+    expect(out).toHaveLength(2);
+    expect(out.map((o) => o.note)).toEqual(["second", "first"]);
+  });
+});
+
+describe("setOutageNote (#176)", () => {
+  beforeEach(resetHistoryState);
+
+  const recordOutage = (id: string, t0: number) => {
+    recordResults([{ id, up: false, status: 503, ms: 5000 }], t0);
+    recordResults([{ id, up: true, status: 200, ms: 100 }], t0 + 5 * MIN);
+  };
+
+  it("sets, replaces, and clears the note on a recorded outage", () => {
+    const t0 = Date.now() - 30 * MIN;
+    recordOutage("n", t0);
+    expect(setOutageNote("n", t0, "power outage")).toBe(true);
+    expect(getAppDetail("n", "UTC", 5).outages[0].note).toBe("power outage");
+    expect(setOutageNote("n", t0, "ISP fault")).toBe(true);
+    expect(getAppDetail("n", "UTC", 5).outages[0].note).toBe("ISP fault");
+    expect(setOutageNote("n", t0, "")).toBe(true);
+    expect(getAppDetail("n", "UTC", 5).outages[0].note).toBeUndefined();
+  });
+
+  it("returns false when no record anchors the start instant", () => {
+    const t0 = Date.now() - 30 * MIN;
+    recordOutage("n", t0);
+    expect(setOutageNote("n", t0 + 1, "off by one")).toBe(false);
+    expect(setOutageNote("other", t0, "wrong app")).toBe(false);
+    expect(getAppDetail("n", "UTC", 5).outages[0].note).toBeUndefined();
   });
 });
 

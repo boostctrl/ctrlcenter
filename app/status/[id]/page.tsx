@@ -27,7 +27,10 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 export default async function StatusDetailRoute({ params }: Params) {
   const { id } = await params;
-  const { config } = await readPublicConfig();
+  // `isAdmin` only unlocks the incident-note editor UI (#176) — presentation-
+  // only trust, same as the home-page layout editor; the note API re-checks
+  // the session on every write.
+  const { config, isAdmin } = await readPublicConfig();
   const { settings } = config;
   const app = config.apps.find((a) => a.id === id);
   if (!app) notFound();
@@ -58,6 +61,7 @@ export default async function StatusDetailRoute({ params }: Params) {
               port: app.port ?? null,
             }}
             defaultRange={settings.statusDefaultRange}
+            isAdmin={isAdmin}
           />
         ) : (
           <p className="text-fg/50">
