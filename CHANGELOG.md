@@ -12,6 +12,27 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **The admin Settings tab got a ground-up redesign** instead of a fifth
+  round of patches. Settings are now grouped by what you're doing: **General**
+  (site identity and default look), **Home layout**, **Widgets** (only what
+  each home-page widget shows), a new **Monitoring** section for status
+  checks and alerts, **Announcements** gathering the site-wide banner and the
+  status page's notices in one place, and **Security**. Each section names
+  itself with a short description, every card follows one consistent shape —
+  a feature's on/off switch now always sits in its card header — and on wide
+  screens cards lay out on a predictable two-column grid instead of a masonry
+  flow that reshuffled as cards expanded. Old
+  `?section=announcement` links keep working. (#180)
+
+### Fixed
+
+- Time-zone suggestions now appear for the World clocks zone fields (they
+  previously only worked for the default time zone in General), and opening
+  the General section no longer triggers a React hydration warning when the
+  server and browser disagree on the time-zone list. (#180)
+
 ## [2.0.3] - 2026-07-17
 
 ### Security
