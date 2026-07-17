@@ -9,16 +9,21 @@ release before reporting it.
 
 ## Reporting a vulnerability
 
-**Please report security issues privately — do not open a public issue or PR.**
-
-Use GitHub's private vulnerability reporting:
-[**Security → Report a vulnerability**](https://github.com/boostctrl/ctrlcenter/security/advisories/new).
+**Please report security issues as GitHub issues:**
+[**open a new issue**](https://github.com/boostctrl/ctrlcenter/issues/new) and
+apply the `security` label. Keeping reports in the open tracker keeps triage,
+discussion, and the fix in one visible place.
 
 Helpful details to include:
 
 - affected version and how ctrlcenter is deployed (reverse proxy, direct, etc.),
 - a description of the impact and the steps to reproduce,
 - any proof-of-concept or logs.
+
+If you believe a finding is too sensitive to post publicly (for example, it's
+trivially exploitable against typical deployments), you may instead use
+GitHub's private reporting:
+[Security → Report a vulnerability](https://github.com/boostctrl/ctrlcenter/security/advisories/new).
 
 We aim to acknowledge a report within a few days and will keep you posted as we
 work on a fix. Once a fix ships we're glad to credit you in the release notes,

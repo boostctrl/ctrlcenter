@@ -14,6 +14,12 @@ here.
 
 ### Changed
 
+- **Security reports are now requested as GitHub issues.** The security
+  policy asks reporters to file findings in the open issue tracker (with the
+  `security` label) so triage and the fix stay in one visible place; GitHub's
+  private reporting remains available for findings too sensitive to post
+  publicly.
+
 - **Navigation is consistent across the site.** Every page outside the home
   dashboard — weather, status and its detail pages, calendar, help, settings,
   and the admin portal — now opens with the same slim navigation strip: the
