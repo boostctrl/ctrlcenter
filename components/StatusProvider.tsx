@@ -89,8 +89,8 @@ export function StatusDot({ id }: { id: string }) {
 // Shares the provider's context, so it renders nothing — and shows no divider —
 // until the first poll resolves (avoiding a flash of "all systems operational").
 const SUMMARY_VARIANTS: Record<"row" | "card", string> = {
-  row: "flex items-center gap-2 border-t border-fg/10 px-6 py-3 text-sm text-fg/70 transition-colors hover:bg-fg/[0.03] hover:text-fg",
-  card: "glass-card flex w-full items-center gap-2 px-6 py-4 text-sm text-fg/70 transition-colors hover:text-fg sm:w-auto",
+  row: "group flex items-center gap-2 border-t border-fg/10 px-6 py-3 text-sm text-fg/70 transition-colors hover:bg-fg/[0.03] hover:text-fg",
+  card: "group glass-card flex w-full items-center gap-2 px-6 py-4 text-sm text-fg/70 transition-colors hover:text-fg sm:w-auto",
 };
 
 export function StatusSummary({
@@ -126,6 +126,14 @@ export function StatusSummary({
         />
       </span>
       <span className="font-medium">{message}</span>
+      {/* The glance is the home page's door to /status (#177): name the
+          destination at rest so the row reads as a link, not just a status
+          readout. Hidden on the narrowest widths — the combo card is the
+          app's most fragile responsive surface (#78/#105/#154), and there
+          the whole row already serves as the tap target. */}
+      <span className="ml-auto hidden text-xs text-fg/40 transition-colors group-hover:text-fg/75 group-focus-visible:text-fg/75 sm:inline">
+        Uptime & outages
+      </span>
     </Link>
   );
 }

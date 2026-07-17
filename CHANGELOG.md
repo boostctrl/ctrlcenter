@@ -24,6 +24,11 @@ here.
 
 ### Changed
 
+- **The status page is easier to find from the home page.** The status
+  glance in the header card now names its destination — a quiet
+  "Uptime & outages" label at the end of the row — so it reads as the link
+  it has always been instead of a bare status readout. (#177)
+
 - **The outage log keeps exact times.** A completed outage is now recorded
   the moment the service recovers, with the exact start and end the checker
   observed, and stays that way for the full 90-day history window. Outage
