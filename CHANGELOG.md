@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [2.0.4] - 2026-07-17
+
 ### Changed
 
 - **The admin Settings tab got a ground-up redesign** instead of a fifth
@@ -2023,7 +2025,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.0.3...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.0.4...HEAD
+[2.0.4]: https://github.com/boostctrl/ctrlcenter/compare/v2.0.3...v2.0.4
 [2.0.3]: https://github.com/boostctrl/ctrlcenter/compare/v2.0.2...v2.0.3
 [2.0.2]: https://github.com/boostctrl/ctrlcenter/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/boostctrl/ctrlcenter/compare/v2.0.0...v2.0.1
