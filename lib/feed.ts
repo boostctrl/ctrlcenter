@@ -190,10 +190,14 @@ async function fetchOneFeed(url: string, cap: number): Promise<Feed | null> {
 // publish time descending; an undated item inherits the timestamp of the most
 // recent dated item above it in ITS OWN feed (feeds run newest-first), so it
 // stays beside its neighbours instead of being dumped at the end. A stable sort
-// keeps ties in feed-then-document order. Each item is stamped with its source
-// feed's label only when more than one feed contributed, so a single feed shows
-// no redundant labels. `count` caps the result; the title falls back to the
-// first feed's own title. Exported for unit testing the interleave.
+// keeps ties in feed-then-document order. Items sharing a URL (the same story
+// carried by overlapping sources) keep only their highest-ranked occurrence —
+// deduped after the sort so rank decides, and before the cap so a dropped
+// duplicate doesn't shortchange the list; "" is not an identity, so unlinked
+// items are exempt. Each item is stamped with its source feed's label only
+// when more than one feed contributed, so a single feed shows no redundant
+// labels. `count` caps the result; the title falls back to the first feed's
+// own title. Exported for unit testing the interleave.
 export function mergeFeeds(
   sources: { feed: Feed; source: string }[],
   count: number
@@ -223,9 +227,16 @@ export function mergeFeeds(
   tagged.sort((a, b) =>
     a.effective === b.effective ? a.order - b.order : b.effective - a.effective
   );
+  const seen = new Set<string>();
+  const deduped = tagged.filter(({ item }) => {
+    if (item.url === "") return true;
+    if (seen.has(item.url)) return false;
+    seen.add(item.url);
+    return true;
+  });
   return {
     title: sources[0]?.feed.title ?? "",
-    items: tagged.slice(0, count).map((t) => t.item),
+    items: deduped.slice(0, count).map((t) => t.item),
   };
 }
 

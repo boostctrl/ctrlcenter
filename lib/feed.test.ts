@@ -161,6 +161,44 @@ describe("mergeFeeds", () => {
     expect(merged.items.map((i) => i.title)).toEqual(["a3", "b2"]);
   });
 
+  it("dedupes items sharing a URL, keeping the highest-ranked occurrence", () => {
+    const story = (title: string, ms: number) => ({
+      title,
+      url: "https://x/shared-story",
+      publishedAt: ms,
+    });
+    const a = feed("A", [story("via A", 300), dated("a1", 100)]);
+    const b = feed("B", [story("via B", 200), dated("b1", 150)]);
+    const merged = mergeFeeds([src(a), src(b)], 10);
+    expect(merged.items.map((i) => i.title)).toEqual(["via A", "b1", "a1"]);
+    expect(merged.items[0].source).toBe("A");
+  });
+
+  it("fills to count from below when duplicates drop out", () => {
+    const story = (title: string, ms: number) => ({
+      title,
+      url: "https://x/shared-story",
+      publishedAt: ms,
+    });
+    const a = feed("A", [story("via A", 300), dated("a1", 100)]);
+    const b = feed("B", [story("via B", 200)]);
+    // Cap 2: the duplicate drops, so a1 makes the cut instead.
+    const merged = mergeFeeds([src(a), src(b)], 2);
+    expect(merged.items.map((i) => i.title)).toEqual(["via A", "a1"]);
+  });
+
+  it("never dedupes unlinked items (empty URL is not an identity)", () => {
+    const bare = (title: string, ms: number) => ({
+      title,
+      url: "",
+      publishedAt: ms,
+    });
+    const a = feed("A", [bare("first note", 300)]);
+    const b = feed("B", [bare("second note", 200)]);
+    const merged = mergeFeeds([src(a), src(b)], 10);
+    expect(merged.items).toHaveLength(2);
+  });
+
   it("sinks an all-undated feed below dated items instead of floating it up", () => {
     // The undated feed is listed FIRST; it must still land below the dated
     // feed's real timestamps, not pin its items to the top of "newest-first".

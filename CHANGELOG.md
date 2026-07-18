@@ -12,6 +12,13 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **The RSS card no longer shows the same story twice.** When two of your
+  feeds carry the same article (common with overlapping news sources), the
+  duplicate is dropped and only the better-ranked copy stays — and the list
+  still fills to your configured entry count. (#169)
+
 ## [2.0.5] - 2026-07-18
 
 ### Changed
