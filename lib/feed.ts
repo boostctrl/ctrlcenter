@@ -218,12 +218,15 @@ const FEED_MAX_BYTES = 3 * 1024 * 1024;
 
 // Parsed-feed cache keyed by URL, like the calendar's — the homepage is
 // force-dynamic, so without it every render would block on the third party.
-// Held on globalThis to survive module-graph duplication.
+// Held on globalThis to survive module-graph duplication, as is the in-flight
+// refresh map that keeps concurrent renders from stacking duplicate fetches.
 type FeedCacheEntry = { feed: Feed; at: number };
 const g = globalThis as unknown as {
   __ctrlcenterFeedCache?: Map<string, FeedCacheEntry>;
+  __ctrlcenterFeedRefresh?: Map<string, Promise<void>>;
 };
 const feedCache = (g.__ctrlcenterFeedCache ??= new Map());
+const refreshInFlight = (g.__ctrlcenterFeedRefresh ??= new Map());
 
 // GET a URL (time-boxed, size-capped) and parse it as a feed, or say why not.
 async function requestFeed(
@@ -256,24 +259,44 @@ async function requestFeed(
   }
 }
 
+// Refresh one URL's cache entry, deduped so at most one fetch per URL is in
+// flight however many renders want it. Only a good parse replaces the entry —
+// a failure keeps serving the last good cache (stale-on-failure). Never
+// rejects (requestFeed never throws), so a fire-and-forget call can't become
+// an unhandled rejection.
+function refreshFeed(target: string): Promise<void> {
+  const inFlight = refreshInFlight.get(target);
+  if (inFlight) return inFlight;
+  const run = (async () => {
+    try {
+      const { feed: fresh } = await requestFeed(target);
+      if (fresh && fresh.items.length > 0) {
+        feedCache.set(target, { feed: fresh, at: Date.now() });
+      }
+    } finally {
+      refreshInFlight.delete(target);
+    }
+  })();
+  refreshInFlight.set(target, run);
+  return run;
+}
+
 // Fetch + parse one feed, cached for a few minutes; `cap` limits the items so a
-// single feed can't crowd out the others in the merge. Returns null for a
-// non-http(s) URL; on a fetch/parse failure serves the last good cache if there
-// is one, else null. Never throws.
+// single feed can't crowd out the others in the merge. Stale-while-revalidate:
+// an existing cache entry — even an expired one — is served immediately, with
+// the refetch running behind the response; only a cold cache blocks the
+// render on the network. Returns null for a non-http(s) URL or when nothing
+// has ever resolved. Never throws.
 async function fetchOneFeed(url: string, cap: number): Promise<Feed | null> {
   const target = url.trim();
   if (!/^https?:\/\//i.test(target)) return null;
-  const now = Date.now();
   const cached = feedCache.get(target);
-  let feed = cached?.feed;
-  if (!cached || now - cached.at >= FEED_CACHE_TTL_MS) {
-    const { feed: fresh } = await requestFeed(target);
-    if (fresh && fresh.items.length > 0) {
-      feed = fresh;
-      feedCache.set(target, { feed: fresh, at: now });
-    }
-    // On failure, keep serving the stale cache (feed stays as cached?.feed).
+  if (!cached) {
+    await refreshFeed(target);
+  } else if (Date.now() - cached.at >= FEED_CACHE_TTL_MS) {
+    void refreshFeed(target);
   }
+  const feed = (feedCache.get(target) ?? cached)?.feed;
   if (!feed) return null;
   return { ...feed, items: feed.items.slice(0, cap) };
 }

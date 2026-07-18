@@ -25,6 +25,11 @@ here.
 
 ### Changed
 
+- **A slow feed no longer stalls the home page.** When the RSS cache goes
+  stale, the page now shows the cached entries immediately and refreshes
+  them in the background — only the very first load after a restart waits
+  on the network. Concurrent visitors share a single refresh per feed.
+  (#166)
 - **The RSS card no longer shows the same story twice.** When two of your
   feeds carry the same article (common with overlapping news sources), the
   duplicate is dropped and only the better-ranked copy stays — and the list

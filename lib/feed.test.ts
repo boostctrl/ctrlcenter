@@ -1,5 +1,11 @@
-import { describe, expect, it } from "vitest";
-import { mergeFeeds, parseFeed, parseJsonFeed, type Feed } from "./feed";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  fetchFeeds,
+  mergeFeeds,
+  parseFeed,
+  parseJsonFeed,
+  type Feed,
+} from "./feed";
 
 const RSS = `<?xml version="1.0"?>
 <rss version="2.0">
@@ -322,5 +328,93 @@ describe("mergeFeeds", () => {
     const datedFeed = feed("News", [dated("n2", 200), dated("n1", 100)]);
     const merged = mergeFeeds([src(undatedFeed), src(datedFeed)], 10);
     expect(merged.items.map((i) => i.title)).toEqual(["n2", "n1", "u1", "u2"]);
+  });
+});
+
+// The fetch/cache layer: stale-while-revalidate with per-URL refresh dedupe.
+// Each test uses its own URL — the cache lives on globalThis and survives
+// across tests in a run.
+describe("fetchFeeds stale-while-revalidate", () => {
+  const TTL = 5 * 60_000;
+  const rss = (title: string) =>
+    `<rss version="2.0"><channel><title>Src</title><item><title>${title}</title><link>https://x.example/${encodeURIComponent(title)}</link></item></channel></rss>`;
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  const settle = () => new Promise((r) => setTimeout(r, 0));
+
+  it("blocks only on a cold cache, then serves the cache within the TTL", async () => {
+    const url = "https://swr-cold.example/feed";
+    const fetchMock = vi.fn(async () => new Response(rss("v1")));
+    vi.stubGlobal("fetch", fetchMock);
+    expect((await fetchFeeds([url], 5))?.items[0].title).toBe("v1");
+    expect((await fetchFeeds([url], 5))?.items[0].title).toBe("v1");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("serves an expired entry immediately and refreshes behind the response", async () => {
+    const url = "https://swr-stale.example/feed";
+    let releaseV2: (() => void) | undefined;
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(rss("v1")))
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            releaseV2 = () => resolve(new Response(rss("v2")));
+          })
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const base = Date.now();
+    const now = vi.spyOn(Date, "now").mockReturnValue(base);
+    await fetchFeeds([url], 5);
+
+    now.mockReturnValue(base + TTL + 1);
+    // The stale entry comes back without waiting on the in-flight v2 fetch.
+    expect((await fetchFeeds([url], 5))?.items[0].title).toBe("v1");
+    releaseV2!();
+    await settle();
+    expect((await fetchFeeds([url], 5))?.items[0].title).toBe("v2");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("dedupes concurrent refreshes to one fetch per URL", async () => {
+    const url = "https://swr-dedupe.example/feed";
+    let release: (() => void) | undefined;
+    const fetchMock = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          release = () => resolve(new Response(rss("v1")));
+        })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const both = Promise.all([fetchFeeds([url], 5), fetchFeeds([url], 5)]);
+    await settle();
+    release!();
+    const [a, b] = await both;
+    expect(a?.items[0].title).toBe("v1");
+    expect(b?.items[0].title).toBe("v1");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps serving the last good parse when the refresh fails", async () => {
+    const url = "https://swr-fail.example/feed";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(rss("v1")))
+      .mockResolvedValue(new Response("boom", { status: 500 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const base = Date.now();
+    const now = vi.spyOn(Date, "now").mockReturnValue(base);
+    await fetchFeeds([url], 5);
+
+    now.mockReturnValue(base + TTL + 1);
+    expect((await fetchFeeds([url], 5))?.items[0].title).toBe("v1");
+    await settle();
+    expect((await fetchFeeds([url], 5))?.items[0].title).toBe("v1");
+    expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 });
