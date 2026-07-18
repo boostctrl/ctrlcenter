@@ -228,12 +228,33 @@ type FeedCacheEntry = {
   etag?: string;
   lastModified?: string;
 };
+// Last fetch outcome per URL — read-only diagnostics for the admin's RSS
+// settings ("OK · 12 entries · 3 min ago" / "HTTP 500 · 2 h ago"). Recorded
+// by every cache refresh, so it fills in as the home page actually fetches.
+export type FeedHealth = {
+  ok: boolean;
+  // Entry count of the last good parse (present when ok).
+  count?: number;
+  // Why the last fetch failed (present when not ok).
+  error?: string;
+  // When the outcome was recorded (epoch ms).
+  at: number;
+};
+
 const g = globalThis as unknown as {
   __ctrlcenterFeedCache?: Map<string, FeedCacheEntry>;
   __ctrlcenterFeedRefresh?: Map<string, Promise<void>>;
+  __ctrlcenterFeedHealth?: Map<string, FeedHealth>;
 };
 const feedCache = (g.__ctrlcenterFeedCache ??= new Map());
 const refreshInFlight = (g.__ctrlcenterFeedRefresh ??= new Map());
+const feedHealthMap = (g.__ctrlcenterFeedHealth ??= new Map());
+
+// Snapshot of every recorded outcome, keyed by feed URL, for the admin
+// health endpoint.
+export function getFeedHealth(): Record<string, FeedHealth> {
+  return Object.fromEntries(feedHealthMap);
+}
 
 // GET a URL (time-boxed, size-capped) and parse it as a feed, or say why not.
 // When the caller has cached validators the request is conditional
@@ -300,15 +321,34 @@ function refreshFeed(target: string): Promise<void> {
   const run = (async () => {
     try {
       const result = await requestFeed(target, feedCache.get(target));
+      const at = Date.now();
       if (result.notModified) {
         const entry = feedCache.get(target);
-        if (entry) feedCache.set(target, { ...entry, at: Date.now() });
+        if (entry) {
+          feedCache.set(target, { ...entry, at });
+          feedHealthMap.set(target, {
+            ok: true,
+            count: entry.feed.items.length,
+            at,
+          });
+        }
       } else if (result.feed && result.feed.items.length > 0) {
         feedCache.set(target, {
           feed: result.feed,
-          at: Date.now(),
+          at,
           etag: result.etag,
           lastModified: result.lastModified,
+        });
+        feedHealthMap.set(target, {
+          ok: true,
+          count: result.feed.items.length,
+          at,
+        });
+      } else {
+        feedHealthMap.set(target, {
+          ok: false,
+          error: result.error ?? "Unreadable feed",
+          at,
         });
       }
     } finally {

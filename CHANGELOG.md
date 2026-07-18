@@ -18,6 +18,11 @@ here.
   Settings → Widgets → RSS feed to add a one-to-two-line snippet from each
   entry under its headline — always plain text, never raw HTML. Off (the
   default) keeps today's compact headline list. (#165)
+- **Each feed URL in Settings now shows its fetch health.** Next to every
+  URL row you'll see what the home page's own fetches last saw — "OK · 12
+  entries · 3 min ago" or "HTTP 500 · 2 h ago" — so when one of several
+  feeds quietly dies, you can tell which one and when. The Test feed
+  button remains the on-demand fresh probe. (#168)
 - **The RSS card now reads JSON Feed sources.** Sites that publish a
   `feed.json` (jsonfeed.org) instead of RSS or Atom work like any other
   feed — same merging, caching, and safety rules. The Test feed button

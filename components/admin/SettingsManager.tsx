@@ -50,6 +50,7 @@ import { reorder } from "./useReorder";
 import IconField from "./IconField";
 import CalendarTest from "./CalendarTest";
 import FeedTest from "./FeedTest";
+import { FeedHealthBadge, useFeedHealth } from "./FeedHealth";
 import AlertTest from "./AlertTest";
 import CitySearch from "./CitySearch";
 import ChangePassword from "./ChangePassword";
@@ -372,6 +373,7 @@ export default function SettingsManager({
   const feedUrlRows = useKeyedRows(feed.urls, setFeedUrls);
   const updateFeedUrl = (i: number, url: string) =>
     setFeedUrls((urls) => urls.map((u, idx) => (idx === i ? url : u)));
+  const feedHealth = useFeedHealth(section === "widgets" && feed.enabled);
 
   const countdown = settings.countdown;
   const setCountdownItems = (
@@ -1078,7 +1080,12 @@ export default function SettingsManager({
                         onClick={() => feedUrlRows.removeAt(i)}
                       />
                     </div>
-                    {url.trim() !== "" && <FeedTest url={url} />}
+                    {url.trim() !== "" && (
+                      <div className="flex flex-wrap items-center gap-3">
+                        <FeedTest url={url} />
+                        <FeedHealthBadge health={feedHealth?.[url.trim()]} />
+                      </div>
+                    )}
                   </div>
                 ))}
                 {feed.urls.length < MAX_FEED_URLS && (

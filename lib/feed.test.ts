@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   fetchFeeds,
+  getFeedHealth,
   mergeFeeds,
   parseFeed,
   parseJsonFeed,
@@ -493,5 +494,48 @@ describe("fetchFeeds conditional requests", () => {
     await fetchFeeds([url], 5);
     await settle();
     expect(fetchMock.mock.calls[2][1].headers["If-None-Match"]).toBe('"tag-2"');
+  });
+});
+
+describe("feed health recording", () => {
+  const rss = (title: string) =>
+    `<rss version="2.0"><channel><title>Src</title><item><title>${title}</title><link>https://x.example/a</link></item></channel></rss>`;
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("records a good fetch as ok with its entry count", async () => {
+    const url = "https://health-ok.example/feed";
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(rss("v1"))));
+    await fetchFeeds([url], 5);
+    const h = getFeedHealth()[url];
+    expect(h.ok).toBe(true);
+    expect(h.count).toBe(1);
+    expect(h.at).toBeGreaterThan(0);
+  });
+
+  it("records why a fetch failed", async () => {
+    const url = "https://health-bad.example/feed";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("nope", { status: 500 }))
+    );
+    await fetchFeeds([url], 5);
+    expect(getFeedHealth()[url]).toMatchObject({ ok: false, error: "HTTP 500" });
+  });
+
+  it("records a non-feed body distinctly from an unreachable host", async () => {
+    const url = "https://health-html.example/feed";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("<html><body>hi</body></html>"))
+    );
+    await fetchFeeds([url], 5);
+    expect(getFeedHealth()[url]).toMatchObject({
+      ok: false,
+      error: "Not an RSS, Atom, or JSON feed",
+    });
   });
 });
