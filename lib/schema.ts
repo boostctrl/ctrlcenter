@@ -143,6 +143,9 @@ export const feedSchema = z.object({
   count: z.number().int().min(1).max(15).default(6),
   // Card title override; empty uses the first feed's own title.
   title: z.string().default(""),
+  // Show a short snippet of each entry under its headline; off keeps the
+  // compact headline-only list.
+  summaries: z.boolean().default(false),
 });
 export type FeedConfig = z.infer<typeof feedSchema>;
 
@@ -762,6 +765,7 @@ export const feedUpdateSchema = z
     urls: z.array(z.string()).max(MAX_FEED_URLS),
     count: z.number().int().min(1).max(15),
     title: z.string(),
+    summaries: z.boolean(),
   })
   .refine(
     (f) => f.urls.every((u) => u.trim() === "" || /^https?:\/\//i.test(u.trim())),

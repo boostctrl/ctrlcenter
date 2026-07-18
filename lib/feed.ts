@@ -17,6 +17,10 @@ export type FeedItem = {
   url: string;
   // Publish time (epoch ms), or null when missing/unparsable.
   publishedAt: number | null;
+  // A short plain-text snippet of the entry body, clipped server-side to the
+  // summary budget. Absent when the entry had no body or the body just
+  // repeats the title. Rendered only when the admin turns summaries on.
+  summary?: string;
   // The source feed's label (its title, else its host), stamped at merge time so
   // an interleaved multi-feed list stays scannable. Absent on freshly parsed
   // items and when only one feed contributed (the label would be redundant).
@@ -89,6 +93,20 @@ function parseDate(raw: string | null): number | null {
   return Number.isNaN(t) ? null : t;
 }
 
+// Summaries render as one-to-two-line snippets, so clip the extracted body to
+// a character budget here on the server — a full-article body must never ride
+// along in the cache or the page. Cut on a word boundary when one is near,
+// with an ellipsis marking the cut.
+const SUMMARY_MAX_CHARS = 200;
+function clipSummary(text: string): string {
+  if (text.length <= SUMMARY_MAX_CHARS) return text;
+  const cut = text.slice(0, SUMMARY_MAX_CHARS + 1);
+  const space = cut.lastIndexOf(" ");
+  const clipped =
+    space > SUMMARY_MAX_CHARS - 40 ? cut.slice(0, space) : cut.slice(0, SUMMARY_MAX_CHARS);
+  return `${clipped.trimEnd()}…`;
+}
+
 // Parse an RSS 2.0 or Atom document into a Feed. Entries missing a title are
 // dropped (there'd be nothing to show); order is preserved (feeds put newest
 // first — re-sorting would misorder feeds without dates).
@@ -102,16 +120,30 @@ export function parseFeed(xml: string): Feed {
     const body = m[2];
     const title = textContent(firstTag(body, "title") ?? "");
     if (!title) continue;
-    const url =
-      m[1].toLowerCase() === "entry"
-        ? atomLink(body)
-        : httpOnly(textContent(firstTag(body, "link") ?? ""));
+    const isAtom = m[1].toLowerCase() === "entry";
+    const url = isAtom
+      ? atomLink(body)
+      : httpOnly(textContent(firstTag(body, "link") ?? ""));
     const publishedAt =
       parseDate(firstTag(body, "pubDate")) ??
       parseDate(firstTag(body, "published")) ??
       parseDate(firstTag(body, "updated")) ??
       parseDate(firstTag(body, "dc:date"));
-    items.push({ title, url, publishedAt });
+    // The entry body: <description> (RSS) / <summary>, else <content> (Atom),
+    // reduced to clipped plain text by the same textContent pipeline as the
+    // title — the no-HTML guarantee holds for summaries too.
+    const summary = clipSummary(
+      textContent(
+        (isAtom
+          ? firstTag(body, "summary") ?? firstTag(body, "content")
+          : firstTag(body, "description")) ?? ""
+      )
+    );
+    items.push(
+      summary && summary !== title
+        ? { title, url, publishedAt, summary }
+        : { title, url, publishedAt }
+    );
   }
   // The feed's own title: the first <title> that appears before any entry
   // (entries have titles too, so position matters).
@@ -151,13 +183,28 @@ export function parseJsonFeed(body: string): Feed | null {
       title?: unknown;
       url?: unknown;
       date_published?: unknown;
+      summary?: unknown;
+      content_text?: unknown;
+      content_html?: unknown;
     };
     const title = plain(it.title);
     if (!title) continue;
     const url = typeof it.url === "string" ? httpOnly(it.url) : "";
     const t =
       typeof it.date_published === "string" ? Date.parse(it.date_published) : NaN;
-    items.push({ title, url, publishedAt: Number.isNaN(t) ? null : t });
+    const publishedAt = Number.isNaN(t) ? null : t;
+    // The entry body: summary, else content_text (both plain by spec), else
+    // content_html stripped to text through the XML path's pipeline.
+    const summary = clipSummary(
+      plain(it.summary) ||
+        plain(it.content_text) ||
+        (typeof it.content_html === "string" ? textContent(it.content_html) : "")
+    );
+    items.push(
+      summary && summary !== title
+        ? { title, url, publishedAt, summary }
+        : { title, url, publishedAt }
+    );
   }
   return { title: plain(d.title), items };
 }

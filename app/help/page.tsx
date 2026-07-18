@@ -589,7 +589,8 @@ export default async function HelpPage() {
               layout editor. With several feeds each entry is labelled by its
               source; entries are fetched server-side and cached for a few
               minutes, and a slow or unreachable feed drops out rather than
-              emptying the card.
+              emptying the card. A <strong>Show summaries</strong> toggle adds
+              a short snippet from each entry under its headline.
             </P>
           </Card>
 

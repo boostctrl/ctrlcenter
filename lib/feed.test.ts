@@ -105,6 +105,64 @@ describe("parseFeed", () => {
   });
 });
 
+describe("summaries", () => {
+  const rss = (item: string) =>
+    `<rss><channel><title>t</title><item><title>Headline</title>${item}</item></channel></rss>`;
+
+  it("extracts an RSS description as clipped plain text", () => {
+    const feed = parseFeed(
+      rss("<description><![CDATA[<p>Some <b>bold</b> body &amp; more</p>]]></description>")
+    );
+    expect(feed.items[0].summary).toBe("Some bold body & more");
+  });
+
+  it("prefers an Atom summary and falls back to content", () => {
+    const entry = (body: string) =>
+      `<feed><title>t</title><entry><title>Headline</title>${body}</entry></feed>`;
+    expect(
+      parseFeed(entry("<summary>short</summary><content>long body</content>"))
+        .items[0].summary
+    ).toBe("short");
+    expect(
+      parseFeed(entry('<content type="xhtml"><div>the body</div></content>'))
+        .items[0].summary
+    ).toBe("the body");
+  });
+
+  it("omits the summary when the entry has no body or it repeats the title", () => {
+    expect(parseFeed(rss("")).items[0].summary).toBeUndefined();
+    expect(
+      parseFeed(rss("<description>Headline</description>")).items[0].summary
+    ).toBeUndefined();
+  });
+
+  it("clips a long body to the budget on a word boundary with an ellipsis", () => {
+    const body = Array.from({ length: 60 }, (_, i) => `word${i}`).join(" ");
+    const summary = parseFeed(rss(`<description>${body}</description>`)).items[0]
+      .summary!;
+    expect(summary.length).toBeLessThanOrEqual(201);
+    expect(summary.endsWith("…")).toBe(true);
+    // Word-boundary cut: no partial word before the ellipsis.
+    expect(body.startsWith(summary.slice(0, -1) + " ")).toBe(true);
+  });
+
+  it("maps JSON Feed summary, content_text, and stripped content_html", () => {
+    const jf = (item: object) =>
+      parseJsonFeed(
+        JSON.stringify({
+          version: "https://jsonfeed.org/version/1.1",
+          title: "t",
+          items: [{ title: "Headline", ...item }],
+        })
+      )?.items[0].summary;
+    expect(jf({ summary: "the summary", content_text: "the text" })).toBe(
+      "the summary"
+    );
+    expect(jf({ content_text: "the text" })).toBe("the text");
+    expect(jf({ content_html: "<p>html <em>body</em></p>" })).toBe("html body");
+  });
+});
+
 describe("parseJsonFeed", () => {
   const JSON_FEED = JSON.stringify({
     version: "https://jsonfeed.org/version/1.1",

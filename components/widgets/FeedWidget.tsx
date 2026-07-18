@@ -23,11 +23,14 @@ export default function FeedWidget({
   feed,
   titleOverride,
   showTitle = true,
+  showSummaries = false,
 }: {
   feed: Feed | null;
   titleOverride: string;
   // Show the section heading; the layout editor's label toggle turns it off.
   showTitle?: boolean;
+  // Render each item's snippet under its headline (Settings → RSS feed).
+  showSummaries?: boolean;
 }) {
   const title = titleOverride.trim() || feed?.title.trim() || "Feed";
   return (
@@ -44,6 +47,11 @@ export default function FeedWidget({
                     <span className="block truncate text-sm text-fg/80">
                       {item.title}
                     </span>
+                    {showSummaries && item.summary && (
+                      <span className="line-clamp-2 text-xs leading-snug text-fg/55">
+                        {item.summary}
+                      </span>
+                    )}
                     {item.source && (
                       <span className="block truncate text-xs text-fg/40">
                         {item.source}

@@ -14,6 +14,10 @@ here.
 
 ### Added
 
+- **The RSS card can show entry summaries.** Turn on **Show summaries** in
+  Settings → Widgets → RSS feed to add a one-to-two-line snippet from each
+  entry under its headline — always plain text, never raw HTML. Off (the
+  default) keeps today's compact headline list. (#165)
 - **The RSS card now reads JSON Feed sources.** Sites that publish a
   `feed.json` (jsonfeed.org) instead of RSS or Atom work like any other
   feed — same merging, caching, and safety rules. The Test feed button

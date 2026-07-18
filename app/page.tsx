@@ -140,7 +140,11 @@ export default async function HomePage({
             initialNow={nowDate.toISOString()}
             feed={
               feedEnabled ? (
-                <FeedWidget feed={feed} titleOverride={feedCfg.title} />
+                <FeedWidget
+                  feed={feed}
+                  titleOverride={feedCfg.title}
+                  showSummaries={feedCfg.summaries}
+                />
               ) : null
             }
             calendar={

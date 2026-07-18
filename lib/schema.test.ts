@@ -37,6 +37,7 @@ describe("feedUpdateSchema", () => {
         urls: ["ftp://nope"],
         count: 6,
         title: "",
+        summaries: false,
       }).success
     ).toBe(false);
     expect(
@@ -45,6 +46,7 @@ describe("feedUpdateSchema", () => {
         urls: Array.from({ length: MAX_FEED_URLS + 1 }, (_, i) => `https://a${i}.example`),
         count: 6,
         title: "",
+        summaries: false,
       }).success
     ).toBe(false);
   });
@@ -56,6 +58,7 @@ describe("feedUpdateSchema", () => {
         urls: ["https://a.example", ""],
         count: 6,
         title: "",
+        summaries: false,
       }).success
     ).toBe(true);
   });

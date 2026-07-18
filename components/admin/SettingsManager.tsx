@@ -1100,6 +1100,12 @@ export default function SettingsManager({
                 value={feed.count}
                 onChange={(count) => updateFeed({ count })}
               />
+              <ToggleRow
+                label="Show summaries"
+                hint="Add a short snippet from each entry under its headline."
+                checked={feed.summaries}
+                onChange={(summaries) => updateFeed({ summaries })}
+              />
               <Hint>
                 With several feeds, each entry shows its source. The count caps
                 the combined list.
