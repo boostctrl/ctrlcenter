@@ -22,6 +22,10 @@ here.
   easier to scan, the editable lists — feeds, search bangs, countdown
   dates, world clocks, extra disks — sit in their own bordered panels, and
   fields respond to hover. (#180)
+- **The two card columns on wide screens now stay level.** Cards that share
+  a row share a height, so a short card no longer leaves a hole in the page
+  beside a tall neighbor — the imbalance that has dogged this tab since its
+  first two-column layout. (#64, #180)
 
 ## [2.0.4] - 2026-07-17
 

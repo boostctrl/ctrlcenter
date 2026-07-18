@@ -574,11 +574,13 @@ export default function SettingsManager({
             (container query, so the split follows the actual cell, not the
             viewport). A grid, not CSS columns (#134/#180): DOM order is
             reading order — left-right, top-bottom — and a card growing
-            (enabling a feature) never re-positions its neighbors. items-start
-            keeps each card its own height; the whitespace beside a taller
-            card is the price of that predictability. */}
+            (enabling a feature) never re-positions its neighbors. Rows keep
+            the default stretch alignment so a row's two cards share a height
+            and the columns stay level (#64's imbalance, finally resolved):
+            a short card gains interior breathing room instead of leaving a
+            hole in the page beside a taller neighbor. */}
         <div className="@container">
-        <div className="grid grid-cols-1 items-start gap-4 @5xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 @5xl:grid-cols-2">
         {section === "general" && (
         <Card title="Site">
           <TextField
