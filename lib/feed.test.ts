@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  discoverFeedLinks,
   fetchFeeds,
   getFeedHealth,
   mergeFeeds,
@@ -537,5 +538,52 @@ describe("feed health recording", () => {
       ok: false,
       error: "Not an RSS, Atom, or JSON feed",
     });
+  });
+});
+
+describe("discoverFeedLinks", () => {
+  const base = "https://example.com/blog/";
+
+  it("finds RSS, Atom and JSON-feed autodiscovery links and resolves them absolute", () => {
+    const html = `<html><head>
+      <link rel="alternate" type="application/rss+xml" href="/feed.xml">
+      <link rel="alternate" type="application/atom+xml" href="atom">
+      <link rel="alternate" type="application/feed+json" href="https://cdn.example.com/feed.json">
+    </head></html>`;
+    expect(discoverFeedLinks(html, base)).toEqual([
+      "https://example.com/feed.xml",
+      "https://example.com/blog/atom",
+      "https://cdn.example.com/feed.json",
+    ]);
+  });
+
+  it("tolerates attribute order, single quotes and self-closing tags", () => {
+    const html = `<link href='/rss' type='application/rss+xml' rel='alternate'/>`;
+    expect(discoverFeedLinks(html, base)).toEqual(["https://example.com/rss"]);
+  });
+
+  it("ignores non-feed links and unrelated rels", () => {
+    const html = `
+      <link rel="stylesheet" href="/style.css">
+      <link rel="icon" type="image/png" href="/favicon.png">
+      <link rel="edit" type="application/atom+xml" href="/service">
+      <link rel="canonical" href="https://example.com/blog/">`;
+    expect(discoverFeedLinks(html, base)).toEqual([]);
+  });
+
+  it("accepts a feed link with no rel but skips a non-http(s) href", () => {
+    const html = `
+      <link type="application/rss+xml" href="/relless-feed">
+      <link rel="alternate" type="application/rss+xml" href="ftp://nope/feed">`;
+    expect(discoverFeedLinks(html, base)).toEqual([
+      "https://example.com/relless-feed",
+    ]);
+  });
+
+  it("dedupes repeated hrefs", () => {
+    const html = `
+      <link rel="alternate" type="application/rss+xml" href="/feed.xml">
+      <link rel="alternate" type="application/rss+xml" href="/feed.xml">`;
+    expect(discoverFeedLinks(html, base)).toEqual(["https://example.com/feed.xml"]);
   });
 });

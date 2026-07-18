@@ -18,6 +18,11 @@ here.
   Settings → Widgets → RSS feed to add a one-to-two-line snippet from each
   entry under its headline — always plain text, never raw HTML. Off (the
   default) keeps today's compact headline list. (#165)
+- **Paste a site's home page and the RSS card finds its feed for you.**
+  Finding a site's actual feed URL is the fiddly part of setting the card
+  up; now the Test feed button, given an ordinary web page, reads the
+  page's feed-autodiscovery links and offers the feed URL(s) as one-click
+  fills. (#171)
 - **Each feed URL in Settings now shows its fetch health.** Next to every
   URL row you'll see what the home page's own fetches last saw — "OK · 12
   entries · 3 min ago" or "HTTP 500 · 2 h ago" — so when one of several

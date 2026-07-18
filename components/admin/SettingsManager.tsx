@@ -1081,8 +1081,11 @@ export default function SettingsManager({
                       />
                     </div>
                     {url.trim() !== "" && (
-                      <div className="flex flex-wrap items-center gap-3">
-                        <FeedTest url={url} />
+                      <div className="flex flex-col gap-1.5">
+                        <FeedTest
+                          url={url}
+                          onPick={(picked) => updateFeedUrl(i, picked)}
+                        />
                         <FeedHealthBadge health={feedHealth?.[url.trim()]} />
                       </div>
                     )}

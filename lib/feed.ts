@@ -209,6 +209,41 @@ export function parseJsonFeed(body: string): Feed | null {
   return { title: plain(d.title), items };
 }
 
+// The MIME types a feed autodiscovery <link> advertises.
+const FEED_LINK_TYPES = /application\/(rss\+xml|atom\+xml|feed\+json)/i;
+
+// Scan an HTML document for feed autodiscovery links — the rel="alternate"
+// <link>s whose type is an RSS / Atom / JSON-feed MIME — and return the feed
+// URLs they reference, resolved absolute against the page and limited to
+// http(s). Deduped, document order preserved, bounded. Lets the admin paste a
+// plain site URL and be offered its actual feed. Exported for unit testing.
+export function discoverFeedLinks(html: string, baseUrl: string): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const m of html.matchAll(/<link\b([^>]*?)\/?>/gi)) {
+    const attrs = m[1];
+    const type = /type\s*=\s*["']([^"']+)["']/i.exec(attrs)?.[1] ?? "";
+    if (!FEED_LINK_TYPES.test(type)) continue;
+    // Autodiscovery links are rel="alternate"; tolerate a missing rel but skip
+    // an unrelated one (e.g. an Atom service document's rel="edit").
+    const rel = /rel\s*=\s*["']([^"']*)["']/i.exec(attrs)?.[1] ?? "";
+    if (rel && !/\balternate\b/i.test(rel)) continue;
+    const href = /href\s*=\s*["']([^"']+)["']/i.exec(attrs)?.[1];
+    if (!href) continue;
+    let resolved: string;
+    try {
+      resolved = new URL(decodeEntities(href), baseUrl).href;
+    } catch {
+      continue;
+    }
+    if (!/^https?:\/\//i.test(resolved) || seen.has(resolved)) continue;
+    seen.add(resolved);
+    out.push(resolved);
+    if (out.length >= MAX_FEED_URLS) break;
+  }
+  return out;
+}
+
 // --- Fetch + cache (server-only) ---
 
 const FEED_TIMEOUT_MS = 6000;
@@ -267,6 +302,9 @@ type FeedFetchResult = {
   notModified?: boolean;
   etag?: string;
   lastModified?: string;
+  // Feed URLs autodiscovered from the body when it was an HTML page, not a
+  // feed — used by the admin probe to offer to fill the row.
+  discovered?: string[];
 };
 async function requestFeed(
   target: string,
@@ -291,7 +329,11 @@ async function requestFeed(
       parseJsonFeed(text) ??
       (/<(rss|feed|rdf:RDF)[\s>]/i.test(text) ? parseFeed(text) : null);
     if (!feed)
-      return { feed: null, error: "Not an RSS, Atom, or JSON feed" };
+      return {
+        feed: null,
+        error: "Not an RSS, Atom, or JSON feed",
+        discovered: discoverFeedLinks(text, target),
+      };
     if (feed.items.length === 0)
       return { feed, error: "Feed has no readable entries" };
     return {
@@ -464,14 +506,31 @@ export async function fetchFeeds(
 }
 
 // Fresh (uncached) reachability check for the admin's "Test feed" button.
-export async function probeFeed(
-  url: string
-): Promise<{ ok: boolean; count: number; title?: string; error?: string }> {
+// When the URL is a web page rather than a feed, `discovered` carries the
+// feed URL(s) autodiscovered from its <head>, so the UI can offer to fill the
+// row instead of just failing.
+export async function probeFeed(url: string): Promise<{
+  ok: boolean;
+  count: number;
+  title?: string;
+  error?: string;
+  discovered?: string[];
+}> {
   const target = url.trim();
   if (!/^https?:\/\//i.test(target)) {
     return { ok: false, count: 0, error: "URL must start with http(s)" };
   }
-  const { feed, error } = await requestFeed(target);
-  if (!feed || error) return { ok: false, count: 0, error: error ?? "Unreadable feed" };
+  const { feed, error, discovered } = await requestFeed(target);
+  if (!feed || error) {
+    return {
+      ok: false,
+      count: 0,
+      error:
+        discovered && discovered.length > 0
+          ? "That's a web page, not a feed — but it links to one"
+          : error ?? "Unreadable feed",
+      discovered: discovered?.length ? discovered : undefined,
+    };
+  }
   return { ok: true, count: feed.items.length, title: feed.title };
 }
