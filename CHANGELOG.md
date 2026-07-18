@@ -25,6 +25,11 @@ here.
 
 ### Changed
 
+- **Feed refreshes now ask "anything new?" instead of re-downloading.**
+  Cached feeds revalidate with ETag / If-Modified-Since, so hosts that
+  support conditional requests answer an unchanged feed with a tiny 304
+  instead of the full body — less bandwidth for you, politer to feed
+  hosts that rate-limit heavy pollers. (#172)
 - **A slow feed no longer stalls the home page.** When the RSS cache goes
   stale, the page now shows the cached entries immediately and refreshes
   them in the background — only the very first load after a restart waits

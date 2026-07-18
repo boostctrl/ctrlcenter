@@ -220,7 +220,14 @@ const FEED_MAX_BYTES = 3 * 1024 * 1024;
 // force-dynamic, so without it every render would block on the third party.
 // Held on globalThis to survive module-graph duplication, as is the in-flight
 // refresh map that keeps concurrent renders from stacking duplicate fetches.
-type FeedCacheEntry = { feed: Feed; at: number };
+// The entry keeps the response's ETag / Last-Modified so revalidations can be
+// conditional — a 304 just re-arms the TTL without re-downloading the body.
+type FeedCacheEntry = {
+  feed: Feed;
+  at: number;
+  etag?: string;
+  lastModified?: string;
+};
 const g = globalThis as unknown as {
   __ctrlcenterFeedCache?: Map<string, FeedCacheEntry>;
   __ctrlcenterFeedRefresh?: Map<string, Promise<void>>;
@@ -229,16 +236,33 @@ const feedCache = (g.__ctrlcenterFeedCache ??= new Map());
 const refreshInFlight = (g.__ctrlcenterFeedRefresh ??= new Map());
 
 // GET a URL (time-boxed, size-capped) and parse it as a feed, or say why not.
+// When the caller has cached validators the request is conditional
+// (If-None-Match / If-Modified-Since) and an unchanged body comes back as
+// `notModified` with no feed — the caller keeps its parse. A fresh body's own
+// ETag / Last-Modified ride along for the next revalidation.
+type FeedFetchResult = {
+  feed: Feed | null;
+  error: string | null;
+  notModified?: boolean;
+  etag?: string;
+  lastModified?: string;
+};
 async function requestFeed(
-  target: string
-): Promise<{ feed: Feed | null; error: string | null }> {
+  target: string,
+  validators?: { etag?: string; lastModified?: string }
+): Promise<FeedFetchResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FEED_TIMEOUT_MS);
   try {
-    const res = await fetch(target, {
-      headers: { Accept: "application/rss+xml, application/atom+xml, application/feed+json, application/json, application/xml, text/xml, */*" },
-      signal: controller.signal,
-    });
+    const headers: Record<string, string> = {
+      Accept: "application/rss+xml, application/atom+xml, application/feed+json, application/json, application/xml, text/xml, */*",
+    };
+    if (validators?.etag) headers["If-None-Match"] = validators.etag;
+    if (validators?.lastModified)
+      headers["If-Modified-Since"] = validators.lastModified;
+    const res = await fetch(target, { headers, signal: controller.signal });
+    if (res.status === 304)
+      return { feed: null, error: null, notModified: true };
     if (!res.ok) return { feed: null, error: `HTTP ${res.status}` };
     const text = await readCapped(res, FEED_MAX_BYTES);
     if (text === null) return { feed: null, error: "Response too large" };
@@ -249,7 +273,12 @@ async function requestFeed(
       return { feed: null, error: "Not an RSS, Atom, or JSON feed" };
     if (feed.items.length === 0)
       return { feed, error: "Feed has no readable entries" };
-    return { feed, error: null };
+    return {
+      feed,
+      error: null,
+      etag: res.headers.get("etag") ?? undefined,
+      lastModified: res.headers.get("last-modified") ?? undefined,
+    };
   } catch (e) {
     const aborted = e instanceof Error && e.name === "AbortError";
     log.warn("feed fetch error", { host: hostOf(target), reason: errorReason(e) });
@@ -260,18 +289,27 @@ async function requestFeed(
 }
 
 // Refresh one URL's cache entry, deduped so at most one fetch per URL is in
-// flight however many renders want it. Only a good parse replaces the entry —
-// a failure keeps serving the last good cache (stale-on-failure). Never
-// rejects (requestFeed never throws), so a fire-and-forget call can't become
-// an unhandled rejection.
+// flight however many renders want it. Revalidations are conditional: a 304
+// re-arms the existing entry's TTL without re-downloading or re-parsing the
+// body. Only a good parse replaces the entry — a failure keeps serving the
+// last good cache (stale-on-failure). Never rejects (requestFeed never
+// throws), so a fire-and-forget call can't become an unhandled rejection.
 function refreshFeed(target: string): Promise<void> {
   const inFlight = refreshInFlight.get(target);
   if (inFlight) return inFlight;
   const run = (async () => {
     try {
-      const { feed: fresh } = await requestFeed(target);
-      if (fresh && fresh.items.length > 0) {
-        feedCache.set(target, { feed: fresh, at: Date.now() });
+      const result = await requestFeed(target, feedCache.get(target));
+      if (result.notModified) {
+        const entry = feedCache.get(target);
+        if (entry) feedCache.set(target, { ...entry, at: Date.now() });
+      } else if (result.feed && result.feed.items.length > 0) {
+        feedCache.set(target, {
+          feed: result.feed,
+          at: Date.now(),
+          etag: result.etag,
+          lastModified: result.lastModified,
+        });
       }
     } finally {
       refreshInFlight.delete(target);

@@ -418,3 +418,80 @@ describe("fetchFeeds stale-while-revalidate", () => {
     expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 });
+
+describe("fetchFeeds conditional requests", () => {
+  const TTL = 5 * 60_000;
+  const rss = (title: string) =>
+    `<rss version="2.0"><channel><title>Src</title><item><title>${title}</title><link>https://x.example/a</link></item></channel></rss>`;
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  const settle = () => new Promise((r) => setTimeout(r, 0));
+
+  it("revalidates with the stored ETag / Last-Modified and re-arms the TTL on 304", async () => {
+    const url = "https://cond.example/feed";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(rss("v1"), {
+          headers: {
+            ETag: '"tag-1"',
+            "Last-Modified": "Fri, 17 Jul 2026 09:00:00 GMT",
+          },
+        })
+      )
+      .mockResolvedValue(new Response(null, { status: 304 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const base = Date.now();
+    const now = vi.spyOn(Date, "now").mockReturnValue(base);
+    await fetchFeeds([url], 5);
+    // First request is unconditional.
+    expect(fetchMock.mock.calls[0][1].headers["If-None-Match"]).toBeUndefined();
+
+    now.mockReturnValue(base + TTL + 1);
+    expect((await fetchFeeds([url], 5))?.items[0].title).toBe("v1");
+    await settle();
+    const revalidation = fetchMock.mock.calls[1][1].headers;
+    expect(revalidation["If-None-Match"]).toBe('"tag-1"');
+    expect(revalidation["If-Modified-Since"]).toBe(
+      "Fri, 17 Jul 2026 09:00:00 GMT"
+    );
+
+    // The 304 re-armed the TTL: a call shortly after serves the cache with no
+    // third fetch.
+    now.mockReturnValue(base + TTL + 1000);
+    expect((await fetchFeeds([url], 5))?.items[0].title).toBe("v1");
+    await settle();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("stores the new validators when a revalidation returns a fresh body", async () => {
+    const url = "https://cond-fresh.example/feed";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(rss("v1"), { headers: { ETag: '"tag-1"' } })
+      )
+      .mockResolvedValueOnce(
+        new Response(rss("v2"), { headers: { ETag: '"tag-2"' } })
+      )
+      .mockResolvedValue(new Response(null, { status: 304 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const base = Date.now();
+    const now = vi.spyOn(Date, "now").mockReturnValue(base);
+    await fetchFeeds([url], 5);
+
+    now.mockReturnValue(base + TTL + 1);
+    await fetchFeeds([url], 5);
+    await settle();
+    expect((await fetchFeeds([url], 5))?.items[0].title).toBe("v2");
+
+    now.mockReturnValue(base + 2 * (TTL + 1));
+    await fetchFeeds([url], 5);
+    await settle();
+    expect(fetchMock.mock.calls[2][1].headers["If-None-Match"]).toBe('"tag-2"');
+  });
+});
