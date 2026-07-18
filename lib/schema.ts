@@ -132,8 +132,8 @@ export type CalendarConfig = z.infer<typeof calendarSchema>;
 // imported config turning the widget into an unbounded outbound-request source.
 export const MAX_FEED_URLS = 10;
 
-// RSS/Atom feed widget fed by one or more public feed URLs, merged newest-first.
-// Stored leniently; URLs are validated on the admin path.
+// Feed widget (RSS/Atom/JSON Feed) fed by one or more public feed URLs,
+// merged newest-first. Stored leniently; URLs are validated on the admin path.
 export const feedSchema = z.object({
   enabled: z.boolean().default(false),
   // The feed URLs to merge, rendered newest-first. The pre-1.9.6 single `url`

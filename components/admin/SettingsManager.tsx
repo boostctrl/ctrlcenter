@@ -1043,7 +1043,7 @@ export default function SettingsManager({
         {section === "widgets" && (
         <Card
           title="RSS feed"
-          intro="Show the latest entries from one or more RSS or Atom feeds, merged newest-first. Fetched server-side and cached for a few minutes. Ships hidden — show the card in the home-page layout editor once configured."
+          intro="Show the latest entries from one or more RSS, Atom, or JSON feeds, merged newest-first. Fetched server-side and cached for a few minutes. Ships hidden — show the card in the home-page layout editor once configured."
           toggle={{
             checked: feed.enabled,
             onChange: (enabled) => updateFeed({ enabled }),
@@ -1051,7 +1051,7 @@ export default function SettingsManager({
         >
           {feed.enabled && (
             <>
-              <ListPanel label="Feed URLs (RSS or Atom)">
+              <ListPanel label="Feed URLs (RSS, Atom, or JSON Feed)">
                 {feed.urls.map((url, i) => (
                   <div
                     key={feedUrlRows.keys[i] ?? i}

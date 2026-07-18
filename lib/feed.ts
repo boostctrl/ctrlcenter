@@ -2,13 +2,14 @@ import { readCapped } from "./fetch-body";
 import { log, hostOf, errorReason } from "./log";
 import { MAX_FEED_URLS } from "./schema";
 
-// Minimal RSS 2.0 / Atom reader for the home-page Feed widget. Hand-rolled (no
-// dependency) and deliberately forgiving: it pulls each entry's title, link and
-// publish date with tolerant tag matching rather than strict XML parsing, so
-// the common real-world feeds work and a malformed one degrades to fewer items
-// instead of an error. Item text is decoded to plain strings and rendered as
-// React text (never HTML); only http(s) links survive, so a hostile feed can't
-// inject markup or javascript: URLs into the dashboard.
+// Minimal RSS 2.0 / Atom / JSON Feed reader for the home-page Feed widget.
+// Hand-rolled (no dependency) and deliberately forgiving: it pulls each
+// entry's title, link and publish date with tolerant tag matching rather than
+// strict XML parsing, so the common real-world feeds work and a malformed one
+// degrades to fewer items instead of an error. Item text is decoded to plain
+// strings and rendered as React text (never HTML); only http(s) links
+// survive, so a hostile feed can't inject markup or javascript: URLs into the
+// dashboard.
 
 export type FeedItem = {
   title: string;
@@ -119,6 +120,48 @@ export function parseFeed(xml: string): Feed {
   return { title, items };
 }
 
+// Parse a JSON Feed (jsonfeed.org) document into a Feed, or null when the
+// body isn't one — no version marker, not JSON, not an object. Items map to
+// the same shape and guarantees as the XML path: whitespace-collapsed plain
+// titles (JSON Feed titles are plain text by spec — no entity decoding, so a
+// literal "&amp;" stays as written), http(s)-only links, entries without a
+// title dropped. Exported for unit testing.
+export function parseJsonFeed(body: string): Feed | null {
+  if (!body.trimStart().startsWith("{")) return null;
+  let doc: unknown;
+  try {
+    doc = JSON.parse(body);
+  } catch {
+    return null;
+  }
+  if (typeof doc !== "object" || doc === null) return null;
+  const d = doc as { version?: unknown; title?: unknown; items?: unknown };
+  if (
+    typeof d.version !== "string" ||
+    !d.version.startsWith("https://jsonfeed.org/version/")
+  ) {
+    return null;
+  }
+  const plain = (v: unknown): string =>
+    typeof v === "string" ? v.replace(/\s+/g, " ").trim() : "";
+  const items: FeedItem[] = [];
+  for (const raw of Array.isArray(d.items) ? d.items : []) {
+    if (typeof raw !== "object" || raw === null) continue;
+    const it = raw as {
+      title?: unknown;
+      url?: unknown;
+      date_published?: unknown;
+    };
+    const title = plain(it.title);
+    if (!title) continue;
+    const url = typeof it.url === "string" ? httpOnly(it.url) : "";
+    const t =
+      typeof it.date_published === "string" ? Date.parse(it.date_published) : NaN;
+    items.push({ title, url, publishedAt: Number.isNaN(t) ? null : t });
+  }
+  return { title: plain(d.title), items };
+}
+
 // --- Fetch + cache (server-only) ---
 
 const FEED_TIMEOUT_MS = 6000;
@@ -143,15 +186,17 @@ async function requestFeed(
   const timer = setTimeout(() => controller.abort(), FEED_TIMEOUT_MS);
   try {
     const res = await fetch(target, {
-      headers: { Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml, */*" },
+      headers: { Accept: "application/rss+xml, application/atom+xml, application/feed+json, application/json, application/xml, text/xml, */*" },
       signal: controller.signal,
     });
     if (!res.ok) return { feed: null, error: `HTTP ${res.status}` };
     const text = await readCapped(res, FEED_MAX_BYTES);
     if (text === null) return { feed: null, error: "Response too large" };
-    if (!/<(rss|feed|rdf:RDF)[\s>]/i.test(text))
-      return { feed: null, error: "Not an RSS or Atom feed" };
-    const feed = parseFeed(text);
+    const feed =
+      parseJsonFeed(text) ??
+      (/<(rss|feed|rdf:RDF)[\s>]/i.test(text) ? parseFeed(text) : null);
+    if (!feed)
+      return { feed: null, error: "Not an RSS, Atom, or JSON feed" };
     if (feed.items.length === 0)
       return { feed, error: "Feed has no readable entries" };
     return { feed, error: null };

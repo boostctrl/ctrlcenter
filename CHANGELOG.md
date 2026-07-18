@@ -12,6 +12,13 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **The RSS card now reads JSON Feed sources.** Sites that publish a
+  `feed.json` (jsonfeed.org) instead of RSS or Atom work like any other
+  feed — same merging, caching, and safety rules. The Test feed button
+  recognizes them too. (#170)
+
 ### Changed
 
 - **The RSS card no longer shows the same story twice.** When two of your

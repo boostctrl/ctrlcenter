@@ -580,8 +580,8 @@ export default async function HelpPage() {
 
           <Card title="RSS feed card">
             <P>
-              Show the latest headlines from one or more RSS or Atom feeds — news
-              sites, blogs, release notes — merged into a single list,
+              Show the latest headlines from one or more RSS, Atom, or JSON
+              feeds — news sites, blogs, release notes — merged into a single list,
               newest-first. Add feed URLs in{" "}
               <strong>Settings → Widgets → RSS feed</strong> (the{" "}
               <strong>Test feed</strong> button confirms each is readable), pick

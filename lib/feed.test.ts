@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mergeFeeds, parseFeed, type Feed } from "./feed";
+import { mergeFeeds, parseFeed, parseJsonFeed, type Feed } from "./feed";
 
 const RSS = `<?xml version="1.0"?>
 <rss version="2.0">
@@ -102,6 +102,64 @@ describe("parseFeed", () => {
       title: "",
       items: [],
     });
+  });
+});
+
+describe("parseJsonFeed", () => {
+  const JSON_FEED = JSON.stringify({
+    version: "https://jsonfeed.org/version/1.1",
+    title: "JSON Blog",
+    items: [
+      {
+        title: "  Spaced   title  ",
+        url: "https://json.example.com/one",
+        date_published: "2026-06-30T10:00:00Z",
+      },
+      { title: "No link or date" },
+      { title: "Bad link", url: "javascript:alert(1)" },
+      { url: "https://json.example.com/untitled" },
+    ],
+  });
+
+  it("maps title, url and date_published into the FeedItem shape", () => {
+    const feed = parseJsonFeed(JSON_FEED);
+    expect(feed?.title).toBe("JSON Blog");
+    expect(feed?.items[0]).toEqual({
+      title: "Spaced title",
+      url: "https://json.example.com/one",
+      publishedAt: Date.parse("2026-06-30T10:00:00Z"),
+    });
+  });
+
+  it("keeps entries without a link or date, drops non-http(s) links and untitled entries", () => {
+    const items = parseJsonFeed(JSON_FEED)?.items ?? [];
+    expect(items).toHaveLength(3);
+    expect(items[1]).toEqual({ title: "No link or date", url: "", publishedAt: null });
+    expect(items[2].url).toBe("");
+  });
+
+  it("does not decode entities — JSON Feed titles are already plain text", () => {
+    const feed = parseJsonFeed(
+      JSON.stringify({
+        version: "https://jsonfeed.org/version/1",
+        title: "t",
+        items: [{ title: "AT&amp;T wrote this literally" }],
+      })
+    );
+    expect(feed?.items[0].title).toBe("AT&amp;T wrote this literally");
+  });
+
+  it("rejects JSON without the jsonfeed.org version marker", () => {
+    expect(parseJsonFeed(JSON.stringify({ title: "t", items: [] }))).toBeNull();
+    expect(
+      parseJsonFeed(JSON.stringify({ version: "2.0", items: [] }))
+    ).toBeNull();
+  });
+
+  it("rejects non-JSON and non-object bodies", () => {
+    expect(parseJsonFeed("<rss></rss>")).toBeNull();
+    expect(parseJsonFeed("not json {")).toBeNull();
+    expect(parseJsonFeed('"a string"')).toBeNull();
   });
 });
 
