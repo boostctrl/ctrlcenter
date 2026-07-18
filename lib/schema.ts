@@ -21,6 +21,7 @@ import {
   MAX_UI_SCALE,
   DEFAULT_UI_SCALE,
   defaultSpanFor,
+  FEED_DEFAULT_ID,
   type LayoutWidgetId,
   type WidgetSpace,
 } from "./layout";
@@ -132,9 +133,20 @@ export type CalendarConfig = z.infer<typeof calendarSchema>;
 // imported config turning the widget into an unbounded outbound-request source.
 export const MAX_FEED_URLS = 10;
 
-// Feed widget (RSS/Atom/JSON Feed) fed by one or more public feed URLs,
+// Cap on how many feed cards (instances) the board can carry. Each is its own
+// widget on the grid with its own URL list, so the real fan-out ceiling is
+// MAX_FEED_CARDS × MAX_FEED_URLS — bounded like the URL list, against a
+// hand-edited or imported config spawning unbounded cards.
+export const MAX_FEED_CARDS = 8;
+
+// One feed card (RSS/Atom/JSON Feed) fed by one or more public feed URLs,
 // merged newest-first. Stored leniently; URLs are validated on the admin path.
+// The board can hold several — each is a config instance keyed by `id`, placed
+// on the grid by a layout entry whose instanceId matches (see lib/layout.ts).
 export const feedSchema = z.object({
+  // Stable instance id — the layout entry's instanceId points at it. The stock
+  // single card uses FEED_DEFAULT_ID; added cards get a client-minted id.
+  id: z.string().default(FEED_DEFAULT_ID),
   enabled: z.boolean().default(false),
   // The feed URLs to merge, rendered newest-first. The pre-1.9.6 single `url`
   // is folded into this list by the one-time shape migration
@@ -148,6 +160,15 @@ export const feedSchema = z.object({
   summaries: z.boolean().default(false),
 });
 export type FeedConfig = z.infer<typeof feedSchema>;
+
+// The configured feed cards. Defaults to a single stock instance so a fresh
+// install (and a config predating the feature) still has one RSS card to set
+// up. The pre-2.1 single `feed` object is folded into this list — as one
+// instance keyed FEED_DEFAULT_ID — by the shape migration.
+export const feedsSchema = lenientArray(feedSchema).default([
+  feedSchema.parse({}),
+]);
+export type FeedsConfig = z.infer<typeof feedsSchema>;
 
 // The effective feed URL list: `urls` with blank entries trimmed out. Shared by
 // the home page, the admin editor's seed, and the fetch layer so a half-typed
@@ -386,6 +407,10 @@ function cleanSpace(space: WidgetSpace | undefined): WidgetSpace | undefined {
 export const layoutWidgetSchema = z
   .object({
     id: z.enum(LAYOUT_WIDGET_IDS),
+    // Multi-instance widgets (feed) carry the config instance they render;
+    // resolveLayoutWidgets validates it against the live instance ids and drops
+    // an orphan, so a bad/stale value here is caught downstream, not at parse.
+    instanceId: z.string().optional().catch(undefined),
     span: z.number().int().min(1).max(GRID_COLUMNS).optional().catch(undefined),
     hidden: z.boolean().optional().catch(undefined),
     cards: z
@@ -408,6 +433,7 @@ export const layoutWidgetSchema = z
   .transform(
     ({
       id,
+      instanceId,
       span,
       hidden,
       cards,
@@ -416,6 +442,7 @@ export const layoutWidgetSchema = z
       space,
     }): {
       id: LayoutWidgetId;
+      instanceId?: string;
       span: number;
       hidden?: boolean;
       cards?: number;
@@ -426,6 +453,7 @@ export const layoutWidgetSchema = z
       const resolvedSpace = cleanSpace(space);
       return {
         id,
+        ...(instanceId === undefined ? {} : { instanceId }),
         span: span ?? defaultSpanFor(id),
         ...(hidden === undefined ? {} : { hidden }),
         ...(cards === undefined ? {} : { cards }),
@@ -498,7 +526,9 @@ export const settingsSchema = z.object({
   // layout `sections` list (used directly in this shared schema): one malformed
   // hand-edited row is dropped rather than failing the whole settings parse.
   statusAnnouncements: lenientArray(statusAnnouncementSchema).default([]),
-  feed: feedSchema.default(feedSchema.parse({})),
+  // Feed cards (RSS/Atom/JSON Feed) — a list since 2.1; the pre-2.1 single
+  // `feed` object is folded into it by the shape migration.
+  feeds: feedsSchema,
   countdown: countdownSchema.default(countdownSchema.parse({})),
   worldClocks: worldClocksSchema.default(worldClocksSchema.parse({})),
   systemStats: systemStatsSchema.default(systemStatsSchema.parse({})),
@@ -756,11 +786,13 @@ export const systemStatsUpdateSchema = z.object({
     .max(MAX_STAT_DISKS),
 });
 
-// The admin sends the whole feed object. The URL list may be empty (the widget
-// stays inert until set) and blank rows are allowed (trimmed on read), but every
-// non-empty entry must be http(s).
+// The admin sends the whole feed-cards list. Each card carries its instance
+// `id`. A card's URL list may be empty (it stays inert until set) and blank
+// rows are allowed (trimmed on read), but every non-empty entry must be
+// http(s). The list is capped at MAX_FEED_CARDS.
 export const feedUpdateSchema = z
   .object({
+    id: z.string(),
     enabled: z.boolean(),
     urls: z.array(z.string()).max(MAX_FEED_URLS),
     count: z.number().int().min(1).max(15),
@@ -771,6 +803,8 @@ export const feedUpdateSchema = z
     (f) => f.urls.every((u) => u.trim() === "" || /^https?:\/\//i.test(u.trim())),
     { message: "Every feed URL must start with http(s)", path: ["urls"] }
   );
+
+export const feedsUpdateSchema = z.array(feedUpdateSchema).max(MAX_FEED_CARDS);
 
 // The admin sends the whole theme object (not a partial), so updateSettings
 // replaces it wholesale — that's how clearing the optional custom colors works
@@ -868,7 +902,8 @@ export const settingsInputSchema = z.object({
   // updateSettings replaces it wholesale — it flows through `rest` like the
   // other plain settings arrays (e.g. bookmarkCategoryOrder).
   statusAnnouncements: z.array(statusAnnouncementSchema).optional(),
-  feed: feedUpdateSchema.optional(),
+  // The whole feed-cards list, replaced wholesale like statusAnnouncements.
+  feeds: feedsUpdateSchema.optional(),
   countdown: countdownUpdateSchema.optional(),
   worldClocks: worldClocksUpdateSchema.optional(),
   systemStats: systemStatsUpdateSchema.optional(),

@@ -587,7 +587,9 @@ export default async function HelpPage() {
               <strong>Test feed</strong> button confirms each is readable, and
               if you paste a site&apos;s home page it offers to fill in the
               feed it links to), pick how many entries to show, then show the
-              card from the home-page layout editor. With several feeds each entry is labelled by its
+              card from the home-page layout editor. Add several cards for
+              topical sources — a News card and a Releases card, say — and
+              place each one separately on the dashboard. With several feeds each entry is labelled by its
               source; entries are fetched server-side and cached for a few
               minutes, and a slow or unreachable feed drops out rather than
               emptying the card. A <strong>Show summaries</strong> toggle adds

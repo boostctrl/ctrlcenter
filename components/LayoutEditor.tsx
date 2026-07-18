@@ -26,9 +26,8 @@ import {
   MAX_UI_SCALE,
   UI_SCALE_STEP,
   SPACE_SIDES,
-  WIDGET_LABELS,
+  widgetKey,
   type LayoutWidget,
-  type LayoutWidgetId,
   type SpaceSide,
 } from "@/lib/layout";
 import { MoveButtons } from "./admin/ui";
@@ -309,6 +308,7 @@ function MoreMenu({ children }: { children: ReactNode }) {
 // so the edit grid packs exactly like the live page (#98).
 export function WidgetFrame({
   widget,
+  label,
   index,
   count,
   cellClass,
@@ -331,6 +331,10 @@ export function WidgetFrame({
   drop,
 }: {
   widget: LayoutWidget;
+  // Display name for this entry — the widget's label, or a feed instance's
+  // title, so multiple cards of one type stay distinguishable. The per-widget
+  // callbacks key on the entry's identity (widgetKey), not the type id.
+  label: string;
   index: number;
   count: number;
   cellClass: string;
@@ -348,24 +352,24 @@ export function WidgetFrame({
   previewStyle?: React.CSSProperties;
   previewClass: string;
   onMove: (from: number, to: number) => void;
-  onSpan: (id: LayoutWidgetId, span: number) => void;
-  onCards: (id: LayoutWidgetId, cards: number | undefined) => void;
-  onHeight: (id: LayoutWidgetId, height: number | undefined) => void;
-  onSpace: (id: LayoutWidgetId, side: SpaceSide, value: number | undefined) => void;
-  onToggleHidden: (id: LayoutWidgetId) => void;
-  onToggleLabel: (id: LayoutWidgetId) => void;
+  onSpan: (key: string, span: number) => void;
+  onCards: (key: string, cards: number | undefined) => void;
+  onHeight: (key: string, height: number | undefined) => void;
+  onSpace: (key: string, side: SpaceSide, value: number | undefined) => void;
+  onToggleHidden: (key: string) => void;
+  onToggleLabel: (key: string) => void;
   gripHandlers: React.HTMLAttributes<HTMLElement> & { draggable?: boolean };
   dropHandlers: React.HTMLAttributes<HTMLDivElement>;
   dragging: boolean;
   drop: DropTarget | null;
 }) {
-  const label = WIDGET_LABELS[widget.id];
+  const key = widgetKey(widget);
   const { frameRef, previewRef, drag, widthHandle, heightHandle } = useDragResize(
     {
       span: widget.span,
       height: widget.height,
-      onSpan: (span) => onSpan(widget.id, span),
-      onHeight: (height) => onHeight(widget.id, height),
+      onSpan: (span) => onSpan(key, span),
+      onHeight: (height) => onHeight(key, height),
     }
   );
   const space = widget.space ?? {};
@@ -380,7 +384,7 @@ export function WidgetFrame({
       incLabel={`Taller ${label}`}
       onDec={() =>
         onHeight(
-          widget.id,
+          key,
           widget.height === undefined
             ? DEFAULT_WIDGET_HEIGHT
             : Math.max(MIN_WIDGET_HEIGHT, widget.height - WIDGET_HEIGHT_STEP)
@@ -388,7 +392,7 @@ export function WidgetFrame({
       }
       onInc={() =>
         onHeight(
-          widget.id,
+          key,
           widget.height === undefined
             ? DEFAULT_WIDGET_HEIGHT
             : Math.min(MAX_WIDGET_HEIGHT, widget.height + WIDGET_HEIGHT_STEP)
@@ -401,7 +405,7 @@ export function WidgetFrame({
           <button
             type="button"
             aria-label={`Automatic height for ${label}`}
-            onClick={() => onHeight(widget.id, undefined)}
+            onClick={() => onHeight(key, undefined)}
             className={`${stepBtn} border-l border-fg/10 text-[10px] tracking-wide uppercase`}
           >
             Auto
@@ -458,8 +462,8 @@ export function WidgetFrame({
             display={`${widget.span}/${GRID_COLUMNS}`}
             decLabel={`Narrow ${label}`}
             incLabel={`Widen ${label}`}
-            onDec={() => onSpan(widget.id, widget.span - 1)}
-            onInc={() => onSpan(widget.id, widget.span + 1)}
+            onDec={() => onSpan(key, widget.span - 1)}
+            onInc={() => onSpan(key, widget.span + 1)}
             canDec={widget.span > 1}
             canInc={widget.span < GRID_COLUMNS}
             className="max-lg:opacity-60"
@@ -469,7 +473,7 @@ export function WidgetFrame({
           {!drag && fillTo > widget.span && (
             <button
               type="button"
-              onClick={() => onSpan(widget.id, fillTo)}
+              onClick={() => onSpan(key, fillTo)}
               title={`Widen ${label} to fill the empty space in its row`}
               className="rounded-lg border border-fg/10 px-2 py-1 text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg"
             >
@@ -506,14 +510,14 @@ export function WidgetFrame({
                       onDec={() => {
                         const cur = space[side] ?? 0;
                         onSpace(
-                          widget.id,
+                          key,
                           side,
                           cur > WIDGET_SPACE_STEP ? cur - WIDGET_SPACE_STEP : undefined
                         );
                       }}
                       onInc={() =>
                         onSpace(
-                          widget.id,
+                          key,
                           side,
                           Math.min(
                             MAX_WIDGET_SPACE,
@@ -536,8 +540,8 @@ export function WidgetFrame({
                     display={widget.cards !== undefined ? `${widget.cards}×` : "Auto"}
                     decLabel={`Fewer cards per row in ${label}`}
                     incLabel={`More cards per row in ${label}`}
-                    onDec={() => onCards(widget.id, effectiveCards - 1)}
-                    onInc={() => onCards(widget.id, effectiveCards + 1)}
+                    onDec={() => onCards(key, effectiveCards - 1)}
+                    onInc={() => onCards(key, effectiveCards + 1)}
                     canDec={effectiveCards > 1}
                     canInc={effectiveCards < MAX_CARD_COLUMNS}
                     extra={
@@ -545,7 +549,7 @@ export function WidgetFrame({
                         <button
                           type="button"
                           aria-label={`Automatic cards per row in ${label}`}
-                          onClick={() => onCards(widget.id, undefined)}
+                          onClick={() => onCards(key, undefined)}
                           className={`${stepBtn} border-l border-fg/10 text-[10px] tracking-wide uppercase`}
                         >
                           Auto
@@ -559,7 +563,7 @@ export function WidgetFrame({
                 <button
                   type="button"
                   aria-pressed={!widget.hideLabel}
-                  onClick={() => onToggleLabel(widget.id)}
+                  onClick={() => onToggleLabel(key)}
                   className="rounded-lg border border-fg/10 px-2 py-1 text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg"
                 >
                   {widget.hideLabel ? "Show heading" : "Hide heading"}
@@ -568,7 +572,7 @@ export function WidgetFrame({
           </MoreMenu>
           <button
             type="button"
-            onClick={() => onToggleHidden(widget.id)}
+            onClick={() => onToggleHidden(key)}
             title={`Hide ${label} from the page (it moves to the tray below)`}
             className="rounded-lg border border-fg/10 px-2 py-1 text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg"
           >
@@ -602,16 +606,16 @@ export function WidgetFrame({
         onKeyDown={(e) => {
           if (e.key === "ArrowRight" || e.key === "ArrowUp") {
             e.preventDefault();
-            onSpan(widget.id, widget.span + 1);
+            onSpan(key, widget.span + 1);
           } else if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
             e.preventDefault();
-            onSpan(widget.id, widget.span - 1);
+            onSpan(key, widget.span - 1);
           } else if (e.key === "Home") {
             e.preventDefault();
-            onSpan(widget.id, 1);
+            onSpan(key, 1);
           } else if (e.key === "End") {
             e.preventDefault();
-            onSpan(widget.id, GRID_COLUMNS);
+            onSpan(key, GRID_COLUMNS);
           }
         }}
         className="absolute top-1/2 right-0 hidden h-12 w-2 -translate-y-1/2 cursor-col-resize touch-none rounded-full bg-fg/10 transition-colors outline-none hover:bg-violet-400/70 focus-visible:bg-violet-400/70 focus-visible:outline-2 focus-visible:outline-violet-400 lg:block pointer-coarse:h-16 pointer-coarse:w-4"
@@ -634,7 +638,7 @@ export function WidgetFrame({
           if (e.key === "ArrowUp" || e.key === "ArrowRight") {
             e.preventDefault();
             onHeight(
-              widget.id,
+              key,
               widget.height === undefined
                 ? DEFAULT_WIDGET_HEIGHT
                 : clampH(seeded + WIDGET_HEIGHT_STEP)
@@ -642,20 +646,20 @@ export function WidgetFrame({
           } else if (e.key === "ArrowDown" || e.key === "ArrowLeft") {
             e.preventDefault();
             onHeight(
-              widget.id,
+              key,
               widget.height === undefined
                 ? DEFAULT_WIDGET_HEIGHT
                 : clampH(seeded - WIDGET_HEIGHT_STEP)
             );
           } else if (e.key === "Home") {
             e.preventDefault();
-            onHeight(widget.id, MIN_WIDGET_HEIGHT);
+            onHeight(key, MIN_WIDGET_HEIGHT);
           } else if (e.key === "End") {
             e.preventDefault();
-            onHeight(widget.id, MAX_WIDGET_HEIGHT);
+            onHeight(key, MAX_WIDGET_HEIGHT);
           } else if (e.key === "Delete" || e.key === "Backspace") {
             e.preventDefault();
-            onHeight(widget.id, undefined);
+            onHeight(key, undefined);
           }
         }}
         className="absolute bottom-0 left-1/2 h-2 w-12 -translate-x-1/2 cursor-row-resize touch-none rounded-full bg-fg/10 transition-colors outline-none hover:bg-violet-400/70 focus-visible:bg-violet-400/70 focus-visible:outline-2 focus-visible:outline-violet-400 pointer-coarse:h-4 pointer-coarse:w-16"

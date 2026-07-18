@@ -23,6 +23,26 @@ export const LAYOUT_WIDGET_IDS = [
 
 export type LayoutWidgetId = (typeof LAYOUT_WIDGET_IDS)[number];
 
+// Widget types that can appear more than once on the board, each bound to its
+// own config instance. A multi-instance entry carries an `instanceId` (matching
+// a config instance's id); its identity for keys, reordering and per-widget
+// edits is that instanceId, not the type id. Single-instance widgets omit it
+// and are identified by their type id as before. Feed is the first (and today
+// only) instanceable type — the same machinery generalizes to notes/countdown.
+export const INSTANCEABLE_WIDGET_IDS: readonly LayoutWidgetId[] = ["feed"];
+
+// The default feed instance's id: the sole instance a fresh install ships and
+// the target the single→list migration folds a pre-2.1 feed into. Shared by the
+// layout default, the config schema, and lib/config-migrate.
+export const FEED_DEFAULT_ID = "feed";
+
+// A layout entry's stable identity: its instanceId for multi-instance widgets,
+// else its type id. Keys, reorder matching, and the per-widget edit callbacks
+// all go through this so two instances of the same type stay distinct.
+export function widgetKey(w: { id: LayoutWidgetId; instanceId?: string }): string {
+  return w.instanceId ?? w.id;
+}
+
 export const GRID_COLUMNS = 24;
 
 // How many cards a widget's inner grid may show side by side (apps/bookmarks/
@@ -119,6 +139,10 @@ export const UI_SCALE_STEP = 5;
 
 export type LayoutWidget = {
   id: LayoutWidgetId;
+  // Present only on multi-instance widgets (INSTANCEABLE_WIDGET_IDS): the id of
+  // the config instance this entry renders. Its value is the entry's identity
+  // (see widgetKey). Absent on single-instance widgets.
+  instanceId?: string;
   span: number;
   hidden: boolean;
   // Cards per row (1–4) for the card-grid widgets; absent = auto from span.
@@ -166,7 +190,7 @@ export const DEFAULT_WIDGETS: LayoutWidget[] = [
   // Ship dormant (hidden) so upgrades don't surprise existing dashboards;
   // the admin shows them from the layout editor or Settings → Layout.
   { id: "notes", span: 8, hidden: true },
-  { id: "feed", span: 8, hidden: true },
+  { id: "feed", instanceId: FEED_DEFAULT_ID, span: 8, hidden: true },
   { id: "countdown", span: 8, hidden: true },
   { id: "worldClocks", span: 8, hidden: true },
   { id: "systemStats", span: 8, hidden: true },
@@ -318,6 +342,7 @@ export function resolveLayoutWidgets(
   saved:
     | readonly {
         id?: unknown;
+        instanceId?: unknown;
         span?: unknown;
         hidden?: unknown;
         cards?: unknown;
@@ -326,14 +351,35 @@ export function resolveLayoutWidgets(
         space?: unknown;
       }[]
     | undefined,
-  components?: LegacyComponentToggles
+  components?: LegacyComponentToggles,
+  // The feed config instance ids currently configured (settings.feeds). A saved
+  // feed entry survives only while its instanceId is still one of these (its
+  // config wasn't deleted); every configured instance not already placed is
+  // appended hidden, so a newly-added feed card shows up ready to place.
+  // Defaults to the single stock instance so callers that don't pass it (and
+  // the layout default) behave exactly as a fresh install.
+  feedInstanceIds: readonly string[] = [FEED_DEFAULT_ID]
 ): LayoutWidget[] {
+  const knownFeedIds = new Set(feedInstanceIds);
   const listed: LayoutWidget[] = [];
-  const seen = new Set<LayoutWidgetId>();
+  const seenSingles = new Set<LayoutWidgetId>();
+  const placedFeedIds = new Set<string>();
   for (const item of saved ?? []) {
     const id = item?.id;
-    if (!isWidgetId(id) || seen.has(id)) continue;
-    seen.add(id);
+    if (!isWidgetId(id)) continue;
+    const instanceable = INSTANCEABLE_WIDGET_IDS.includes(id);
+    let instanceId: string | undefined;
+    if (instanceable) {
+      // A multi-instance entry is kept only when it names a still-configured
+      // instance and hasn't already been placed (drops orphans + duplicates).
+      instanceId = typeof item.instanceId === "string" ? item.instanceId : undefined;
+      if (!instanceId || !knownFeedIds.has(instanceId) || placedFeedIds.has(instanceId))
+        continue;
+      placedFeedIds.add(instanceId);
+    } else {
+      if (seenSingles.has(id)) continue;
+      seenSingles.add(id);
+    }
     const span = isSpan(item.span) ? item.span : DEFAULT_BY_ID[id].span;
     const hidden =
       typeof item.hidden === "boolean"
@@ -342,6 +388,7 @@ export function resolveLayoutWidgets(
     const space = coerceSpace(item.space);
     listed.push({
       id,
+      ...(instanceId ? { instanceId } : {}),
       span,
       hidden,
       ...(isCards(item.cards) ? { cards: item.cards } : {}),
@@ -352,16 +399,34 @@ export function resolveLayoutWidgets(
       ...(space ? { space } : {}),
     });
   }
-  const missing = (ids: readonly LayoutWidgetId[]) =>
-    ids
-      .filter((id) => !seen.has(id))
-      .map((id) => ({
+  const missingHeader = HEADER_WIDGET_IDS.filter((id) => !seenSingles.has(id)).map(
+    (id) => ({
+      ...DEFAULT_BY_ID[id],
+      hidden: legacyHidden(id, components) ?? DEFAULT_BY_ID[id].hidden,
+    })
+  );
+  // Append every body widget the saved layout is missing, walking the canonical
+  // order so the default arrangement reproduces exactly. At `feed`, emit one
+  // hidden entry per configured instance not already placed.
+  const appendedBody: LayoutWidget[] = [];
+  for (const id of LAYOUT_WIDGET_IDS) {
+    if (HEADER_WIDGET_IDS.includes(id)) continue;
+    if (INSTANCEABLE_WIDGET_IDS.includes(id)) {
+      for (const fid of feedInstanceIds) {
+        if (!placedFeedIds.has(fid))
+          appendedBody.push({
+            id,
+            instanceId: fid,
+            span: DEFAULT_BY_ID[id].span,
+            hidden: DEFAULT_BY_ID[id].hidden,
+          });
+      }
+    } else if (!seenSingles.has(id)) {
+      appendedBody.push({
         ...DEFAULT_BY_ID[id],
         hidden: legacyHidden(id, components) ?? DEFAULT_BY_ID[id].hidden,
-      }));
-  return [
-    ...missing(HEADER_WIDGET_IDS),
-    ...listed,
-    ...missing(LAYOUT_WIDGET_IDS.filter((id) => !HEADER_WIDGET_IDS.includes(id))),
-  ];
+      });
+    }
+  }
+  return [...missingHeader, ...listed, ...appendedBody];
 }

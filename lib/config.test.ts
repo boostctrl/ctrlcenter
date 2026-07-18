@@ -121,7 +121,7 @@ describe("updateSettings partial merge", () => {
     expect(settings.timezone).toBe("America/Chicago");
   });
 
-  it("keeps a deleted feed deleted after migrating a legacy single-url config", async () => {
+  it("keeps a deleted feed url deleted after migrating a legacy single-url config", async () => {
     // A pre-1.9.6 config: a single legacy `url`, no `urls` list yet.
     await fs.writeFile(
       configPath,
@@ -130,20 +130,22 @@ describe("updateSettings partial merge", () => {
       }),
       "utf8"
     );
-    // The migration folds the url into the list…
+    // The migration folds the single feed into a one-instance feeds list…
     const loaded = await config.readConfigInternal();
-    expect(loaded.settings.feed.urls).toEqual(["https://old.example/rss"]);
-    // …and the admin then deletes the row, saving an empty list. Nothing is
-    // left on disk for a later read to resurrect the feed from.
+    expect(loaded.settings.feeds[0].urls).toEqual(["https://old.example/rss"]);
+    // …and the admin then clears the row, saving the whole feeds list with an
+    // empty url list. Nothing is left on disk to resurrect the feed from.
     const settings = await config.updateSettings({
-      feed: { enabled: true, urls: [], count: 6, title: "" },
+      feeds: [
+        { id: "feed", enabled: true, urls: [], count: 6, title: "", summaries: false },
+      ],
     });
-    expect(settings.feed.urls).toEqual([]);
+    expect(settings.feeds[0].urls).toEqual([]);
     const onDisk = YAML.load(await fs.readFile(configPath, "utf8")) as {
-      settings: { feed: Record<string, unknown> };
+      settings: { feed?: unknown; feeds: Record<string, unknown>[] };
     };
-    expect("url" in onDisk.settings.feed).toBe(false);
-    expect(onDisk.settings.feed.urls).toEqual([]);
+    expect("feed" in onDisk.settings).toBe(false);
+    expect(onDisk.settings.feeds[0].urls).toEqual([]);
   });
 
   it("merges nested weather fields without dropping siblings", async () => {
@@ -249,11 +251,11 @@ describe("updateSettings partial merge", () => {
     expect(await fs.readFile(`${configPath}.bak`, "utf8")).toBe(legacyText);
     // …and the live file is migrated (feed folded) with the mutation applied.
     const onDisk = YAML.load(await fs.readFile(configPath, "utf8")) as {
-      settings: { feed: Record<string, unknown> };
+      settings: { feed?: unknown; feeds: Record<string, unknown>[] };
       apps: { name: string }[];
     };
-    expect("url" in onDisk.settings.feed).toBe(false);
-    expect(onDisk.settings.feed.urls).toEqual(["https://old.example/rss"]);
+    expect("feed" in onDisk.settings).toBe(false);
+    expect(onDisk.settings.feeds[0].urls).toEqual(["https://old.example/rss"]);
     expect(onDisk.apps.map((a) => a.name)).toEqual(["First"]);
   });
 
@@ -317,7 +319,7 @@ describe("updateSettings partial merge", () => {
       apps: [],
       bookmarks: [],
     });
-    expect(replaced.settings.feed.urls).toEqual(["https://old.example/rss"]);
+    expect(replaced.settings.feeds[0].urls).toEqual(["https://old.example/rss"]);
     expect(replaced.settings.layout.sections).toEqual([
       { id: "apps", span: 12, hidden: false },
       { id: "bookmarks", span: 12, space: { bottom: 40 } },

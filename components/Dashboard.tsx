@@ -54,6 +54,7 @@ import {
   SIZED_WIDGET_IDS,
   WIDGET_LABELS,
   fillSpan,
+  widgetKey,
   type LayoutWidget,
   type LayoutWidgetId,
   type SpaceSide,
@@ -217,7 +218,8 @@ export default function Dashboard({
   showClock,
   statusEnabled,
   notes,
-  feed = null,
+  feedNodes = {},
+  feedLabels = {},
   countdown,
   worldClocks,
   systemStats,
@@ -252,9 +254,13 @@ export default function Dashboard({
   statusEnabled: boolean;
   // The Notes widget's admin-authored title + markdown body.
   notes: { title: string; content: string };
-  // The RSS feed widget (rendered server-side and passed in, like `calendar`);
-  // null when the feature is off, so its layout cell isn't left empty.
-  feed?: React.ReactNode;
+  // The rendered RSS feed cards, keyed by feed instance id (rendered
+  // server-side and passed in, like `calendar`). A card missing from the map
+  // is off/empty and its layout cell renders nothing.
+  feedNodes?: Record<string, React.ReactNode>;
+  // Per-instance display label for the editor's frame/tray (the card's title,
+  // else a generic), so multiple feed cards stay distinguishable.
+  feedLabels?: Record<string, string>;
   // The Countdown widget's admin-authored title + dated rows.
   countdown: { title: string; items: CountdownItem[] };
   // The World Clocks widget's admin-authored title + labeled time zones.
@@ -365,20 +371,22 @@ export default function Dashboard({
   }
   const mutateSections = (sections: LayoutWidget[]) =>
     mutateLayout({ ...layout, sections });
-  const setWidgetSpan = (id: LayoutWidgetId, span: number) =>
+  // Per-widget edits match on the entry's stable identity (widgetKey), so two
+  // feed instances stay independent — matching on the type id would move both.
+  const setWidgetSpan = (key: string, span: number) =>
     mutateSections(
       layout.sections.map((w) =>
-        w.id === id
+        widgetKey(w) === key
           ? { ...w, span: Math.min(GRID_COLUMNS, Math.max(1, span)) }
           : w
       )
     );
   // Cards per row for the card-grid widgets; undefined returns to auto (the
   // key is dropped so the stored entry stays clean).
-  const setWidgetCards = (id: LayoutWidgetId, cards: number | undefined) =>
+  const setWidgetCards = (key: string, cards: number | undefined) =>
     mutateSections(
       layout.sections.map((w) => {
-        if (w.id !== id) return w;
+        if (widgetKey(w) !== key) return w;
         if (cards !== undefined) return { ...w, cards };
         const rest = { ...w };
         delete rest.cards;
@@ -387,10 +395,10 @@ export default function Dashboard({
     );
   // Explicit height (px) for any widget; undefined clears it back to auto (the
   // key is dropped so the stored entry stays clean, like `cards`).
-  const setWidgetHeight = (id: LayoutWidgetId, height: number | undefined) =>
+  const setWidgetHeight = (key: string, height: number | undefined) =>
     mutateSections(
       layout.sections.map((w) => {
-        if (w.id !== id) return w;
+        if (widgetKey(w) !== key) return w;
         if (height !== undefined) return { ...w, height };
         const rest = { ...w };
         delete rest.height;
@@ -400,13 +408,13 @@ export default function Dashboard({
   // Extra space (px) on one side of a widget; undefined/0 clears that side. An
   // emptied `space` object is dropped so stored entries stay clean (like cards).
   const setWidgetSpace = (
-    id: LayoutWidgetId,
+    key: string,
     side: SpaceSide,
     value: number | undefined
   ) =>
     mutateSections(
       layout.sections.map((w) => {
-        if (w.id !== id) return w;
+        if (widgetKey(w) !== key) return w;
         const nextSpace = { ...(w.space ?? {}) };
         if (value) nextSpace[side] = value;
         else delete nextSpace[side];
@@ -420,18 +428,18 @@ export default function Dashboard({
   const setGap = (next: number) => mutateLayout({ ...layout, gap: next });
   const setTopGap = (next: number) =>
     mutateLayout({ ...layout, topGap: next });
-  const toggleWidgetHidden = (id: LayoutWidgetId) =>
+  const toggleWidgetHidden = (key: string) =>
     mutateSections(
       layout.sections.map((w) =>
-        w.id === id ? { ...w, hidden: !w.hidden } : w
+        widgetKey(w) === key ? { ...w, hidden: !w.hidden } : w
       )
     );
   // Toggle the section heading. Stored only when off (the key is dropped when
   // turning it back on) so entries stay clean, like `cards`.
-  const toggleWidgetLabel = (id: LayoutWidgetId) =>
+  const toggleWidgetLabel = (key: string) =>
     mutateSections(
       layout.sections.map((w) => {
-        if (w.id !== id) return w;
+        if (widgetKey(w) !== key) return w;
         if (w.hideLabel) {
           const rest = { ...w };
           delete rest.hideLabel;
@@ -468,12 +476,19 @@ export default function Dashboard({
       router.replace("/", { scroll: false });
   }, [setEditing, router]);
 
-  const hiddenById = useMemo(
-    () => new Map(layout.sections.map((w) => [w.id, w.hidden])),
+  // Keyed by widgetKey so feed instances don't collide; apps/bookmarks are
+  // single-instance, so their key is just the type id.
+  const hiddenByKey = useMemo(
+    () => new Map(layout.sections.map((w) => [widgetKey(w), w.hidden])),
     [layout.sections]
   );
-  const showApps = !hiddenById.get("apps");
-  const showBookmarks = !hiddenById.get("bookmarks");
+  const showApps = !hiddenByKey.get("apps");
+  const showBookmarks = !hiddenByKey.get("bookmarks");
+  // A feed instance's label (title, else generic) for the editor frame/tray.
+  const labelFor = (widget: LayoutWidget): string =>
+    widget.id === "feed"
+      ? (feedLabels[widgetKey(widget)] ?? WIDGET_LABELS.feed)
+      : WIDGET_LABELS[widget.id];
 
   // Editing hotkeys: Ctrl/Cmd+Z undoes the last layout change; Escape exits
   // edit mode like Done — unless a layered surface should eat it first (an
@@ -660,8 +675,12 @@ export default function Dashboard({
             showTitle={!widget.hideLabel}
           />
         ) : null;
-      case "feed":
-        return q && !editing ? null : withTitle(feed, widget.hideLabel);
+      case "feed": {
+        const node = feedNodes[widgetKey(widget)];
+        return !node || (q && !editing)
+          ? null
+          : withTitle(node, widget.hideLabel);
+      }
       case "countdown":
         return countdown.items.some((i) => isValidCountdownDate(i.date)) ? (
           <CountdownWidget
@@ -789,11 +808,13 @@ export default function Dashboard({
   // move is always a visible change, never a silent swap with a tray widget.
   function moveVisible(fromV: number, toV: number) {
     if (toV < 0 || toV >= liveCells.length) return;
-    const liveIds = new Set(liveWidgets.map((w) => w.id));
+    const liveKeys = new Set(liveWidgets.map((w) => widgetKey(w)));
     const nextVisible = reorder(liveWidgets, fromV, toV);
     let vi = 0;
     mutateSections(
-      layout.sections.map((w) => (liveIds.has(w.id) ? nextVisible[vi++] : w))
+      layout.sections.map((w) =>
+        liveKeys.has(widgetKey(w)) ? nextVisible[vi++] : w
+      )
     );
   }
 
@@ -834,7 +855,7 @@ export default function Dashboard({
           if (!editing) {
             return (
               <div
-                key={widget.id}
+                key={widgetKey(widget)}
                 className={`${cellClass} ${heightClass}`}
                 style={heightStyle}
                 data-space-top={widget.space?.top || undefined}
@@ -848,8 +869,9 @@ export default function Dashboard({
           }
           return (
             <WidgetFrame
-              key={widget.id}
+              key={widgetKey(widget)}
               widget={widget}
+              label={labelFor(widget)}
               index={vIndex}
               count={liveCells.length}
               cellClass={cellClass}
@@ -898,18 +920,18 @@ export default function Dashboard({
           <div className="mt-3 flex flex-wrap gap-2">
             {trayCells.map(({ widget, node }) => (
               <div
-                key={widget.id}
+                key={widgetKey(widget)}
                 title={node === null ? emptyReason(widget.id) : undefined}
                 className="flex items-center gap-2 rounded-lg border border-fg/10 bg-fg/5 px-2.5 py-1.5 text-xs text-fg/60"
               >
-                <span className="font-medium">{WIDGET_LABELS[widget.id]}</span>
+                <span className="font-medium">{labelFor(widget)}</span>
                 <span className="rounded bg-fg/10 px-1.5 py-0.5 text-[10px] tracking-wide text-fg/60 uppercase">
                   {widget.hidden ? "Hidden" : "Empty"}
                 </span>
                 {widget.hidden ? (
                   <button
                     type="button"
-                    onClick={() => toggleWidgetHidden(widget.id)}
+                    onClick={() => toggleWidgetHidden(widgetKey(widget))}
                     className="rounded-md border border-fg/10 px-2 py-0.5 text-fg/70 transition-colors hover:bg-fg/10 hover:text-fg"
                   >
                     Show

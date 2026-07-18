@@ -14,13 +14,14 @@
 //
 // Ledger of what migrates (each entry names the release that deprecated it):
 // - settings.feed.url            → folded into feed.urls   (deprecated 1.9.6, #107)
+// - settings.feed (single object)→ settings.feeds list      (superseded 2.1, #167)
 // - layout spans on the 12-grid  → doubled onto 24 columns (superseded 1.3)
 // - layout section `width` enum  → mapped to a 24-col span (superseded 1.3)
 // - layout section `spaceBelow`  → moved to `space.bottom` (superseded 1.8.1)
 // The deprecated d7 status windows (#117) are API payload, not config — they
 // were removed from lib/status.ts outright with no migration to run.
 
-import { GRID_COLUMNS, MAX_WIDGET_SPACE } from "./layout";
+import { FEED_DEFAULT_ID, GRID_COLUMNS, MAX_WIDGET_SPACE } from "./layout";
 
 // The 1.3 grid was 12 columns; spans saved against it double onto today's 24.
 // A `columns` marker on the persisted layout says which grid the spans were
@@ -59,23 +60,40 @@ function hasValidSpace(v: unknown): boolean {
   return ["top", "right", "bottom", "left"].some((side) => isSpaceValue(v[side]));
 }
 
-// Fold the deprecated single feed `url` into the `urls` list. The url only
-// survives into `urls` while that list has no usable entry (matching the old
-// feedUrls() fallback); either way the legacy key comes off the object — every
-// 1.9.x write stamped `url: ""` onto the file, so key presence alone marks a
-// pre-2.0 config.
+// Fold the pre-2.1 single `settings.feed` object into the `settings.feeds`
+// list (#167) as one instance keyed FEED_DEFAULT_ID, and stamp that id onto
+// the layout's placed feed entry so the card binds to the migrated instance.
+// The even-older single `url` (pre-1.9.6) is folded into `urls` on the way —
+// it only wins when `urls` has no usable entry, matching the old feedUrls()
+// fallback. Runs while `settings.feed` is a record and `settings.feeds` isn't
+// already an array, so it's idempotent (a second pass sees `feed` gone).
 function migrateFeed(settings: Record<string, unknown>): boolean {
   const feed = settings.feed;
-  if (!isRecord(feed) || !("url" in feed)) return false;
-  const { url, urls } = feed;
+  if (!isRecord(feed) || Array.isArray(settings.feeds)) return false;
+  const { url, urls, ...rest } = feed;
   const hasUrls =
     Array.isArray(urls) && urls.some((u) => typeof u === "string" && u.trim() !== "");
-  const next: Record<string, unknown> = { ...feed };
-  delete next.url;
-  if (!hasUrls && typeof url === "string" && url.trim() !== "") {
-    next.urls = [url];
+  const nextUrls = hasUrls
+    ? urls
+    : typeof url === "string" && url.trim() !== ""
+      ? [url]
+      : Array.isArray(urls)
+        ? urls
+        : [];
+  settings.feeds = [{ ...rest, id: FEED_DEFAULT_ID, urls: nextUrls }];
+  delete settings.feed;
+  // Bind the placed feed layout entry (there's at most one pre-2.1) to the
+  // migrated instance so it keeps its position/size instead of being re-added.
+  if (isRecord(settings.layout) && Array.isArray(settings.layout.sections)) {
+    settings.layout = {
+      ...settings.layout,
+      sections: settings.layout.sections.map((row) =>
+        isRecord(row) && row.id === "feed" && typeof row.instanceId !== "string"
+          ? { ...row, instanceId: FEED_DEFAULT_ID }
+          : row
+      ),
+    };
   }
-  settings.feed = next;
   return true;
 }
 

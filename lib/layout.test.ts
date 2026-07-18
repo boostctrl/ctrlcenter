@@ -185,8 +185,73 @@ describe("resolveLayoutWidgets", () => {
     const out = resolveLayoutWidgets(older);
     expect(out.map((w) => w.id)).toEqual([...older.map((w) => w.id), ...added]);
     for (const id of added) {
-      expect(out.find((w) => w.id === id)).toEqual({ id, span: 8, hidden: true });
+      // The feed is multi-instance: its appended entry carries the stock
+      // instance id so the layout binds to the default feed card.
+      const expected =
+        id === "feed"
+          ? { id, instanceId: "feed", span: 8, hidden: true }
+          : { id, span: 8, hidden: true };
+      expect(out.find((w) => w.id === id)).toEqual(expected);
     }
+  });
+
+  describe("multi-instance feed reconciliation (#167)", () => {
+    // A concrete non-feed entry keeps the resolver's other branches exercised.
+    const apps = { id: "apps", span: 24, hidden: false };
+
+    it("keeps every placed feed instance that is still configured", () => {
+      const out = resolveLayoutWidgets(
+        [
+          apps,
+          { id: "feed", instanceId: "a", span: 8, hidden: false },
+          { id: "feed", instanceId: "b", span: 12, hidden: false },
+        ],
+        undefined,
+        ["a", "b"]
+      );
+      const feeds = out.filter((w) => w.id === "feed");
+      expect(feeds.map((w) => w.instanceId)).toEqual(["a", "b"]);
+      expect(feeds.map((w) => w.span)).toEqual([8, 12]);
+    });
+
+    it("drops a feed entry whose instance was deleted (orphan)", () => {
+      const out = resolveLayoutWidgets(
+        [apps, { id: "feed", instanceId: "gone", span: 8, hidden: false }],
+        undefined,
+        ["a"]
+      );
+      // "gone" isn't configured → dropped; the configured "a" is appended hidden.
+      const feeds = out.filter((w) => w.id === "feed");
+      expect(feeds).toEqual([{ id: "feed", instanceId: "a", span: 8, hidden: true }]);
+    });
+
+    it("appends a configured instance that has no layout entry yet, hidden", () => {
+      const out = resolveLayoutWidgets(
+        [apps, { id: "feed", instanceId: "a", span: 8, hidden: false }],
+        undefined,
+        ["a", "b"]
+      );
+      const feeds = out.filter((w) => w.id === "feed");
+      expect(feeds.map((w) => [w.instanceId, w.hidden])).toEqual([
+        ["a", false],
+        ["b", true],
+      ]);
+    });
+
+    it("dedupes repeated instanceIds and drops a feed entry with none", () => {
+      const out = resolveLayoutWidgets(
+        [
+          { id: "feed", instanceId: "a", span: 8, hidden: false },
+          { id: "feed", instanceId: "a", span: 20, hidden: false },
+          { id: "feed", span: 8, hidden: false },
+        ],
+        undefined,
+        ["a"]
+      );
+      const feeds = out.filter((w) => w.id === "feed");
+      // First "a" wins (span 8); the duplicate and the id-less entry are dropped.
+      expect(feeds).toEqual([{ id: "feed", instanceId: "a", span: 8, hidden: false }]);
+    });
   });
 });
 

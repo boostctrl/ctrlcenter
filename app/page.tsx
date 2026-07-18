@@ -51,9 +51,14 @@ export default async function HomePage({
   const calAuth = calEnabled
     ? await getCalendarAuth()
     : { username: "", password: "" };
-  const feedCfg = settings.feed;
-  const feedList = feedUrls(feedCfg);
-  const feedEnabled = feedCfg.enabled && feedList.length > 0;
+  // Each configured feed card: its trimmed URL list and whether it should fetch
+  // (enabled with at least one URL). One home-page render can fan out to every
+  // active card — bounded by MAX_FEED_CARDS × MAX_FEED_URLS.
+  const feedCards = settings.feeds.map((config) => {
+    const urls = feedUrls(config);
+    return { config, urls, active: config.enabled && urls.length > 0 };
+  });
+  const feedInstanceIds = settings.feeds.map((f) => f.id);
   const weather = settings.weather;
 
   // Resolved before the fetches: the system-stats collection below is gated on
@@ -61,7 +66,8 @@ export default async function HomePage({
   // previews), so a hidden card costs no reads on a guest render.
   const widgets = resolveLayoutWidgets(
     settings.layout.sections,
-    settings.components
+    settings.components,
+    feedInstanceIds
   );
   const statsShown =
     isAdmin || widgets.some((w) => w.id === "systemStats" && !w.hidden);
@@ -72,13 +78,17 @@ export default async function HomePage({
   // returns null/[] on failure, so one unresponsive service can never hang the
   // render — the page loads and that widget simply degrades or fills in
   // client-side.
-  const [events, feed, initialWeather, systemStats] = await Promise.all([
+  const [events, feedResults, initialWeather, systemStats] = await Promise.all([
     calEnabled
       ? cal.homeView === "month"
         ? fetchCalendarRange(cal.url, now - 40 * DAY, now + 40 * DAY, calAuth)
         : fetchCalendar(cal.url, cal.count, calAuth)
       : Promise.resolve([]),
-    feedEnabled ? fetchFeeds(feedList, feedCfg.count) : Promise.resolve(null),
+    Promise.all(
+      feedCards.map((c) =>
+        c.active ? fetchFeeds(c.urls, c.config.count) : Promise.resolve(null)
+      )
+    ),
     weather.enabled
       ? fetchWeather(weather.latitude, weather.longitude, weather.units)
       : Promise.resolve(null),
@@ -86,6 +96,24 @@ export default async function HomePage({
       ? collectSystemStats(settings.systemStats.disks)
       : Promise.resolve(null),
   ]);
+
+  // One rendered FeedWidget per active card, keyed by instance id so the
+  // Dashboard can slot each into its layout cell; the label (title, else a
+  // generic) is what the editor's frame/tray shows to tell cards apart.
+  const feedNodes: Record<string, React.ReactNode> = {};
+  const feedLabels: Record<string, string> = {};
+  feedCards.forEach((c, i) => {
+    feedLabels[c.config.id] = c.config.title.trim() || "RSS feed";
+    if (c.active) {
+      feedNodes[c.config.id] = (
+        <FeedWidget
+          feed={feedResults[i]}
+          titleOverride={c.config.title}
+          showSummaries={c.config.summaries}
+        />
+      );
+    }
+  });
 
   // Whether the calendar widget will actually render (matches CalendarWidget's
   // own guards), so its layout cell isn't left empty when it won't.
@@ -138,15 +166,8 @@ export default async function HomePage({
             worldClocks={settings.worldClocks}
             systemStats={{ title: settings.systemStats.title, stats: systemStats }}
             initialNow={nowDate.toISOString()}
-            feed={
-              feedEnabled ? (
-                <FeedWidget
-                  feed={feed}
-                  titleOverride={feedCfg.title}
-                  showSummaries={feedCfg.summaries}
-                />
-              ) : null
-            }
+            feedNodes={feedNodes}
+            feedLabels={feedLabels}
             calendar={
               calendarVisible ? (
                 <CalendarWidget

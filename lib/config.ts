@@ -305,7 +305,7 @@ export async function updateSettings(
       calendar: calendarPartial,
       notes: notesPartial,
       announcement: announcementPartial,
-      feed: feedPartial,
+      feeds: feedsPartial,
       countdown: countdownPartial,
       worldClocks: worldClocksPartial,
       systemStats: systemStatsPartial,
@@ -341,10 +341,10 @@ export async function updateSettings(
         ...config.settings.announcement,
         ...withoutUndefined(announcementPartial ?? {}),
       },
-      feed: {
-        ...config.settings.feed,
-        ...withoutUndefined(feedPartial ?? {}),
-      },
+      // Feed cards are sent as the whole list (each carries its instance id),
+      // so replace wholesale — that's how removing a card persists; keep the
+      // existing list when the update doesn't touch feeds.
+      feeds: feedsPartial ?? config.settings.feeds,
       countdown: {
         ...config.settings.countdown,
         ...withoutUndefined(countdownPartial ?? {}),

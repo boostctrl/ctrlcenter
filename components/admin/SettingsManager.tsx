@@ -2,13 +2,14 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import type { Settings } from "@/lib/schema";
+import type { Settings, FeedConfig } from "@/lib/schema";
 import {
   ALERT_TYPES,
   ANNOUNCEMENT_TONES,
   STATUS_ANNOUNCEMENT_KINDS,
   feedUrls,
   MAX_FEED_URLS,
+  MAX_FEED_CARDS,
   MAX_STAT_DISKS,
 } from "@/lib/schema";
 import type { ThemePack } from "@/lib/theme";
@@ -38,6 +39,7 @@ import {
   NumberRow,
   RemoveButton,
   SelectField,
+  Switch,
   TextArea,
   TextField,
   ToggleRow,
@@ -51,6 +53,7 @@ import IconField from "./IconField";
 import CalendarTest from "./CalendarTest";
 import FeedTest from "./FeedTest";
 import { FeedHealthBadge, useFeedHealth } from "./FeedHealth";
+import type { FeedHealth } from "@/lib/feed";
 import AlertTest from "./AlertTest";
 import CitySearch from "./CitySearch";
 import ChangePassword from "./ChangePassword";
@@ -210,6 +213,132 @@ function useKeyedRows<T>(
   };
 }
 
+// One feed card in the RSS settings section (#167): its enable toggle, URL
+// list (each row with a Test/autodiscover button and passive fetch-health
+// badge), title, entry count, and summaries toggle. The board can hold several
+// — each is a config instance the layout editor places independently — so the
+// header carries a Move/Remove affordance and a label that falls back to the
+// card's number. Owns its own URL-rows keying, so it must be its own component
+// (hooks can't be called inside the parent's feeds.map).
+function FeedCardEditor({
+  feed,
+  index,
+  count,
+  health,
+  onChange,
+  onRemove,
+  onMove,
+}: {
+  feed: FeedConfig;
+  index: number;
+  count: number;
+  health: Record<string, FeedHealth> | null;
+  onChange: (next: FeedConfig) => void;
+  onRemove: () => void;
+  onMove: (from: number, to: number) => void;
+}) {
+  const setUrls = (update: (prev: string[]) => string[]) =>
+    onChange({ ...feed, urls: update(feed.urls) });
+  const urlRows = useKeyedRows(feed.urls, setUrls);
+  const updateUrl = (i: number, url: string) =>
+    setUrls((urls) => urls.map((u, idx) => (idx === i ? url : u)));
+  const label = feed.title.trim() || `Feed card ${index + 1}`;
+  return (
+    <div className={`${subCardClasses} flex flex-col gap-3 p-3`}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          {count > 1 && (
+            <MoveButtons
+              index={index}
+              count={count}
+              label={label}
+              onMove={onMove}
+            />
+          )}
+          <span className={`${fieldLabelClasses} truncate`}>{label}</span>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <label className="flex cursor-pointer items-center">
+            <Switch
+              checked={feed.enabled}
+              onChange={(enabled) => onChange({ ...feed, enabled })}
+              label={`${label} enabled`}
+            />
+          </label>
+          {count > 1 && (
+            <RemoveButton label={`Remove ${label}`} onClick={onRemove} />
+          )}
+        </div>
+      </div>
+      {feed.enabled && (
+        <>
+          <ListPanel label="Feed URLs (RSS, Atom, or JSON Feed)">
+            {feed.urls.map((url, i) => (
+              <div
+                key={urlRows.keys[i] ?? i}
+                className="flex flex-col gap-1.5"
+              >
+                <div className="flex items-center gap-2">
+                  {feed.urls.length > 1 && (
+                    <MoveButtons
+                      index={i}
+                      count={feed.urls.length}
+                      label={`${label} feed ${i + 1}`}
+                      onMove={urlRows.move}
+                    />
+                  )}
+                  <input
+                    value={url}
+                    onChange={(e) => updateUrl(i, e.target.value)}
+                    placeholder="https://example.com/feed.xml"
+                    aria-label={`${label} URL ${i + 1}`}
+                    className={`${controlClasses} min-w-0 flex-1`}
+                  />
+                  <RemoveButton
+                    label={`Remove ${label} feed ${i + 1}`}
+                    onClick={() => urlRows.removeAt(i)}
+                  />
+                </div>
+                {url.trim() !== "" && (
+                  <div className="flex flex-col gap-1.5">
+                    <FeedTest
+                      url={url}
+                      onPick={(picked) => updateUrl(i, picked)}
+                    />
+                    <FeedHealthBadge health={health?.[url.trim()]} />
+                  </div>
+                )}
+              </div>
+            ))}
+            {feed.urls.length < MAX_FEED_URLS && (
+              <AddButton onClick={() => urlRows.add("")}>+ Add feed</AddButton>
+            )}
+          </ListPanel>
+          <TextField
+            label="Card title (optional — defaults to the first feed's own)"
+            placeholder=""
+            value={feed.title}
+            onChange={(e) => onChange({ ...feed, title: e.target.value })}
+          />
+          <NumberRow
+            label="Entries to show"
+            min={1}
+            max={15}
+            value={feed.count}
+            onChange={(nextCount) => onChange({ ...feed, count: nextCount })}
+          />
+          <ToggleRow
+            label="Show summaries"
+            hint="Add a short snippet from each entry under its headline."
+            checked={feed.summaries}
+            onChange={(summaries) => onChange({ ...feed, summaries })}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function SettingsManager({
   initialSettings,
   themePacks,
@@ -236,12 +365,9 @@ export default function SettingsManager({
         initialSettings.components
       ),
     },
-    // Fold the deprecated single feed `url` into the `urls` list up front, so a
-    // pre-1.9.6 config shows its feed in the editor and autosaves the new shape.
-    feed: {
-      ...initialSettings.feed,
-      urls: feedUrls(initialSettings.feed),
-    },
+    // Trim each feed card's blank URL rows up front (the resolved list, like
+    // the home page uses), so a half-typed row saved earlier doesn't linger.
+    feeds: initialSettings.feeds.map((f) => ({ ...f, urls: feedUrls(f) })),
   }));
   // The URL seeds the active section (?tab=settings&section=widgets is a
   // shareable deep link that survives refresh); rail clicks mirror it back
@@ -365,15 +491,38 @@ export default function SettingsManager({
   // Every list editor below threads a FUNCTIONAL updater through setSettings
   // (update off the latest sub-array, never a render-captured snapshot), so a
   // batched pair of row mutations can't drop data — see useKeyedRows.
-  const feed = settings.feed;
-  const updateFeed = (patch: Partial<Settings["feed"]>) =>
-    setSettings((s) => ({ ...s, feed: { ...s.feed, ...patch } }));
-  const setFeedUrls = (update: (prev: string[]) => string[]) =>
-    setSettings((s) => ({ ...s, feed: { ...s.feed, urls: update(s.feed.urls) } }));
-  const feedUrlRows = useKeyedRows(feed.urls, setFeedUrls);
-  const updateFeedUrl = (i: number, url: string) =>
-    setFeedUrls((urls) => urls.map((u, idx) => (idx === i ? url : u)));
-  const feedHealth = useFeedHealth(section === "widgets" && feed.enabled);
+  // Feed cards: a list of instances (#167). Each is edited whole through its
+  // stable id; the layout editor places each by matching instanceId.
+  const feeds = settings.feeds;
+  const setFeeds = (update: (prev: FeedConfig[]) => FeedConfig[]) =>
+    setSettings((s) => ({ ...s, feeds: update(s.feeds) }));
+  const updateFeedCard = (id: string, next: FeedConfig) =>
+    setFeeds((fs) => fs.map((f) => (f.id === id ? next : f)));
+  const addFeedCard = () =>
+    setFeeds((fs) =>
+      fs.length >= MAX_FEED_CARDS
+        ? fs
+        : [
+            ...fs,
+            {
+              id: newThemeId(),
+              enabled: true,
+              urls: [""],
+              count: 6,
+              title: "",
+              summaries: false,
+            },
+          ]
+    );
+  const removeFeedCard = (id: string) =>
+    setFeeds((fs) => fs.filter((f) => f.id !== id));
+  const moveFeedCard = (from: number, to: number) =>
+    setFeeds((fs) => reorder(fs, from, to));
+  // Health covers every URL the home page has fetched; each card reads its own
+  // rows out of it. Poll while any card is enabled.
+  const feedHealth = useFeedHealth(
+    section === "widgets" && feeds.some((f) => f.enabled)
+  );
 
   const countdown = settings.countdown;
   const setCountdownItems = (
@@ -1045,83 +1194,30 @@ export default function SettingsManager({
         {section === "widgets" && (
         <Card
           title="RSS feed"
-          intro="Show the latest entries from one or more RSS, Atom, or JSON feeds, merged newest-first. Fetched server-side and cached for a few minutes. Ships hidden — show the card in the home-page layout editor once configured."
-          toggle={{
-            checked: feed.enabled,
-            onChange: (enabled) => updateFeed({ enabled }),
-          }}
+          intro="Show the latest entries from one or more RSS, Atom, or JSON feeds, merged newest-first. Add several cards for topical sources — news, releases, blogs — each placed separately in the home-page layout editor. Fetched server-side and cached for a few minutes; cards ship hidden until you show them."
         >
-          {feed.enabled && (
-            <>
-              <ListPanel label="Feed URLs (RSS, Atom, or JSON Feed)">
-                {feed.urls.map((url, i) => (
-                  <div
-                    key={feedUrlRows.keys[i] ?? i}
-                    className="flex flex-col gap-1.5"
-                  >
-                    <div className="flex items-center gap-2">
-                      {feed.urls.length > 1 && (
-                        <MoveButtons
-                          index={i}
-                          count={feed.urls.length}
-                          label={`feed ${i + 1}`}
-                          onMove={feedUrlRows.move}
-                        />
-                      )}
-                      <input
-                        value={url}
-                        onChange={(e) => updateFeedUrl(i, e.target.value)}
-                        placeholder="https://example.com/feed.xml"
-                        aria-label={`Feed ${i + 1} URL`}
-                        className={`${controlClasses} min-w-0 flex-1`}
-                      />
-                      <RemoveButton
-                        label={`Remove feed ${i + 1}`}
-                        onClick={() => feedUrlRows.removeAt(i)}
-                      />
-                    </div>
-                    {url.trim() !== "" && (
-                      <div className="flex flex-col gap-1.5">
-                        <FeedTest
-                          url={url}
-                          onPick={(picked) => updateFeedUrl(i, picked)}
-                        />
-                        <FeedHealthBadge health={feedHealth?.[url.trim()]} />
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {feed.urls.length < MAX_FEED_URLS && (
-                  <AddButton onClick={() => feedUrlRows.add("")}>
-                    + Add feed
-                  </AddButton>
-                )}
-              </ListPanel>
-              <TextField
-                label="Card title (optional — defaults to the first feed's own)"
-                placeholder=""
-                value={feed.title}
-                onChange={(e) => updateFeed({ title: e.target.value })}
+          <div className="flex flex-col gap-3">
+            {feeds.map((f, i) => (
+              <FeedCardEditor
+                key={f.id}
+                feed={f}
+                index={i}
+                count={feeds.length}
+                health={feedHealth}
+                onChange={(next) => updateFeedCard(f.id, next)}
+                onRemove={() => removeFeedCard(f.id)}
+                onMove={moveFeedCard}
               />
-              <NumberRow
-                label="Entries to show"
-                min={1}
-                max={15}
-                value={feed.count}
-                onChange={(count) => updateFeed({ count })}
-              />
-              <ToggleRow
-                label="Show summaries"
-                hint="Add a short snippet from each entry under its headline."
-                checked={feed.summaries}
-                onChange={(summaries) => updateFeed({ summaries })}
-              />
-              <Hint>
-                With several feeds, each entry shows its source. The count caps
-                the combined list.
-              </Hint>
-            </>
-          )}
+            ))}
+            {feeds.length < MAX_FEED_CARDS && (
+              <AddButton onClick={addFeedCard}>+ Add feed card</AddButton>
+            )}
+            <Hint>
+              Within a card, several feeds merge newest-first and each entry
+              shows its source. Add separate cards to place feeds independently
+              on the dashboard.
+            </Hint>
+          </div>
         </Card>
         )}
 

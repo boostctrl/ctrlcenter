@@ -33,6 +33,7 @@ describe("feedUpdateSchema", () => {
   it("rejects a non-http(s) url and more than the cap", () => {
     expect(
       feedUpdateSchema.safeParse({
+        id: "feed",
         enabled: true,
         urls: ["ftp://nope"],
         count: 6,
@@ -42,6 +43,7 @@ describe("feedUpdateSchema", () => {
     ).toBe(false);
     expect(
       feedUpdateSchema.safeParse({
+        id: "feed",
         enabled: true,
         urls: Array.from({ length: MAX_FEED_URLS + 1 }, (_, i) => `https://a${i}.example`),
         count: 6,
@@ -54,6 +56,7 @@ describe("feedUpdateSchema", () => {
   it("accepts blank rows (trimmed on read) up to the cap", () => {
     expect(
       feedUpdateSchema.safeParse({
+        id: "feed",
         enabled: true,
         urls: ["https://a.example", ""],
         count: 6,

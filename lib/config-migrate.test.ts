@@ -5,7 +5,9 @@ describe("migrateConfigShape", () => {
   it("reports a current-shape config unchanged, value untouched", () => {
     const modern = {
       settings: {
-        feed: { enabled: true, urls: ["https://a.example/rss"], count: 6, title: "" },
+        feeds: [
+          { id: "feed", enabled: true, urls: ["https://a.example/rss"], count: 6, title: "" },
+        ],
         layout: {
           sections: [{ id: "apps", span: 12, hidden: false }],
           columns: 24,
@@ -24,41 +26,77 @@ describe("migrateConfigShape", () => {
     expect(migrateConfigShape({ apps: [] }).changed).toBe(false);
   });
 
-  describe("feed url → urls", () => {
-    it("folds a legacy single url into the urls list and drops the key", () => {
+  describe("feed → feeds (single object → list, #167)", () => {
+    type FeedsShape = {
+      value: {
+        settings: {
+          feeds: Record<string, unknown>[];
+          feed?: unknown;
+          layout?: { sections: Record<string, unknown>[] };
+        };
+      };
+      changed: boolean;
+    };
+
+    it("folds the single feed into a one-instance feeds list and folds a legacy url", () => {
       const { value, changed } = migrateConfigShape({
         settings: { feed: { enabled: true, url: "https://old.example/rss" } },
-      }) as { value: { settings: { feed: Record<string, unknown> } }; changed: boolean };
+      }) as FeedsShape;
       expect(changed).toBe(true);
-      expect(value.settings.feed.urls).toEqual(["https://old.example/rss"]);
-      expect("url" in value.settings.feed).toBe(false);
+      expect("feed" in value.settings).toBe(false);
+      expect(value.settings.feeds).toHaveLength(1);
+      expect(value.settings.feeds[0]).toMatchObject({
+        id: "feed",
+        enabled: true,
+        urls: ["https://old.example/rss"],
+      });
+      expect("url" in value.settings.feeds[0]).toBe(false);
+    });
+
+    it("stamps the migrated instance id onto the placed feed layout entry", () => {
+      const { value } = migrateConfigShape({
+        settings: {
+          feed: { enabled: true, urls: ["https://a.example/rss"] },
+          layout: { sections: [{ id: "feed", span: 8, hidden: false }] },
+        },
+      }) as FeedsShape;
+      expect(value.settings.layout?.sections[0]).toMatchObject({
+        id: "feed",
+        instanceId: "feed",
+      });
     });
 
     it("prefers a populated urls list; the stale url is simply dropped", () => {
-      const { value, changed } = migrateConfigShape({
+      const { value } = migrateConfigShape({
         settings: {
           feed: { url: "https://stale.example/rss", urls: ["https://new.example/rss"] },
         },
-      }) as { value: { settings: { feed: Record<string, unknown> } }; changed: boolean };
-      expect(changed).toBe(true);
-      expect(value.settings.feed.urls).toEqual(["https://new.example/rss"]);
-      expect("url" in value.settings.feed).toBe(false);
+      }) as FeedsShape;
+      expect(value.settings.feeds[0].urls).toEqual(["https://new.example/rss"]);
+      expect("url" in value.settings.feeds[0]).toBe(false);
     });
 
     it("treats a blank-only urls list as empty, so the url still folds in", () => {
       const { value } = migrateConfigShape({
         settings: { feed: { url: "https://old.example/rss", urls: ["  ", ""] } },
-      }) as { value: { settings: { feed: Record<string, unknown> } } };
-      expect(value.settings.feed.urls).toEqual(["https://old.example/rss"]);
+      }) as FeedsShape;
+      expect(value.settings.feeds[0].urls).toEqual(["https://old.example/rss"]);
     });
 
-    it("drops a blank url key without inventing a feed (every 1.9.x write stamped url: '')", () => {
+    it("converts a blank single feed into one empty-url instance", () => {
       const { value, changed } = migrateConfigShape({
         settings: { feed: { enabled: false, url: "", urls: [] } },
-      }) as { value: { settings: { feed: Record<string, unknown> } }; changed: boolean };
+      }) as FeedsShape;
       expect(changed).toBe(true);
-      expect("url" in value.settings.feed).toBe(false);
-      expect(value.settings.feed.urls).toEqual([]);
+      expect("feed" in value.settings).toBe(false);
+      expect(value.settings.feeds[0].urls).toEqual([]);
+    });
+
+    it("does not touch a config already on the feeds list shape", () => {
+      const modern = {
+        settings: { feeds: [{ id: "feed", enabled: true, urls: [] }] },
+      };
+      expect(migrateConfigShape(modern).changed).toBe(false);
     });
   });
 
@@ -275,14 +313,15 @@ describe("migrateConfigShape", () => {
         apps: unknown;
         settings: {
           unknownSetting: unknown;
-          feed: Record<string, unknown>;
+          feeds: Record<string, unknown>[];
           layout: { experiment: unknown; sections: Record<string, unknown>[] };
         };
       };
     };
     expect(value.futureTopLevel).toEqual({ anything: true });
     expect(value.settings.unknownSetting).toBe("stays");
-    expect(value.settings.feed.customFlag).toBe(7);
+    // The single feed migrated to a one-instance list; its unknown key rides along.
+    expect(value.settings.feeds[0].customFlag).toBe(7);
     expect(value.settings.layout.experiment).toBe("keep-me");
     expect(value.settings.layout.sections[0].someday).toBe("maybe");
     expect(value.apps).toEqual([{ id: "broken", name: "" }]);

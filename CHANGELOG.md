@@ -14,6 +14,12 @@ here.
 
 ### Added
 
+- **You can now have more than one RSS card.** Add separate feed cards for
+  topical sources — a News card and a Releases card, say — in Settings →
+  Widgets → RSS feed, each with its own feeds, title, entry count and
+  summaries setting, and place each one independently on the dashboard in
+  the layout editor. Your existing single feed carries over unchanged as
+  the first card. (#167)
 - **The RSS card can show entry summaries.** Turn on **Show summaries** in
   Settings → Widgets → RSS feed to add a one-to-two-line snippet from each
   entry under its headline — always plain text, never raw HTML. Off (the
