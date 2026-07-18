@@ -23,7 +23,11 @@ import {
 // Control chrome for the odd inputs the components below don't cover
 // (datalist text inputs, datetime-local) — so even those can't drift.
 export const controlClasses =
-  "accent-focus rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-fg placeholder-fg/30 outline-none transition-colors";
+  "accent-focus rounded-lg border border-fg/10 bg-fg/[0.06] px-3 py-2 text-fg placeholder-fg/30 outline-none transition-colors hover:border-fg/25";
+
+// The label above a stacked field, and the heading of a list panel — one
+// class so every field name in the portal carries the same weight.
+export const fieldLabelClasses = "text-[13px] font-medium text-fg/60";
 
 // The muted explainer under a control or at the end of a card.
 export function Hint({ children }: { children: ReactNode }) {
@@ -39,8 +43,8 @@ export function TextField({
   hint?: ReactNode;
 } & InputHTMLAttributes<HTMLInputElement>) {
   return (
-    <label className="flex flex-col gap-1 text-sm">
-      <span className="text-fg/50">{label}</span>
+    <label className="flex flex-col gap-1.5 text-sm">
+      <span className={fieldLabelClasses}>{label}</span>
       <input {...props} className={controlClasses} />
       {hint && <span className="text-xs text-fg/40">{hint}</span>}
     </label>
@@ -56,9 +60,30 @@ export function SelectField({
   hint?: ReactNode;
 } & SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <label className="flex flex-col gap-1 text-sm">
-      <span className="text-fg/50">{label}</span>
-      <select {...props} className={controlClasses} />
+    <label className="flex flex-col gap-1.5 text-sm">
+      <span className={fieldLabelClasses}>{label}</span>
+      {/* The native dropdown arrow differs per OS and disappears into the
+          dark surface; draw our own chevron so every select matches. */}
+      <span className="relative">
+        <select
+          {...props}
+          className={`${controlClasses} w-full appearance-none pr-9`}
+        />
+        <svg
+          aria-hidden
+          viewBox="0 0 16 16"
+          fill="none"
+          className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-fg/40"
+        >
+          <path
+            d="M4 6l4 4 4-4"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </span>
       {hint && <span className="text-xs text-fg/40">{hint}</span>}
     </label>
   );
@@ -76,8 +101,8 @@ export function TextArea({
   mono?: boolean;
 } & TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
-    <label className="flex flex-col gap-1 text-sm">
-      <span className="text-fg/50">{label}</span>
+    <label className="flex flex-col gap-1.5 text-sm">
+      <span className={fieldLabelClasses}>{label}</span>
       <textarea
         {...props}
         className={`${controlClasses} leading-relaxed ${
@@ -119,8 +144,8 @@ export function NumberField({
   onChange: (value: number) => void;
 }) {
   return (
-    <label className="flex flex-col gap-1 text-sm">
-      <span className="text-fg/50">{label}</span>
+    <label className="flex flex-col gap-1.5 text-sm">
+      <span className={fieldLabelClasses}>{label}</span>
       <input
         type="number"
         min={min}
@@ -169,30 +194,59 @@ export function NumberRow({
   );
 }
 
-// Label-left row with a checkbox on the right.
+// The on/off control: an accent-filled sliding switch, not a native checkbox.
+// Renders no <label> of its own — compose it inside one (ToggleRow, a card
+// header) so the whole row stays clickable; `label` is the accessible name.
+export function Switch({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+}) {
+  return (
+    <span className="relative inline-flex shrink-0 items-center">
+      <input
+        type="checkbox"
+        role="switch"
+        aria-label={label}
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="peer sr-only"
+      />
+      <span
+        aria-hidden
+        className="h-5 w-9 rounded-full bg-fg/20 transition-colors peer-checked:[background-image:linear-gradient(135deg,var(--accent-from),var(--accent-to))] peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--accent-from)] peer-focus-visible:ring-offset-1"
+      />
+      <span
+        aria-hidden
+        className="absolute top-1/2 left-0.5 h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-4"
+      />
+    </span>
+  );
+}
+
+// Label-left row with a switch on the right.
 export function ToggleRow({
   label,
   hint,
   checked,
   onChange,
 }: {
-  label: ReactNode;
+  label: string;
   hint?: ReactNode;
   checked: boolean;
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex items-center justify-between gap-4 text-sm">
+    <label className="flex cursor-pointer items-center justify-between gap-4 text-sm">
       <span className="text-fg/70">
         {label}
         {hint && <span className="block text-xs text-fg/40">{hint}</span>}
       </span>
-      <input
-        type="checkbox"
-        className="shrink-0"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-      />
+      <Switch checked={checked} onChange={onChange} label={label} />
     </label>
   );
 }
@@ -303,26 +357,47 @@ export function Card({
       .replace(/(^-|-$)/g, "");
   return (
     <section id={id} className="glass-card flex flex-col gap-4 p-5">
-      <div className="flex items-start justify-between gap-4">
+      {/* The header underlines itself only when a body follows — a disabled
+          feature card is just its header, and a rule over nothing looks
+          broken. */}
+      <div className="flex items-start justify-between gap-4 [&:not(:only-child)]:border-b [&:not(:only-child)]:border-fg/10 [&:not(:only-child)]:pb-4">
         <div>
-          <h3 className="text-xs font-semibold tracking-[0.15em] text-fg/45 uppercase">
+          <h3 className="text-[15px] leading-snug font-semibold text-fg/90">
             {title}
           </h3>
-          {intro && <p className="mt-1.5 text-xs text-fg/40">{intro}</p>}
+          {intro && <p className="mt-1 text-[13px] text-fg/45">{intro}</p>}
         </div>
         {toggle && (
-          <label className="flex shrink-0 items-center gap-2 text-sm text-fg/70">
-            <input
-              type="checkbox"
+          <label className="flex shrink-0 cursor-pointer items-center pt-0.5">
+            <Switch
               checked={toggle.checked}
-              onChange={(e) => toggle.onChange(e.target.checked)}
+              onChange={toggle.onChange}
+              label={`${title} enabled`}
             />
-            Enabled
           </label>
         )}
       </div>
       {children}
     </section>
+  );
+}
+
+// Bordered panel grouping an editable list's rows and its "+ Add" action into
+// one visual unit, instead of rows floating loose in the card.
+export function ListPanel({
+  label,
+  children,
+}: {
+  label?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      {label && <span className={fieldLabelClasses}>{label}</span>}
+      <div className={`${subCardClasses} flex flex-col gap-2 p-3`}>
+        {children}
+      </div>
+    </div>
   );
 }
 

@@ -12,6 +12,17 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **The admin Settings tab now looks redesigned, not just reorganized.**
+  2.0.4 restructured the tab but kept its old look; this release restyles
+  it: real sliding toggle switches (filled with your accent color) replace
+  the bare checkboxes, every dropdown gets a consistent chevron, each card
+  opens with a proper title over a divider, field labels are heavier and
+  easier to scan, the editable lists — feeds, search bangs, countdown
+  dates, world clocks, extra disks — sit in their own bordered panels, and
+  fields respond to hover. (#180)
+
 ## [2.0.4] - 2026-07-17
 
 ### Changed

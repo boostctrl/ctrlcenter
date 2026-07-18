@@ -32,6 +32,7 @@ import {
   Card,
   ControlRow,
   Hint,
+  ListPanel,
   MoveButtons,
   NumberField,
   NumberRow,
@@ -41,6 +42,7 @@ import {
   TextField,
   ToggleRow,
   controlClasses,
+  fieldLabelClasses,
   subCardClasses,
 } from "./ui";
 import { ChipGroup } from "@/components/ChipGroup";
@@ -590,8 +592,8 @@ export default function SettingsManager({
             value={settings.favicon}
             onChange={(favicon) => setSettings({ ...settings, favicon })}
           />
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-fg/50">Default time zone</span>
+          <label className="flex flex-col gap-1.5 text-sm">
+            <span className={fieldLabelClasses}>Default time zone</span>
             <input
               list="settings-tz"
               value={settings.timezone}
@@ -826,7 +828,7 @@ export default function SettingsManager({
             </>
           }
         >
-          <div className="flex flex-col gap-2">
+          <ListPanel>
             {bangs.map((b, i) => (
               <div key={bangRows.keys[i] ?? i} className="flex items-center gap-2">
                 <span className="text-fg/40">!</span>
@@ -857,7 +859,7 @@ export default function SettingsManager({
             <AddButton onClick={() => bangRows.add({ key: "", url: "" })}>
               + Add bang
             </AddButton>
-          </div>
+          </ListPanel>
         </Card>
         )}
 
@@ -874,7 +876,7 @@ export default function SettingsManager({
           }}
         >
           <div className="flex flex-col gap-1.5">
-            <span className="text-sm text-fg/50">Default location</span>
+            <span className={fieldLabelClasses}>Default location</span>
             <CitySearch
               onSelect={(latitude, longitude) =>
                 setSettings({
@@ -1047,8 +1049,7 @@ export default function SettingsManager({
         >
           {feed.enabled && (
             <>
-              <div className="flex flex-col gap-2">
-                <span className="text-sm text-fg/50">Feed URLs (RSS or Atom)</span>
+              <ListPanel label="Feed URLs (RSS or Atom)">
                 {feed.urls.map((url, i) => (
                   <div
                     key={feedUrlRows.keys[i] ?? i}
@@ -1083,7 +1084,7 @@ export default function SettingsManager({
                     + Add feed
                   </AddButton>
                 )}
-              </div>
+              </ListPanel>
               <TextField
                 label="Card title (optional — defaults to the first feed's own)"
                 placeholder=""
@@ -1150,8 +1151,7 @@ export default function SettingsManager({
               }))
             }
           />
-          <div className="flex flex-col gap-2">
-            <span className="text-sm text-fg/50">Dates</span>
+          <ListPanel label="Dates">
             {countdown.items.map((item, i) => (
               <div
                 key={countdownRows.keys[i] ?? i}
@@ -1180,7 +1180,7 @@ export default function SettingsManager({
             <AddButton onClick={() => countdownRows.add({ label: "", date: "" })}>
               + Add date
             </AddButton>
-          </div>
+          </ListPanel>
           <Hint>
             Days count in each visitor&apos;s own time zone. Past dates dim and
             sink below the upcoming ones.
@@ -1204,8 +1204,7 @@ export default function SettingsManager({
               }))
             }
           />
-          <div className="flex flex-col gap-2">
-            <span className="text-sm text-fg/50">Time zones</span>
+          <ListPanel label="Time zones">
             {worldClocks.items.map((item, i) => (
               <div
                 key={worldClockRows.keys[i] ?? i}
@@ -1245,7 +1244,7 @@ export default function SettingsManager({
             >
               + Add time zone
             </AddButton>
-          </div>
+          </ListPanel>
           <Hint>
             Each clock shows the current time in its own zone. Leave the label
             blank to use the zone&apos;s city name.
@@ -1269,8 +1268,7 @@ export default function SettingsManager({
               }))
             }
           />
-          <div className="flex flex-col gap-2">
-            <span className="text-sm text-fg/50">Extra disks</span>
+          <ListPanel label="Extra disks">
             {systemStats.disks.map((disk, i) => (
               <div
                 key={statDiskRows.keys[i] ?? i}
@@ -1309,7 +1307,7 @@ export default function SettingsManager({
                 + Add disk
               </AddButton>
             )}
-          </div>
+          </ListPanel>
           <Hint>
             The data volume is always shown. A path here has to be mounted into
             the app&apos;s container to be measurable; a path that isn&apos;t is
@@ -1643,7 +1641,7 @@ export default function SettingsManager({
                   />
 
                   <div className="flex flex-col gap-1.5">
-                    <span className="text-sm text-fg/50">Kind</span>
+                    <span className={fieldLabelClasses}>Kind</span>
                     <ChipGroup
                       label="Announcement kind"
                       equal
@@ -1657,8 +1655,8 @@ export default function SettingsManager({
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <label className="flex flex-col gap-1 text-sm">
-                      <span className="text-fg/50">Starts (optional)</span>
+                    <label className="flex flex-col gap-1.5 text-sm">
+                      <span className={fieldLabelClasses}>Starts (optional)</span>
                       <input
                         type="datetime-local"
                         value={isoToLocalInput(a.startsAt)}
@@ -1670,8 +1668,8 @@ export default function SettingsManager({
                         className={controlClasses}
                       />
                     </label>
-                    <label className="flex flex-col gap-1 text-sm">
-                      <span className="text-fg/50">Ends (optional)</span>
+                    <label className="flex flex-col gap-1.5 text-sm">
+                      <span className={fieldLabelClasses}>Ends (optional)</span>
                       <input
                         type="datetime-local"
                         value={isoToLocalInput(a.endsAt)}
