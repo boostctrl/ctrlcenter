@@ -72,8 +72,13 @@ export default function AnnouncementBanner({
   if (text === "" || dismissed) return null;
 
   const { bg, color } = ANNOUNCEMENT_TONE_STYLES[tone];
+  // Soften the full-width strip's tint to 70% of the shared tone background
+  // (the /status announcement cards keep the fuller tint): a banner spanning
+  // the whole page reads better a touch lighter. color-mix scales the tint's
+  // alpha whether it's an rgba() or a color-mix() to begin with.
+  const bannerBg = `color-mix(in srgb, ${bg} 70%, transparent)`;
   return (
-    <div className="border-b border-fg/10" style={{ background: bg }} role="status">
+    <div className="border-b border-fg/10" style={{ background: bannerBg }} role="status">
       <div className="mx-auto flex max-w-8xl items-center gap-3 px-6 py-2.5 sm:px-10">
         <svg
           width="18"
