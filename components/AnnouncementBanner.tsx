@@ -72,11 +72,12 @@ export default function AnnouncementBanner({
   if (text === "" || dismissed) return null;
 
   const { bg, color } = ANNOUNCEMENT_TONE_STYLES[tone];
-  // Soften the full-width strip's tint to 70% of the shared tone background
-  // (the /status announcement cards keep the fuller tint): a banner spanning
-  // the whole page reads better a touch lighter. color-mix scales the tint's
-  // alpha whether it's an rgba() or a color-mix() to begin with.
-  const bannerBg = `color-mix(in srgb, ${bg} 70%, transparent)`;
+  // The banner runs full width over the animated scene, so the shared tone
+  // tint — translucent, which reads fine on the /status glass cards — let the
+  // moving background bleed through and look muddy/uneven. Back that same tint
+  // with the opaque page surface so the strip is one solid, even tone edge to
+  // edge (same hue, no transparency). The /status cards keep the bare tint.
+  const bannerBg = `linear-gradient(${bg}, ${bg}), var(--background)`;
   return (
     <div className="border-b border-fg/10" style={{ background: bannerBg }} role="status">
       <div className="mx-auto flex max-w-8xl items-center gap-3 px-6 py-2.5 sm:px-10">

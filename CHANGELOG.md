@@ -14,10 +14,11 @@ here.
 
 ### Changed
 
-- **The site-wide announcement banner reads a touch lighter.** Its
-  background tint is now 30% softer, so the full-width strip is less heavy
-  at the top of every page. The /status page's announcement cards are
-  unchanged.
+- **The site-wide announcement banner has a cleaner background.** Its tone
+  tint now sits on a solid surface instead of layering over the moving
+  page background, so the full-width strip is one even color edge to edge
+  rather than letting the scene show through and look muddy. The /status
+  page's announcement cards are unchanged.
 
 ## [2.1.0] - 2026-07-18
 
