@@ -23,6 +23,10 @@ here.
 
 ### Changed
 
+- **Calendars no longer slow the home page when their host is slow.** The
+  calendar cache now serves the last fetched events immediately and
+  refreshes in the background, so a lagging ICS/CalDAV server can't hold up
+  the page render — the same behaviour the RSS feeds already have. (#186)
 - **The site-wide announcement banner has a cleaner background.** Its tone
   tint now sits on a solid surface instead of layering over the moving
   page background, so the full-width strip is one even color edge to edge

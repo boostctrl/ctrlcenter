@@ -578,12 +578,16 @@ const CAL_MAX_BYTES = 5 * 1024 * 1024;
 
 // Parsed-event cache keyed by URL, so the homepage (force-dynamic) doesn't make
 // a blocking third-party request on every render. Held on globalThis to survive
-// module-graph duplication, like the status-history store.
+// module-graph duplication, like the status-history store. A companion map
+// dedupes in-flight background refreshes so a stale entry triggers at most one
+// refetch per URL however many renders want it (the same shape lib/feed.ts uses).
 type CalCacheEntry = { events: CalendarEvent[]; at: number };
 const g = globalThis as unknown as {
   __ctrlcenterCalCache?: Map<string, CalCacheEntry>;
+  __ctrlcenterCalRefresh?: Map<string, Promise<void>>;
 };
 const calCache = (g.__ctrlcenterCalCache ??= new Map());
+const calRefreshInFlight = (g.__ctrlcenterCalRefresh ??= new Map());
 
 export type CalendarAuth = { username?: string; password?: string };
 
@@ -642,29 +646,49 @@ async function requestIcs(
   return second.text ? second : first;
 }
 
+// Refresh one calendar URL's cache entry, deduped so at most one fetch per URL
+// is in flight however many renders want it. Only a successful ICS parse
+// replaces the entry — a fetch/parse failure keeps serving the last good cache
+// (stale-on-failure). Never rejects (requestIcs never throws), so a
+// fire-and-forget call can't become an unhandled rejection.
+function refreshCalendar(target: string, auth?: CalendarAuth): Promise<void> {
+  const inFlight = calRefreshInFlight.get(target);
+  if (inFlight) return inFlight;
+  const run = (async () => {
+    try {
+      const { text } = await requestIcs(target, calendarHeaders(auth));
+      if (text) calCache.set(target, { events: parseICS(text), at: Date.now() });
+      // On failure, keep the last good cache (leave the entry untouched).
+    } finally {
+      calRefreshInFlight.delete(target);
+    }
+  })();
+  calRefreshInFlight.set(target, run);
+  return run;
+}
+
 // Fetch + parse a calendar's raw (unexpanded) VEVENTs, cached for a few minutes
 // so repeated home/calendar renders don't each hit the third-party feed. Returns
 // [] for a non-http(s) URL; on a fetch/parse failure serves the last good cache
 // if there is one, else []. Never throws. `webcal://` URLs are normalized to
 // https. Shared by fetchCalendar (upcoming) and fetchCalendarRange (month grid).
+//
+// Stale-while-revalidate: an existing entry — even one past its TTL — is served
+// immediately with the refetch running behind the response; only a cold cache
+// blocks the render on the third-party fetch (previously every lapsed TTL did).
 async function loadParsedEvents(
   url: string,
   auth?: CalendarAuth
 ): Promise<CalendarEvent[]> {
   const target = url.trim().replace(/^webcal:\/\//i, "https://");
   if (!/^https?:\/\//i.test(target)) return [];
-  const now = Date.now();
   const cached = calCache.get(target);
-  let events = cached?.events;
-  if (!cached || now - cached.at >= CAL_CACHE_TTL_MS) {
-    const { text } = await requestIcs(target, calendarHeaders(auth));
-    if (text) {
-      events = parseICS(text);
-      calCache.set(target, { events, at: now });
-    }
-    // On failure, keep serving the stale cache (events stays as cached?.events).
+  if (!cached) {
+    await refreshCalendar(target, auth);
+  } else if (Date.now() - cached.at >= CAL_CACHE_TTL_MS) {
+    void refreshCalendar(target, auth);
   }
-  return events ?? [];
+  return (calCache.get(target) ?? cached)?.events ?? [];
 }
 
 // The next `count` upcoming events (recurring series expanded over the near

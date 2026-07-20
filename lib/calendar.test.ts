@@ -363,6 +363,55 @@ describe("fetchCalendar caching", () => {
     }
   });
 
+  it("serves a stale entry immediately and refreshes in the background (#186)", async () => {
+    const cal = (summary: string, dtstart: string) =>
+      [
+        "BEGIN:VCALENDAR",
+        "BEGIN:VEVENT",
+        `UID:${summary}`,
+        `SUMMARY:${summary}`,
+        `DTSTART:${dtstart}`,
+        "END:VEVENT",
+        "END:VCALENDAR",
+      ].join("\r\n");
+    const calGlobals = globalThis as unknown as {
+      __ctrlcenterCalCache?: Map<string, { events: unknown[]; at: number }>;
+      __ctrlcenterCalRefresh?: Map<string, Promise<void>>;
+    };
+    let body = cal("First", "20990101T120000Z");
+    let calls = 0;
+    const orig = globalThis.fetch;
+    globalThis.fetch = (async () => {
+      calls++;
+      return new Response(body, { status: 200 });
+    }) as typeof fetch;
+    try {
+      const url = `https://cal.example.test/${Date.now()}-swr.ics`;
+      const first = await fetchCalendar(url, 5);
+      expect(first[0]?.summary).toBe("First");
+      expect(calls).toBe(1);
+
+      // Age the cache entry past its 5-minute TTL so the next read is stale.
+      const entry = calGlobals.__ctrlcenterCalCache!.get(url)!;
+      entry.at = Date.now() - 6 * 60_000;
+      body = cal("Second", "20990201T120000Z");
+
+      // Stale-while-revalidate: this render is served the OLD event without
+      // blocking on the fetch, and only kicks off the background refresh.
+      const stale = await fetchCalendar(url, 5);
+      expect(stale[0]?.summary).toBe("First");
+      expect(calls).toBe(2); // the background refetch fired
+
+      // Once it settles, the fresh event is cached — served without another fetch.
+      await calGlobals.__ctrlcenterCalRefresh?.get(url);
+      const fresh = await fetchCalendar(url, 5);
+      expect(fresh[0]?.summary).toBe("Second");
+      expect(calls).toBe(2);
+    } finally {
+      globalThis.fetch = orig;
+    }
+  });
+
   it("expands recurring events relative to now", async () => {
     const ics = [
       "BEGIN:VCALENDAR",
