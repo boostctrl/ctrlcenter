@@ -18,6 +18,7 @@
 
 import fs from "fs/promises";
 import os from "os";
+import { basename } from "path";
 import { CONFIG_DIR } from "./config";
 import { MAX_STAT_DISKS } from "./schema";
 import { log, errorReason } from "./log";
@@ -26,7 +27,6 @@ export type SystemStatsSource = "container" | "host";
 
 export type DiskStat = {
   label: string;
-  path: string;
   usedBytes: number;
   totalBytes: number;
 };
@@ -256,6 +256,18 @@ async function collectProc(base: string): Promise<SystemStats> {
   return { source: "host", cpu, memory, disks: [] };
 }
 
+// A disk row's public-facing label. The System Stats card renders on the
+// anonymous home page, so a blank label must never fall through to the raw
+// mount path — that would hand signed-out visitors an internal filesystem-layout
+// detail (#184). Fall back to the path's last segment ("/mnt/nas/media" →
+// "media"), or a generic "Disk" when even that is empty (e.g. the root "/").
+export function diskLabel(label: string, mountPath: string): string {
+  const trimmed = label.trim();
+  if (trimmed !== "") return trimmed;
+  const base = basename(mountPath.trim());
+  return base !== "" ? base : "Disk";
+}
+
 async function collectDisks(
   extra: { label: string; path: string }[]
 ): Promise<DiskStat[]> {
@@ -273,9 +285,10 @@ async function collectDisks(
   for (const row of rows) {
     try {
       const s = await fs.statfs(row.path);
+      // Only the label reaches the client — the raw path is never serialized,
+      // so it can't leak through the props even for a well-labelled row.
       out.push({
-        label: row.label || row.path,
-        path: row.path,
+        label: diskLabel(row.label, row.path),
         usedBytes: (s.blocks - s.bfree) * s.bsize,
         totalBytes: s.blocks * s.bsize,
       });

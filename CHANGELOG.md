@@ -12,6 +12,15 @@ here.
 
 ## [Unreleased]
 
+### Security
+
+- **The System Stats card no longer exposes a disk's mount path to
+  signed-out visitors.** When an extra disk row was left without a label,
+  the card showed its raw server path (e.g. `/mnt/nas/media`) to everyone,
+  including anonymous visitors on a public dashboard. A blank label now
+  falls back to just the folder name, and the path is never sent to the
+  browser at all. (#184)
+
 ### Changed
 
 - **The site-wide announcement banner has a cleaner background.** Its tone

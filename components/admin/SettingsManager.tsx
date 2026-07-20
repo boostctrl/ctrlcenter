@@ -1425,7 +1425,8 @@ export default function SettingsManager({
           <Hint>
             The data volume is always shown. A path here has to be mounted into
             the app&apos;s container to be measurable; a path that isn&apos;t is
-            simply skipped.
+            simply skipped. Leave the label blank and the card shows the
+            folder&apos;s name, never the full mount path.
           </Hint>
         </Card>
         )}

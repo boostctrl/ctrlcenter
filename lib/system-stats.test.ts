@@ -6,6 +6,7 @@ import {
   parseInactiveFile,
   parseProcStatCpu,
   parseMeminfo,
+  diskLabel,
 } from "./system-stats";
 
 describe("parseCpuMax", () => {
@@ -85,5 +86,25 @@ describe("parseMeminfo", () => {
   it("returns null when either line is missing", () => {
     expect(parseMeminfo("MemTotal: 100 kB\n")).toBeNull();
     expect(parseMeminfo("")).toBeNull();
+  });
+});
+
+describe("diskLabel (#184)", () => {
+  it("uses the admin's label when one is set", () => {
+    expect(diskLabel("Media", "/mnt/nas/media")).toBe("Media");
+    expect(diskLabel("  Backups  ", "/srv/backups")).toBe("Backups");
+  });
+
+  it("never falls through to the raw mount path when the label is blank", () => {
+    // The card is anonymous-facing: a blank label shows the path's last segment,
+    // not the internal filesystem layout it sits in.
+    expect(diskLabel("", "/mnt/nas/media")).toBe("media");
+    expect(diskLabel("   ", "/srv/backups/")).toBe("backups");
+    expect(diskLabel("", "media")).toBe("media");
+  });
+
+  it("uses a generic label when the path has no last segment", () => {
+    expect(diskLabel("", "/")).toBe("Disk");
+    expect(diskLabel("", "")).toBe("Disk");
   });
 });
