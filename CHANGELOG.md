@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-07-20
+
 ### Security
 
 - **The icon cache can no longer grow without bound on disk.** Icons fetched
@@ -2115,7 +2117,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.1.1...HEAD
+[2.1.1]: https://github.com/boostctrl/ctrlcenter/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.0.5...v2.1.0
 [2.0.5]: https://github.com/boostctrl/ctrlcenter/compare/v2.0.4...v2.0.5
 [2.0.4]: https://github.com/boostctrl/ctrlcenter/compare/v2.0.3...v2.0.4
