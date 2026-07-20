@@ -71,15 +71,21 @@ export default function AnnouncementBanner({
 
   if (text === "" || dismissed) return null;
 
-  const { bg, color } = ANNOUNCEMENT_TONE_STYLES[tone];
-  // The banner runs full width over the animated scene, so the shared tone
-  // tint — translucent, which reads fine on the /status glass cards — let the
-  // moving background bleed through and look muddy/uneven. Back that same tint
-  // with the opaque page surface so the strip is one solid, even tone edge to
-  // edge (same hue, no transparency). The /status cards keep the bare tint.
-  const bannerBg = `linear-gradient(${bg}, ${bg}), var(--background)`;
+  const { color } = ANNOUNCEMENT_TONE_STYLES[tone];
+  // The strip is opaque and full-width over the page, so it can't reuse the
+  // translucent /status tint: flattened onto the near-black page a low-opacity
+  // amber collapses into a muddy brown. Instead give the surface just a light
+  // wash of the tone's accent and let a crisp accent underline plus the bright
+  // icon carry the tone — the same "gentle fill, bright accent" balance the
+  // /status cards strike with their left border. (/status keeps the bare tint.)
+  const fill = `color-mix(in srgb, ${color} 9%, var(--background))`;
+  const underline = `color-mix(in srgb, ${color} 55%, var(--background))`;
   return (
-    <div className="border-b border-fg/10" style={{ background: bannerBg }} role="status">
+    <div
+      className="border-b-2"
+      style={{ background: fill, borderBottomColor: underline }}
+      role="status"
+    >
       <div className="mx-auto flex max-w-8xl items-center gap-3 px-6 py-2.5 sm:px-10">
         <svg
           width="18"

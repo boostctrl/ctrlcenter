@@ -12,6 +12,14 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **The site-wide announcement banner looks cleaner in every tone.** Instead
+  of a heavy tinted fill — which turned muddy brown for the warning tone on
+  the dark theme — the strip is now a light wash of the tone's colour with a
+  crisp coloured underline and icon carrying the meaning, so info, warning,
+  success, and accent banners all read sharp on both light and dark themes.
+
 ## [2.1.1] - 2026-07-20
 
 ### Security
