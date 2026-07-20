@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "fs/promises";
 import os from "os";
 import path from "path";
@@ -66,6 +66,27 @@ function resetHistoryState() {
     s.downSince = new Map();
     s.outages = new Map();
   }
+}
+
+// CONFIG_PATH is a shared, mutable env var: once a persistence test points it at
+// a throwaway dir it stays pointed there, so any later loadHistory() silently
+// reads whatever file the previous test wrote. Capture the original and restore
+// it after every test so that cross-describe leak can't happen (#182).
+const ORIGINAL_CONFIG_PATH = process.env.CONFIG_PATH;
+afterEach(() => {
+  if (ORIGINAL_CONFIG_PATH === undefined) delete process.env.CONFIG_PATH;
+  else process.env.CONFIG_PATH = ORIGINAL_CONFIG_PATH;
+});
+
+// One isolated on-disk history for a single test: a new empty temp dir, with
+// CONFIG_PATH pointed inside it and the in-memory store cleared. Every test that
+// calls loadHistory()/flush() must start from one of these so it never inherits
+// another test's file. Returns the dir for tests that need to seed a file.
+async function freshHistoryDir(): Promise<string> {
+  resetHistoryState();
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "ctrlcenter-hist-"));
+  process.env.CONFIG_PATH = path.join(dir, "config.yaml");
+  return dir;
 }
 
 describe("hourOf", () => {
@@ -458,9 +479,7 @@ describe("loadHistory / flush persistence", () => {
   let dir: string;
 
   beforeEach(async () => {
-    resetHistoryState();
-    dir = await fs.mkdtemp(path.join(os.tmpdir(), "ctrlcenter-hist-"));
-    process.env.CONFIG_PATH = path.join(dir, "config.yaml");
+    dir = await freshHistoryDir();
   });
 
   it("loads an old-format file (2-tuples, no recent ms) with no latency data", async () => {
@@ -884,14 +903,9 @@ describe("setOutageNote (#176)", () => {
 });
 
 describe("getAppDetail", () => {
+  beforeEach(freshHistoryDir);
+
   it("returns detail-resolution series plus the outage log", async () => {
-    resetHistoryState();
-    // Point at a fresh empty dir: loadHistory must not pick up whatever file
-    // the persistence tests above left behind under the previous CONFIG_PATH.
-    process.env.CONFIG_PATH = path.join(
-      await fs.mkdtemp(path.join(os.tmpdir(), "ctrlcenter-hist-")),
-      "config.yaml"
-    );
     await loadHistory();
     const now = Date.now();
     recordResults([{ id: "a", up: true, status: 200, ms: 30 }], now - 10 * 60_000);
