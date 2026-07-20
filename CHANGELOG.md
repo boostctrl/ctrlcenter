@@ -14,6 +14,12 @@ here.
 
 ### Security
 
+- **The icon cache can no longer grow without bound on disk.** Icons fetched
+  from the icon CDN are cached beside your config; that cache is now capped
+  (64 MB by default, set `CTRLCENTER_ICON_CACHE_MAX_BYTES` to change it) and
+  evicts the least-recently-used icons past the cap, so it can't be pre-warmed
+  to fill a small data volume. An evicted icon is re-fetched the next time it's
+  shown. (#183)
 - **The System Stats card no longer exposes a disk's mount path to
   signed-out visitors.** When an extra disk row was left without a label,
   the card showed its raw server path (e.g. `/mnt/nas/media`) to everyone,

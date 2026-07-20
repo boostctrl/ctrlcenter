@@ -16,8 +16,15 @@ const g = globalThis as unknown as {
     negativeUntil: Map<string, number>;
     metadata: { text: string; at: number } | null;
     metadataInflight: unknown;
+    diskBytes: number | null;
+    evictInFlight: unknown;
+    lastServed: Map<string, number>;
   };
 };
+
+// Small on-disk budget so the eviction tests can exceed it with a handful of
+// tiny icons; set before the dynamic import so the module reads it at load.
+const CACHE_MAX_BYTES = 4096;
 
 const SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle r="10"/></svg>`;
 
@@ -27,6 +34,7 @@ const okSvg = () =>
 beforeAll(async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "ctrlcenter-icons-"));
   process.env.CONFIG_PATH = path.join(dir, "config.yaml");
+  process.env.CTRLCENTER_ICON_CACHE_MAX_BYTES = String(CACHE_MAX_BYTES);
   cache = await import("./icon-cache");
   iconsDir = path.join(dir, "icons");
 });
@@ -38,10 +46,29 @@ beforeEach(async () => {
     s.negativeUntil.clear();
     s.metadata = null;
     s.metadataInflight = null;
+    s.diskBytes = null;
+    s.evictInFlight = null;
+    s.lastServed.clear();
   }
   await fs.rm(iconsDir, { recursive: true, force: true });
   vi.unstubAllGlobals();
 });
+
+// Sum the bytes of every cached <slug>.svg on disk.
+async function cachedBytes(): Promise<number> {
+  let names: string[];
+  try {
+    names = await fs.readdir(iconsDir);
+  } catch {
+    return 0;
+  }
+  let total = 0;
+  for (const name of names) {
+    if (!name.endsWith(".svg")) continue;
+    total += (await fs.stat(path.join(iconsDir, name))).size;
+  }
+  return total;
+}
 
 describe("isCdnIconSlug", () => {
   it("accepts the set's slug shape and rejects everything else", () => {
@@ -135,6 +162,69 @@ describe("getCdnIcon", () => {
     expect(await a).not.toBeNull();
     expect(await b).not.toBeNull();
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("on-disk cache budget (#183)", () => {
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  // Write a cached icon straight to disk with a controlled mtime (the LRU key),
+  // bypassing the fetch path so a test can stage a known recency order.
+  async function seedIcon(slug: string, mtimeMs: number): Promise<void> {
+    await fs.mkdir(iconsDir, { recursive: true });
+    const file = path.join(iconsDir, `${slug}.svg`);
+    await fs.writeFile(file, SVG);
+    const when = new Date(mtimeMs);
+    await fs.utimes(file, when, when);
+  }
+
+  it("caps total on-disk bytes, evicting to stay within the budget", async () => {
+    const fetchMock = vi.fn(async () => okSvg());
+    vi.stubGlobal("fetch", fetchMock);
+    // Far more distinct icons than the budget holds (SVG is ~90 bytes each).
+    for (let i = 0; i < 80; i++) {
+      expect(await cache.getCdnIcon(`icon-${i}`)).not.toBeNull();
+    }
+    const onDisk = await cachedBytes();
+    expect(onDisk).toBeLessThanOrEqual(CACHE_MAX_BYTES);
+    // The bound actually bit: not every fetched icon is still on disk.
+    const remaining = (await fs.readdir(iconsDir)).filter((n) => n.endsWith(".svg"));
+    expect(remaining.length).toBeLessThan(80);
+    // The running total tracks the real on-disk size.
+    expect(g.__ctrlcenterIconCache!.diskBytes).toBe(onDisk);
+  });
+
+  it("evicts least-recently-served icons first (oldest mtime)", async () => {
+    // Stage enough aged icons to blow the budget, oldest → newest by mtime.
+    const base = Date.now() - 1_000_000;
+    for (let i = 0; i < 50; i++) await seedIcon(`old-${i}`, base + i * 10_000);
+    // A fresh fetch (newest mtime) triggers the over-budget eviction pass.
+    vi.stubGlobal("fetch", vi.fn(async () => okSvg()));
+    expect(await cache.getCdnIcon("fresh")).not.toBeNull();
+
+    expect(await cachedBytes()).toBeLessThanOrEqual(CACHE_MAX_BYTES);
+    // The oldest-served was evicted; the newest-served and the fresh one stayed.
+    await expect(fs.access(path.join(iconsDir, "old-0.svg"))).rejects.toBeTruthy();
+    await expect(fs.access(path.join(iconsDir, "old-49.svg"))).resolves.toBeUndefined();
+    await expect(fs.access(path.join(iconsDir, "fresh.svg"))).resolves.toBeUndefined();
+  });
+
+  it("bumps a served icon's mtime, debounced, so LRU counts it as recent", async () => {
+    const old = Date.now() - 30 * 24 * 3_600_000; // a month ago
+    await seedIcon("plex", old);
+    const file = path.join(iconsDir, "plex.svg");
+    vi.stubGlobal("fetch", vi.fn()); // a cache hit must not fetch
+
+    // Serving it refreshes the mtime (fire-and-forget utimes).
+    expect(await cache.getCdnIcon("plex")).not.toBeNull();
+    for (let i = 0; i < 40 && (await fs.stat(file)).mtimeMs <= old; i++) await sleep(5);
+    const bumped = (await fs.stat(file)).mtimeMs;
+    expect(bumped).toBeGreaterThan(old);
+
+    // A second serve inside the debounce window doesn't rewrite the mtime again.
+    expect(await cache.getCdnIcon("plex")).not.toBeNull();
+    await sleep(20);
+    expect((await fs.stat(file)).mtimeMs).toBe(bumped);
   });
 });
 

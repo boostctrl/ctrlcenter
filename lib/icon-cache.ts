@@ -3,8 +3,10 @@
 // render time, so an offline/air-gapped install showed no icons at all and a
 // CDN hiccup blanked random tiles. Now the client asks this server
 // (/api/icons/cdn/<slug>), which fetches an icon once, stores it beside the
-// uploaded icons in the data volume, and serves it locally forever after —
-// the dashboard works fully offline for every icon it actually uses.
+// uploaded icons in the data volume, and serves it locally from then on — the
+// dashboard works fully offline for every icon it actually uses. The on-disk
+// cache is bounded (ICON_CACHE_MAX_BYTES) and evicts least-recently-served
+// icons past that; an evicted icon is simply re-fetched next time it's used.
 //
 // SSRF posture: the upstream URL is a fixed template on one host; the only
 // caller-controlled part is the slug, validated to the CDN set's own shape
@@ -51,6 +53,35 @@ const METADATA_TTL_MS = 24 * 3_600_000;
 // own sockets) relaying that.
 const MAX_UPSTREAM_FETCHES = 8;
 
+// On-disk cache budget (#183). /api/icons/cdn/<slug> is public and each fetched
+// icon is stored "forever"; without a bound, an unauthenticated visitor
+// enumerating the set's real slugs (its slug list is public) could pre-warm the
+// whole set — thousands of files, on the order of 100 MB–1 GB — and crowd a
+// small data volume. Cap the total bytes of cached icons and evict the
+// least-recently-served when the cap is exceeded. The default comfortably fits
+// any real dashboard (which uses a few MB of icons); set
+// CTRLCENTER_ICON_CACHE_MAX_BYTES to shrink it for a tiny volume.
+const ICON_CACHE_MAX_BYTES = (() => {
+  const n = Number(process.env.CTRLCENTER_ICON_CACHE_MAX_BYTES);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 64 * 1024 * 1024;
+})();
+// Evict down to this low-water mark rather than just under the cap, so eviction
+// — which scans the dir — runs once per many writes at capacity, not on every
+// write. Floored at one icon's max size so a single fresh icon can never exceed
+// it and get evicted the instant it's written.
+const ICON_CACHE_EVICT_TO_BYTES = Math.min(
+  ICON_CACHE_MAX_BYTES,
+  Math.max(Math.floor(ICON_CACHE_MAX_BYTES * 0.9), MAX_CDN_ICON_BYTES)
+);
+// Debounce serve-time mtime bumps: an icon served within this window keeps its
+// recency without another disk write (write wear matters on the SD/eMMC cards
+// homelab hosts run on). mtime is the LRU key, so this is the resolution of
+// "recently served".
+const ICON_TOUCH_INTERVAL_MS = 6 * 3_600_000;
+// Bound the in-memory last-served map like the negative cache, so serving a
+// flood of distinct valid slugs can't grow it without limit.
+const MAX_SERVED_ENTRIES = 8192;
+
 // The dashboard-icons set names files with lowercase alphanumerics and dashes.
 // Anything else can't be one of its icons — reject before touching disk or
 // network (this is also what keeps the request path traversal-free).
@@ -69,6 +100,12 @@ type IconCacheState = {
   metadataInflight: Promise<string | null> | null;
   active: number;
   waiters: (() => void)[];
+  // Running total of cached-icon bytes (null until first computed by a scan),
+  // plus a dedupe handle so concurrent writes trigger at most one eviction pass.
+  diskBytes: number | null;
+  evictInFlight: Promise<void> | null;
+  // slug → last time we bumped its file mtime, to debounce serve-time touches.
+  lastServed: Map<string, number>;
 };
 const g = globalThis as unknown as { __ctrlcenterIconCache?: IconCacheState };
 const state = (g.__ctrlcenterIconCache ??= {
@@ -80,6 +117,9 @@ const state = (g.__ctrlcenterIconCache ??= {
   // Annotated: a bare [] in the ??= initializer infers never[], poisoning
   // every push through the expression's union type.
   waiters: [] as (() => void)[],
+  diskBytes: null,
+  evictInFlight: null,
+  lastServed: new Map(),
 });
 
 // Remember a slug the CDN didn't serve, so the next request degrades instead
@@ -127,6 +167,92 @@ async function writeFileAtomic(dest: string, data: Uint8Array | string): Promise
   await fs.rename(tmp, dest);
 }
 
+// Every cached icon with its size and mtime (the LRU key). Only `<slug>.svg`
+// files count toward the budget — metadata.json, temp files, and anything else
+// are ignored. Best-effort: an entry that races away between readdir and stat is
+// skipped. Returns [] when the cache dir doesn't exist yet.
+async function listCachedIcons(): Promise<
+  { file: string; slug: string; size: number; mtimeMs: number }[]
+> {
+  let names: string[];
+  try {
+    names = await fs.readdir(CACHE_DIR);
+  } catch {
+    return [];
+  }
+  const out: { file: string; slug: string; size: number; mtimeMs: number }[] = [];
+  for (const name of names) {
+    if (!name.endsWith(".svg")) continue;
+    const file = path.join(CACHE_DIR, name);
+    try {
+      const st = await fs.stat(file);
+      if (st.isFile())
+        out.push({ file, slug: name.slice(0, -4), size: st.size, mtimeMs: st.mtimeMs });
+    } catch {
+      // Gone between readdir and stat — ignore.
+    }
+  }
+  return out;
+}
+
+// Evict least-recently-served icons until the cache is at/under the low-water
+// mark. Recency is the file mtime, bumped on serve (touchOnServe), so a
+// write-once icon that's never served again ages out before ones in active use.
+// Resyncs diskBytes from the fresh scan, self-healing any drift. Never throws.
+async function evictToBudget(): Promise<void> {
+  const entries = await listCachedIcons();
+  entries.sort((a, b) => a.mtimeMs - b.mtimeMs); // oldest-served first
+  let total = entries.reduce((sum, e) => sum + e.size, 0);
+  for (const e of entries) {
+    if (total <= ICON_CACHE_EVICT_TO_BYTES) break;
+    try {
+      await fs.unlink(e.file);
+      total -= e.size;
+      state.lastServed.delete(e.slug);
+    } catch {
+      // Couldn't remove (raced/locked): leave it counted and move on.
+    }
+  }
+  state.diskBytes = total;
+}
+
+// Account for a freshly written icon and evict if the budget is now exceeded.
+// The first call after boot scans the existing dir to seed the running total
+// (which already includes the just-written file); later calls just add to it.
+// Eviction is deduped so a burst of concurrent writes shares one pass.
+async function accountForWrite(writtenBytes: number): Promise<void> {
+  if (state.diskBytes === null) {
+    state.diskBytes = (await listCachedIcons()).reduce((s, e) => s + e.size, 0);
+  } else {
+    state.diskBytes += writtenBytes;
+  }
+  if (state.diskBytes <= ICON_CACHE_MAX_BYTES) return;
+  if (!state.evictInFlight) {
+    state.evictInFlight = evictToBudget().finally(() => {
+      state.evictInFlight = null;
+    });
+  }
+  await state.evictInFlight;
+}
+
+// Refresh a served icon's mtime so LRU eviction keeps in-use icons over idle
+// ones — debounced to at most once per ICON_TOUCH_INTERVAL_MS per slug so a
+// busy dashboard doesn't rewrite mtimes on every render. Fire-and-forget: the
+// bump never blocks or fails the response.
+function touchOnServe(slug: string, file: string): void {
+  const now = Date.now();
+  if (now - (state.lastServed.get(slug) ?? 0) < ICON_TOUCH_INTERVAL_MS) return;
+  // Bound the map: drop the oldest-inserted entry when full. That slug merely
+  // loses its debounce memory, so it's touched once more than needed — harmless.
+  if (!state.lastServed.has(slug) && state.lastServed.size >= MAX_SERVED_ENTRIES) {
+    const oldest = state.lastServed.keys().next().value;
+    if (oldest !== undefined) state.lastServed.delete(oldest);
+  }
+  state.lastServed.set(slug, now);
+  const when = new Date(now);
+  fs.utimes(file, when, when).catch(() => {});
+}
+
 // Fetch one icon from the CDN, validate it, store it, return its bytes — or
 // null (with the slug negative-cached) when the upstream says no or the
 // response doesn't look like the SVG it must be.
@@ -154,6 +280,7 @@ async function fetchAndStore(slug: string, file: string): Promise<Uint8Array | n
       return null;
     }
     await writeFileAtomic(file, bytes);
+    await accountForWrite(bytes.byteLength);
     return bytes;
   } catch (e) {
     // Network failure (offline, timeout): negative-cache and degrade — the
@@ -171,7 +298,9 @@ export async function getCdnIcon(slug: string): Promise<Uint8Array | null> {
   if (!isCdnIconSlug(slug)) return null;
   const file = path.join(CACHE_DIR, `${slug}.svg`);
   try {
-    return await fs.readFile(file);
+    const bytes = await fs.readFile(file);
+    touchOnServe(slug, file);
+    return bytes;
   } catch {
     // Not cached yet.
   }
