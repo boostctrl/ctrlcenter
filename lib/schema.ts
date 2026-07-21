@@ -849,6 +849,12 @@ export const layoutUpdateSchema = z.object({
   sections: z.array(
     z.object({
       id: z.enum(LAYOUT_WIDGET_IDS),
+      // Multi-instance widgets (feed) bind to their config instance by this id.
+      // It MUST round-trip through a save: without it the stored feed entry
+      // becomes id-less, and resolveLayoutWidgets then drops it and re-appends
+      // the card hidden — a placed RSS card silently vanishing after any
+      // settings save (the read schema, layoutWidgetSchema, keeps it too).
+      instanceId: z.string().optional(),
       span: z.number().int().min(1).max(GRID_COLUMNS),
       hidden: z.boolean(),
       cards: z.number().int().min(1).max(MAX_CARD_COLUMNS).optional(),

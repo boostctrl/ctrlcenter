@@ -360,9 +360,15 @@ export default function SettingsManager({
       // Keep columns/scale — this form autosaves the whole layout object, so
       // dropping them here would reset them on the next save.
       ...initialSettings.layout,
+      // Pass the configured feed instance ids (like app/page.tsx does):
+      // without them resolveLayoutWidgets keeps only the stock "feed" instance
+      // and drops every other feed card as an orphan — and since this form
+      // autosaves the whole layout, that drop would persist and un-place a
+      // placed RSS card the next time any setting is saved (#187).
       sections: resolveLayoutWidgets(
         initialSettings.layout.sections,
-        initialSettings.components
+        initialSettings.components,
+        initialSettings.feeds.map((f) => f.id)
       ),
     },
     // Trim each feed card's blank URL rows up front (the resolved list, like

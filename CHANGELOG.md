@@ -14,6 +14,11 @@ here.
 
 ### Fixed
 
+- **A placed RSS card no longer vanishes after you save settings.** Saving
+  the settings form (or the layout editor) dropped the internal id that binds
+  a feed card to its place on the dashboard, so a card you'd shown would
+  silently disappear on the next load — worst of all for a second feed card.
+  Feed cards now keep their placement across every save. (#187)
 - **The layout editor's toolbar no longer covers the widget tray.** While
   editing, the floating toolbar could sit on top of the "Not on the live
   page" tray at the bottom, hiding the **Show** buttons — so a hidden widget

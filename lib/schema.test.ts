@@ -344,6 +344,25 @@ describe("settingsInputSchema partial merge semantics", () => {
     expect("statusChecks" in parsed).toBe(false);
   });
 
+  it("preserves a feed entry's instanceId through a layout save (#187)", () => {
+    // The write path must round-trip instanceId: stripping it makes the feed
+    // entry id-less, and resolveLayoutWidgets then drops it and re-appends the
+    // card hidden — a placed RSS card vanishing after any settings save.
+    const parsed = settingsInputSchema.parse({
+      layout: {
+        sections: [
+          { id: "greeting", span: 24, hidden: false },
+          { id: "feed", instanceId: "feed-second", span: 12, hidden: false },
+        ],
+        columns: 24,
+      },
+    });
+    const sections = parsed.layout!.sections;
+    expect(sections[1].instanceId).toBe("feed-second");
+    // A single-instance widget carries no instanceId.
+    expect("instanceId" in sections[0]).toBe(false);
+  });
+
   it("accepts a valid theme and rejects an invalid one", () => {
     expect(
       settingsInputSchema.safeParse({
