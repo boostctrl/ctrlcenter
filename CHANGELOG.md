@@ -12,6 +12,16 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **The admin portal reads as one tool across every tab.** The Applications,
+  Bookmarks, and Themes managers now share the same card headers, form
+  controls, switches, and buttons the Settings tab already used. So the "Only
+  show when logged in" control is a proper switch, every dropdown carries the
+  same chevron, and the list rows and their Edit/Delete actions match
+  throughout. Purely a visual tidy-up — nothing about how apps, bookmarks, or
+  themes work has changed. (#185)
+
 ## [2.2.0] - 2026-07-20
 
 ### Added

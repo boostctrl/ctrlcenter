@@ -13,6 +13,7 @@ import {
 } from "@/lib/theme";
 import type { ThemePackConfig } from "@/lib/schema";
 import { ChipGroup } from "@/components/ChipGroup";
+import { SelectField } from "./ui";
 import { apiErrorMessage } from "./apiError";
 import { useConfirm } from "./Confirm";
 import { useAutosave, SaveStatus, type SaveOptions } from "./useAutosave";
@@ -33,8 +34,6 @@ async function saveThemes(
   }
 }
 
-const selectClass =
-  "accent-focus rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-sm text-fg outline-none transition-colors";
 const colorClass =
   "h-8 w-8 shrink-0 cursor-pointer rounded border border-fg/10 bg-transparent";
 
@@ -195,34 +194,28 @@ function PackEditor({
       />
 
       <div className="grid grid-cols-2 gap-2">
-        <label className="flex flex-col gap-1 text-xs">
-          <span className="text-fg/50">Design</span>
-          <select
-            value={pack.design}
-            onChange={(e) => onField({ design: e.target.value as DesignId })}
-            className={selectClass}
-          >
-            {DESIGNS.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-xs">
-          <span className="text-fg/50">Scene</span>
-          <select
-            value={pack.scene}
-            onChange={(e) => onField({ scene: e.target.value as SceneId })}
-            className={selectClass}
-          >
-            {SCENES.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <SelectField
+          label="Design"
+          value={pack.design}
+          onChange={(e) => onField({ design: e.target.value as DesignId })}
+        >
+          {DESIGNS.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.name}
+            </option>
+          ))}
+        </SelectField>
+        <SelectField
+          label="Scene"
+          value={pack.scene}
+          onChange={(e) => onField({ scene: e.target.value as SceneId })}
+        >
+          {SCENES.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </SelectField>
       </div>
 
       <ChipGroup

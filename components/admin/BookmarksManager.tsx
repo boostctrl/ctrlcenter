@@ -6,12 +6,14 @@ import { orderCategories } from "@/lib/bookmarks";
 import Icon from "@/components/Icon";
 import { RenameButton, RenameField } from "@/components/InlineRename";
 import {
+  Card,
   TextField,
+  ToggleRow,
   Button,
   MoveButtons,
   DragGrip,
   PrivateChip,
-  PrivateToggle,
+  subCardClasses,
 } from "./ui";
 import IconField from "./IconField";
 import { useReorder, dropIndicatorClass } from "./useReorder";
@@ -291,59 +293,60 @@ export default function BookmarksManager({
         ))}
       </div>
 
-      <form
-        onSubmit={handleSubmit}
-        className="glass-card flex h-fit flex-col gap-4 p-5"
-      >
-        <h3 className="font-semibold">{editingId ? "Edit bookmark" : "Add bookmark"}</h3>
-        <TextField
-          label="Name"
-          required
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-        />
-        <TextField
-          label="Category"
-          required
-          list="bookmark-categories"
-          placeholder="e.g. Shopping"
-          value={form.category}
-          onChange={(e) => setForm({ ...form, category: e.target.value })}
-        />
-        <datalist id="bookmark-categories">
-          {categories.map((c) => (
-            <option key={c} value={c} />
-          ))}
-        </datalist>
-        <TextField
-          label="URL"
-          required
-          type="url"
-          placeholder="https://"
-          value={form.url}
-          onChange={(e) => setForm({ ...form, url: e.target.value })}
-        />
-        <IconField
-          value={form.icon}
-          onChange={(v) => setForm({ ...form, icon: v })}
-          name={form.name}
-        />
-        <PrivateToggle
-          checked={form.private}
-          onChange={(v) => setForm({ ...form, private: v })}
-          hint="Hides this bookmark from signed-out visitors. A category whose bookmarks are all private disappears with them."
-        />
-        <div className="flex gap-2">
-          <Button type="submit" disabled={saving}>
-            {editingId ? "Save changes" : "Add"}
-          </Button>
-          {editingId && (
-            <Button type="button" variant="ghost" onClick={resetForm}>
-              Cancel
-            </Button>
-          )}
-        </div>
-      </form>
+      <div className="h-fit">
+        <Card title={editingId ? "Edit bookmark" : "Add bookmark"}>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <TextField
+              label="Name"
+              required
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
+            <TextField
+              label="Category"
+              required
+              list="bookmark-categories"
+              placeholder="e.g. Shopping"
+              value={form.category}
+              onChange={(e) => setForm({ ...form, category: e.target.value })}
+            />
+            <datalist id="bookmark-categories">
+              {categories.map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
+            <TextField
+              label="URL"
+              required
+              type="url"
+              placeholder="https://"
+              value={form.url}
+              onChange={(e) => setForm({ ...form, url: e.target.value })}
+            />
+            <IconField
+              value={form.icon}
+              onChange={(v) => setForm({ ...form, icon: v })}
+              name={form.name}
+            />
+            <ToggleRow
+              label="Only show when logged in"
+              hint="Hides this bookmark from signed-out visitors. A category whose bookmarks are all private disappears with them."
+              checked={form.private}
+              onChange={(v) => setForm({ ...form, private: v })}
+            />
+            <div className="flex gap-2">
+              <Button type="submit" disabled={saving}>
+                {editingId ? "Save changes" : "Add"}
+              </Button>
+              {editingId && (
+                <Button type="button" variant="ghost" onClick={resetForm}>
+                  Cancel
+                </Button>
+              )}
+            </div>
+          </form>
+        </Card>
+      </div>
     </div>
   );
 }
@@ -377,7 +380,7 @@ function CategoryGroup({
         <div
           key={bookmark.id}
           {...handlers(index)}
-          className={`flex items-center justify-between gap-4 rounded-xl border border-fg/10 bg-fg/[0.03] px-4 py-3 transition-colors ${dropIndicatorClass(
+          className={`flex items-center justify-between gap-4 ${subCardClasses} px-4 py-3 transition-colors ${dropIndicatorClass(
             index,
             { dragIndex, overIndex, dropEdge }
           )} ${dragIndex === index ? "opacity-50" : ""}`}
@@ -402,11 +405,17 @@ function CategoryGroup({
             </div>
           </div>
           <div className="flex shrink-0 gap-2">
-            <Button variant="ghost" type="button" onClick={() => onEdit(bookmark)}>
+            <Button
+              variant="ghost"
+              size="sm"
+              type="button"
+              onClick={() => onEdit(bookmark)}
+            >
               Edit
             </Button>
             <Button
               variant="danger"
+              size="sm"
               type="button"
               onClick={() => onDelete(bookmark.id)}
             >

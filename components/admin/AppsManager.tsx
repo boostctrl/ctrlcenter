@@ -6,12 +6,18 @@ import { CHECK_TYPES, type CheckType } from "@/lib/status";
 import Icon from "@/components/Icon";
 import { ChipGroup } from "@/components/ChipGroup";
 import {
+  Card,
   TextField,
+  SelectField,
+  ToggleRow,
   Button,
   MoveButtons,
   DragGrip,
   PrivateChip,
-  PrivateToggle,
+  Hint,
+  fieldLabelClasses,
+  controlClasses,
+  subCardClasses,
 } from "./ui";
 import IconField from "./IconField";
 import { useReorder, dropIndicatorClass } from "./useReorder";
@@ -198,7 +204,7 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
           <div
             key={app.id}
             {...handlers(index)}
-            className={`flex items-center justify-between gap-4 rounded-xl border border-fg/10 bg-fg/[0.03] px-4 py-3 transition-colors ${dropIndicatorClass(
+            className={`flex items-center justify-between gap-4 ${subCardClasses} px-4 py-3 transition-colors ${dropIndicatorClass(
               index,
               { dragIndex, overIndex, dropEdge }
             )} ${dragIndex === index ? "opacity-50" : ""}`}
@@ -220,10 +226,20 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
               </div>
             </div>
             <div className="flex shrink-0 gap-2">
-              <Button variant="ghost" type="button" onClick={() => startEdit(app)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                type="button"
+                onClick={() => startEdit(app)}
+              >
                 Edit
               </Button>
-              <Button variant="danger" type="button" onClick={() => handleDelete(app.id)}>
+              <Button
+                variant="danger"
+                size="sm"
+                type="button"
+                onClick={() => handleDelete(app.id)}
+              >
                 Delete
               </Button>
             </div>
@@ -231,143 +247,140 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
         ))}
       </div>
 
-      <form
-        onSubmit={handleSubmit}
-        className="glass-card flex h-fit flex-col gap-4 p-5"
-      >
-        <h3 className="font-semibold">{editingId ? "Edit application" : "Add application"}</h3>
-        <TextField
-          label="Name"
-          required
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-        />
-        <TextField
-          label="Subtitle"
-          value={form.subtitle}
-          onChange={(e) => setForm({ ...form, subtitle: e.target.value })}
-        />
-        <TextField
-          label="URL"
-          required
-          type="url"
-          placeholder="https://"
-          value={form.url}
-          onChange={(e) => setForm({ ...form, url: e.target.value })}
-        />
-        <IconField
-          value={form.icon}
-          onChange={(v) => setForm({ ...form, icon: v })}
-          name={form.name}
-        />
-        <PrivateToggle
-          checked={form.private}
-          onChange={(v) => setForm({ ...form, private: v })}
-          hint="Hides this app from signed-out visitors everywhere, including the status page. It's still monitored and alerted on."
-        />
-        <div className="flex flex-col gap-2">
-          <label htmlFor="check-method" className="text-sm text-fg/50">
-            Check method
-          </label>
-          <select
-            id="check-method"
-            value={form.checkType}
-            onChange={(e) =>
-              setForm({ ...form, checkType: e.target.value as CheckType })
-            }
-            className="accent-focus rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-sm text-fg outline-none transition-colors"
-          >
-            {CHECK_TYPES.map((c) => (
-              <option key={c.key} value={c.key}>
-                {c.label}
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-fg/40">{checkTypeHint(form.checkType)}</p>
-        </div>
-
-        {(form.checkType === "tcp" || form.checkType === "dns") && (
-          <TextField
-            label="Port"
-            type="number"
-            min={1}
-            max={65535}
-            placeholder={
-              form.checkType === "dns"
-                ? "53"
-                : "Defaults to the URL's port (or 443/80)"
-            }
-            value={form.port}
-            onChange={(e) => setForm({ ...form, port: e.target.value })}
-          />
-        )}
-
-        {form.checkType === "keyword" && (
-          <TextField
-            label="Keyword in response"
-            placeholder="e.g. Welcome"
-            value={form.keyword}
-            onChange={(e) => setForm({ ...form, keyword: e.target.value })}
-          />
-        )}
-
-        {form.checkType === "http" && (
-        <div className="flex flex-col gap-2">
-          <span className="text-sm text-fg/50">Counts as up when</span>
-          <ChipGroup
-            label="Counts as up when"
-            equal
-            options={
-              [
-                { value: "any", label: "Any response" },
-                { value: "ok", label: "2xx & 3xx" },
-                { value: "custom", label: "Custom" },
-              ] as const
-            }
-            value={upMode}
-            onChange={(key) => {
-              setUpMode(key);
-              if (key === "any") setForm({ ...form, expectStatus: "" });
-              else if (key === "ok")
-                setForm({ ...form, expectStatus: "200-399" });
-              else
-                setForm({
-                  ...form,
-                  expectStatus:
-                    modeFromExpect(form.expectStatus) === "custom"
-                      ? form.expectStatus
-                      : "200-299",
-                });
-            }}
-          />
-          {upMode === "custom" && (
-            <input
-              value={form.expectStatus}
-              onChange={(e) => setForm({ ...form, expectStatus: e.target.value })}
-              placeholder="e.g. 200-299, 401"
-              className="accent-focus rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-sm text-fg outline-none transition-colors"
+      <div className="h-fit">
+        <Card title={editingId ? "Edit application" : "Add application"}>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <TextField
+              label="Name"
+              required
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
-          )}
-          <p className="text-xs text-fg/40">
-            {upMode === "any"
-              ? "Any reachable host counts as up — even a 4xx/5xx response."
-              : upMode === "ok"
-                ? "Up only on a 2xx or 3xx response."
-                : "Up only when the response code is in these codes/ranges — e.g. mark a 404 as down."}
-          </p>
-        </div>
-        )}
-        <div className="flex gap-2">
-          <Button type="submit" disabled={saving}>
-            {editingId ? "Save changes" : "Add"}
-          </Button>
-          {editingId && (
-            <Button type="button" variant="ghost" onClick={resetForm}>
-              Cancel
-            </Button>
-          )}
-        </div>
-      </form>
+            <TextField
+              label="Subtitle"
+              value={form.subtitle}
+              onChange={(e) => setForm({ ...form, subtitle: e.target.value })}
+            />
+            <TextField
+              label="URL"
+              required
+              type="url"
+              placeholder="https://"
+              value={form.url}
+              onChange={(e) => setForm({ ...form, url: e.target.value })}
+            />
+            <IconField
+              value={form.icon}
+              onChange={(v) => setForm({ ...form, icon: v })}
+              name={form.name}
+            />
+            <ToggleRow
+              label="Only show when logged in"
+              hint="Hides this app from signed-out visitors everywhere, including the status page. It's still monitored and alerted on."
+              checked={form.private}
+              onChange={(v) => setForm({ ...form, private: v })}
+            />
+            <SelectField
+              label="Check method"
+              hint={checkTypeHint(form.checkType)}
+              value={form.checkType}
+              onChange={(e) =>
+                setForm({ ...form, checkType: e.target.value as CheckType })
+              }
+            >
+              {CHECK_TYPES.map((c) => (
+                <option key={c.key} value={c.key}>
+                  {c.label}
+                </option>
+              ))}
+            </SelectField>
+
+            {(form.checkType === "tcp" || form.checkType === "dns") && (
+              <TextField
+                label="Port"
+                type="number"
+                min={1}
+                max={65535}
+                placeholder={
+                  form.checkType === "dns"
+                    ? "53"
+                    : "Defaults to the URL's port (or 443/80)"
+                }
+                value={form.port}
+                onChange={(e) => setForm({ ...form, port: e.target.value })}
+              />
+            )}
+
+            {form.checkType === "keyword" && (
+              <TextField
+                label="Keyword in response"
+                placeholder="e.g. Welcome"
+                value={form.keyword}
+                onChange={(e) => setForm({ ...form, keyword: e.target.value })}
+              />
+            )}
+
+            {form.checkType === "http" && (
+              <div className="flex flex-col gap-2">
+                <span className={fieldLabelClasses}>Counts as up when</span>
+                <ChipGroup
+                  label="Counts as up when"
+                  equal
+                  options={
+                    [
+                      { value: "any", label: "Any response" },
+                      { value: "ok", label: "2xx & 3xx" },
+                      { value: "custom", label: "Custom" },
+                    ] as const
+                  }
+                  value={upMode}
+                  onChange={(key) => {
+                    setUpMode(key);
+                    if (key === "any") setForm({ ...form, expectStatus: "" });
+                    else if (key === "ok")
+                      setForm({ ...form, expectStatus: "200-399" });
+                    else
+                      setForm({
+                        ...form,
+                        expectStatus:
+                          modeFromExpect(form.expectStatus) === "custom"
+                            ? form.expectStatus
+                            : "200-299",
+                      });
+                  }}
+                />
+                {upMode === "custom" && (
+                  <input
+                    value={form.expectStatus}
+                    onChange={(e) =>
+                      setForm({ ...form, expectStatus: e.target.value })
+                    }
+                    placeholder="e.g. 200-299, 401"
+                    className={`${controlClasses} text-sm`}
+                  />
+                )}
+                <Hint>
+                  {upMode === "any"
+                    ? "Any reachable host counts as up — even a 4xx/5xx response."
+                    : upMode === "ok"
+                      ? "Up only on a 2xx or 3xx response."
+                      : "Up only when the response code is in these codes/ranges — e.g. mark a 404 as down."}
+                </Hint>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <Button type="submit" disabled={saving}>
+                {editingId ? "Save changes" : "Add"}
+              </Button>
+              {editingId && (
+                <Button type="button" variant="ghost" onClick={resetForm}>
+                  Cancel
+                </Button>
+              )}
+            </div>
+          </form>
+        </Card>
+      </div>
     </div>
   );
 }
