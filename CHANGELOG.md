@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [2.2.1] - 2026-07-20
+
 ### Changed
 
 - **The admin portal reads as one tool across every tab.** The Applications,
@@ -2161,7 +2163,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.2.0...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.2.1...HEAD
+[2.2.1]: https://github.com/boostctrl/ctrlcenter/compare/v2.2.0...v2.2.1
 [2.2.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.1.2...v2.2.0
 [2.1.2]: https://github.com/boostctrl/ctrlcenter/compare/v2.1.1...v2.1.2
 [2.1.1]: https://github.com/boostctrl/ctrlcenter/compare/v2.1.0...v2.1.1
