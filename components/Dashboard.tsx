@@ -210,6 +210,7 @@ export default function Dashboard({
   bookmarks,
   search,
   categoryOrder = [],
+  groupPrivateApps = false,
   calendar = null,
   initialDate,
   initialGreeting,
@@ -240,6 +241,10 @@ export default function Dashboard({
   bookmarks: BookmarkItem[];
   search: SearchConfig;
   categoryOrder?: string[];
+  // When on, the Apps widget splits private apps into their own labeled
+  // "Private Applications" group. Only affects the admin — guests never
+  // receive private apps, so the group is always empty for them.
+  groupPrivateApps?: boolean;
   // The calendar widget (rendered server-side and passed in); hidden during an
   // active search so results stay adjacent to the input. Passed as null when the
   // widget wouldn't render, so its layout cell isn't left empty.
@@ -719,16 +724,41 @@ export default function Dashboard({
         ) : null;
       case "apps": {
         const list = editing ? apps : filteredApps;
-        return list.length > 0 ? (
+        if (list.length === 0) return null;
+        // With grouping on, private apps get their own labeled block below the
+        // public ones. The private slice is empty for guests (readPublicConfig
+        // filters private apps out upstream), so the second group only ever
+        // appears for the admin. Both slices keep the single ordered list's
+        // relative order.
+        const publicApps = groupPrivateApps ? list.filter((a) => !a.private) : list;
+        const privateApps = groupPrivateApps ? list.filter((a) => a.private) : [];
+        return (
           <section className="@container">
-            {!widget.hideLabel && <SectionTitle>Applications</SectionTitle>}
-            <div className={cardGridClass(widget, "gap-4")}>
-              {list.map((app) => (
-                <AppCard key={app.id} app={app} />
-              ))}
-            </div>
+            {publicApps.length > 0 && (
+              <>
+                {!widget.hideLabel && <SectionTitle>Applications</SectionTitle>}
+                <div className={cardGridClass(widget, "gap-4")}>
+                  {publicApps.map((app) => (
+                    <AppCard key={app.id} app={app} />
+                  ))}
+                </div>
+              </>
+            )}
+            {privateApps.length > 0 && (
+              // Space the private group off the public grid above it; the
+              // SectionTitle only carries a bottom margin. No top gap when it's
+              // the only group (every app is private).
+              <div className={publicApps.length > 0 ? "mt-8" : undefined}>
+                <SectionTitle>Private Applications</SectionTitle>
+                <div className={cardGridClass(widget, "gap-4")}>
+                  {privateApps.map((app) => (
+                    <AppCard key={app.id} app={app} />
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
-        ) : null;
+        );
       }
       case "bookmarks": {
         const groups = editing

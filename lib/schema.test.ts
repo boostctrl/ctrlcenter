@@ -115,6 +115,7 @@ describe("configSchema defaults", () => {
     expect(config.settings.theme.scene).toBe("aurora");
     expect(config.settings.theme.accentFrom).toBe("#a78bfa");
     expect(config.settings.statusChecks).toBe(false);
+    expect(config.settings.groupPrivateApps).toBe(false);
     expect(config.settings.statusInterval).toBe(5);
     expect(config.settings.statusDefaultRange).toBe("d1");
     expect(config.settings.statusAnnouncements).toEqual([]);
@@ -185,6 +186,23 @@ describe("settingsSchema", () => {
       enabled: true,
       units: "imperial",
     });
+  });
+
+  it("defaults groupPrivateApps off and keeps a stored value", () => {
+    expect(settingsSchema.parse({}).groupPrivateApps).toBe(false);
+    expect(settingsSchema.parse({ groupPrivateApps: true }).groupPrivateApps).toBe(
+      true
+    );
+  });
+});
+
+describe("settingsInputSchema", () => {
+  it("accepts groupPrivateApps as an optional partial update", () => {
+    expect(settingsInputSchema.parse({ groupPrivateApps: true })).toEqual({
+      groupPrivateApps: true,
+    });
+    // Omitted stays absent, so updateSettings' partial merge leaves it untouched.
+    expect(settingsInputSchema.parse({}).groupPrivateApps).toBeUndefined();
   });
 });
 

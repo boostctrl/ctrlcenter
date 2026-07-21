@@ -365,6 +365,9 @@ export default async function HelpPage() {
                 icon. Mark one <strong>Only show when logged in</strong> to keep
                 an internal service off the dashboard and status page for
                 signed-out visitors — it&apos;s still monitored and alerted on.
+                Turn on <strong>Group private apps separately</strong> under
+                Settings → Layout to collect those apps into their own{" "}
+                <strong>Private Applications</strong> section, shown only to you.
               </li>
               <li>
                 <strong>Bookmarks</strong> group under categories you name. Both

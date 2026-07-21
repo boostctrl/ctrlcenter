@@ -155,6 +155,7 @@ export default async function HomePage({
             bookmarks={bookmarks}
             search={settings.search}
             categoryOrder={settings.bookmarkCategoryOrder}
+            groupPrivateApps={settings.groupPrivateApps}
             initialDate={initialDate}
             initialGreeting={initialGreeting}
             initialWeather={initialWeather}

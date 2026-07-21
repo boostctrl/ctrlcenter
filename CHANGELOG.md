@@ -12,6 +12,14 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Private apps can now sit in their own section.** Turn on **Group private
+  apps separately** under Settings → Layout and every app marked *Only show
+  when logged in* collects into a dedicated **Private Applications** group
+  beneath your public apps. Because private apps are only ever shown to a
+  signed-in admin, the group appears only to you. (#188)
+
 ## [2.1.2] - 2026-07-20
 
 ### Fixed

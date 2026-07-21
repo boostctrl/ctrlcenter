@@ -914,7 +914,18 @@ export default function SettingsManager({
                 onChange={(value) => setComponent(t.key, value)}
               />
             ))}
+            <ToggleRow
+              label="Group private apps separately"
+              checked={settings.groupPrivateApps}
+              onChange={(groupPrivateApps) =>
+                setSettings({ ...settings, groupPrivateApps })
+              }
+            />
           </div>
+          <Hint>
+            Private apps only appear when you&apos;re signed in, so this
+            &ldquo;Private Applications&rdquo; group is only ever visible to you.
+          </Hint>
           {!components.settingsButton && (
             <Hint>
               With the floating navigation menu off, reach this page directly at
