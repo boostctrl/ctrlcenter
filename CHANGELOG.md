@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [2.1.2] - 2026-07-20
+
 ### Fixed
 
 - **A placed RSS card no longer vanishes after you save settings.** Saving
@@ -2139,7 +2141,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.1.1...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.1.2...HEAD
+[2.1.2]: https://github.com/boostctrl/ctrlcenter/compare/v2.1.1...v2.1.2
 [2.1.1]: https://github.com/boostctrl/ctrlcenter/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.0.5...v2.1.0
 [2.0.5]: https://github.com/boostctrl/ctrlcenter/compare/v2.0.4...v2.0.5
