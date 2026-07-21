@@ -12,6 +12,15 @@ here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The layout editor's toolbar no longer covers the widget tray.** While
+  editing, the floating toolbar could sit on top of the "Not on the live
+  page" tray at the bottom, hiding the **Show** buttons — so a hidden widget
+  (an RSS card, say) looked like it had vanished with no way to bring it
+  back. The page now reserves room below the tray so every widget stays
+  reachable.
+
 ### Changed
 
 - **The site-wide announcement banner looks cleaner in every tone.** Instead

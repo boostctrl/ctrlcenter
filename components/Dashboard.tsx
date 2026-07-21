@@ -989,6 +989,14 @@ export default function Dashboard({
         </p>
       )}
 
+      {/* The edit toolbar is a fixed pill at the bottom of the viewport, so it
+          floats over whatever sits at the end of the page — most painfully the
+          tray, whose "Show" buttons are how a hidden widget (e.g. an RSS card)
+          gets placed back. Reserve scroll room below the content while editing
+          so the tray always clears the pill. Taller on small screens, where the
+          pill wraps to more rows. */}
+      {editing && <div aria-hidden className="h-40 sm:h-28" />}
+
       {editing && (
         <ConfirmProvider>
           <EditToolbar
