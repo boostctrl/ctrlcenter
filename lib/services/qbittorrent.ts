@@ -168,12 +168,18 @@ async function mintSession(
   }
   if (!res.ok) throw new ServiceError(`HTTP ${res.status}`);
   const body = text.trim();
-  if (body === "") {
-    // qBittorrent's login always answers "Ok."/"Fails." — an empty body means
-    // the URL isn't reaching a qBittorrent WebUI (wrong port, or a middlebox).
-    throw new ServiceError("Empty response — is the URL a qBittorrent WebUI?");
-  }
-  if (!/^Ok\.?$/i.test(body)) {
+  // qBittorrent <5.2 answers 200 with "Ok."/"Fails." in the body; 5.2+ answers
+  // 204 No Content with an empty body on a successful login — the SID cookie
+  // still comes back either way (#215). Accept the 204; otherwise require the
+  // "Ok." body, keeping the specific messages below for the failure cases.
+  if (res.status !== 204 && !/^Ok\.?$/i.test(body)) {
+    if (body === "") {
+      // A 2xx with no body that ISN'T the 5.2+ 204 — the URL isn't reaching a
+      // qBittorrent WebUI (wrong port, or a middlebox).
+      throw new ServiceError("Empty response — is the URL a qBittorrent WebUI?");
+    }
+    // "Fails." (or anything unexpected) — qBittorrent answers 200 even on bad
+    // credentials, so a non-"Ok." body is a real login failure.
     throw new ServiceError("Login failed — check the username and password");
   }
   const sid = /SID=([^;]+)/.exec(res.headers.get("set-cookie") ?? "")?.[1];

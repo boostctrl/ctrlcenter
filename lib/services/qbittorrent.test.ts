@@ -213,6 +213,31 @@ describe("getQbittorrentSnapshot", () => {
     expect(logins).toBe(2);
   });
 
+  it("accepts qBittorrent 5.2+'s 204 No Content login", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/v2/auth/login")) {
+        // qBittorrent 5.2+ answers 204 with an empty body on success; the SID
+        // cookie still comes back. The old code threw "Empty response" here.
+        return new Response(null, {
+          status: 204,
+          headers: { "set-cookie": "SID=xyz789; HttpOnly; path=/" },
+        });
+      }
+      if (url.endsWith("/api/v2/app/version")) return new Response("v5.2.0");
+      return new Response("{}");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await probeQbittorrent(CFG);
+    expect(result).toEqual({ ok: true, detail: "qBittorrent v5.2.0" });
+    // The cookie minted from the 204 is reused on the authenticated call.
+    const authed = fetchMock.mock.calls.find(([input]) =>
+      String(input).endsWith("/api/v2/app/version")
+    ) as [RequestInfo, RequestInit];
+    expect(new Headers(authed[1].headers).get("cookie")).toBe("SID=xyz789");
+  });
+
   it("reports bad credentials in the admin's terms", async () => {
     stubQbit({ badCredentials: true });
     const result = await probeQbittorrent(CFG);

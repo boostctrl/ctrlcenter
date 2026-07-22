@@ -12,6 +12,15 @@ here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The qBittorrent integration works with qBittorrent 5.2 and later.** Newer
+  qBittorrent versions answer a successful login with an empty "204 No Content"
+  response, which the card and the Test-connection button were misreading as
+  "Empty response — is the URL a qBittorrent WebUI?". Login now succeeds against
+  those versions while still reporting a genuinely wrong URL or bad credentials
+  clearly. (#215)
+
 ## [2.3.2] - 2026-07-22
 
 ### Fixed
