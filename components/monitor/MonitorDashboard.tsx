@@ -12,6 +12,7 @@ import AdguardCard from "./AdguardCard";
 import TautulliCard from "./TautulliCard";
 import OverseerrCard from "./OverseerrCard";
 import PortainerCard from "./PortainerCard";
+import TruenasCard from "./TruenasCard";
 
 // The private Monitor page's body (#207): a card per configured integration,
 // server-rendered from the shared snapshot cache and then kept fresh by
@@ -34,6 +35,7 @@ const CARDS: {
   tautulli: (status) => <TautulliCard status={status} />,
   overseerr: (status) => <OverseerrCard status={status} />,
   portainer: (status) => <PortainerCard status={status} />,
+  truenas: (status) => <TruenasCard status={status} />,
 };
 
 // Generic so the id stays correlated with its slice of the snapshot — indexing

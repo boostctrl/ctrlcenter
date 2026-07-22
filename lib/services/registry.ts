@@ -33,6 +33,11 @@ import {
   probePortainer,
   type PortainerSnapshot,
 } from "./portainer";
+import {
+  getTruenasSnapshot,
+  probeTruenas,
+  type TruenasSnapshot,
+} from "./truenas";
 import type { ProbeResult } from "./http";
 
 export { SERVICE_IDS, SERVICE_LABELS, type ServiceId };
@@ -48,6 +53,7 @@ export type ServiceSnapshotMap = {
   tautulli: TautulliSnapshot;
   overseerr: OverseerrSnapshot;
   portainer: PortainerSnapshot;
+  truenas: TruenasSnapshot;
 };
 
 // The superset of credential fields a Test-connection probe can carry
@@ -102,6 +108,10 @@ export const SERVICES: {
   portainer: {
     snapshot: (cfg) => getPortainerSnapshot(cfg),
     probe: ({ url, apiKey }) => probePortainer({ url, apiKey }),
+  },
+  truenas: {
+    snapshot: (cfg) => getTruenasSnapshot(cfg),
+    probe: ({ url, apiKey }) => probeTruenas({ url, apiKey }),
   },
 };
 

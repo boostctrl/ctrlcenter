@@ -34,6 +34,10 @@ here.
   every environment it manages, the health signal for the self-hosted apps
   that expose no API of their own. The API key can live in
   `CTRLCENTER_PORTAINER_KEY`. (#197)
+- **TrueNAS on the Monitor page.** Connect TrueNAS SCALE and the Monitor
+  dashboard shows each pool's health and capacity and the active alerts
+  (SMART failures, replication problems, and the like). Strictly read-only.
+  The API key can live in `CTRLCENTER_TRUENAS_KEY`. (#193)
 
 ## [2.3.3] - 2026-07-22
 

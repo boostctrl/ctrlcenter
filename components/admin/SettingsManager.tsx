@@ -163,7 +163,7 @@ const USER_PASS_INTEGRATION_CARDS: readonly {
 ];
 
 const API_KEY_INTEGRATION_CARDS: readonly {
-  id: "sonarr" | "radarr" | "tautulli" | "overseerr" | "portainer";
+  id: "sonarr" | "radarr" | "tautulli" | "overseerr" | "portainer" | "truenas";
   title: string;
   intro: string;
   placeholder: string;
@@ -214,6 +214,15 @@ const API_KEY_INTEGRATION_CARDS: readonly {
     placeholder: "https://192.168.1.10:9443",
     keyHint: "Portainer → My account → Access tokens → Add access token.",
     envVar: "CTRLCENTER_PORTAINER_KEY",
+  },
+  {
+    id: "truenas",
+    title: "TrueNAS",
+    intro:
+      "Pool health, capacity, and active alerts, read-only, on the Monitor page.",
+    placeholder: "http://192.168.1.10",
+    keyHint: "TrueNAS → Settings → API Keys → Add.",
+    envVar: "CTRLCENTER_TRUENAS_KEY",
   },
 ];
 

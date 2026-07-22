@@ -275,6 +275,7 @@ export const integrationsSchema = z.object({
   tautulli: apiKey(),
   overseerr: apiKey(),
   portainer: apiKey(),
+  truenas: apiKey(),
 });
 export type IntegrationsConfig = z.infer<typeof integrationsSchema>;
 
@@ -888,6 +889,7 @@ export const integrationsUpdateSchema = z.object({
   tautulli: apiKeyIntegrationUpdateSchema,
   overseerr: apiKeyIntegrationUpdateSchema,
   portainer: apiKeyIntegrationUpdateSchema,
+  truenas: apiKeyIntegrationUpdateSchema,
 });
 
 // The admin sends the whole theme object (not a partial), so updateSettings

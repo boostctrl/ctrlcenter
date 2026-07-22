@@ -14,6 +14,7 @@ const integrations = (
   tautulli: { enabled: false, url: "", apiKey: "" },
   overseerr: { enabled: false, url: "", apiKey: "" },
   portainer: { enabled: false, url: "", apiKey: "" },
+  truenas: { enabled: false, url: "", apiKey: "" },
   ...over,
 });
 
