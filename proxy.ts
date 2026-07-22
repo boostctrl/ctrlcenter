@@ -18,6 +18,9 @@ const ADMIN_PREFIXES = [
   "/api/themes",
   "/api/config",
   "/api/password",
+  // Integration snapshots + test probes (#189): infrastructure internals,
+  // never served anonymously. The routes re-check the session themselves too.
+  "/api/monitor",
 ];
 
 function needsAuth(pathname: string): boolean {

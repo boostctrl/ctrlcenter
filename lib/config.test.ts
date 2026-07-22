@@ -682,6 +682,24 @@ describe("settings-secret redaction", () => {
         to: "me@example.com",
       },
     },
+    integrations: {
+      qbittorrent: {
+        enabled: true,
+        url: "http://qbit.lan:8080",
+        username: "admin",
+        password: "qbit-secret",
+      },
+      sonarr: {
+        enabled: true,
+        url: "http://sonarr.lan:8989",
+        apiKey: "sonarr-secret",
+      },
+      radarr: {
+        enabled: false,
+        url: "http://radarr.lan:7878",
+        apiKey: "radarr-secret",
+      },
+    },
   };
 
   it("stripSecrets blanks every credential while keeping non-secret fields", async () => {
@@ -697,6 +715,14 @@ describe("settings-secret redaction", () => {
     expect(pub.settings.alerts.email.host).toBe("");
     expect(pub.settings.alerts.email.from).toBe("");
     expect(pub.settings.alerts.email.to).toBe("");
+    // Integrations (#189): credentials AND URLs — internal topology — go.
+    expect(pub.settings.integrations.qbittorrent.url).toBe("");
+    expect(pub.settings.integrations.qbittorrent.username).toBe("");
+    expect(pub.settings.integrations.qbittorrent.password).toBe("");
+    expect(pub.settings.integrations.sonarr.url).toBe("");
+    expect(pub.settings.integrations.sonarr.apiKey).toBe("");
+    expect(pub.settings.integrations.radarr.url).toBe("");
+    expect(pub.settings.integrations.radarr.apiKey).toBe("");
 
     // Non-secret fields survive so the widgets/nav still render and fetch.
     expect(pub.settings.calendar.url).toBe(withSecrets.calendar.url);
@@ -707,6 +733,8 @@ describe("settings-secret redaction", () => {
     // Redaction doesn't mutate the source config.
     expect(full.settings.calendar.password).toBe("cal-secret");
     expect(full.settings.alerts.email.pass).toBe("smtp-secret");
+    expect(full.settings.integrations.qbittorrent.password).toBe("qbit-secret");
+    expect(full.settings.integrations.sonarr.apiKey).toBe("sonarr-secret");
   });
 
   it("getCalendarAuth still returns the real credentials server-side", async () => {

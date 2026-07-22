@@ -236,6 +236,41 @@ export const systemStatsSchema = z.object({
 });
 export type SystemStatsConfig = z.infer<typeof systemStatsSchema>;
 
+// --- Integrations (#189): connections to other self-hosted services, shown
+// only on the private Monitor dashboard (/admin/monitor). Read-only in the
+// 2.3.x arc. Stored leniently like every settings section. The credentials
+// are secrets — and the URLs are internal topology — so stripSecrets
+// (lib/config.ts) blanks both out of anything a public surface serializes
+// (#157); each credential can also come from an env var instead of the file:
+// CTRLCENTER_QBITTORRENT_PASS, CTRLCENTER_SONARR_KEY, CTRLCENTER_RADARR_KEY
+// (resolved at use time in lib/services/*).
+export const qbittorrentIntegrationSchema = z.object({
+  enabled: z.boolean().default(false),
+  url: z.string().default(""),
+  username: z.string().default(""),
+  password: z.string().default(""),
+});
+export type QbittorrentIntegration = z.infer<
+  typeof qbittorrentIntegrationSchema
+>;
+
+// Sonarr and Radarr share one shape (URL + API key).
+export const arrIntegrationSchema = z.object({
+  enabled: z.boolean().default(false),
+  url: z.string().default(""),
+  apiKey: z.string().default(""),
+});
+export type ArrIntegration = z.infer<typeof arrIntegrationSchema>;
+
+export const integrationsSchema = z.object({
+  qbittorrent: qbittorrentIntegrationSchema.default(
+    qbittorrentIntegrationSchema.parse({})
+  ),
+  sonarr: arrIntegrationSchema.default(arrIntegrationSchema.parse({})),
+  radarr: arrIntegrationSchema.default(arrIntegrationSchema.parse({})),
+});
+export type IntegrationsConfig = z.infer<typeof integrationsSchema>;
+
 // The Notes widget's content: a title and a markdown body (safe subset,
 // rendered by lib/markdown.ts — never as raw HTML). No `enabled` flag: the
 // widget's layout `hidden` flag governs visibility, and an empty body renders
@@ -537,6 +572,7 @@ export const settingsSchema = z.object({
   countdown: countdownSchema.default(countdownSchema.parse({})),
   worldClocks: worldClocksSchema.default(worldClocksSchema.parse({})),
   systemStats: systemStatsSchema.default(systemStatsSchema.parse({})),
+  integrations: integrationsSchema.default(integrationsSchema.parse({})),
   components: componentsSchema.default(componentsSchema.parse({})),
   layout: layoutSchema.default(layoutSchema.parse({})),
 });
@@ -811,6 +847,42 @@ export const feedUpdateSchema = z
 
 export const feedsUpdateSchema = z.array(feedUpdateSchema).max(MAX_FEED_CARDS);
 
+// The admin sends the whole integrations object (the Settings tab autosaves
+// the complete settings), so updateSettings replaces it wholesale like the
+// theme. A URL is optional — the integration stays inert until one is set —
+// but must be http(s) when present.
+const isIntegrationUrl = (v: string) =>
+  v.trim() === "" || /^https?:\/\//i.test(v.trim());
+
+export const qbittorrentIntegrationUpdateSchema = z
+  .object({
+    enabled: z.boolean(),
+    url: z.string(),
+    username: z.string(),
+    password: z.string(),
+  })
+  .refine((i) => isIntegrationUrl(i.url), {
+    message: "URL must start with http(s)",
+    path: ["url"],
+  });
+
+export const arrIntegrationUpdateSchema = z
+  .object({
+    enabled: z.boolean(),
+    url: z.string(),
+    apiKey: z.string(),
+  })
+  .refine((i) => isIntegrationUrl(i.url), {
+    message: "URL must start with http(s)",
+    path: ["url"],
+  });
+
+export const integrationsUpdateSchema = z.object({
+  qbittorrent: qbittorrentIntegrationUpdateSchema,
+  sonarr: arrIntegrationUpdateSchema,
+  radarr: arrIntegrationUpdateSchema,
+});
+
 // The admin sends the whole theme object (not a partial), so updateSettings
 // replaces it wholesale — that's how clearing the optional custom colors works
 // (omit them and they're gone). Required fields keep a saved theme well-formed.
@@ -919,6 +991,7 @@ export const settingsInputSchema = z.object({
   countdown: countdownUpdateSchema.optional(),
   worldClocks: worldClocksUpdateSchema.optional(),
   systemStats: systemStatsUpdateSchema.optional(),
+  integrations: integrationsUpdateSchema.optional(),
   components: componentsUpdateSchema.optional(),
   layout: layoutUpdateSchema.optional(),
 });

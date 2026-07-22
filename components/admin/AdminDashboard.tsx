@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, useState, type ChangeEvent } from "react";
 import type {
   AppItem,
@@ -16,6 +17,7 @@ import { useEdgeFade } from "@/components/useEdgeFade";
 import { resolveThemePacks } from "@/lib/theme";
 import { navPages } from "@/lib/nav";
 import { downloadJson } from "@/lib/download";
+import { buttonClasses } from "@/lib/buttons";
 import { Button } from "./ui";
 import { ToastProvider, useToast } from "./Toast";
 import { ConfirmProvider, useConfirm } from "./Confirm";
@@ -169,6 +171,13 @@ function AdminBody({
         <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-3xl font-bold">Manage your dashboard</h1>
           <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href="/admin/monitor"
+              className={buttonClasses("ghost", "md")}
+              title="Live status of your connected integrations — admin-only."
+            >
+              Monitor
+            </Link>
             <Button
               variant="ghost"
               type="button"

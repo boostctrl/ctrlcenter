@@ -12,6 +12,23 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **A private Monitor page for your services.** Sign in and open **Monitor**
+  (from the corner menu or the admin portal) for a live, read-only view of
+  the services you connect — refreshed automatically while the tab is open.
+  The page and everything it shows are admin-only: visitors never see it,
+  and none of its data ever appears on the public dashboard. (#207)
+- **Integrations: qBittorrent, Sonarr, and Radarr.** Connect them under
+  **Admin → Settings → Integrations** (each with a test-connection button)
+  and the Monitor page shows current transfer speeds and the active torrent
+  list for qBittorrent, and the download queue, missing counts, and health
+  warnings for Sonarr and Radarr. Connections are read-only, polled gently
+  through a shared server-side cache, and credentials never leave the server
+  — each can also come from an environment variable
+  (`CTRLCENTER_QBITTORRENT_PASS`, `CTRLCENTER_SONARR_KEY`,
+  `CTRLCENTER_RADARR_KEY`) instead of the config file. (#189, #190, #191)
+
 ## [2.2.1] - 2026-07-20
 
 ### Changed

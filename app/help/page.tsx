@@ -455,6 +455,28 @@ export default async function HelpPage() {
             </P>
           </Card>
 
+          <Card title="The Monitor page">
+            <P>
+              Connect <strong>qBittorrent</strong>, <strong>Sonarr</strong>, or{" "}
+              <strong>Radarr</strong> under{" "}
+              <strong>Settings → Integrations</strong> (each has a
+              test-connection button) and the private{" "}
+              <A href="/admin/monitor">Monitor</A> page shows what they&apos;re
+              doing right now: transfer speeds and the busiest torrents,
+              download queues with progress, missing counts, and health
+              warnings. It refreshes itself while the tab is open.
+            </P>
+            <P>
+              Everything about it is admin-only: the page, the data it polls,
+              and the stored credentials all sit behind your sign-in, and
+              nothing from an integration ever appears on the public dashboard.
+              Connections are read-only — the dashboard can look, never touch.
+              Each credential can also come from an environment variable
+              instead of the config file (see the README&apos;s environment
+              table).
+            </P>
+          </Card>
+
           <Card title="Incident notes">
             <P>
               Explain an outage where people will look for the explanation.

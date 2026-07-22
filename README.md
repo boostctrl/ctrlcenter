@@ -105,6 +105,15 @@ Built with Next.js 16, React 19, and Tailwind v4.
   the RSS feed, the announcement banner, and one-click **Export/Import** of the
   whole config (uploaded icons included).
 
+- **Private Monitor page.** Connect **qBittorrent, Sonarr, and Radarr**
+  (Admin → Settings → Integrations, each with a test-connection button) and a
+  signed-in-only **/admin/monitor** page shows their live state: transfer
+  speeds and the active torrent list, download queues with progress, missing
+  counts, and health warnings. Strictly read-only and strictly admin-only —
+  the page, its API, and the stored credentials are all behind the admin
+  session, credentials can live in env vars instead of the config file, and
+  nothing integration-related ever renders on the public dashboard.
+
 - **Self-hosted & simple.** A single YAML config, a prebuilt multi-arch Docker
   image, an installable PWA manifest, `/api/health` for orchestrators, and an
   in-app **/help** page that documents every feature where visitors will look
@@ -198,7 +207,8 @@ settings:
     count: 5                # how many upcoming events to show (1–20)
   # Further sections mirror the admin UI one-to-one and are easiest to edit
   # there: favicon, announcement (the site-wide banner), statusAnnouncements,
-  # notes, feed (the RSS card), countdown, worldClocks, systemStats, and
+  # notes, feed (the RSS card), countdown, worldClocks, systemStats,
+  # integrations (the private Monitor page's service connections), and
   # bookmarkCategoryOrder.
   components:
     clock: true             # the date/time row inside the header card
@@ -265,6 +275,9 @@ for reuse. You can also paste a direct image URL or a `data:` URI.
 | `CONFIG_PATH` | no | Path to the config file (default `./config/config.yaml`; the container sets `/config/config.yaml`). The uptime history (`status-history.json`) and uploaded custom icons (`uploads/`) are written beside it. |
 | `CTRLCENTER_SMTP_PASS` | no | Overrides the email-alert SMTP password, so the secret can stay out of `config.yaml`. |
 | `CTRLCENTER_CALDAV_PASS` | no | Overrides the private-calendar (CalDAV/WebDAV) password, so that secret can stay out of `config.yaml` too. |
+| `CTRLCENTER_QBITTORRENT_PASS` | no | Overrides the qBittorrent integration's password (leave the field blank in the admin), keeping that secret out of `config.yaml`. |
+| `CTRLCENTER_SONARR_KEY` | no | Overrides the Sonarr integration's API key, same convention. |
+| `CTRLCENTER_RADARR_KEY` | no | Overrides the Radarr integration's API key, same convention. |
 | `CTRLCENTER_WEATHER_API` | no | Base URL the *server* uses for weather requests (default `https://api.open-meteo.com`). Point it at a [self-hosted Open-Meteo](https://open-meteo.com/en/docs#self-hosting) instance to keep weather traffic on your own network; it must speak the same `/v1/forecast` API. A visitor who sets their own location still fetches from the public API client-side. |
 | `CTRLCENTER_HOST_PROC` | no | Where the System stats widget looks for a host-mode `/proc` mount (default `/host/proc`). In a container the widget normally reports the *container's* cgroup-scoped CPU/memory; to show the host machine instead, bind-mount the host's `/proc` read-only — `-v /proc:/host/proc:ro` (compose: `- /proc:/host/proc:ro`) — and the widget switches to host mode automatically, no privileges needed. Disks are separate: a path must be mounted into the container to be measured. |
 | `CTRLCENTER_ICON_CACHE_MAX_BYTES` | no | Cap, in bytes, on the on-disk cache of icons fetched from the icon CDN (stored beside your config). Default `67108864` (64 MB) — far more than any real dashboard uses. When the cap is exceeded, the least-recently-served icons are evicted (and simply re-fetched next time they're needed). Lower it on a very small data volume. |

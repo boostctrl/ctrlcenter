@@ -51,8 +51,9 @@ export default function FloatingNav({
       calendar ? { href: "/calendar", label: "Calendar" } : null,
       { href: "/help", label: "Help" },
       { href: "/settings", label: "Settings" },
-      // Always listed, like on the Settings page — /admin gates itself behind
-      // its own login.
+      // Always listed, like on the Settings page — both live under /admin and
+      // gate themselves behind its login.
+      { href: "/admin/monitor", label: "Monitor" },
       { href: "/admin", label: "Admin portal" },
     ].filter(Boolean) as { href: string; label: string }[]
   ).filter((l) => l.href !== pathname);

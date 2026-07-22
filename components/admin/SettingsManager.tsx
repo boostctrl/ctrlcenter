@@ -51,6 +51,7 @@ import { ChipGroup } from "@/components/ChipGroup";
 import { reorder } from "./useReorder";
 import IconField from "./IconField";
 import CalendarTest from "./CalendarTest";
+import IntegrationTest from "./IntegrationTest";
 import FeedTest from "./FeedTest";
 import { FeedHealthBadge, useFeedHealth } from "./FeedHealth";
 import type { FeedHealth } from "@/lib/feed";
@@ -104,6 +105,12 @@ const SETTINGS_SECTIONS = [
     id: "monitoring",
     label: "Monitoring",
     blurb: "Uptime checks on your apps, and alerts when one goes down.",
+  },
+  {
+    id: "integrations",
+    label: "Integrations",
+    blurb:
+      "Connections to your self-hosted services, shown on the private Monitor page — signed-in admins only.",
   },
   {
     id: "announcements",
@@ -423,6 +430,19 @@ export default function SettingsManager({
     setSettings((s) => ({
       ...s,
       alerts: { ...s.alerts, email: { ...s.alerts.email, ...patch } },
+    }));
+
+  const integrations = settings.integrations;
+  const updateIntegration = <K extends keyof Settings["integrations"]>(
+    service: K,
+    patch: Partial<Settings["integrations"][K]>
+  ) =>
+    setSettings((s) => ({
+      ...s,
+      integrations: {
+        ...s.integrations,
+        [service]: { ...s.integrations[service], ...patch },
+      },
     }));
 
   const components = settings.components;
@@ -1671,6 +1691,152 @@ export default function SettingsManager({
                   }
                 />
               </div>
+            </>
+          )}
+        </Card>
+        )}
+
+        {section === "integrations" && (
+        <Card
+          title="qBittorrent"
+          intro="Transfer speeds and the active torrent list, read-only, on the Monitor page."
+          toggle={{
+            checked: integrations.qbittorrent.enabled,
+            onChange: (enabled) => updateIntegration("qbittorrent", { enabled }),
+          }}
+        >
+          {integrations.qbittorrent.enabled && (
+            <>
+              <TextField
+                label="WebUI URL"
+                placeholder="http://192.168.1.10:8080"
+                value={integrations.qbittorrent.url}
+                onChange={(e) =>
+                  updateIntegration("qbittorrent", { url: e.target.value })
+                }
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <TextField
+                  label="Username"
+                  autoComplete="off"
+                  value={integrations.qbittorrent.username}
+                  onChange={(e) =>
+                    updateIntegration("qbittorrent", {
+                      username: e.target.value,
+                    })
+                  }
+                />
+                <TextField
+                  label="Password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={integrations.qbittorrent.password}
+                  onChange={(e) =>
+                    updateIntegration("qbittorrent", {
+                      password: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <IntegrationTest
+                service="qbittorrent"
+                url={integrations.qbittorrent.url}
+                username={integrations.qbittorrent.username}
+                password={integrations.qbittorrent.password}
+              />
+              <Hint>
+                The password can stay out of the config file: set the
+                CTRLCENTER_QBITTORRENT_PASS environment variable instead and
+                leave the field blank.
+              </Hint>
+            </>
+          )}
+        </Card>
+        )}
+
+        {section === "integrations" && (
+        <Card
+          title="Sonarr"
+          intro="Download queue, missing episodes, and health warnings, read-only, on the Monitor page."
+          toggle={{
+            checked: integrations.sonarr.enabled,
+            onChange: (enabled) => updateIntegration("sonarr", { enabled }),
+          }}
+        >
+          {integrations.sonarr.enabled && (
+            <>
+              <TextField
+                label="URL"
+                placeholder="http://192.168.1.10:8989"
+                value={integrations.sonarr.url}
+                onChange={(e) =>
+                  updateIntegration("sonarr", { url: e.target.value })
+                }
+              />
+              <TextField
+                label="API key"
+                type="password"
+                autoComplete="off"
+                value={integrations.sonarr.apiKey}
+                onChange={(e) =>
+                  updateIntegration("sonarr", { apiKey: e.target.value })
+                }
+                hint="Sonarr → Settings → General → API Key."
+              />
+              <IntegrationTest
+                service="sonarr"
+                url={integrations.sonarr.url}
+                apiKey={integrations.sonarr.apiKey}
+              />
+              <Hint>
+                The key can stay out of the config file: set the
+                CTRLCENTER_SONARR_KEY environment variable instead and leave
+                the field blank.
+              </Hint>
+            </>
+          )}
+        </Card>
+        )}
+
+        {section === "integrations" && (
+        <Card
+          title="Radarr"
+          intro="Download queue, missing movies, and health warnings, read-only, on the Monitor page."
+          toggle={{
+            checked: integrations.radarr.enabled,
+            onChange: (enabled) => updateIntegration("radarr", { enabled }),
+          }}
+        >
+          {integrations.radarr.enabled && (
+            <>
+              <TextField
+                label="URL"
+                placeholder="http://192.168.1.10:7878"
+                value={integrations.radarr.url}
+                onChange={(e) =>
+                  updateIntegration("radarr", { url: e.target.value })
+                }
+              />
+              <TextField
+                label="API key"
+                type="password"
+                autoComplete="off"
+                value={integrations.radarr.apiKey}
+                onChange={(e) =>
+                  updateIntegration("radarr", { apiKey: e.target.value })
+                }
+                hint="Radarr → Settings → General → API Key."
+              />
+              <IntegrationTest
+                service="radarr"
+                url={integrations.radarr.url}
+                apiKey={integrations.radarr.apiKey}
+              />
+              <Hint>
+                The key can stay out of the config file: set the
+                CTRLCENTER_RADARR_KEY environment variable instead and leave
+                the field blank.
+              </Hint>
             </>
           )}
         </Card>

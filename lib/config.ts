@@ -199,14 +199,18 @@ export function stripAuth(config: Config): Omit<Config, "auth"> {
 }
 
 // Blank the secret-bearing settings fields so a signed-out visitor can never
-// receive them: the calendar Basic-auth credentials and the alert webhook URL /
-// SMTP credentials. stripAuth only removes the top-level admin credential; these
-// secrets live inside `settings`, where they'd otherwise ride along in anything
-// serialized from a public surface. readPublicConfig (lib/api-auth.ts) applies
-// this so its result is genuinely safe to hand to a client component (#157). The
-// server-side consumers that need the real values read them separately — the
-// calendar fetcher via getCalendarAuth, the alert poller via readConfigInternal.
+// receive them: the calendar Basic-auth credentials, the alert webhook URL /
+// SMTP credentials, and the integration connections (#189 — credentials AND
+// URLs: an integration URL maps internal topology, and nothing public renders
+// integrations at all). stripAuth only removes the top-level admin credential;
+// these secrets live inside `settings`, where they'd otherwise ride along in
+// anything serialized from a public surface. readPublicConfig (lib/api-auth.ts)
+// applies this so its result is genuinely safe to hand to a client component
+// (#157). The server-side consumers that need the real values read them
+// separately — the calendar fetcher via getCalendarAuth, the alert poller and
+// the monitor snapshot via readConfigInternal-backed accessors.
 export function stripSecrets<T extends { settings: Settings }>(config: T): T {
+  const { integrations } = config.settings;
   return {
     ...config,
     settings: {
@@ -223,6 +227,16 @@ export function stripSecrets<T extends { settings: Settings }>(config: T): T {
           from: "",
           to: "",
         },
+      },
+      integrations: {
+        qbittorrent: {
+          ...integrations.qbittorrent,
+          url: "",
+          username: "",
+          password: "",
+        },
+        sonarr: { ...integrations.sonarr, url: "", apiKey: "" },
+        radarr: { ...integrations.radarr, url: "", apiKey: "" },
       },
     },
   };
@@ -309,6 +323,7 @@ export async function updateSettings(
       countdown: countdownPartial,
       worldClocks: worldClocksPartial,
       systemStats: systemStatsPartial,
+      integrations: integrationsPartial,
       components: componentsPartial,
       theme: themePartial,
       layout: layoutPartial,
@@ -357,6 +372,10 @@ export async function updateSettings(
         ...config.settings.systemStats,
         ...withoutUndefined(systemStatsPartial ?? {}),
       },
+      // Integrations are sent whole (every service, credentials included), so
+      // replace wholesale like the theme; keep the existing object when the
+      // update doesn't touch them.
+      integrations: integrationsPartial ?? config.settings.integrations,
       components: {
         ...config.settings.components,
         ...withoutUndefined(componentsPartial ?? {}),
