@@ -167,7 +167,13 @@ async function mintSession(
     throw new ServiceError("Login refused — IP temporarily banned?");
   }
   if (!res.ok) throw new ServiceError(`HTTP ${res.status}`);
-  if (!/^Ok\.?$/i.test(text.trim())) {
+  const body = text.trim();
+  if (body === "") {
+    // qBittorrent's login always answers "Ok."/"Fails." — an empty body means
+    // the URL isn't reaching a qBittorrent WebUI (wrong port, or a middlebox).
+    throw new ServiceError("Empty response — is the URL a qBittorrent WebUI?");
+  }
+  if (!/^Ok\.?$/i.test(body)) {
     throw new ServiceError("Login failed — check the username and password");
   }
   const sid = /SID=([^;]+)/.exec(res.headers.get("set-cookie") ?? "")?.[1];

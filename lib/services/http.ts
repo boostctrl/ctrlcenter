@@ -44,7 +44,11 @@ export async function serviceRequest(
   const timer = setTimeout(() => controller.abort(), SERVICE_TIMEOUT_MS);
   try {
     const res = await fetch(url, { ...init, signal: controller.signal });
-    const text = await readCapped(res, maxBytes);
+    // Read the actual body and cap on its real size — do NOT reject on a
+    // declared Content-Length that may not match (a service or a middlebox in
+    // front of it can send a header far larger than the body, which used to
+    // fail even a few-byte login response as "too large").
+    const text = await readCapped(res, maxBytes, { trustContentLength: false });
     if (text === null) throw new ServiceError("Response too large");
     return { res, text };
   } catch (e) {

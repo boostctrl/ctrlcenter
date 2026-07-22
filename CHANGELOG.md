@@ -12,6 +12,15 @@ here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Integrations no longer fail with "Response too large" on normal-sized
+  instances.** A service (or a proxy in front of it) sending a `Content-Length`
+  header that didn't match its actual body could make even a few-byte response
+  — including the Test-connection check — wrongly report as too large. The
+  integration clients now read the real body and cap on its actual size, and a
+  qBittorrent URL that isn't a WebUI reports that plainly instead. (#214)
+
 ## [2.3.1] - 2026-07-22
 
 ### Changed
