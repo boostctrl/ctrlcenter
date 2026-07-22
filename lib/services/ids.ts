@@ -18,6 +18,7 @@ export const SERVICE_IDS = [
   "overseerr",
   "portainer",
   "truenas",
+  "unifi",
 ] as const;
 export type ServiceId = (typeof SERVICE_IDS)[number];
 
@@ -30,4 +31,5 @@ export const SERVICE_LABELS: Record<ServiceId, string> = {
   overseerr: "Overseerr",
   portainer: "Portainer",
   truenas: "TrueNAS",
+  unifi: "UniFi",
 };

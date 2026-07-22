@@ -16,12 +16,14 @@ export default function IntegrationTest({
   username,
   password,
   apiKey,
+  allowInsecureTls,
 }: {
   service: ServiceId;
   url: string;
   username?: string;
   password?: string;
   apiKey?: string;
+  allowInsecureTls?: boolean;
 }) {
   const [state, setState] = useState<Result>({ loading: false });
 
@@ -31,7 +33,14 @@ export default function IntegrationTest({
       const res = await fetch("/api/monitor/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ service, url, username, password, apiKey }),
+        body: JSON.stringify({
+          service,
+          url,
+          username,
+          password,
+          apiKey,
+          allowInsecureTls,
+        }),
       });
       const data = await res.json().catch(() => null);
       setState({

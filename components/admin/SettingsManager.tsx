@@ -135,12 +135,15 @@ const LEGACY_SECTION_ALIASES: Record<string, SettingsSectionId> = {
 // credential shape (#212). The cards are identical apart from the strings, so
 // a new service joins a table instead of adding a hand-kept copy.
 const USER_PASS_INTEGRATION_CARDS: readonly {
-  id: "qbittorrent" | "adguard";
+  id: "qbittorrent" | "adguard" | "unifi";
   title: string;
   intro: string;
   urlLabel: string;
   placeholder: string;
   envVar: string;
+  // Show the "allow self-signed certificate" toggle for HTTPS-only
+  // controllers that ship a self-signed cert (UniFi).
+  insecureToggle?: boolean;
 }[] = [
   {
     id: "qbittorrent",
@@ -159,6 +162,16 @@ const USER_PASS_INTEGRATION_CARDS: readonly {
     urlLabel: "URL",
     placeholder: "http://192.168.1.10:3000",
     envVar: "CTRLCENTER_ADGUARD_PASS",
+  },
+  {
+    id: "unifi",
+    title: "UniFi",
+    intro:
+      "Internet/WAN status, connected client count, and device health, read-only, on the Monitor page.",
+    urlLabel: "Controller URL",
+    placeholder: "https://192.168.1.1",
+    envVar: "CTRLCENTER_UNIFI_PASS",
+    insecureToggle: true,
   },
 ];
 
@@ -1793,7 +1806,7 @@ export default function SettingsManager({
 
         {section === "integrations" &&
           USER_PASS_INTEGRATION_CARDS.map(
-            ({ id, title, intro, urlLabel, placeholder, envVar }) => (
+            ({ id, title, intro, urlLabel, placeholder, envVar, insecureToggle }) => (
               <Card
                 key={id}
                 title={title}
@@ -1832,11 +1845,22 @@ export default function SettingsManager({
                         }
                       />
                     </div>
+                    {insecureToggle && (
+                      <ToggleRow
+                        label="Allow self-signed certificate"
+                        hint="Skip TLS verification for this HTTPS controller. Leave off unless it uses a self-signed certificate."
+                        checked={integrations[id].allowInsecureTls}
+                        onChange={(allowInsecureTls) =>
+                          updateIntegration(id, { allowInsecureTls })
+                        }
+                      />
+                    )}
                     <IntegrationTest
                       service={id}
                       url={integrations[id].url}
                       username={integrations[id].username}
                       password={integrations[id].password}
+                      allowInsecureTls={integrations[id].allowInsecureTls}
                     />
                     <Hint>
                       The password can stay out of the config file: set the{" "}

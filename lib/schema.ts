@@ -247,11 +247,16 @@ export type SystemStatsConfig = z.infer<typeof systemStatsSchema>;
 // Two credential shapes cover every service: a WebUI login
 // (username/password) and an API key. A new service reuses one of these and
 // adds its id to integrationsSchema + the registry (lib/services/registry.ts).
+// Opt-in, default off: skip TLS certificate verification for this service.
+// Only honored by clients that support it (UniFi) and only for an https URL —
+// it exists for controllers that ship a self-signed cert with no plaintext
+// alternative. Not a secret (a boolean), so stripSecrets leaves it intact.
 export const userPassIntegrationSchema = z.object({
   enabled: z.boolean().default(false),
   url: z.string().default(""),
   username: z.string().default(""),
   password: z.string().default(""),
+  allowInsecureTls: z.boolean().default(false),
 });
 export type UserPassIntegration = z.infer<typeof userPassIntegrationSchema>;
 
@@ -259,6 +264,7 @@ export const apiKeyIntegrationSchema = z.object({
   enabled: z.boolean().default(false),
   url: z.string().default(""),
   apiKey: z.string().default(""),
+  allowInsecureTls: z.boolean().default(false),
 });
 export type ApiKeyIntegration = z.infer<typeof apiKeyIntegrationSchema>;
 
@@ -276,6 +282,7 @@ export const integrationsSchema = z.object({
   overseerr: apiKey(),
   portainer: apiKey(),
   truenas: apiKey(),
+  unifi: userPass(),
 });
 export type IntegrationsConfig = z.infer<typeof integrationsSchema>;
 
@@ -873,12 +880,14 @@ export const userPassIntegrationUpdateSchema = z.object({
   url: z.string(),
   username: z.string(),
   password: z.string(),
+  allowInsecureTls: z.boolean(),
 });
 
 export const apiKeyIntegrationUpdateSchema = z.object({
   enabled: z.boolean(),
   url: z.string(),
   apiKey: z.string(),
+  allowInsecureTls: z.boolean(),
 });
 
 export const integrationsUpdateSchema = z.object({
@@ -890,6 +899,7 @@ export const integrationsUpdateSchema = z.object({
   overseerr: apiKeyIntegrationUpdateSchema,
   portainer: apiKeyIntegrationUpdateSchema,
   truenas: apiKeyIntegrationUpdateSchema,
+  unifi: userPassIntegrationUpdateSchema,
 });
 
 // The admin sends the whole theme object (not a partial), so updateSettings

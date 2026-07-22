@@ -38,6 +38,7 @@ import {
   probeTruenas,
   type TruenasSnapshot,
 } from "./truenas";
+import { getUnifiSnapshot, probeUnifi, type UnifiSnapshot } from "./unifi";
 import type { ProbeResult } from "./http";
 
 export { SERVICE_IDS, SERVICE_LABELS, type ServiceId };
@@ -54,6 +55,7 @@ export type ServiceSnapshotMap = {
   overseerr: OverseerrSnapshot;
   portainer: PortainerSnapshot;
   truenas: TruenasSnapshot;
+  unifi: UnifiSnapshot;
 };
 
 // The superset of credential fields a Test-connection probe can carry
@@ -64,6 +66,7 @@ export type ProbeFields = {
   username: string;
   password: string;
   apiKey: string;
+  allowInsecureTls: boolean;
 };
 
 export type ServiceDefinition<C, T> = {
@@ -112,6 +115,11 @@ export const SERVICES: {
   truenas: {
     snapshot: (cfg) => getTruenasSnapshot(cfg),
     probe: ({ url, apiKey }) => probeTruenas({ url, apiKey }),
+  },
+  unifi: {
+    snapshot: (cfg) => getUnifiSnapshot(cfg),
+    probe: ({ url, username, password, allowInsecureTls }) =>
+      probeUnifi({ url, username, password, allowInsecureTls }),
   },
 };
 

@@ -15,6 +15,7 @@ const bodySchema = z.object({
   username: z.string().default(""),
   password: z.string().default(""),
   apiKey: z.string().default(""),
+  allowInsecureTls: z.boolean().default(false),
 });
 
 export async function POST(request: NextRequest) {

@@ -5,6 +5,7 @@
 // admin-gated (the monitor cache, the test-connection route); nothing here
 // ever runs in the browser.
 
+import https from "node:https";
 import { readCapped } from "../fetch-body";
 import { log, hostOf, errorReason } from "../log";
 
@@ -62,6 +63,92 @@ export async function serviceRequest(
   } finally {
     clearTimeout(timer);
   }
+}
+
+export type InsecureResponse = {
+  status: number;
+  ok: boolean;
+  // Raw Set-Cookie headers (an array, unlike fetch's combined single string) —
+  // a session login needs the individual cookies intact.
+  setCookie: string[];
+  text: string;
+};
+
+// A timeout-bounded, size-capped HTTPS request that does NOT verify the
+// server's certificate. Only for an integration the admin has explicitly
+// marked `allowInsecureTls`, and only reachable for an https URL — it exists
+// for controllers that ship a self-signed cert with no plaintext-HTTP
+// alternative (a UniFi gateway). node:https rather than fetch because Node's
+// global fetch (undici) can't be told to skip certificate verification
+// without pulling undici's Agent in as a dependency. Same failure vocabulary
+// as serviceRequest so callers map errors identically.
+export async function insecureHttpsRequest(
+  url: string,
+  init: { method?: string; headers?: Record<string, string>; body?: string } = {},
+  maxBytes: number = SERVICE_MAX_BYTES
+): Promise<InsecureResponse> {
+  let target: URL;
+  try {
+    target = new URL(url);
+  } catch {
+    throw new ServiceError("Set a valid http(s) URL");
+  }
+  return new Promise<InsecureResponse>((resolve, reject) => {
+    let settled = false;
+    const settle = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      fn();
+    };
+    const req = https.request(
+      target,
+      {
+        method: init.method ?? "GET",
+        headers: init.headers,
+        rejectUnauthorized: false,
+        timeout: SERVICE_TIMEOUT_MS,
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        let size = 0;
+        res.on("data", (chunk: Buffer) => {
+          size += chunk.length;
+          if (size > maxBytes) {
+            settle(() => reject(new ServiceError("Response too large")));
+            req.destroy();
+            return;
+          }
+          chunks.push(chunk);
+        });
+        res.on("end", () =>
+          settle(() => {
+            const status = res.statusCode ?? 0;
+            resolve({
+              status,
+              ok: status >= 200 && status < 300,
+              setCookie: res.headers["set-cookie"] ?? [],
+              text: Buffer.concat(chunks).toString("utf8"),
+            });
+          })
+        );
+      }
+    );
+    req.on("timeout", () => {
+      settle(() => reject(new ServiceError("Timed out")));
+      req.destroy();
+    });
+    req.on("error", (e) =>
+      settle(() => {
+        log.warn("insecure service fetch error", {
+          host: hostOf(url),
+          reason: errorReason(e),
+        });
+        reject(new ServiceError("Couldn't connect"));
+      })
+    );
+    if (init.body !== undefined) req.write(init.body);
+    req.end();
+  });
 }
 
 // GET a service endpoint and parse the JSON body.

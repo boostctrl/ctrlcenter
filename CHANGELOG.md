@@ -38,6 +38,13 @@ here.
   dashboard shows each pool's health and capacity and the active alerts
   (SMART failures, replication problems, and the like). Strictly read-only.
   The API key can live in `CTRLCENTER_TRUENAS_KEY`. (#193)
+- **UniFi on the Monitor page.** Connect a UniFi Network controller (UniFi OS
+  gateways like the UDM/UDR, or a classic self-hosted controller — both are
+  auto-detected) and the Monitor dashboard shows internet/WAN status, the
+  connected-client count, and UniFi device health. The password can live in
+  `CTRLCENTER_UNIFI_PASS`. Because self-hosted controllers ship a self-signed
+  certificate, the card includes an opt-in **"Allow self-signed certificate"**
+  toggle. (#194)
 
 ## [2.3.3] - 2026-07-22
 

@@ -7,14 +7,15 @@ const TTL = 30_000;
 const integrations = (
   over: Partial<IntegrationsConfig> = {}
 ): IntegrationsConfig => ({
-  qbittorrent: { enabled: false, url: "", username: "", password: "" },
-  sonarr: { enabled: false, url: "", apiKey: "" },
-  radarr: { enabled: false, url: "", apiKey: "" },
-  adguard: { enabled: false, url: "", username: "", password: "" },
-  tautulli: { enabled: false, url: "", apiKey: "" },
-  overseerr: { enabled: false, url: "", apiKey: "" },
-  portainer: { enabled: false, url: "", apiKey: "" },
-  truenas: { enabled: false, url: "", apiKey: "" },
+  qbittorrent: { enabled: false, url: "", username: "", password: "", allowInsecureTls: false },
+  sonarr: { enabled: false, url: "", apiKey: "", allowInsecureTls: false },
+  radarr: { enabled: false, url: "", apiKey: "", allowInsecureTls: false },
+  adguard: { enabled: false, url: "", username: "", password: "", allowInsecureTls: false },
+  tautulli: { enabled: false, url: "", apiKey: "", allowInsecureTls: false },
+  overseerr: { enabled: false, url: "", apiKey: "", allowInsecureTls: false },
+  portainer: { enabled: false, url: "", apiKey: "", allowInsecureTls: false },
+  truenas: { enabled: false, url: "", apiKey: "", allowInsecureTls: false },
+  unifi: { enabled: false, url: "", username: "", password: "", allowInsecureTls: false },
   ...over,
 });
 
