@@ -1,6 +1,7 @@
 import { isValidTimeZone } from "./datetime";
 import { readCapped } from "./fetch-body";
 import { log, hostOf, errorReason } from "./log";
+import { resolveSecret } from "./secrets";
 
 // Minimal iCalendar (RFC 5545) reader for the agenda widget. Hand-rolled (no
 // dependency) and deliberately small: it pulls upcoming VEVENTs (summary, start,
@@ -597,7 +598,7 @@ function calendarHeaders(auth?: CalendarAuth): Record<string, string> {
   const headers: Record<string, string> = { Accept: "text/calendar, */*" };
   const user = auth?.username?.trim();
   if (user) {
-    const pass = process.env.CTRLCENTER_CALDAV_PASS || auth?.password || "";
+    const pass = resolveSecret("CTRLCENTER_CALDAV_PASS", auth?.password ?? "");
     headers.Authorization =
       "Basic " + Buffer.from(`${user}:${pass}`).toString("base64");
   }

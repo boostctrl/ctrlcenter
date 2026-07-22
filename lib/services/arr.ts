@@ -14,6 +14,7 @@ import {
   runProbe,
   type ProbeResult,
 } from "./http";
+import { resolveSecret } from "../secrets";
 
 export type ArrKind = "sonarr" | "radarr";
 
@@ -22,11 +23,10 @@ export type ArrConfig = { url: string; apiKey: string };
 // The API key can come from the environment instead of config.yaml, same
 // convention as CTRLCENTER_SMTP_PASS / CTRLCENTER_CALDAV_PASS.
 export function resolveArrApiKey(kind: ArrKind, cfg: { apiKey: string }): string {
-  const env =
-    kind === "sonarr"
-      ? process.env.CTRLCENTER_SONARR_KEY
-      : process.env.CTRLCENTER_RADARR_KEY;
-  return env || cfg.apiKey;
+  return resolveSecret(
+    kind === "sonarr" ? "CTRLCENTER_SONARR_KEY" : "CTRLCENTER_RADARR_KEY",
+    cfg.apiKey
+  );
 }
 
 // One row of the "upcoming" list: a series/movie title, a short qualifier

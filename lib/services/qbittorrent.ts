@@ -13,6 +13,7 @@ import {
   runProbe,
   type ProbeResult,
 } from "./http";
+import { resolveSecret } from "../secrets";
 
 export type QbittorrentConfig = {
   url: string;
@@ -25,7 +26,7 @@ export type QbittorrentConfig = {
 export function resolveQbittorrentPassword(cfg: {
   password: string;
 }): string {
-  return process.env.CTRLCENTER_QBITTORRENT_PASS || cfg.password;
+  return resolveSecret("CTRLCENTER_QBITTORRENT_PASS", cfg.password);
 }
 
 // qBittorrent reports ~15 raw states; the cards need far fewer. Buckets:

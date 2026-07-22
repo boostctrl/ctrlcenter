@@ -1,5 +1,6 @@
 import type { AlertConfig, AlertEmailConfig, AlertType } from "./schema";
 import { log, hostOf, errorReason } from "./log";
+import { resolveSecret } from "./secrets";
 
 // Outbound uptime alerting. The background poller (lib/status-poller.ts) feeds
 // each tick's results through here; we detect down/recovery transitions and
@@ -208,9 +209,6 @@ async function sendAlert(req: AlertRequest): Promise<void> {
   else log.warn("alert webhook failed", { host, reason: result.detail });
 }
 
-// Env var that overrides the stored SMTP password, so a self-hoster can keep the
-// secret out of config.yaml.
-const SMTP_PASS_ENV = "CTRLCENTER_SMTP_PASS";
 
 // Send one alert email over SMTP and report the outcome. nodemailer is imported
 // lazily so it never lands in a client/edge bundle and only loads inside the
@@ -223,7 +221,7 @@ async function runEmailAlert(
 ): Promise<ChannelResult> {
   try {
     const { default: nodemailer } = await import("nodemailer");
-    const pass = process.env[SMTP_PASS_ENV] || cfg.pass;
+    const pass = resolveSecret("CTRLCENTER_SMTP_PASS", cfg.pass);
     const transport = nodemailer.createTransport({
       host: cfg.host,
       port: cfg.port,

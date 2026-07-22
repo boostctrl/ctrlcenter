@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import type { MonitorSnapshot } from "@/lib/monitor";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
+import type { MonitorSnapshot, ServiceStatus } from "@/lib/monitor";
+import { SERVICE_IDS, SERVICE_LABELS, type ServiceId } from "@/lib/services/ids";
+import type { ServiceSnapshotMap } from "@/lib/services/registry";
 import PageNav from "@/components/PageNav";
 import QbittorrentCard from "./QbittorrentCard";
 import ArrCard from "./ArrCard";
@@ -15,11 +17,33 @@ import ArrCard from "./ArrCard";
 
 const REFRESH_MS = 45_000;
 
-const SERVICE_LABELS: Record<keyof MonitorSnapshot, string> = {
-  qbittorrent: "qBittorrent",
-  sonarr: "Sonarr",
-  radarr: "Radarr",
+// One card renderer per service, keyed by the shared ServiceId union (#212):
+// a service without a card is a compile error, not a configured service that
+// silently never renders.
+const CARDS: {
+  [K in ServiceId]: (status: ServiceStatus<ServiceSnapshotMap[K]>) => ReactNode;
+} = {
+  qbittorrent: (status) => <QbittorrentCard status={status} />,
+  sonarr: (status) => <ArrCard title="Sonarr" status={status} />,
+  radarr: (status) => <ArrCard title="Radarr" status={status} />,
 };
+
+// Generic so the id stays correlated with its slice of the snapshot — indexing
+// with the plain union would decouple the card from its payload type.
+function renderCard<K extends ServiceId>(
+  id: K,
+  snapshot: MonitorSnapshot
+): ReactNode {
+  return CARDS[id](snapshot[id]);
+}
+
+// "qBittorrent, Sonarr, or Radarr" — prose list of every service, so the
+// empty-state copy names whatever the registry currently holds.
+function serviceList(): string {
+  const labels = SERVICE_IDS.map((id) => SERVICE_LABELS[id]);
+  if (labels.length <= 1) return labels[0] ?? "";
+  return `${labels.slice(0, -1).join(", ")}, or ${labels[labels.length - 1]}`;
+}
 
 export default function MonitorDashboard({
   initial,
@@ -51,12 +75,8 @@ export default function MonitorDashboard({
     };
   }, []);
 
-  const configured = (
-    Object.keys(SERVICE_LABELS) as (keyof MonitorSnapshot)[]
-  ).filter((id) => snapshot[id].configured);
-  const unconfigured = (
-    Object.keys(SERVICE_LABELS) as (keyof MonitorSnapshot)[]
-  ).filter((id) => !snapshot[id].configured);
+  const configured = SERVICE_IDS.filter((id) => snapshot[id].configured);
+  const unconfigured = SERVICE_IDS.filter((id) => !snapshot[id].configured);
 
   const settingsLink = "/admin?tab=settings&section=integrations";
 
@@ -75,9 +95,9 @@ export default function MonitorDashboard({
         <div className="glass-card flex flex-col items-start gap-3 p-8">
           <h2 className="text-lg font-semibold">No integrations connected yet</h2>
           <p className="max-w-prose text-sm text-fg/60">
-            Connect qBittorrent, Sonarr, or Radarr and their live status
-            appears here. Credentials stay on the server — cards on this page
-            only ever receive the resulting numbers.
+            Connect {serviceList()} and their live status appears here.
+            Credentials stay on the server — cards on this page only ever
+            receive the resulting numbers.
           </p>
           <Link
             href={settingsLink}
@@ -88,15 +108,9 @@ export default function MonitorDashboard({
         </div>
       ) : (
         <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-          {snapshot.qbittorrent.configured && (
-            <QbittorrentCard status={snapshot.qbittorrent} />
-          )}
-          {snapshot.sonarr.configured && (
-            <ArrCard title="Sonarr" status={snapshot.sonarr} />
-          )}
-          {snapshot.radarr.configured && (
-            <ArrCard title="Radarr" status={snapshot.radarr} />
-          )}
+          {configured.map((id) => (
+            <Fragment key={id}>{renderCard(id, snapshot)}</Fragment>
+          ))}
           {unconfigured.length > 0 && (
             <div className="flex min-h-32 flex-col items-start justify-center gap-2 rounded-2xl border border-dashed border-fg/15 p-6">
               <p className="text-sm text-fg/50">

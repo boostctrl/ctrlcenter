@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { isAdminRequest } from "@/lib/api-auth";
-import { MONITOR_SERVICE_IDS } from "@/lib/monitor";
-import { probeQbittorrent } from "@/lib/services/qbittorrent";
-import { probeArr } from "@/lib/services/arr";
+import { SERVICE_IDS, SERVICES } from "@/lib/services/registry";
 
 // Admin-only "Test connection" for the Integrations settings: probes the
 // values currently in the form — before saving — and reports what answered
 // ("qBittorrent v5.0.1"), mirroring /api/calendar/test. Proxy-gated by the
 // /api/monitor prefix; the explicit session check matches the sibling route.
+// Dispatches through the service registry (#212): the body carries the
+// superset of credential fields and each service's probe reads its own.
 const bodySchema = z.object({
-  service: z.enum(MONITOR_SERVICE_IDS),
+  service: z.enum(SERVICE_IDS),
   url: z.string().default(""),
   username: z.string().default(""),
   password: z.string().default(""),
@@ -25,13 +25,9 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
-  const { service, url, username, password, apiKey } = parsed.data;
-  if (!url.trim()) {
+  const { service, ...fields } = parsed.data;
+  if (!fields.url.trim()) {
     return NextResponse.json({ ok: false, error: "No URL set" });
   }
-  const result =
-    service === "qbittorrent"
-      ? await probeQbittorrent({ url, username, password })
-      : await probeArr(service, { url, apiKey });
-  return NextResponse.json(result);
+  return NextResponse.json(await SERVICES[service].probe(fields));
 }

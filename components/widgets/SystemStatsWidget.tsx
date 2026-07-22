@@ -24,7 +24,9 @@ export function formatBytes(bytes: number): string {
   return `${rounded} ${units[u]}`;
 }
 
-function Meter({ percent }: { percent: number }) {
+// Exported for the Monitor cards (components/monitor/*), which show the same
+// thin accent bar — one definition so the figures and the bars match (#212).
+export function Meter({ percent }: { percent: number }) {
   const pct = Math.min(100, Math.max(0, percent));
   return (
     <div className="h-1.5 w-full overflow-hidden rounded-full bg-fg/10">

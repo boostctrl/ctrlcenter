@@ -131,6 +131,38 @@ const LEGACY_SECTION_ALIASES: Record<string, SettingsSectionId> = {
   announcement: "announcements",
 };
 
+// The URL + API-key integrations' settings cards are identical apart from
+// these strings, so they render from one parameterized card (#212) — a
+// service of that shape joins this table instead of adding a hand-kept copy.
+// qBittorrent keeps its own card (username/password login).
+const API_KEY_INTEGRATION_CARDS: readonly {
+  id: "sonarr" | "radarr";
+  title: string;
+  intro: string;
+  placeholder: string;
+  keyHint: string;
+  envVar: string;
+}[] = [
+  {
+    id: "sonarr",
+    title: "Sonarr",
+    intro:
+      "Download queue, missing episodes, and health warnings, read-only, on the Monitor page.",
+    placeholder: "http://192.168.1.10:8989",
+    keyHint: "Sonarr → Settings → General → API Key.",
+    envVar: "CTRLCENTER_SONARR_KEY",
+  },
+  {
+    id: "radarr",
+    title: "Radarr",
+    intro:
+      "Download queue, missing movies, and health warnings, read-only, on the Monitor page.",
+    placeholder: "http://192.168.1.10:7878",
+    keyHint: "Radarr → Settings → General → API Key.",
+    envVar: "CTRLCENTER_RADARR_KEY",
+  },
+];
+
 // Offered uptime-check intervals (minutes). The schema accepts 1–60, so a
 // hand-edited value can fall outside this list — the control shows it as an
 // extra read-only chip rather than pretending nothing is selected.
@@ -1754,93 +1786,52 @@ export default function SettingsManager({
         </Card>
         )}
 
-        {section === "integrations" && (
-        <Card
-          title="Sonarr"
-          intro="Download queue, missing episodes, and health warnings, read-only, on the Monitor page."
-          toggle={{
-            checked: integrations.sonarr.enabled,
-            onChange: (enabled) => updateIntegration("sonarr", { enabled }),
-          }}
-        >
-          {integrations.sonarr.enabled && (
-            <>
-              <TextField
-                label="URL"
-                placeholder="http://192.168.1.10:8989"
-                value={integrations.sonarr.url}
-                onChange={(e) =>
-                  updateIntegration("sonarr", { url: e.target.value })
-                }
-              />
-              <TextField
-                label="API key"
-                type="password"
-                autoComplete="off"
-                value={integrations.sonarr.apiKey}
-                onChange={(e) =>
-                  updateIntegration("sonarr", { apiKey: e.target.value })
-                }
-                hint="Sonarr → Settings → General → API Key."
-              />
-              <IntegrationTest
-                service="sonarr"
-                url={integrations.sonarr.url}
-                apiKey={integrations.sonarr.apiKey}
-              />
-              <Hint>
-                The key can stay out of the config file: set the
-                CTRLCENTER_SONARR_KEY environment variable instead and leave
-                the field blank.
-              </Hint>
-            </>
+        {section === "integrations" &&
+          API_KEY_INTEGRATION_CARDS.map(
+            ({ id, title, intro, placeholder, keyHint, envVar }) => (
+              <Card
+                key={id}
+                title={title}
+                intro={intro}
+                toggle={{
+                  checked: integrations[id].enabled,
+                  onChange: (enabled) => updateIntegration(id, { enabled }),
+                }}
+              >
+                {integrations[id].enabled && (
+                  <>
+                    <TextField
+                      label="URL"
+                      placeholder={placeholder}
+                      value={integrations[id].url}
+                      onChange={(e) =>
+                        updateIntegration(id, { url: e.target.value })
+                      }
+                    />
+                    <TextField
+                      label="API key"
+                      type="password"
+                      autoComplete="off"
+                      value={integrations[id].apiKey}
+                      onChange={(e) =>
+                        updateIntegration(id, { apiKey: e.target.value })
+                      }
+                      hint={keyHint}
+                    />
+                    <IntegrationTest
+                      service={id}
+                      url={integrations[id].url}
+                      apiKey={integrations[id].apiKey}
+                    />
+                    <Hint>
+                      The key can stay out of the config file: set the {envVar}{" "}
+                      environment variable instead and leave the field blank.
+                    </Hint>
+                  </>
+                )}
+              </Card>
+            )
           )}
-        </Card>
-        )}
-
-        {section === "integrations" && (
-        <Card
-          title="Radarr"
-          intro="Download queue, missing movies, and health warnings, read-only, on the Monitor page."
-          toggle={{
-            checked: integrations.radarr.enabled,
-            onChange: (enabled) => updateIntegration("radarr", { enabled }),
-          }}
-        >
-          {integrations.radarr.enabled && (
-            <>
-              <TextField
-                label="URL"
-                placeholder="http://192.168.1.10:7878"
-                value={integrations.radarr.url}
-                onChange={(e) =>
-                  updateIntegration("radarr", { url: e.target.value })
-                }
-              />
-              <TextField
-                label="API key"
-                type="password"
-                autoComplete="off"
-                value={integrations.radarr.apiKey}
-                onChange={(e) =>
-                  updateIntegration("radarr", { apiKey: e.target.value })
-                }
-                hint="Radarr → Settings → General → API Key."
-              />
-              <IntegrationTest
-                service="radarr"
-                url={integrations.radarr.url}
-                apiKey={integrations.radarr.apiKey}
-              />
-              <Hint>
-                The key can stay out of the config file: set the
-                CTRLCENTER_RADARR_KEY environment variable instead and leave
-                the field blank.
-              </Hint>
-            </>
-          )}
-        </Card>
-        )}
 
         {section === "announcements" && (
         <Card

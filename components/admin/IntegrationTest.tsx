@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { ServiceId } from "@/lib/services/ids";
 
 type Result = { loading: boolean; ok?: boolean; detail?: string; error?: string };
 
@@ -16,7 +17,7 @@ export default function IntegrationTest({
   password,
   apiKey,
 }: {
-  service: "qbittorrent" | "sonarr" | "radarr";
+  service: ServiceId;
   url: string;
   username?: string;
   password?: string;

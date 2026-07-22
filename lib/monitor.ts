@@ -12,15 +12,15 @@
 
 import type { IntegrationsConfig } from "./schema";
 import {
-  getQbittorrentSnapshot,
-  type QbittorrentSnapshot,
-} from "./services/qbittorrent";
-import { getArrSnapshot, type ArrSnapshot } from "./services/arr";
+  SERVICE_IDS,
+  SERVICES,
+  isServiceConfigured,
+  serviceFingerprint,
+  type ServiceId,
+  type ServiceSnapshotMap,
+} from "./services/registry";
 import { ServiceError } from "./services/http";
 import { log, errorReason } from "./log";
-
-export const MONITOR_SERVICE_IDS = ["qbittorrent", "sonarr", "radarr"] as const;
-export type MonitorServiceId = (typeof MONITOR_SERVICE_IDS)[number];
 
 // One service's slice of the dashboard: the last good snapshot when there is
 // one, the latest failure when there isn't — or both, when a refresh fails
@@ -35,9 +35,7 @@ export type ServiceStatus<T> = {
 };
 
 export type MonitorSnapshot = {
-  qbittorrent: ServiceStatus<QbittorrentSnapshot>;
-  sonarr: ServiceStatus<ArrSnapshot>;
-  radarr: ServiceStatus<ArrSnapshot>;
+  [K in ServiceId]: ServiceStatus<ServiceSnapshotMap[K]>;
 };
 
 // Snappier than the feed cache's 5 minutes — this page is "what's happening
@@ -54,7 +52,7 @@ type CacheEntry = {
 };
 
 const g = globalThis as unknown as {
-  __ctrlcenterMonitorCache?: Map<MonitorServiceId, CacheEntry>;
+  __ctrlcenterMonitorCache?: Map<ServiceId, CacheEntry>;
   __ctrlcenterMonitorRefresh?: Map<string, Promise<void>>;
 };
 const cache = (g.__ctrlcenterMonitorCache ??= new Map());
@@ -63,7 +61,7 @@ const cache = (g.__ctrlcenterMonitorCache ??= new Map());
 const inFlight = (g.__ctrlcenterMonitorRefresh ??= new Map());
 
 function refresh(
-  id: MonitorServiceId,
+  id: ServiceId,
   key: string,
   fetcher: () => Promise<unknown>
 ): Promise<void> {
@@ -98,7 +96,7 @@ function refresh(
 }
 
 async function serviceStatus<T>(
-  id: MonitorServiceId,
+  id: ServiceId,
   configured: boolean,
   key: string,
   fetcher: () => Promise<T>
@@ -122,32 +120,29 @@ async function serviceStatus<T>(
   };
 }
 
-const isConfigured = (i: { enabled: boolean; url: string }): boolean =>
-  i.enabled && i.url.trim() !== "";
+// One service's status via its registry entry. Generic over the id so the
+// config slice, fetcher, and payload types stay correlated.
+function statusFor<K extends ServiceId>(
+  id: K,
+  integrations: IntegrationsConfig
+): Promise<ServiceStatus<ServiceSnapshotMap[K]>> {
+  const cfg = integrations[id];
+  return serviceStatus(
+    id,
+    isServiceConfigured(cfg),
+    serviceFingerprint(cfg),
+    () => SERVICES[id].snapshot(cfg)
+  );
+}
 
 export async function getMonitorSnapshot(
   integrations: IntegrationsConfig
 ): Promise<MonitorSnapshot> {
-  const { qbittorrent: qb, sonarr, radarr } = integrations;
-  const [qbStatus, sonarrStatus, radarrStatus] = await Promise.all([
-    serviceStatus(
-      "qbittorrent",
-      isConfigured(qb),
-      JSON.stringify([qb.url, qb.username, qb.password]),
-      () => getQbittorrentSnapshot(qb)
-    ),
-    serviceStatus(
-      "sonarr",
-      isConfigured(sonarr),
-      JSON.stringify([sonarr.url, sonarr.apiKey]),
-      () => getArrSnapshot("sonarr", sonarr)
-    ),
-    serviceStatus(
-      "radarr",
-      isConfigured(radarr),
-      JSON.stringify([radarr.url, radarr.apiKey]),
-      () => getArrSnapshot("radarr", radarr)
-    ),
-  ]);
-  return { qbittorrent: qbStatus, sonarr: sonarrStatus, radarr: radarrStatus };
+  const entries = await Promise.all(
+    SERVICE_IDS.map(async (id) => [id, await statusFor(id, integrations)] as const)
+  );
+  // Assembled by mapping the registry ids, so every service is present by
+  // construction; the cast restores the per-service payload types the zip
+  // through Object.fromEntries loses.
+  return Object.fromEntries(entries) as MonitorSnapshot;
 }

@@ -76,16 +76,6 @@ export function formatEta(seconds: number): string {
   return `${Math.floor(seconds)}s`;
 }
 
-// The thin accent progress bar the widgets already use (SystemStatsWidget's
-// Meter, restated here for the monitor cards).
-export function Meter({ percent }: { percent: number }) {
-  const pct = Math.min(100, Math.max(0, percent));
-  return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-fg/10">
-      <div
-        className="h-full rounded-full bg-gradient-to-r from-[var(--accent-from)] to-[var(--accent-to)]"
-        style={{ width: `${pct}%` }}
-      />
-    </div>
-  );
-}
+// The thin accent progress bar, shared with the home grid's widgets — one
+// definition (SystemStatsWidget's), re-exported for the monitor cards.
+export { Meter } from "@/components/widgets/SystemStatsWidget";
