@@ -92,10 +92,10 @@ export default function MonitorDashboard({
             <QbittorrentCard status={snapshot.qbittorrent} />
           )}
           {snapshot.sonarr.configured && (
-            <ArrCard title="Sonarr" noun="episodes" status={snapshot.sonarr} />
+            <ArrCard title="Sonarr" status={snapshot.sonarr} />
           )}
           {snapshot.radarr.configured && (
-            <ArrCard title="Radarr" noun="movies" status={snapshot.radarr} />
+            <ArrCard title="Radarr" status={snapshot.radarr} />
           )}
           {unconfigured.length > 0 && (
             <div className="flex min-h-32 flex-col items-start justify-center gap-2 rounded-2xl border border-dashed border-fg/15 p-6">

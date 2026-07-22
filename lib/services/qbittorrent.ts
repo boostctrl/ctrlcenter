@@ -75,6 +75,17 @@ export type QbittorrentSnapshot = {
 // not a torrent manager; the full list lives in qBittorrent itself.
 export const TORRENT_LIST_CAP = 8;
 
+// The card's per-state tally (total / downloading / seeding / paused) needs
+// every torrent, so /torrents/info is fetched unfiltered — and on a large
+// instance that JSON runs well past the default SERVICE_MAX_BYTES, which
+// surfaced as a "Response too large" error that killed the whole card. Give
+// just this one call a much larger budget (~16k torrents at ~2 KB each).
+// A proper bounded fetch (server-side sort+limit for the list, a cheaper
+// source for the counts) is tracked in #210; this keeps the fleet counts the
+// card shows today. Server-side and admin-only, so the memory cost is bounded
+// to the poll interval.
+export const QBITTORRENT_MAX_BYTES = 32 * 1024 * 1024;
+
 // qBittorrent reports this ETA when there is no estimate (100 days).
 const ETA_INFINITY = 8640000;
 
@@ -170,21 +181,28 @@ async function mintSession(
 
 // GET an authenticated endpoint, logging in on a missing/expired session.
 // Exactly one retry: a 403 straight after a fresh login is a real error.
+// `maxBytes` lets the large torrent-list call raise the body cap without
+// widening it for the small endpoints.
 async function qbitRequest(
   base: string,
   cfg: QbittorrentConfig,
-  path: string
+  path: string,
+  maxBytes?: number
 ): Promise<string> {
   const key = sessionKey(base, cfg.username);
   let cookie = sessions.get(key) ?? (await login(base, cfg));
-  let { res, text } = await serviceRequest(`${base}${path}`, {
-    headers: { Cookie: cookie, Referer: base },
-  });
+  let { res, text } = await serviceRequest(
+    `${base}${path}`,
+    { headers: { Cookie: cookie, Referer: base } },
+    maxBytes
+  );
   if (res.status === 403) {
     cookie = await login(base, cfg);
-    ({ res, text } = await serviceRequest(`${base}${path}`, {
-      headers: { Cookie: cookie, Referer: base },
-    }));
+    ({ res, text } = await serviceRequest(
+      `${base}${path}`,
+      { headers: { Cookie: cookie, Referer: base } },
+      maxBytes
+    ));
   }
   if (!res.ok) throw new ServiceError(`HTTP ${res.status}`);
   return text;
@@ -220,7 +238,7 @@ export async function getQbittorrentSnapshot(
   const base = serviceBase(cfg.url);
   const [transferText, torrentsText] = await Promise.all([
     qbitRequest(base, cfg, "/api/v2/transfer/info"),
-    qbitRequest(base, cfg, "/api/v2/torrents/info"),
+    qbitRequest(base, cfg, "/api/v2/torrents/info", QBITTORRENT_MAX_BYTES),
   ]);
   const transfer = parseJson<RawTransfer>(transferText);
   const raw = parseJson<RawTorrent[]>(torrentsText);

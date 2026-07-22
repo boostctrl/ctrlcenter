@@ -17,21 +17,27 @@ const integrations = (
 const sonarrOn = (url = "http://sonarr.local:8989") =>
   integrations({ sonarr: { enabled: true, url, apiKey: "k" } });
 
-function stubSonarr(queueTotal: () => number, httpStatus: () => number = () => 200) {
+// `upcomingCount` varies the calendar size across cache windows, so the cache
+// tests can tell a fresh snapshot from a served one.
+function stubSonarr(upcomingCount: () => number, httpStatus: () => number = () => 200) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
     const status = httpStatus();
     if (status !== 200) return new Response("boom", { status });
     const url = String(input);
-    const body = url.includes("/api/v3/queue")
-      ? { totalRecords: queueTotal(), records: [] }
-      : url.includes("/api/v3/wanted/missing")
-        ? { totalRecords: 0 }
-        : url.includes("/api/v3/health")
-          ? []
-          : null;
-    return body !== null
-      ? new Response(JSON.stringify(body))
-      : new Response("not found", { status: 404 });
+    if (url.includes("/api/v3/calendar")) {
+      const episodes = Array.from({ length: upcomingCount() }, (_, i) => ({
+        airDateUtc: new Date(Date.now() + i * 3_600_000).toISOString(),
+        seasonNumber: 1,
+        episodeNumber: i + 1,
+        series: { title: "Show" },
+      }));
+      return new Response(JSON.stringify(episodes));
+    }
+    if (url.includes("/api/v3/history")) {
+      return new Response(JSON.stringify({ records: [] }));
+    }
+    if (url.includes("/api/v3/health")) return new Response(JSON.stringify([]));
+    return new Response("not found", { status: 404 });
   });
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
@@ -77,9 +83,9 @@ describe("getMonitorSnapshot", () => {
     const second = await getMonitorSnapshot(sonarrOn());
 
     expect(first.sonarr.configured).toBe(true);
-    expect(first.sonarr.data?.queueCount).toBe(5);
-    expect(second.sonarr.data?.queueCount).toBe(5);
-    // One queue + one missing + one health fetch — the second call was cached.
+    expect(first.sonarr.data?.upcoming).toHaveLength(5);
+    expect(second.sonarr.data?.upcoming).toHaveLength(5);
+    // One calendar + one history + one health fetch — the second was cached.
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
@@ -94,16 +100,16 @@ describe("getMonitorSnapshot", () => {
     now.mockReturnValue(base + TTL + 1);
     // The stale snapshot comes back without waiting on the refresh.
     const stale = await getMonitorSnapshot(sonarrOn());
-    expect(stale.sonarr.data?.queueCount).toBe(1);
+    expect(stale.sonarr.data?.upcoming).toHaveLength(1);
 
     await settle();
     const fresh = await getMonitorSnapshot(sonarrOn());
-    expect(fresh.sonarr.data?.queueCount).toBe(2);
+    expect(fresh.sonarr.data?.upcoming).toHaveLength(2);
   });
 
   it("keeps the last good data and reports the error when a refresh fails", async () => {
     let status = 200;
-    stubSonarr(() => 9, () => status);
+    stubSonarr(() => 4, () => status);
     const base = Date.now();
     const now = vi.spyOn(Date, "now").mockReturnValue(base);
     await getMonitorSnapshot(sonarrOn());
@@ -114,7 +120,7 @@ describe("getMonitorSnapshot", () => {
     await settle();
 
     const after = await getMonitorSnapshot(sonarrOn());
-    expect(after.sonarr.data?.queueCount).toBe(9); // stale-on-failure
+    expect(after.sonarr.data?.upcoming).toHaveLength(4); // stale-on-failure
     expect(after.sonarr.error).toBe("HTTP 500");
   });
 

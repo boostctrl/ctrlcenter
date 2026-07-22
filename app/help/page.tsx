@@ -462,9 +462,11 @@ export default async function HelpPage() {
               <strong>Settings → Integrations</strong> (each has a
               test-connection button) and the private{" "}
               <A href="/admin/monitor">Monitor</A> page shows what they&apos;re
-              doing right now: transfer speeds and the busiest torrents,
-              download queues with progress, missing counts, and health
-              warnings. It refreshes itself while the tab is open.
+              doing: transfer speeds and the busiest torrents for qBittorrent,
+              and — for Sonarr and Radarr — what&apos;s coming up (upcoming
+              episodes and movie releases), what was recently grabbed or
+              imported, and any health warnings. It refreshes itself while the
+              tab is open.
             </P>
             <P>
               Everything about it is admin-only: the page, the data it polls,

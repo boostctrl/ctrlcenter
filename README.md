@@ -108,8 +108,10 @@ Built with Next.js 16, React 19, and Tailwind v4.
 - **Private Monitor page.** Connect **qBittorrent, Sonarr, and Radarr**
   (Admin → Settings → Integrations, each with a test-connection button) and a
   signed-in-only **/admin/monitor** page shows their live state: transfer
-  speeds and the active torrent list, download queues with progress, missing
-  counts, and health warnings. Strictly read-only and strictly admin-only —
+  speeds and the active torrent list for qBittorrent, and — for Sonarr and
+  Radarr — what's coming up (upcoming episodes and movie releases), what was
+  recently grabbed or imported, and any health warnings. Strictly read-only
+  and strictly admin-only —
   the page, its API, and the stored credentials are all behind the admin
   session, credentials can live in env vars instead of the config file, and
   nothing integration-related ever renders on the public dashboard.

@@ -1,7 +1,11 @@
-// Typed client for the Sonarr and Radarr v3 APIs (#191) — one implementation,
-// because the two expose identical shapes for everything the monitor needs
-// (queue, wanted/missing, health, system status). Server-side only; the API
-// key never reaches the browser.
+// Typed client for the Sonarr and Radarr v3 APIs (#191). One implementation —
+// the two share nearly every shape — with small per-kind differences where the
+// APIs genuinely diverge (episodes vs movies). Server-side only; the API key
+// never reaches the browser.
+//
+// The card answers "what's coming to my library, and what just landed": the
+// next couple of weeks of the calendar (upcoming episodes / movie releases),
+// the most recent grabs and imports from history, and any health warnings.
 
 import {
   ServiceError,
@@ -25,41 +29,65 @@ export function resolveArrApiKey(kind: ArrKind, cfg: { apiKey: string }): string
   return env || cfg.apiKey;
 }
 
-export type ArrQueueItem = {
+// One row of the "upcoming" list: a series/movie title, a short qualifier
+// (episode code, or the release kind for a movie), and when it airs/releases.
+export type ArrUpcomingItem = {
   title: string;
-  // The service's own status word ("downloading", "queued", "warning", …).
-  status: string;
-  // Completion 0..1, or null when the record reports no sizes.
-  progress: number | null;
-  // The service's remaining-time string ("00:12:34"), or null.
-  timeLeft: string | null;
+  subtitle: string;
+  // Air/release time (epoch ms), or null when the record had no usable date.
+  at: number | null;
+};
+
+// One row of the "recent" list: something grabbed or imported, newest first.
+export type ArrRecentItem = {
+  title: string;
+  subtitle: string;
+  event: "grabbed" | "imported";
+  // When the event happened (epoch ms), or null.
+  at: number | null;
 };
 
 export type ArrHealthItem = { type: "warning" | "error"; message: string };
 
 export type ArrSnapshot = {
-  // Total records in the download queue (the list below is capped).
-  queueCount: number;
-  queue: ArrQueueItem[];
-  // Monitored-but-missing episodes/movies.
-  missingCount: number;
+  upcoming: ArrUpcomingItem[];
+  recent: ArrRecentItem[];
   health: ArrHealthItem[];
 };
 
-export const ARR_QUEUE_CAP = 6;
+export const ARR_UPCOMING_CAP = 6;
+export const ARR_RECENT_CAP = 5;
 const HEALTH_CAP = 5;
+// How far ahead the "upcoming" window looks.
+const UPCOMING_WINDOW_DAYS = 14;
+// History page to scan before filtering down to grabs/imports (other event
+// types — renames, deletions — are skipped).
+const HISTORY_PAGE_SIZE = 25;
 
 // --- Raw API shapes (only the fields the snapshot uses) ---
 
-type RawQueuePage = { totalRecords?: number; records?: RawQueueRecord[] };
-type RawQueueRecord = {
+type RawCalendarEpisode = {
+  airDateUtc?: string;
+  seasonNumber?: number;
+  episodeNumber?: number;
   title?: string;
-  status?: string;
-  size?: number;
-  sizeleft?: number;
-  timeleft?: string;
+  series?: { title?: string };
 };
-type RawWantedPage = { totalRecords?: number };
+type RawCalendarMovie = {
+  title?: string;
+  year?: number;
+  inCinemas?: string;
+  digitalRelease?: string;
+  physicalRelease?: string;
+};
+type RawHistoryPage = { records?: RawHistoryRecord[] };
+type RawHistoryRecord = {
+  eventType?: string;
+  date?: string;
+  series?: { title?: string };
+  episode?: { seasonNumber?: number; episodeNumber?: number };
+  movie?: { title?: string; year?: number };
+};
 type RawHealth = { type?: string; message?: string };
 
 async function arrJson<T>(
@@ -81,31 +109,102 @@ async function arrJson<T>(
   }
 }
 
-function mapQueue(page: RawQueuePage): { count: number; items: ArrQueueItem[] } {
-  const records = Array.isArray(page.records) ? page.records : [];
-  const items = records.slice(0, ARR_QUEUE_CAP).map((r): ArrQueueItem => {
-    const size = typeof r.size === "number" ? r.size : 0;
-    const left = typeof r.sizeleft === "number" ? r.sizeleft : null;
-    return {
-      title: typeof r.title === "string" && r.title !== "" ? r.title : "(unnamed)",
-      status: typeof r.status === "string" ? r.status : "unknown",
-      progress:
-        size > 0 && left !== null
-          ? Math.min(1, Math.max(0, (size - left) / size))
-          : null,
-      timeLeft: typeof r.timeleft === "string" && r.timeleft !== "" ? r.timeleft : null,
-    };
-  });
-  return {
-    count:
-      typeof page.totalRecords === "number" ? page.totalRecords : items.length,
-    items,
-  };
+// --- Pure parse helpers ---
+
+const toMs = (s?: string): number | null => {
+  if (typeof s !== "string" || s === "") return null;
+  const t = Date.parse(s);
+  return Number.isNaN(t) ? null : t;
+};
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const seasonEp = (s?: number, e?: number): string =>
+  typeof s === "number" && typeof e === "number" ? `S${pad2(s)}E${pad2(e)}` : "";
+// Earliest first; undated rows sort to the end.
+const byAtAsc = (a: { at: number | null }, b: { at: number | null }) =>
+  (a.at ?? Infinity) - (b.at ?? Infinity);
+
+export function mapSonarrCalendar(raw: unknown): ArrUpcomingItem[] {
+  const arr = Array.isArray(raw) ? (raw as RawCalendarEpisode[]) : [];
+  return arr
+    .map(
+      (e): ArrUpcomingItem => ({
+        title: e.series?.title?.trim() || "(unknown series)",
+        subtitle: seasonEp(e.seasonNumber, e.episodeNumber),
+        at: toMs(e.airDateUtc),
+      })
+    )
+    .sort(byAtAsc)
+    .slice(0, ARR_UPCOMING_CAP);
 }
 
-function mapHealth(raw: RawHealth[]): ArrHealthItem[] {
+export function mapRadarrCalendar(raw: unknown): ArrUpcomingItem[] {
+  const arr = Array.isArray(raw) ? (raw as RawCalendarMovie[]) : [];
+  const now = Date.now();
+  return arr
+    .map((m): ArrUpcomingItem => {
+      // A calendar movie can carry several release dates; show the soonest
+      // one still ahead of us, else the soonest overall.
+      const dates: { label: string; at: number }[] = [];
+      for (const [label, value] of [
+        ["Digital", m.digitalRelease],
+        ["Physical", m.physicalRelease],
+        ["Cinemas", m.inCinemas],
+      ] as const) {
+        const at = toMs(value);
+        if (at !== null) dates.push({ label, at });
+      }
+      const ahead = dates.filter((d) => d.at >= now).sort((a, b) => a.at - b.at);
+      const pick = ahead[0] ?? dates.sort((a, b) => a.at - b.at)[0];
+      return {
+        title: m.title?.trim() || "(unknown movie)",
+        subtitle: [m.year ? String(m.year) : "", pick?.label ?? ""]
+          .filter(Boolean)
+          .join(" · "),
+        at: pick?.at ?? null,
+      };
+    })
+    .sort(byAtAsc)
+    .slice(0, ARR_UPCOMING_CAP);
+}
+
+// History event types that count as "imported" (the file landed in the
+// library). Grabs are matched separately; every other event is skipped.
+const IMPORT_EVENTS = new Set([
+  "downloadFolderImported",
+  "movieFileImported",
+  "episodeFileImported",
+  "seriesFolderImported",
+]);
+
+export function mapHistory(kind: ArrKind, raw: unknown): ArrRecentItem[] {
+  const page = (raw ?? {}) as RawHistoryPage;
+  const records = Array.isArray(page.records) ? page.records : [];
+  const out: ArrRecentItem[] = [];
+  for (const r of records) {
+    const et = typeof r.eventType === "string" ? r.eventType : "";
+    let event: "grabbed" | "imported" | null = null;
+    if (et === "grabbed") event = "grabbed";
+    else if (IMPORT_EVENTS.has(et) || /imported/i.test(et)) event = "imported";
+    if (!event) continue;
+    const title =
+      kind === "sonarr"
+        ? r.series?.title?.trim() || "(unknown)"
+        : r.movie?.title?.trim() || "(unknown)";
+    const subtitle =
+      kind === "sonarr"
+        ? seasonEp(r.episode?.seasonNumber, r.episode?.episodeNumber)
+        : r.movie?.year
+          ? String(r.movie.year)
+          : "";
+    out.push({ title, subtitle, event, at: toMs(r.date) });
+    if (out.length >= ARR_RECENT_CAP) break;
+  }
+  return out;
+}
+
+function mapHealth(raw: unknown): ArrHealthItem[] {
   if (!Array.isArray(raw)) return [];
-  return raw
+  return (raw as RawHealth[])
     .filter((h) => typeof h.message === "string" && h.message !== "")
     .map(
       (h): ArrHealthItem => ({
@@ -121,33 +220,45 @@ export async function getArrSnapshot(
   kind: ArrKind,
   cfg: ArrConfig
 ): Promise<ArrSnapshot> {
-  const [queueR, missingR, healthR] = await Promise.allSettled([
-    arrJson<RawQueuePage>(
-      kind,
-      cfg,
-      `/api/v3/queue?page=1&pageSize=${ARR_QUEUE_CAP}`
-    ),
-    // Only the total is needed; ask for the smallest possible page.
-    arrJson<RawWantedPage>(kind, cfg, "/api/v3/wanted/missing?page=1&pageSize=1"),
+  const now = Date.now();
+  const start = encodeURIComponent(new Date(now).toISOString());
+  const end = encodeURIComponent(
+    new Date(now + UPCOMING_WINDOW_DAYS * 86_400_000).toISOString()
+  );
+  const calendarPath =
+    kind === "sonarr"
+      ? `/api/v3/calendar?start=${start}&end=${end}&includeSeries=true`
+      : `/api/v3/calendar?start=${start}&end=${end}`;
+  const historyPath =
+    kind === "sonarr"
+      ? `/api/v3/history?page=1&pageSize=${HISTORY_PAGE_SIZE}&sortKey=date&sortDirection=descending&includeSeries=true&includeEpisode=true`
+      : `/api/v3/history?page=1&pageSize=${HISTORY_PAGE_SIZE}&sortKey=date&sortDirection=descending&includeMovie=true`;
+
+  const [calR, histR, healthR] = await Promise.allSettled([
+    arrJson<unknown>(kind, cfg, calendarPath),
+    arrJson<RawHistoryPage>(kind, cfg, historyPath),
     arrJson<RawHealth[]>(kind, cfg, "/api/v3/health"),
   ]);
-  // Queue and missing are the card's core numbers — if either can't be read
-  // the card has nothing honest to show, so surface that failure. Health is
-  // advisory (warning banners), so a flaky /health endpoint degrades to "no
-  // warnings" rather than blanking the whole card: one failing sub-request no
-  // longer takes the other two down with it (Promise.all did).
-  if (queueR.status === "rejected") throw queueR.reason;
-  if (missingR.status === "rejected") throw missingR.reason;
-  const q = mapQueue(queueR.value);
-  return {
-    queueCount: q.count,
-    queue: q.items,
-    missingCount:
-      typeof missingR.value.totalRecords === "number"
-        ? missingR.value.totalRecords
-        : 0,
-    health: healthR.status === "fulfilled" ? mapHealth(healthR.value) : [],
-  };
+  // If every sub-request failed, the service is down or misconfigured (bad key,
+  // unreachable host) — surface that as the card's error. If only some failed
+  // (one flaky endpoint), show the sections that did load instead of blanking
+  // the whole card.
+  if (
+    calR.status === "rejected" &&
+    histR.status === "rejected" &&
+    healthR.status === "rejected"
+  ) {
+    throw calR.reason;
+  }
+  const upcoming =
+    calR.status === "fulfilled"
+      ? kind === "sonarr"
+        ? mapSonarrCalendar(calR.value)
+        : mapRadarrCalendar(calR.value)
+      : [];
+  const recent = histR.status === "fulfilled" ? mapHistory(kind, histR.value) : [];
+  const health = healthR.status === "fulfilled" ? mapHealth(healthR.value) : [];
+  return { upcoming, recent, health };
 }
 
 // Fresh reachability check for the admin's "Test connection" button. The

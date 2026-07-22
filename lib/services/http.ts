@@ -9,9 +9,11 @@ import { readCapped } from "../fetch-body";
 import { log, hostOf, errorReason } from "../log";
 
 const SERVICE_TIMEOUT_MS = 6000;
-// Cap on a service response body. A torrent list on a busy instance can run to
-// a few MB of JSON; anything beyond this reads as a misconfigured URL.
-const SERVICE_MAX_BYTES = 4 * 1024 * 1024;
+// Default cap on a service response body — enough for the small status/queue
+// payloads. A specific call that legitimately returns a larger body (the
+// qBittorrent torrent list on a big instance) passes its own higher cap; see
+// serviceRequest's `maxBytes` and QBITTORRENT_MAX_BYTES.
+export const SERVICE_MAX_BYTES = 4 * 1024 * 1024;
 
 // A failure whose message is written for the admin's eyes — thrown by the
 // clients, shown verbatim on the monitor cards and the test-connection button.
@@ -35,13 +37,14 @@ export function serviceBase(url: string): string {
 // re-login, its login set-cookie), so both come back.
 export async function serviceRequest(
   url: string,
-  init: RequestInit = {}
+  init: RequestInit = {},
+  maxBytes: number = SERVICE_MAX_BYTES
 ): Promise<{ res: Response; text: string }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), SERVICE_TIMEOUT_MS);
   try {
     const res = await fetch(url, { ...init, signal: controller.signal });
-    const text = await readCapped(res, SERVICE_MAX_BYTES);
+    const text = await readCapped(res, maxBytes);
     if (text === null) throw new ServiceError("Response too large");
     return { res, text };
   } catch (e) {

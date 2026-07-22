@@ -12,6 +12,19 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **Sonarr and Radarr cards now show what's coming and what just landed.** Instead
+  of a list of raw release file names, each card shows the next couple of weeks of
+  your calendar (upcoming episodes / movie releases) and the most recent grabs and
+  imports, with health warnings underneath. (#191)
+
+### Fixed
+
+- **The qBittorrent card no longer fails with "Response too large" on a big
+  instance.** The torrent list is fetched with a much larger size budget, so
+  dashboards with thousands of torrents load instead of erroring. (#210)
+
 ## [2.3.0] - 2026-07-22
 
 ### Added

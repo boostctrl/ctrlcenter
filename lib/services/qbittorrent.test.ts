@@ -174,6 +174,25 @@ describe("getQbittorrentSnapshot", () => {
     expect(snap.counts.downloading).toBe(2);
   });
 
+  it("accepts a torrent list larger than the default body cap", async () => {
+    // ~5 MB of torrents JSON — over the 4 MB default cap, under the raised
+    // per-call cap. The default would reject this as "Response too large".
+    const big = Array.from({ length: 3500 }, (_, i) => ({
+      name: `torrent-${i}-${"x".repeat(1400)}`,
+      state: "pausedDL",
+      progress: 0,
+      ratio: 0,
+      dlspeed: 0,
+      upspeed: 0,
+      size: 1000,
+      eta: 0,
+    }));
+    expect(JSON.stringify(big).length).toBeGreaterThan(4 * 1024 * 1024);
+    stubQbit({ torrents: big });
+    const snap = await getQbittorrentSnapshot(CFG);
+    expect(snap.counts.total).toBe(3500);
+  });
+
   it("re-logins once when the cached session has expired", async () => {
     let logins = 0;
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
