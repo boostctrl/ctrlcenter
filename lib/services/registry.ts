@@ -23,6 +23,11 @@ import {
   probeTautulli,
   type TautulliSnapshot,
 } from "./tautulli";
+import {
+  getOverseerrSnapshot,
+  probeOverseerr,
+  type OverseerrSnapshot,
+} from "./overseerr";
 import type { ProbeResult } from "./http";
 
 export { SERVICE_IDS, SERVICE_LABELS, type ServiceId };
@@ -36,6 +41,7 @@ export type ServiceSnapshotMap = {
   radarr: ArrSnapshot;
   adguard: AdguardSnapshot;
   tautulli: TautulliSnapshot;
+  overseerr: OverseerrSnapshot;
 };
 
 // The superset of credential fields a Test-connection probe can carry
@@ -82,6 +88,10 @@ export const SERVICES: {
   tautulli: {
     snapshot: (cfg) => getTautulliSnapshot(cfg),
     probe: ({ url, apiKey }) => probeTautulli({ url, apiKey }),
+  },
+  overseerr: {
+    snapshot: (cfg) => getOverseerrSnapshot(cfg),
+    probe: ({ url, apiKey }) => probeOverseerr({ url, apiKey }),
   },
 };
 

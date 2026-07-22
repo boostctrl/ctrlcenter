@@ -163,7 +163,7 @@ const USER_PASS_INTEGRATION_CARDS: readonly {
 ];
 
 const API_KEY_INTEGRATION_CARDS: readonly {
-  id: "sonarr" | "radarr" | "tautulli";
+  id: "sonarr" | "radarr" | "tautulli" | "overseerr";
   title: string;
   intro: string;
   placeholder: string;
@@ -196,6 +196,15 @@ const API_KEY_INTEGRATION_CARDS: readonly {
     placeholder: "http://192.168.1.10:8181",
     keyHint: "Tautulli → Settings → Web Interface → API Key.",
     envVar: "CTRLCENTER_TAUTULLI_KEY",
+  },
+  {
+    id: "overseerr",
+    title: "Overseerr / Jellyseerr",
+    intro:
+      "Pending requests and their status, read-only, on the Monitor page. Works with Overseerr or Jellyseerr — they share an API.",
+    placeholder: "http://192.168.1.10:5055",
+    keyHint: "Overseerr → Settings → General → API Key.",
+    envVar: "CTRLCENTER_OVERSEERR_KEY",
   },
 ];
 

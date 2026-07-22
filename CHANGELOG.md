@@ -24,6 +24,11 @@ here.
   dashboard shows who's watching Plex right now: stream count, total
   bandwidth, and each session's progress and whether it's a direct play or a
   transcode. The API key can live in `CTRLCENTER_TAUTULLI_KEY`. (#195)
+- **Overseerr / Jellyseerr on the Monitor page.** Connect Overseerr or
+  Jellyseerr (they share an API) and the Monitor dashboard shows the pending
+  request count and the most recent requests — title, who asked, and where
+  each stands (pending, approved, downloading, or available). The API key can
+  live in `CTRLCENTER_OVERSEERR_KEY`. (#196)
 
 ## [2.3.3] - 2026-07-22
 

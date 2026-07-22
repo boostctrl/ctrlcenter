@@ -12,6 +12,7 @@ const integrations = (
   radarr: { enabled: false, url: "", apiKey: "" },
   adguard: { enabled: false, url: "", username: "", password: "" },
   tautulli: { enabled: false, url: "", apiKey: "" },
+  overseerr: { enabled: false, url: "", apiKey: "" },
   ...over,
 });
 
