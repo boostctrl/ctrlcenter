@@ -8,6 +8,7 @@ import type { ServiceSnapshotMap } from "@/lib/services/registry";
 import PageNav from "@/components/PageNav";
 import QbittorrentCard from "./QbittorrentCard";
 import ArrCard from "./ArrCard";
+import AdguardCard from "./AdguardCard";
 
 // The private Monitor page's body (#207): a card per configured integration,
 // server-rendered from the shared snapshot cache and then kept fresh by
@@ -26,6 +27,7 @@ const CARDS: {
   qbittorrent: (status) => <QbittorrentCard status={status} />,
   sonarr: (status) => <ArrCard title="Sonarr" status={status} />,
   radarr: (status) => <ArrCard title="Radarr" status={status} />,
+  adguard: (status) => <AdguardCard status={status} />,
 };
 
 // Generic so the id stays correlated with its slice of the snapshot — indexing

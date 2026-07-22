@@ -12,6 +12,15 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **AdGuard Home on the Monitor page.** Connect AdGuard Home
+  (Settings → Integrations) and the private Monitor dashboard shows whether
+  protection is on, DNS query volume and blocked share over the stats window,
+  and the most blocked domains — read-only, admins only. The password can
+  live in the `CTRLCENTER_ADGUARD_PASS` environment variable instead of the
+  config file. (#192)
+
 ## [2.3.3] - 2026-07-22
 
 ### Fixed

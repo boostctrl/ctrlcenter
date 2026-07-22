@@ -131,10 +131,37 @@ const LEGACY_SECTION_ALIASES: Record<string, SettingsSectionId> = {
   announcement: "announcements",
 };
 
-// The URL + API-key integrations' settings cards are identical apart from
-// these strings, so they render from one parameterized card (#212) — a
-// service of that shape joins this table instead of adding a hand-kept copy.
-// qBittorrent keeps its own card (username/password login).
+// Integration settings cards render from these two tables — one per
+// credential shape (#212). The cards are identical apart from the strings, so
+// a new service joins a table instead of adding a hand-kept copy.
+const USER_PASS_INTEGRATION_CARDS: readonly {
+  id: "qbittorrent" | "adguard";
+  title: string;
+  intro: string;
+  urlLabel: string;
+  placeholder: string;
+  envVar: string;
+}[] = [
+  {
+    id: "qbittorrent",
+    title: "qBittorrent",
+    intro:
+      "Transfer speeds and the active torrent list, read-only, on the Monitor page.",
+    urlLabel: "WebUI URL",
+    placeholder: "http://192.168.1.10:8080",
+    envVar: "CTRLCENTER_QBITTORRENT_PASS",
+  },
+  {
+    id: "adguard",
+    title: "AdGuard Home",
+    intro:
+      "DNS query volume, blocked share, and protection status, read-only, on the Monitor page.",
+    urlLabel: "URL",
+    placeholder: "http://192.168.1.10:3000",
+    envVar: "CTRLCENTER_ADGUARD_PASS",
+  },
+];
+
 const API_KEY_INTEGRATION_CARDS: readonly {
   id: "sonarr" | "radarr";
   title: string;
@@ -1728,63 +1755,63 @@ export default function SettingsManager({
         </Card>
         )}
 
-        {section === "integrations" && (
-        <Card
-          title="qBittorrent"
-          intro="Transfer speeds and the active torrent list, read-only, on the Monitor page."
-          toggle={{
-            checked: integrations.qbittorrent.enabled,
-            onChange: (enabled) => updateIntegration("qbittorrent", { enabled }),
-          }}
-        >
-          {integrations.qbittorrent.enabled && (
-            <>
-              <TextField
-                label="WebUI URL"
-                placeholder="http://192.168.1.10:8080"
-                value={integrations.qbittorrent.url}
-                onChange={(e) =>
-                  updateIntegration("qbittorrent", { url: e.target.value })
-                }
-              />
-              <div className="grid grid-cols-2 gap-3">
-                <TextField
-                  label="Username"
-                  autoComplete="off"
-                  value={integrations.qbittorrent.username}
-                  onChange={(e) =>
-                    updateIntegration("qbittorrent", {
-                      username: e.target.value,
-                    })
-                  }
-                />
-                <TextField
-                  label="Password"
-                  type="password"
-                  autoComplete="new-password"
-                  value={integrations.qbittorrent.password}
-                  onChange={(e) =>
-                    updateIntegration("qbittorrent", {
-                      password: e.target.value,
-                    })
-                  }
-                />
-              </div>
-              <IntegrationTest
-                service="qbittorrent"
-                url={integrations.qbittorrent.url}
-                username={integrations.qbittorrent.username}
-                password={integrations.qbittorrent.password}
-              />
-              <Hint>
-                The password can stay out of the config file: set the
-                CTRLCENTER_QBITTORRENT_PASS environment variable instead and
-                leave the field blank.
-              </Hint>
-            </>
+        {section === "integrations" &&
+          USER_PASS_INTEGRATION_CARDS.map(
+            ({ id, title, intro, urlLabel, placeholder, envVar }) => (
+              <Card
+                key={id}
+                title={title}
+                intro={intro}
+                toggle={{
+                  checked: integrations[id].enabled,
+                  onChange: (enabled) => updateIntegration(id, { enabled }),
+                }}
+              >
+                {integrations[id].enabled && (
+                  <>
+                    <TextField
+                      label={urlLabel}
+                      placeholder={placeholder}
+                      value={integrations[id].url}
+                      onChange={(e) =>
+                        updateIntegration(id, { url: e.target.value })
+                      }
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                      <TextField
+                        label="Username"
+                        autoComplete="off"
+                        value={integrations[id].username}
+                        onChange={(e) =>
+                          updateIntegration(id, { username: e.target.value })
+                        }
+                      />
+                      <TextField
+                        label="Password"
+                        type="password"
+                        autoComplete="new-password"
+                        value={integrations[id].password}
+                        onChange={(e) =>
+                          updateIntegration(id, { password: e.target.value })
+                        }
+                      />
+                    </div>
+                    <IntegrationTest
+                      service={id}
+                      url={integrations[id].url}
+                      username={integrations[id].username}
+                      password={integrations[id].password}
+                    />
+                    <Hint>
+                      The password can stay out of the config file: set the{" "}
+                      {envVar} environment variable instead and leave the field
+                      blank.
+                    </Hint>
+                  </>
+                )}
+              </Card>
+            )
           )}
-        </Card>
-        )}
 
         {section === "integrations" &&
           API_KEY_INTEGRATION_CARDS.map(

@@ -13,6 +13,11 @@ import {
   type QbittorrentSnapshot,
 } from "./qbittorrent";
 import { getArrSnapshot, probeArr, type ArrSnapshot } from "./arr";
+import {
+  getAdguardSnapshot,
+  probeAdguard,
+  type AdguardSnapshot,
+} from "./adguard";
 import type { ProbeResult } from "./http";
 
 export { SERVICE_IDS, SERVICE_LABELS, type ServiceId };
@@ -24,6 +29,7 @@ export type ServiceSnapshotMap = {
   qbittorrent: QbittorrentSnapshot;
   sonarr: ArrSnapshot;
   radarr: ArrSnapshot;
+  adguard: AdguardSnapshot;
 };
 
 // The superset of credential fields a Test-connection probe can carry
@@ -61,6 +67,11 @@ export const SERVICES: {
   radarr: {
     snapshot: (cfg) => getArrSnapshot("radarr", cfg),
     probe: ({ url, apiKey }) => probeArr("radarr", { url, apiKey }),
+  },
+  adguard: {
+    snapshot: (cfg) => getAdguardSnapshot(cfg),
+    probe: ({ url, username, password }) =>
+      probeAdguard({ url, username, password }),
   },
 };
 

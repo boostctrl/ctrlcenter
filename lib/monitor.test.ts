@@ -10,6 +10,7 @@ const integrations = (
   qbittorrent: { enabled: false, url: "", username: "", password: "" },
   sonarr: { enabled: false, url: "", apiKey: "" },
   radarr: { enabled: false, url: "", apiKey: "" },
+  adguard: { enabled: false, url: "", username: "", password: "" },
   ...over,
 });
 

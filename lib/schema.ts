@@ -238,36 +238,40 @@ export type SystemStatsConfig = z.infer<typeof systemStatsSchema>;
 
 // --- Integrations (#189): connections to other self-hosted services, shown
 // only on the private Monitor dashboard (/admin/monitor). Read-only in the
-// 2.3.x arc. Stored leniently like every settings section. The credentials
-// are secrets — and the URLs are internal topology — so stripSecrets
-// (lib/config.ts) blanks both out of anything a public surface serializes
-// (#157); each credential can also come from an env var instead of the file:
-// CTRLCENTER_QBITTORRENT_PASS, CTRLCENTER_SONARR_KEY, CTRLCENTER_RADARR_KEY
-// (resolved at use time in lib/services/*).
-export const qbittorrentIntegrationSchema = z.object({
+// 2.3.x–2.4.x arc. Stored leniently like every settings section. The
+// credentials are secrets — and the URLs are internal topology — so
+// stripSecrets (lib/config.ts) blanks both out of anything a public surface
+// serializes (#157); each credential can also come from a CTRLCENTER_* env
+// var instead of the file (resolved at use time in lib/services/*).
+//
+// Two credential shapes cover every service: a WebUI login
+// (username/password) and an API key. A new service reuses one of these and
+// adds its id to integrationsSchema + the registry (lib/services/registry.ts).
+export const userPassIntegrationSchema = z.object({
   enabled: z.boolean().default(false),
   url: z.string().default(""),
   username: z.string().default(""),
   password: z.string().default(""),
 });
-export type QbittorrentIntegration = z.infer<
-  typeof qbittorrentIntegrationSchema
->;
+export type UserPassIntegration = z.infer<typeof userPassIntegrationSchema>;
 
-// Sonarr and Radarr share one shape (URL + API key).
-export const arrIntegrationSchema = z.object({
+export const apiKeyIntegrationSchema = z.object({
   enabled: z.boolean().default(false),
   url: z.string().default(""),
   apiKey: z.string().default(""),
 });
-export type ArrIntegration = z.infer<typeof arrIntegrationSchema>;
+export type ApiKeyIntegration = z.infer<typeof apiKeyIntegrationSchema>;
+
+const userPass = () =>
+  userPassIntegrationSchema.default(userPassIntegrationSchema.parse({}));
+const apiKey = () =>
+  apiKeyIntegrationSchema.default(apiKeyIntegrationSchema.parse({}));
 
 export const integrationsSchema = z.object({
-  qbittorrent: qbittorrentIntegrationSchema.default(
-    qbittorrentIntegrationSchema.parse({})
-  ),
-  sonarr: arrIntegrationSchema.default(arrIntegrationSchema.parse({})),
-  radarr: arrIntegrationSchema.default(arrIntegrationSchema.parse({})),
+  qbittorrent: userPass(),
+  sonarr: apiKey(),
+  radarr: apiKey(),
+  adguard: userPass(),
 });
 export type IntegrationsConfig = z.infer<typeof integrationsSchema>;
 
@@ -860,23 +864,24 @@ export const feedsUpdateSchema = z.array(feedUpdateSchema).max(MAX_FEED_CARDS);
 // URL with a clear message shown on the Monitor card and the Test-connection
 // button — and stored leniently, so a bad value stays inert rather than
 // wedging the admin form.
-export const qbittorrentIntegrationUpdateSchema = z.object({
+export const userPassIntegrationUpdateSchema = z.object({
   enabled: z.boolean(),
   url: z.string(),
   username: z.string(),
   password: z.string(),
 });
 
-export const arrIntegrationUpdateSchema = z.object({
+export const apiKeyIntegrationUpdateSchema = z.object({
   enabled: z.boolean(),
   url: z.string(),
   apiKey: z.string(),
 });
 
 export const integrationsUpdateSchema = z.object({
-  qbittorrent: qbittorrentIntegrationUpdateSchema,
-  sonarr: arrIntegrationUpdateSchema,
-  radarr: arrIntegrationUpdateSchema,
+  qbittorrent: userPassIntegrationUpdateSchema,
+  sonarr: apiKeyIntegrationUpdateSchema,
+  radarr: apiKeyIntegrationUpdateSchema,
+  adguard: userPassIntegrationUpdateSchema,
 });
 
 // The admin sends the whole theme object (not a partial), so updateSettings
