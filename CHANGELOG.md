@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-07-22
+
 ### Fixed
 
 - **The qBittorrent card works when the WebUI bypasses authentication.** With
@@ -2261,7 +2263,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.3.3...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.4.0...HEAD
+[2.4.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.3.3...v2.4.0
 [2.3.3]: https://github.com/boostctrl/ctrlcenter/compare/v2.3.2...v2.3.3
 [2.3.2]: https://github.com/boostctrl/ctrlcenter/compare/v2.3.1...v2.3.2
 [2.3.1]: https://github.com/boostctrl/ctrlcenter/compare/v2.3.0...v2.3.1
