@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [2.3.3] - 2026-07-22
+
 ### Fixed
 
 - **The qBittorrent integration works with qBittorrent 5.2 and later.** Newer
@@ -2217,7 +2219,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.3.2...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.3.3...HEAD
+[2.3.3]: https://github.com/boostctrl/ctrlcenter/compare/v2.3.2...v2.3.3
 [2.3.2]: https://github.com/boostctrl/ctrlcenter/compare/v2.3.1...v2.3.2
 [2.3.1]: https://github.com/boostctrl/ctrlcenter/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.2.1...v2.3.0
