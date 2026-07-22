@@ -18,6 +18,11 @@ import {
   probeAdguard,
   type AdguardSnapshot,
 } from "./adguard";
+import {
+  getTautulliSnapshot,
+  probeTautulli,
+  type TautulliSnapshot,
+} from "./tautulli";
 import type { ProbeResult } from "./http";
 
 export { SERVICE_IDS, SERVICE_LABELS, type ServiceId };
@@ -30,6 +35,7 @@ export type ServiceSnapshotMap = {
   sonarr: ArrSnapshot;
   radarr: ArrSnapshot;
   adguard: AdguardSnapshot;
+  tautulli: TautulliSnapshot;
 };
 
 // The superset of credential fields a Test-connection probe can carry
@@ -72,6 +78,10 @@ export const SERVICES: {
     snapshot: (cfg) => getAdguardSnapshot(cfg),
     probe: ({ url, username, password }) =>
       probeAdguard({ url, username, password }),
+  },
+  tautulli: {
+    snapshot: (cfg) => getTautulliSnapshot(cfg),
+    probe: ({ url, apiKey }) => probeTautulli({ url, apiKey }),
   },
 };
 

@@ -9,7 +9,13 @@
 // compile error rather than a configured service that silently never polls or
 // renders.
 
-export const SERVICE_IDS = ["qbittorrent", "sonarr", "radarr", "adguard"] as const;
+export const SERVICE_IDS = [
+  "qbittorrent",
+  "sonarr",
+  "radarr",
+  "adguard",
+  "tautulli",
+] as const;
 export type ServiceId = (typeof SERVICE_IDS)[number];
 
 export const SERVICE_LABELS: Record<ServiceId, string> = {
@@ -17,4 +23,5 @@ export const SERVICE_LABELS: Record<ServiceId, string> = {
   sonarr: "Sonarr",
   radarr: "Radarr",
   adguard: "AdGuard Home",
+  tautulli: "Tautulli",
 };

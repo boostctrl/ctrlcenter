@@ -11,6 +11,7 @@ const integrations = (
   sonarr: { enabled: false, url: "", apiKey: "" },
   radarr: { enabled: false, url: "", apiKey: "" },
   adguard: { enabled: false, url: "", username: "", password: "" },
+  tautulli: { enabled: false, url: "", apiKey: "" },
   ...over,
 });
 

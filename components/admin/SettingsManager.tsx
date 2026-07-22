@@ -163,7 +163,7 @@ const USER_PASS_INTEGRATION_CARDS: readonly {
 ];
 
 const API_KEY_INTEGRATION_CARDS: readonly {
-  id: "sonarr" | "radarr";
+  id: "sonarr" | "radarr" | "tautulli";
   title: string;
   intro: string;
   placeholder: string;
@@ -187,6 +187,15 @@ const API_KEY_INTEGRATION_CARDS: readonly {
     placeholder: "http://192.168.1.10:7878",
     keyHint: "Radarr → Settings → General → API Key.",
     envVar: "CTRLCENTER_RADARR_KEY",
+  },
+  {
+    id: "tautulli",
+    title: "Tautulli",
+    intro:
+      "Active Plex streams — who's watching, progress, and transcodes — read-only, on the Monitor page.",
+    placeholder: "http://192.168.1.10:8181",
+    keyHint: "Tautulli → Settings → Web Interface → API Key.",
+    envVar: "CTRLCENTER_TAUTULLI_KEY",
   },
 ];
 

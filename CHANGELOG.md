@@ -20,6 +20,10 @@ here.
   and the most blocked domains — read-only, admins only. The password can
   live in the `CTRLCENTER_ADGUARD_PASS` environment variable instead of the
   config file. (#192)
+- **Tautulli on the Monitor page.** Connect Tautulli and the Monitor
+  dashboard shows who's watching Plex right now: stream count, total
+  bandwidth, and each session's progress and whether it's a direct play or a
+  transcode. The API key can live in `CTRLCENTER_TAUTULLI_KEY`. (#195)
 
 ## [2.3.3] - 2026-07-22
 
