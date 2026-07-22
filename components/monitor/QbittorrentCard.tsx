@@ -95,8 +95,11 @@ export default function QbittorrentCard({
           </p>
           {data.torrents.length > 0 ? (
             <ul className="divide-y divide-fg/10">
-              {data.torrents.map((t) => (
-                <TorrentRow key={t.name} torrent={t} />
+              {/* Names aren't unique (the same release added twice), so pair
+                  with the index — the list is a stable server-sorted snapshot,
+                  matching ArrCard's key scheme. */}
+              {data.torrents.map((t, i) => (
+                <TorrentRow key={`${t.name}-${i}`} torrent={t} />
               ))}
             </ul>
           ) : (

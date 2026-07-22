@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/lib/api-auth";
-import { getSettings } from "@/lib/config";
+import { readConfigInternal } from "@/lib/config";
 import { getMonitorSnapshot } from "@/lib/monitor";
 
 // The private Monitor dashboard's data plane (#189/#207): one JSON snapshot
@@ -10,9 +10,15 @@ import { getMonitorSnapshot } from "@/lib/monitor";
 // itself — infrastructure internals must stay unreachable even if the
 // path allowlist ever drifts.
 export async function GET(request: NextRequest) {
-  if (!(await isAdminRequest(request))) {
+  // One config read for both the auth check and the integration settings:
+  // every open Monitor tab polls this route, so pass the password hash into
+  // isAdminRequest instead of letting it read and parse config.yaml a second
+  // time (the fast path the polled status routes already take).
+  const config = await readConfigInternal();
+  if (!(await isAdminRequest(request, config.auth.passwordHash))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const settings = await getSettings();
-  return NextResponse.json(await getMonitorSnapshot(settings.integrations));
+  return NextResponse.json(
+    await getMonitorSnapshot(config.settings.integrations)
+  );
 }

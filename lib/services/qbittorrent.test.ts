@@ -148,6 +148,32 @@ describe("getQbittorrentSnapshot", () => {
     expect(snap.torrents[1].eta).toBeNull();
   });
 
+  it("excludes queued and checking torrents from the downloading count", async () => {
+    const raw = (state: string) => ({
+      name: state,
+      state,
+      progress: 0,
+      ratio: 0,
+      dlspeed: 0,
+      upspeed: 0,
+      size: 1000,
+      eta: 0,
+    });
+    stubQbit({
+      torrents: [
+        raw("queuedDL"),
+        raw("checkingDL"),
+        raw("downloading"),
+        raw("stalledDL"),
+      ],
+    });
+    const snap = await getQbittorrentSnapshot(CFG);
+    expect(snap.counts.total).toBe(4);
+    // Only downloading + stalledDL — a queue-capped client at 0 B/s must not
+    // read as "2 downloading" when nothing is moving.
+    expect(snap.counts.downloading).toBe(2);
+  });
+
   it("re-logins once when the cached session has expired", async () => {
     let logins = 0;
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {

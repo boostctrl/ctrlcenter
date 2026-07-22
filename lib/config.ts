@@ -210,7 +210,6 @@ export function stripAuth(config: Config): Omit<Config, "auth"> {
 // separately — the calendar fetcher via getCalendarAuth, the alert poller and
 // the monitor snapshot via readConfigInternal-backed accessors.
 export function stripSecrets<T extends { settings: Settings }>(config: T): T {
-  const { integrations } = config.settings;
   return {
     ...config,
     settings: {
@@ -228,18 +227,30 @@ export function stripSecrets<T extends { settings: Settings }>(config: T): T {
           to: "",
         },
       },
-      integrations: {
-        qbittorrent: {
-          ...integrations.qbittorrent,
-          url: "",
-          username: "",
-          password: "",
-        },
-        sonarr: { ...integrations.sonarr, url: "", apiKey: "" },
-        radarr: { ...integrations.radarr, url: "", apiKey: "" },
-      },
+      integrations: redactIntegrations(config.settings.integrations),
     },
   };
+}
+
+// Blank every string-valued field of every integration (the URL and all
+// credential fields), keeping only the `enabled` boolean. Generic on purpose:
+// a service later added to integrationsSchema is redacted by construction, so
+// it can't ship its URL or credentials to a public surface just because
+// someone forgot to extend a hand-written list here — the #157/#184 leak class
+// closed structurally (fail-closed) rather than per-service. Nothing public
+// renders integrations at all, so blanking a non-secret string too is safe.
+function redactIntegrations(
+  integrations: Settings["integrations"]
+): Settings["integrations"] {
+  const out: Record<string, Record<string, unknown>> = {};
+  for (const [id, cfg] of Object.entries(integrations)) {
+    const redacted: Record<string, unknown> = { ...cfg };
+    for (const key of Object.keys(redacted)) {
+      if (typeof redacted[key] === "string") redacted[key] = "";
+    }
+    out[id] = redacted;
+  }
+  return out as Settings["integrations"];
 }
 
 // Validate and write a whole config, replacing what's on disk (used by import).

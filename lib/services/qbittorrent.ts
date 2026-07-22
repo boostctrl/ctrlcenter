@@ -250,11 +250,17 @@ export async function getQbittorrentSnapshot(
     errored: 0,
   };
   for (const t of torrents) {
-    if (t.state === "downloading" || t.state === "stalled" || t.state === "queued" || t.state === "checking")
+    // "downloading" is the active download phase only — actually downloading,
+    // or stalled (wants data, no peers right now). Queued and checking are
+    // deliberately NOT counted here: a queue-capped client sitting at 0 B/s
+    // must not read as "N downloading" when nothing is moving (they still
+    // count toward `total`). error is its own bucket so they don't fall into
+    // it either.
+    if (t.state === "downloading" || t.state === "stalled")
       counts.downloading += 1;
     else if (t.state === "seeding") counts.seeding += 1;
     else if (t.state === "paused") counts.paused += 1;
-    else counts.errored += 1;
+    else if (t.state === "error") counts.errored += 1;
   }
 
   const list = [...torrents]
@@ -282,9 +288,14 @@ export async function probeQbittorrent(
 ): Promise<ProbeResult> {
   return runProbe("qbittorrent", async () => {
     const base = serviceBase(cfg.url);
-    // Probe with fresh credentials, not a cached session — the point is to
-    // validate what's in the form right now.
-    sessions.delete(sessionKey(base, cfg.username));
+    const key = sessionKey(base, cfg.username);
+    // Probe with fresh credentials — not a cached session, and not a login
+    // already in flight for the OLD password. login() dedupes on base+username
+    // only (ignoring the password), so without clearing the in-flight entry a
+    // probe fired while a background poll's stale-password login is running
+    // would adopt that promise and validate the wrong credentials.
+    sessions.delete(key);
+    loginsInFlight.delete(key);
     const version = await qbitRequest(base, cfg, "/api/v2/app/version");
     return `qBittorrent ${version.trim()}`.trim();
   });

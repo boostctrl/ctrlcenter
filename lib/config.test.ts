@@ -615,6 +615,8 @@ describe("readConfigInternal stays off public surfaces", () => {
     "app/api/alerts/test/route.ts",
     "app/api/config/route.ts",
     "app/api/password/route.ts",
+    // Admin-only integration snapshot: reads once, then gates on the hash.
+    "app/api/monitor/route.ts",
     // Auth itself: verifies the password / issues the session.
     "app/api/login/route.ts",
     // Public, but their shared cache must hold every app; each filters per
@@ -716,13 +718,16 @@ describe("settings-secret redaction", () => {
     expect(pub.settings.alerts.email.from).toBe("");
     expect(pub.settings.alerts.email.to).toBe("");
     // Integrations (#189): credentials AND URLs — internal topology — go.
-    expect(pub.settings.integrations.qbittorrent.url).toBe("");
-    expect(pub.settings.integrations.qbittorrent.username).toBe("");
-    expect(pub.settings.integrations.qbittorrent.password).toBe("");
-    expect(pub.settings.integrations.sonarr.url).toBe("");
-    expect(pub.settings.integrations.sonarr.apiKey).toBe("");
-    expect(pub.settings.integrations.radarr.url).toBe("");
-    expect(pub.settings.integrations.radarr.apiKey).toBe("");
+    // Asserted generically (not field-by-field) so this guard keeps holding
+    // for a service added later: NO integration may leak a non-empty string
+    // to a public surface, only its `enabled` boolean survives.
+    for (const [service, cfg] of Object.entries(pub.settings.integrations)) {
+      for (const [field, value] of Object.entries(cfg)) {
+        if (typeof value === "string") {
+          expect(value, `${service}.${field} must be redacted`).toBe("");
+        }
+      }
+    }
 
     // Non-secret fields survive so the widgets/nav still render and fetch.
     expect(pub.settings.calendar.url).toBe(withSecrets.calendar.url);

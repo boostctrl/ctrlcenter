@@ -849,33 +849,29 @@ export const feedsUpdateSchema = z.array(feedUpdateSchema).max(MAX_FEED_CARDS);
 
 // The admin sends the whole integrations object (the Settings tab autosaves
 // the complete settings), so updateSettings replaces it wholesale like the
-// theme. A URL is optional — the integration stays inert until one is set —
-// but must be http(s) when present.
-const isIntegrationUrl = (v: string) =>
-  v.trim() === "" || /^https?:\/\//i.test(v.trim());
+// theme.
+//
+// No URL-format refine here on purpose: because the entire Settings object is
+// one autosave PUT, a refine failure on a half-typed integration URL (e.g. a
+// schemeless "192.168.1.10:8080" pasted straight from the service's own UI)
+// would 400 the whole request and block saving every OTHER section too, with
+// only a generic "Couldn't save". Integration URLs are validated at point of
+// use instead — serviceBase() (lib/services/http.ts) rejects a non-http(s)
+// URL with a clear message shown on the Monitor card and the Test-connection
+// button — and stored leniently, so a bad value stays inert rather than
+// wedging the admin form.
+export const qbittorrentIntegrationUpdateSchema = z.object({
+  enabled: z.boolean(),
+  url: z.string(),
+  username: z.string(),
+  password: z.string(),
+});
 
-export const qbittorrentIntegrationUpdateSchema = z
-  .object({
-    enabled: z.boolean(),
-    url: z.string(),
-    username: z.string(),
-    password: z.string(),
-  })
-  .refine((i) => isIntegrationUrl(i.url), {
-    message: "URL must start with http(s)",
-    path: ["url"],
-  });
-
-export const arrIntegrationUpdateSchema = z
-  .object({
-    enabled: z.boolean(),
-    url: z.string(),
-    apiKey: z.string(),
-  })
-  .refine((i) => isIntegrationUrl(i.url), {
-    message: "URL must start with http(s)",
-    path: ["url"],
-  });
+export const arrIntegrationUpdateSchema = z.object({
+  enabled: z.boolean(),
+  url: z.string(),
+  apiKey: z.string(),
+});
 
 export const integrationsUpdateSchema = z.object({
   qbittorrent: qbittorrentIntegrationUpdateSchema,

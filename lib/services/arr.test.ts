@@ -93,6 +93,41 @@ describe("getArrSnapshot", () => {
       "Invalid API key"
     );
   });
+
+  it("tolerates a failed health check instead of blanking the whole card", async () => {
+    // Only /health flakes; queue and missing succeed.
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/v3/health")) {
+        return new Response("boom", { status: 500 });
+      }
+      if (url.includes("/api/v3/queue")) {
+        return new Response(JSON.stringify({ totalRecords: 3, records: [] }));
+      }
+      if (url.includes("/api/v3/wanted/missing")) {
+        return new Response(JSON.stringify({ totalRecords: 4 }));
+      }
+      return new Response("not found", { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const snap = await getArrSnapshot("sonarr", CFG);
+    expect(snap.queueCount).toBe(3);
+    expect(snap.missingCount).toBe(4);
+    expect(snap.health).toEqual([]);
+  });
+
+  it("still fails when the core queue call fails", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/v3/queue")) {
+        return new Response("boom", { status: 500 });
+      }
+      return new Response(JSON.stringify({ totalRecords: 0, records: [] }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(getArrSnapshot("sonarr", CFG)).rejects.toThrow("HTTP 500");
+  });
 });
 
 describe("probeArr", () => {

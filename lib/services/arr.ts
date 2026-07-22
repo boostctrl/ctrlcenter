@@ -121,7 +121,7 @@ export async function getArrSnapshot(
   kind: ArrKind,
   cfg: ArrConfig
 ): Promise<ArrSnapshot> {
-  const [queue, missing, health] = await Promise.all([
+  const [queueR, missingR, healthR] = await Promise.allSettled([
     arrJson<RawQueuePage>(
       kind,
       cfg,
@@ -131,13 +131,22 @@ export async function getArrSnapshot(
     arrJson<RawWantedPage>(kind, cfg, "/api/v3/wanted/missing?page=1&pageSize=1"),
     arrJson<RawHealth[]>(kind, cfg, "/api/v3/health"),
   ]);
-  const q = mapQueue(queue);
+  // Queue and missing are the card's core numbers — if either can't be read
+  // the card has nothing honest to show, so surface that failure. Health is
+  // advisory (warning banners), so a flaky /health endpoint degrades to "no
+  // warnings" rather than blanking the whole card: one failing sub-request no
+  // longer takes the other two down with it (Promise.all did).
+  if (queueR.status === "rejected") throw queueR.reason;
+  if (missingR.status === "rejected") throw missingR.reason;
+  const q = mapQueue(queueR.value);
   return {
     queueCount: q.count,
     queue: q.items,
     missingCount:
-      typeof missing.totalRecords === "number" ? missing.totalRecords : 0,
-    health: mapHealth(health),
+      typeof missingR.value.totalRecords === "number"
+        ? missingR.value.totalRecords
+        : 0,
+    health: healthR.status === "fulfilled" ? mapHealth(healthR.value) : [],
   };
 }
 
