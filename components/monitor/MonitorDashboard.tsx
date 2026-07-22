@@ -11,6 +11,7 @@ import ArrCard from "./ArrCard";
 import AdguardCard from "./AdguardCard";
 import TautulliCard from "./TautulliCard";
 import OverseerrCard from "./OverseerrCard";
+import PortainerCard from "./PortainerCard";
 
 // The private Monitor page's body (#207): a card per configured integration,
 // server-rendered from the shared snapshot cache and then kept fresh by
@@ -32,6 +33,7 @@ const CARDS: {
   adguard: (status) => <AdguardCard status={status} />,
   tautulli: (status) => <TautulliCard status={status} />,
   overseerr: (status) => <OverseerrCard status={status} />,
+  portainer: (status) => <PortainerCard status={status} />,
 };
 
 // Generic so the id stays correlated with its slice of the snapshot — indexing

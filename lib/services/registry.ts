@@ -28,6 +28,11 @@ import {
   probeOverseerr,
   type OverseerrSnapshot,
 } from "./overseerr";
+import {
+  getPortainerSnapshot,
+  probePortainer,
+  type PortainerSnapshot,
+} from "./portainer";
 import type { ProbeResult } from "./http";
 
 export { SERVICE_IDS, SERVICE_LABELS, type ServiceId };
@@ -42,6 +47,7 @@ export type ServiceSnapshotMap = {
   adguard: AdguardSnapshot;
   tautulli: TautulliSnapshot;
   overseerr: OverseerrSnapshot;
+  portainer: PortainerSnapshot;
 };
 
 // The superset of credential fields a Test-connection probe can carry
@@ -92,6 +98,10 @@ export const SERVICES: {
   overseerr: {
     snapshot: (cfg) => getOverseerrSnapshot(cfg),
     probe: ({ url, apiKey }) => probeOverseerr({ url, apiKey }),
+  },
+  portainer: {
+    snapshot: (cfg) => getPortainerSnapshot(cfg),
+    probe: ({ url, apiKey }) => probePortainer({ url, apiKey }),
   },
 };
 

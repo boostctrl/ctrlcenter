@@ -16,6 +16,7 @@ export const SERVICE_IDS = [
   "adguard",
   "tautulli",
   "overseerr",
+  "portainer",
 ] as const;
 export type ServiceId = (typeof SERVICE_IDS)[number];
 
@@ -26,4 +27,5 @@ export const SERVICE_LABELS: Record<ServiceId, string> = {
   adguard: "AdGuard Home",
   tautulli: "Tautulli",
   overseerr: "Overseerr",
+  portainer: "Portainer",
 };

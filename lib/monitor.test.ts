@@ -13,6 +13,7 @@ const integrations = (
   adguard: { enabled: false, url: "", username: "", password: "" },
   tautulli: { enabled: false, url: "", apiKey: "" },
   overseerr: { enabled: false, url: "", apiKey: "" },
+  portainer: { enabled: false, url: "", apiKey: "" },
   ...over,
 });
 

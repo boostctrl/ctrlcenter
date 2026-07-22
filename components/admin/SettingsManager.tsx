@@ -163,7 +163,7 @@ const USER_PASS_INTEGRATION_CARDS: readonly {
 ];
 
 const API_KEY_INTEGRATION_CARDS: readonly {
-  id: "sonarr" | "radarr" | "tautulli" | "overseerr";
+  id: "sonarr" | "radarr" | "tautulli" | "overseerr" | "portainer";
   title: string;
   intro: string;
   placeholder: string;
@@ -205,6 +205,15 @@ const API_KEY_INTEGRATION_CARDS: readonly {
     placeholder: "http://192.168.1.10:5055",
     keyHint: "Overseerr → Settings → General → API Key.",
     envVar: "CTRLCENTER_OVERSEERR_KEY",
+  },
+  {
+    id: "portainer",
+    title: "Portainer",
+    intro:
+      "Container states across every environment, read-only, on the Monitor page.",
+    placeholder: "https://192.168.1.10:9443",
+    keyHint: "Portainer → My account → Access tokens → Add access token.",
+    envVar: "CTRLCENTER_PORTAINER_KEY",
   },
 ];
 

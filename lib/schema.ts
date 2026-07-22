@@ -274,6 +274,7 @@ export const integrationsSchema = z.object({
   adguard: userPass(),
   tautulli: apiKey(),
   overseerr: apiKey(),
+  portainer: apiKey(),
 });
 export type IntegrationsConfig = z.infer<typeof integrationsSchema>;
 
@@ -886,6 +887,7 @@ export const integrationsUpdateSchema = z.object({
   adguard: userPassIntegrationUpdateSchema,
   tautulli: apiKeyIntegrationUpdateSchema,
   overseerr: apiKeyIntegrationUpdateSchema,
+  portainer: apiKeyIntegrationUpdateSchema,
 });
 
 // The admin sends the whole theme object (not a partial), so updateSettings

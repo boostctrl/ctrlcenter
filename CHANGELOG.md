@@ -29,6 +29,11 @@ here.
   request count and the most recent requests — title, who asked, and where
   each stands (pending, approved, downloading, or available). The API key can
   live in `CTRLCENTER_OVERSEERR_KEY`. (#196)
+- **Portainer on the Monitor page.** Connect Portainer and the Monitor
+  dashboard shows container states — running, stopped, and unhealthy — across
+  every environment it manages, the health signal for the self-hosted apps
+  that expose no API of their own. The API key can live in
+  `CTRLCENTER_PORTAINER_KEY`. (#197)
 
 ## [2.3.3] - 2026-07-22
 
