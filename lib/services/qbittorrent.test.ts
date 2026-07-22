@@ -238,6 +238,30 @@ describe("getQbittorrentSnapshot", () => {
     expect(new Headers(authed[1].headers).get("cookie")).toBe("SID=xyz789");
   });
 
+  it("proceeds without a cookie when the WebUI bypasses authentication", async () => {
+    // qBittorrent with "Bypass authentication for clients on localhost /
+    // whitelisted subnets" returns a successful login with NO Set-Cookie. The
+    // old code failed here ("Login succeeded but no session cookie came back").
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/v2/auth/login")) return new Response("Ok.");
+      if (url.endsWith("/api/v2/transfer/info")) {
+        return new Response(JSON.stringify({ dl_info_speed: 5, up_info_speed: 2 }));
+      }
+      if (url.endsWith("/api/v2/torrents/info")) return new Response("[]");
+      return new Response("not found", { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const snap = await getQbittorrentSnapshot(CFG);
+    expect(snap.downSpeed).toBe(5);
+    // The authenticated calls carry no Cookie header (there is no session).
+    const authed = fetchMock.mock.calls.find(([input]) =>
+      String(input).endsWith("/api/v2/transfer/info")
+    ) as [RequestInfo, RequestInit];
+    expect(new Headers(authed[1].headers).get("cookie")).toBeNull();
+  });
+
   it("reports bad credentials in the admin's terms", async () => {
     stubQbit({ badCredentials: true });
     const result = await probeQbittorrent(CFG);

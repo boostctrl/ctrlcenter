@@ -176,7 +176,7 @@ const USER_PASS_INTEGRATION_CARDS: readonly {
 ];
 
 const API_KEY_INTEGRATION_CARDS: readonly {
-  id: "sonarr" | "radarr" | "tautulli" | "overseerr" | "portainer" | "truenas";
+  id: "sonarr" | "radarr" | "tautulli" | "seerr" | "portainer" | "truenas";
   title: string;
   intro: string;
   placeholder: string;
@@ -211,13 +211,13 @@ const API_KEY_INTEGRATION_CARDS: readonly {
     envVar: "CTRLCENTER_TAUTULLI_KEY",
   },
   {
-    id: "overseerr",
-    title: "Overseerr / Jellyseerr",
+    id: "seerr",
+    title: "Seerr",
     intro:
-      "Pending requests and their status, read-only, on the Monitor page. Works with Overseerr or Jellyseerr — they share an API.",
+      "Pending requests and their status, read-only, on the Monitor page. Seerr is the merged successor to Overseerr and Jellyseerr.",
     placeholder: "http://192.168.1.10:5055",
-    keyHint: "Overseerr → Settings → General → API Key.",
-    envVar: "CTRLCENTER_OVERSEERR_KEY",
+    keyHint: "Seerr → Settings → General → API Key.",
+    envVar: "CTRLCENTER_SEERR_KEY",
   },
   {
     id: "portainer",

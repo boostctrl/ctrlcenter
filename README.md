@@ -282,7 +282,7 @@ for reuse. You can also paste a direct image URL or a `data:` URI.
 | `CTRLCENTER_RADARR_KEY` | no | Overrides the Radarr integration's API key, same convention. |
 | `CTRLCENTER_ADGUARD_PASS` | no | Overrides the AdGuard Home integration's password, same convention. |
 | `CTRLCENTER_TAUTULLI_KEY` | no | Overrides the Tautulli integration's API key, same convention. |
-| `CTRLCENTER_OVERSEERR_KEY` | no | Overrides the Overseerr/Jellyseerr integration's API key, same convention. |
+| `CTRLCENTER_SEERR_KEY` | no | Overrides the Seerr integration's API key, same convention. |
 | `CTRLCENTER_PORTAINER_KEY` | no | Overrides the Portainer integration's API key, same convention. |
 | `CTRLCENTER_TRUENAS_KEY` | no | Overrides the TrueNAS integration's API key, same convention. |
 | `CTRLCENTER_UNIFI_PASS` | no | Overrides the UniFi integration's password, same convention. |

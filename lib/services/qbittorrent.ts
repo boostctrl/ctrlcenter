@@ -14,6 +14,7 @@ import {
   type ProbeResult,
 } from "./http";
 import { resolveSecret } from "../secrets";
+import { log, hostOf } from "../log";
 
 export type QbittorrentConfig = {
   url: string;
@@ -183,13 +184,39 @@ async function mintSession(
     // credentials, so a non-"Ok." body is a real login failure.
     throw new ServiceError("Login failed — check the username and password");
   }
-  const sid = /SID=([^;]+)/.exec(res.headers.get("set-cookie") ?? "")?.[1];
+  // qBittorrent normally issues a SID cookie on login. But when the WebUI is
+  // set to bypass authentication for this client ("Bypass authentication for
+  // clients on localhost" / for whitelisted subnets), a successful login
+  // returns no cookie because none is needed. Proceed cookieless rather than
+  // failing — the API calls then go through unauthenticated. A qBittorrent
+  // that genuinely requires the cookie (a proxy stripped it, say) still
+  // surfaces clearly as an HTTP 403 on the data call, not here.
+  const sid = extractSid(res.headers);
   if (!sid) {
-    throw new ServiceError("Login succeeded but no session cookie came back");
+    log.info(
+      "qbittorrent login returned no session cookie — treating this client as auth-exempt",
+      { host: hostOf(base) }
+    );
   }
-  const cookie = `SID=${sid}`;
+  const cookie = sid ? `SID=${sid}` : "";
   sessions.set(sessionKey(base, cfg.username), cookie);
   return cookie;
+}
+
+// Pull the SID value out of the login response's Set-Cookie header(s).
+// getSetCookie() keeps multiple cookies separate (get("set-cookie") would
+// comma-join them); the boundary match avoids a cookie whose name merely ends
+// in "SID". Returns null when no session cookie is present.
+function extractSid(headers: Headers): string | null {
+  const cookies =
+    typeof headers.getSetCookie === "function"
+      ? headers.getSetCookie()
+      : ((c) => (c ? [c] : []))(headers.get("set-cookie"));
+  for (const cookie of cookies) {
+    const match = /(?:^|;\s*)SID=([^;]+)/.exec(cookie);
+    if (match) return match[1];
+  }
+  return null;
 }
 
 // GET an authenticated endpoint, logging in on a missing/expired session.
@@ -203,17 +230,21 @@ async function qbitRequest(
   maxBytes?: number
 ): Promise<string> {
   const key = sessionKey(base, cfg.username);
+  // An empty cookie means the session is auth-exempt (see mintSession); send
+  // no Cookie header at all in that case.
+  const headersFor = (cookie: string): Record<string, string> =>
+    cookie ? { Cookie: cookie, Referer: base } : { Referer: base };
   let cookie = sessions.get(key) ?? (await login(base, cfg));
   let { res, text } = await serviceRequest(
     `${base}${path}`,
-    { headers: { Cookie: cookie, Referer: base } },
+    { headers: headersFor(cookie) },
     maxBytes
   );
   if (res.status === 403) {
     cookie = await login(base, cfg);
     ({ res, text } = await serviceRequest(
       `${base}${path}`,
-      { headers: { Cookie: cookie, Referer: base } },
+      { headers: headersFor(cookie) },
       maxBytes
     ));
   }

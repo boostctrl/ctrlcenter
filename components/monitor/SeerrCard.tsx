@@ -3,15 +3,15 @@
 import { useSyncExternalStore } from "react";
 import type { ServiceStatus } from "@/lib/monitor";
 import type {
-  OverseerrSnapshot,
-  OverseerrRequest,
-  OverseerrRequestStatus,
-} from "@/lib/services/overseerr";
+  SeerrSnapshot,
+  SeerrRequest,
+  SeerrRequestStatus,
+} from "@/lib/services/seerr";
 import MonitorCard from "./MonitorCard";
 
-// Overseerr/Jellyseerr's card on the Monitor page (#196): what's waiting on
-// approval — pending count and the most recent requests, each with its title,
-// requester, and standing. Read-only — approve/deny is a 2.6.0 action.
+// Seerr's card on the Monitor page (#196): what's waiting on approval —
+// pending count and the most recent requests, each with its title, requester,
+// and standing. Read-only — approve/deny is a 2.6.0 action.
 
 // The relative "added" label depends on the viewer's clock, so it renders
 // only after mount to avoid a hydration mismatch (matches ArrCard).
@@ -35,7 +35,7 @@ function relTime(at: number | null): string {
   return `${Math.round(hours / 24)}d ago`;
 }
 
-const STATUS_LABELS: Record<OverseerrRequestStatus, string> = {
+const STATUS_LABELS: Record<SeerrRequestStatus, string> = {
   pending: "pending",
   declined: "declined",
   approved: "approved",
@@ -43,7 +43,7 @@ const STATUS_LABELS: Record<OverseerrRequestStatus, string> = {
   available: "available",
 };
 
-const STATUS_TONES: Record<OverseerrRequestStatus, string> = {
+const STATUS_TONES: Record<SeerrRequestStatus, string> = {
   pending: "text-amber-400/90",
   declined: "text-red-400",
   approved: "text-sky-400/80",
@@ -51,7 +51,7 @@ const STATUS_TONES: Record<OverseerrRequestStatus, string> = {
   available: "text-emerald-400/90",
 };
 
-function RequestRow({ request, meta }: { request: OverseerrRequest; meta: string }) {
+function RequestRow({ request, meta }: { request: SeerrRequest; meta: string }) {
   return (
     <li className="flex items-baseline justify-between gap-3">
       <span className="min-w-0 truncate text-sm text-fg/80" title={request.title}>
@@ -68,15 +68,15 @@ function RequestRow({ request, meta }: { request: OverseerrRequest; meta: string
   );
 }
 
-export default function OverseerrCard({
+export default function SeerrCard({
   status,
 }: {
-  status: ServiceStatus<OverseerrSnapshot>;
+  status: ServiceStatus<SeerrSnapshot>;
 }) {
   const mounted = useMounted();
   const data = status.data;
   return (
-    <MonitorCard title="Overseerr" status={status}>
+    <MonitorCard title="Seerr" status={status}>
       {data && (
         <>
           <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">

@@ -23,11 +23,7 @@ import {
   probeTautulli,
   type TautulliSnapshot,
 } from "./tautulli";
-import {
-  getOverseerrSnapshot,
-  probeOverseerr,
-  type OverseerrSnapshot,
-} from "./overseerr";
+import { getSeerrSnapshot, probeSeerr, type SeerrSnapshot } from "./seerr";
 import {
   getPortainerSnapshot,
   probePortainer,
@@ -52,7 +48,7 @@ export type ServiceSnapshotMap = {
   radarr: ArrSnapshot;
   adguard: AdguardSnapshot;
   tautulli: TautulliSnapshot;
-  overseerr: OverseerrSnapshot;
+  seerr: SeerrSnapshot;
   portainer: PortainerSnapshot;
   truenas: TruenasSnapshot;
   unifi: UnifiSnapshot;
@@ -104,9 +100,9 @@ export const SERVICES: {
     snapshot: (cfg) => getTautulliSnapshot(cfg),
     probe: ({ url, apiKey }) => probeTautulli({ url, apiKey }),
   },
-  overseerr: {
-    snapshot: (cfg) => getOverseerrSnapshot(cfg),
-    probe: ({ url, apiKey }) => probeOverseerr({ url, apiKey }),
+  seerr: {
+    snapshot: (cfg) => getSeerrSnapshot(cfg),
+    probe: ({ url, apiKey }) => probeSeerr({ url, apiKey }),
   },
   portainer: {
     snapshot: (cfg) => getPortainerSnapshot(cfg),

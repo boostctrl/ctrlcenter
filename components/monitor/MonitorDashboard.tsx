@@ -10,7 +10,7 @@ import QbittorrentCard from "./QbittorrentCard";
 import ArrCard from "./ArrCard";
 import AdguardCard from "./AdguardCard";
 import TautulliCard from "./TautulliCard";
-import OverseerrCard from "./OverseerrCard";
+import SeerrCard from "./SeerrCard";
 import PortainerCard from "./PortainerCard";
 import TruenasCard from "./TruenasCard";
 import UnifiCard from "./UnifiCard";
@@ -34,7 +34,7 @@ const CARDS: {
   radarr: (status) => <ArrCard title="Radarr" status={status} />,
   adguard: (status) => <AdguardCard status={status} />,
   tautulli: (status) => <TautulliCard status={status} />,
-  overseerr: (status) => <OverseerrCard status={status} />,
+  seerr: (status) => <SeerrCard status={status} />,
   portainer: (status) => <PortainerCard status={status} />,
   truenas: (status) => <TruenasCard status={status} />,
   unifi: (status) => <UnifiCard status={status} />,

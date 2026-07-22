@@ -12,7 +12,7 @@ const integrations = (
   radarr: { enabled: false, url: "", apiKey: "", allowInsecureTls: false },
   adguard: { enabled: false, url: "", username: "", password: "", allowInsecureTls: false },
   tautulli: { enabled: false, url: "", apiKey: "", allowInsecureTls: false },
-  overseerr: { enabled: false, url: "", apiKey: "", allowInsecureTls: false },
+  seerr: { enabled: false, url: "", apiKey: "", allowInsecureTls: false },
   portainer: { enabled: false, url: "", apiKey: "", allowInsecureTls: false },
   truenas: { enabled: false, url: "", apiKey: "", allowInsecureTls: false },
   unifi: { enabled: false, url: "", username: "", password: "", allowInsecureTls: false },

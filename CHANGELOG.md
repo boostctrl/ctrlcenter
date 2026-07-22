@@ -12,6 +12,14 @@ here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The qBittorrent card works when the WebUI bypasses authentication.** With
+  qBittorrent's "Bypass authentication for clients on localhost" (or for
+  whitelisted subnets) enabled, a successful login returns no session cookie —
+  which the card was misreading as "Login succeeded but no session cookie came
+  back". It now connects without one. (#216)
+
 ### Added
 
 - **AdGuard Home on the Monitor page.** Connect AdGuard Home
@@ -24,11 +32,11 @@ here.
   dashboard shows who's watching Plex right now: stream count, total
   bandwidth, and each session's progress and whether it's a direct play or a
   transcode. The API key can live in `CTRLCENTER_TAUTULLI_KEY`. (#195)
-- **Overseerr / Jellyseerr on the Monitor page.** Connect Overseerr or
-  Jellyseerr (they share an API) and the Monitor dashboard shows the pending
+- **Seerr on the Monitor page.** Connect Seerr (the merged successor to
+  Overseerr and Jellyseerr) and the Monitor dashboard shows the pending
   request count and the most recent requests — title, who asked, and where
   each stands (pending, approved, downloading, or available). The API key can
-  live in `CTRLCENTER_OVERSEERR_KEY`. (#196)
+  live in `CTRLCENTER_SEERR_KEY`. (#196)
 - **Portainer on the Monitor page.** Connect Portainer and the Monitor
   dashboard shows container states — running, stopped, and unhealthy — across
   every environment it manages, the health signal for the self-hosted apps
