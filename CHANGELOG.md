@@ -12,6 +12,17 @@ here.
 
 ## [Unreleased]
 
+### Security
+
+- **Integration-layer security review (#199).** Reviewed the read-only
+  integration layer before any write-capable actions ship: the admin-only
+  boundary is enforced twice over (proxy prefix and in-route session check),
+  snapshots carry no URLs or credentials, and secrets never reach logs or
+  public surfaces. As defense in depth, the public config now fully
+  neutralizes every integration — blanking URLs/credentials and forcing the
+  enabled flags off — so no public page can reveal even which integrations are
+  configured.
+
 ## [2.4.1] - 2026-07-22
 
 ### Fixed

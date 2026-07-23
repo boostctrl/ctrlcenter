@@ -717,14 +717,18 @@ describe("settings-secret redaction", () => {
     expect(pub.settings.alerts.email.host).toBe("");
     expect(pub.settings.alerts.email.from).toBe("");
     expect(pub.settings.alerts.email.to).toBe("");
-    // Integrations (#189): credentials AND URLs — internal topology — go.
-    // Asserted generically (not field-by-field) so this guard keeps holding
-    // for a service added later: NO integration may leak a non-empty string
-    // to a public surface, only its `enabled` boolean survives.
+    // Integrations (#189, #199): credentials, URLs (internal topology), AND
+    // the enabled flags all go. Asserted generically (not field-by-field) so
+    // the guard keeps holding for a service added later: NO integration may
+    // leak anything to a public surface — every string blanked, every boolean
+    // forced off, so a public serialization can't even reveal which
+    // integrations are configured.
     for (const [service, cfg] of Object.entries(pub.settings.integrations)) {
       for (const [field, value] of Object.entries(cfg)) {
         if (typeof value === "string") {
-          expect(value, `${service}.${field} must be redacted`).toBe("");
+          expect(value, `${service}.${field} must be blanked`).toBe("");
+        } else if (typeof value === "boolean") {
+          expect(value, `${service}.${field} must be forced off`).toBe(false);
         }
       }
     }

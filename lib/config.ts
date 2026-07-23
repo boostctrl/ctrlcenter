@@ -232,13 +232,17 @@ export function stripSecrets<T extends { settings: Settings }>(config: T): T {
   };
 }
 
-// Blank every string-valued field of every integration (the URL and all
-// credential fields), keeping only the `enabled` boolean. Generic on purpose:
-// a service later added to integrationsSchema is redacted by construction, so
-// it can't ship its URL or credentials to a public surface just because
-// someone forgot to extend a hand-written list here — the #157/#184 leak class
-// closed structurally (fail-closed) rather than per-service. Nothing public
-// renders integrations at all, so blanking a non-secret string too is safe.
+// Fully neutralize every integration for any public surface: blank every
+// string field (the URL is internal topology, the rest are secrets) AND force
+// every boolean off, so a public serialization reveals neither an
+// integration's credentials/URL nor even which integrations are enabled.
+// Generic on purpose: a service later added to integrationsSchema is
+// neutralized by construction, so it can't leak to a public surface just
+// because someone forgot to extend a hand-written list here — the #157/#184
+// leak class closed structurally (fail-closed) rather than per-service.
+// Nothing public renders integrations at all (they live only on the
+// admin-only Monitor page, #207); this keeps that true even if a future public
+// page serializes the whole settings object by mistake (#199).
 function redactIntegrations(
   integrations: Settings["integrations"]
 ): Settings["integrations"] {
@@ -246,7 +250,9 @@ function redactIntegrations(
   for (const [id, cfg] of Object.entries(integrations)) {
     const redacted: Record<string, unknown> = { ...cfg };
     for (const key of Object.keys(redacted)) {
-      if (typeof redacted[key] === "string") redacted[key] = "";
+      const value = redacted[key];
+      if (typeof value === "string") redacted[key] = "";
+      else if (typeof value === "boolean") redacted[key] = false;
     }
     out[id] = redacted;
   }
