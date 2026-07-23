@@ -38,6 +38,7 @@ type Props = {
   initialBookmarks: BookmarkItem[];
   initialSettings: Settings;
   initialThemes: ThemePackConfig[];
+  initialTwoFactorEnabled: boolean;
   // The ?tab / ?section deep-link params, read server-side by the page (NOT
   // useSearchParams here — that would demand a Suspense boundary whose
   // streamed segment can be left orphaned in the DOM). Unvalidated strings;
@@ -63,6 +64,7 @@ function AdminBody({
   initialBookmarks,
   initialSettings,
   initialThemes,
+  initialTwoFactorEnabled,
   initialTab,
   initialSection,
 }: Props) {
@@ -244,6 +246,7 @@ function AdminBody({
           initialSettings={initialSettings}
           themePacks={resolveThemePacks(initialThemes)}
           initialSection={initialSection}
+          initialTwoFactorEnabled={initialTwoFactorEnabled}
         />
       )}
     </div>

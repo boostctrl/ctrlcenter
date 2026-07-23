@@ -4,6 +4,8 @@
 // self-hosted container, so a Map is sufficient and avoids a dependency on
 // Redis or similar. If this were ever scaled horizontally, login throttling
 // would need a shared store instead.
+import type { NextRequest } from "next/server";
+
 type Window = { count: number; resetAt: number };
 
 const windows = new Map<string, Window>();
@@ -49,4 +51,29 @@ export function pruneRateLimit(now = Date.now()): void {
   for (const [key, window] of windows) {
     if (now >= window.resetAt) windows.delete(key);
   }
+}
+
+// Number of trusted reverse proxies in front of the app (each appends to
+// X-Forwarded-For). The real client IP is this many entries from the right;
+// entries to the left are client-supplied and must not be trusted for
+// throttling. Default 1 (the documented "behind a reverse proxy" setup). Set
+// to 0 when exposing the app directly so a forged header can't mint fresh keys.
+const TRUSTED_PROXY_HOPS = Math.max(
+  0,
+  Math.trunc(Number(process.env.TRUSTED_PROXY_HOPS ?? "1")) || 0
+);
+
+// A rate-limit key for the requesting client under a namespace (e.g. "login",
+// "2fa"). Behind the documented reverse proxy this is the real client IP, not
+// the spoofable X-Forwarded-For prefix. Shared by the login and 2FA routes so
+// the trusted-hops logic lives in one place.
+export function clientKey(request: NextRequest, prefix: string): string {
+  const xff = request.headers.get("x-forwarded-for");
+  if (!xff || TRUSTED_PROXY_HOPS === 0) return `${prefix}:unknown`;
+  const parts = xff
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const idx = parts.length - TRUSTED_PROXY_HOPS;
+  return `${prefix}:${idx >= 0 ? parts[idx] : "unknown"}`;
 }

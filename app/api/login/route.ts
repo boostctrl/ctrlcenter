@@ -6,8 +6,10 @@ import {
   sessionCookieOptions,
   SESSION_COOKIE_NAME,
 } from "@/lib/auth";
-import { readConfigInternal } from "@/lib/config";
-import { rateLimit, pruneRateLimit } from "@/lib/rate-limit";
+import { readConfigInternal, setTotpRecoveryCodes } from "@/lib/config";
+import { rateLimit, pruneRateLimit, clientKey } from "@/lib/rate-limit";
+import { verifyTotp } from "@/lib/totp";
+import { verifyRecoveryCode } from "@/lib/recovery-codes";
 
 // Allow a small burst of attempts per client, then lock that source out for the
 // window — the primary gate, checked before any password hashing. A separate,
@@ -19,27 +21,6 @@ const MAX_ATTEMPTS = 5;
 const GLOBAL_MAX_ATTEMPTS = 50;
 const WINDOW_MS = 5 * 60 * 1000;
 
-// Number of trusted reverse proxies in front of the app (each appends to
-// X-Forwarded-For). The real client IP is this many entries from the right;
-// entries to the left are client-supplied and must not be trusted for
-// throttling. Default 1 (the documented "behind a reverse proxy" setup). Set to
-// 0 when exposing the app directly so a forged header can't mint fresh keys.
-const TRUSTED_PROXY_HOPS = Math.max(
-  0,
-  Math.trunc(Number(process.env.TRUSTED_PROXY_HOPS ?? "1")) || 0
-);
-
-function clientKey(request: NextRequest): string {
-  const xff = request.headers.get("x-forwarded-for");
-  if (!xff || TRUSTED_PROXY_HOPS === 0) return "login:unknown";
-  const parts = xff
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const idx = parts.length - TRUSTED_PROXY_HOPS;
-  return `login:${idx >= 0 ? parts[idx] : "unknown"}`;
-}
-
 export async function POST(request: NextRequest) {
   pruneRateLimit();
   // Per-client throttle first — checked and consumed before any PBKDF2 work, so
@@ -47,7 +28,7 @@ export async function POST(request: NextRequest) {
   // reverse proxy the key is the real client IP (not the spoofable X-Forwarded-For
   // prefix). This is the gate that stops a single attacker; the global backstop
   // below only counts failures so it can't lock the real admin out.
-  const perClient = rateLimit(clientKey(request), MAX_ATTEMPTS, WINDOW_MS);
+  const perClient = rateLimit(clientKey(request, "login"), MAX_ATTEMPTS, WINDOW_MS);
   if (!perClient.allowed) {
     return NextResponse.json(
       { error: "Too many attempts. Try again later." },
@@ -60,6 +41,7 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => null);
   const password = body?.password;
+  const totpCode = typeof body?.totp === "string" ? body.totp : "";
 
   if (typeof password !== "string") {
     return NextResponse.json({ error: "Invalid password" }, { status: 401 });
@@ -89,6 +71,35 @@ export async function POST(request: NextRequest) {
       );
     }
     return NextResponse.json({ error: "Invalid password" }, { status: 401 });
+  }
+
+  // Password is correct. If the second factor is on, the code must also check
+  // out before a session is issued (#198). The per-client throttle above
+  // already bounds guesses of the 6-digit code — a wrong code doesn't touch
+  // the global backstop, so someone who has the password but not the device
+  // can't lock the real admin out by spamming codes.
+  if (auth.totp.enabled) {
+    if (totpCode.trim() === "") {
+      // Signal the client to collect the code, without revealing whether the
+      // password was right vs wrong to a caller who never sends a code.
+      return NextResponse.json(
+        { error: "Enter your authentication code", totpRequired: true },
+        { status: 401 }
+      );
+    }
+    const codeOk = await verifyTotp(auth.totp.secret, totpCode);
+    if (!codeOk) {
+      // Not a valid time code — try it as a one-time recovery code, spending
+      // it on success so it can't be reused.
+      const match = await verifyRecoveryCode(totpCode, auth.totp.recoveryCodes);
+      if (!match.ok) {
+        return NextResponse.json(
+          { error: "Invalid authentication code", totpRequired: true },
+          { status: 401 }
+        );
+      }
+      await setTotpRecoveryCodes(match.remaining);
+    }
   }
 
   // Bind the token to the current password hash so a later password change

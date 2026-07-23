@@ -7,12 +7,14 @@ import { log, errorReason } from "./log";
 import {
   configSchema,
   configReadSchema,
+  totpAuthSchema,
   type Config,
   type AppItem,
   type BookmarkItem,
   type Settings,
   type SettingsInput,
   type ThemePackConfig,
+  type TotpAuth,
 } from "./schema";
 
 const CONFIG_PATH =
@@ -294,7 +296,52 @@ export async function setPasswordHash(
   passwordSalt: string
 ): Promise<void> {
   await mutate((config) => {
-    config.auth = { passwordHash, passwordSalt };
+    // Spread the existing auth so a password change preserves the TOTP
+    // enrollment (#198) instead of wiping it.
+    config.auth = { ...config.auth, passwordHash, passwordSalt };
+  });
+}
+
+// --- TOTP second factor (#198), all mutations of config.auth.totp ---
+
+// Stash a freshly generated secret mid-enrollment. Not active until a code
+// verifies it (activateTotp); overwriting a prior pending secret is fine.
+export async function setTotpPendingSecret(pendingSecret: string): Promise<void> {
+  await mutate((config) => {
+    config.auth.totp = { ...config.auth.totp, pendingSecret };
+  });
+}
+
+// Turn the pending secret into the active one and store the (hashed) recovery
+// codes — called only after the enrollment code verified.
+export async function activateTotp(
+  secret: string,
+  recoveryCodes: TotpAuth["recoveryCodes"]
+): Promise<void> {
+  await mutate((config) => {
+    config.auth.totp = {
+      enabled: true,
+      secret,
+      pendingSecret: "",
+      recoveryCodes,
+    };
+  });
+}
+
+// Turn 2FA off and clear every trace of it.
+export async function disableTotp(): Promise<void> {
+  await mutate((config) => {
+    config.auth.totp = totpAuthSchema.parse({});
+  });
+}
+
+// Replace the stored recovery codes — used to drop a code once it's been spent
+// on a login.
+export async function setTotpRecoveryCodes(
+  recoveryCodes: TotpAuth["recoveryCodes"]
+): Promise<void> {
+  await mutate((config) => {
+    config.auth.totp = { ...config.auth.totp, recoveryCodes };
   });
 }
 

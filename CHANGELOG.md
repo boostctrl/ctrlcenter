@@ -12,6 +12,15 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Opt-in two-factor authentication for the admin.** Turn on TOTP in
+  Settings → Security: scan the QR code with any authenticator app (or enter
+  the secret by hand), confirm a code, and save the one-time recovery codes.
+  Sign-in then asks for a 6-digit code after your password; a recovery code
+  works if you lose your device. Strictly optional — password-only setups are
+  unchanged — and disabling it requires a current code. (#198)
+
 ### Security
 
 - **Integration-layer security review (#199).** Reviewed the read-only

@@ -476,10 +476,10 @@ describe("replaceConfig", () => {
       apps: [],
       bookmarks: [],
     });
-    expect(replaced.auth).toEqual({ passwordHash: "HASH", passwordSalt: "SALT" });
+    expect(replaced.auth).toMatchObject({ passwordHash: "HASH", passwordSalt: "SALT" });
 
     const reread = await config.readConfigInternal();
-    expect(reread.auth).toEqual({ passwordHash: "HASH", passwordSalt: "SALT" });
+    expect(reread.auth).toMatchObject({ passwordHash: "HASH", passwordSalt: "SALT" });
     expect(reread.settings.title).toBe("Imported");
   });
 
@@ -557,7 +557,7 @@ describe("replaceConfig", () => {
       bookmarks: [],
       auth: { passwordHash: "THEIRS", passwordSalt: "THEIRSALT" },
     });
-    expect(replaced.auth).toEqual({ passwordHash: "MINE", passwordSalt: "MYSALT" });
+    expect(replaced.auth).toMatchObject({ passwordHash: "MINE", passwordSalt: "MYSALT" });
   });
 });
 
@@ -619,6 +619,9 @@ describe("readConfigInternal stays off public surfaces", () => {
     "app/api/monitor/route.ts",
     // Auth itself: verifies the password / issues the session.
     "app/api/login/route.ts",
+    // Admin-only 2FA management: read the current TOTP state before mutating.
+    "app/api/2fa/activate/route.ts",
+    "app/api/2fa/disable/route.ts",
     // Public, but their shared cache must hold every app; each filters per
     // response via visibleItems (the [id] detail route 404s non-visible ids).
     "app/api/status/route.ts",

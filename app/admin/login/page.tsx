@@ -17,6 +17,10 @@ function safeNext(next: string | null): string {
 function LoginForm() {
   const searchParams = useSearchParams();
   const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  // The password checked out and the server is asking for the second factor
+  // (#198): swap the form to the code step, keeping the password to resend.
+  const [needCode, setNeedCode] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -27,7 +31,7 @@ function LoginForm() {
     const res = await fetch("/api/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ password, totp: code }),
     });
     setLoading(false);
     if (!res.ok) {
@@ -44,6 +48,13 @@ function LoginForm() {
         );
         return;
       }
+      if (data?.totpRequired) {
+        // Password was accepted; move to (or stay on) the code step. Only
+        // surface an error once the admin has actually submitted a code.
+        setNeedCode(true);
+        setError(code.trim() === "" ? null : data?.error || "Invalid code");
+        return;
+      }
       setError(data?.error || "Incorrect password");
       return;
     }
@@ -57,17 +68,34 @@ function LoginForm() {
   return (
     <form onSubmit={handleSubmit} className="glass-card flex w-full max-w-sm flex-col gap-4 p-8">
       <h1 className="text-2xl font-bold">Sign in</h1>
-      <TextField
-        label="Password"
-        type="password"
-        autoFocus
-        required
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
+      {!needCode ? (
+        <TextField
+          label="Password"
+          type="password"
+          autoFocus
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+      ) : (
+        <>
+          <p className="text-sm text-fg/60">
+            Enter the 6-digit code from your authenticator app, or a recovery
+            code.
+          </p>
+          <TextField
+            label="Authentication code"
+            autoFocus
+            required
+            autoComplete="one-time-code"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+          />
+        </>
+      )}
       {error && <p className="text-sm text-red-400">{error}</p>}
       <Button type="submit" disabled={loading}>
-        {loading ? "Signing in..." : "Sign in"}
+        {loading ? "Signing in..." : needCode ? "Verify" : "Sign in"}
       </Button>
     </form>
   );

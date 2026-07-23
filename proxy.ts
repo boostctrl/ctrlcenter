@@ -18,6 +18,9 @@ const ADMIN_PREFIXES = [
   "/api/themes",
   "/api/config",
   "/api/password",
+  // Managing the TOTP second factor (#198): enroll/activate/disable are
+  // admin-only. The login step itself (/api/login) stays public.
+  "/api/2fa",
   // Integration snapshots + test probes (#189): infrastructure internals,
   // never served anonymously. The routes re-check the session themselves too.
   "/api/monitor",

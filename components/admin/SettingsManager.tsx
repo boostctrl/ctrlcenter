@@ -58,6 +58,7 @@ import type { FeedHealth } from "@/lib/feed";
 import AlertTest from "./AlertTest";
 import CitySearch from "./CitySearch";
 import ChangePassword from "./ChangePassword";
+import TwoFactor from "./TwoFactor";
 import { useConfirm } from "./Confirm";
 import { replaceUrlParams } from "./urlState";
 import { apiErrorMessage } from "./apiError";
@@ -458,12 +459,14 @@ export default function SettingsManager({
   initialSettings,
   themePacks,
   initialSection,
+  initialTwoFactorEnabled,
 }: {
   initialSettings: Settings;
   themePacks: ThemePack[];
   // The ?section deep-link param, read server-side by /admin's page (see
   // AdminDashboard's matching prop for why useSearchParams is avoided).
   initialSection?: string;
+  initialTwoFactorEnabled: boolean;
 }) {
   // Resolve the layout up front: stored entries can omit `hidden` (the legacy
   // components toggles fold in at resolve time), but this form autosaves the
@@ -2078,6 +2081,15 @@ export default function SettingsManager({
           intro="The password used to sign in to this admin portal."
         >
           <ChangePassword />
+        </Card>
+        )}
+
+        {section === "security" && (
+        <Card
+          title="Two-factor authentication"
+          intro="Add a second factor — a time-based code from an authenticator app — to admin sign-in. Strictly optional; leave it off to keep signing in with just your password."
+        >
+          <TwoFactor initialEnabled={initialTwoFactorEnabled} />
         </Card>
         )}
         </div>
