@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-07-23
+
 ### Added
 
 - **Opt-in two-factor authentication for the admin.** Turn on TOTP in
@@ -2293,7 +2295,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.4.1...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.5.0...HEAD
+[2.5.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.4.1...v2.5.0
 [2.4.1]: https://github.com/boostctrl/ctrlcenter/compare/v2.4.0...v2.4.1
 [2.4.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.3.3...v2.4.0
 [2.3.3]: https://github.com/boostctrl/ctrlcenter/compare/v2.3.2...v2.3.3
