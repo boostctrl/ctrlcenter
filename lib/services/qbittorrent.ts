@@ -1,9 +1,10 @@
 // Typed client for the qBittorrent WebUI API (#190). Server-side only — calls
 // happen inside admin-gated routes via the monitor cache, and the credentials
 // never reach the browser. qBittorrent authenticates with a session cookie
-// (SID) minted by /api/v2/auth/login; the cookie is cached per connection on
-// globalThis (lib module state forks per route bundle) and re-minted once on a
-// 403, so an expired session heals without surfacing an error.
+// minted by /api/v2/auth/login (named `SID` through 5.1, `QBT_SID_<port>` from
+// 5.2); the cookie is cached per connection on globalThis (lib module state
+// forks per route bundle) and re-minted once on a 403, so an expired session
+// heals without surfacing an error.
 
 import {
   ServiceError,
@@ -171,9 +172,9 @@ async function mintSession(
   if (!res.ok) throw new ServiceError(`HTTP ${res.status}`);
   const body = text.trim();
   // qBittorrent <5.2 answers 200 with "Ok."/"Fails." in the body; 5.2+ answers
-  // 204 No Content with an empty body on a successful login — the SID cookie
-  // still comes back either way (#215). Accept the 204; otherwise require the
-  // "Ok." body, keeping the specific messages below for the failure cases.
+  // 204 No Content with an empty body on a successful login — the session
+  // cookie still comes back either way (#215). Accept the 204; otherwise
+  // require the "Ok." body, keeping the specific messages below for failures.
   if (res.status !== 204 && !/^Ok\.?$/i.test(body)) {
     if (body === "") {
       // A 2xx with no body that ISN'T the 5.2+ 204 — the URL isn't reaching a
@@ -184,37 +185,42 @@ async function mintSession(
     // credentials, so a non-"Ok." body is a real login failure.
     throw new ServiceError("Login failed — check the username and password");
   }
-  // qBittorrent normally issues a SID cookie on login. But when the WebUI is
-  // set to bypass authentication for this client ("Bypass authentication for
-  // clients on localhost" / for whitelisted subnets), a successful login
+  // qBittorrent normally issues a session cookie on login. But when the WebUI
+  // is set to bypass authentication for this client ("Bypass authentication
+  // for clients on localhost" / for whitelisted subnets), a successful login
   // returns no cookie because none is needed. Proceed cookieless rather than
   // failing — the API calls then go through unauthenticated. A qBittorrent
-  // that genuinely requires the cookie (a proxy stripped it, say) still
-  // surfaces clearly as an HTTP 403 on the data call, not here.
-  const sid = extractSid(res.headers);
-  if (!sid) {
+  // that genuinely requires the cookie still surfaces clearly as an HTTP 403
+  // on the data call, not here.
+  const sessionCookie = extractSessionCookie(res.headers);
+  if (!sessionCookie) {
     log.info(
       "qbittorrent login returned no session cookie — treating this client as auth-exempt",
       { host: hostOf(base) }
     );
   }
-  const cookie = sid ? `SID=${sid}` : "";
+  const cookie = sessionCookie ?? "";
   sessions.set(sessionKey(base, cfg.username), cookie);
   return cookie;
 }
 
-// Pull the SID value out of the login response's Set-Cookie header(s).
-// getSetCookie() keeps multiple cookies separate (get("set-cookie") would
-// comma-join them); the boundary match avoids a cookie whose name merely ends
-// in "SID". Returns null when no session cookie is present.
-function extractSid(headers: Headers): string | null {
+// The WebUI's session cookie as a replayable `name=value` pair. qBittorrent
+// named it `SID` through 5.1 and renamed it to `QBT_SID_<port>` in 5.2 (with
+// HttpOnly; SameSite=Strict) — matching only `SID` is why a 5.2 login looked
+// cookieless and every data call then 403'd (#217). Match either name and
+// keep the whole pair so the cookie is replayed verbatim, name and all.
+// getSetCookie() keeps multiple Set-Cookie headers separate (get("set-cookie")
+// would comma-join them). Returns null when no session cookie is present (an
+// auth-exempt WebUI).
+function extractSessionCookie(headers: Headers): string | null {
   const cookies =
     typeof headers.getSetCookie === "function"
       ? headers.getSetCookie()
       : ((c) => (c ? [c] : []))(headers.get("set-cookie"));
-  for (const cookie of cookies) {
-    const match = /(?:^|;\s*)SID=([^;]+)/.exec(cookie);
-    if (match) return match[1];
+  for (const raw of cookies) {
+    const pair = raw.split(";", 1)[0].trim(); // "NAME=VALUE", attributes dropped
+    const name = pair.split("=", 1)[0];
+    if (name === "SID" || /^QBT_SID_\d+$/.test(name)) return pair;
   }
   return null;
 }

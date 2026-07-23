@@ -12,6 +12,14 @@ here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The qBittorrent card works with qBittorrent 5.2 and later.** qBittorrent
+  5.2 renamed its WebUI session cookie (from `SID` to `QBT_SID_<port>`), which
+  the card didn't recognize — so it captured no session and every refresh
+  failed with a 403. It now reads the new cookie name (and still the old one),
+  so 5.2+ instances connect. (#217)
+
 ## [2.4.0] - 2026-07-22
 
 ### Fixed

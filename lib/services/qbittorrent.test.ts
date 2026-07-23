@@ -238,6 +238,37 @@ describe("getQbittorrentSnapshot", () => {
     expect(new Headers(authed[1].headers).get("cookie")).toBe("SID=xyz789");
   });
 
+  it("captures qBittorrent 5.2's renamed QBT_SID_<port> cookie and replays it", async () => {
+    // 5.2 answers 204 and names the session cookie QBT_SID_<port> (not SID).
+    // The data calls 403 unless that exact cookie is sent back verbatim.
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/v2/auth/login")) {
+        return new Response(null, {
+          status: 204,
+          headers: { "set-cookie": "QBT_SID_8080=tok9; HttpOnly; SameSite=Strict" },
+        });
+      }
+      const cookie = new Headers(init?.headers).get("cookie");
+      if (cookie !== "QBT_SID_8080=tok9") {
+        return new Response("Forbidden", { status: 403 });
+      }
+      if (url.endsWith("/api/v2/transfer/info")) {
+        return new Response(JSON.stringify({ dl_info_speed: 9, up_info_speed: 4 }));
+      }
+      if (url.endsWith("/api/v2/torrents/info")) return new Response("[]");
+      return new Response("not found", { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const snap = await getQbittorrentSnapshot(CFG);
+    expect(snap.downSpeed).toBe(9);
+    const authed = fetchMock.mock.calls.find(([input]) =>
+      String(input).endsWith("/api/v2/transfer/info")
+    ) as [RequestInfo, RequestInit];
+    expect(new Headers(authed[1].headers).get("cookie")).toBe("QBT_SID_8080=tok9");
+  });
+
   it("proceeds without a cookie when the WebUI bypasses authentication", async () => {
     // qBittorrent with "Bypass authentication for clients on localhost /
     // whitelisted subnets" returns a successful login with NO Set-Cookie. The
