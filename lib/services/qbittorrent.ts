@@ -5,6 +5,12 @@
 // 5.2); the cookie is cached per connection on globalThis (lib module state
 // forks per route bundle) and re-minted once on a 403, so an expired session
 // heals without surfacing an error.
+//
+// The snapshot polls /sync/maindata, qBittorrent's incremental endpoint: the
+// first call (rid 0) returns the whole torrent map and server counters, and
+// each later call returns only what changed since the rid we last saw. The
+// maintained view lives per connection on globalThis, so a large seedbox ships
+// its full list once rather than re-parsing multi-MB of JSON every poll (#210).
 
 import {
   ServiceError,
@@ -79,14 +85,12 @@ export type QbittorrentSnapshot = {
 export const TORRENT_LIST_CAP = 8;
 
 // The card's per-state tally (total / downloading / seeding / paused) needs
-// every torrent, so /torrents/info is fetched unfiltered — and on a large
-// instance that JSON runs well past the default SERVICE_MAX_BYTES, which
-// surfaced as a "Response too large" error that killed the whole card. Give
-// just this one call a much larger budget (~16k torrents at ~2 KB each).
-// A proper bounded fetch (server-side sort+limit for the list, a cheaper
-// source for the counts) is tracked in #210; this keeps the fleet counts the
-// card shows today. Server-side and admin-only, so the memory cost is bounded
-// to the poll interval.
+// every torrent, so the first /sync/maindata call returns the whole map — and
+// on a large instance that JSON runs well past the default SERVICE_MAX_BYTES,
+// which would surface as a "Response too large" error that killed the whole
+// card. Give the maindata call a much larger budget (~16k torrents at ~2 KB
+// each) for that initial full sync; steady-state deltas are tiny. Server-side
+// and admin-only, so the memory cost is bounded to one instance's torrents.
 export const QBITTORRENT_MAX_BYTES = 32 * 1024 * 1024;
 
 // qBittorrent reports this ETA when there is no estimate (100 days).
@@ -131,9 +135,16 @@ export function simplifyTorrentState(raw: string): TorrentState {
 const g = globalThis as unknown as {
   __ctrlcenterQbitSessions?: Map<string, string>;
   __ctrlcenterQbitLogins?: Map<string, Promise<string>>;
+  __ctrlcenterQbitSync?: Map<string, QbitSyncState>;
+  __ctrlcenterQbitSyncLocks?: Map<string, Promise<QbitSyncState>>;
 };
 const sessions = (g.__ctrlcenterQbitSessions ??= new Map());
 const loginsInFlight = (g.__ctrlcenterQbitLogins ??= new Map());
+// The maintained /sync/maindata view per connection, plus a per-connection
+// lock so two concurrent polls can't both consume the same rid (which would
+// drop the delta the loser never applied).
+const syncStates = (g.__ctrlcenterQbitSync ??= new Map());
+const syncLocks = (g.__ctrlcenterQbitSyncLocks ??= new Map());
 
 function sessionKey(base: string, username: string): string {
   return `${base}|${username}`;
@@ -260,7 +271,8 @@ async function qbitRequest(
 
 // --- Raw API shapes (only the fields the snapshot uses) ---
 
-type RawTransfer = { dl_info_speed?: number; up_info_speed?: number };
+// The server-wide counters from maindata's server_state (overall rates).
+type RawServerState = { dl_info_speed?: number; up_info_speed?: number };
 type RawTorrent = {
   name?: string;
   state?: string;
@@ -271,6 +283,84 @@ type RawTorrent = {
   size?: number;
   eta?: number;
 };
+
+// One /sync/maindata response. A full sync (rid 0, or after the server drops
+// our rid) carries `full_update` with the whole torrent map and server_state;
+// later responses carry only the torrents/fields that changed, a
+// `torrents_removed` list, and a server_state delta.
+type MaindataResponse = {
+  rid?: number;
+  full_update?: boolean;
+  torrents?: Record<string, Partial<RawTorrent>>;
+  torrents_removed?: string[];
+  server_state?: Partial<RawServerState>;
+};
+
+// The maintained per-connection view, advanced by each maindata delta.
+export type QbitSyncState = {
+  rid: number;
+  torrents: Map<string, RawTorrent>;
+  serverState: RawServerState;
+};
+
+// Fold one maindata response into the prior state (pure, so the merge is unit
+// tested directly). A full update — or a cold prior — resets the maps;
+// otherwise each partial torrent merges over its last-known object, removed
+// hashes drop out, and the server_state delta merges too. rid carries forward
+// when the response omits it.
+export function applyMaindata(
+  prev: QbitSyncState | null,
+  res: MaindataResponse
+): QbitSyncState {
+  const full = res.full_update === true || prev === null;
+  const torrents = full
+    ? new Map<string, RawTorrent>()
+    : new Map(prev!.torrents);
+  const serverState: RawServerState = full ? {} : { ...prev!.serverState };
+  if (res.torrents) {
+    for (const [hash, partial] of Object.entries(res.torrents)) {
+      torrents.set(hash, { ...(torrents.get(hash) ?? {}), ...partial });
+    }
+  }
+  if (res.torrents_removed) {
+    for (const hash of res.torrents_removed) torrents.delete(hash);
+  }
+  if (res.server_state) Object.assign(serverState, res.server_state);
+  return {
+    rid: typeof res.rid === "number" ? res.rid : prev?.rid ?? 0,
+    torrents,
+    serverState,
+  };
+}
+
+// One incremental maindata step for a connection: fetch the delta since our
+// last rid, fold it in, and store the advanced state. Serialized per connection
+// via a lock so concurrent polls share one fetch instead of both consuming the
+// same rid. A failed fetch throws before the store is touched, so the rid stays
+// put and the next poll simply re-requests the same delta.
+function syncMaindata(
+  base: string,
+  cfg: QbittorrentConfig
+): Promise<QbitSyncState> {
+  const key = sessionKey(base, cfg.username);
+  const running = syncLocks.get(key);
+  if (running) return running;
+  const run = (async () => {
+    const prev = syncStates.get(key) ?? null;
+    const rid = prev?.rid ?? 0;
+    const text = await qbitRequest(
+      base,
+      cfg,
+      `/api/v2/sync/maindata?rid=${rid}`,
+      QBITTORRENT_MAX_BYTES
+    );
+    const next = applyMaindata(prev, parseJson<MaindataResponse>(text));
+    syncStates.set(key, next);
+    return next;
+  })().finally(() => syncLocks.delete(key));
+  syncLocks.set(key, run);
+  return run;
+}
 
 const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
 
@@ -286,13 +376,8 @@ export async function getQbittorrentSnapshot(
   cfg: QbittorrentConfig
 ): Promise<QbittorrentSnapshot> {
   const base = serviceBase(cfg.url);
-  const [transferText, torrentsText] = await Promise.all([
-    qbitRequest(base, cfg, "/api/v2/transfer/info"),
-    qbitRequest(base, cfg, "/api/v2/torrents/info", QBITTORRENT_MAX_BYTES),
-  ]);
-  const transfer = parseJson<RawTransfer>(transferText);
-  const raw = parseJson<RawTorrent[]>(torrentsText);
-  const rows = Array.isArray(raw) ? raw : [];
+  const state = await syncMaindata(base, cfg);
+  const rows = [...state.torrents.values()];
 
   const torrents = rows.map(
     (t): QbittorrentTorrent => ({
@@ -341,8 +426,8 @@ export async function getQbittorrentSnapshot(
     .slice(0, TORRENT_LIST_CAP);
 
   return {
-    downSpeed: num(transfer.dl_info_speed),
-    upSpeed: num(transfer.up_info_speed),
+    downSpeed: num(state.serverState.dl_info_speed),
+    upSpeed: num(state.serverState.up_info_speed),
     counts,
     torrents: list,
   };
@@ -364,6 +449,9 @@ export async function probeQbittorrent(
     // would adopt that promise and validate the wrong credentials.
     sessions.delete(key);
     loginsInFlight.delete(key);
+    // Also drop any maintained sync state, so a re-test after editing the
+    // connection starts from a fresh full sync rather than an old rid.
+    syncStates.delete(key);
     const version = await qbitRequest(base, cfg, "/api/v2/app/version");
     return `qBittorrent ${version.trim()}`.trim();
   });

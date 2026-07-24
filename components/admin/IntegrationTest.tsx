@@ -1,15 +1,14 @@
 "use client";
 
-import { useState } from "react";
 import type { ServiceId } from "@/lib/services/ids";
+import TestConnectionButton from "./TestConnectionButton";
 
-type Result = { loading: boolean; ok?: boolean; detail?: string; error?: string };
+type Result = { ok?: boolean; detail?: string; error?: string };
 
 // "Test connection" button for an Integrations card: probes the values
-// currently in the form (before saving) via the admin-only
-// /api/monitor/test route, and names what answered ("qBittorrent v5.0.1")
-// so the admin knows the right service is on the other end. CalendarTest's
-// sibling.
+// currently in the form (before saving) via the admin-only /api/monitor/test
+// route, and names what answered ("qBittorrent v5.0.1") so the admin knows the
+// right service is on the other end. A thin adapter over TestConnectionButton.
 export default function IntegrationTest({
   service,
   url,
@@ -25,53 +24,22 @@ export default function IntegrationTest({
   apiKey?: string;
   allowInsecureTls?: boolean;
 }) {
-  const [state, setState] = useState<Result>({ loading: false });
-
-  async function run() {
-    setState({ loading: true });
-    try {
-      const res = await fetch("/api/monitor/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          service,
-          url,
-          username,
-          password,
-          apiKey,
-          allowInsecureTls,
-        }),
-      });
-      const data = await res.json().catch(() => null);
-      setState({
-        loading: false,
-        ok: data?.ok,
-        detail: data?.detail,
-        error: data?.error,
-      });
-    } catch {
-      setState({ loading: false, ok: false, error: "Request failed" });
-    }
-  }
-
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <button
-        type="button"
-        onClick={run}
-        disabled={state.loading || url.trim() === ""}
-        className="rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/80 transition-colors hover:bg-fg/10 disabled:opacity-50"
-      >
-        {state.loading ? "Testing…" : "Test connection"}
-      </button>
-      {!state.loading && state.ok === true && (
-        <span className="text-xs text-emerald-400">
-          ✓ Connected{state.detail ? ` — ${state.detail}` : ""}
-        </span>
-      )}
-      {!state.loading && state.ok === false && (
-        <span className="text-xs text-red-400">✗ {state.error}</span>
-      )}
-    </div>
+    <TestConnectionButton<Result>
+      endpoint="/api/monitor/test"
+      body={{ service, url, username, password, apiKey, allowInsecureTls }}
+      label="Test connection"
+      pendingLabel="Testing…"
+      disabled={url.trim() === ""}
+      renderResult={(data) =>
+        data.ok ? (
+          <span className="text-xs text-emerald-400">
+            ✓ Connected{data.detail ? ` — ${data.detail}` : ""}
+          </span>
+        ) : (
+          <span className="text-xs text-red-400">✗ {data.error}</span>
+        )
+      }
+    />
   );
 }

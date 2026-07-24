@@ -12,6 +12,24 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **The qBittorrent card polls more efficiently.** It now uses qBittorrent's
+  incremental sync API — fetching the full torrent list once and only the
+  changes on each refresh after that — so a large instance (thousands of
+  torrents) no longer re-downloads and re-parses its whole list every 30
+  seconds. Small setups behave exactly as before. (#210)
+- **Quicker Monitor updates after back-to-back settings edits.** The Monitor
+  page's snapshot cache no longer forces a redundant blocking refetch when a
+  connection is edited twice in quick succession. (#211)
+
+### Fixed
+
+- **The Settings "test" buttons match the app's button style.** The Test
+  connection, Test feed, and Send test alert buttons now use the shared button
+  recipe, so their corners follow your theme (square or pill) like every other
+  button instead of a fixed rounded shape. (#213)
+
 ## [2.5.0] - 2026-07-23
 
 ### Added

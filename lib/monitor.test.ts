@@ -51,14 +51,26 @@ function stubSonarr(upcomingCount: () => number, httpStatus: () => number = () =
 
 const settle = () => new Promise((r) => setTimeout(r, 0));
 
+// A promise whose resolution the test controls, to hold one refresh open while
+// another completes.
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
+
 beforeEach(() => {
   // The cache lives on globalThis and survives across tests in a run.
   const g = globalThis as {
     __ctrlcenterMonitorCache?: Map<string, unknown>;
     __ctrlcenterMonitorRefresh?: Map<string, unknown>;
+    __ctrlcenterMonitorLatest?: Map<string, unknown>;
   };
   g.__ctrlcenterMonitorCache?.clear();
   g.__ctrlcenterMonitorRefresh?.clear();
+  g.__ctrlcenterMonitorLatest?.clear();
 });
 
 afterEach(() => {
@@ -143,5 +155,44 @@ describe("getMonitorSnapshot", () => {
         String(input).startsWith("http://sonarr-b.local/")
       )
     ).toBe(true);
+  });
+
+  it("drops a superseded refresh's late write instead of forcing a blocking refetch (#211)", async () => {
+    // Two quick edits (A then B) for the same service race: A's refresh is held
+    // open until after B's completes and caches. The stale A write must be
+    // dropped so the cache keeps B — otherwise the next B read sees a key
+    // mismatch and blocks on a redundant refetch.
+    const gate = deferred();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith("http://a.local")) await gate.promise; // hold A open
+      if (url.includes("/api/v3/calendar")) {
+        const episodes = Array.from({ length: 3 }, (_, i) => ({
+          airDateUtc: new Date(Date.now() + i * 3_600_000).toISOString(),
+          seasonNumber: 1,
+          episodeNumber: i + 1,
+          series: { title: "Show" },
+        }));
+        return new Response(JSON.stringify(episodes));
+      }
+      if (url.includes("/api/v3/history")) {
+        return new Response(JSON.stringify({ records: [] }));
+      }
+      if (url.includes("/api/v3/health")) return new Response(JSON.stringify([]));
+      return new Response("not found", { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const pA = getMonitorSnapshot(sonarrOn("http://a.local"));
+    const pB = getMonitorSnapshot(sonarrOn("http://b.local"));
+    await pB; // B (ungated) resolves first and caches
+    gate.resolve(); // release A, whose write should now be dropped
+    await pA;
+
+    const callsAfterRace = fetchMock.mock.calls.length; // A(3) + B(3)
+    const readB = await getMonitorSnapshot(sonarrOn("http://b.local"));
+    expect(readB.sonarr.data?.upcoming).toHaveLength(3); // still B's data
+    // Served from cache: no redundant blocking refetch was triggered.
+    expect(fetchMock.mock.calls.length).toBe(callsAfterRace);
   });
 });

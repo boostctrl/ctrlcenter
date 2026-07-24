@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  applyMaindata,
   getQbittorrentSnapshot,
   probeQbittorrent,
   resolveQbittorrentPassword,
   simplifyTorrentState,
   TORRENT_LIST_CAP,
+  type QbitSyncState,
 } from "./qbittorrent";
 
 const CFG = {
@@ -13,11 +15,17 @@ const CFG = {
   password: "file-secret",
 };
 
-// The session-cookie cache lives on globalThis and survives across tests.
-function clearSessions() {
-  (
-    globalThis as { __ctrlcenterQbitSessions?: Map<string, string> }
-  ).__ctrlcenterQbitSessions?.clear();
+// The session-cookie cache and the maindata sync state both live on globalThis
+// and survive across tests; reset all of it between tests.
+function clearQbitState() {
+  const g = globalThis as {
+    __ctrlcenterQbitSessions?: Map<string, unknown>;
+    __ctrlcenterQbitSync?: Map<string, unknown>;
+    __ctrlcenterQbitSyncLocks?: Map<string, unknown>;
+  };
+  g.__ctrlcenterQbitSessions?.clear();
+  g.__ctrlcenterQbitSync?.clear();
+  g.__ctrlcenterQbitSyncLocks?.clear();
 }
 
 const okLogin = () =>
@@ -25,7 +33,9 @@ const okLogin = () =>
     headers: { "set-cookie": "SID=abc123; HttpOnly; path=/" },
   });
 
-// Dispatching fetch stub for the WebUI endpoints a snapshot/probe touches.
+// Dispatching fetch stub for the WebUI endpoints a snapshot/probe touches. The
+// snapshot polls /sync/maindata; the stub answers with a full update carrying
+// the given torrents (keyed into a map) and server_state, mirroring qBittorrent.
 function stubQbit({
   torrents = [] as unknown[],
   transfer = { dl_info_speed: 1200, up_info_speed: 800 },
@@ -33,16 +43,16 @@ function stubQbit({
 } = {}) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
-    if (url.endsWith("/api/v2/auth/login")) {
+    if (url.includes("/api/v2/auth/login")) {
       return badCredentials ? new Response("Fails.") : okLogin();
     }
-    if (url.endsWith("/api/v2/transfer/info")) {
-      return new Response(JSON.stringify(transfer));
+    if (url.includes("/api/v2/sync/maindata")) {
+      const map = Object.fromEntries(torrents.map((t, i) => [`h${i}`, t]));
+      return new Response(
+        JSON.stringify({ rid: 1, full_update: true, torrents: map, server_state: transfer })
+      );
     }
-    if (url.endsWith("/api/v2/torrents/info")) {
-      return new Response(JSON.stringify(torrents));
-    }
-    if (url.endsWith("/api/v2/app/version")) return new Response("v5.0.1");
+    if (url.includes("/api/v2/app/version")) return new Response("v5.0.1");
     return new Response("not found", { status: 404 });
   });
   vi.stubGlobal("fetch", fetchMock);
@@ -51,10 +61,10 @@ function stubQbit({
 
 const loginCalls = (fetchMock: ReturnType<typeof vi.fn>) =>
   fetchMock.mock.calls.filter(([input]) =>
-    String(input).endsWith("/api/v2/auth/login")
+    String(input).includes("/api/v2/auth/login")
   );
 
-beforeEach(clearSessions);
+beforeEach(clearQbitState);
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
@@ -99,9 +109,55 @@ describe("getQbittorrentSnapshot", () => {
 
     // Authenticated calls carry the minted cookie.
     const authed = fetchMock.mock.calls.find(([input]) =>
-      String(input).endsWith("/api/v2/transfer/info")
+      String(input).includes("/api/v2/sync/maindata")
     ) as [RequestInfo, RequestInit];
     expect(new Headers(authed[1].headers).get("cookie")).toBe("SID=abc123");
+  });
+
+  it("polls maindata incrementally, advancing the rid across snapshots", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/v2/auth/login")) return okLogin();
+      if (url.includes("/api/v2/sync/maindata")) {
+        const rid = new URL(url).searchParams.get("rid");
+        // First poll (rid 0) is a full sync; the next carries only a delta.
+        if (rid === "0") {
+          return new Response(
+            JSON.stringify({
+              rid: 4,
+              full_update: true,
+              torrents: {
+                a: { name: "A", state: "downloading", dlspeed: 10, progress: 0.1 },
+              },
+              server_state: { dl_info_speed: 10, up_info_speed: 0 },
+            })
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            rid: 5,
+            torrents: { a: { dlspeed: 99 } },
+            server_state: { dl_info_speed: 99 },
+          })
+        );
+      }
+      return new Response("not found", { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const first = await getQbittorrentSnapshot(CFG);
+    expect(first.downSpeed).toBe(10);
+    const second = await getQbittorrentSnapshot(CFG);
+    // The delta merged over the retained torrent: one torrent still, new speed.
+    expect(second.downSpeed).toBe(99);
+    expect(second.counts.total).toBe(1);
+    // The second request advanced to the rid the first response returned.
+    const mainCalls = fetchMock.mock.calls.filter(([i]) =>
+      String(i).includes("/api/v2/sync/maindata")
+    );
+    expect(mainCalls).toHaveLength(2);
+    expect(String(mainCalls[0][0])).toContain("rid=0");
+    expect(String(mainCalls[1][0])).toContain("rid=4");
   });
 
   it("maps rows, buckets the counts, and caps the list actively-first", async () => {
@@ -253,10 +309,16 @@ describe("getQbittorrentSnapshot", () => {
       if (cookie !== "QBT_SID_8080=tok9") {
         return new Response("Forbidden", { status: 403 });
       }
-      if (url.endsWith("/api/v2/transfer/info")) {
-        return new Response(JSON.stringify({ dl_info_speed: 9, up_info_speed: 4 }));
+      if (url.includes("/api/v2/sync/maindata")) {
+        return new Response(
+          JSON.stringify({
+            rid: 1,
+            full_update: true,
+            torrents: {},
+            server_state: { dl_info_speed: 9, up_info_speed: 4 },
+          })
+        );
       }
-      if (url.endsWith("/api/v2/torrents/info")) return new Response("[]");
       return new Response("not found", { status: 404 });
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -264,7 +326,7 @@ describe("getQbittorrentSnapshot", () => {
     const snap = await getQbittorrentSnapshot(CFG);
     expect(snap.downSpeed).toBe(9);
     const authed = fetchMock.mock.calls.find(([input]) =>
-      String(input).endsWith("/api/v2/transfer/info")
+      String(input).includes("/api/v2/sync/maindata")
     ) as [RequestInfo, RequestInit];
     expect(new Headers(authed[1].headers).get("cookie")).toBe("QBT_SID_8080=tok9");
   });
@@ -275,11 +337,17 @@ describe("getQbittorrentSnapshot", () => {
     // old code failed here ("Login succeeded but no session cookie came back").
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url.endsWith("/api/v2/auth/login")) return new Response("Ok.");
-      if (url.endsWith("/api/v2/transfer/info")) {
-        return new Response(JSON.stringify({ dl_info_speed: 5, up_info_speed: 2 }));
+      if (url.includes("/api/v2/auth/login")) return new Response("Ok.");
+      if (url.includes("/api/v2/sync/maindata")) {
+        return new Response(
+          JSON.stringify({
+            rid: 1,
+            full_update: true,
+            torrents: {},
+            server_state: { dl_info_speed: 5, up_info_speed: 2 },
+          })
+        );
       }
-      if (url.endsWith("/api/v2/torrents/info")) return new Response("[]");
       return new Response("not found", { status: 404 });
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -288,7 +356,7 @@ describe("getQbittorrentSnapshot", () => {
     expect(snap.downSpeed).toBe(5);
     // The authenticated calls carry no Cookie header (there is no session).
     const authed = fetchMock.mock.calls.find(([input]) =>
-      String(input).endsWith("/api/v2/transfer/info")
+      String(input).includes("/api/v2/sync/maindata")
     ) as [RequestInfo, RequestInit];
     expect(new Headers(authed[1].headers).get("cookie")).toBeNull();
   });
@@ -322,5 +390,74 @@ describe("resolveQbittorrentPassword", () => {
     expect(resolveQbittorrentPassword({ password: "file-secret" })).toBe(
       "file-secret"
     );
+  });
+});
+
+describe("applyMaindata", () => {
+  const torrent = (over: Record<string, unknown> = {}) => ({
+    name: "t",
+    state: "downloading",
+    progress: 0.5,
+    dlspeed: 10,
+    ...over,
+  });
+
+  const full = (over: Partial<QbitSyncState> = {}): QbitSyncState =>
+    applyMaindata(null, {
+      rid: 1,
+      full_update: true,
+      torrents: { a: torrent({ name: "A", dlspeed: 10, progress: 0.2 }) },
+      server_state: { dl_info_speed: 100, up_info_speed: 5 },
+      ...(over as object),
+    });
+
+  it("initializes from a cold prior as a full sync", () => {
+    const state = full();
+    expect(state.rid).toBe(1);
+    expect([...state.torrents.keys()]).toEqual(["a"]);
+    expect(state.torrents.get("a")?.name).toBe("A");
+    expect(state.serverState).toMatchObject({ dl_info_speed: 100, up_info_speed: 5 });
+  });
+
+  it("merges a partial torrent update over the last-known object", () => {
+    const next = applyMaindata(full(), {
+      rid: 2,
+      torrents: { a: { dlspeed: 50 }, b: torrent({ name: "B" }) },
+      server_state: { dl_info_speed: 200 },
+    });
+    expect(next.rid).toBe(2);
+    // `a` keeps its untouched fields; only dlspeed changed.
+    expect(next.torrents.get("a")).toMatchObject({
+      name: "A",
+      progress: 0.2,
+      dlspeed: 50,
+    });
+    expect(next.torrents.get("b")?.name).toBe("B");
+    // server_state merges: the untouched up_info_speed survives.
+    expect(next.serverState).toMatchObject({ dl_info_speed: 200, up_info_speed: 5 });
+  });
+
+  it("drops torrents listed in torrents_removed", () => {
+    const prev = applyMaindata(null, {
+      rid: 1,
+      full_update: true,
+      torrents: { a: torrent(), b: torrent() },
+    });
+    const next = applyMaindata(prev, { rid: 2, torrents_removed: ["a"] });
+    expect([...next.torrents.keys()]).toEqual(["b"]);
+  });
+
+  it("resets the map on a later full_update", () => {
+    const next = applyMaindata(full(), {
+      rid: 5,
+      full_update: true,
+      torrents: { c: torrent({ name: "C" }) },
+    });
+    expect([...next.torrents.keys()]).toEqual(["c"]);
+  });
+
+  it("carries the prior rid forward when a response omits it", () => {
+    const prev = applyMaindata(null, { rid: 7, full_update: true, torrents: {} });
+    expect(applyMaindata(prev, { torrents: {} }).rid).toBe(7);
   });
 });
