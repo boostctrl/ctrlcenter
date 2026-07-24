@@ -2,14 +2,16 @@
 
 import Link from "next/link";
 import { STATE_DOT, type ServiceState } from "./MonitorCard";
+import type { GlanceVisual, SegmentTone } from "./glances";
 
-// One service's complication on the Monitor face (#208, #223): an instrument
-// "dial" — a ring gauge with a center readout on the left, a status dot + label
-// and one to three stat lines on the right, and an optional sparkline. A
-// configured service links to its detail page; an unused one (disabled / not set
-// up) dims and links to Settings, so the face keeps its shape whether one
-// service or all nine are running. The gauge/readout content comes from each
-// service's glance extractor; this component is purely presentational.
+// One service's complication on the Monitor face (#208, #223, #226): a compact
+// clickable tile with a headline on the left — a ring gauge where a real
+// proportion exists, otherwise a plain number badge — a status dot + label and
+// one to three stat lines on the right, and a *purposeful* visual (a query
+// sparkline, a next-7-days strip, or a request breakdown bar) where the service
+// has one. A configured service links to its detail page; an unused one dims and
+// links to Settings, so the face keeps its shape whether one service or all nine
+// are running. Purely presentational — the content comes from the glance.
 
 export default function Complication({
   label,
@@ -20,18 +22,18 @@ export default function Complication({
   ring,
   alert,
   lines,
-  spark,
+  visual,
 }: {
   label: string;
   state: ServiceState;
   href: string;
   center: string;
   caption: string;
-  // 0..1 fill; omitted → a soft decorative ring (pure-count services).
+  // 0..1 gauge fill; omitted → a plain number badge (no decorative ring).
   ring?: number;
   alert?: boolean;
   lines: string[];
-  spark?: number[];
+  visual?: GlanceVisual;
 }) {
   const dim = state === "disabled" || state === "unconfigured";
   // In-use services grow to fill their band; an off / not-set-up one stays a
@@ -44,7 +46,11 @@ export default function Complication({
         dim ? "opacity-45 hover:opacity-80" : ""
       }`}
     >
-      <Gauge state={state} center={center} caption={caption} ring={ring} alert={alert} />
+      {ring !== undefined ? (
+        <Gauge state={state} center={center} caption={caption} ring={ring} alert={alert} />
+      ) : (
+        <NumberBadge center={center} caption={caption} alert={alert} />
+      )}
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex items-center gap-1.5">
           <span
@@ -59,25 +65,23 @@ export default function Complication({
           <span
             key={i}
             className={`truncate ${
-              i === 0
-                ? "text-sm font-semibold text-fg/90"
-                : "text-xs text-fg/45"
+              i === 0 ? "text-sm font-semibold text-fg/90" : "text-xs text-fg/45"
             }`}
             title={text}
           >
             {text}
           </span>
         ))}
-        {spark && spark.length > 1 && <Sparkline data={spark} />}
+        {visual && <Visual visual={visual} />}
       </div>
     </Link>
   );
 }
 
 // The ring gauge: a track circle under a fill arc, with the center token and its
-// caption overlaid. Using r = 15.9155 makes the circumference ≈ 100, so the fill
-// dash array is simply `${percent} 100`. The arc uses currentColor so its tone
-// (accent / amber / red / muted-decorative) is set by a single text-color class.
+// caption overlaid. r = 15.9155 makes the circumference ≈ 100, so the fill dash
+// array is simply `${percent} 100`. The arc uses currentColor so its tone
+// (accent / amber / red) is set by a single text-color class.
 function Gauge({
   state,
   center,
@@ -88,20 +92,15 @@ function Gauge({
   state: ServiceState;
   center: string;
   caption: string;
-  ring?: number;
+  ring: number;
   alert?: boolean;
 }) {
-  const decorative = ring === undefined;
-  const pct = Math.min(100, Math.max(0, (ring ?? 1) * 100));
+  const pct = Math.min(100, Math.max(0, ring * 100));
   const tone = alert
     ? "text-red-400"
     : state === "stale"
       ? "text-amber-400"
-      : state === "unreachable"
-        ? "text-red-400"
-        : decorative
-          ? "text-fg/25"
-          : "text-[var(--accent-from)]";
+      : "text-[var(--accent-from)]";
   return (
     <span className="relative inline-flex h-16 w-16 shrink-0 items-center justify-center">
       <svg viewBox="0 0 36 36" className="absolute inset-0 h-full w-full -rotate-90">
@@ -119,7 +118,7 @@ function Gauge({
           cy="18"
           r="15.9155"
           fill="none"
-          className={`${tone} ${decorative ? "opacity-40" : ""}`}
+          className={tone}
           stroke="currentColor"
           strokeWidth="2.5"
           strokeLinecap="round"
@@ -138,9 +137,48 @@ function Gauge({
   );
 }
 
+// The plain number badge for a count service (no measured proportion): a bold
+// figure over its caption, in the same footprint as the gauge so readouts align.
+function NumberBadge({
+  center,
+  caption,
+  alert,
+}: {
+  center: string;
+  caption: string;
+  alert?: boolean;
+}) {
+  return (
+    <span className="flex h-16 w-16 shrink-0 flex-col items-center justify-center leading-none">
+      <span
+        className={`truncate text-3xl font-bold ${alert ? "text-red-400" : "text-fg/90"}`}
+      >
+        {center}
+      </span>
+      {caption && (
+        <span className="mt-1 truncate text-[8px] font-medium tracking-wide text-fg/40 uppercase">
+          {caption}
+        </span>
+      )}
+    </span>
+  );
+}
+
+const SEGMENT_BG: Record<SegmentTone, string> = {
+  pending: "bg-amber-400/80",
+  processing: "bg-sky-400/70",
+  available: "bg-emerald-400/70",
+};
+
+// The purposeful bottom visual, chosen per service so it always means something.
+function Visual({ visual }: { visual: GlanceVisual }) {
+  if (visual.kind === "spark") return <Sparkline data={visual.values} />;
+  if (visual.kind === "days") return <DayStrip values={visual.values} />;
+  return <SegmentBar parts={visual.parts} />;
+}
+
 // A minimal trend line for a per-unit series (AdGuard query volume). Normalized
-// to its own max and drawn full-width under the readouts; non-scaling stroke so
-// it stays crisp when the viewBox stretches.
+// to its own max and drawn full-width under the readouts.
 function Sparkline({ data }: { data: number[] }) {
   const pts = data.slice(-32);
   const max = Math.max(...pts, 1);
@@ -155,7 +193,7 @@ function Sparkline({ data }: { data: number[] }) {
       viewBox={`0 0 ${w} ${h}`}
       preserveAspectRatio="none"
       aria-hidden
-      className="mt-1 h-4 w-full text-[var(--accent-from)]"
+      className="mt-1.5 h-4 w-full text-[var(--accent-from)]"
     >
       <polyline
         points={points}
@@ -167,5 +205,46 @@ function Sparkline({ data }: { data: number[] }) {
         vectorEffect="non-scaling-stroke"
       />
     </svg>
+  );
+}
+
+// A next-7-days bar strip (Sonarr/Radarr upcoming): one bar per day, height by
+// count; empty days are a faint baseline so the cadence reads at a glance.
+function DayStrip({ values }: { values: number[] }) {
+  const max = Math.max(...values, 1);
+  return (
+    <div aria-hidden className="mt-1.5 flex h-5 items-end gap-1">
+      {values.map((v, i) => (
+        <span
+          key={i}
+          className={`flex-1 rounded-sm ${v > 0 ? "bg-[var(--accent-from)]" : "bg-fg/15"}`}
+          style={{ height: `${v > 0 ? Math.max(20, (v / max) * 100) : 12}%` }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// A stacked breakdown bar (Seerr pending/processing/available). A thin rail with
+// a colored segment per bucket, sized by share; an all-zero total shows the rail.
+function SegmentBar({ parts }: { parts: { value: number; tone: SegmentTone }[] }) {
+  const total = parts.reduce((sum, p) => sum + p.value, 0);
+  return (
+    <div
+      aria-hidden
+      className="mt-2 flex h-1.5 w-full overflow-hidden rounded-full bg-fg/10"
+    >
+      {total > 0 &&
+        parts.map(
+          (p, i) =>
+            p.value > 0 && (
+              <span
+                key={i}
+                className={SEGMENT_BG[p.tone]}
+                style={{ width: `${(p.value / total) * 100}%` }}
+              />
+            )
+        )}
+    </div>
   );
 }

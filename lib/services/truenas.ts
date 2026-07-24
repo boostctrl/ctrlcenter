@@ -38,17 +38,27 @@ export type TruenasPool = {
 
 export type TruenasAlert = { level: "warning" | "critical"; message: string };
 
+// One container (workload) an app runs, from active_workloads.container_details:
+// its service/name, verbatim state ("running" / "exited" / …), and image.
+export type TruenasContainer = {
+  name: string;
+  state: string;
+  image: string | null;
+};
+
 // One installed app from the Docker-based Apps system (SCALE 24.10+). `state`
 // is TrueNAS's verbatim RUNNING / STOPPED / DEPLOYING / CRASHED; `running` is
 // the derived healthy read. `containers` is how many workloads the app runs
-// (null when TrueNAS didn't report it), `upgradeAvailable` flags a pending
-// update.
+// (null when TrueNAS didn't report it); `containerList` is those workloads when
+// TrueNAS details them (the detail page lists them). `upgradeAvailable` flags a
+// pending update.
 export type TruenasApp = {
   name: string;
   state: string;
   running: boolean;
   upgradeAvailable: boolean;
   containers: number | null;
+  containerList: TruenasContainer[];
 };
 
 export type TruenasSnapshot = {
@@ -77,15 +87,34 @@ type RawAlert = {
   text?: string | null;
   dismissed?: boolean;
 };
+type RawContainer = {
+  id?: string;
+  service_name?: string;
+  image?: string;
+  state?: string;
+};
 type RawApp = {
   name?: string;
   state?: string;
   upgrade_available?: boolean;
   active_workloads?: {
     containers?: number;
-    container_details?: unknown[];
+    container_details?: RawContainer[];
   } | null;
 };
+
+// Some apps run many workloads; the detail page lists them, but cap so a
+// pathological compose file can't blow up the payload.
+const TRUENAS_CONTAINER_CAP = 20;
+
+function mapContainers(raw: RawContainer[] | undefined): TruenasContainer[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.slice(0, TRUENAS_CONTAINER_CAP).map((c, i) => ({
+    name: c.service_name?.trim() || c.id?.trim() || `container ${i + 1}`,
+    state: typeof c.state === "string" && c.state ? c.state.toLowerCase() : "unknown",
+    image: typeof c.image === "string" && c.image ? c.image : null,
+  }));
+}
 
 // TrueNAS reports some byte counts as strings (they exceed 2^53); read them
 // leniently and treat anything unparseable as unknown.
@@ -150,11 +179,12 @@ export function mapTruenasApps(raw: unknown): TruenasApp[] {
     const state =
       typeof a.state === "string" && a.state ? a.state.toUpperCase() : "UNKNOWN";
     const w = a.active_workloads;
+    const containerList = mapContainers(w?.container_details);
     const containers =
       typeof w?.containers === "number"
         ? w.containers
-        : Array.isArray(w?.container_details)
-          ? w.container_details.length
+        : containerList.length > 0
+          ? containerList.length
           : null;
     return {
       name: a.name?.trim() || `App ${i + 1}`,
@@ -162,6 +192,7 @@ export function mapTruenasApps(raw: unknown): TruenasApp[] {
       running: state === "RUNNING",
       upgradeAvailable: a.upgrade_available === true,
       containers,
+      containerList,
     };
   });
   apps.sort((a, b) => Number(a.running) - Number(b.running));

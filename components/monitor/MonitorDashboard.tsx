@@ -7,7 +7,7 @@ import PageNav from "@/components/PageNav";
 import SystemHealthBar from "./SystemHealthBar";
 import Complication from "./Complication";
 import { serviceState, type ServiceState } from "./MonitorCard";
-import { GLANCES } from "./glances";
+import { GLANCES, type GlanceVisual } from "./glances";
 
 // The private Monitor cockpit (#207, #208): one cohesive "instrument face" — a
 // system-health hero over domain-grouped clusters of clickable complications,
@@ -22,8 +22,10 @@ const REFRESH_MS = 45_000;
 const SETTINGS_LINK = "/admin?tab=settings&section=integrations";
 
 // The face's fixed layout: services clustered by domain, in reading order.
+// Media follows the content lifecycle — request, library automation, streaming —
+// with qBittorrent last so the downloader no longer dominates the section.
 const GROUPS: { label: string; ids: ServiceId[] }[] = [
-  { label: "Media", ids: ["qbittorrent", "sonarr", "radarr", "seerr", "tautulli"] },
+  { label: "Media", ids: ["sonarr", "radarr", "seerr", "tautulli", "qbittorrent"] },
   { label: "Network", ids: ["adguard", "unifi"] },
   { label: "Storage & Containers", ids: ["truenas", "portainer"] },
 ];
@@ -36,7 +38,7 @@ type ComplicationProps = {
   ring?: number;
   alert?: boolean;
   lines: string[];
-  spark?: number[];
+  visual?: GlanceVisual;
 };
 
 // One service's complication content from its status. Generic over the id so the

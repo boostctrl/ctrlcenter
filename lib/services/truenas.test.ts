@@ -45,7 +45,13 @@ const APPS = [
     name: "immich",
     state: "CRASHED",
     upgrade_available: false,
-    active_workloads: { container_details: [{}, {}, {}] },
+    active_workloads: {
+      container_details: [
+        { service_name: "immich_server", image: "ghcr.io/immich/server:v1.100", state: "exited" },
+        { service_name: "immich_redis", image: "redis:7", state: "running" },
+        { id: "abc123", state: "running" },
+      ],
+    },
   },
 ];
 
@@ -115,9 +121,20 @@ describe("getTruenasSnapshot", () => {
     stubApi({});
     const snap = await getTruenasSnapshot(CFG);
     expect(snap.apps).toEqual([
-      { name: "sonarr", state: "STOPPED", running: false, upgradeAvailable: true, containers: 0 },
-      { name: "immich", state: "CRASHED", running: false, upgradeAvailable: false, containers: 3 },
-      { name: "jellyfin", state: "RUNNING", running: true, upgradeAvailable: false, containers: 1 },
+      { name: "sonarr", state: "STOPPED", running: false, upgradeAvailable: true, containers: 0, containerList: [] },
+      {
+        name: "immich",
+        state: "CRASHED",
+        running: false,
+        upgradeAvailable: false,
+        containers: 3,
+        containerList: [
+          { name: "immich_server", state: "exited", image: "ghcr.io/immich/server:v1.100" },
+          { name: "immich_redis", state: "running", image: "redis:7" },
+          { name: "abc123", state: "running", image: null },
+        ],
+      },
+      { name: "jellyfin", state: "RUNNING", running: true, upgradeAvailable: false, containers: 1, containerList: [] },
     ]);
   });
 
@@ -163,7 +180,30 @@ describe("mapTruenasApps", () => {
       running: false,
       upgradeAvailable: true,
       containers: null,
+      containerList: [],
     });
+  });
+
+  it("lists containers from active_workloads, capping and falling back for names", () => {
+    const [app] = mapTruenasApps([
+      {
+        name: "app",
+        state: "RUNNING",
+        active_workloads: {
+          container_details: [
+            { service_name: "web", image: "nginx", state: "RUNNING" },
+            { id: "onlyid" },
+            ...Array.from({ length: 30 }, () => ({ service_name: "x" })),
+          ],
+        },
+      },
+    ]);
+    expect(app.containerList).toHaveLength(20);
+    expect(app.containerList[0]).toEqual({ name: "web", state: "running", image: "nginx" });
+    // Missing service_name falls back to the id; missing state reads "unknown".
+    expect(app.containerList[1]).toEqual({ name: "onlyid", state: "unknown", image: null });
+    // The count comes from the detailed list when TrueNAS omits the number.
+    expect(app.containers).toBe(20);
   });
 });
 

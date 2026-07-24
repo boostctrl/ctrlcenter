@@ -1,32 +1,42 @@
-// The instrument-gauge content each service shows as a complication on the
-// Monitor face (#208, #223). One extractor per service turns the same snapshot
-// the detail page renders into a compact "dial": a gauge center token + caption,
-// an optional ring fill (a real proportion where one exists), and one to three
-// readout lines beside it — the dual speeds, next-up title, wifi/wired split,
-// now-playing, per-pool capacity, and so on that the single-number face hid. The
-// face stays glanceable; the full depth is one click away on /admin/monitor/[id].
+// The instrument content each service shows as a complication on the Monitor
+// face (#208, #223, #226). One extractor per service turns the same snapshot
+// the detail page renders into a compact tile: a headline center token + caption
+// and one to three readout lines, plus a *purposeful* visual — a ring gauge where
+// a real proportion exists, an upcoming bar strip or a breakdown bar where it
+// doesn't. No tile shows a decorative ring around a bare count. The face stays
+// glanceable; the full depth is one click away on /admin/monitor/[id].
 
 import type { ServiceId } from "@/lib/services/ids";
 import type { ServiceSnapshotMap } from "@/lib/services/registry";
 import { formatSpeed, formatEta } from "./MonitorCard";
 import { formatBytes } from "@/components/widgets/SystemStatsWidget";
 
-// A service's gauge-dial glance:
-//   center  — the short token inside the ring ("23%", "6", "Idle")
-//   caption — the tiny label under it ("blocked", "active", "clients")
-//   ring    — 0..1 fill for services with a natural proportion (capacity,
-//             blocked share, running/total); omitted → a soft decorative ring
-//             for pure-count services with no denominator
-//   alert   — tint the ring danger (near-full capacity, WAN down, unhealthy)
-//   lines   — 1–3 readout lines beside the gauge; the first is the headline
-//   spark   — an optional per-unit series for a mini sparkline (AdGuard)
+// A service's tile visual — chosen so it always means something:
+//   spark    — a line sparkline over a per-unit series (AdGuard query volume)
+//   days     — a next-7-days bar strip (Sonarr/Radarr upcoming, one bar per day)
+//   segments — a stacked breakdown bar (Seerr pending/processing/available)
+export type GlanceVisual =
+  | { kind: "spark"; values: number[] }
+  | { kind: "days"; values: number[] }
+  | { kind: "segments"; parts: { value: number; tone: SegmentTone }[] };
+
+export type SegmentTone = "pending" | "processing" | "available";
+
+// A service's glance:
+//   center  — the headline token (the ring center, or the badge number)
+//   caption — the tiny label under it ("blocked", "upcoming", "clients")
+//   ring    — 0..1 gauge fill for services with a natural proportion; omitted →
+//             a plain number badge (a count service shows its visual instead)
+//   alert   — tint the gauge/number danger (near-full capacity, WAN down, …)
+//   lines   — 1–3 readout lines beside the headline; the first is the headline
+//   visual  — the purposeful bottom visual, when the service has one
 export type Glance = {
   center: string;
   caption: string;
   ring?: number;
   alert?: boolean;
   lines: string[];
-  spark?: number[];
+  visual?: GlanceVisual;
 };
 
 // "45.2k" — compact, locale-independent (locale formatting hydrates differently
@@ -38,6 +48,12 @@ function compact(n: number): string {
 }
 
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
+
+// Local midnight for a timestamp — the day-bucket boundary for the upcoming strip.
+const startOfDay = (ms: number): number => {
+  const d = new Date(ms);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+};
 
 // A relative day label for an upcoming air/release time — "today", "in 3d". Null
 // when the time is missing, or before the client has mounted (`now` is null on
@@ -54,8 +70,8 @@ function whenLabel(at: number | null, now: number | null): string | null {
 // Trim to a clean line, kept short so the readout column never has to wrap.
 const line = (s: string): string => (s.length > 34 ? `${s.slice(0, 33)}…` : s);
 
-// Each extractor takes its snapshot slice and `now` (for relative dates). Most
-// ignore `now`; only the *arr next-up line needs it.
+// Each extractor takes its snapshot slice and `now` (for relative dates and the
+// upcoming strip). Most ignore `now`; only the *arr tiles need it.
 export const GLANCES: {
   [K in ServiceId]: (data: ServiceSnapshotMap[K], now: number | null) => Glance;
 } = {
@@ -86,18 +102,26 @@ export const GLANCES: {
   },
   sonarr: (d, now) => arrGlance(d, now),
   radarr: (d, now) => arrGlance(d, now),
-  seerr: (d) => ({
-    center: String(d.pending),
-    caption: "pending",
-    lines: [
-      d.pending > 0 ? "awaiting review" : "nothing to review",
-      ...(d.processing > 0 ? [`${d.processing} processing`] : []),
-    ],
-  }),
+  seerr: (d) => {
+    const parts: { value: number; tone: SegmentTone }[] = [
+      { value: d.pending, tone: "pending" },
+      { value: d.processing, tone: "processing" },
+      { value: d.available, tone: "available" },
+    ];
+    return {
+      center: String(d.pending),
+      caption: "pending",
+      lines: [
+        d.pending > 0 ? "Awaiting review" : "All caught up",
+        `${d.totalRequests} total`,
+      ],
+      visual: { kind: "segments", parts },
+    };
+  },
   tautulli: (d) => {
     if (d.streamCount === 0)
       return { center: "0", caption: "streams", lines: ["Nothing playing"] };
-    const now = d.sessions[0];
+    const top = d.sessions[0];
     const bandwidth =
       d.totalBandwidthKbps && d.totalBandwidthKbps > 0
         ? `${formatBytes((d.totalBandwidthKbps * 1000) / 8)}/s`
@@ -109,15 +133,12 @@ export const GLANCES: {
       ring: d.transcodeCount / d.streamCount,
       alert: d.transcodeCount > 0 && d.transcodeCount === d.streamCount,
       lines: [
-        now ? line(now.title) : `${plural(d.streamCount, "stream")} active`,
+        top ? line(top.title) : `${plural(d.streamCount, "stream")} active`,
         line(
-          [
-            now?.user,
-            d.transcodeCount > 0 ? plural(d.transcodeCount, "transcode") : null,
-          ]
+          [top?.user, d.transcodeCount > 0 ? plural(d.transcodeCount, "transcode") : null]
             .filter(Boolean)
             .join(" · ")
-        ) || "direct play",
+        ) || "Direct play",
         ...(bandwidth ? [bandwidth] : []),
       ].filter(Boolean),
     };
@@ -128,20 +149,20 @@ export const GLANCES: {
     ring: d.blockedRatio,
     alert: !d.protectionEnabled,
     lines: [
-      d.protectionEnabled ? `${compact(d.totalQueries)} queries` : "⚠ protection off",
+      d.protectionEnabled ? `${compact(d.totalQueries)} queries` : "⚠ Protection off",
       ...(d.avgProcessingMs != null
         ? [`${d.avgProcessingMs.toFixed(0)} ms avg`]
         : d.topBlocked[0]
           ? [line(d.topBlocked[0].domain)]
           : []),
     ],
-    spark: d.series.length > 1 ? d.series : undefined,
+    visual: d.series.length > 1 ? { kind: "spark", values: d.series } : undefined,
   }),
   unifi: (d) => {
     const { total, wireless, wired } = d.clients;
     const wan = d.internet.up
-      ? `${d.internet.isp ?? "online"}${d.internet.latencyMs != null ? ` · ${d.internet.latencyMs} ms` : ""}`
-      : "internet down";
+      ? `${d.internet.isp ?? "Online"}${d.internet.latencyMs != null ? ` · ${d.internet.latencyMs} ms` : ""}`
+      : "Internet down";
     const devices =
       d.devices.disconnected > 0
         ? `${plural(d.devices.disconnected, "device")} down`
@@ -157,10 +178,13 @@ export const GLANCES: {
   truenas: (d) => {
     const ratios = d.pools.map((p) => p.usedRatio ?? 0);
     const fullest = ratios.length > 0 ? Math.max(...ratios) : null;
+    const totalFree = d.pools.reduce((sum, p) => sum + (p.free ?? 0), 0);
     const down = d.apps.filter((a) => !a.running).length;
     const upgrades = d.apps.filter((a) => a.upgradeAvailable).length;
     const critical = d.alerts.some((a) => a.level === "critical");
-    const lines = [plural(d.pools.length, "pool")];
+    const lines = [
+      `${plural(d.pools.length, "pool")}${totalFree > 0 ? ` · ${formatBytes(totalFree)} free` : ""}`,
+    ];
     if (d.apps.length > 0)
       lines.push(`${plural(d.apps.length, "app")}${down > 0 ? ` · ${down} down` : ""}`);
     if (d.alerts.length > 0) lines.push(plural(d.alerts.length, "alert"));
@@ -192,17 +216,29 @@ export const GLANCES: {
   },
 };
 
-// Sonarr and Radarr share a glance: an upcoming count in the ring center, the
-// next title + when it lands, and a recent/health tail.
-function arrGlance(
-  d: ServiceSnapshotMap["sonarr"],
-  now: number | null
-): Glance {
+// Sonarr and Radarr share a glance: the upcoming count as a headline, the next
+// title with when it lands, a recent/health tail, and a next-7-days bar strip.
+function arrGlance(d: ServiceSnapshotMap["sonarr"], now: number | null): Glance {
   const next = d.upcoming[0];
   const warnings = d.health.length;
-  // Only a health *error* alarms the ring red; a warning (a stale branch, an
-  // unmapped root folder) is routine and shouldn't read as a failure.
+  // Only a health *error* alarms; a warning (a stale branch, an unmapped root
+  // folder) is routine and shouldn't read as a failure.
   const errors = d.health.filter((h) => h.type === "error").length;
+
+  // Bucket the upcoming items into the next seven days for the strip. Before the
+  // client mounts `now` is null, so every bar is empty — matching the server
+  // render, then filling in once mounted.
+  const days = Array<number>(7).fill(0);
+  if (now != null) {
+    const base = startOfDay(now);
+    for (const it of d.upcoming) {
+      if (it.at == null) continue;
+      const offset = Math.round((startOfDay(it.at) - base) / 86_400_000);
+      if (offset >= 0 && offset < 7) days[offset] += 1;
+    }
+  }
+  const visual: GlanceVisual = { kind: "days", values: days };
+
   if (!next) {
     return {
       center: "0",
@@ -212,6 +248,7 @@ function arrGlance(
         d.recent.length > 0 ? `${plural(d.recent.length, "recent")}` : "Nothing scheduled",
         ...(warnings > 0 ? [plural(warnings, "warning")] : []),
       ],
+      visual,
     };
   }
   const when = whenLabel(next.at, now);
@@ -221,12 +258,13 @@ function arrGlance(
     alert: errors > 0,
     lines: [
       line(next.title),
-      line([when, next.subtitle].filter(Boolean).join(" · ")) || "scheduled",
+      line([when, next.subtitle].filter(Boolean).join(" · ")) || "Scheduled",
       ...(d.recent.length > 0
         ? [`${plural(d.recent.length, "recent")}`]
         : warnings > 0
           ? [plural(warnings, "warning")]
           : []),
     ].filter(Boolean),
+    visual,
   };
 }

@@ -5,6 +5,7 @@ import type {
   TruenasSnapshot,
   TruenasPool,
   TruenasApp,
+  TruenasContainer,
 } from "@/lib/services/truenas";
 import { formatBytes } from "@/components/widgets/SystemStatsWidget";
 import MonitorCard, { Meter } from "./MonitorCard";
@@ -57,39 +58,82 @@ function appDot(app: TruenasApp): string {
   return "bg-fg/25";
 }
 
-function AppRow({ app }: { app: TruenasApp }) {
+// A container's state dot: running is green, a stopped/exited one red, anything
+// transitional or unknown muted — the same vocabulary as the app and pool dots.
+function containerDot(state: string): string {
+  if (state === "running") return "bg-emerald-400";
+  if (state === "exited" || state === "dead" || state === "stopped") return "bg-red-400";
+  return "bg-fg/25";
+}
+
+function ContainerRow({ container }: { container: TruenasContainer }) {
   return (
-    <li className="flex items-baseline justify-between gap-3">
-      <span className="flex min-w-0 items-center gap-2 text-sm text-fg/80">
+    <li className="flex items-baseline justify-between gap-3 text-xs">
+      <span className="flex min-w-0 items-center gap-2 text-fg/65">
         <span
           aria-hidden
-          className={`h-2 w-2 shrink-0 rounded-full ${appDot(app)}`}
+          className={`h-1.5 w-1.5 shrink-0 rounded-full ${containerDot(container.state)}`}
         />
-        <span className="truncate" title={app.name}>
-          {app.name}
+        <span className="truncate" title={container.name}>
+          {container.name}
         </span>
-        {!app.running && (
+      </span>
+      {container.image && (
+        <span
+          className="max-w-[45%] shrink-0 truncate text-fg/35"
+          title={container.image}
+        >
+          {container.image}
+        </span>
+      )}
+    </li>
+  );
+}
+
+function AppRow({ app }: { app: TruenasApp }) {
+  const hasContainers = app.containerList.length > 0;
+  return (
+    <li className="flex flex-col gap-1.5">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="flex min-w-0 items-center gap-2 text-sm text-fg/80">
           <span
-            className={`shrink-0 text-xs ${
-              app.state === "CRASHED" ? "text-red-400" : "text-fg/45"
-            }`}
-          >
-            {app.state.toLowerCase()}
+            aria-hidden
+            className={`h-2 w-2 shrink-0 rounded-full ${appDot(app)}`}
+          />
+          <span className="truncate" title={app.name}>
+            {app.name}
           </span>
-        )}
-      </span>
-      <span className="flex shrink-0 items-baseline gap-2 text-xs tabular-nums text-fg/50">
-        {app.upgradeAvailable && (
-          <span className="rounded border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-amber-200/90 uppercase">
-            update
-          </span>
-        )}
-        {app.containers !== null && (
-          <span>
-            {app.containers} container{app.containers === 1 ? "" : "s"}
-          </span>
-        )}
-      </span>
+          {!app.running && (
+            <span
+              className={`shrink-0 text-xs ${
+                app.state === "CRASHED" ? "text-red-400" : "text-fg/45"
+              }`}
+            >
+              {app.state.toLowerCase()}
+            </span>
+          )}
+        </span>
+        <span className="flex shrink-0 items-baseline gap-2 text-xs tabular-nums text-fg/50">
+          {app.upgradeAvailable && (
+            <span className="rounded border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-amber-200/90 uppercase">
+              update
+            </span>
+          )}
+          {/* When we can list the containers below, the count is redundant. */}
+          {!hasContainers && app.containers !== null && (
+            <span>
+              {app.containers} container{app.containers === 1 ? "" : "s"}
+            </span>
+          )}
+        </span>
+      </div>
+      {hasContainers && (
+        <ul className="flex flex-col gap-1 border-l border-fg/10 pl-3">
+          {app.containerList.map((c, i) => (
+            <ContainerRow key={`${c.name}-${i}`} container={c} />
+          ))}
+        </ul>
+      )}
     </li>
   );
 }
@@ -118,7 +162,7 @@ export default function TruenasCard({
               <p className="text-[11px] font-medium tracking-wide text-fg/40 uppercase">
                 Apps
               </p>
-              <ul className="flex flex-col gap-1.5">
+              <ul className="flex flex-col gap-3">
                 {data.apps.map((a, i) => (
                   <AppRow key={`${a.name}-${i}`} app={a} />
                 ))}

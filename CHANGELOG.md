@@ -12,6 +12,25 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **The TrueNAS detail page now lists every container.** Each app expands to show
+  its containers with a status dot (running, exited, or transitional) and image,
+  instead of only a container count — so you can see exactly what's up or down
+  without opening the TrueNAS UI. The at-a-glance TrueNAS tile also shows total
+  free space alongside pool count. Still strictly read-only. (#227)
+
+### Changed
+
+- **The Monitor at-a-glance tiles are more consistent and informative.** Every
+  tile now earns its visual: services with a real proportion (qBittorrent,
+  Tautulli, AdGuard, capacity, containers) keep a ring gauge, while count-based
+  services get a purposeful mini-visual instead of a plain ring — Sonarr and
+  Radarr show a next-7-days strip of what's coming, and Seerr shows a
+  pending/processing/available breakdown. qBittorrent moves to the end of the
+  Media row so downloads no longer lead the section, and status wording is
+  capitalized consistently. (#226)
+
 ## [2.8.1] - 2026-07-24
 
 ### Added
