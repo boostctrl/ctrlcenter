@@ -12,6 +12,20 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **The at-a-glance media tiles now show what you actually care about.** Seerr no
+  longer leads with a "pending" count (useless when requests auto-approve) —
+  it shows what's downloading and the most recent request instead. Sonarr and
+  Radarr swap their "upcoming" calendar for recent activity: how much was grabbed
+  this week, the latest grab, and a 7-day cadence strip. The Media section is now
+  laid out as a tidy 3 + 2 (Seerr, Radarr, Sonarr, then Tautulli, qBittorrent)
+  and sits below Network and Storage, so your infrastructure leads the page. (#228)
+- **The TrueNAS tile is more informative, and its detail page lists every app.**
+  The at-a-glance tile now shows running vs. total apps and a capacity bar for
+  each pool (not just the fullest), and the detail page no longer stops at eight
+  apps — your full app roster shows. (#229)
+
 ## [2.8.2] - 2026-07-24
 
 ### Added

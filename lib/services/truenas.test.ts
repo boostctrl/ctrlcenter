@@ -164,7 +164,7 @@ describe("mapTruenasPools", () => {
 
 describe("mapTruenasApps", () => {
   it("caps the list and treats malformed input as empty", () => {
-    const many = Array.from({ length: 12 }, (_, i) => ({ name: `a${i}`, state: "RUNNING" }));
+    const many = Array.from({ length: 45 }, (_, i) => ({ name: `a${i}`, state: "RUNNING" }));
     expect(mapTruenasApps(many)).toHaveLength(TRUENAS_APP_CAP);
     expect(mapTruenasApps("nonsense")).toEqual([]);
     expect(mapTruenasApps([])).toEqual([]);

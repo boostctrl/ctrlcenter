@@ -13,11 +13,13 @@ import { formatBytes } from "@/components/widgets/SystemStatsWidget";
 
 // A service's tile visual — chosen so it always means something:
 //   spark    — a line sparkline over a per-unit series (AdGuard query volume)
-//   days     — a next-7-days bar strip (Sonarr/Radarr upcoming, one bar per day)
+//   days     — a 7-day activity strip, normalized (Sonarr/Radarr recent grabs)
+//   bars     — per-item capacity bars, absolute 0..1 height (TrueNAS pools)
 //   segments — a stacked breakdown bar (Seerr pending/processing/available)
 export type GlanceVisual =
   | { kind: "spark"; values: number[] }
   | { kind: "days"; values: number[] }
+  | { kind: "bars"; values: number[] }
   | { kind: "segments"; parts: { value: number; tone: SegmentTone }[] };
 
 export type SegmentTone = "pending" | "processing" | "available";
@@ -55,16 +57,18 @@ const startOfDay = (ms: number): number => {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 };
 
-// A relative day label for an upcoming air/release time — "today", "in 3d". Null
-// when the time is missing, or before the client has mounted (`now` is null on
-// the server render and first paint, so the string can't mismatch on hydration).
-function whenLabel(at: number | null, now: number | null): string | null {
+const DAY = 86_400_000;
+
+// A relative "ago" label for a past event — "today", "2d ago". Null when the
+// time is missing, or before the client has mounted (`now` is null on the server
+// render and first paint, so the string can't mismatch on hydration).
+function agoLabel(at: number | null, now: number | null): string | null {
   if (at == null || now == null) return null;
-  const days = Math.round((at - now) / 86_400_000);
+  const days = Math.round((now - at) / DAY);
   if (days <= 0) return "today";
-  if (days === 1) return "tomorrow";
-  if (days < 7) return `in ${days}d`;
-  return `in ${Math.round(days / 7)}w`;
+  if (days === 1) return "yesterday";
+  if (days < 7) return `${days}d ago`;
+  return `${Math.round(days / 7)}w ago`;
 }
 
 // Trim to a clean line, kept short so the readout column never has to wrap.
@@ -103,17 +107,22 @@ export const GLANCES: {
   sonarr: (d, now) => arrGlance(d, now),
   radarr: (d, now) => arrGlance(d, now),
   seerr: (d) => {
+    // With auto-approve, "pending" is usually zero — the useful read is what's
+    // being downloaded now and what was most recently requested.
     const parts: { value: number; tone: SegmentTone }[] = [
       { value: d.pending, tone: "pending" },
       { value: d.processing, tone: "processing" },
       { value: d.available, tone: "available" },
     ];
+    const active = d.requests.find((r) => r.status === "processing") ?? d.requests[0];
     return {
-      center: String(d.pending),
-      caption: "pending",
+      center: String(d.processing),
+      caption: "downloading",
       lines: [
-        d.pending > 0 ? "Awaiting review" : "All caught up",
-        `${d.totalRequests} total`,
+        active ? line(active.title) : "No recent requests",
+        active
+          ? line(`${active.requester} · ${active.status}`)
+          : `${d.totalRequests} total`,
       ],
       visual: { kind: "segments", parts },
     };
@@ -179,22 +188,31 @@ export const GLANCES: {
     const ratios = d.pools.map((p) => p.usedRatio ?? 0);
     const fullest = ratios.length > 0 ? Math.max(...ratios) : null;
     const totalFree = d.pools.reduce((sum, p) => sum + (p.free ?? 0), 0);
-    const down = d.apps.filter((a) => !a.running).length;
+    const running = d.apps.filter((a) => a.running).length;
+    const down = d.apps.length - running;
     const upgrades = d.apps.filter((a) => a.upgradeAvailable).length;
+    const containers = d.apps.reduce((sum, a) => sum + (a.containers ?? 0), 0);
     const critical = d.alerts.some((a) => a.level === "critical");
     const lines = [
       `${plural(d.pools.length, "pool")}${totalFree > 0 ? ` · ${formatBytes(totalFree)} free` : ""}`,
     ];
     if (d.apps.length > 0)
-      lines.push(`${plural(d.apps.length, "app")}${down > 0 ? ` · ${down} down` : ""}`);
+      lines.push(
+        `${running}/${d.apps.length} apps up${down > 0 ? ` · ${down} down` : ""}`
+      );
+    // Third line, in priority order: trouble, then updates, then scale.
     if (d.alerts.length > 0) lines.push(plural(d.alerts.length, "alert"));
     else if (upgrades > 0) lines.push(`${plural(upgrades, "update")} ready`);
+    else if (containers > 0) lines.push(plural(containers, "container"));
     return {
       center: fullest != null ? `${Math.round(fullest * 100)}%` : String(d.pools.length),
       caption: fullest != null ? "capacity" : "pools",
       ring: fullest ?? undefined,
       alert: (fullest ?? 0) >= 0.9 || critical,
       lines,
+      // With more than one pool the ring only shows the fullest; a bar per pool
+      // makes every pool's capacity legible at a glance.
+      visual: d.pools.length > 1 ? { kind: "bars", values: ratios } : undefined,
     };
   },
   portainer: (d) => {
@@ -216,55 +234,58 @@ export const GLANCES: {
   },
 };
 
-// Sonarr and Radarr share a glance: the upcoming count as a headline, the next
-// title with when it lands, a recent/health tail, and a next-7-days bar strip.
+// Sonarr and Radarr share a glance oriented around what actually landed: recent
+// grabs/imports over the last week (a "calendar" of upcoming releases isn't much
+// use when you don't grab everything it lists). The headline is this week's
+// activity count, the lines are the latest grab, and the strip is the daily
+// cadence over the last seven days.
 function arrGlance(d: ServiceSnapshotMap["sonarr"], now: number | null): Glance {
-  const next = d.upcoming[0];
-  const warnings = d.health.length;
   // Only a health *error* alarms; a warning (a stale branch, an unmapped root
   // folder) is routine and shouldn't read as a failure.
   const errors = d.health.filter((h) => h.type === "error").length;
+  const warnings = d.health.length;
 
-  // Bucket the upcoming items into the next seven days for the strip. Before the
-  // client mounts `now` is null, so every bar is empty — matching the server
-  // render, then filling in once mounted.
+  // Bucket recent grabs/imports into the last seven days (index 0 = six days
+  // ago … index 6 = today). Before the client mounts `now` is null, so every bar
+  // is empty — matching the server render, then filling in once mounted.
   const days = Array<number>(7).fill(0);
+  let thisWeek = 0;
   if (now != null) {
-    const base = startOfDay(now);
-    for (const it of d.upcoming) {
+    const today = startOfDay(now);
+    for (const it of d.recent) {
       if (it.at == null) continue;
-      const offset = Math.round((startOfDay(it.at) - base) / 86_400_000);
-      if (offset >= 0 && offset < 7) days[offset] += 1;
+      const back = Math.round((today - startOfDay(it.at)) / DAY);
+      if (back >= 0 && back < 7) {
+        days[6 - back] += 1;
+        thisWeek += 1;
+      }
     }
   }
   const visual: GlanceVisual = { kind: "days", values: days };
 
-  if (!next) {
+  const latest = d.recent[0];
+  if (latest) {
+    const ago = agoLabel(latest.at, now);
     return {
-      center: "0",
-      caption: "upcoming",
+      center: String(thisWeek),
+      caption: "this week",
       alert: errors > 0,
       lines: [
-        d.recent.length > 0 ? `${plural(d.recent.length, "recent")}` : "Nothing scheduled",
-        ...(warnings > 0 ? [plural(warnings, "warning")] : []),
+        line(latest.title),
+        line([latest.event, ago].filter(Boolean).join(" · ")) || latest.event,
       ],
       visual,
     };
   }
-  const when = whenLabel(next.at, now);
+  // Nothing has landed recently — fall back to what's scheduled, if anything.
   return {
-    center: String(d.upcoming.length),
-    caption: "upcoming",
+    center: "0",
+    caption: "this week",
     alert: errors > 0,
     lines: [
-      line(next.title),
-      line([when, next.subtitle].filter(Boolean).join(" · ")) || "Scheduled",
-      ...(d.recent.length > 0
-        ? [`${plural(d.recent.length, "recent")}`]
-        : warnings > 0
-          ? [plural(warnings, "warning")]
-          : []),
-    ].filter(Boolean),
+      d.upcoming.length > 0 ? `${plural(d.upcoming.length, "upcoming")}` : "No recent activity",
+      ...(warnings > 0 ? [plural(warnings, "warning")] : []),
+    ],
     visual,
   };
 }

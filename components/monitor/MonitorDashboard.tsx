@@ -21,13 +21,14 @@ import { GLANCES, type GlanceVisual } from "./glances";
 const REFRESH_MS = 45_000;
 const SETTINGS_LINK = "/admin?tab=settings&section=integrations";
 
-// The face's fixed layout: services clustered by domain, in reading order.
-// Media follows the content lifecycle — request, library automation, streaming —
-// with qBittorrent last so the downloader no longer dominates the section.
+// The face's fixed layout: services clustered by domain. Network and storage —
+// the infrastructure — lead; media follows, its five services laid out 3 + 2
+// (Seerr/Radarr/Sonarr, then Tautulli/qBittorrent) so the section reads as two
+// tidy rows rather than a lopsided four-and-one.
 const GROUPS: { label: string; ids: ServiceId[] }[] = [
-  { label: "Media", ids: ["sonarr", "radarr", "seerr", "tautulli", "qbittorrent"] },
   { label: "Network", ids: ["adguard", "unifi"] },
   { label: "Storage & Containers", ids: ["truenas", "portainer"] },
+  { label: "Media", ids: ["seerr", "radarr", "sonarr", "tautulli", "qbittorrent"] },
 ];
 
 type ComplicationProps = {

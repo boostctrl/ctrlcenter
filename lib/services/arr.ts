@@ -56,7 +56,9 @@ export type ArrSnapshot = {
 };
 
 export const ARR_UPCOMING_CAP = 6;
-export const ARR_RECENT_CAP = 5;
+// The glance headlines recent grab/import activity over the last week, so keep
+// enough recent history for an accurate "this week" count and its bar strip.
+export const ARR_RECENT_CAP = 14;
 const HEALTH_CAP = 5;
 // How far ahead the "upcoming" window looks.
 const UPCOMING_WINDOW_DAYS = 14;

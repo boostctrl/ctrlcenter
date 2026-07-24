@@ -202,7 +202,7 @@ describe("calendar/history mappers", () => {
       { eventType: "grabbed", date: iso(-1000), series: { title: "A" } },
       { eventType: "episodeFileDeleted", date: iso(-2000), series: { title: "B" } },
       { eventType: "downloadFolderImported", date: iso(-3000), series: { title: "C" } },
-      ...Array.from({ length: 10 }, (_, i) => ({
+      ...Array.from({ length: 20 }, (_, i) => ({
         eventType: "grabbed",
         date: iso(-4000 - i),
         series: { title: `G${i}` },

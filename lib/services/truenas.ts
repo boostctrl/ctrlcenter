@@ -68,7 +68,9 @@ export type TruenasSnapshot = {
 };
 
 export const TRUENAS_POOL_CAP = 8;
-export const TRUENAS_APP_CAP = 8;
+// The detail page lists every app, so the cap is generous — high enough that a
+// typical homelab's full app roster shows, still bounded against a runaway list.
+export const TRUENAS_APP_CAP = 40;
 export const TRUENAS_ALERT_CAP = 6;
 
 // --- Raw API shapes (only the fields the snapshot uses) ---
