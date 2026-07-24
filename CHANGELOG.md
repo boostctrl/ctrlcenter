@@ -22,6 +22,13 @@ here.
   problems stand out. It's read-only, so you can keep an eye on your containers
   without also opening Portainer. (#220)
 
+### Changed
+
+- **The Monitor cockpit's proportions are rebalanced.** Sonarr and Radarr now
+  sit in wider tiles so their upcoming/recent lists have room to breathe, and
+  qBittorrent takes a more modest footprint — the page reads as a more even
+  instrument panel. TrueNAS keeps a large tile for its new apps list. (#219)
+
 ## [2.7.0] - 2026-07-24
 
 ### Changed

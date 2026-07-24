@@ -26,25 +26,31 @@ import UnifiCard from "./UnifiCard";
 
 const REFRESH_MS = 45_000;
 
-// The opinionated bento: each service's fixed footprint. The classes read as a
-// 4-column mosaic (at `xl`) that folds to two columns at `md` and one on phones.
-// The three richest, most-glanced services (qBittorrent's torrents, Portainer's
-// containers, TrueNAS's pools/alerts) get the large 2×2 tiles; the *arr queues a
-// tall 1×2; the summary/stat services (Seerr, Tautulli, AdGuard, UniFi) fill the
-// 1×1 gaps. Defaults (unspanned) are 1×1, so only the larger tiles carry a
-// class. The spans sum to a clean 20-cell rectangle (5 rows × 4 cols at `xl`),
-// which dense auto-flow packs gaplessly; the layout is not user-arrangeable.
-const BENTO: Record<ServiceId, string> = {
-  qbittorrent: "md:col-span-2 md:row-span-2",
-  portainer: "md:col-span-2 md:row-span-2",
-  truenas: "md:col-span-2 md:row-span-2",
-  sonarr: "md:row-span-2",
-  radarr: "md:row-span-2",
-  seerr: "",
-  tautulli: "",
-  adguard: "",
-  unifi: "",
+// The opinionated bento: each service's fixed footprint (`span`) and its place
+// in the render order (`order`). The classes read as a 4-column mosaic (at `xl`)
+// that folds to two columns at `md` and one on phones. Sonarr/Radarr and TrueNAS
+// (pools + apps) get the large 2×2 tiles; qBittorrent and Portainer get a wide
+// 2×1; the summary/stat services (AdGuard, Tautulli, Seerr, UniFi) fill the 1×1
+// gaps. Defaults (unspanned) are 1×1. The `order` interleaves the tiles so
+// `grid-flow-row-dense` packs them into clean full-width bands with no holes —
+// two 2×2 (rows 1–2), then TrueNAS 2×2 beside qBittorrent+Portainer stacked
+// (rows 3–4), then the four 1×1 (row 5): a 20-cell rectangle. It also sets the
+// single-column phone order. The layout is opinionated and not user-arrangeable.
+const BENTO: Record<ServiceId, { span: string; order: number }> = {
+  sonarr: { span: "md:col-span-2 md:row-span-2", order: 1 },
+  radarr: { span: "md:col-span-2 md:row-span-2", order: 2 },
+  qbittorrent: { span: "md:col-span-2", order: 3 },
+  truenas: { span: "md:col-span-2 md:row-span-2", order: 4 },
+  portainer: { span: "md:col-span-2", order: 5 },
+  adguard: { span: "", order: 6 },
+  tautulli: { span: "", order: 7 },
+  seerr: { span: "", order: 8 },
+  unifi: { span: "", order: 9 },
 };
+
+// SERVICE_IDS stays the completeness anchor (every id has a BENTO entry, checked
+// by the Record type); this just renders them in the bento's order.
+const BENTO_ORDER = [...SERVICE_IDS].sort((a, b) => BENTO[a].order - BENTO[b].order);
 
 // One card renderer per service, keyed by the shared ServiceId union (#212):
 // a service without a card is a compile error, not a configured service that
@@ -130,8 +136,8 @@ export default function MonitorDashboard({
           stretching the row; on phones the grid is a single natural-height
           column. */}
       <div className="grid grid-cols-1 gap-4 md:auto-rows-[13rem] md:grid-flow-row-dense md:grid-cols-2 xl:grid-cols-4">
-        {SERVICE_IDS.map((id) => (
-          <div key={id} className={BENTO[id]}>
+        {BENTO_ORDER.map((id) => (
+          <div key={id} className={BENTO[id].span}>
             {renderCard(id, snapshot, refresh)}
           </div>
         ))}
