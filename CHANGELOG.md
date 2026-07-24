@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-07-24
+
 ### Changed
 
 - **The Monitor page is now a cohesive command center.** The admin Monitor page
@@ -2352,7 +2354,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.6.0...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.7.0...HEAD
+[2.7.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.6.0...v2.7.0
 [2.6.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.5.1...v2.6.0
 [2.5.1]: https://github.com/boostctrl/ctrlcenter/compare/v2.5.0...v2.5.1
 [2.5.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.4.1...v2.5.0
