@@ -617,6 +617,8 @@ describe("readConfigInternal stays off public surfaces", () => {
     "app/api/password/route.ts",
     // Admin-only integration snapshot: reads once, then gates on the hash.
     "app/api/monitor/route.ts",
+    // Admin-only per-service detail: same read-once-then-gate as the snapshot.
+    "app/api/monitor/[id]/route.ts",
     // Auth itself: verifies the password / issues the session.
     "app/api/login/route.ts",
     // Admin-only 2FA management: read the current TOTP state before mutating.

@@ -88,6 +88,37 @@ export type QbittorrentSnapshot = {
 // not a torrent manager; the full list lives in qBittorrent itself.
 export const TORRENT_LIST_CAP = 8;
 
+// The detail page (#208) shows far more of the list than the glance card — but
+// still bounded, since a huge instance's full list belongs in qBittorrent
+// itself and the payload crosses the wire on every poll.
+export const TORRENT_DETAIL_CAP = 200;
+
+// The all-time / session transfer totals the detail header shows, beyond the
+// live rates the card already has.
+export type QbittorrentSession = {
+  // Bytes transferred this session and all-time.
+  sessionDown: number;
+  sessionUp: number;
+  allTimeDown: number;
+  allTimeUp: number;
+  // Global share ratio, or null when qBittorrent didn't report a number.
+  ratio: number | null;
+  // Bytes free on the default save path; null when unknown.
+  freeSpace: number | null;
+  // "connected" / "firewalled" / "disconnected" — verbatim, "" when unknown.
+  connection: string;
+};
+
+// The detail payload: the same overview the card has, a much larger torrent
+// list, and the session totals.
+export type QbittorrentDetail = {
+  downSpeed: number;
+  upSpeed: number;
+  counts: QbittorrentSnapshot["counts"];
+  session: QbittorrentSession;
+  torrents: QbittorrentTorrent[];
+};
+
 // The card's per-state tally (total / downloading / seeding / paused) needs
 // every torrent, so the first /sync/maindata call returns the whole map — and
 // on a large instance that JSON runs well past the default SERVICE_MAX_BYTES,
@@ -288,8 +319,20 @@ async function qbitRequest(
 
 // --- Raw API shapes (only the fields the snapshot uses) ---
 
-// The server-wide counters from maindata's server_state (overall rates).
-type RawServerState = { dl_info_speed?: number; up_info_speed?: number };
+// The server-wide counters from maindata's server_state. The card needs only
+// the live rates; the detail view (#208 detail pages) also reads the session
+// and all-time totals, global ratio, free disk space, and connection status.
+type RawServerState = {
+  dl_info_speed?: number;
+  up_info_speed?: number;
+  dl_info_data?: number;
+  up_info_data?: number;
+  alltime_dl?: number;
+  alltime_ul?: number;
+  global_ratio?: string | number;
+  free_space_on_disk?: number;
+  connection_status?: string;
+};
 type RawTorrent = {
   name?: string;
   state?: string;
@@ -389,13 +432,17 @@ function interest(t: QbittorrentTorrent): number {
   );
 }
 
-export async function getQbittorrentSnapshot(
-  cfg: QbittorrentConfig
-): Promise<QbittorrentSnapshot> {
-  const base = serviceBase(cfg.url);
-  const state = await syncMaindata(base, cfg);
+// Map the maintained sync state into the shared overview both the card and the
+// detail view read: live rates, the state tally, and the torrents sorted by
+// interest (moving first). Callers slice the sorted list to their own cap.
+function summarize(state: QbitSyncState): {
+  downSpeed: number;
+  upSpeed: number;
+  counts: QbittorrentSnapshot["counts"];
+  sorted: QbittorrentTorrent[];
+} {
   // Entries, not values: the map key IS the torrent's info-hash, which the
-  // card's actions target.
+  // actions target.
   const rows = [...state.torrents.entries()];
 
   const torrents = rows.map(
@@ -436,20 +483,60 @@ export async function getQbittorrentSnapshot(
     else if (t.state === "error") counts.errored += 1;
   }
 
-  const list = [...torrents]
-    .sort(
-      (a, b) =>
-        interest(b) - interest(a) ||
-        b.downSpeed + b.upSpeed - (a.downSpeed + a.upSpeed) ||
-        a.name.localeCompare(b.name)
-    )
-    .slice(0, TORRENT_LIST_CAP);
+  const sorted = [...torrents].sort(
+    (a, b) =>
+      interest(b) - interest(a) ||
+      b.downSpeed + b.upSpeed - (a.downSpeed + a.upSpeed) ||
+      a.name.localeCompare(b.name)
+  );
 
   return {
     downSpeed: num(state.serverState.dl_info_speed),
     upSpeed: num(state.serverState.up_info_speed),
     counts,
-    torrents: list,
+    sorted,
+  };
+}
+
+export async function getQbittorrentSnapshot(
+  cfg: QbittorrentConfig
+): Promise<QbittorrentSnapshot> {
+  const base = serviceBase(cfg.url);
+  const state = await syncMaindata(base, cfg);
+  const { downSpeed, upSpeed, counts, sorted } = summarize(state);
+  return { downSpeed, upSpeed, counts, torrents: sorted.slice(0, TORRENT_LIST_CAP) };
+}
+
+// The detail view (#208): the same overview with a much larger torrent list and
+// the session/all-time totals the header shows. Rides the same maintained sync
+// state as the snapshot, so opening a detail page adds no extra qBittorrent load.
+export async function getQbittorrentDetail(
+  cfg: QbittorrentConfig
+): Promise<QbittorrentDetail> {
+  const base = serviceBase(cfg.url);
+  const state = await syncMaindata(base, cfg);
+  const { downSpeed, upSpeed, counts, sorted } = summarize(state);
+  const s = state.serverState;
+  const ratio =
+    typeof s.global_ratio === "number"
+      ? s.global_ratio
+      : typeof s.global_ratio === "string" && s.global_ratio.trim() !== "" && Number.isFinite(Number(s.global_ratio))
+        ? Number(s.global_ratio)
+        : null;
+  return {
+    downSpeed,
+    upSpeed,
+    counts,
+    session: {
+      sessionDown: num(s.dl_info_data),
+      sessionUp: num(s.up_info_data),
+      allTimeDown: num(s.alltime_dl),
+      allTimeUp: num(s.alltime_ul),
+      ratio,
+      freeSpace: typeof s.free_space_on_disk === "number" ? s.free_space_on_disk : null,
+      connection: typeof s.connection_status === "string" ? s.connection_status : "",
+    },
+    torrents: sorted.slice(0, TORRENT_DETAIL_CAP),
   };
 }
 

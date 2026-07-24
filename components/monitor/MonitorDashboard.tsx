@@ -62,9 +62,7 @@ const CARDS: {
     onActed: () => void
   ) => ReactNode;
 } = {
-  qbittorrent: (status, onActed) => (
-    <QbittorrentCard status={status} onActed={onActed} />
-  ),
+  qbittorrent: (status) => <QbittorrentCard status={status} />,
   sonarr: (status) => <ArrCard title="Sonarr" status={status} />,
   radarr: (status) => <ArrCard title="Radarr" status={status} />,
   adguard: (status) => <AdguardCard status={status} />,

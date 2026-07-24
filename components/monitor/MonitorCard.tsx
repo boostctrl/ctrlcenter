@@ -143,17 +143,25 @@ function Placeholder({
 export default function MonitorCard({
   title,
   status,
+  href,
   children,
 }: {
   title: string;
   status: ServiceStatus<unknown>;
+  // When set, a configured service's whole tile links to its detail page (#208).
+  // Disabled/unconfigured tiles keep their Settings CTA and never link — there's
+  // nothing to drill into yet.
+  href?: string;
   children?: ReactNode;
 }) {
   const state = serviceState(status);
   const showData = hasData(state);
-  return (
-    <section className="glass-card flex h-full flex-col gap-3 p-5">
-      <div className="flex items-baseline justify-between gap-3 border-b border-fg/10 pb-2.5">
+  // Live, stale, and offline tiles are drillable; the placeholder states aren't.
+  const clickable =
+    href != null && state !== "disabled" && state !== "unconfigured";
+  const cls = "glass-card flex h-full flex-col gap-3 p-5";
+  const header = (
+    <div className="flex items-baseline justify-between gap-3 border-b border-fg/10 pb-2.5">
         <h2 className="flex items-center gap-2 text-[15px] font-semibold text-fg/90">
           <span
             aria-hidden
@@ -161,26 +169,40 @@ export default function MonitorCard({
           />
           {title}
         </h2>
-        {state === "stale" && status.error && (
-          <span className="text-right text-xs text-amber-400/90">
-            Stale — {status.error}
-          </span>
-        )}
-      </div>
-      {/* The body flexes to fill the fixed-height bento tile and scrolls inside
-          it, so a long list (torrents, containers, pools) can never blow out
-          the mosaic. Placeholders center in the same space. */}
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
-        {showData ? (
-          children
-        ) : state === "unreachable" ? (
-          <OfflineBody title={title} error={status.error} />
-        ) : state === "disabled" ? (
-          <DisabledBody />
-        ) : (
-          <ConnectBody title={title} />
-        )}
-      </div>
+      {state === "stale" && status.error && (
+        <span className="text-right text-xs text-amber-400/90">
+          Stale — {status.error}
+        </span>
+      )}
+    </div>
+  );
+  // The body flexes to fill the fixed-height bento tile and scrolls inside it,
+  // so a long list (torrents, containers, pools) can never blow out the mosaic.
+  // Placeholders center in the same space.
+  const body = (
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+      {showData ? (
+        children
+      ) : state === "unreachable" ? (
+        <OfflineBody title={title} error={status.error} />
+      ) : state === "disabled" ? (
+        <DisabledBody />
+      ) : (
+        <ConnectBody title={title} />
+      )}
+    </div>
+  );
+
+  // A drillable tile is the link itself, so the whole card is one big target.
+  return clickable ? (
+    <Link href={href} className={`${cls} transition hover:brightness-110`}>
+      {header}
+      {body}
+    </Link>
+  ) : (
+    <section className={cls}>
+      {header}
+      {body}
     </section>
   );
 }
