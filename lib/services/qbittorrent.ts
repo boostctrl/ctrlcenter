@@ -50,6 +50,10 @@ export type TorrentState =
   | "error";
 
 export type QbittorrentTorrent = {
+  // The info-hash, qBittorrent's per-torrent id — the key the maindata map is
+  // already stored under. Carried so the card's actions (#201) can target this
+  // exact torrent (pause/resume/delete).
+  hash: string;
   name: string;
   state: TorrentState;
   // Completion 0..1.
@@ -236,33 +240,46 @@ function extractSessionCookie(headers: Headers): string | null {
   return null;
 }
 
-// GET an authenticated endpoint, logging in on a missing/expired session.
+// Call an authenticated endpoint, logging in on a missing/expired session.
 // Exactly one retry: a 403 straight after a fresh login is a real error.
-// `maxBytes` lets the large torrent-list call raise the body cap without
-// widening it for the small endpoints.
+// GET by default; `method`/`body` drive the write actions (#201) as
+// form-encoded POSTs. `maxBytes` lets the large torrent-list call raise the
+// body cap without widening it for the small endpoints.
 async function qbitRequest(
   base: string,
   cfg: QbittorrentConfig,
   path: string,
-  maxBytes?: number
+  opts: { maxBytes?: number; method?: string; body?: string } = {}
 ): Promise<string> {
   const key = sessionKey(base, cfg.username);
   // An empty cookie means the session is auth-exempt (see mintSession); send
   // no Cookie header at all in that case.
-  const headersFor = (cookie: string): Record<string, string> =>
-    cookie ? { Cookie: cookie, Referer: base } : { Referer: base };
+  const headersFor = (cookie: string): Record<string, string> => {
+    const h: Record<string, string> = cookie
+      ? { Cookie: cookie, Referer: base }
+      : { Referer: base };
+    if (opts.body !== undefined) {
+      h["Content-Type"] = "application/x-www-form-urlencoded";
+    }
+    return h;
+  };
+  const init = (cookie: string): RequestInit => ({
+    method: opts.method,
+    headers: headersFor(cookie),
+    body: opts.body,
+  });
   let cookie = sessions.get(key) ?? (await login(base, cfg));
   let { res, text } = await serviceRequest(
     `${base}${path}`,
-    { headers: headersFor(cookie) },
-    maxBytes
+    init(cookie),
+    opts.maxBytes
   );
   if (res.status === 403) {
     cookie = await login(base, cfg);
     ({ res, text } = await serviceRequest(
       `${base}${path}`,
-      { headers: headersFor(cookie) },
-      maxBytes
+      init(cookie),
+      opts.maxBytes
     ));
   }
   if (!res.ok) throw new ServiceError(`HTTP ${res.status}`);
@@ -352,7 +369,7 @@ function syncMaindata(
       base,
       cfg,
       `/api/v2/sync/maindata?rid=${rid}`,
-      QBITTORRENT_MAX_BYTES
+      { maxBytes: QBITTORRENT_MAX_BYTES }
     );
     const next = applyMaindata(prev, parseJson<MaindataResponse>(text));
     syncStates.set(key, next);
@@ -377,10 +394,13 @@ export async function getQbittorrentSnapshot(
 ): Promise<QbittorrentSnapshot> {
   const base = serviceBase(cfg.url);
   const state = await syncMaindata(base, cfg);
-  const rows = [...state.torrents.values()];
+  // Entries, not values: the map key IS the torrent's info-hash, which the
+  // card's actions target.
+  const rows = [...state.torrents.entries()];
 
   const torrents = rows.map(
-    (t): QbittorrentTorrent => ({
+    ([hash, t]): QbittorrentTorrent => ({
+      hash,
       name: typeof t.name === "string" ? t.name : "(unnamed)",
       state: simplifyTorrentState(typeof t.state === "string" ? t.state : ""),
       progress: Math.min(1, Math.max(0, num(t.progress))),
@@ -454,5 +474,66 @@ export async function probeQbittorrent(
     syncStates.delete(key);
     const version = await qbitRequest(base, cfg, "/api/v2/app/version");
     return `qBittorrent ${version.trim()}`.trim();
+  });
+}
+
+// --- Write actions (#201) ---
+//
+// Every action is a form-encoded POST carrying the torrent's info-hash. All go
+// through qbitRequest, so they reuse the session cache and one-retry re-login.
+// Reachable only through the admin-gated /api/monitor/action route, itself
+// behind the allowActions opt-in (lib/services/guard.ts).
+
+// qBittorrent 5.0 renamed the pause/resume endpoints to stop/start (matching
+// the state rename this client already buckets). Try the 5.x name and fall
+// back to the legacy one on a 404/405, so one client drives both versions.
+async function torrentCommand(
+  cfg: QbittorrentConfig,
+  modern: string,
+  legacy: string,
+  hash: string
+): Promise<void> {
+  const base = serviceBase(cfg.url);
+  const body = new URLSearchParams({ hashes: hash }).toString();
+  try {
+    await qbitRequest(base, cfg, `/api/v2/torrents/${modern}`, {
+      method: "POST",
+      body,
+    });
+  } catch (e) {
+    if (e instanceof ServiceError && /^HTTP 40[45]$/.test(e.message)) {
+      await qbitRequest(base, cfg, `/api/v2/torrents/${legacy}`, {
+        method: "POST",
+        body,
+      });
+      return;
+    }
+    throw e;
+  }
+}
+
+export function pauseTorrent(cfg: QbittorrentConfig, hash: string): Promise<void> {
+  return torrentCommand(cfg, "stop", "pause", hash);
+}
+
+export function resumeTorrent(cfg: QbittorrentConfig, hash: string): Promise<void> {
+  return torrentCommand(cfg, "start", "resume", hash);
+}
+
+// Remove a torrent. `deleteFiles` chooses whether its downloaded data goes with
+// it — the card makes that choice explicit (#201). The endpoint name is stable
+// across qBittorrent 4/5.
+export async function deleteTorrent(
+  cfg: QbittorrentConfig,
+  hash: string,
+  deleteFiles: boolean
+): Promise<void> {
+  const base = serviceBase(cfg.url);
+  await qbitRequest(base, cfg, "/api/v2/torrents/delete", {
+    method: "POST",
+    body: new URLSearchParams({
+      hashes: hash,
+      deleteFiles: deleteFiles ? "true" : "false",
+    }).toString(),
   });
 }

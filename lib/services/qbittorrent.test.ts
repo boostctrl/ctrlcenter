@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   applyMaindata,
+  deleteTorrent,
   getQbittorrentSnapshot,
+  pauseTorrent,
   probeQbittorrent,
   resolveQbittorrentPassword,
+  resumeTorrent,
   simplifyTorrentState,
   TORRENT_LIST_CAP,
   type QbitSyncState,
@@ -374,6 +377,90 @@ describe("getQbittorrentSnapshot", () => {
     expect(result.ok).toBe(false);
     expect(result.error).toMatch(/http\(s\)/);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("qBittorrent actions", () => {
+  // A fetch stub that logs in, then answers the torrent-command endpoints,
+  // optionally 404ing the 5.x names so the legacy fallback is exercised.
+  function stubCommands({ modern404 = false } = {}) {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/v2/auth/login")) return okLogin();
+      if (
+        modern404 &&
+        (url.endsWith("/torrents/stop") || url.endsWith("/torrents/start"))
+      ) {
+        return new Response("", { status: 404 });
+      }
+      if (
+        url.endsWith("/torrents/stop") ||
+        url.endsWith("/torrents/start") ||
+        url.endsWith("/torrents/pause") ||
+        url.endsWith("/torrents/resume") ||
+        url.endsWith("/torrents/delete")
+      ) {
+        return new Response("");
+      }
+      return new Response("not found", { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  const torrentCall = (fetchMock: ReturnType<typeof vi.fn>, suffix: string) =>
+    fetchMock.mock.calls.find(([i]) => String(i).endsWith(suffix)) as
+      | [RequestInfo, RequestInit]
+      | undefined;
+
+  it("threads the info-hash into each snapshot row", async () => {
+    stubQbit({ torrents: [{ name: "A", state: "downloading" }] });
+    const snap = await getQbittorrentSnapshot(CFG);
+    // The stub keys torrents h0, h1, … — the map key IS the hash.
+    expect(snap.torrents[0].hash).toBe("h0");
+  });
+
+  it("pauses via the 5.x /stop endpoint with a form-encoded hash", async () => {
+    const fetchMock = stubCommands();
+    await pauseTorrent(CFG, "abc123");
+    const call = torrentCall(fetchMock, "/torrents/stop");
+    expect(call).toBeTruthy();
+    const [, init] = call!;
+    expect(init.method).toBe("POST");
+    expect(String(init.body)).toBe("hashes=abc123");
+    expect(new Headers(init.headers).get("content-type")).toBe(
+      "application/x-www-form-urlencoded"
+    );
+  });
+
+  it("resumes via the 5.x /start endpoint", async () => {
+    const fetchMock = stubCommands();
+    await resumeTorrent(CFG, "abc123");
+    expect(torrentCall(fetchMock, "/torrents/start")).toBeTruthy();
+  });
+
+  it("falls back to the legacy /pause endpoint when /stop is a 404", async () => {
+    const fetchMock = stubCommands({ modern404: true });
+    await pauseTorrent(CFG, "abc123");
+    // Tried the 5.x name, then the legacy one.
+    expect(torrentCall(fetchMock, "/torrents/stop")).toBeTruthy();
+    const legacy = torrentCall(fetchMock, "/torrents/pause");
+    expect(legacy).toBeTruthy();
+    expect(String(legacy![1].body)).toBe("hashes=abc123");
+  });
+
+  it("encodes the deleteFiles choice on delete", async () => {
+    const withData = stubCommands();
+    await deleteTorrent(CFG, "abc123", true);
+    expect(String(torrentCall(withData, "/torrents/delete")![1].body)).toBe(
+      "hashes=abc123&deleteFiles=true"
+    );
+
+    const keepData = stubCommands();
+    await deleteTorrent(CFG, "abc123", false);
+    expect(String(torrentCall(keepData, "/torrents/delete")![1].body)).toBe(
+      "hashes=abc123&deleteFiles=false"
+    );
   });
 });
 

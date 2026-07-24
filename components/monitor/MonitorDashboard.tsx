@@ -1,10 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useEffect, useState, type ReactNode } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 import type { MonitorSnapshot, ServiceStatus } from "@/lib/monitor";
 import { SERVICE_IDS, SERVICE_LABELS, type ServiceId } from "@/lib/services/ids";
 import type { ServiceSnapshotMap } from "@/lib/services/registry";
+import { ConfirmProvider } from "@/components/admin/Confirm";
 import PageNav from "@/components/PageNav";
 import QbittorrentCard from "./QbittorrentCard";
 import ArrCard from "./ArrCard";
@@ -25,11 +32,17 @@ const REFRESH_MS = 45_000;
 
 // One card renderer per service, keyed by the shared ServiceId union (#212):
 // a service without a card is a compile error, not a configured service that
-// silently never renders.
+// silently never renders. Action-capable cards (#201/#202/#203) take `onActed`
+// to refetch the snapshot right after a successful action; the rest ignore it.
 const CARDS: {
-  [K in ServiceId]: (status: ServiceStatus<ServiceSnapshotMap[K]>) => ReactNode;
+  [K in ServiceId]: (
+    status: ServiceStatus<ServiceSnapshotMap[K]>,
+    onActed: () => void
+  ) => ReactNode;
 } = {
-  qbittorrent: (status) => <QbittorrentCard status={status} />,
+  qbittorrent: (status, onActed) => (
+    <QbittorrentCard status={status} onActed={onActed} />
+  ),
   sonarr: (status) => <ArrCard title="Sonarr" status={status} />,
   radarr: (status) => <ArrCard title="Radarr" status={status} />,
   adguard: (status) => <AdguardCard status={status} />,
@@ -44,9 +57,10 @@ const CARDS: {
 // with the plain union would decouple the card from its payload type.
 function renderCard<K extends ServiceId>(
   id: K,
-  snapshot: MonitorSnapshot
+  snapshot: MonitorSnapshot,
+  onActed: () => void
 ): ReactNode {
-  return CARDS[id](snapshot[id]);
+  return CARDS[id](snapshot[id], onActed);
 }
 
 // "qBittorrent, Sonarr, or Radarr" — prose list of every service, so the
@@ -66,26 +80,26 @@ export default function MonitorDashboard({
 }) {
   const [snapshot, setSnapshot] = useState(initial);
 
-  useEffect(() => {
-    let cancelled = false;
-    const tick = async () => {
-      // A backgrounded tab shouldn't keep the services warm.
-      if (document.hidden) return;
-      try {
-        const res = await fetch("/api/monitor");
-        if (!res.ok) return; // keep the last snapshot; cards show their own errors
-        const next = (await res.json()) as MonitorSnapshot;
-        if (!cancelled) setSnapshot(next);
-      } catch {
-        // Network blip — the interval will try again.
-      }
-    };
-    const timer = setInterval(tick, REFRESH_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
+  // Refetch the shared snapshot. Drives the poll and is handed to the
+  // action-capable cards so a completed action reflects at once instead of
+  // waiting out the interval. A setState after unmount is a harmless no-op in
+  // React 19, so no cancellation bookkeeping is needed.
+  const refresh = useCallback(async () => {
+    // A backgrounded tab shouldn't keep the services warm.
+    if (document.hidden) return;
+    try {
+      const res = await fetch("/api/monitor");
+      if (!res.ok) return; // keep the last snapshot; cards show their own errors
+      setSnapshot((await res.json()) as MonitorSnapshot);
+    } catch {
+      // Network blip — the interval will try again.
+    }
   }, []);
+
+  useEffect(() => {
+    const timer = setInterval(refresh, REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [refresh]);
 
   const configured = SERVICE_IDS.filter((id) => snapshot[id].configured);
   const unconfigured = SERVICE_IDS.filter((id) => !snapshot[id].configured);
@@ -93,6 +107,7 @@ export default function MonitorDashboard({
   const settingsLink = "/admin?tab=settings&section=integrations";
 
   return (
+    <ConfirmProvider>
     <main className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 py-12 sm:px-10 lg:py-16">
       <div>
         <PageNav current={null} {...nav} />
@@ -121,7 +136,7 @@ export default function MonitorDashboard({
       ) : (
         <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2 2xl:grid-cols-3">
           {configured.map((id) => (
-            <Fragment key={id}>{renderCard(id, snapshot)}</Fragment>
+            <Fragment key={id}>{renderCard(id, snapshot, refresh)}</Fragment>
           ))}
           {unconfigured.length > 0 && (
             <div className="flex min-h-32 flex-col items-start justify-center gap-2 rounded-2xl border border-dashed border-fg/15 p-6">
@@ -144,5 +159,6 @@ export default function MonitorDashboard({
         tab is visible.
       </p>
     </main>
+    </ConfirmProvider>
   );
 }

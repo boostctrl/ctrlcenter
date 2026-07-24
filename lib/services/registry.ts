@@ -130,14 +130,16 @@ export function isServiceConfigured(cfg: {
 }
 
 // Cache fingerprint of the config that produced a snapshot: every field
-// except `enabled`, so an edited URL or credential invalidates the cached
-// data immediately (it may belong to a different target) while toggling a
-// service off and on doesn't discard still-valid data. Keys are sorted so
-// property order can't fake a config change.
+// except the flags that don't change the target — `enabled` and `allowActions`
+// — so an edited URL or credential invalidates the cached data immediately (it
+// may belong to a different target) while toggling a service off and on, or
+// turning actions on and off, doesn't discard still-valid data. Keys are sorted
+// so property order can't fake a config change.
+const NON_TARGET_FIELDS = new Set(["enabled", "allowActions"]);
 export function serviceFingerprint(cfg: object): string {
   return JSON.stringify(
     Object.entries(cfg)
-      .filter(([key]) => key !== "enabled")
+      .filter(([key]) => !NON_TARGET_FIELDS.has(key))
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
   );
 }

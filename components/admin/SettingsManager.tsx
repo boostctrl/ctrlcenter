@@ -145,15 +145,19 @@ const USER_PASS_INTEGRATION_CARDS: readonly {
   // Show the "allow self-signed certificate" toggle for HTTPS-only
   // controllers that ship a self-signed cert (UniFi).
   insecureToggle?: boolean;
+  // Show the write-action opt-in toggle for services with dashboard actions
+  // (#201/#202/#203). Default off — the card stays read-only until turned on.
+  actionsToggle?: boolean;
 }[] = [
   {
     id: "qbittorrent",
     title: "qBittorrent",
     intro:
-      "Transfer speeds and the active torrent list, read-only, on the Monitor page.",
+      "Transfer speeds and the active torrent list on the Monitor page. Turn on actions to pause, resume, and delete torrents.",
     urlLabel: "WebUI URL",
     placeholder: "http://192.168.1.10:8080",
     envVar: "CTRLCENTER_QBITTORRENT_PASS",
+    actionsToggle: true,
   },
   {
     id: "adguard",
@@ -183,6 +187,9 @@ const API_KEY_INTEGRATION_CARDS: readonly {
   placeholder: string;
   keyHint: string;
   envVar: string;
+  // Show the write-action opt-in toggle for services with dashboard actions
+  // (#201/#202/#203). Default off — the card stays read-only until turned on.
+  actionsToggle?: boolean;
 }[] = [
   {
     id: "sonarr",
@@ -215,19 +222,21 @@ const API_KEY_INTEGRATION_CARDS: readonly {
     id: "seerr",
     title: "Seerr",
     intro:
-      "Pending requests and their status, read-only, on the Monitor page. Seerr is the merged successor to Overseerr and Jellyseerr.",
+      "Pending requests and their status on the Monitor page. Turn on actions to approve or deny requests. Seerr is the merged successor to Overseerr and Jellyseerr.",
     placeholder: "http://192.168.1.10:5055",
     keyHint: "Seerr → Settings → General → API Key.",
     envVar: "CTRLCENTER_SEERR_KEY",
+    actionsToggle: true,
   },
   {
     id: "portainer",
     title: "Portainer",
     intro:
-      "Container states across every environment, read-only, on the Monitor page.",
+      "Container states across every environment on the Monitor page. Turn on actions to start, stop, and restart containers and view their logs.",
     placeholder: "https://192.168.1.10:9443",
     keyHint: "Portainer → My account → Access tokens → Add access token.",
     envVar: "CTRLCENTER_PORTAINER_KEY",
+    actionsToggle: true,
   },
   {
     id: "truenas",
@@ -1809,7 +1818,7 @@ export default function SettingsManager({
 
         {section === "integrations" &&
           USER_PASS_INTEGRATION_CARDS.map(
-            ({ id, title, intro, urlLabel, placeholder, envVar, insecureToggle }) => (
+            ({ id, title, intro, urlLabel, placeholder, envVar, insecureToggle, actionsToggle }) => (
               <Card
                 key={id}
                 title={title}
@@ -1858,6 +1867,16 @@ export default function SettingsManager({
                         }
                       />
                     )}
+                    {actionsToggle && (
+                      <ToggleRow
+                        label="Allow actions from the dashboard"
+                        hint="Off by default — the card stays read-only. When on, admins can act on this service from the Monitor page. Every action is logged."
+                        checked={integrations[id].allowActions}
+                        onChange={(allowActions) =>
+                          updateIntegration(id, { allowActions })
+                        }
+                      />
+                    )}
                     <IntegrationTest
                       service={id}
                       url={integrations[id].url}
@@ -1878,7 +1897,7 @@ export default function SettingsManager({
 
         {section === "integrations" &&
           API_KEY_INTEGRATION_CARDS.map(
-            ({ id, title, intro, placeholder, keyHint, envVar }) => (
+            ({ id, title, intro, placeholder, keyHint, envVar, actionsToggle }) => (
               <Card
                 key={id}
                 title={title}
@@ -1908,6 +1927,16 @@ export default function SettingsManager({
                       }
                       hint={keyHint}
                     />
+                    {actionsToggle && (
+                      <ToggleRow
+                        label="Allow actions from the dashboard"
+                        hint="Off by default — the card stays read-only. When on, admins can act on this service from the Monitor page. Every action is logged."
+                        checked={integrations[id].allowActions}
+                        onChange={(allowActions) =>
+                          updateIntegration(id, { allowActions })
+                        }
+                      />
+                    )}
                     <IntegrationTest
                       service={id}
                       url={integrations[id].url}

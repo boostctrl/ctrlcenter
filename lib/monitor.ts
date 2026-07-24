@@ -28,6 +28,11 @@ import { log, errorReason } from "./log";
 // service renders as a set-up hint, not an error.
 export type ServiceStatus<T> = {
   configured: boolean;
+  // Whether write actions are turned on for this integration (#201/#202/#203):
+  // configured AND its allowActions opt-in is set. The card renders its action
+  // controls only when true — the flag itself, not the credentials, is all the
+  // client needs to know, so nothing sensitive crosses to the browser.
+  actionsAllowed: boolean;
   data: T | null;
   error: string | null;
   // When `data`/`error` was recorded (epoch ms); null when never fetched.
@@ -111,6 +116,7 @@ function refresh(
 async function serviceStatus<T>(
   id: ServiceId,
   configured: boolean,
+  actionsAllowed: boolean,
   key: string,
   fetcher: () => Promise<T>
 ): Promise<ServiceStatus<T>> {
@@ -119,7 +125,7 @@ async function serviceStatus<T>(
     // Also forget the latest key, so an in-flight refresh that started before
     // the service was disabled can't write its result back in.
     latestKey.delete(id);
-    return { configured: false, data: null, error: null, at: null };
+    return { configured: false, actionsAllowed: false, data: null, error: null, at: null };
   }
   const entry = cache.get(id);
   if (!entry || entry.key !== key) {
@@ -130,6 +136,7 @@ async function serviceStatus<T>(
   const now = cache.get(id);
   return {
     configured: true,
+    actionsAllowed,
     data: (now?.data as T) ?? null,
     error: now?.error ?? null,
     at: now?.at ?? null,
@@ -143,9 +150,15 @@ function statusFor<K extends ServiceId>(
   integrations: IntegrationsConfig
 ): Promise<ServiceStatus<ServiceSnapshotMap[K]>> {
   const cfg = integrations[id];
+  const configured = isServiceConfigured(cfg);
   return serviceStatus(
     id,
-    isServiceConfigured(cfg),
+    configured,
+    // Actions are live only when the integration is both configured and opted
+    // in. Every integration carries allowActions (lib/schema.ts); the services
+    // without action support just never have a control to render it. `=== true`
+    // keeps the flag a strict boolean even if a hand-edited config omits it.
+    configured && cfg.allowActions === true,
     serviceFingerprint(cfg),
     () => SERVICES[id].snapshot(cfg)
   );

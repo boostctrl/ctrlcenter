@@ -7,15 +7,15 @@ const TTL = 30_000;
 const integrations = (
   over: Partial<IntegrationsConfig> = {}
 ): IntegrationsConfig => ({
-  qbittorrent: { enabled: false, url: "", username: "", password: "", allowInsecureTls: false },
-  sonarr: { enabled: false, url: "", apiKey: "", allowInsecureTls: false },
-  radarr: { enabled: false, url: "", apiKey: "", allowInsecureTls: false },
-  adguard: { enabled: false, url: "", username: "", password: "", allowInsecureTls: false },
-  tautulli: { enabled: false, url: "", apiKey: "", allowInsecureTls: false },
-  seerr: { enabled: false, url: "", apiKey: "", allowInsecureTls: false },
-  portainer: { enabled: false, url: "", apiKey: "", allowInsecureTls: false },
-  truenas: { enabled: false, url: "", apiKey: "", allowInsecureTls: false },
-  unifi: { enabled: false, url: "", username: "", password: "", allowInsecureTls: false },
+  qbittorrent: { enabled: false, url: "", username: "", password: "", allowInsecureTls: false, allowActions: false },
+  sonarr: { enabled: false, url: "", apiKey: "", allowInsecureTls: false, allowActions: false },
+  radarr: { enabled: false, url: "", apiKey: "", allowInsecureTls: false, allowActions: false },
+  adguard: { enabled: false, url: "", username: "", password: "", allowInsecureTls: false, allowActions: false },
+  tautulli: { enabled: false, url: "", apiKey: "", allowInsecureTls: false, allowActions: false },
+  seerr: { enabled: false, url: "", apiKey: "", allowInsecureTls: false, allowActions: false },
+  portainer: { enabled: false, url: "", apiKey: "", allowInsecureTls: false, allowActions: false },
+  truenas: { enabled: false, url: "", apiKey: "", allowInsecureTls: false, allowActions: false },
+  unifi: { enabled: false, url: "", username: "", password: "", allowInsecureTls: false, allowActions: false },
   ...over,
 });
 
@@ -87,12 +87,29 @@ describe("getMonitorSnapshot", () => {
     );
     expect(snap.qbittorrent).toEqual({
       configured: false,
+      actionsAllowed: false,
       data: null,
       error: null,
       at: null,
     });
     expect(snap.radarr.configured).toBe(false);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("marks actionsAllowed only when the integration is configured and opted in", async () => {
+    stubSonarr(() => 1);
+    // Configured but actions off (the default posture) — read-only.
+    const readOnly = await getMonitorSnapshot(sonarrOn());
+    expect(readOnly.sonarr.configured).toBe(true);
+    expect(readOnly.sonarr.actionsAllowed).toBe(false);
+
+    // Same target with the opt-in turned on — actions live.
+    const opted = await getMonitorSnapshot(
+      integrations({
+        sonarr: { enabled: true, url: "http://sonarr.local:8989", apiKey: "k", allowActions: true },
+      })
+    );
+    expect(opted.sonarr.actionsAllowed).toBe(true);
   });
 
   it("blocks only on a cold cache, then serves the cache within the TTL", async () => {

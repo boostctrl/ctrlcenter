@@ -12,6 +12,16 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Control qBittorrent from the Monitor page.** Each torrent on the
+  qBittorrent card gains Pause/Resume and Delete buttons. Deleting asks first
+  and makes the choice explicit — remove the torrent but keep its files, or
+  delete the data too. Actions are off by default: turn on “Allow actions from
+  the dashboard” for qBittorrent in Settings → Integrations to enable them. The
+  card stays read-only until you do, actions require an admin sign-in, and every
+  one is logged on the server. (#201)
+
 ## [2.5.1] - 2026-07-23
 
 ### Changed

@@ -251,12 +251,20 @@ export type SystemStatsConfig = z.infer<typeof systemStatsSchema>;
 // Only honored by clients that support it (UniFi) and only for an https URL —
 // it exists for controllers that ship a self-signed cert with no plaintext
 // alternative. Not a secret (a boolean), so stripSecrets leaves it intact.
+//
+// `allowActions` is the write-side opt-in (#201/#202/#203): default off, so a
+// configured integration stays read-only until the admin turns it on. Only the
+// action-capable services (qBittorrent, Seerr, Portainer) expose the toggle and
+// honor it; every service carries the field so both credential shapes share one
+// schema. redactIntegrations (lib/config.ts) forces every boolean off for
+// public surfaces, so this can't leak either.
 export const userPassIntegrationSchema = z.object({
   enabled: z.boolean().default(false),
   url: z.string().default(""),
   username: z.string().default(""),
   password: z.string().default(""),
   allowInsecureTls: z.boolean().default(false),
+  allowActions: z.boolean().default(false),
 });
 export type UserPassIntegration = z.infer<typeof userPassIntegrationSchema>;
 
@@ -265,6 +273,7 @@ export const apiKeyIntegrationSchema = z.object({
   url: z.string().default(""),
   apiKey: z.string().default(""),
   allowInsecureTls: z.boolean().default(false),
+  allowActions: z.boolean().default(false),
 });
 export type ApiKeyIntegration = z.infer<typeof apiKeyIntegrationSchema>;
 
@@ -904,6 +913,7 @@ export const userPassIntegrationUpdateSchema = z.object({
   username: z.string(),
   password: z.string(),
   allowInsecureTls: z.boolean(),
+  allowActions: z.boolean(),
 });
 
 export const apiKeyIntegrationUpdateSchema = z.object({
@@ -911,6 +921,7 @@ export const apiKeyIntegrationUpdateSchema = z.object({
   url: z.string(),
   apiKey: z.string(),
   allowInsecureTls: z.boolean(),
+  allowActions: z.boolean(),
 });
 
 export const integrationsUpdateSchema = z.object({
