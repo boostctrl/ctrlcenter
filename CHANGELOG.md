@@ -14,20 +14,30 @@ here.
 
 ### Added
 
-- **See your TrueNAS apps on the Monitor page.** The TrueNAS card now lists the
-  apps running on TrueNAS SCALE's Docker engine (Electric Eel / Fangtooth and
-  newer) alongside pool health and alerts — each with a status dot (running,
-  stopped, crashed, or deploying), its container count, and an "update" badge
-  when a newer version is available. Stopped and crashed apps sort to the top so
-  problems stand out. It's read-only, so you can keep an eye on your containers
-  without also opening Portainer. (#220)
+- **See your TrueNAS apps on the Monitor page.** TrueNAS now surfaces the apps
+  running on its Docker engine (TrueNAS SCALE Electric Eel / Fangtooth and
+  newer): the Monitor page shows an at-a-glance apps summary, and the TrueNAS
+  detail page lists every app with a status dot (running, stopped, crashed, or
+  deploying), its container count, and an "update" badge when a newer version is
+  available. Stopped and crashed apps sort to the top so problems stand out.
+  It's read-only, so you can keep an eye on your containers without also opening
+  Portainer. (#220)
 
 ### Changed
 
-- **The Monitor cockpit's proportions are rebalanced.** Sonarr and Radarr now
-  sit in wider tiles so their upcoming/recent lists have room to breathe, and
-  qBittorrent takes a more modest footprint — the page reads as a more even
-  instrument panel. TrueNAS keeps a large tile for its new apps list. (#219)
+- **The Monitor page is now an at-a-glance dashboard, and every service opens
+  its own detail page.** The grid of separate cards has been replaced by one
+  cohesive surface — a system-health summary above domain-grouped clusters
+  (Media, Network, Storage & Containers), where each service is a compact tile
+  showing its headline stat and a status dot. Click any service to open a
+  dedicated detail page with its full information: qBittorrent lists every
+  torrent with session and all-time transfer totals, Sonarr and Radarr show
+  their complete upcoming and recent queues, TrueNAS its full apps list, and so
+  on. Services you're using grow to fill the space while unused ones stay
+  quietly dimmed, so the page looks deliberate whether one service or all nine
+  are connected, and it reflows cleanly to phone width. Service controls for
+  qBittorrent, Seerr, and Portainer now live on each service's detail page.
+  (#222, #221, #219)
 
 ## [2.7.0] - 2026-07-24
 
