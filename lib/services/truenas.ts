@@ -38,12 +38,27 @@ export type TruenasPool = {
 
 export type TruenasAlert = { level: "warning" | "critical"; message: string };
 
+// One installed app from the Docker-based Apps system (SCALE 24.10+). `state`
+// is TrueNAS's verbatim RUNNING / STOPPED / DEPLOYING / CRASHED; `running` is
+// the derived healthy read. `containers` is how many workloads the app runs
+// (null when TrueNAS didn't report it), `upgradeAvailable` flags a pending
+// update.
+export type TruenasApp = {
+  name: string;
+  state: string;
+  running: boolean;
+  upgradeAvailable: boolean;
+  containers: number | null;
+};
+
 export type TruenasSnapshot = {
   pools: TruenasPool[];
+  apps: TruenasApp[];
   alerts: TruenasAlert[];
 };
 
 export const TRUENAS_POOL_CAP = 8;
+export const TRUENAS_APP_CAP = 8;
 export const TRUENAS_ALERT_CAP = 6;
 
 // --- Raw API shapes (only the fields the snapshot uses) ---
@@ -61,6 +76,15 @@ type RawAlert = {
   formatted?: string | null;
   text?: string | null;
   dismissed?: boolean;
+};
+type RawApp = {
+  name?: string;
+  state?: string;
+  upgrade_available?: boolean;
+  active_workloads?: {
+    containers?: number;
+    container_details?: unknown[];
+  } | null;
 };
 
 // TrueNAS reports some byte counts as strings (they exceed 2^53); read them
@@ -117,6 +141,33 @@ export function mapTruenasAlerts(raw: unknown): TruenasAlert[] {
   return out;
 }
 
+// Apps the admin runs on TrueNAS's Docker engine (SCALE 24.10+). Not-running
+// apps sort first so a crashed/stopped app surfaces at the top of the list, the
+// same "problems first" treatment the alerts get.
+export function mapTruenasApps(raw: unknown): TruenasApp[] {
+  const list = Array.isArray(raw) ? (raw as RawApp[]) : [];
+  const apps = list.map((a, i) => {
+    const state =
+      typeof a.state === "string" && a.state ? a.state.toUpperCase() : "UNKNOWN";
+    const w = a.active_workloads;
+    const containers =
+      typeof w?.containers === "number"
+        ? w.containers
+        : Array.isArray(w?.container_details)
+          ? w.container_details.length
+          : null;
+    return {
+      name: a.name?.trim() || `App ${i + 1}`,
+      state,
+      running: state === "RUNNING",
+      upgradeAvailable: a.upgrade_available === true,
+      containers,
+    };
+  });
+  apps.sort((a, b) => Number(a.running) - Number(b.running));
+  return apps.slice(0, TRUENAS_APP_CAP);
+}
+
 async function truenasJson<T>(cfg: TruenasConfig, path: string): Promise<T> {
   const base = serviceBase(cfg.url);
   try {
@@ -137,15 +188,18 @@ async function truenasJson<T>(cfg: TruenasConfig, path: string): Promise<T> {
 export async function getTruenasSnapshot(
   cfg: TruenasConfig
 ): Promise<TruenasSnapshot> {
-  const [poolsR, alertsR] = await Promise.allSettled([
+  const [poolsR, appsR, alertsR] = await Promise.allSettled([
     truenasJson<RawPool[]>(cfg, "/api/v2.0/pool"),
+    truenasJson<RawApp[]>(cfg, "/api/v2.0/app"),
     truenasJson<RawAlert[]>(cfg, "/api/v2.0/alert/list"),
   ]);
-  // Pools failing means the key or host is wrong — surface it. A failed alert
-  // list alone (a permissions quirk) shouldn't blank the pools.
+  // Pools failing means the key or host is wrong — surface it. A failed apps or
+  // alert list alone (an older SCALE without /app, or a key-scope quirk)
+  // shouldn't blank the pools; those sections just come back empty.
   if (poolsR.status === "rejected") throw poolsR.reason;
   return {
     pools: mapTruenasPools(poolsR.value),
+    apps: appsR.status === "fulfilled" ? mapTruenasApps(appsR.value) : [],
     alerts: alertsR.status === "fulfilled" ? mapTruenasAlerts(alertsR.value) : [],
   };
 }

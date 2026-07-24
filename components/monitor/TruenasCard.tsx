@@ -1,13 +1,18 @@
 "use client";
 
 import type { ServiceStatus } from "@/lib/monitor";
-import type { TruenasSnapshot, TruenasPool } from "@/lib/services/truenas";
+import type {
+  TruenasSnapshot,
+  TruenasPool,
+  TruenasApp,
+} from "@/lib/services/truenas";
 import { formatBytes } from "@/components/widgets/SystemStatsWidget";
 import MonitorCard, { Meter } from "./MonitorCard";
 
-// TrueNAS's card on the Monitor page (#193): per-pool health and capacity, and
-// the active alerts (SMART failures, replication problems, …). Read-only by
-// design — TrueNAS write actions are permanently out of scope.
+// TrueNAS's card on the Monitor page (#193): per-pool health and capacity, the
+// apps running on its Docker engine (SCALE 24.10+), and the active alerts (SMART
+// failures, replication problems, …). Read-only by design — TrueNAS write
+// actions are permanently out of scope.
 
 function PoolRow({ pool }: { pool: TruenasPool }) {
   return (
@@ -43,6 +48,52 @@ function PoolRow({ pool }: { pool: TruenasPool }) {
   );
 }
 
+// Running apps read green; a crash is red, a transitional state amber, anything
+// else (stopped/unknown) a muted grey — matching the pool health dots.
+function appDot(app: TruenasApp): string {
+  if (app.running) return "bg-emerald-400";
+  if (app.state === "CRASHED") return "bg-red-400";
+  if (app.state === "DEPLOYING" || app.state === "STOPPING") return "bg-amber-400";
+  return "bg-fg/25";
+}
+
+function AppRow({ app }: { app: TruenasApp }) {
+  return (
+    <li className="flex items-baseline justify-between gap-3">
+      <span className="flex min-w-0 items-center gap-2 text-sm text-fg/80">
+        <span
+          aria-hidden
+          className={`h-2 w-2 shrink-0 rounded-full ${appDot(app)}`}
+        />
+        <span className="truncate" title={app.name}>
+          {app.name}
+        </span>
+        {!app.running && (
+          <span
+            className={`shrink-0 text-xs ${
+              app.state === "CRASHED" ? "text-red-400" : "text-fg/45"
+            }`}
+          >
+            {app.state.toLowerCase()}
+          </span>
+        )}
+      </span>
+      <span className="flex shrink-0 items-baseline gap-2 text-xs tabular-nums text-fg/50">
+        {app.upgradeAvailable && (
+          <span className="rounded border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-amber-200/90 uppercase">
+            update
+          </span>
+        )}
+        {app.containers !== null && (
+          <span>
+            {app.containers} container{app.containers === 1 ? "" : "s"}
+          </span>
+        )}
+      </span>
+    </li>
+  );
+}
+
 export default function TruenasCard({
   status,
 }: {
@@ -61,6 +112,18 @@ export default function TruenasCard({
             </ul>
           ) : (
             <p className="text-sm text-fg/40">No pools reported.</p>
+          )}
+          {data.apps.length > 0 && (
+            <div className="flex flex-col gap-2 border-t border-fg/10 pt-3">
+              <p className="text-[11px] font-medium tracking-wide text-fg/40 uppercase">
+                Apps
+              </p>
+              <ul className="flex flex-col gap-1.5">
+                {data.apps.map((a, i) => (
+                  <AppRow key={`${a.name}-${i}`} app={a} />
+                ))}
+              </ul>
+            </div>
           )}
           {data.alerts.length > 0 && (
             <ul className="flex flex-col gap-1 border-t border-fg/10 pt-3">

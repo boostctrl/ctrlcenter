@@ -12,6 +12,16 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **See your TrueNAS apps on the Monitor page.** The TrueNAS card now lists the
+  apps running on TrueNAS SCALE's Docker engine (Electric Eel / Fangtooth and
+  newer) alongside pool health and alerts — each with a status dot (running,
+  stopped, crashed, or deploying), its container count, and an "update" badge
+  when a newer version is available. Stopped and crashed apps sort to the top so
+  problems stand out. It's read-only, so you can keep an eye on your containers
+  without also opening Portainer. (#220)
+
 ## [2.7.0] - 2026-07-24
 
 ### Changed

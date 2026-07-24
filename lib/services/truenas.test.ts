@@ -4,8 +4,10 @@ import {
   probeTruenas,
   resolveTruenasApiKey,
   mapTruenasPools,
+  mapTruenasApps,
   mapTruenasAlerts,
   TRUENAS_ALERT_CAP,
+  TRUENAS_APP_CAP,
 } from "./truenas";
 
 const CFG = { url: "http://truenas.local/", apiKey: "1-abcdef" };
@@ -36,8 +38,20 @@ const ALERTS = [
   { level: "CRITICAL", formatted: "Old dismissed alert", dismissed: true },
 ];
 
+const APPS = [
+  { name: "jellyfin", state: "RUNNING", upgrade_available: false, active_workloads: { containers: 1 } },
+  { name: "sonarr", state: "STOPPED", upgrade_available: true, active_workloads: { containers: 0 } },
+  {
+    name: "immich",
+    state: "CRASHED",
+    upgrade_available: false,
+    active_workloads: { container_details: [{}, {}, {}] },
+  },
+];
+
 function stubApi(opts: {
   pools?: unknown;
+  apps?: unknown;
   alerts?: unknown;
   info?: unknown;
   fail?: (url: string) => number | null;
@@ -48,6 +62,9 @@ function stubApi(opts: {
     if (failStatus) return new Response("nope", { status: failStatus });
     if (url.includes("/api/v2.0/pool")) {
       return new Response(JSON.stringify(opts.pools ?? POOLS));
+    }
+    if (url.includes("/api/v2.0/app")) {
+      return new Response(JSON.stringify(opts.apps ?? APPS));
     }
     if (url.includes("/api/v2.0/alert/list")) {
       return new Response(JSON.stringify(opts.alerts ?? ALERTS));
@@ -94,6 +111,23 @@ describe("getTruenasSnapshot", () => {
     expect(snap.alerts).toEqual([]);
   });
 
+  it("maps apps with not-running ones first", async () => {
+    stubApi({});
+    const snap = await getTruenasSnapshot(CFG);
+    expect(snap.apps).toEqual([
+      { name: "sonarr", state: "STOPPED", running: false, upgradeAvailable: true, containers: 0 },
+      { name: "immich", state: "CRASHED", running: false, upgradeAvailable: false, containers: 3 },
+      { name: "jellyfin", state: "RUNNING", running: true, upgradeAvailable: false, containers: 1 },
+    ]);
+  });
+
+  it("shows pools even when the apps list fails (older SCALE without /app)", async () => {
+    stubApi({ fail: (url) => (url.includes("/api/v2.0/app") ? 404 : null) });
+    const snap = await getTruenasSnapshot(CFG);
+    expect(snap.pools).toHaveLength(2);
+    expect(snap.apps).toEqual([]);
+  });
+
   it("maps a 401 on the pool list to an invalid-key message", async () => {
     stubApi({ fail: (url) => (url.includes("/api/v2.0/pool") ? 401 : null) });
     await expect(getTruenasSnapshot(CFG)).rejects.toThrow("Invalid API key");
@@ -108,6 +142,28 @@ describe("mapTruenasPools", () => {
     // healthy=true but a FAULTED status must still read unhealthy.
     const faulted = mapTruenasPools([{ name: "p", status: "FAULTED", healthy: true }]);
     expect(faulted[0].healthy).toBe(false);
+  });
+});
+
+describe("mapTruenasApps", () => {
+  it("caps the list and treats malformed input as empty", () => {
+    const many = Array.from({ length: 12 }, (_, i) => ({ name: `a${i}`, state: "RUNNING" }));
+    expect(mapTruenasApps(many)).toHaveLength(TRUENAS_APP_CAP);
+    expect(mapTruenasApps("nonsense")).toEqual([]);
+    expect(mapTruenasApps([])).toEqual([]);
+  });
+
+  it("normalizes state, containers, and the upgrade flag", () => {
+    const [app] = mapTruenasApps([
+      { name: "  vaultwarden  ", state: "deploying", upgrade_available: true },
+    ]);
+    expect(app).toEqual({
+      name: "vaultwarden",
+      state: "DEPLOYING",
+      running: false,
+      upgradeAvailable: true,
+      containers: null,
+    });
   });
 });
 
