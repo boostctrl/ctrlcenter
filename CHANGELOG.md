@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [2.8.3] - 2026-07-24
+
 ### Changed
 
 - **The at-a-glance media tiles now show what you actually care about.** Seerr no
@@ -2445,7 +2447,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.2...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.3...HEAD
+[2.8.3]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.2...v2.8.3
 [2.8.2]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.1...v2.8.2
 [2.8.1]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.0...v2.8.1
 [2.8.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.7.0...v2.8.0
