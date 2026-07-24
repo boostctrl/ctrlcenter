@@ -59,7 +59,7 @@ export default function SystemHealthBar({
           : { dot: STATE_DOT.disabled, text: "No integrations connected" };
 
   return (
-    <section className="glass-card flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-3">
         <span
           aria-hidden
@@ -110,6 +110,6 @@ export default function SystemHealthBar({
           </span>
         )}
       </div>
-    </section>
+    </div>
   );
 }
