@@ -151,12 +151,15 @@ export async function insecureHttpsRequest(
   });
 }
 
-// GET a service endpoint and parse the JSON body.
+// GET a service endpoint and parse the JSON body. `maxBytes` lets a call that
+// legitimately returns a large body (a TrueNAS host with many apps) raise the
+// default cap so it isn't rejected as "Response too large".
 export async function serviceJson<T>(
   url: string,
-  init: RequestInit = {}
+  init: RequestInit = {},
+  maxBytes: number = SERVICE_MAX_BYTES
 ): Promise<T> {
-  const { res, text } = await serviceRequest(url, init);
+  const { res, text } = await serviceRequest(url, init, maxBytes);
   if (!res.ok) throw new ServiceError(`HTTP ${res.status}`);
   return parseJson<T>(text);
 }

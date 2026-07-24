@@ -138,6 +138,30 @@ describe("getTruenasSnapshot", () => {
     ]);
   });
 
+  it("returns the full app roster even when the response exceeds the default cap", async () => {
+    // Each TrueNAS app object is large; a big roster's body runs past the
+    // default 4 MB cap. That must NOT fail the whole fetch — the regression was
+    // that a host with many apps showed none (or was truncated).
+    const filler = "x".repeat(150 * 1024);
+    const bigApps = Array.from({ length: 30 }, (_, i) => ({
+      name: `app${i}`,
+      state: "RUNNING",
+      config: filler,
+      active_workloads: {
+        container_details: [{ service_name: `svc${i}`, image: "img:1", state: "running" }],
+      },
+    }));
+    const fetchMock = stubApi({ apps: bigApps });
+    const snap = await getTruenasSnapshot(CFG);
+    expect(snap.apps).toHaveLength(30);
+    // The app query carries an explicit limit so an upstream default page size
+    // can't silently truncate the roster.
+    const appUrl = fetchMock.mock.calls
+      .map((c) => String(c[0]))
+      .find((u) => u.includes("/api/v2.0/app"));
+    expect(appUrl).toContain("limit=");
+  });
+
   it("shows pools even when the apps list fails (older SCALE without /app)", async () => {
     stubApi({ fail: (url) => (url.includes("/api/v2.0/app") ? 404 : null) });
     const snap = await getTruenasSnapshot(CFG);
@@ -164,7 +188,7 @@ describe("mapTruenasPools", () => {
 
 describe("mapTruenasApps", () => {
   it("caps the list and treats malformed input as empty", () => {
-    const many = Array.from({ length: 45 }, (_, i) => ({ name: `a${i}`, state: "RUNNING" }));
+    const many = Array.from({ length: 65 }, (_, i) => ({ name: `a${i}`, state: "RUNNING" }));
     expect(mapTruenasApps(many)).toHaveLength(TRUENAS_APP_CAP);
     expect(mapTruenasApps("nonsense")).toEqual([]);
     expect(mapTruenasApps([])).toEqual([]);

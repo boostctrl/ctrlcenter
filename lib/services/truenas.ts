@@ -70,8 +70,15 @@ export type TruenasSnapshot = {
 export const TRUENAS_POOL_CAP = 8;
 // The detail page lists every app, so the cap is generous — high enough that a
 // typical homelab's full app roster shows, still bounded against a runaway list.
-export const TRUENAS_APP_CAP = 40;
+export const TRUENAS_APP_CAP = 60;
 export const TRUENAS_ALERT_CAP = 6;
+
+// Each TrueNAS app object is large (it carries the app's full config and catalog
+// metadata), so a host with dozens of apps returns a body far past the default
+// service cap — which would fail the whole fetch as "Response too large" and
+// show no apps at all. Give the app query a generous budget so the full roster
+// comes back.
+export const TRUENAS_MAX_BYTES = 24 * 1024 * 1024;
 
 // --- Raw API shapes (only the fields the snapshot uses) ---
 
@@ -201,12 +208,18 @@ export function mapTruenasApps(raw: unknown): TruenasApp[] {
   return apps.slice(0, TRUENAS_APP_CAP);
 }
 
-async function truenasJson<T>(cfg: TruenasConfig, path: string): Promise<T> {
+async function truenasJson<T>(
+  cfg: TruenasConfig,
+  path: string,
+  maxBytes?: number
+): Promise<T> {
   const base = serviceBase(cfg.url);
   try {
-    return await serviceJson<T>(`${base}${path}`, {
-      headers: { Authorization: `Bearer ${resolveTruenasApiKey(cfg)}` },
-    });
+    return await serviceJson<T>(
+      `${base}${path}`,
+      { headers: { Authorization: `Bearer ${resolveTruenasApiKey(cfg)}` } },
+      maxBytes
+    );
   } catch (e) {
     if (
       e instanceof ServiceError &&
@@ -223,7 +236,13 @@ export async function getTruenasSnapshot(
 ): Promise<TruenasSnapshot> {
   const [poolsR, appsR, alertsR] = await Promise.allSettled([
     truenasJson<RawPool[]>(cfg, "/api/v2.0/pool"),
-    truenasJson<RawApp[]>(cfg, "/api/v2.0/app"),
+    // An explicit limit (in case the endpoint imposes a smaller default page)
+    // plus a raised byte budget, so the whole app roster comes back.
+    truenasJson<RawApp[]>(
+      cfg,
+      `/api/v2.0/app?limit=${TRUENAS_APP_CAP}`,
+      TRUENAS_MAX_BYTES
+    ),
     truenasJson<RawAlert[]>(cfg, "/api/v2.0/alert/list"),
   ]);
   // Pools failing means the key or host is wrong — surface it. A failed apps or

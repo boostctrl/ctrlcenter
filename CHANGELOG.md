@@ -24,7 +24,9 @@ here.
 - **The TrueNAS tile is more informative, and its detail page lists every app.**
   The at-a-glance tile now shows running vs. total apps and a capacity bar for
   each pool (not just the fullest), and the detail page no longer stops at eight
-  apps — your full app roster shows. (#229)
+  apps. Hosts with many apps that previously showed only a handful (or none at
+  all, when the larger response tripped a size limit) now list their full
+  roster. (#229)
 
 ## [2.8.2] - 2026-07-24
 
