@@ -164,6 +164,18 @@ function statusFor<K extends ServiceId>(
   );
 }
 
+// Drop a service's cached snapshot so the next read fetches fresh data. Called
+// right after a write action (#201/#202/#203): otherwise the card's post-action
+// refetch would serve the still-cached snapshot for up to a TTL, so a
+// just-paused torrent or stopped container would linger. The next getMonitor
+// snapshot for this service then blocks on a cold cache and reflects the change.
+export function invalidateService(id: ServiceId): void {
+  cache.delete(id);
+  // Forget the latest key too, so an in-flight refresh begun before the action
+  // can't write its now-stale result back in.
+  latestKey.delete(id);
+}
+
 export async function getMonitorSnapshot(
   integrations: IntegrationsConfig
 ): Promise<MonitorSnapshot> {

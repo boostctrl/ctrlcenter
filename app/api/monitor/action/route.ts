@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAction } from "@/lib/services/guard";
+import { invalidateService } from "@/lib/monitor";
 import type { IntegrationsConfig } from "@/lib/schema";
 import {
   pauseTorrent,
@@ -114,6 +115,10 @@ export async function POST(request: NextRequest) {
     const reason = e instanceof ServiceError ? e.message : "Action failed";
     return NextResponse.json({ error: reason }, { status: 502 });
   }
+
+  // Drop the cached snapshot so the card's refetch reflects the action at once
+  // instead of serving stale data until the TTL lapses.
+  invalidateService(body.service);
 
   log.info("integration action", {
     service: body.service,

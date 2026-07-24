@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getMonitorSnapshot } from "./monitor";
+import { getMonitorSnapshot, invalidateService } from "./monitor";
 import type { IntegrationsConfig } from "./schema";
 
 const TTL = 30_000;
@@ -94,6 +94,19 @@ describe("getMonitorSnapshot", () => {
     });
     expect(snap.radarr.configured).toBe(false);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("re-fetches after invalidateService drops the cached snapshot", async () => {
+    const fetchMock = stubSonarr(() => 3);
+    await getMonitorSnapshot(sonarrOn());
+    const afterFirst = fetchMock.mock.calls.length;
+    // Within the TTL a second read is served from cache — no new fetch.
+    await getMonitorSnapshot(sonarrOn());
+    expect(fetchMock.mock.calls.length).toBe(afterFirst);
+    // Invalidating forces the next read to fetch fresh (as a write action does).
+    invalidateService("sonarr");
+    await getMonitorSnapshot(sonarrOn());
+    expect(fetchMock.mock.calls.length).toBeGreaterThan(afterFirst);
   });
 
   it("marks actionsAllowed only when the integration is configured and opted in", async () => {
