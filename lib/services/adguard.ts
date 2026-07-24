@@ -40,6 +40,9 @@ export type AdguardSnapshot = {
   avgProcessingMs: number | null;
   // "last 24 hours" / "last 7 days" — the stats window, when derivable.
   windowLabel: string | null;
+  // Per-unit query volume across the stats window (one value per hour/day),
+  // oldest first — the series behind the face's sparkline. Empty when absent.
+  series: number[];
   topBlocked: { domain: string; count: number }[];
 };
 
@@ -81,7 +84,12 @@ export function mapAdguardSnapshot(
       ? stats.avg_processing_time * 1000
       : null;
 
-  const units = Array.isArray(stats.dns_queries) ? stats.dns_queries.length : 0;
+  const series = Array.isArray(stats.dns_queries)
+    ? stats.dns_queries.filter(
+        (n): n is number => typeof n === "number" && Number.isFinite(n)
+      )
+    : [];
+  const units = series.length;
   const windowLabel =
     stats.time_units === "hours" && units > 0
       ? "last 24 hours"
@@ -105,6 +113,7 @@ export function mapAdguardSnapshot(
     blockedRatio: totalQueries > 0 ? blocked / totalQueries : 0,
     avgProcessingMs: avgMs,
     windowLabel,
+    series,
     topBlocked,
   };
 }

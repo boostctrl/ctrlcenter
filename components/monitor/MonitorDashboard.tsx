@@ -30,39 +30,50 @@ const GROUPS: { label: string; ids: ServiceId[] }[] = [
 
 type ComplicationProps = {
   state: ServiceState;
-  metric: string;
-  sub?: string;
-  meter?: number;
   href: string;
+  center: string;
+  caption: string;
+  ring?: number;
+  alert?: boolean;
+  lines: string[];
+  spark?: number[];
 };
 
 // One service's complication content from its status. Generic over the id so the
-// glance extractor stays correlated with its slice of the snapshot.
+// glance extractor stays correlated with its slice of the snapshot. The three
+// non-data states get standardized gauge dials; live/stale defer to the
+// per-service extractor. `now` (null until mounted) drives relative dates.
 function complicationFor<K extends ServiceId>(
   id: K,
-  snapshot: MonitorSnapshot
+  snapshot: MonitorSnapshot,
+  now: number | null
 ): ComplicationProps {
   const status = snapshot[id];
   const state = serviceState(status);
   if (state === "disabled")
-    return { state, metric: "Off", href: SETTINGS_LINK };
+    return { state, href: SETTINGS_LINK, center: "Off", caption: "", lines: ["Turned off"] };
   if (state === "unconfigured")
-    return { state, metric: "Not set up", href: SETTINGS_LINK };
+    return {
+      state,
+      href: SETTINGS_LINK,
+      center: "+",
+      caption: "set up",
+      lines: ["Not connected"],
+    };
   if (state === "unreachable")
     return {
       state,
-      metric: "Offline",
-      sub: status.error ?? undefined,
       href: `/admin/monitor/${id}`,
+      center: "!",
+      caption: "offline",
+      alert: true,
+      lines: [status.error ?? "Can’t reach"],
     };
   // live / stale: data is present, so the glance extractor can read it.
-  const glance = GLANCES[id](status.data!);
   return {
     state,
-    metric: glance.metric,
-    sub: glance.sub,
-    meter: glance.meter,
     href: `/admin/monitor/${id}`,
+    ...GLANCES[id](status.data!, now),
   };
 }
 
@@ -74,6 +85,10 @@ export default function MonitorDashboard({
   nav: { weather: boolean; status: boolean; calendar: boolean };
 }) {
   const [snapshot, setSnapshot] = useState(initial);
+  // Client-time for relative dates ("in 3d"). Null on the server render and the
+  // first client paint so those strings can't mismatch on hydration; set on
+  // mount and kept current as data refreshes.
+  const [now, setNow] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
     if (document.hidden) return;
@@ -81,14 +96,21 @@ export default function MonitorDashboard({
       const res = await fetch("/api/monitor");
       if (!res.ok) return;
       setSnapshot((await res.json()) as MonitorSnapshot);
+      setNow(Date.now());
     } catch {
       // Network blip — the interval will try again.
     }
   }, []);
 
   useEffect(() => {
+    // After paint (not synchronously in the effect) so relative dates appear
+    // without risking a hydration mismatch on the first render.
+    const raf = requestAnimationFrame(() => setNow(Date.now()));
     const timer = setInterval(refresh, REFRESH_MS);
-    return () => clearInterval(timer);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearInterval(timer);
+    };
   }, [refresh]);
 
   return (
@@ -118,7 +140,7 @@ export default function MonitorDashboard({
                 <Complication
                   key={id}
                   label={SERVICE_LABELS[id]}
-                  {...complicationFor(id, snapshot)}
+                  {...complicationFor(id, snapshot, now)}
                 />
               ))}
             </div>

@@ -57,6 +57,9 @@ describe("getAdguardSnapshot", () => {
     expect(snap.blockedRatio).toBeCloseTo(0.075);
     expect(snap.avgProcessingMs).toBeCloseTo(12.3);
     expect(snap.windowLabel).toBe("last 24 hours");
+    // The per-unit query series (for the face's sparkline) carries every value.
+    expect(snap.series).toHaveLength(24);
+    expect(snap.series[0]).toBe(400);
     expect(snap.topBlocked).toEqual([
       { domain: "ads.example.com", count: 320 },
       { domain: "track.example.net", count: 120 },

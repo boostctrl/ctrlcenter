@@ -12,6 +12,19 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **The Monitor page is now a proper instrument dashboard.** Each service on the
+  at-a-glance page is a compact "dial": a ring gauge with a headline reading and
+  a few live stats beside it, instead of a single number. You now see, at a
+  glance, qBittorrent's up/down speeds and what's downloading, the next episode
+  or movie and when it lands, who's watching what on Plex, your wifi/wired client
+  split and internet latency, per-pool storage capacity, running vs. stopped
+  containers, and a small trend line of AdGuard's DNS query volume. The ring
+  turns red only for real trouble — a nearly full pool, an unhealthy container, a
+  downed internet link — so problems stand out without the page ever looking
+  alarming. (#225)
+
 ## [2.8.0] - 2026-07-24
 
 ### Added
