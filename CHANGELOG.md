@@ -12,6 +12,21 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **The Monitor page is now a cohesive command center.** The admin Monitor page
+  has been redesigned from a plain grid of cards into a single, deliberate
+  instrument panel. A system-health bar across the top summarizes everything at
+  a glance — how many services are live, stale, offline, turned off, or not yet
+  set up, plus activity like active downloads, streams, and storage alerts —
+  above a fixed “bento” of tiles, one per service. Every service always keeps
+  its place: one that’s disabled, unreachable, or not yet connected shows a
+  calm, on-brand tile in that spot (clearly off, a quiet offline notice, or an
+  inviting “Connect” prompt) instead of leaving a hole, so the page looks
+  intentional whether you’ve connected a single integration or all nine. The
+  whole layout reflows cleanly down to phone width, making it a genuine
+  home-screen control center. (#208, #206)
+
 ## [2.6.0] - 2026-07-23
 
 ### Added
