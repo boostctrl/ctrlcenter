@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [2.8.2] - 2026-07-24
+
 ### Added
 
 - **The TrueNAS detail page now lists every container.** Each app expands to show
@@ -2427,7 +2429,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.1...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.2...HEAD
+[2.8.2]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.1...v2.8.2
 [2.8.1]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.0...v2.8.1
 [2.8.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.6.0...v2.7.0
