@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-07-23
+
 ### Added
 
 - **Control qBittorrent from the Monitor page.** Each torrent on the
@@ -2335,7 +2337,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.5.1...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.6.0...HEAD
+[2.6.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.5.1...v2.6.0
 [2.5.1]: https://github.com/boostctrl/ctrlcenter/compare/v2.5.0...v2.5.1
 [2.5.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.4.1...v2.5.0
 [2.4.1]: https://github.com/boostctrl/ctrlcenter/compare/v2.4.0...v2.4.1
