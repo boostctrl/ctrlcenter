@@ -12,6 +12,16 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Service detail pages now show history and trends, not just the current
+  state.** Open a service from the Monitor page to see more of its story:
+  AdGuard Home gets a trend chart of query volume and blocked queries across its
+  stats window; Tautulli lists what was recently watched, by whom, and when (and
+  whether it was a transcode); and Sonarr and Radarr show a fuller feed of recent
+  grabs and imports. It all comes from each service's own data — nothing new is
+  stored. (#223)
+
 ### Changed
 
 - **The Monitor page is now a proper instrument dashboard.** Each service on the

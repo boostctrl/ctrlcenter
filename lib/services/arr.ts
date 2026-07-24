@@ -176,7 +176,11 @@ const IMPORT_EVENTS = new Set([
   "seriesFolderImported",
 ]);
 
-export function mapHistory(kind: ArrKind, raw: unknown): ArrRecentItem[] {
+export function mapHistory(
+  kind: ArrKind,
+  raw: unknown,
+  cap: number = ARR_RECENT_CAP
+): ArrRecentItem[] {
   const page = (raw ?? {}) as RawHistoryPage;
   const records = Array.isArray(page.records) ? page.records : [];
   const out: ArrRecentItem[] = [];
@@ -197,7 +201,7 @@ export function mapHistory(kind: ArrKind, raw: unknown): ArrRecentItem[] {
           ? String(r.movie.year)
           : "";
     out.push({ title, subtitle, event, at: toMs(r.date) });
-    if (out.length >= ARR_RECENT_CAP) break;
+    if (out.length >= cap) break;
   }
   return out;
 }
@@ -216,10 +220,19 @@ function mapHealth(raw: unknown): ArrHealthItem[] {
     .slice(0, HEALTH_CAP);
 }
 
+// The detail page (#223) shows a fuller grab/import history than the glance
+// card's five most-recent — a bigger page scanned, capped higher.
+export const ARR_DETAIL_RECENT_CAP = 30;
+const DETAIL_HISTORY_PAGE_SIZE = 60;
+
 export async function getArrSnapshot(
   kind: ArrKind,
-  cfg: ArrConfig
+  cfg: ArrConfig,
+  // The detail read pulls a deeper history; the glance snapshot stays lean.
+  opts: { recentCap?: number; historyPageSize?: number } = {}
 ): Promise<ArrSnapshot> {
+  const recentCap = opts.recentCap ?? ARR_RECENT_CAP;
+  const historyPageSize = opts.historyPageSize ?? HISTORY_PAGE_SIZE;
   const now = Date.now();
   const start = encodeURIComponent(new Date(now).toISOString());
   const end = encodeURIComponent(
@@ -231,8 +244,8 @@ export async function getArrSnapshot(
       : `/api/v3/calendar?start=${start}&end=${end}`;
   const historyPath =
     kind === "sonarr"
-      ? `/api/v3/history?page=1&pageSize=${HISTORY_PAGE_SIZE}&sortKey=date&sortDirection=descending&includeSeries=true&includeEpisode=true`
-      : `/api/v3/history?page=1&pageSize=${HISTORY_PAGE_SIZE}&sortKey=date&sortDirection=descending&includeMovie=true`;
+      ? `/api/v3/history?page=1&pageSize=${historyPageSize}&sortKey=date&sortDirection=descending&includeSeries=true&includeEpisode=true`
+      : `/api/v3/history?page=1&pageSize=${historyPageSize}&sortKey=date&sortDirection=descending&includeMovie=true`;
 
   const [calR, histR, healthR] = await Promise.allSettled([
     arrJson<unknown>(kind, cfg, calendarPath),
@@ -256,9 +269,18 @@ export async function getArrSnapshot(
         ? mapSonarrCalendar(calR.value)
         : mapRadarrCalendar(calR.value)
       : [];
-  const recent = histR.status === "fulfilled" ? mapHistory(kind, histR.value) : [];
+  const recent =
+    histR.status === "fulfilled" ? mapHistory(kind, histR.value, recentCap) : [];
   const health = healthR.status === "fulfilled" ? mapHealth(healthR.value) : [];
   return { upcoming, recent, health };
+}
+
+// The detail read: the same snapshot shape, but with a deeper recent history.
+export function getArrDetail(kind: ArrKind, cfg: ArrConfig): Promise<ArrSnapshot> {
+  return getArrSnapshot(kind, cfg, {
+    recentCap: ARR_DETAIL_RECENT_CAP,
+    historyPageSize: DETAIL_HISTORY_PAGE_SIZE,
+  });
 }
 
 // Fresh reachability check for the admin's "Test connection" button. The

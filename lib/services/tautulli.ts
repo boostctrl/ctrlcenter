@@ -47,6 +47,24 @@ export type TautulliSnapshot = {
 
 export const TAUTULLI_SESSION_CAP = 6;
 
+// One row of recent watch history (the detail page, #223): who watched what and
+// when, and whether it was a transcode.
+export type TautulliHistoryItem = {
+  user: string;
+  title: string;
+  // When it was watched (epoch ms), or null when Tautulli omitted the date.
+  at: number | null;
+  playback: "direct" | "transcode";
+};
+
+// The detail payload: the live activity snapshot plus a page of recent history.
+export type TautulliDetail = TautulliSnapshot & {
+  history: TautulliHistoryItem[];
+};
+
+// How many recent history rows the detail page pulls.
+export const TAUTULLI_HISTORY_CAP = 15;
+
 // --- Raw API shapes (only the fields the snapshot uses). Tautulli reports
 // most numbers as strings ("2", "42.5"), so everything goes through num(). ---
 
@@ -66,6 +84,15 @@ type RawSession = {
   transcode_decision?: string;
   progress_percent?: unknown;
   quality_profile?: string;
+};
+type RawHistory = { data?: RawHistoryRow[] };
+type RawHistoryRow = {
+  friendly_name?: string;
+  user?: string;
+  full_title?: string;
+  // Tautulli returns the watch time as a unix timestamp in seconds.
+  date?: unknown;
+  transcode_decision?: string;
 };
 
 const num = (v: unknown): number | null => {
@@ -101,6 +128,22 @@ export function mapTautulliActivity(raw: unknown): TautulliSnapshot {
   };
 }
 
+// Exported for the unit tests: fold get_history's data into history rows.
+export function mapTautulliHistory(raw: unknown): TautulliHistoryItem[] {
+  const rows = Array.isArray((raw as RawHistory)?.data)
+    ? ((raw as RawHistory).data as RawHistoryRow[])
+    : [];
+  return rows.slice(0, TAUTULLI_HISTORY_CAP).map((r): TautulliHistoryItem => {
+    const secs = num(r.date);
+    return {
+      user: r.friendly_name?.trim() || r.user?.trim() || "(unknown)",
+      title: r.full_title?.trim() || "(unknown)",
+      at: secs !== null ? secs * 1000 : null,
+      playback: r.transcode_decision === "transcode" ? "transcode" : "direct",
+    };
+  });
+}
+
 async function tautulliCmd<T>(cfg: TautulliConfig, cmd: string): Promise<T> {
   const base = serviceBase(cfg.url);
   const key = encodeURIComponent(resolveTautulliApiKey(cfg));
@@ -123,6 +166,28 @@ export async function getTautulliSnapshot(
   cfg: TautulliConfig
 ): Promise<TautulliSnapshot> {
   return mapTautulliActivity(await tautulliCmd<RawActivity>(cfg, "get_activity"));
+}
+
+// The detail read (#223): live activity plus a page of recent watch history.
+// A failed history fetch degrades to an empty list rather than blanking the
+// page — the live activity is the more important half.
+export async function getTautulliDetail(
+  cfg: TautulliConfig
+): Promise<TautulliDetail> {
+  const [activity, history] = await Promise.allSettled([
+    tautulliCmd<RawActivity>(cfg, "get_activity"),
+    tautulliCmd<RawHistory>(
+      cfg,
+      `get_history&length=${TAUTULLI_HISTORY_CAP}&order_column=date&order_dir=desc`
+    ),
+  ]);
+  // If even the activity read failed, the service is down — surface that.
+  if (activity.status === "rejected") throw activity.reason;
+  return {
+    ...mapTautulliActivity(activity.value),
+    history:
+      history.status === "fulfilled" ? mapTautulliHistory(history.value) : [],
+  };
 }
 
 // Fresh reachability check for the admin's "Test connection" button: a

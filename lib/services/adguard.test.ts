@@ -17,6 +17,7 @@ const STATS = {
   num_blocked_filtering: 750,
   avg_processing_time: 0.0123,
   dns_queries: Array.from({ length: 24 }, () => 400),
+  blocked_filtering: Array.from({ length: 24 }, () => 90),
   top_blocked_domains: [{ "ads.example.com": 320 }, { "track.example.net": 120 }],
 };
 
@@ -60,6 +61,9 @@ describe("getAdguardSnapshot", () => {
     // The per-unit query series (for the face's sparkline) carries every value.
     expect(snap.series).toHaveLength(24);
     expect(snap.series[0]).toBe(400);
+    // The blocked series aligns with it (the detail chart's second line).
+    expect(snap.blockedSeries).toHaveLength(24);
+    expect(snap.blockedSeries[0]).toBe(90);
     expect(snap.topBlocked).toEqual([
       { domain: "ads.example.com", count: 320 },
       { domain: "track.example.net", count: 120 },

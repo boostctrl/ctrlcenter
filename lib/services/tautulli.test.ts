@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getTautulliSnapshot,
+  getTautulliDetail,
   probeTautulli,
   resolveTautulliApiKey,
   mapTautulliActivity,
+  mapTautulliHistory,
   TAUTULLI_SESSION_CAP,
+  TAUTULLI_HISTORY_CAP,
 } from "./tautulli";
 
 // Trailing slash on purpose: the client must trim it before joining paths.
@@ -33,11 +36,19 @@ const ACTIVITY = {
   ],
 };
 
+const HISTORY = {
+  data: [
+    { friendly_name: "elliott", full_title: "The Bear - Napkins", date: 1_700_000_400, transcode_decision: "transcode" },
+    { user: "guest", full_title: "Dune: Part Two", date: 1_699_900_000, transcode_decision: "direct play" },
+  ],
+};
+
 const ok = (data: unknown) =>
   JSON.stringify({ response: { result: "success", message: null, data } });
 
 function stubApi(opts: {
   activity?: unknown;
+  history?: unknown;
   info?: unknown;
   body?: (cmd: string) => string | null;
   status?: number;
@@ -49,6 +60,7 @@ function stubApi(opts: {
     const custom = opts.body?.(cmd);
     if (custom !== null && custom !== undefined) return new Response(custom);
     if (cmd === "get_activity") return new Response(ok(opts.activity ?? ACTIVITY));
+    if (cmd === "get_history") return new Response(ok(opts.history ?? HISTORY));
     if (cmd === "get_tautulli_info")
       return new Response(ok(opts.info ?? { tautulli_version: "v2.13.4" }));
     return new Response("not found", { status: 404 });
@@ -130,6 +142,56 @@ describe("mapTautulliActivity", () => {
     // No stream_count in the payload — fall back to the session rows.
     expect(snap.streamCount).toBe(10);
     expect(snap.totalBandwidthKbps).toBeNull();
+  });
+});
+
+describe("getTautulliDetail", () => {
+  it("returns the activity snapshot plus mapped watch history", async () => {
+    stubApi({});
+    const detail = await getTautulliDetail(CFG);
+    expect(detail.streamCount).toBe(2);
+    expect(detail.history).toEqual([
+      { user: "elliott", title: "The Bear - Napkins", at: 1_700_000_400_000, playback: "transcode" },
+      { user: "guest", title: "Dune: Part Two", at: 1_699_900_000_000, playback: "direct" },
+    ]);
+  });
+
+  it("degrades to empty history when only the history call fails", async () => {
+    stubApi({
+      body: (cmd) =>
+        cmd === "get_history"
+          ? JSON.stringify({ response: { result: "error", message: "boom" } })
+          : null,
+    });
+    const detail = await getTautulliDetail(CFG);
+    expect(detail.streamCount).toBe(2);
+    expect(detail.history).toEqual([]);
+  });
+
+  it("throws when the activity read itself fails", async () => {
+    stubApi({ status: 502 });
+    await expect(getTautulliDetail(CFG)).rejects.toThrow();
+  });
+});
+
+describe("mapTautulliHistory", () => {
+  it("caps the list and converts the unix-second date to ms", () => {
+    const rows = Array.from({ length: 40 }, (_, i) => ({
+      full_title: `Item ${i}`,
+      date: 1_700_000_000 + i,
+    }));
+    const out = mapTautulliHistory({ data: rows });
+    expect(out).toHaveLength(TAUTULLI_HISTORY_CAP);
+    expect(out[0]).toEqual({
+      user: "(unknown)",
+      title: "Item 0",
+      at: 1_700_000_000_000,
+      playback: "direct",
+    });
+  });
+
+  it("tolerates a missing/blank date", () => {
+    expect(mapTautulliHistory({ data: [{ full_title: "X" }] })[0].at).toBeNull();
   });
 });
 

@@ -43,6 +43,9 @@ export type AdguardSnapshot = {
   // Per-unit query volume across the stats window (one value per hour/day),
   // oldest first — the series behind the face's sparkline. Empty when absent.
   series: number[];
+  // Per-unit *blocked* count over the same window, aligned with `series` — the
+  // second line on the detail page's trend chart. Empty when absent.
+  blockedSeries: number[];
   topBlocked: { domain: string; count: number }[];
 };
 
@@ -56,8 +59,9 @@ type RawStats = {
   num_dns_queries?: number;
   num_blocked_filtering?: number;
   avg_processing_time?: number;
-  // Per-unit series; only its length is used (to size the window label).
+  // Per-unit series across the stats window (one value per hour/day).
   dns_queries?: unknown[];
+  blocked_filtering?: unknown[];
   // AdGuard's shape: one { "domain.tld": count } object per entry.
   top_blocked_domains?: Record<string, unknown>[];
 };
@@ -84,11 +88,12 @@ export function mapAdguardSnapshot(
       ? stats.avg_processing_time * 1000
       : null;
 
-  const series = Array.isArray(stats.dns_queries)
-    ? stats.dns_queries.filter(
-        (n): n is number => typeof n === "number" && Number.isFinite(n)
-      )
-    : [];
+  const numbers = (v: unknown): number[] =>
+    Array.isArray(v)
+      ? v.filter((n): n is number => typeof n === "number" && Number.isFinite(n))
+      : [];
+  const series = numbers(stats.dns_queries);
+  const blockedSeries = numbers(stats.blocked_filtering);
   const units = series.length;
   const windowLabel =
     stats.time_units === "hours" && units > 0
@@ -114,6 +119,7 @@ export function mapAdguardSnapshot(
     avgProcessingMs: avgMs,
     windowLabel,
     series,
+    blockedSeries,
     topBlocked,
   };
 }

@@ -9,9 +9,9 @@ import { ConfirmProvider } from "@/components/admin/Confirm";
 import PageNav from "@/components/PageNav";
 import { InDetailContext } from "./MonitorCard";
 import QbittorrentDetail from "./detail/QbittorrentDetail";
+import AdguardDetail from "./detail/AdguardDetail";
+import TautulliDetail from "./detail/TautulliDetail";
 import ArrCard from "./ArrCard";
-import AdguardCard from "./AdguardCard";
-import TautulliCard from "./TautulliCard";
 import SeerrCard from "./SeerrCard";
 import PortainerCard from "./PortainerCard";
 import TruenasCard from "./TruenasCard";
@@ -62,9 +62,9 @@ function renderBody(result: DetailResult, refresh: () => void): ReactNode {
     case "radarr":
       return <ArrCard title="Radarr" status={asStatus(result)} />;
     case "adguard":
-      return <AdguardCard status={asStatus(result)} />;
+      return <AdguardDetail status={asStatus(result)} />;
     case "tautulli":
-      return <TautulliCard status={asStatus(result)} />;
+      return <TautulliDetail status={asStatus(result)} />;
     case "seerr":
       return <SeerrCard status={asStatus(result)} onActed={refresh} />;
     case "portainer":

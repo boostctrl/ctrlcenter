@@ -25,6 +25,8 @@ import {
   getQbittorrentDetail,
   type QbittorrentDetail,
 } from "./services/qbittorrent";
+import { getTautulliDetail, type TautulliDetail } from "./services/tautulli";
+import { getArrDetail } from "./services/arr";
 
 // Every service has a detail page. Most reuse their snapshot data (the same the
 // card renders) as a "basic" detail; qBittorrent has a richer payload. Later
@@ -36,10 +38,14 @@ export function isDetailService(id: string): id is DetailServiceId {
   return (DETAIL_SERVICES as readonly string[]).includes(id);
 }
 
-// Each service's detail payload — the snapshot type, except qBittorrent's richer
-// detail (uncapped list + session totals).
-export type DetailData = Omit<ServiceSnapshotMap, "qbittorrent"> & {
+// Each service's detail payload — the snapshot type, except the services with a
+// richer detail read: qBittorrent (uncapped list + session totals) and Tautulli
+// (activity + recent watch history). Sonarr/Radarr and AdGuard keep the snapshot
+// type — their detail read just fills it more fully (a deeper history, the query
+// series) without changing its shape.
+export type DetailData = Omit<ServiceSnapshotMap, "qbittorrent" | "tautulli"> & {
   qbittorrent: QbittorrentDetail;
+  tautulli: TautulliDetail;
 };
 
 // One service's detail read: the service id, whether its write actions are on
@@ -93,15 +99,26 @@ function fetchDetail<K extends DetailServiceId>(
   id: K,
   integrations: IntegrationsConfig
 ): Promise<DetailData[K]> {
-  // qBittorrent has a richer detail payload; every other service's detail is,
-  // for now, its snapshot (the same data its card renders), fetched through the
-  // registry.
-  if (id === "qbittorrent") {
-    return getQbittorrentDetail(integrations.qbittorrent) as Promise<
-      DetailData[K]
-    >;
+  // A handful of services fetch a richer detail payload; the rest fall through
+  // to their registry snapshot (the same data their card renders).
+  switch (id) {
+    case "qbittorrent":
+      return getQbittorrentDetail(integrations.qbittorrent) as Promise<
+        DetailData[K]
+      >;
+    case "tautulli":
+      return getTautulliDetail(integrations.tautulli) as Promise<DetailData[K]>;
+    case "sonarr":
+      return getArrDetail("sonarr", integrations.sonarr) as Promise<
+        DetailData[K]
+      >;
+    case "radarr":
+      return getArrDetail("radarr", integrations.radarr) as Promise<
+        DetailData[K]
+      >;
+    default:
+      return SERVICES[id].snapshot(integrations[id]) as Promise<DetailData[K]>;
   }
-  return SERVICES[id].snapshot(integrations[id]) as Promise<DetailData[K]>;
 }
 
 // Re-exported for callers that validate a raw route param against the id union.

@@ -213,6 +213,17 @@ describe("calendar/history mappers", () => {
     // The deleted event was skipped.
     expect(out.some((r) => r.title === "B")).toBe(false);
   });
+
+  it("mapHistory honors a larger cap for the detail read", () => {
+    const records = Array.from({ length: 40 }, (_, i) => ({
+      eventType: "grabbed",
+      date: iso(-i),
+      series: { title: `G${i}` },
+    }));
+    // The default cap stays lean; the detail cap keeps more.
+    expect(mapHistory("sonarr", { records })).toHaveLength(ARR_RECENT_CAP);
+    expect(mapHistory("sonarr", { records }, 30)).toHaveLength(30);
+  });
 });
 
 describe("probeArr", () => {
