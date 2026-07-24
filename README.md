@@ -110,11 +110,16 @@ Built with Next.js 16, React 19, and Tailwind v4.
   signed-in-only **/admin/monitor** page shows their live state: transfer
   speeds and the active torrent list for qBittorrent, and — for Sonarr and
   Radarr — what's coming up (upcoming episodes and movie releases), what was
-  recently grabbed or imported, and any health warnings. Strictly read-only
-  and strictly admin-only —
-  the page, its API, and the stored credentials are all behind the admin
-  session, credentials can live in env vars instead of the config file, and
-  nothing integration-related ever renders on the public dashboard.
+  recently grabbed or imported, and any health warnings. Read-only by default;
+  for **qBittorrent, Seerr, and Portainer** you can opt in per integration
+  ("Allow actions from the dashboard") to act from the page — pause/resume/delete
+  torrents, approve/deny requests, and start/stop/restart containers with a
+  read-only log tail. Actions stay **off until you turn them on**, are admin-only,
+  ask before anything destructive, and are logged on the server. Strictly
+  admin-only throughout — the page, its API, and the stored credentials are all
+  behind the admin session, credentials can live in env vars instead of the
+  config file, and nothing integration-related ever renders on the public
+  dashboard.
 
 - **Self-hosted & simple.** A single YAML config, a prebuilt multi-arch Docker
   image, an installable PWA manifest, `/api/health` for orchestrators, and an

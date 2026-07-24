@@ -64,6 +64,16 @@ deployment safe.
   ctrlcenter cannot narrow. Treat every configured credential as full access to
   that service, and give the integration the least privilege the service itself
   allows (a read-only or limited role where one exists, e.g. UniFi or Portainer).
+- **Write actions are opt-in and off by default.** qBittorrent, Seerr, and
+  Portainer can act from the Monitor page (pause/resume/delete torrents,
+  approve/deny requests, start/stop/restart containers, and a read-only log
+  tail), but only after you turn on "Allow actions from the dashboard" for that
+  integration — until then it stays read-only. Every action passes four gates
+  (the admin-only proxy prefix, a route session re-check, the integration being
+  configured, and the opt-in flag), is confirmed before anything destructive,
+  and is logged on the server. Leave the opt-in off for any integration you only
+  want to observe, and remember that an action-enabled key needs write access to
+  its service, not just read.
 - **Firewall the container to just the services it monitors.** ctrlcenter
   fetches the base URLs an admin configures, and the admin-only "Test
   connection" button will attempt a connection to any `host:port` an admin
@@ -72,8 +82,8 @@ deployment safe.
   turned into a way to probe the rest of your network.
 - **Don't expose a dashboard with integrations to the internet.** The routes are
   admin-only, but the blast radius of a stolen admin session grows once
-  integrations are configured (and more so when write actions arrive in a later
-  release). Reach the portal over a VPN or tunnel (Tailscale, WireGuard,
+  integrations are configured (and more so with write actions enabled, above).
+  Reach the portal over a VPN or tunnel (Tailscale, WireGuard,
   Cloudflare Tunnel) rather than a public port. If it must be publicly
   reachable, turn on two-factor authentication and keep it behind the reverse
   proxy with a strong password.

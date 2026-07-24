@@ -472,10 +472,20 @@ export default async function HelpPage() {
               Everything about it is admin-only: the page, the data it polls,
               and the stored credentials all sit behind your sign-in, and
               nothing from an integration ever appears on the public dashboard.
-              Connections are read-only — the dashboard can look, never touch.
               Each credential can also come from an environment variable
               instead of the config file (see the README&apos;s environment
               table).
+            </P>
+            <P>
+              Connections are read-only by default. For{" "}
+              <strong>qBittorrent</strong>, <strong>Seerr</strong>, and{" "}
+              <strong>Portainer</strong> you can turn on{" "}
+              <strong>Allow actions from the dashboard</strong> per integration
+              to control them from the page — pause, resume, or delete torrents;
+              approve or deny requests; start, stop, or restart containers and
+              read their logs. Actions stay off until you enable them, ask before
+              anything destructive, and are logged on the server. Leave the
+              switch off and the dashboard can look but never touch.
             </P>
           </Card>
 
