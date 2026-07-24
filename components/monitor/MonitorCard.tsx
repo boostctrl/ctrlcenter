@@ -1,10 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import type { ServiceStatus } from "@/lib/monitor";
 import { buttonClasses } from "@/lib/buttons";
 import { formatBytes } from "@/components/widgets/SystemStatsWidget";
+
+// Set on a service's detail page (#208), where the page's own <h1> already names
+// the service. A card rendered under this context drops its dot+title header and
+// its fixed tile height — it's the detail panel, not a glance tile — so the name
+// isn't printed twice and the full content shows without an inner scroll.
+export const InDetailContext = createContext(false);
 
 // Shared chrome for one integration's tile on the Monitor cockpit (#207, #208).
 // Every service renders a tile at all times — the graceful-degradation states
@@ -154,12 +160,30 @@ export default function MonitorCard({
   href?: string;
   children?: ReactNode;
 }) {
+  const inDetail = useContext(InDetailContext);
   const state = serviceState(status);
   const showData = hasData(state);
   // Live, stale, and offline tiles are drillable; the placeholder states aren't.
   const clickable =
     href != null && state !== "disabled" && state !== "unconfigured";
   const cls = "glass-card flex h-full flex-col gap-3 p-5";
+  const bodyContent = showData ? (
+    children
+  ) : state === "unreachable" ? (
+    <OfflineBody title={title} error={status.error} />
+  ) : state === "disabled" ? (
+    <DisabledBody />
+  ) : (
+    <ConnectBody title={title} />
+  );
+
+  // On a detail page the card is the panel itself: no repeated header, no fixed
+  // height or inner scroll — the full content flows down the page.
+  if (inDetail) {
+    return (
+      <section className="glass-card flex flex-col gap-3 p-6">{bodyContent}</section>
+    );
+  }
   const header = (
     <div className="flex items-baseline justify-between gap-3 border-b border-fg/10 pb-2.5">
         <h2 className="flex items-center gap-2 text-[15px] font-semibold text-fg/90">
@@ -181,15 +205,7 @@ export default function MonitorCard({
   // Placeholders center in the same space.
   const body = (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
-      {showData ? (
-        children
-      ) : state === "unreachable" ? (
-        <OfflineBody title={title} error={status.error} />
-      ) : state === "disabled" ? (
-        <DisabledBody />
-      ) : (
-        <ConnectBody title={title} />
-      )}
+      {bodyContent}
     </div>
   );
 

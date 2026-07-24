@@ -7,6 +7,7 @@ import type { ServiceStatus } from "@/lib/monitor";
 import { SERVICE_LABELS } from "@/lib/services/ids";
 import { ConfirmProvider } from "@/components/admin/Confirm";
 import PageNav from "@/components/PageNav";
+import { InDetailContext } from "./MonitorCard";
 import QbittorrentDetail from "./detail/QbittorrentDetail";
 import ArrCard from "./ArrCard";
 import AdguardCard from "./AdguardCard";
@@ -115,7 +116,9 @@ export default function MonitorDetail({
           </Link>
           <h1 className="mt-1 text-3xl font-bold">{SERVICE_LABELS[id]}</h1>
         </div>
-        {renderBody(result, refresh)}
+        <InDetailContext.Provider value={true}>
+          {renderBody(result, refresh)}
+        </InDetailContext.Provider>
       </main>
     </ConfirmProvider>
   );
