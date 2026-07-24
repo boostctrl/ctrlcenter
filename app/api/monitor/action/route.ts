@@ -8,6 +8,11 @@ import {
   deleteTorrent,
   type QbittorrentConfig,
 } from "@/lib/services/qbittorrent";
+import {
+  approveRequest,
+  declineRequest,
+  type SeerrConfig,
+} from "@/lib/services/seerr";
 import { ServiceError } from "@/lib/services/http";
 import { log, hostOf, errorReason } from "@/lib/log";
 
@@ -30,6 +35,11 @@ const bodySchema = z.discriminatedUnion("service", [
     // Only meaningful for delete; ignored otherwise. Defaults to keeping data.
     deleteFiles: z.boolean().optional(),
   }),
+  z.object({
+    service: z.literal("seerr"),
+    action: z.enum(["approve", "decline"]),
+    id: z.number().int().nonnegative(),
+  }),
 ]);
 
 type ActionBody = z.infer<typeof bodySchema>;
@@ -48,6 +58,11 @@ async function perform(
       if (body.action === "pause") return pauseTorrent(c, body.hash);
       if (body.action === "resume") return resumeTorrent(c, body.hash);
       return deleteTorrent(c, body.hash, body.deleteFiles ?? false);
+    }
+    case "seerr": {
+      const c = cfg as SeerrConfig;
+      if (body.action === "approve") return approveRequest(c, body.id);
+      return declineRequest(c, body.id);
     }
   }
 }

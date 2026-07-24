@@ -14,6 +14,7 @@ import {
   ServiceError,
   serviceBase,
   serviceJson,
+  serviceRequest,
   runProbe,
   type ProbeResult,
 } from "./http";
@@ -37,6 +38,9 @@ export type SeerrRequestStatus =
   | "available";
 
 export type SeerrRequest = {
+  // The request's id — what the approve/decline actions target (#202). A row
+  // is actionable only while it's pending.
+  id: number;
   title: string;
   requester: string;
   type: "movie" | "tv";
@@ -66,6 +70,7 @@ type RawCount = {
 };
 type RawRequestPage = { results?: RawRequest[] };
 type RawRequest = {
+  id?: number;
   // 1 = pending approval, 2 = approved, 3 = declined.
   status?: number;
   type?: string;
@@ -118,6 +123,7 @@ function requester(raw: RawRequest): string {
 // the card's row shape.
 export function mapSeerrRequest(raw: RawRequest, title: string): SeerrRequest {
   return {
+    id: typeof raw.id === "number" ? raw.id : 0,
     title,
     requester: requester(raw),
     type: raw.type === "tv" ? "tv" : "movie",
@@ -182,6 +188,30 @@ export async function getSeerrSnapshot(cfg: SeerrConfig): Promise<SeerrSnapshot>
     totalRequests: num(count.total),
     requests,
   };
+}
+
+// --- Write actions (#202) ---
+//
+// Approve or decline a pending request. Both are keyed POSTs to the request's
+// own endpoint; Seerr answers with the updated request, which the card doesn't
+// need — a 2xx is success. Reachable only through the admin-gated
+// /api/monitor/action route, behind the allowActions opt-in.
+async function seerrAction(cfg: SeerrConfig, path: string): Promise<void> {
+  const base = serviceBase(cfg.url);
+  const { res } = await serviceRequest(`${base}${path}`, {
+    method: "POST",
+    headers: { "X-Api-Key": resolveSeerrApiKey(cfg) },
+  });
+  if (res.status === 403) throw new ServiceError("Invalid API key");
+  if (!res.ok) throw new ServiceError(`HTTP ${res.status}`);
+}
+
+export function approveRequest(cfg: SeerrConfig, id: number): Promise<void> {
+  return seerrAction(cfg, `/api/v1/request/${id}/approve`);
+}
+
+export function declineRequest(cfg: SeerrConfig, id: number): Promise<void> {
+  return seerrAction(cfg, `/api/v1/request/${id}/decline`);
 }
 
 // Fresh reachability check for the admin's "Test connection" button. The

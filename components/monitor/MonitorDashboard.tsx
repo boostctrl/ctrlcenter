@@ -47,7 +47,7 @@ const CARDS: {
   radarr: (status) => <ArrCard title="Radarr" status={status} />,
   adguard: (status) => <AdguardCard status={status} />,
   tautulli: (status) => <TautulliCard status={status} />,
-  seerr: (status) => <SeerrCard status={status} />,
+  seerr: (status, onActed) => <SeerrCard status={status} onActed={onActed} />,
   portainer: (status) => <PortainerCard status={status} />,
   truenas: (status) => <TruenasCard status={status} />,
   unifi: (status) => <UnifiCard status={status} />,

@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  approveRequest,
+  declineRequest,
   getSeerrSnapshot,
   probeSeerr,
   resolveSeerrApiKey,
@@ -13,6 +15,7 @@ const COUNT = { pending: 3, processing: 1, available: 40, total: 52 };
 const REQUESTS = {
   results: [
     {
+      id: 101,
       status: 1,
       type: "movie",
       createdAt: "2026-07-20T10:00:00.000Z",
@@ -20,6 +23,7 @@ const REQUESTS = {
       requestedBy: { displayName: "Elliott", username: "e" },
     },
     {
+      id: 102,
       status: 2,
       type: "tv",
       createdAt: "2026-07-19T08:00:00.000Z",
@@ -85,6 +89,7 @@ describe("getSeerrSnapshot", () => {
     });
     expect(snap.requests).toEqual([
       {
+        id: 101,
         title: "Movie 693134",
         requester: "Elliott",
         type: "movie",
@@ -92,6 +97,7 @@ describe("getSeerrSnapshot", () => {
         at: Date.parse("2026-07-20T10:00:00.000Z"),
       },
       {
+        id: 102,
         title: "Show 95396",
         requester: "guest",
         type: "tv",
@@ -117,6 +123,36 @@ describe("getSeerrSnapshot", () => {
   it("maps a 403 to an invalid-key message", async () => {
     stubApi({ fail: (url) => (url.includes("/request/count") ? 403 : null) });
     await expect(getSeerrSnapshot(CFG)).rejects.toThrow("Invalid API key");
+  });
+});
+
+describe("Seerr actions", () => {
+  function stubAction(status = 200) {
+    const fetchMock = vi.fn(async () => new Response("", { status }));
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  it("approves a request by POSTing to its approve endpoint with the key", async () => {
+    const fetchMock = stubAction();
+    await approveRequest(CFG, 101);
+    const [url, init] = fetchMock.mock.calls[0] as [RequestInfo, RequestInit];
+    expect(String(url)).toBe("http://seerr.local:5055/api/v1/request/101/approve");
+    expect(init.method).toBe("POST");
+    expect((init.headers as Record<string, string>)["X-Api-Key"]).toBe("key123");
+  });
+
+  it("declines a request by POSTing to its decline endpoint", async () => {
+    const fetchMock = stubAction();
+    await declineRequest(CFG, 102);
+    expect(String(fetchMock.mock.calls[0][0])).toBe(
+      "http://seerr.local:5055/api/v1/request/102/decline"
+    );
+  });
+
+  it("maps a 403 to an invalid-key message", async () => {
+    stubAction(403);
+    await expect(approveRequest(CFG, 1)).rejects.toThrow("Invalid API key");
   });
 });
 

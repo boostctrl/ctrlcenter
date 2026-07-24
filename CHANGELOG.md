@@ -21,6 +21,10 @@ here.
   the dashboard” for qBittorrent in Settings → Integrations to enable them. The
   card stays read-only until you do, actions require an admin sign-in, and every
   one is logged on the server. (#201)
+- **Approve or deny Seerr requests from the Monitor page.** Pending requests on
+  the Seerr card gain Approve and Deny buttons; denying asks first. Like every
+  action, it’s off until you turn on “Allow actions from the dashboard” for
+  Seerr in Settings → Integrations, needs an admin sign-in, and is logged. (#202)
 
 ## [2.5.1] - 2026-07-23
 

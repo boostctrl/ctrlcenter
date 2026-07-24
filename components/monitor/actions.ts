@@ -7,12 +7,18 @@ import { useCallback, useState } from "react";
 // result. The body union mirrors the route's zod schema; each service adds its
 // own variant as its actions ship.
 
-export type MonitorActionBody = {
-  service: "qbittorrent";
-  action: "pause" | "resume" | "delete";
-  hash: string;
-  deleteFiles?: boolean;
-};
+export type MonitorActionBody =
+  | {
+      service: "qbittorrent";
+      action: "pause" | "resume" | "delete";
+      hash: string;
+      deleteFiles?: boolean;
+    }
+  | {
+      service: "seerr";
+      action: "approve" | "decline";
+      id: number;
+    };
 
 export type ActionResult = { ok: boolean; error?: string };
 
