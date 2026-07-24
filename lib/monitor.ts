@@ -28,6 +28,14 @@ import { log, errorReason } from "./log";
 // service renders as a set-up hint, not an error.
 export type ServiceStatus<T> = {
   configured: boolean;
+  // The two bits `configured` collapses, so the Monitor cockpit (#208) can tell
+  // a *disabled* integration (has a URL, toggle off) from one that was *never
+  // set up* (no URL) and render each its own graceful-degradation tile instead
+  // of one undifferentiated "not configured" hole. Admin-only booleans — no URL,
+  // no credentials — on an already session-gated surface, the same category as
+  // `configured` itself, so nothing sensitive crosses to the browser.
+  enabled: boolean;
+  urlSet: boolean;
   // Whether write actions are turned on for this integration (#201/#202/#203):
   // configured AND its allowActions opt-in is set. The card renders its action
   // controls only when true — the flag itself, not the credentials, is all the
@@ -116,6 +124,8 @@ function refresh(
 async function serviceStatus<T>(
   id: ServiceId,
   configured: boolean,
+  enabled: boolean,
+  urlSet: boolean,
   actionsAllowed: boolean,
   key: string,
   fetcher: () => Promise<T>
@@ -125,7 +135,15 @@ async function serviceStatus<T>(
     // Also forget the latest key, so an in-flight refresh that started before
     // the service was disabled can't write its result back in.
     latestKey.delete(id);
-    return { configured: false, actionsAllowed: false, data: null, error: null, at: null };
+    return {
+      configured: false,
+      enabled,
+      urlSet,
+      actionsAllowed: false,
+      data: null,
+      error: null,
+      at: null,
+    };
   }
   const entry = cache.get(id);
   if (!entry || entry.key !== key) {
@@ -136,6 +154,8 @@ async function serviceStatus<T>(
   const now = cache.get(id);
   return {
     configured: true,
+    enabled,
+    urlSet,
     actionsAllowed,
     data: (now?.data as T) ?? null,
     error: now?.error ?? null,
@@ -154,6 +174,11 @@ function statusFor<K extends ServiceId>(
   return serviceStatus(
     id,
     configured,
+    // The enable toggle and whether a URL is present — the two bits `configured`
+    // (their AND) folds together, kept apart so a disabled service reads
+    // differently from a never-set-up one on the cockpit (#208).
+    cfg.enabled === true,
+    cfg.url.trim() !== "",
     // Actions are live only when the integration is both configured and opted
     // in. Every integration carries allowActions (lib/schema.ts); the services
     // without action support just never have a control to render it. `=== true`

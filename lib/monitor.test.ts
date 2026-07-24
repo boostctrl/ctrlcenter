@@ -87,6 +87,8 @@ describe("getMonitorSnapshot", () => {
     );
     expect(snap.qbittorrent).toEqual({
       configured: false,
+      enabled: false,
+      urlSet: false,
       actionsAllowed: false,
       data: null,
       error: null,
@@ -94,6 +96,45 @@ describe("getMonitorSnapshot", () => {
     });
     expect(snap.radarr.configured).toBe(false);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("distinguishes disabled, not-set-up, and configured via enabled/urlSet (#208)", async () => {
+    const fetchMock = stubSonarr(() => 1);
+    const snap = await getMonitorSnapshot(
+      integrations({
+        // Disabled: has a URL, toggle off — reads "off, not broken".
+        qbittorrent: {
+          enabled: false,
+          url: "http://qb.local",
+          username: "",
+          password: "",
+          allowInsecureTls: false,
+          allowActions: false,
+        },
+        // Never set up: enabled but no URL — reads as onboarding.
+        radarr: { enabled: true, url: "", apiKey: "" },
+        // Fully configured — polls and reports data.
+        sonarr: { enabled: true, url: "http://sonarr.local:8989", apiKey: "k" },
+      })
+    );
+
+    expect(snap.qbittorrent.configured).toBe(false);
+    expect(snap.qbittorrent.enabled).toBe(false);
+    expect(snap.qbittorrent.urlSet).toBe(true);
+
+    expect(snap.radarr.configured).toBe(false);
+    expect(snap.radarr.enabled).toBe(true);
+    expect(snap.radarr.urlSet).toBe(false);
+
+    expect(snap.sonarr.configured).toBe(true);
+    expect(snap.sonarr.enabled).toBe(true);
+    expect(snap.sonarr.urlSet).toBe(true);
+    // Only the configured service was polled.
+    expect(
+      fetchMock.mock.calls.every(([input]) =>
+        String(input).startsWith("http://sonarr.local")
+      )
+    ).toBe(true);
   });
 
   it("re-fetches after invalidateService drops the cached snapshot", async () => {
