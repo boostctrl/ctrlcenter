@@ -48,7 +48,9 @@ const CARDS: {
   adguard: (status) => <AdguardCard status={status} />,
   tautulli: (status) => <TautulliCard status={status} />,
   seerr: (status, onActed) => <SeerrCard status={status} onActed={onActed} />,
-  portainer: (status) => <PortainerCard status={status} />,
+  portainer: (status, onActed) => (
+    <PortainerCard status={status} onActed={onActed} />
+  ),
   truenas: (status) => <TruenasCard status={status} />,
   unifi: (status) => <UnifiCard status={status} />,
 };

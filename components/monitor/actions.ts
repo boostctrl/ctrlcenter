@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import type { PortainerContainer } from "@/lib/services/portainer";
 
 // Client helper for the Monitor cards' write actions (#201/#202/#203): POST the
 // action to the admin-gated /api/monitor/action dispatcher and surface the
@@ -18,6 +19,12 @@ export type MonitorActionBody =
       service: "seerr";
       action: "approve" | "decline";
       id: number;
+    }
+  | {
+      service: "portainer";
+      action: "start" | "stop" | "restart";
+      endpoint: number;
+      container: string;
     };
 
 export type ActionResult = { ok: boolean; error?: string };
@@ -36,6 +43,46 @@ export async function runMonitorAction(
     return { ok: true };
   } catch {
     return { ok: false, error: "Network error" };
+  }
+}
+
+// Portainer's on-demand reads (#203): one environment's container list, and a
+// container's log tail. GETs to the admin-gated drill-down routes; the card
+// calls them only when the admin expands an environment or opens the logs.
+export async function fetchContainers(
+  endpoint: number
+): Promise<{ containers?: PortainerContainer[]; error?: string }> {
+  try {
+    const res = await fetch(
+      `/api/monitor/portainer/containers?endpoint=${endpoint}`
+    );
+    const data = (await res.json().catch(() => ({}))) as {
+      containers?: PortainerContainer[];
+      error?: string;
+    };
+    if (!res.ok) return { error: data.error ?? `HTTP ${res.status}` };
+    return { containers: data.containers ?? [] };
+  } catch {
+    return { error: "Network error" };
+  }
+}
+
+export async function fetchContainerLogs(
+  endpoint: number,
+  container: string
+): Promise<{ logs?: string; error?: string }> {
+  try {
+    const res = await fetch(
+      `/api/monitor/portainer/logs?endpoint=${endpoint}&container=${encodeURIComponent(container)}`
+    );
+    const data = (await res.json().catch(() => ({}))) as {
+      logs?: string;
+      error?: string;
+    };
+    if (!res.ok) return { error: data.error ?? `HTTP ${res.status}` };
+    return { logs: data.logs ?? "" };
+  } catch {
+    return { error: "Network error" };
   }
 }
 

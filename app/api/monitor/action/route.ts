@@ -13,6 +13,12 @@ import {
   declineRequest,
   type SeerrConfig,
 } from "@/lib/services/seerr";
+import {
+  startContainer,
+  stopContainer,
+  restartContainer,
+  type PortainerConfig,
+} from "@/lib/services/portainer";
 import { ServiceError } from "@/lib/services/http";
 import { log, hostOf, errorReason } from "@/lib/log";
 
@@ -40,6 +46,12 @@ const bodySchema = z.discriminatedUnion("service", [
     action: z.enum(["approve", "decline"]),
     id: z.number().int().nonnegative(),
   }),
+  z.object({
+    service: z.literal("portainer"),
+    action: z.enum(["start", "stop", "restart"]),
+    endpoint: z.number().int().positive(),
+    container: z.string().min(1),
+  }),
 ]);
 
 type ActionBody = z.infer<typeof bodySchema>;
@@ -63,6 +75,14 @@ async function perform(
       const c = cfg as SeerrConfig;
       if (body.action === "approve") return approveRequest(c, body.id);
       return declineRequest(c, body.id);
+    }
+    case "portainer": {
+      const c = cfg as PortainerConfig;
+      if (body.action === "start")
+        return startContainer(c, body.endpoint, body.container);
+      if (body.action === "stop")
+        return stopContainer(c, body.endpoint, body.container);
+      return restartContainer(c, body.endpoint, body.container);
     }
   }
 }

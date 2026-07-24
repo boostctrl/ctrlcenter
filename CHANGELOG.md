@@ -25,6 +25,12 @@ here.
   the Seerr card gain Approve and Deny buttons; denying asks first. Like every
   action, it’s off until you turn on “Allow actions from the dashboard” for
   Seerr in Settings → Integrations, needs an admin sign-in, and is logged. (#202)
+- **Start, stop, and restart Portainer containers, and read their logs.** Expand
+  an environment on the Portainer card to list its containers; each can be
+  started, stopped, or restarted (stop and restart ask first), and “Logs” opens
+  a read-only, capped tail of its output — no shell, no console. Off until you
+  turn on “Allow actions from the dashboard” for Portainer in Settings →
+  Integrations; admin-only and logged. (#203)
 
 ## [2.5.1] - 2026-07-23
 
