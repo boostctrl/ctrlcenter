@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [2.8.4] - 2026-07-24
+
 ### Added
 
 - **See your UniFi devices on the Monitor page.** The UniFi detail page now lists
@@ -2469,7 +2471,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.3...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.4...HEAD
+[2.8.4]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.3...v2.8.4
 [2.8.3]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.2...v2.8.3
 [2.8.2]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.1...v2.8.2
 [2.8.1]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.0...v2.8.1
