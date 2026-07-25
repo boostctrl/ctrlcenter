@@ -107,7 +107,7 @@ export default function AdguardDetail({
     <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
       <AdguardCard status={status} />
       {data && (
-        <section className="hud-panel flex flex-col gap-3 p-6">
+        <section className="glass-card flex flex-col gap-3 p-6">
           <h2 className="text-[15px] font-semibold text-fg/90">Query activity</h2>
           <TrendChart
             series={data.series}

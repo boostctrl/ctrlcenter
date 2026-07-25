@@ -65,7 +65,7 @@ export default function UnifiDetail({
     <div className="flex flex-col gap-4">
       <UnifiCard status={status} />
       {status.data && (
-        <section className="hud-panel flex flex-col gap-3 p-6">
+        <section className="glass-card flex flex-col gap-3 p-6">
           <h2 className="text-[15px] font-semibold text-fg/90">Devices</h2>
           {devices.length > 0 ? (
             <div className="grid gap-x-12 sm:grid-cols-2">

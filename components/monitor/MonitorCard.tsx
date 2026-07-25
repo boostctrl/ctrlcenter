@@ -181,7 +181,7 @@ export default function MonitorCard({
   // height or inner scroll — the full content flows down the page.
   if (inDetail) {
     return (
-      <section className="hud-panel flex flex-col gap-3 p-6">{bodyContent}</section>
+      <section className="glass-card flex flex-col gap-3 p-6">{bodyContent}</section>
     );
   }
   const header = (

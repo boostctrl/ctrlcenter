@@ -12,6 +12,21 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **The Monitor follows your theme again.** The fixed heads-up-display skin from
+  2.8.6 is gone; the Monitor's tiles and panels now take on your chosen design
+  and accent like the rest of the app. You can still get the instrument-panel
+  look — pick a design such as Cyber or Console with a cyan accent — or keep it
+  clean with Glass. (#236)
+
+### Fixed
+
+- **Monitor health alerts stack vertically.** When something needs attention,
+  each alert — a failing drive, an offline service — gets its own line instead
+  of being crammed into one comma-separated line that ran off the edge. (#236)
+- **Removed a stray fade at the bottom of the Monitor page.** (#236)
+
 ## [2.8.6] - 2026-07-24
 
 ### Changed
