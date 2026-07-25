@@ -228,6 +228,18 @@ export function formatSpeed(bytesPerSecond: number): string {
   return `${formatBytes(bytesPerSecond)}/s`;
 }
 
+// Compact "time since" for the freshness reads shared by the cockpit header and
+// the detail masthead — how long ago the shown data last came back. Under five
+// seconds reads "just now" so a fresh poll doesn't flicker "0s ago".
+export function sinceLabel(ms: number): string {
+  const secs = Math.max(0, Math.round(ms / 1000));
+  if (secs < 5) return "just now";
+  if (secs < 60) return `${secs}s ago`;
+  const mins = Math.round(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  return `${Math.round(mins / 60)}h ago`;
+}
+
 // Compact remaining time: "1h 20m", "12m", "45s".
 export function formatEta(seconds: number): string {
   if (seconds >= 3600) {

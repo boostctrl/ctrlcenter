@@ -6,7 +6,7 @@ import { SERVICE_LABELS, type ServiceId } from "@/lib/services/ids";
 import PageNav from "@/components/PageNav";
 import SystemHealthBar from "./SystemHealthBar";
 import Complication from "./Complication";
-import { serviceState, type ServiceState } from "./MonitorCard";
+import { serviceState, sinceLabel, type ServiceState } from "./MonitorCard";
 import { GLANCES, type GlanceVisual } from "./glances";
 
 // The private Monitor cockpit (#207, #208): one cohesive "instrument face" — a
@@ -92,6 +92,9 @@ export default function MonitorDashboard({
   // first client paint so those strings can't mismatch on hydration; set on
   // mount and kept current as data refreshes.
   const [now, setNow] = useState<number | null>(null);
+  // When the shown snapshot last came back, for the header's freshness read —
+  // also null until mount so the "updated Xs ago" label can't mismatch either.
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
     if (document.hidden) return;
@@ -99,7 +102,9 @@ export default function MonitorDashboard({
       const res = await fetch("/api/monitor");
       if (!res.ok) return;
       setSnapshot((await res.json()) as MonitorSnapshot);
-      setNow(Date.now());
+      const at = Date.now();
+      setNow(at);
+      setUpdatedAt(at);
     } catch {
       // Network blip — the interval will try again.
     }
@@ -108,11 +113,19 @@ export default function MonitorDashboard({
   useEffect(() => {
     // After paint (not synchronously in the effect) so relative dates appear
     // without risking a hydration mismatch on the first render.
-    const raf = requestAnimationFrame(() => setNow(Date.now()));
+    const raf = requestAnimationFrame(() => {
+      const at = Date.now();
+      setNow(at);
+      setUpdatedAt(at);
+    });
     const timer = setInterval(refresh, REFRESH_MS);
+    // A lighter clock so the header freshness label re-ticks between polls
+    // rather than sitting frozen for a whole 45s refresh window.
+    const clock = setInterval(() => setNow(Date.now()), 10_000);
     return () => {
       cancelAnimationFrame(raf);
       clearInterval(timer);
+      clearInterval(clock);
     };
   }, [refresh]);
 
@@ -120,11 +133,23 @@ export default function MonitorDashboard({
     <main className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-6 px-6 py-12 sm:px-10 lg:py-16">
       <div>
         <PageNav current={null} {...nav} />
-        <h1 className="mt-3 text-3xl font-bold">Monitor</h1>
-        <p className="mt-1 text-sm text-fg/45">
-          A read-only view of your connected services. Only signed-in admins can
-          see this page — nothing here is ever shown to visitors.
-        </p>
+        <div className="mt-3 flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
+          <div>
+            <h1 className="text-3xl font-bold">Monitor</h1>
+            <p className="mt-1 text-sm text-fg/45">
+              A read-only view of your connected services. Only signed-in admins
+              can see this page — nothing here is ever shown to visitors.
+            </p>
+          </div>
+          {/* A freshness read that mirrors the detail pages' status pill, so the
+              whole Monitor reads as one family. No status dot here — the health
+              hero below is the cockpit's verdict. */}
+          {updatedAt !== null && now !== null && (
+            <span className="inline-flex shrink-0 items-center rounded-full border border-fg/10 bg-fg/5 px-3.5 py-1.5 text-xs whitespace-nowrap text-fg/50">
+              Updated {sinceLabel(now - updatedAt)}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* One cohesive surface: the health hero, then each domain cluster,

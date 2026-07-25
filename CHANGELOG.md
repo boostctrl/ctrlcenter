@@ -12,6 +12,16 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **Every Monitor service page opens on the same tidy header.** Click a tile on
+  the Monitor and its detail page now leads with a live status pill — Live,
+  Stale, or Offline, with how long ago it last refreshed — and its content sits
+  in a comfortable centered column instead of stretching edge to edge, so lists
+  read as lists rather than flinging each row's details to the far side of the
+  screen. The Monitor page itself gains the same "updated moments ago" read, so
+  the whole dashboard shares one freshness signal. (#233)
+
 ## [2.8.4] - 2026-07-24
 
 ### Added
