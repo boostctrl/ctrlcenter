@@ -12,6 +12,14 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **The Monitor gets an instrument-panel look.** The Monitor and its per-service
+  pages are reskinned as a cockpit of glowing, chamfered "tech-panel" tiles on a
+  faint grid, with section rails, a warning-triangle alert banner, and crisp
+  technical labels — the same information and layout, a sharper heads-up-display
+  feel. It follows your accent colour, so it re-tints with your theme. (#235)
+
 ## [2.8.5] - 2026-07-24
 
 ### Changed

@@ -524,6 +524,115 @@ select optgroup {
     background-color: var(--surface-bg-hover);
     box-shadow: var(--surface-shadow-hover);
   }
+
+  /* --- Monitor "instrument panel" HUD (#235) --------------------------------
+     A cockpit skin for the admin Monitor only: chamfered tech-panel frames with
+     a glowing accent edge and a corner-bracket tick, hairline section rails, and
+     a faint instrument grid. Scoped to .hud-* so the app-wide glass-card is
+     untouched; every colour derives from the accent tokens, so panels re-tint
+     with the active theme.
+
+     The frame is one element: an accent-tinted box clipped to a notched polygon,
+     with an inset ::before painting the surface inside the same notch, so a 1px
+     sliver of the accent reads as a glowing edge. The glow uses filter:
+     drop-shadow (not box-shadow) so it follows the clipped silhouette instead of
+     being squared off by the clip. */
+  .hud-panel {
+    --hud-edge: var(--accent-from);
+    --hud-cut: 14px;
+    position: relative;
+    clip-path: polygon(
+      0 0,
+      calc(100% - var(--hud-cut)) 0,
+      100% var(--hud-cut),
+      100% 100%,
+      var(--hud-cut) 100%,
+      0 calc(100% - var(--hud-cut))
+    );
+    background: color-mix(in srgb, var(--hud-edge) 42%, transparent);
+    filter: drop-shadow(0 0 6px color-mix(in srgb, var(--hud-edge) 16%, transparent));
+    transition: filter 0.25s ease, background 0.25s ease;
+  }
+  .hud-panel::before {
+    content: "";
+    position: absolute;
+    inset: 1px;
+    z-index: 0;
+    clip-path: inherit;
+    background: linear-gradient(
+      158deg,
+      color-mix(in srgb, var(--hud-edge) 7%, var(--background)),
+      var(--background) 62%
+    );
+  }
+  /* The corner-bracket tick at the square top-left corner. */
+  .hud-panel::after {
+    content: "";
+    position: absolute;
+    top: 9px;
+    left: 9px;
+    z-index: 1;
+    width: 12px;
+    height: 12px;
+    border-top: 1.5px solid color-mix(in srgb, var(--hud-edge) 55%, transparent);
+    border-left: 1.5px solid color-mix(in srgb, var(--hud-edge) 55%, transparent);
+    pointer-events: none;
+  }
+  .hud-panel > * {
+    position: relative;
+    z-index: 1;
+  }
+  /* Interactive tiles brighten their edge and glow on hover. */
+  .hud-panel-link:hover {
+    background: color-mix(in srgb, var(--hud-edge) 60%, transparent);
+    filter: drop-shadow(0 0 10px color-mix(in srgb, var(--hud-edge) 26%, transparent));
+  }
+  .hud-panel-link:hover::before {
+    background: linear-gradient(
+      158deg,
+      color-mix(in srgb, var(--hud-edge) 12%, var(--background)),
+      var(--background) 55%
+    );
+  }
+  /* The alert variant swaps the accent edge for a warning red. */
+  .hud-panel-alert {
+    --hud-edge: #f87171;
+  }
+
+  /* Section rail: a mono label followed by a hairline running to the edge. */
+  .hud-rail {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .hud-rail::after {
+    content: "";
+    height: 1px;
+    flex: 1 1 auto;
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--accent-from) 26%, transparent),
+      transparent
+    );
+  }
+
+  /* A faint instrument grid for the cockpit backdrop, masked to fade toward the
+     edges so it reads as texture rather than a spreadsheet. */
+  .hud-grid {
+    background-image: linear-gradient(
+        color-mix(in srgb, var(--accent-from) 6%, transparent) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--accent-from) 6%, transparent) 1px,
+        transparent 1px
+      );
+    background-size: 44px 44px;
+    -webkit-mask-image: radial-gradient(125% 120% at 50% 0%, #000 38%, transparent 100%);
+    mask-image: radial-gradient(125% 120% at 50% 0%, #000 38%, transparent 100%);
+  }
+
   .gradient-text {
     background-image: linear-gradient(135deg, var(--accent-from), var(--accent-to));
     background-clip: text;

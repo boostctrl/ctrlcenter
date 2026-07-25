@@ -47,7 +47,7 @@ export default function Complication({
   return (
     <Link
       href={href}
-      className={`flex min-h-[7rem] items-center gap-4 rounded-xl border border-fg/10 bg-fg/[0.02] p-4 transition-colors hover:border-fg/20 hover:bg-fg/[0.05] ${sizing} ${
+      className={`hud-panel hud-panel-link flex min-h-[7rem] items-center gap-4 p-4 pl-5 ${sizing} ${
         dim ? "opacity-45 hover:opacity-80" : ""
       }`}
     >
@@ -62,7 +62,7 @@ export default function Complication({
             aria-hidden
             className={`h-1.5 w-1.5 shrink-0 rounded-full ${STATE_DOT[state]}`}
           />
-          <span className="truncate text-[11px] font-medium tracking-wide text-fg/40 uppercase">
+          <span className="truncate font-mono text-[10px] font-medium tracking-[0.18em] text-fg/45 uppercase">
             {label}
           </span>
         </span>
@@ -133,7 +133,7 @@ function Gauge({
       <span className="flex max-w-[3.25rem] flex-col items-center leading-none">
         <span className="truncate text-[15px] font-bold text-fg/90">{center}</span>
         {caption && (
-          <span className="mt-0.5 truncate text-[7px] font-medium tracking-wide text-fg/40 uppercase">
+          <span className="mt-0.5 truncate font-mono text-[7px] font-medium tracking-[0.12em] text-fg/40 uppercase">
             {caption}
           </span>
         )}
@@ -161,7 +161,7 @@ function NumberBadge({
         {center}
       </span>
       {caption && (
-        <span className="mt-1 truncate text-[8px] font-medium tracking-wide text-fg/40 uppercase">
+        <span className="mt-1 truncate font-mono text-[8px] font-medium tracking-[0.14em] text-fg/40 uppercase">
           {caption}
         </span>
       )}

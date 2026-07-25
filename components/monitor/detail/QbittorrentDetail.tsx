@@ -222,7 +222,7 @@ export default function QbittorrentDetail({
 
   if (!data) {
     return (
-      <section className="glass-card flex flex-col items-center gap-2 p-8 text-center">
+      <section className="hud-panel flex flex-col items-center gap-2 p-8 text-center">
         <p className="text-sm text-fg/55">Can’t reach qBittorrent</p>
         {error && <p className="text-xs text-fg/35">{error}</p>}
       </section>
@@ -258,7 +258,7 @@ export default function QbittorrentDetail({
   const s = data.session;
   return (
     <div className="flex flex-col gap-4">
-      <section className="glass-card flex flex-col gap-4 p-6">
+      <section className="hud-panel flex flex-col gap-4 p-6">
         <div className="flex flex-wrap items-baseline gap-x-8 gap-y-1">
           <span className="text-2xl font-semibold tabular-nums text-fg/90">
             ↓ {formatSpeed(data.downSpeed)}
@@ -291,7 +291,7 @@ export default function QbittorrentDetail({
         {actionError && <p className="text-xs text-red-400">{actionError}</p>}
       </section>
 
-      <section className="glass-card flex flex-col gap-3 p-6">
+      <section className="hud-panel flex flex-col gap-3 p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-[15px] font-semibold text-fg/90">Torrents</h2>
           {data.torrents.length > 1 && (

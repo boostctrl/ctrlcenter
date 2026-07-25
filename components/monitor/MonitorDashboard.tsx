@@ -133,36 +133,49 @@ export default function MonitorDashboard({
     <main className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-6 px-6 py-12 sm:px-10 lg:py-16">
       <div>
         <PageNav current={null} {...nav} />
-        <div className="mt-3 flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
+        <div className="mt-3 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
           <div>
-            <h1 className="text-3xl font-bold">Monitor</h1>
-            <p className="mt-1 text-sm text-fg/45">
-              A read-only view of your connected services. Only signed-in admins
-              can see this page — nothing here is ever shown to visitors.
+            <p className="font-mono text-[11px] font-medium tracking-[0.3em] text-[var(--accent-from)]/70 uppercase">
+              System Monitor
             </p>
+            <h1 className="mt-1 text-3xl font-bold">Monitor</h1>
           </div>
           {/* A freshness read that mirrors the detail pages' status pill, so the
               whole Monitor reads as one family. No status dot here — the health
               hero below is the cockpit's verdict. */}
           {updatedAt !== null && now !== null && (
-            <span className="inline-flex shrink-0 items-center rounded-full border border-fg/10 bg-fg/5 px-3.5 py-1.5 text-xs whitespace-nowrap text-fg/50">
+            <span className="inline-flex shrink-0 items-center gap-2 rounded-sm border border-[var(--accent-from)]/25 bg-[var(--accent-from)]/[0.06] px-3 py-1.5 font-mono text-[10px] tracking-[0.14em] whitespace-nowrap text-fg/55 uppercase">
+              <span
+                aria-hidden
+                className="h-1.5 w-1.5 rounded-full bg-[var(--accent-from)]/70"
+              />
               Updated {sinceLabel(now - updatedAt)}
             </span>
           )}
         </div>
+        <p className="mt-2 max-w-2xl text-sm text-fg/45">
+          A read-only view of your connected services. Only signed-in admins can
+          see this page — nothing here is ever shown to visitors.
+        </p>
       </div>
 
-      {/* One cohesive surface: the health hero, then each domain cluster,
-          separated by hairline dividers. */}
-      <div className="glass-card divide-y divide-fg/10">
-        <div className="p-6">
-          <SystemHealthBar snapshot={snapshot} />
-        </div>
+      {/* Instrument panels floating on a faint grid backdrop: the health hero,
+          then each domain cluster under its own rail. */}
+      <div className="hud-grid flex flex-col gap-7 py-1">
+        <SystemHealthBar snapshot={snapshot} />
         {GROUPS.map((group) => (
-          <div key={group.label} className="flex flex-col gap-4 p-6">
-            <p className="text-[11px] font-medium tracking-wide text-fg/40 uppercase">
-              {group.label}
-            </p>
+          <section key={group.label} className="flex flex-col gap-4">
+            <div className="hud-rail">
+              <span className="flex shrink-0 items-center gap-2">
+                <span
+                  aria-hidden
+                  className="h-3 w-[3px] bg-[var(--accent-from)]/70"
+                />
+                <span className="font-mono text-[11px] font-medium tracking-[0.2em] text-fg/55 uppercase">
+                  {group.label}
+                </span>
+              </span>
+            </div>
             <div className="flex flex-wrap gap-3">
               {group.ids.map((id) => (
                 <Complication
@@ -172,13 +185,12 @@ export default function MonitorDashboard({
                 />
               ))}
             </div>
-          </div>
+          </section>
         ))}
       </div>
 
-      <p className="text-[11px] text-fg/35">
-        Refreshes automatically every {REFRESH_MS / 1000} seconds while this tab
-        is visible.
+      <p className="font-mono text-[10px] tracking-[0.12em] text-fg/35 uppercase">
+        Auto-refresh · {REFRESH_MS / 1000}s interval · while tab visible
       </p>
     </main>
   );

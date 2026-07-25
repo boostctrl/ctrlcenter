@@ -20,7 +20,7 @@ function Chip({
   children: ReactNode;
 }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-fg/10 bg-fg/5 px-3 py-1 text-xs text-fg/70">
+    <span className="inline-flex items-center gap-1.5 rounded-sm border border-fg/12 bg-fg/[0.04] px-2.5 py-1 font-mono text-[10px] tracking-[0.1em] text-fg/65 uppercase">
       {dot && <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${dot}`} />}
       {children}
     </span>
@@ -77,20 +77,58 @@ export default function SystemHealthBar({
         : `${connected} of ${SERVICE_IDS.length} services connected`;
 
   return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-3">
-        <span
-          aria-hidden
-          className={`h-2.5 w-2.5 shrink-0 rounded-full ${overall.dot}`}
-        />
+    <div
+      className={`hud-panel ${
+        attention ? "hud-panel-alert" : ""
+      } flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6`}
+    >
+      <div className="flex items-center gap-3.5">
+        {attention ? (
+          // A warning triangle, red with a soft glow — the cockpit's alarm lamp.
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden
+            className="h-7 w-7 shrink-0 text-red-400 drop-shadow-[0_0_6px_rgba(248,113,113,0.5)]"
+          >
+            <path
+              d="M12 3.4 22.2 20.2H1.8L12 3.4Z"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M12 9.8v4.4"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              strokeLinecap="round"
+            />
+            <circle cx="12" cy="17.2" r="0.95" fill="currentColor" />
+          </svg>
+        ) : (
+          <span
+            aria-hidden
+            className={`h-3 w-3 shrink-0 rounded-full ${overall.dot}`}
+          />
+        )}
         <div>
-          <h2 className="text-lg font-semibold text-fg/90">{overall.text}</h2>
+          <h2
+            className={`text-base font-bold tracking-[0.1em] uppercase ${
+              attention
+                ? criticalAlerts
+                  ? "text-red-400"
+                  : "text-amber-300"
+                : "text-fg/90"
+            }`}
+          >
+            {overall.text}
+          </h2>
           <p
-            className={`text-xs ${
+            className={`mt-0.5 text-xs ${
               attention && problems.length > 0
                 ? criticalAlerts
-                  ? "text-red-300/85"
-                  : "text-amber-300/85"
+                  ? "text-red-300/80"
+                  : "text-amber-300/80"
                 : "text-fg/45"
             }`}
           >
@@ -124,10 +162,10 @@ export default function SystemHealthBar({
         )}
         {alerts.length > 0 && (
           <span
-            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${
+            className={`inline-flex items-center gap-1.5 rounded-sm border px-2.5 py-1 font-mono text-[10px] tracking-[0.1em] uppercase ${
               criticalAlerts
-                ? "border-red-500/30 bg-red-500/10 text-red-300"
-                : "border-amber-400/30 bg-amber-400/10 text-amber-200/90"
+                ? "border-red-500/40 bg-red-500/12 text-red-300"
+                : "border-amber-400/40 bg-amber-400/12 text-amber-200/90"
             }`}
           >
             {alerts.length} alert{alerts.length === 1 ? "" : "s"}

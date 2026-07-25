@@ -45,7 +45,7 @@ export default function TautulliDetail({
     <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
       <TautulliCard status={status} />
       {status.data && (
-        <section className="glass-card flex flex-col gap-3 p-6">
+        <section className="hud-panel flex flex-col gap-3 p-6">
           <h2 className="text-[15px] font-semibold text-fg/90">Recently watched</h2>
           {history.length > 0 ? (
             <ul className="divide-y divide-fg/10">

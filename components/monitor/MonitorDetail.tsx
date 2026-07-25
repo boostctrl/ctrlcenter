@@ -56,7 +56,7 @@ function StatusPill({
       ? sinceLabel(now - updatedAt)
       : null;
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-fg/10 bg-fg/5 px-3.5 py-1.5 text-xs">
+    <span className="inline-flex items-center gap-2 rounded-sm border border-[var(--accent-from)]/25 bg-[var(--accent-from)]/[0.06] px-3 py-1.5 font-mono text-[10px] tracking-[0.14em] uppercase">
       <span aria-hidden className={`h-2 w-2 rounded-full ${STATE_DOT[state]}`} />
       <span className="font-medium text-fg/80">{label}</span>
       {since && <span className="text-fg/40">· updated {since}</span>}
@@ -179,10 +179,11 @@ export default function MonitorDetail({
         <div className="flex flex-col gap-4">
           <div>
             <PageNav current={null} {...nav} />
-            {/* Breadcrumb back to the cockpit — a plain text link, no arrow. */}
+            {/* Breadcrumb back to the cockpit — plain text, no arrow, in the
+                same mono readout style as the cockpit's eyebrow. */}
             <Link
               href="/admin/monitor"
-              className="mt-3 inline-block text-sm text-fg/50 transition-colors hover:text-fg/80"
+              className="mt-3 inline-block font-mono text-[11px] font-medium tracking-[0.22em] text-fg/45 uppercase transition-colors hover:text-fg/70"
             >
               Monitor
             </Link>
@@ -193,7 +194,7 @@ export default function MonitorDetail({
           </div>
         </div>
         <InDetailContext.Provider value={true}>
-          {renderBody(result, refresh)}
+          <div className="hud-grid py-1">{renderBody(result, refresh)}</div>
         </InDetailContext.Provider>
       </main>
     </ConfirmProvider>
