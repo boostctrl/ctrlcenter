@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [2.8.6] - 2026-07-24
+
 ### Changed
 
 - **The Monitor gets an instrument-panel look.** The Monitor and its per-service
@@ -2494,7 +2496,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.5...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.6...HEAD
+[2.8.6]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.5...v2.8.6
 [2.8.5]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.4...v2.8.5
 [2.8.4]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.3...v2.8.4
 [2.8.3]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.2...v2.8.3
