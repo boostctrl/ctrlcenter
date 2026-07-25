@@ -153,24 +153,37 @@ export default function SeerrCard({
               <p className="text-[11px] font-medium tracking-wide text-fg/40 uppercase">
                 Recent requests
               </p>
-              <ul className="flex flex-col gap-2.5">
-                {data.requests.map((r, i) => (
-                  <RequestRow
-                    key={`${r.id}-${r.title}-${i}`}
-                    request={r}
-                    meta={mounted ? relTime(r.at) : ""}
-                    actions={
-                      status.actionsAllowed && r.status === "pending"
-                        ? {
-                            busy: busy === String(r.id),
-                            onApprove: () => approve(r),
-                            onDeny: () => deny(r),
+              {/* Two independent columns on wide screens so the list fills the
+                  width; each column packs its own rows, so the taller pending
+                  rows (with Approve/Deny) don't leave gaps beside shorter ones. */}
+              <div className="grid gap-x-12 sm:grid-cols-2">
+                {(() => {
+                  const mid = Math.ceil(data.requests.length / 2);
+                  return [
+                    data.requests.slice(0, mid),
+                    data.requests.slice(mid),
+                  ].map((col, ci) => (
+                    <ul key={ci} className="flex flex-col gap-2.5">
+                      {col.map((r, i) => (
+                        <RequestRow
+                          key={`${r.id}-${r.title}-${i}`}
+                          request={r}
+                          meta={mounted ? relTime(r.at) : ""}
+                          actions={
+                            status.actionsAllowed && r.status === "pending"
+                              ? {
+                                  busy: busy === String(r.id),
+                                  onApprove: () => approve(r),
+                                  onDeny: () => deny(r),
+                                }
+                              : undefined
                           }
-                        : undefined
-                    }
-                  />
-                ))}
-              </ul>
+                        />
+                      ))}
+                    </ul>
+                  ));
+                })()}
+              </div>
             </div>
           ) : (
             <p className="text-sm text-fg/40">No requests yet.</p>

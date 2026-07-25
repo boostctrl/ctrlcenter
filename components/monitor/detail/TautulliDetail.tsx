@@ -40,7 +40,9 @@ export default function TautulliDetail({
   const mounted = useMounted();
   const history = status.data?.history ?? [];
   return (
-    <div className="flex flex-col gap-4">
+    // Now-playing and history side by side on wide screens, so the page fills
+    // the width instead of stacking two half-empty bands.
+    <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
       <TautulliCard status={status} />
       {status.data && (
         <section className="glass-card flex flex-col gap-3 p-6">

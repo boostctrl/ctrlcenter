@@ -102,7 +102,9 @@ export default function AdguardDetail({
 }) {
   const data = status.data;
   return (
-    <div className="flex flex-col gap-4">
+    // Summary and trend sit side by side on wide screens so the page fills the
+    // width with content rather than stacking two half-empty bands.
+    <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
       <AdguardCard status={status} />
       {data && (
         <section className="glass-card flex flex-col gap-3 p-6">

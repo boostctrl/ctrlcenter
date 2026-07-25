@@ -183,11 +183,23 @@ export default function TruenasCard({
               <p className="text-[11px] font-medium tracking-wide text-fg/40 uppercase">
                 Apps
               </p>
-              <ul className="flex flex-col gap-3">
-                {data.apps.map((a, i) => (
-                  <AppRow key={`${a.name}-${i}`} app={a} />
-                ))}
-              </ul>
+              {/* Two independent columns on wide screens so the roster fills the
+                  width; each column packs its own rows, so an app with a
+                  container sub-list doesn't leave a gap beside a plain one. */}
+              <div className="grid gap-x-12 gap-y-3 sm:grid-cols-2 sm:gap-y-0">
+                {(() => {
+                  const mid = Math.ceil(data.apps.length / 2);
+                  return [data.apps.slice(0, mid), data.apps.slice(mid)].map(
+                    (col, ci) => (
+                      <ul key={ci} className="flex flex-col gap-3">
+                        {col.map((a, i) => (
+                          <AppRow key={`${a.name}-${i}`} app={a} />
+                        ))}
+                      </ul>
+                    )
+                  );
+                })()}
+              </div>
             </div>
           )}
         </>

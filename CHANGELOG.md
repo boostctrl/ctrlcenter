@@ -14,13 +14,16 @@ here.
 
 ### Changed
 
-- **Every Monitor service page opens on the same tidy header.** Click a tile on
-  the Monitor and its detail page now leads with a live status pill — Live,
-  Stale, or Offline, with how long ago it last refreshed — and its content sits
-  in a comfortable centered column instead of stretching edge to edge, so lists
-  read as lists rather than flinging each row's details to the far side of the
-  screen. The Monitor page itself gains the same "updated moments ago" read, so
-  the whole dashboard shares one freshness signal. (#233)
+- **Every Monitor service page opens on the same tidy header and fills the
+  width.** Click a tile on the Monitor and its detail page now leads with a live
+  status pill — Live, Stale, or Offline, with how long ago it last refreshed.
+  Its content lays out in columns that use the whole width instead of one thin
+  list with each row's details flung to the far edge: Upcoming beside Recent on
+  Sonarr and Radarr, what's playing beside recent history on Tautulli, protection
+  stats beside the query-activity chart on AdGuard, and the UniFi devices, Seerr
+  requests, and TrueNAS apps in two columns. The Monitor page itself gains the
+  same "updated moments ago" read, so the whole dashboard shares one freshness
+  signal. (#233)
 
 ## [2.8.4] - 2026-07-24
 

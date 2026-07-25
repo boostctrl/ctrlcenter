@@ -87,45 +87,49 @@ export default function ArrCard({
     <MonitorCard title={title} status={status}>
       {data && (
         <>
-          <div className="flex flex-col gap-2">
-            <SectionLabel>Upcoming</SectionLabel>
-            {data.upcoming.length > 0 ? (
-              <ul className="flex flex-col gap-1.5">
-                {data.upcoming.map((it: ArrUpcomingItem, i) => (
-                  <Row
-                    key={`${it.title}-${it.subtitle}-${i}`}
-                    title={it.title}
-                    subtitle={it.subtitle}
-                    meta={mounted ? dayLabel(it.at) : ""}
-                  />
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-fg/40">
-                Nothing scheduled in the next two weeks.
-              </p>
+          {/* Upcoming and Recent read side by side on wide screens, filling the
+              width with two lists rather than one column flung against the edge. */}
+          <div className="grid gap-x-12 gap-y-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <SectionLabel>Upcoming</SectionLabel>
+              {data.upcoming.length > 0 ? (
+                <ul className="flex flex-col gap-1.5">
+                  {data.upcoming.map((it: ArrUpcomingItem, i) => (
+                    <Row
+                      key={`${it.title}-${it.subtitle}-${i}`}
+                      title={it.title}
+                      subtitle={it.subtitle}
+                      meta={mounted ? dayLabel(it.at) : ""}
+                    />
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-fg/40">
+                  Nothing scheduled in the next two weeks.
+                </p>
+              )}
+            </div>
+
+            {data.recent.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <SectionLabel>Recent</SectionLabel>
+                <ul className="flex flex-col gap-1.5">
+                  {data.recent.map((it: ArrRecentItem, i) => (
+                    <Row
+                      key={`${it.title}-${it.subtitle}-${i}`}
+                      title={it.title}
+                      subtitle={it.subtitle}
+                      meta={
+                        mounted && it.at !== null
+                          ? `${it.event} · ${relTime(it.at)}`
+                          : it.event
+                      }
+                    />
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
-
-          {data.recent.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <SectionLabel>Recent</SectionLabel>
-              <ul className="flex flex-col gap-1.5">
-                {data.recent.map((it: ArrRecentItem, i) => (
-                  <Row
-                    key={`${it.title}-${it.subtitle}-${i}`}
-                    title={it.title}
-                    subtitle={it.subtitle}
-                    meta={
-                      mounted && it.at !== null
-                        ? `${it.event} · ${relTime(it.at)}`
-                        : it.event
-                    }
-                  />
-                ))}
-              </ul>
-            </div>
-          )}
 
           {data.health.length > 0 && (
             <ul className="flex flex-col gap-1 border-t border-fg/10 pt-3">

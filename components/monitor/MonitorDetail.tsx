@@ -172,7 +172,7 @@ export default function MonitorDetail({
 
   return (
     <ConfirmProvider>
-      <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-6 px-6 py-12 sm:px-10 lg:py-16">
+      <main className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-6 px-6 py-12 sm:px-10 lg:py-16">
         {/* The detail masthead: breadcrumb, then the service name paired with a
             live status pill, so every service opens on the same designed header
             instead of a bare title over an empty band. */}

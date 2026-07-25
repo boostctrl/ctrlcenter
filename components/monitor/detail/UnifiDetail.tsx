@@ -56,6 +56,11 @@ export default function UnifiDetail({
   status: ServiceStatus<UnifiDetailData>;
 }) {
   const devices = status.data?.deviceList ?? [];
+  // Split the roster across two columns on wide screens so it fills the width
+  // instead of one tall list flung against the right edge. Offline gear already
+  // sorts to the front, and it stays that way reading down the first column.
+  const mid = Math.ceil(devices.length / 2);
+  const columns = [devices.slice(0, mid), devices.slice(mid)];
   return (
     <div className="flex flex-col gap-4">
       <UnifiCard status={status} />
@@ -63,11 +68,15 @@ export default function UnifiDetail({
         <section className="glass-card flex flex-col gap-3 p-6">
           <h2 className="text-[15px] font-semibold text-fg/90">Devices</h2>
           {devices.length > 0 ? (
-            <ul className="divide-y divide-fg/10">
-              {devices.map((d, i) => (
-                <DeviceRow key={`${d.name}-${i}`} device={d} />
+            <div className="grid gap-x-12 sm:grid-cols-2">
+              {columns.map((col, ci) => (
+                <ul key={ci} className="divide-y divide-fg/10">
+                  {col.map((d, i) => (
+                    <DeviceRow key={`${d.name}-${i}`} device={d} />
+                  ))}
+                </ul>
               ))}
-            </ul>
+            </div>
           ) : (
             <p className="text-sm text-fg/40">No devices reported.</p>
           )}
