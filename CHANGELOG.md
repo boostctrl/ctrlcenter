@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [2.8.5] - 2026-07-24
+
 ### Changed
 
 - **Every Monitor service page opens on the same tidy header and fills the
@@ -2484,7 +2486,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.4...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.5...HEAD
+[2.8.5]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.4...v2.8.5
 [2.8.4]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.3...v2.8.4
 [2.8.3]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.2...v2.8.3
 [2.8.2]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.1...v2.8.2
