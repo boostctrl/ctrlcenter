@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-07-25
+
 ### Added
 
 - **Inbound webhooks — your media apps can push events to CtrlCenter.** Sonarr,
@@ -2536,7 +2538,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.7...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.9.0...HEAD
+[2.9.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.7...v2.9.0
 [2.8.7]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.6...v2.8.7
 [2.8.6]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.5...v2.8.6
 [2.8.5]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.4...v2.8.5
