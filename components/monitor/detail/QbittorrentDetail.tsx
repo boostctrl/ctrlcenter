@@ -38,6 +38,44 @@ const STATE_TONES: Record<TorrentState, string> = {
   error: "text-red-400",
 };
 
+// Torrent ordering the list can be sorted by (#231). "Activity" keeps the
+// backend's active-first order; "Status" groups by state in this rank so all the
+// downloading torrents sit together, then stalled, seeding, paused, and so on.
+type SortKey = "activity" | "status" | "name" | "progress";
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "activity", label: "Activity" },
+  { key: "status", label: "Status" },
+  { key: "name", label: "Name" },
+  { key: "progress", label: "Progress" },
+];
+
+const STATUS_RANK: Record<TorrentState, number> = {
+  downloading: 0,
+  stalled: 1,
+  queued: 2,
+  checking: 3,
+  seeding: 4,
+  paused: 5,
+  error: 6,
+};
+
+function sortTorrents(
+  list: QbittorrentTorrent[],
+  key: SortKey
+): QbittorrentTorrent[] {
+  if (key === "activity") return list;
+  const sorted = [...list];
+  if (key === "status")
+    sorted.sort(
+      (a, b) => STATUS_RANK[a.state] - STATUS_RANK[b.state] || b.progress - a.progress
+    );
+  else if (key === "name")
+    sorted.sort((a, b) => a.name.localeCompare(b.name));
+  else sorted.sort((a, b) => b.progress - a.progress);
+  return sorted;
+}
+
 function TorrentRow({
   torrent,
   actions,
@@ -180,6 +218,7 @@ export default function QbittorrentDetail({
   const [pendingDelete, setPendingDelete] = useState<QbittorrentTorrent | null>(
     null
   );
+  const [sortBy, setSortBy] = useState<SortKey>("activity");
 
   if (!data) {
     return (
@@ -253,10 +292,31 @@ export default function QbittorrentDetail({
       </section>
 
       <section className="glass-card flex flex-col gap-3 p-6">
-        <h2 className="text-[15px] font-semibold text-fg/90">Torrents</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-[15px] font-semibold text-fg/90">Torrents</h2>
+          {data.torrents.length > 1 && (
+            <div className="flex items-center gap-1 text-xs">
+              <span className="mr-1 text-fg/40">Sort</span>
+              {SORT_OPTIONS.map((opt) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => setSortBy(opt.key)}
+                  className={`rounded-full px-2.5 py-1 transition-colors ${
+                    sortBy === opt.key
+                      ? "bg-fg/10 text-fg/90"
+                      : "text-fg/50 hover:text-fg/80"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         {data.torrents.length > 0 ? (
           <ul className="divide-y divide-fg/10">
-            {data.torrents.map((t, i) => (
+            {sortTorrents(data.torrents, sortBy).map((t, i) => (
               <TorrentRow key={`${t.hash}-${i}`} torrent={t} actions={actions} />
             ))}
           </ul>

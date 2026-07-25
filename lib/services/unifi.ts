@@ -64,6 +64,24 @@ export type UnifiSnapshot = {
 export const UNIFI_ISSUE_CAP = 6;
 const DEFAULT_SITE = "default";
 
+// One UniFi device (an access point, switch, or gateway) for the detail page —
+// the "which gear, and is it up" the health counts can't show.
+export type UnifiDevice = {
+  name: string;
+  // A friendly kind ("Access Point" / "Switch" / "Gateway"), from the raw type.
+  kind: string;
+  up: boolean;
+  // Clients associated to this device.
+  clients: number;
+  // Uptime in seconds, or null when not reported.
+  uptime: number | null;
+};
+
+// The detail payload: the health snapshot plus the adopted-device list.
+export type UnifiDetail = UnifiSnapshot & { deviceList: UnifiDevice[] };
+
+export const UNIFI_DEVICE_CAP = 40;
+
 // --- Raw API shapes (only the fields the snapshot uses) ---
 
 type RawEnvelope<T> = { data?: T; meta?: { rc?: string; msg?: string } };
@@ -81,8 +99,45 @@ type RawSubsystem = {
   latency?: number;
 };
 
+type RawDevice = {
+  name?: string;
+  model?: string;
+  mac?: string;
+  type?: string;
+  // 1 = connected/adopted; anything else is offline/provisioning.
+  state?: number;
+  num_sta?: number;
+  uptime?: number;
+};
+
 const int = (v: unknown): number =>
   typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.round(v) : 0;
+
+// UniFi device type codes → a friendly kind.
+const DEVICE_KINDS: Record<string, string> = {
+  uap: "Access Point",
+  usw: "Switch",
+  ugw: "Gateway",
+  udm: "Gateway",
+  uxg: "Gateway",
+  usg: "Gateway",
+};
+
+// Exported for the unit tests: fold stat/device into the detail's device list,
+// offline gear first so a downed device surfaces at the top.
+export function mapUnifiDevices(raw: unknown): UnifiDevice[] {
+  const list = Array.isArray(raw) ? (raw as RawDevice[]) : [];
+  return list
+    .slice(0, UNIFI_DEVICE_CAP)
+    .map((d) => ({
+      name: d.name?.trim() || d.model?.trim() || d.mac?.trim() || "device",
+      kind: DEVICE_KINDS[d.type ?? ""] ?? (d.type?.trim() || "Device"),
+      up: d.state === 1,
+      clients: int(d.num_sta),
+      uptime: typeof d.uptime === "number" && d.uptime > 0 ? d.uptime : null,
+    }))
+    .sort((a, b) => Number(a.up) - Number(b.up));
+}
 
 const SUBSYSTEM_LABELS: Record<string, string> = {
   wan: "WAN",
@@ -284,6 +339,24 @@ export async function getUnifiSnapshot(cfg: UnifiConfig): Promise<UnifiSnapshot>
     (prefix) => `${prefix}/api/s/${DEFAULT_SITE}/stat/health`
   );
   return mapUnifiHealth(siteData<RawSubsystem[]>(text));
+}
+
+// The detail read (#231): the health snapshot plus the adopted-device list. A
+// failed device fetch degrades to an empty list rather than blanking the page.
+export async function getUnifiDetail(cfg: UnifiConfig): Promise<UnifiDetail> {
+  const base = serviceBase(cfg.url);
+  const [healthR, devicesR] = await Promise.allSettled([
+    unifiGet(base, cfg, (p) => `${p}/api/s/${DEFAULT_SITE}/stat/health`),
+    unifiGet(base, cfg, (p) => `${p}/api/s/${DEFAULT_SITE}/stat/device`),
+  ]);
+  if (healthR.status === "rejected") throw healthR.reason;
+  return {
+    ...mapUnifiHealth(siteData<RawSubsystem[]>(healthR.value)),
+    deviceList:
+      devicesR.status === "fulfilled"
+        ? mapUnifiDevices(siteData<RawDevice[]>(devicesR.value))
+        : [],
+  };
 }
 
 // Fresh reachability check for the admin's "Test connection" button: a real

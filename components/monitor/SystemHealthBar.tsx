@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import type { MonitorSnapshot } from "@/lib/monitor";
-import { SERVICE_IDS } from "@/lib/services/ids";
+import { SERVICE_IDS, SERVICE_LABELS } from "@/lib/services/ids";
 import { serviceState, STATE_DOT, type ServiceState } from "./MonitorCard";
 
 // The cockpit's master status bar (#208): the at-a-glance system-health read
@@ -48,15 +48,33 @@ export default function SystemHealthBar({
   const alerts = snapshot.truenas.data?.alerts ?? [];
   const criticalAlerts = alerts.some((a) => a.level === "critical");
 
+  const attention = offline > 0 || criticalAlerts;
+
   // The one-line verdict, in priority order.
-  const overall =
-    offline > 0 || criticalAlerts
-      ? { dot: STATE_DOT.unreachable, text: "Attention needed" }
-      : stale > 0
-        ? { dot: STATE_DOT.stale, text: "Running degraded" }
-        : connected > 0
-          ? { dot: STATE_DOT.live, text: "All systems normal" }
-          : { dot: STATE_DOT.disabled, text: "No integrations connected" };
+  const overall = attention
+    ? { dot: STATE_DOT.unreachable, text: "Attention needed" }
+    : stale > 0
+      ? { dot: STATE_DOT.stale, text: "Running degraded" }
+      : connected > 0
+        ? { dot: STATE_DOT.live, text: "All systems normal" }
+        : { dot: STATE_DOT.disabled, text: "No integrations connected" };
+
+  // Under an "Attention needed" verdict the subtext names what's wrong — the
+  // actual alerts and any offline services — rather than the reassuring
+  // connected count that reads oddly next to a red dot.
+  const problems: string[] = [
+    ...alerts.map((a) => a.message),
+    ...SERVICE_IDS.filter((id) => serviceState(snapshot[id]) === "unreachable").map(
+      (id) => `${SERVICE_LABELS[id]} offline`
+    ),
+  ];
+  const subtext =
+    connected === 0
+      ? "Connect a service in Settings to get started."
+      : attention && problems.length > 0
+        ? problems.slice(0, 2).join(" · ") +
+          (problems.length > 2 ? ` · +${problems.length - 2} more` : "")
+        : `${connected} of ${SERVICE_IDS.length} services connected`;
 
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -67,10 +85,16 @@ export default function SystemHealthBar({
         />
         <div>
           <h2 className="text-lg font-semibold text-fg/90">{overall.text}</h2>
-          <p className="text-xs text-fg/45">
-            {connected === 0
-              ? "Connect a service in Settings to get started."
-              : `${connected} of ${SERVICE_IDS.length} services connected`}
+          <p
+            className={`text-xs ${
+              attention && problems.length > 0
+                ? criticalAlerts
+                  ? "text-red-300/85"
+                  : "text-amber-300/85"
+                : "text-fg/45"
+            }`}
+          >
+            {subtext}
           </p>
         </div>
       </div>

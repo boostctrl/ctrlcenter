@@ -148,6 +148,27 @@ export default function TruenasCard({
     <MonitorCard title="TrueNAS" status={status}>
       {data && (
         <>
+          {/* Alerts lead — a SMART failure or degraded pool is the whole point
+              of glancing at TrueNAS, so it can't sit buried under the app list. */}
+          {data.alerts.length > 0 && (
+            <ul className="flex flex-col gap-1.5">
+              {data.alerts.map((a, i) => (
+                <li
+                  key={`${a.message}-${i}`}
+                  className={`flex items-baseline gap-2 rounded-lg border px-3 py-2 text-xs ${
+                    a.level === "critical"
+                      ? "border-red-500/30 bg-red-500/10 text-red-300"
+                      : "border-amber-400/30 bg-amber-400/10 text-amber-200/90"
+                  }`}
+                >
+                  <span aria-hidden className="shrink-0 font-semibold uppercase">
+                    {a.level === "critical" ? "Critical" : "Warning"}
+                  </span>
+                  <span className="min-w-0">{a.message}</span>
+                </li>
+              ))}
+            </ul>
+          )}
           {data.pools.length > 0 ? (
             <ul className="divide-y divide-fg/10">
               {data.pools.map((p, i) => (
@@ -168,20 +189,6 @@ export default function TruenasCard({
                 ))}
               </ul>
             </div>
-          )}
-          {data.alerts.length > 0 && (
-            <ul className="flex flex-col gap-1 border-t border-fg/10 pt-3">
-              {data.alerts.map((a, i) => (
-                <li
-                  key={`${a.message}-${i}`}
-                  className={`text-xs ${
-                    a.level === "critical" ? "text-red-400" : "text-amber-400/90"
-                  }`}
-                >
-                  {a.message}
-                </li>
-              ))}
-            </ul>
           )}
         </>
       )}

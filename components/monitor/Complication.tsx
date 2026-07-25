@@ -36,11 +36,14 @@ export default function Complication({
   visual?: GlanceVisual;
 }) {
   const dim = state === "disabled" || state === "unconfigured";
-  // Tiles flow up to three per row on wide screens (two on tablets, one on
-  // phones) and grow to fill, so a group of five lays out as a clean 3 + 2 and a
-  // group of two splits the row evenly — whichever services are in use.
-  const sizing =
-    "grow basis-full sm:basis-[calc(50%-0.375rem)] lg:basis-[calc(33.333%-0.5rem)]";
+  // In-use tiles flow up to three per row on wide screens (two on tablets, one
+  // on phones) and grow to fill, so a group of five lays out as a clean 3 + 2.
+  // An off / not-set-up tile stays a compact chip that doesn't grow, so a
+  // service you aren't using (e.g. Portainer) collapses out of the way instead
+  // of claiming an equal slot.
+  const sizing = dim
+    ? "grow-0 basis-60"
+    : "grow basis-full sm:basis-[calc(50%-0.375rem)] lg:basis-[calc(33.333%-0.5rem)]";
   return (
     <Link
       href={href}
@@ -176,7 +179,6 @@ const SEGMENT_BG: Record<SegmentTone, string> = {
 function Visual({ visual }: { visual: GlanceVisual }) {
   if (visual.kind === "spark") return <Sparkline data={visual.values} />;
   if (visual.kind === "days") return <DayStrip values={visual.values} />;
-  if (visual.kind === "bars") return <RatioBars values={visual.values} />;
   return <SegmentBar parts={visual.parts} />;
 }
 
@@ -224,26 +226,6 @@ function DayStrip({ values }: { values: number[] }) {
           style={{ height: `${v > 0 ? Math.max(20, (v / max) * 100) : 12}%` }}
         />
       ))}
-    </div>
-  );
-}
-
-// Per-item capacity bars (TrueNAS pools): each bar's height is its absolute
-// fill (0..1, not normalized), so a near-full pool reads tall and turns red —
-// unlike the activity strip, where heights are relative to the busiest day.
-function RatioBars({ values }: { values: number[] }) {
-  return (
-    <div aria-hidden className="mt-1.5 flex h-5 items-end gap-1">
-      {values.map((v, i) => {
-        const pct = Math.min(100, Math.max(0, v * 100));
-        return (
-          <span
-            key={i}
-            className={`flex-1 rounded-sm ${v >= 0.9 ? "bg-red-400/80" : "bg-[var(--accent-from)]"}`}
-            style={{ height: `${Math.max(8, pct)}%` }}
-          />
-        );
-      })}
     </div>
   );
 }

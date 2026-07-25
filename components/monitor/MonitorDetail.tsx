@@ -11,11 +11,11 @@ import { InDetailContext } from "./MonitorCard";
 import QbittorrentDetail from "./detail/QbittorrentDetail";
 import AdguardDetail from "./detail/AdguardDetail";
 import TautulliDetail from "./detail/TautulliDetail";
+import UnifiDetail from "./detail/UnifiDetail";
 import ArrCard from "./ArrCard";
 import SeerrCard from "./SeerrCard";
 import PortainerCard from "./PortainerCard";
 import TruenasCard from "./TruenasCard";
-import UnifiCard from "./UnifiCard";
 
 // The client shell for a service's detail page (#208): the shared chrome
 // (back-to-Monitor breadcrumb, title) plus a poll of /api/monitor/[id] that
@@ -72,7 +72,7 @@ function renderBody(result: DetailResult, refresh: () => void): ReactNode {
     case "truenas":
       return <TruenasCard status={asStatus(result)} />;
     case "unifi":
-      return <UnifiCard status={asStatus(result)} />;
+      return <UnifiDetail status={asStatus(result)} />;
   }
 }
 

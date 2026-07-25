@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getUnifiSnapshot,
+  getUnifiDetail,
   probeUnifi,
   resolveUnifiPassword,
   mapUnifiHealth,
+  mapUnifiDevices,
   UNIFI_ISSUE_CAP,
+  UNIFI_DEVICE_CAP,
 } from "./unifi";
 
 const CFG = {
@@ -59,6 +62,7 @@ function stubUnifiOs(opts: {
   loginStatus?: number;
   health?: unknown;
   sysinfo?: unknown;
+  devices?: unknown;
   healthStatus?: () => number;
 } = {}) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
@@ -82,11 +86,22 @@ function stubUnifiOs(opts: {
     if (url.includes("/proxy/network/api/s/default/stat/sysinfo")) {
       return new Response(envelope(opts.sysinfo ?? [{ version: "10.5.62" }]));
     }
+    if (url.includes("/proxy/network/api/s/default/stat/device")) {
+      return new Response(envelope(opts.devices ?? DEVICES));
+    }
     return new Response("not found", { status: 404 });
   });
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
 }
+
+// A trimmed stat/device payload: a gateway, two APs (one offline), a switch.
+const DEVICES = [
+  { name: "Dream Machine", type: "udm", state: 1, num_sta: 25, uptime: 864_000 },
+  { name: "Office AP", type: "uap", state: 1, num_sta: 12, uptime: 3600 },
+  { name: "Garage AP", type: "uap", state: 0, num_sta: 0, uptime: 0 },
+  { name: "Rack Switch", type: "usw", state: 1, num_sta: 8, uptime: 90_000 },
+];
 
 afterEach(() => {
   const g = globalThis as {
@@ -190,6 +205,54 @@ describe("probeUnifi", () => {
       ok: false,
       error: "Login failed — check the username and password",
     });
+  });
+});
+
+describe("getUnifiDetail", () => {
+  it("adds the device list to the health snapshot, offline gear first", async () => {
+    stubUnifiOs();
+    const detail = await getUnifiDetail(CFG);
+    // Health snapshot still present.
+    expect(detail.internet.up).toBe(true);
+    // Devices mapped, offline first, with a friendly kind.
+    expect(detail.deviceList).toEqual([
+      { name: "Garage AP", kind: "Access Point", up: false, clients: 0, uptime: null },
+      { name: "Dream Machine", kind: "Gateway", up: true, clients: 25, uptime: 864_000 },
+      { name: "Office AP", kind: "Access Point", up: true, clients: 12, uptime: 3600 },
+      { name: "Rack Switch", kind: "Switch", up: true, clients: 8, uptime: 90_000 },
+    ]);
+  });
+
+  it("degrades to an empty device list when stat/device fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/api/auth/login"))
+          return new Response("{}", {
+            status: 200,
+            headers: { "set-cookie": "TOKEN=jwt; Path=/" },
+          });
+        if (url.includes("/stat/health")) return new Response(envelope(HEALTH));
+        if (url.includes("/stat/device")) return new Response("nope", { status: 500 });
+        return new Response("not found", { status: 404 });
+      })
+    );
+    const detail = await getUnifiDetail(CFG);
+    expect(detail.internet.up).toBe(true);
+    expect(detail.deviceList).toEqual([]);
+  });
+});
+
+describe("mapUnifiDevices", () => {
+  it("caps the list and falls back for name and kind", () => {
+    const many = Array.from({ length: UNIFI_DEVICE_CAP + 5 }, () => ({
+      type: "usw",
+      state: 1,
+    }));
+    expect(mapUnifiDevices(many)).toHaveLength(UNIFI_DEVICE_CAP);
+    const [d] = mapUnifiDevices([{ mac: "aa:bb", type: "mystery", state: 0 }]);
+    expect(d).toEqual({ name: "aa:bb", kind: "mystery", up: false, clients: 0, uptime: null });
   });
 });
 

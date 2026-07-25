@@ -14,12 +14,10 @@ import { formatBytes } from "@/components/widgets/SystemStatsWidget";
 // A service's tile visual — chosen so it always means something:
 //   spark    — a line sparkline over a per-unit series (AdGuard query volume)
 //   days     — a 7-day activity strip, normalized (Sonarr/Radarr recent grabs)
-//   bars     — per-item capacity bars, absolute 0..1 height (TrueNAS pools)
 //   segments — a stacked breakdown bar (Seerr pending/processing/available)
 export type GlanceVisual =
   | { kind: "spark"; values: number[] }
   | { kind: "days"; values: number[] }
-  | { kind: "bars"; values: number[] }
   | { kind: "segments"; parts: { value: number; tone: SegmentTone }[] };
 
 export type SegmentTone = "pending" | "processing" | "available";
@@ -117,7 +115,9 @@ export const GLANCES: {
     const active = d.requests.find((r) => r.status === "processing") ?? d.requests[0];
     return {
       center: String(d.processing),
-      caption: "downloading",
+      // "processing" is Seerr's own term — the request is approved and being
+      // handled, which may still be searching, not necessarily downloading yet.
+      caption: "processing",
       lines: [
         active ? line(active.title) : "No recent requests",
         active
@@ -210,9 +210,6 @@ export const GLANCES: {
       ring: fullest ?? undefined,
       alert: (fullest ?? 0) >= 0.9 || critical,
       lines,
-      // With more than one pool the ring only shows the fullest; a bar per pool
-      // makes every pool's capacity legible at a glance.
-      visual: d.pools.length > 1 ? { kind: "bars", values: ratios } : undefined,
     };
   },
   portainer: (d) => {

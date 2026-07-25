@@ -27,6 +27,7 @@ import {
 } from "./services/qbittorrent";
 import { getTautulliDetail, type TautulliDetail } from "./services/tautulli";
 import { getArrDetail } from "./services/arr";
+import { getUnifiDetail, type UnifiDetail } from "./services/unifi";
 
 // Every service has a detail page. Most reuse their snapshot data (the same the
 // card renders) as a "basic" detail; qBittorrent has a richer payload. Later
@@ -43,9 +44,13 @@ export function isDetailService(id: string): id is DetailServiceId {
 // (activity + recent watch history). Sonarr/Radarr and AdGuard keep the snapshot
 // type — their detail read just fills it more fully (a deeper history, the query
 // series) without changing its shape.
-export type DetailData = Omit<ServiceSnapshotMap, "qbittorrent" | "tautulli"> & {
+export type DetailData = Omit<
+  ServiceSnapshotMap,
+  "qbittorrent" | "tautulli" | "unifi"
+> & {
   qbittorrent: QbittorrentDetail;
   tautulli: TautulliDetail;
+  unifi: UnifiDetail;
 };
 
 // One service's detail read: the service id, whether its write actions are on
@@ -116,6 +121,8 @@ function fetchDetail<K extends DetailServiceId>(
       return getArrDetail("radarr", integrations.radarr) as Promise<
         DetailData[K]
       >;
+    case "unifi":
+      return getUnifiDetail(integrations.unifi) as Promise<DetailData[K]>;
     default:
       return SERVICES[id].snapshot(integrations[id]) as Promise<DetailData[K]>;
   }

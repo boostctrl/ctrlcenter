@@ -12,6 +12,28 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **See your UniFi devices on the Monitor page.** The UniFi detail page now lists
+  your access points, switches, and gateway — each with whether it's online, how
+  many clients it's serving, and its uptime (offline gear first) — instead of
+  only echoing the health counts. (#231)
+
+### Changed
+
+- **Sort qBittorrent torrents by status.** The qBittorrent detail page gains a
+  sort control: group all your downloading torrents together, then stalled,
+  seeding, and paused, or sort by name or progress. (#231)
+- **Alerts are easier to spot.** TrueNAS alerts now lead its detail page with
+  clear Critical/Warning badges instead of sitting below the whole app list, and
+  when the Monitor reads "Attention needed" it names the actual alerts and any
+  offline services rather than a reassuring service count. (#231, #232)
+- **At-a-glance tidy-ups.** Seerr shows "processing" instead of "downloading" for
+  requests still being handled (one may still be searching, not yet downloading);
+  the TrueNAS tile drops its confusing per-pool bars (the ring already shows
+  capacity); and a service you aren't using, like Portainer, collapses to a
+  compact chip again instead of claiming a full slot. (#232)
+
 ## [2.8.3] - 2026-07-24
 
 ### Changed
