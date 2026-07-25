@@ -23,6 +23,18 @@ here.
   connection. Each service has its own token in the URL, which you can regenerate
   if it ever leaks. (#204)
 
+### Changed
+
+- **The Portainer detail page opens on real container detail.** When container
+  actions are on, it auto-expands the first environment instead of leaving you a
+  wall of collapsed rows to click through. (#234)
+
+### Fixed
+
+- **Portainer log tails no longer show stray characters on very large logs.** The
+  viewer now trims the tail on whole decoded lines rather than raw bytes, so a
+  huge log can't leave Docker frame-header bytes at the start of a line. (#218)
+
 ## [2.8.7] - 2026-07-25
 
 ### Changed

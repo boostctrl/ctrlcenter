@@ -275,8 +275,15 @@ export async function containerLogs(
     }
     if (!res.ok) throw new ServiceError(`HTTP ${res.status}`);
     const bytes = Buffer.from(await res.arrayBuffer());
-    const capped = bytes.subarray(Math.max(0, bytes.length - PORTAINER_LOG_MAX_BYTES));
-    return demuxDockerLog(capped);
+    // Demux the whole framed body first, THEN cap the decoded text. Capping the
+    // raw bytes before demuxing could slice mid-frame, so demuxDockerLog would
+    // hit a misaligned header, bail to raw, and leave stray header bytes at line
+    // starts (#218). `tail=PORTAINER_LOG_TAIL` bounds the body, so demuxing the
+    // whole thing stays cheap.
+    const text = demuxDockerLog(bytes);
+    return text.length > PORTAINER_LOG_MAX_BYTES
+      ? text.slice(text.length - PORTAINER_LOG_MAX_BYTES)
+      : text;
   } catch (e) {
     if (e instanceof ServiceError) throw e;
     log.warn("portainer logs fetch error", {

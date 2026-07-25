@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ServiceStatus } from "@/lib/monitor";
 import type {
@@ -11,7 +11,7 @@ import type {
 import { Button } from "@/components/admin/ui";
 import { useConfirm } from "@/components/admin/Confirm";
 import { useFocusTrap } from "@/components/admin/useFocusTrap";
-import MonitorCard from "./MonitorCard";
+import MonitorCard, { InDetailContext } from "./MonitorCard";
 import {
   useMonitorAction,
   fetchContainers,
@@ -211,6 +211,25 @@ export default function PortainerCard({
     if (res.error) setListError(res.error);
     else setContainers(res.containers ?? []);
   }, []);
+
+  // On the detail page, open the first drillable environment automatically so
+  // the page opens on real container detail instead of a wall of collapsed rows
+  // (#234). Once only — a later poll or a manual collapse must stick.
+  const inDetail = useContext(InDetailContext);
+  const autoExpanded = useRef(false);
+  useEffect(() => {
+    if (autoExpanded.current || !inDetail || !status.actionsAllowed) return;
+    const first = data?.endpoints.find((e) => e.hasSnapshot && e.id > 0);
+    if (!first) return;
+    autoExpanded.current = true;
+    // Defer the open past the effect (as the cockpit does for its clock) so it
+    // isn't a synchronous set-state in the effect body.
+    const raf = requestAnimationFrame(() => {
+      setExpanded(first.id);
+      loadContainers(first.id);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [inDetail, status.actionsAllowed, data, loadContainers]);
 
   const toggle = (endpointId: number) => {
     if (expanded === endpointId) {
