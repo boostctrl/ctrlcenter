@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [2.8.7] - 2026-07-25
+
 ### Changed
 
 - **The Monitor follows your theme again.** The fixed heads-up-display skin from
@@ -2511,7 +2513,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.6...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.7...HEAD
+[2.8.7]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.6...v2.8.7
 [2.8.6]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.5...v2.8.6
 [2.8.5]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.4...v2.8.5
 [2.8.4]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.3...v2.8.4
