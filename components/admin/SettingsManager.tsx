@@ -7,6 +7,8 @@ import {
   ALERT_TYPES,
   ANNOUNCEMENT_TONES,
   STATUS_ANNOUNCEMENT_KINDS,
+  WEBHOOK_SERVICES,
+  type WebhookService,
   feedUrls,
   MAX_FEED_URLS,
   MAX_FEED_CARDS,
@@ -34,6 +36,7 @@ import {
   ControlRow,
   Hint,
   ListPanel,
+  Button,
   MoveButtons,
   NumberField,
   NumberRow,
@@ -464,6 +467,78 @@ function FeedCardEditor({
   );
 }
 
+// How each inbound-webhook service is named in its own app's UI, for the toggle
+// and the "paste into …" hint (Seerr's payload comes from Overseerr/Jellyseerr).
+const WEBHOOK_LABELS: Record<WebhookService, string> = {
+  sonarr: "Sonarr",
+  radarr: "Radarr",
+  seerr: "Overseerr / Jellyseerr",
+};
+
+// The visitor's origin without a set-state-in-effect: "" on the server and first
+// paint (hydration-safe), the real origin once mounted — so the built URL is
+// exact for wherever the admin is browsing without guessing the host server-side.
+const subscribeNever = () => () => {};
+function useOrigin(): string {
+  return useSyncExternalStore(
+    subscribeNever,
+    () => window.location.origin,
+    () => ""
+  );
+}
+
+// The read-only inbound-webhook URL for one service, with copy + regenerate.
+function WebhookUrlRow({
+  service,
+  label,
+  token,
+  onRegenerate,
+}: {
+  service: WebhookService;
+  label: string;
+  token: string;
+  onRegenerate: () => void;
+}) {
+  const origin = useOrigin();
+  const [copied, setCopied] = useState(false);
+  const url = origin && token ? `${origin}/api/hooks/${service}?token=${token}` : "";
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard blocked (insecure origin / permissions) — the field is
+      // selectable, so the admin can still copy by hand.
+    }
+  };
+  return (
+    <div className="flex flex-col gap-2">
+      <span className={fieldLabelClasses}>Webhook URL</span>
+      <div className="flex items-center gap-2">
+        <input
+          readOnly
+          aria-label={`${label} webhook URL`}
+          value={url}
+          onFocus={(e) => e.currentTarget.select()}
+          className={`${controlClasses} min-w-0 flex-1 font-mono text-xs`}
+        />
+        <Button variant="ghost" size="sm" type="button" onClick={copy} disabled={!url}>
+          {copied ? "Copied" : "Copy"}
+        </Button>
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs text-fg/45">
+          Paste into {label} → Settings → Connect → Webhook (method POST).
+        </p>
+        <Button variant="ghost" size="sm" type="button" onClick={onRegenerate}>
+          Regenerate
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsManager({
   initialSettings,
   themePacks,
@@ -564,6 +639,32 @@ export default function SettingsManager({
         [service]: { ...s.integrations[service], ...patch },
       },
     }));
+
+  // Inbound webhooks (#204). Toggling a service on mints a token if it has none;
+  // "Regenerate" rotates it (invalidating the old URL). A random 32-hex token —
+  // crypto.randomUUID is available in every browser this admin runs in.
+  const webhooks = settings.webhooks;
+  const updateWebhooks = (patch: Partial<Settings["webhooks"]>) =>
+    setSettings((s) => ({ ...s, webhooks: { ...s.webhooks, ...patch } }));
+  const updateWebhookService = (
+    service: WebhookService,
+    patch: Partial<Settings["webhooks"][WebhookService]>
+  ) =>
+    setSettings((s) => ({
+      ...s,
+      webhooks: {
+        ...s.webhooks,
+        [service]: { ...s.webhooks[service], ...patch },
+      },
+    }));
+  const genWebhookToken = () => crypto.randomUUID().replace(/-/g, "");
+  const toggleWebhookService = (service: WebhookService, enabled: boolean) =>
+    updateWebhookService(
+      service,
+      enabled && !webhooks[service].token
+        ? { enabled, token: genWebhookToken() }
+        : { enabled }
+    );
 
   const components = settings.components;
   const setComponent = (key: keyof Settings["components"], value: boolean) =>
@@ -1811,6 +1912,59 @@ export default function SettingsManager({
                   }
                 />
               </div>
+            </>
+          )}
+        </Card>
+        )}
+
+        {section === "monitoring" && (
+        <Card
+          title="Inbound webhooks"
+          intro="Let Sonarr, Radarr, and Overseerr push events — a grab, an import, a request needing approval, a health issue — to CtrlCenter, relayed out through the alert channels above. Each service has its own URL; paste it into that app's webhook connection."
+          toggle={{
+            checked: webhooks.enabled,
+            onChange: (enabled) => updateWebhooks({ enabled }),
+          }}
+        >
+          {webhooks.enabled && (
+            <>
+              {!(
+                (alerts.webhookEnabled && alerts.webhookUrl.trim() !== "") ||
+                (alerts.email.enabled &&
+                  alerts.email.host.trim() !== "" &&
+                  alerts.email.from.trim() !== "" &&
+                  alerts.email.to.trim() !== "")
+              ) && (
+                <p className="text-xs text-amber-400/80">
+                  Set up a webhook or email channel in Alerts above — inbound
+                  events have nowhere to go until then.
+                </p>
+              )}
+              {WEBHOOK_SERVICES.map((svc) => {
+                const w = webhooks[svc];
+                return (
+                  <div
+                    key={svc}
+                    className="flex flex-col gap-3 border-t border-fg/10 pt-4"
+                  >
+                    <ToggleRow
+                      label={WEBHOOK_LABELS[svc]}
+                      checked={w.enabled}
+                      onChange={(enabled) => toggleWebhookService(svc, enabled)}
+                    />
+                    {w.enabled && (
+                      <WebhookUrlRow
+                        service={svc}
+                        label={WEBHOOK_LABELS[svc]}
+                        token={w.token}
+                        onRegenerate={() =>
+                          updateWebhookService(svc, { token: genWebhookToken() })
+                        }
+                      />
+                    )}
+                  </div>
+                );
+              })}
             </>
           )}
         </Card>

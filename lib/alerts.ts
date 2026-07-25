@@ -102,6 +102,55 @@ export function buildAlertRequest(
   }
 }
 
+// A free-form notification (an inbound webhook event, #204) rather than an
+// up/down transition: a headline plus optional detail and a link.
+export type NotificationContent = { title: string; body?: string; url?: string };
+
+// Shape a notification into a request for the chosen channel — the counterpart
+// to buildAlertRequest for events that aren't uptime transitions. Reuses each
+// channel's body/header conventions so inbound events read like every other
+// alert. Pure (no IO), so it's unit-tested directly.
+export function buildNotificationRequest(
+  type: AlertType,
+  webhookUrl: string,
+  c: NotificationContent
+): AlertRequest {
+  const detail = [c.body?.trim(), c.url?.trim()].filter(Boolean).join("\n");
+  const text = [c.title, detail].filter(Boolean).join("\n");
+  switch (type) {
+    case "discord":
+      return jsonReq(webhookUrl, { content: text });
+    case "slack":
+      return jsonReq(webhookUrl, { text });
+    case "ntfy": {
+      // Title header is latin-1 only (see buildAlertRequest); send it only when
+      // ASCII-safe, and put an optional link in the Click header ntfy honors.
+      const asciiTitle = /^[\x20-\x7E]*$/.test(c.title) ? c.title : undefined;
+      return {
+        url: webhookUrl,
+        init: {
+          method: "POST",
+          headers: {
+            ...(asciiTitle ? { Title: asciiTitle } : {}),
+            ...(c.url ? { Click: c.url } : {}),
+          },
+          // ntfy needs a non-empty body; fall back to the title when there's no
+          // detail so the message never arrives blank.
+          body: detail || c.title,
+        },
+      };
+    }
+    case "generic":
+    default:
+      return jsonReq(webhookUrl, {
+        title: c.title,
+        message: c.body ?? "",
+        url: c.url ?? "",
+        at: new Date().toISOString(),
+      });
+  }
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -162,6 +211,36 @@ ${urlRow}
   return { subject, text, html };
 }
 
+// Email content for a free-form notification (#204): the title becomes the
+// subject and lead, the body and link fill the card. Pure, unit-tested.
+export function buildNotificationEmail(
+  c: NotificationContent
+): { subject: string; text: string; html: string } {
+  const when = new Date().toISOString();
+  const subject =
+    c.title.replace(/[\r\n]+/g, " ").trim().slice(0, 200) || "Notification";
+  const text =
+    [c.title, c.body?.trim(), c.url?.trim()].filter(Boolean).join("\n") +
+    `\n\nAt ${when}`;
+  const accent = "#2563eb";
+  const bodyRow = c.body?.trim()
+    ? `<p style="margin:0 0 8px;font-size:14px;color:#3f3f46;white-space:pre-line">${escapeHtml(c.body.trim())}</p>`
+    : "";
+  const urlRow = c.url?.trim()
+    ? `<p style="margin:0 0 4px"><a href="${escapeHtml(c.url.trim())}" style="color:${accent};text-decoration:none">${escapeHtml(c.url.trim())}</a></p>`
+    : "";
+  const html = `<!doctype html><html><body style="margin:0;background:#f4f4f5;padding:24px">
+<table role="presentation" cellpadding="0" cellspacing="0" style="max-width:480px;margin:0 auto;width:100%;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+<tr><td style="background:#ffffff;border-radius:12px;border-left:4px solid ${accent};padding:20px 24px">
+<h1 style="margin:0 0 12px;font-size:18px;color:#18181b">${escapeHtml(c.title)}</h1>
+${bodyRow}${urlRow}
+<p style="margin:8px 0 0;font-size:12px;color:#71717a">At ${when}</p>
+</td></tr>
+</table>
+</body></html>`;
+  return { subject, text, html };
+}
+
 function jsonReq(url: string, payload: unknown): AlertRequest {
   return {
     url,
@@ -213,6 +292,23 @@ async function sendAlert(req: AlertRequest): Promise<void> {
 // Send one alert email over SMTP and report the outcome. nodemailer is imported
 // lazily so it never lands in a client/edge bundle and only loads inside the
 // Node poller. Time-boxed; never throws (mirrors runAlert for the mail path).
+// Build a time-boxed SMTP transport from the alert email config. nodemailer is
+// imported lazily so it never lands in a client/edge bundle and only loads
+// inside the Node poller / webhook route.
+async function makeTransport(cfg: AlertEmailConfig) {
+  const { default: nodemailer } = await import("nodemailer");
+  const pass = resolveSecret("CTRLCENTER_SMTP_PASS", cfg.pass);
+  return nodemailer.createTransport({
+    host: cfg.host,
+    port: cfg.port,
+    secure: cfg.secure,
+    auth: cfg.user ? { user: cfg.user, pass } : undefined,
+    connectionTimeout: ALERT_TIMEOUT_MS,
+    greetingTimeout: ALERT_TIMEOUT_MS,
+    socketTimeout: ALERT_TIMEOUT_MS,
+  });
+}
+
 async function runEmailAlert(
   cfg: AlertEmailConfig,
   event: AlertEvent,
@@ -220,23 +316,61 @@ async function runEmailAlert(
   at: number
 ): Promise<ChannelResult> {
   try {
-    const { default: nodemailer } = await import("nodemailer");
-    const pass = resolveSecret("CTRLCENTER_SMTP_PASS", cfg.pass);
-    const transport = nodemailer.createTransport({
-      host: cfg.host,
-      port: cfg.port,
-      secure: cfg.secure,
-      auth: cfg.user ? { user: cfg.user, pass } : undefined,
-      connectionTimeout: ALERT_TIMEOUT_MS,
-      greetingTimeout: ALERT_TIMEOUT_MS,
-      socketTimeout: ALERT_TIMEOUT_MS,
-    });
+    const transport = await makeTransport(cfg);
     const { subject, text, html } = buildEmailMessage(event, app, at, cfg.subject);
     await transport.sendMail({ from: cfg.from, to: cfg.to, subject, text, html });
     return { ok: true, detail: "sent" };
   } catch (e) {
     return { ok: false, detail: errorReason(e) };
   }
+}
+
+// Relay one free-form notification out to the configured alert channels (#204),
+// best-effort: a failed or slow channel must never block the webhook response,
+// so errors are swallowed (and logged). A no-op when neither the webhook nor
+// the email channel is configured — the caller checks that first.
+export async function sendNotification(
+  config: AlertConfig,
+  c: NotificationContent
+): Promise<void> {
+  const webhookUrl = config.webhookUrl.trim();
+  const sendWebhook = config.webhookEnabled && webhookUrl !== "";
+  const sendEmail = emailReady(config.email);
+  const tasks: Promise<void>[] = [];
+  if (sendWebhook)
+    tasks.push(sendAlert(buildNotificationRequest(config.type, webhookUrl, c)));
+  if (sendEmail) {
+    tasks.push(
+      (async () => {
+        try {
+          const transport = await makeTransport(config.email);
+          const { subject, text, html } = buildNotificationEmail(c);
+          await transport.sendMail({
+            from: config.email.from,
+            to: config.email.to,
+            subject,
+            text,
+            html,
+          });
+        } catch (e) {
+          log.warn("notification email failed", {
+            host: config.email.host,
+            reason: errorReason(e),
+          });
+        }
+      })()
+    );
+  }
+  await Promise.all(tasks);
+}
+
+// Whether any alert channel is configured to receive a relayed notification —
+// the webhook route uses this to 503 clearly when there's nowhere to send.
+export function anyChannelReady(config: AlertConfig): boolean {
+  return (
+    (config.webhookEnabled && config.webhookUrl.trim() !== "") ||
+    emailReady(config.email)
+  );
 }
 
 // Send one alert email over SMTP, best-effort. A mail failure must never disturb

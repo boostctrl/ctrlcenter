@@ -517,6 +517,25 @@ export default async function HelpPage() {
             </P>
           </Card>
 
+          <Card title="Inbound webhooks">
+            <P>
+              The Monitor <em>polls</em> your services; inbound webhooks let{" "}
+              <strong>Sonarr</strong>, <strong>Radarr</strong>, and{" "}
+              <strong>Overseerr / Jellyseerr</strong> push events the moment they
+              happen — a grab, an import, a request awaiting approval, a health
+              issue — relayed straight out through the alert channels above.
+            </P>
+            <P>
+              Turn on <strong>Settings → Alerts → Inbound webhooks</strong>,
+              enable a service, and copy its URL. In that app&apos;s{" "}
+              <strong>Connect → Webhook</strong> settings paste the URL, set the
+              method to <strong>POST</strong>, and pick which events to send. Each
+              service has its own token in the URL — <strong>Regenerate</strong>{" "}
+              rotates it if one leaks — and events need a webhook or email channel
+              configured under Alerts to land anywhere.
+            </P>
+          </Card>
+
           <Card title="Announcement banner">
             <P>
               A banner across the top of every page for notices, maintenance

@@ -12,6 +12,17 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Inbound webhooks — your media apps can push events to CtrlCenter.** Sonarr,
+  Radarr, and Overseerr / Jellyseerr can now POST events the moment they happen —
+  a grab, an import, a request awaiting approval, a health issue — and CtrlCenter
+  relays them straight out through your existing alert channels (Discord, Slack,
+  ntfy, a generic webhook, or email). Turn it on under **Settings → Alerts →
+  Inbound webhooks**, enable a service, and paste its URL into that app's webhook
+  connection. Each service has its own token in the URL, which you can regenerate
+  if it ever leaks. (#204)
+
 ## [2.8.7] - 2026-07-25
 
 ### Changed

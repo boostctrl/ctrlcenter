@@ -230,8 +230,26 @@ export function stripSecrets<T extends { settings: Settings }>(config: T): T {
         },
       },
       integrations: redactIntegrations(config.settings.integrations),
+      // Inbound-webhook tokens are shared secrets — a public serialization must
+      // never reveal them (or which services are wired up), same class as the
+      // integration credentials above.
+      webhooks: redactWebhooks(config.settings.webhooks),
     },
   };
+}
+
+// Blank every inbound-webhook token and force every flag off for public
+// surfaces — mirrors redactIntegrations so a stray public serialization leaks
+// neither a token nor which services are connected.
+function redactWebhooks(
+  webhooks: Settings["webhooks"]
+): Settings["webhooks"] {
+  const out: Record<string, unknown> = { enabled: false };
+  for (const key of Object.keys(webhooks)) {
+    if (key === "enabled") continue;
+    out[key] = { enabled: false, token: "" };
+  }
+  return out as Settings["webhooks"];
 }
 
 // Fully neutralize every integration for any public surface: blank every

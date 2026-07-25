@@ -106,6 +106,36 @@ export const alertsSchema = z.object({
 });
 export type AlertConfig = z.infer<typeof alertsSchema>;
 
+// Inbound webhooks (#204): Sonarr/Radarr/Overseerr(Seerr) POST an event to us
+// ("download complete", "request needs approval", "health issue") and we relay
+// it out through the same alert channels as uptime alerts (settings.alerts).
+// Polling answers "what's the state now"; this answers "something just
+// happened". Each service carries its own token so one can be revoked without
+// breaking the others; the token gates the public /api/hooks/<service> route.
+// The token is a shared secret the app generates — redacted from public config
+// reads (stripSecrets) like the other credentials.
+export const WEBHOOK_SERVICES = ["sonarr", "radarr", "seerr"] as const;
+export type WebhookService = (typeof WEBHOOK_SERVICES)[number];
+
+export const webhookServiceSchema = z.object({
+  enabled: z.boolean().default(false),
+  token: z.string().default(""),
+});
+export type WebhookServiceConfig = z.infer<typeof webhookServiceSchema>;
+
+const webhookService = () =>
+  webhookServiceSchema.default(webhookServiceSchema.parse({}));
+
+export const webhooksSchema = z.object({
+  // Master switch for the inbound endpoint. Off = the route rejects everything
+  // even if a token matches, so pasting a URL somewhere can't quietly re-open it.
+  enabled: z.boolean().default(false),
+  sonarr: webhookService(),
+  radarr: webhookService(),
+  seerr: webhookService(),
+});
+export type WebhooksConfig = z.infer<typeof webhooksSchema>;
+
 // Agenda widget fed by a published iCal (.ics) URL. Stored leniently; the URL is
 // validated on the admin path.
 export const calendarSchema = z.object({
@@ -597,6 +627,7 @@ export const settingsSchema = z.object({
   worldClocks: worldClocksSchema.default(worldClocksSchema.parse({})),
   systemStats: systemStatsSchema.default(systemStatsSchema.parse({})),
   integrations: integrationsSchema.default(integrationsSchema.parse({})),
+  webhooks: webhooksSchema.default(webhooksSchema.parse({})),
   components: componentsSchema.default(componentsSchema.parse({})),
   layout: layoutSchema.default(layoutSchema.parse({})),
 });
@@ -936,6 +967,20 @@ export const integrationsUpdateSchema = z.object({
   unifi: userPassIntegrationUpdateSchema,
 });
 
+// The admin sends the whole webhooks object; updateSettings replaces it
+// wholesale. Tokens are stored leniently (the app generates them, so there's no
+// user input to validate).
+export const webhookServiceUpdateSchema = z.object({
+  enabled: z.boolean(),
+  token: z.string(),
+});
+export const webhooksUpdateSchema = z.object({
+  enabled: z.boolean(),
+  sonarr: webhookServiceUpdateSchema,
+  radarr: webhookServiceUpdateSchema,
+  seerr: webhookServiceUpdateSchema,
+});
+
 // The admin sends the whole theme object (not a partial), so updateSettings
 // replaces it wholesale — that's how clearing the optional custom colors works
 // (omit them and they're gone). Required fields keep a saved theme well-formed.
@@ -1045,6 +1090,7 @@ export const settingsInputSchema = z.object({
   worldClocks: worldClocksUpdateSchema.optional(),
   systemStats: systemStatsUpdateSchema.optional(),
   integrations: integrationsUpdateSchema.optional(),
+  webhooks: webhooksUpdateSchema.optional(),
   components: componentsUpdateSchema.optional(),
   layout: layoutUpdateSchema.optional(),
 });

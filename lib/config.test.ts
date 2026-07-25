@@ -629,6 +629,10 @@ describe("readConfigInternal stays off public surfaces", () => {
     "app/api/status/route.ts",
     "app/api/status/history/route.ts",
     "app/api/status/history/[id]/route.ts",
+    // Public but token-gated inbound webhooks (#204): needs the unfiltered
+    // config to check the per-service token and to read the alert-channel
+    // secrets it relays through. It never serializes config back to the caller.
+    "app/api/hooks/[service]/route.ts",
   ];
 
   it("only allowlisted files under app/ use the unfiltered read", async () => {
