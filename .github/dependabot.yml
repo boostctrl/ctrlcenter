@@ -1,0 +1,35 @@
+# Keep dependencies from drifting: 2.9.0 sat ten weeks behind and missed a
+# critical Next.js advisory. Updates target develop (main only moves at
+# release time) and go through the same CI gate as any change.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # Routine bumps in one PR; majors arrive one at a time.
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # The Dockerfile pins node:24-alpine by digest; this proposes digest bumps
+  # (base-image security fixes) but not a new Node major.
+  - package-ecosystem: docker
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: node
+        update-types: [version-update:semver-major]
