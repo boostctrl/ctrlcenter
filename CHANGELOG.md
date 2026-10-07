@@ -12,6 +12,14 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Friendlier "page not found" and error pages.** A mistyped address now gets
+  a proper page in your theme with a way back to the dashboard, and an
+  unexpected error — including a config file that can't be read — shows a
+  clear message with a retry button instead of a bare browser-style error.
+  (#264)
+
 ### Changed
 
 - **The Docker image now runs on Node.js 24** (the current long-term-support
