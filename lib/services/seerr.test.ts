@@ -40,7 +40,7 @@ function stubApi(opts: {
   titles?: Record<string, unknown>;
   fail?: (url: string) => number | null;
 }) {
-  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+  const fetchMock = vi.fn<typeof fetch>(async (input) => {
     const url = String(input);
     const failStatus = opts.fail?.(url) ?? null;
     if (failStatus) return new Response("nope", { status: failStatus });
@@ -128,7 +128,7 @@ describe("getSeerrSnapshot", () => {
 
 describe("Seerr actions", () => {
   function stubAction(status = 200) {
-    const fetchMock = vi.fn(async () => new Response("", { status }));
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response("", { status }));
     vi.stubGlobal("fetch", fetchMock);
     return fetchMock;
   }

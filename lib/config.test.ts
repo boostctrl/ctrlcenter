@@ -3,10 +3,25 @@ import fs from "fs/promises";
 import os from "os";
 import path from "path";
 import YAML from "js-yaml";
+import type { z } from "zod";
+import {
+  appInputSchema,
+  bookmarkInputSchema,
+  integrationsSchema,
+  settingsInputSchema,
+} from "./schema";
 
 // config.ts captures CONFIG_PATH at module load, so the env var has to be set
 // before the module is imported — hence the dynamic import in beforeAll.
 let config: typeof import("./config");
+
+// Fixtures go through the same schemas the API routes parse with, so they pick
+// up defaults exactly like real input and can't drift from the stored shape.
+const appInput = (v: z.input<typeof appInputSchema>) => appInputSchema.parse(v);
+const bookmarkInput = (v: z.input<typeof bookmarkInputSchema>) =>
+  bookmarkInputSchema.parse(v);
+const settingsInput = (v: z.input<typeof settingsInputSchema>) =>
+  settingsInputSchema.parse(v);
 let configPath: string;
 
 beforeAll(async () => {
@@ -52,12 +67,12 @@ describe("readConfigInternal", () => {
 
 describe("apps CRUD", () => {
   it("creates an app with a generated id and persists it", async () => {
-    const created = await config.createApp({
+    const created = await config.createApp(appInput({
       name: "Plex",
       subtitle: "Movies",
       url: "https://plex.example.com",
       icon: "plex",
-    });
+    }));
     expect(created.id).toBeTruthy();
 
     const apps = await config.listApps();
@@ -66,12 +81,12 @@ describe("apps CRUD", () => {
   });
 
   it("partially updates an app, leaving other fields untouched", async () => {
-    const created = await config.createApp({
+    const created = await config.createApp(appInput({
       name: "Plex",
       subtitle: "Movies",
       url: "https://plex.example.com",
       icon: "plex",
-    });
+    }));
 
     const updated = await config.updateApp(created.id, { name: "Plex TV" });
     expect(updated).toMatchObject({
@@ -89,12 +104,12 @@ describe("apps CRUD", () => {
   });
 
   it("deletes an app", async () => {
-    const created = await config.createApp({
+    const created = await config.createApp(appInput({
       name: "Plex",
       subtitle: "",
       url: "https://plex.example.com",
       icon: "",
-    });
+    }));
     await config.deleteApp(created.id);
     expect(await config.listApps()).toHaveLength(0);
   });
@@ -102,17 +117,18 @@ describe("apps CRUD", () => {
 
 describe("updateSettings partial merge", () => {
   it("updates a top-level field without clobbering the others", async () => {
-    await config.updateSettings({
+    await config.updateSettings(settingsInput({
       theme: {
         mode: "dark",
         design: "cyber",
         scene: "abyss",
+        font: "jakarta",
         accentFrom: "#a78bfa",
         accentTo: "#22d3ee",
       },
       timezone: "America/Chicago",
-    });
-    const settings = await config.updateSettings({ title: "Dash" });
+    }));
+    const settings = await config.updateSettings(settingsInput({ title: "Dash" }));
 
     expect(settings.title).toBe("Dash");
     expect(settings.theme.mode).toBe("dark");
@@ -135,11 +151,11 @@ describe("updateSettings partial merge", () => {
     expect(loaded.settings.feeds[0].urls).toEqual(["https://old.example/rss"]);
     // …and the admin then clears the row, saving the whole feeds list with an
     // empty url list. Nothing is left on disk to resurrect the feed from.
-    const settings = await config.updateSettings({
+    const settings = await config.updateSettings(settingsInput({
       feeds: [
         { id: "feed", enabled: true, urls: [], count: 6, title: "", summaries: false },
       ],
-    });
+    }));
     expect(settings.feeds[0].urls).toEqual([]);
     const onDisk = YAML.load(await fs.readFile(configPath, "utf8")) as {
       settings: { feed?: unknown; feeds: Record<string, unknown>[] };
@@ -149,12 +165,12 @@ describe("updateSettings partial merge", () => {
   });
 
   it("merges nested weather fields without dropping siblings", async () => {
-    await config.updateSettings({
+    await config.updateSettings(settingsInput({
       weather: { latitude: 40, longitude: -75 },
-    });
-    const settings = await config.updateSettings({
+    }));
+    const settings = await config.updateSettings(settingsInput({
       weather: { units: "metric" },
-    });
+    }));
 
     expect(settings.weather.units).toBe("metric");
     expect(settings.weather.latitude).toBe(40);
@@ -162,27 +178,29 @@ describe("updateSettings partial merge", () => {
   });
 
   it("replaces the theme wholesale so custom colors can be cleared", async () => {
-    await config.updateSettings({
+    await config.updateSettings(settingsInput({
       theme: {
         mode: "dark",
         design: "glass",
         scene: "aurora",
+        font: "jakarta",
         accentFrom: "#a78bfa",
         accentTo: "#22d3ee",
         background: "#101010",
         foreground: "#fafafa",
       },
-    });
+    }));
     // Re-saving without the colors drops them rather than merging them back in.
-    const settings = await config.updateSettings({
+    const settings = await config.updateSettings(settingsInput({
       theme: {
         mode: "light",
         design: "flat",
         scene: "aurora",
+        font: "jakarta",
         accentFrom: "#a78bfa",
         accentTo: "#22d3ee",
       },
-    });
+    }));
 
     expect(settings.theme.mode).toBe("light");
     expect(settings.theme.design).toBe("flat");
@@ -191,20 +209,20 @@ describe("updateSettings partial merge", () => {
   });
 
   it("replaces the layout wholesale", async () => {
-    await config.updateSettings({
+    await config.updateSettings(settingsInput({
       layout: {
         sections: [{ id: "apps", span: 12, hidden: false }],
         columns: 24,
         scale: 100,
       },
-    });
-    const settings = await config.updateSettings({
+    }));
+    const settings = await config.updateSettings(settingsInput({
       layout: {
         sections: [{ id: "bookmarks", span: 24, hidden: true }],
         columns: 24,
         scale: 110,
       },
-    });
+    }));
     expect(settings.layout.sections).toEqual([
       { id: "bookmarks", span: 24, hidden: true },
     ]);
@@ -243,9 +261,9 @@ describe("updateSettings partial merge", () => {
     await fs.writeFile(configPath, legacyText, "utf8");
 
     // createApp() is the first read-or-write this process makes on the file.
-    await config.createApp({
+    await config.createApp(appInput({
       name: "First", subtitle: "", url: "https://first.example.com", icon: "",
-    });
+    }));
 
     // The untouched original was snapshotted verbatim before the rewrite…
     expect(await fs.readFile(`${configPath}.bak`, "utf8")).toBe(legacyText);
@@ -262,11 +280,11 @@ describe("updateSettings partial merge", () => {
   it("does not write a spurious .bak when mutating a current-shape config", async () => {
     // A mutation on an already-current file must NOT snapshot — otherwise every
     // write would clobber a real import backup with the live config.
-    await config.updateSettings({ title: "Current" });
+    await config.updateSettings(settingsInput({ title: "Current" }));
     await fs.rm(`${configPath}.bak`, { force: true });
-    await config.createApp({
+    await config.createApp(appInput({
       name: "X", subtitle: "", url: "https://x.example.com", icon: "",
-    });
+    }));
     await expect(fs.access(`${configPath}.bak`)).rejects.toBeTruthy();
   });
 
@@ -294,7 +312,7 @@ describe("updateSettings partial merge", () => {
 
     // The first read persisted the doubled spans + marker; later reads and
     // writes must not double them a second time.
-    await config.updateSettings({ title: "Dash" });
+    await config.updateSettings(settingsInput({ title: "Dash" }));
     const reloaded = await config.readConfigInternal();
     expect(reloaded.settings.layout.sections).toEqual([
       { id: "apps", span: 12, hidden: false },
@@ -330,9 +348,9 @@ describe("updateSettings partial merge", () => {
 
 describe("reorderApps", () => {
   async function seedThree() {
-    const a = await config.createApp({ name: "A", subtitle: "", url: "https://a.com", icon: "" });
-    const b = await config.createApp({ name: "B", subtitle: "", url: "https://b.com", icon: "" });
-    const c = await config.createApp({ name: "C", subtitle: "", url: "https://c.com", icon: "" });
+    const a = await config.createApp(appInput({ name: "A", subtitle: "", url: "https://a.com", icon: "" }));
+    const b = await config.createApp(appInput({ name: "B", subtitle: "", url: "https://b.com", icon: "" }));
+    const c = await config.createApp(appInput({ name: "C", subtitle: "", url: "https://c.com", icon: "" }));
     return { a, b, c };
   }
 
@@ -353,25 +371,25 @@ describe("reorderApps", () => {
 
 describe("renameBookmarkCategory", () => {
   async function seed() {
-    await config.createBookmark({
+    await config.createBookmark(bookmarkInput({
       category: "Media",
       name: "Plex",
       url: "https://plex.example.com",
       icon: "",
-    });
-    await config.createBookmark({
+    }));
+    await config.createBookmark(bookmarkInput({
       category: "Media",
       name: "Jellyfin",
       url: "https://jelly.example.com",
       icon: "",
-    });
-    await config.createBookmark({
+    }));
+    await config.createBookmark(bookmarkInput({
       category: "Dev",
       name: "GitHub",
       url: "https://github.com",
       icon: "",
-    });
-    await config.updateSettings({ bookmarkCategoryOrder: ["Dev", "Media"] });
+    }));
+    await config.updateSettings(settingsInput({ bookmarkCategoryOrder: ["Dev", "Media"] }));
   }
 
   it("retags every bookmark in the category and updates the order in place", async () => {
@@ -397,27 +415,27 @@ describe("renameBookmarkCategory", () => {
   });
 
   it("merges into an existing category, keeping the earlier position", async () => {
-    await config.createBookmark({
+    await config.createBookmark(bookmarkInput({
       category: "Dev",
       name: "GitHub",
       url: "https://github.com",
       icon: "",
-    });
-    await config.createBookmark({
+    }));
+    await config.createBookmark(bookmarkInput({
       category: "Media",
       name: "Plex",
       url: "https://plex.example.com",
       icon: "",
-    });
-    await config.createBookmark({
+    }));
+    await config.createBookmark(bookmarkInput({
       category: "Docs",
       name: "Wiki",
       url: "https://wiki.example.com",
       icon: "",
-    });
-    await config.updateSettings({
+    }));
+    await config.updateSettings(settingsInput({
       bookmarkCategoryOrder: ["Dev", "Media", "Docs"],
-    });
+    }));
 
     // Dev (index 0) is earlier than Media (index 1), so merging Dev into Media
     // collapses to a single "Media" at index 0 and drops the duplicate.
@@ -447,7 +465,7 @@ describe("updateBookmark", () => {
 
 describe("replaceConfig", () => {
   it("validates and replaces the whole config", async () => {
-    await config.createApp({ name: "Old", subtitle: "", url: "https://old.com", icon: "" });
+    await config.createApp(appInput({ name: "Old", subtitle: "", url: "https://old.com", icon: "" }));
     const replaced = await config.replaceConfig({
       settings: { title: "Imported" },
       apps: [{ id: "x1", name: "New", subtitle: "", url: "https://new.com", icon: "" }],
@@ -485,13 +503,13 @@ describe("replaceConfig", () => {
 
   it("snapshots the pre-import config to a .bak beside the config file", async () => {
     // Seed a distinctive pre-import state, then import over it.
-    await config.createApp({
+    await config.createApp(appInput({
       name: "PreImport",
       subtitle: "",
       url: "https://pre.example.com",
       icon: "",
-    });
-    await config.updateSettings({ title: "Before" });
+    }));
+    await config.updateSettings(settingsInput({ title: "Before" }));
 
     await config.replaceConfig({
       settings: { title: "After" },
@@ -587,12 +605,12 @@ describe("write queue serialization", () => {
     // write queue these read-modify-write cycles would clobber each other and
     // only the last write would survive.
     const creates = Array.from({ length: 10 }, (_, i) =>
-      config.createApp({
+      config.createApp(appInput({
         name: `App ${i}`,
         subtitle: "",
         url: `https://app${i}.example.com`,
         icon: "",
-      })
+      }))
     );
     await Promise.all(creates);
 
@@ -713,27 +731,34 @@ describe("settings-secret redaction", () => {
       },
     },
     integrations: {
+      ...integrationsSchema.parse({}),
       qbittorrent: {
         enabled: true,
         url: "http://qbit.lan:8080",
         username: "admin",
         password: "qbit-secret",
+        allowInsecureTls: false,
+        allowActions: false,
       },
       sonarr: {
         enabled: true,
         url: "http://sonarr.lan:8989",
         apiKey: "sonarr-secret",
+        allowInsecureTls: false,
+        allowActions: false,
       },
       radarr: {
         enabled: false,
         url: "http://radarr.lan:7878",
         apiKey: "radarr-secret",
+        allowInsecureTls: false,
+        allowActions: false,
       },
     },
   };
 
   it("stripSecrets blanks every credential while keeping non-secret fields", async () => {
-    await config.updateSettings(withSecrets);
+    await config.updateSettings(settingsInput(withSecrets));
     const full = await config.readConfigInternal();
 
     const pub = config.stripSecrets(config.stripAuth(full));
@@ -775,7 +800,7 @@ describe("settings-secret redaction", () => {
   });
 
   it("getCalendarAuth still returns the real credentials server-side", async () => {
-    await config.updateSettings(withSecrets);
+    await config.updateSettings(settingsInput(withSecrets));
     expect(await config.getCalendarAuth()).toEqual({
       username: "alice",
       password: "cal-secret",

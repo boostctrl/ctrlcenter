@@ -44,7 +44,7 @@ function stubQbit({
   transfer = { dl_info_speed: 1200, up_info_speed: 800 },
   badCredentials = false,
 } = {}) {
-  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+  const fetchMock = vi.fn<typeof fetch>(async (input) => {
     const url = String(input);
     if (url.includes("/api/v2/auth/login")) {
       return badCredentials ? new Response("Fails.") : okLogin();
@@ -118,7 +118,7 @@ describe("getQbittorrentSnapshot", () => {
   });
 
   it("polls maindata incrementally, advancing the rid across snapshots", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
       const url = String(input);
       if (url.includes("/api/v2/auth/login")) return okLogin();
       if (url.includes("/api/v2/sync/maindata")) {
@@ -254,7 +254,7 @@ describe("getQbittorrentSnapshot", () => {
 
   it("re-logins once when the cached session has expired", async () => {
     let logins = 0;
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
       const url = String(input);
       if (url.endsWith("/api/v2/auth/login")) {
         logins += 1;
@@ -273,7 +273,7 @@ describe("getQbittorrentSnapshot", () => {
   });
 
   it("accepts qBittorrent 5.2+'s 204 No Content login", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
       const url = String(input);
       if (url.endsWith("/api/v2/auth/login")) {
         // qBittorrent 5.2+ answers 204 with an empty body on success; the SID
@@ -300,7 +300,7 @@ describe("getQbittorrentSnapshot", () => {
   it("captures qBittorrent 5.2's renamed QBT_SID_<port> cookie and replays it", async () => {
     // 5.2 answers 204 and names the session cookie QBT_SID_<port> (not SID).
     // The data calls 403 unless that exact cookie is sent back verbatim.
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
       const url = String(input);
       if (url.endsWith("/api/v2/auth/login")) {
         return new Response(null, {
@@ -338,7 +338,7 @@ describe("getQbittorrentSnapshot", () => {
     // qBittorrent with "Bypass authentication for clients on localhost /
     // whitelisted subnets" returns a successful login with NO Set-Cookie. The
     // old code failed here ("Login succeeded but no session cookie came back").
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
       const url = String(input);
       if (url.includes("/api/v2/auth/login")) return new Response("Ok.");
       if (url.includes("/api/v2/sync/maindata")) {
@@ -384,7 +384,7 @@ describe("qBittorrent actions", () => {
   // A fetch stub that logs in, then answers the torrent-command endpoints,
   // optionally 404ing the 5.x names so the legacy fallback is exercised.
   function stubCommands({ modern404 = false } = {}) {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
       const url = String(input);
       if (url.includes("/api/v2/auth/login")) return okLogin();
       if (

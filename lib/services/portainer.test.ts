@@ -40,7 +40,7 @@ const ENDPOINTS = [
 ];
 
 function stubApi(opts: { endpoints?: unknown; fail?: (url: string) => number | null }) {
-  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+  const fetchMock = vi.fn<typeof fetch>(async (input) => {
     const url = String(input);
     const failStatus = opts.fail?.(url) ?? null;
     if (failStatus) return new Response("nope", { status: failStatus });
@@ -120,7 +120,7 @@ describe("mapContainers", () => {
 
 describe("listContainers", () => {
   it("fetches one environment's containers with the key", async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       new Response(JSON.stringify([{ Id: "x", Names: ["/app"], State: "running" }]))
     );
     vi.stubGlobal("fetch", fetchMock);
@@ -137,7 +137,7 @@ describe("listContainers", () => {
 describe("container actions", () => {
   // 204/304 are null-body statuses — a Response constructed with a body throws.
   const capture = (status = 204) => {
-    const fetchMock = vi.fn(async () => new Response(null, { status }));
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response(null, { status }));
     vi.stubGlobal("fetch", fetchMock);
     return fetchMock;
   };
@@ -204,7 +204,7 @@ describe("containerLogs", () => {
       header.writeUInt32BE(payload.length, 4);
       return Buffer.concat([header, payload]);
     })();
-    const fetchMock = vi.fn(async () => new Response(framed));
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response(framed));
     vi.stubGlobal("fetch", fetchMock);
     const out = await containerLogs(CFG, 2, "cid");
     expect(out).toBe("line one\nline two\n");

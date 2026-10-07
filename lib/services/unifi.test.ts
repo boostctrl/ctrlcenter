@@ -65,7 +65,7 @@ function stubUnifiOs(opts: {
   devices?: unknown;
   healthStatus?: () => number;
 } = {}) {
-  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+  const fetchMock = vi.fn<typeof fetch>(async (input) => {
     const url = String(input);
     if (url.endsWith("/api/auth/login")) {
       const status = opts.loginStatus ?? 200;
@@ -226,7 +226,7 @@ describe("getUnifiDetail", () => {
   it("degrades to an empty device list when stat/device fails", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
+      vi.fn<typeof fetch>(async (input) => {
         const url = String(input);
         if (url.endsWith("/api/auth/login"))
           return new Response("{}", {

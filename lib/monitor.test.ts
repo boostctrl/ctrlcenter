@@ -21,7 +21,7 @@ const integrations = (
 
 // Sonarr is the simplest service to drive end-to-end (no login dance).
 const sonarrOn = (url = "http://sonarr.local:8989") =>
-  integrations({ sonarr: { enabled: true, url, apiKey: "k" } });
+  integrations({ sonarr: { enabled: true, url, apiKey: "k", allowInsecureTls: false, allowActions: false } });
 
 // `upcomingCount` varies the calendar size across cache windows, so the cache
 // tests can tell a fresh snapshot from a served one.
@@ -83,7 +83,7 @@ describe("getMonitorSnapshot", () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     const snap = await getMonitorSnapshot(
-      integrations({ radarr: { enabled: true, url: "   ", apiKey: "k" } })
+      integrations({ radarr: { enabled: true, url: "   ", apiKey: "k", allowInsecureTls: false, allowActions: false } })
     );
     expect(snap.qbittorrent).toEqual({
       configured: false,
@@ -112,9 +112,9 @@ describe("getMonitorSnapshot", () => {
           allowActions: false,
         },
         // Never set up: enabled but no URL — reads as onboarding.
-        radarr: { enabled: true, url: "", apiKey: "" },
+        radarr: { enabled: true, url: "", apiKey: "", allowInsecureTls: false, allowActions: false },
         // Fully configured — polls and reports data.
-        sonarr: { enabled: true, url: "http://sonarr.local:8989", apiKey: "k" },
+        sonarr: { enabled: true, url: "http://sonarr.local:8989", apiKey: "k", allowInsecureTls: false, allowActions: false },
       })
     );
 
@@ -160,7 +160,7 @@ describe("getMonitorSnapshot", () => {
     // Same target with the opt-in turned on — actions live.
     const opted = await getMonitorSnapshot(
       integrations({
-        sonarr: { enabled: true, url: "http://sonarr.local:8989", apiKey: "k", allowActions: true },
+        sonarr: { enabled: true, url: "http://sonarr.local:8989", apiKey: "k", allowInsecureTls: false, allowActions: true },
       })
     );
     expect(opted.sonarr.actionsAllowed).toBe(true);

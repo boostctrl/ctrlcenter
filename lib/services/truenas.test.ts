@@ -62,7 +62,7 @@ function stubApi(opts: {
   info?: unknown;
   fail?: (url: string) => number | null;
 }) {
-  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+  const fetchMock = vi.fn<typeof fetch>(async (input) => {
     const url = String(input);
     const failStatus = opts.fail?.(url) ?? null;
     if (failStatus) return new Response("nope", { status: failStatus });
