@@ -56,6 +56,17 @@ jobs:
       - run: npm test
       - run: npm run build
 
+      # Browser smoke test of the standalone build: renders the key pages in
+      # Chromium and signs in through the real form (scripts/smoke.mjs).
+      - run: npx playwright-core install --with-deps chromium
+      - run: npm run smoke
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: smoke-screenshots
+          path: smoke-screenshots/
+          if-no-files-found: ignore
+
   # Build each architecture on its own native runner and push it to GHCR by
   # digest (no tags yet). Native runners skip QEMU entirely — the arm64 image
   # builds on real arm64 hardware instead of a pathologically slow emulated

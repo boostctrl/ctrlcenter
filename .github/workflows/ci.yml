@@ -22,3 +22,14 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+      # Browser smoke test of the standalone build: renders the key pages in
+      # Chromium and signs in through the real form (scripts/smoke.mjs).
+      - run: npx playwright-core install --with-deps chromium
+      - run: npm run smoke
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: smoke-screenshots
+          path: smoke-screenshots/
+          if-no-files-found: ignore

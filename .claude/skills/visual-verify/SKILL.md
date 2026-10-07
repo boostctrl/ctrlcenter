@@ -9,6 +9,11 @@ Render the standalone production build in headless Chromium and screenshot the
 affected pages. The dev server is not a substitute: standalone asset serving is
 the thing that breaks, and it only exists in the production build.
 
+`npm run smoke` (part of the quality gate, run in CI) already does steps 1–4
+for the main pages and writes screenshots to `smoke-screenshots/`. Use the
+manual steps below for pages it doesn't cover, other viewports, or a seeded
+config — and either way, look at the screenshots (step 5).
+
 ## Steps
 
 1. Build and assemble the standalone output exactly the way the Dockerfile
@@ -41,7 +46,10 @@ the thing that breaks, and it only exists in the production build.
    node -e "(async()=>{for(let i=0;i<40;i++){try{if((await fetch('http://127.0.0.1:3111/api/health')).ok)process.exit(0)}catch{}await new Promise(r=>setTimeout(r,500))}process.exit(1)})()"
    ```
 
-4. Screenshot every page the change touches, in both color schemes:
+4. Screenshot every page the change touches, in both color schemes. The
+   script uses the playwright-core devDependency; if its Chromium isn't
+   installed (`npx playwright-core install chromium`), point `CHROMIUM_PATH`
+   at one — in cloud sessions, `CHROMIUM_PATH=/opt/pw-browsers/chromium`:
 
    ```bash
    node .claude/skills/visual-verify/screenshot.mjs http://127.0.0.1:3111/ "$SCRATCH/home-light.png"
