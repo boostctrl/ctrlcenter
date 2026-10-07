@@ -62,7 +62,7 @@ import {
 import { useEditMode } from "./EditMode";
 import { ConfirmProvider } from "./admin/Confirm";
 import { useAutosave, type SaveOptions } from "./admin/useAutosave";
-import { apiErrorMessage } from "./admin/apiError";
+import { saveSettingsPatch } from "./admin/settingsApi";
 import { reorder } from "./admin/useReorder";
 import { WidgetFrame, EditToolbar, useFlowReorder } from "./LayoutEditor";
 import { useGridLayout } from "./useGridLayout";
@@ -123,16 +123,10 @@ function takeUndoSnapshot(timing: { lastPush: number }): boolean {
 
 // Persist the whole layout; the settings API replaces it wholesale.
 async function saveLayout(layout: EditableLayout, opts?: SaveOptions): Promise<void> {
-  const res = await fetch("/api/settings", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ layout }),
-    keepalive: opts?.keepalive,
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => null);
-    throw new Error(apiErrorMessage(data, "Failed to save layout"));
-  }
+  await saveSettingsPatch(
+    { layout },
+    { fallback: "Failed to save layout", keepalive: opts?.keepalive }
+  );
 }
 
 // How many of the 24 columns each widget spans. Complete, static class strings

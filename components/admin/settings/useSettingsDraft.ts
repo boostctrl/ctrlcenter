@@ -1,33 +1,17 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import type { Settings, FeedConfig } from "@/lib/schema";
+import type { Settings, SettingsInput, FeedConfig } from "@/lib/schema";
 import { type WebhookService, feedUrls, MAX_FEED_CARDS } from "@/lib/schema";
 import type { ThemePack } from "@/lib/theme";
 import { newThemeId } from "@/lib/prefs";
 import { resolveLayoutWidgets, type LayoutWidgetId } from "@/lib/layout";
 import { reorder } from "../useReorder";
 import { useConfirm } from "../Confirm";
-import { apiErrorMessage } from "../apiError";
 import { useAutosave, type SaveOptions } from "../useAutosave";
 import { settingsPatch } from "../settingsPatch";
+import { saveSettingsPatch } from "../settingsApi";
 import { useKeyedRows } from "./useKeyedRows";
-
-async function saveSettings(
-  patch: Partial<Settings>,
-  opts?: SaveOptions
-): Promise<void> {
-  const res = await fetch("/api/settings", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(patch),
-    keepalive: opts?.keepalive,
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => null);
-    throw new Error(apiErrorMessage(data, "Failed to save settings"));
-  }
-}
 
 // The settings form's state: the draft settings object, the autosave that
 // persists it, and the per-section updaters every section component edits
@@ -67,7 +51,7 @@ export function useSettingsDraft(initialSettings: Settings, themePacks: ThemePac
   const save = useCallback(async (next: Settings, opts?: SaveOptions) => {
     const patch = settingsPatch(saved.current, next);
     if (Object.keys(patch).length === 0) return;
-    await saveSettings(patch, opts);
+    await saveSettingsPatch(patch as SettingsInput, { keepalive: opts?.keepalive });
     saved.current = next;
   }, []);
   const { status, error } = useAutosave(settings, save);

@@ -20,6 +20,7 @@ import { useReorder, dropIndicatorClass } from "./useReorder";
 import { useToast } from "./Toast";
 import { useConfirm } from "./Confirm";
 import { apiErrorMessage } from "./apiError";
+import { saveSettingsPatch } from "./settingsApi";
 
 type FormState = {
   name: string;
@@ -147,12 +148,9 @@ export default function BookmarksManager({
   async function persistCategoryOrder(next: string[]) {
     const previous = categoryOrder;
     setCategoryOrder(next); // optimistic
-    const res = await fetch("/api/settings", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ bookmarkCategoryOrder: next }),
-    });
-    if (!res.ok) {
+    try {
+      await saveSettingsPatch({ bookmarkCategoryOrder: next });
+    } catch {
       setCategoryOrder(previous);
       toast("Couldn't save the category order", "error");
     }

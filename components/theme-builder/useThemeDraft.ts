@@ -7,7 +7,7 @@ import { useConfirm } from "../admin/Confirm";
 import type { ModeColors } from "@/lib/theme";
 import { parseThemesExport, siteThemeFromCustomTheme } from "@/lib/prefs";
 import type { CustomTheme, ThemeColors } from "@/lib/prefs";
-import { apiErrorMessage } from "../admin/apiError";
+import { saveSettingsPatch } from "../admin/settingsApi";
 import { downloadJson } from "@/lib/download";
 import { deepenForLight } from "../scenes/color";
 import { DEFAULT_DRAFT, MODE_DEFAULTS } from "./constants";
@@ -205,21 +205,15 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     if (!ok) return;
     setPromoting(true);
     try {
-      const res = await fetch("/api/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          theme: siteThemeFromCustomTheme(t, promote.siteMode),
-        }),
-      });
-      if (res.ok) {
-        setPromoteStatus(`“${t.name}” is now the site theme.`);
-      } else {
-        const data = await res.json().catch(() => null);
-        setPromoteStatus(apiErrorMessage(data, "Couldn't set the site theme."));
-      }
-    } catch {
-      setPromoteStatus("Couldn't set the site theme.");
+      await saveSettingsPatch(
+        { theme: siteThemeFromCustomTheme(t, promote.siteMode) },
+        { fallback: "Couldn't set the site theme." }
+      );
+      setPromoteStatus(`“${t.name}” is now the site theme.`);
+    } catch (e) {
+      setPromoteStatus(
+        e instanceof Error ? e.message : "Couldn't set the site theme."
+      );
     } finally {
       setPromoting(false);
     }
