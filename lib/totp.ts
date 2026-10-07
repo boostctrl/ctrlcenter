@@ -110,23 +110,58 @@ function constantTimeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-// Verify a user-entered code against the secret, allowing ±DEFAULT_SKEW_STEPS
-// time steps for clock drift. Rejects anything that isn't exactly 6 digits
+// The time step a user-entered code matches, allowing ±DEFAULT_SKEW_STEPS
+// steps for clock drift, or null. Rejects anything that isn't exactly 6 digits
 // before doing any crypto.
+async function matchTotpStep(
+  secretBase32: string,
+  token: string,
+  atMs: number
+): Promise<number | null> {
+  if (typeof token !== "string" || !/^\d{6}$/.test(token.trim())) return null;
+  const code = token.trim();
+  const secret = base32Decode(secretBase32);
+  if (secret.length === 0) return null;
+  const counter = Math.floor(atMs / 1000 / PERIOD_SECONDS);
+  for (let i = -DEFAULT_SKEW_STEPS; i <= DEFAULT_SKEW_STEPS; i++) {
+    if (constantTimeEqual(code, await hotp(secret, counter + i))) return counter + i;
+  }
+  return null;
+}
+
+// Verify a user-entered code against the secret. Use verifyTotpOnce wherever
+// a code authenticates someone; this plain check is for enrollment, where the
+// code only proves the authenticator app was set up correctly.
 export async function verifyTotp(
   secretBase32: string,
   token: string,
   atMs: number = Date.now()
 ): Promise<boolean> {
-  if (typeof token !== "string" || !/^\d{6}$/.test(token.trim())) return false;
-  const code = token.trim();
-  const secret = base32Decode(secretBase32);
-  if (secret.length === 0) return false;
-  const counter = Math.floor(atMs / 1000 / PERIOD_SECONDS);
-  for (let i = -DEFAULT_SKEW_STEPS; i <= DEFAULT_SKEW_STEPS; i++) {
-    if (constantTimeEqual(code, await hotp(secret, counter + i))) return true;
-  }
-  return false;
+  return (await matchTotpStep(secretBase32, token, atMs)) !== null;
+}
+
+// Highest time step accepted so far, per secret. Held on globalThis so the
+// login and 2FA routes (separate module graphs) share it. In memory only: a
+// restart forgets it, which reopens at most the ~90 s a code stays valid.
+const g = globalThis as unknown as { __ctrlcenterTotpUsed?: Map<string, number> };
+const usedSteps = (g.__ctrlcenterTotpUsed ??= new Map());
+
+// verifyTotp, but each code works once: a code (or an older one) from a step
+// that's already been accepted is refused, so a code observed over a shoulder
+// or in a proxy log can't be replayed within its validity window.
+export async function verifyTotpOnce(
+  secretBase32: string,
+  token: string,
+  atMs: number = Date.now()
+): Promise<boolean> {
+  const step = await matchTotpStep(secretBase32, token, atMs);
+  if (step === null) return false;
+  // No await between this check and the set, so two concurrent submissions of
+  // the same code can't both get through.
+  const last = usedSteps.get(secretBase32);
+  if (last !== undefined && step <= last) return false;
+  usedSteps.set(secretBase32, step);
+  return true;
 }
 
 // The otpauth:// URI an authenticator app imports (via QR or manual paste).

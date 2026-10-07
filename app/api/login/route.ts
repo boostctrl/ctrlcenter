@@ -6,9 +6,9 @@ import {
   sessionCookieOptions,
   SESSION_COOKIE_NAME,
 } from "@/lib/auth";
-import { readConfigInternal, setTotpRecoveryCodes } from "@/lib/config";
+import { readConfigInternal, spendTotpRecoveryCode } from "@/lib/config";
 import { rateLimit, pruneRateLimit, clientKey } from "@/lib/rate-limit";
-import { verifyTotp } from "@/lib/totp";
+import { verifyTotpOnce } from "@/lib/totp";
 import { verifyRecoveryCode } from "@/lib/recovery-codes";
 import { isSameOriginRequest } from "@/lib/api-auth";
 
@@ -93,18 +93,17 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
-    const codeOk = await verifyTotp(auth.totp.secret, totpCode);
+    const codeOk = await verifyTotpOnce(auth.totp.secret, totpCode);
     if (!codeOk) {
       // Not a valid time code — try it as a one-time recovery code, spending
       // it on success so it can't be reused.
       const match = await verifyRecoveryCode(totpCode, auth.totp.recoveryCodes);
-      if (!match.ok) {
+      if (!match.matched || !(await spendTotpRecoveryCode(match.matched.hash))) {
         return NextResponse.json(
           { error: "Invalid authentication code", totpRequired: true },
           { status: 401 }
         );
       }
-      await setTotpRecoveryCodes(match.remaining);
     }
   }
 

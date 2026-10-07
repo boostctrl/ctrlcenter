@@ -5,6 +5,7 @@ import {
   generateTotpSecret,
   totpCode,
   verifyTotp,
+  verifyTotpOnce,
   otpauthUri,
   generateRecoveryCodes,
   normalizeRecoveryCode,
@@ -42,6 +43,43 @@ describe("totpCode (RFC 4226 vectors)", () => {
       const code = await totpCode(RFC_SECRET_BASE32, counter * 30_000);
       expect(code, `counter ${counter}`).toBe(RFC_HOTP[counter]);
     }
+  });
+});
+
+describe("verifyTotpOnce (replay protection)", () => {
+  // A distinct secret per test: the used-step memory is process-wide.
+  const secret = () => generateTotpSecret();
+
+  it("accepts a code once and refuses the same code again", async () => {
+    const s = secret();
+    const now = 1_000 * 30_000;
+    const code = await totpCode(s, now);
+    expect(await verifyTotpOnce(s, code, now)).toBe(true);
+    expect(await verifyTotpOnce(s, code, now)).toBe(false);
+    // Still refused later in its ±1-step window.
+    expect(await verifyTotpOnce(s, code, now + 30_000)).toBe(false);
+  });
+
+  it("refuses an older step once a newer one was used", async () => {
+    const s = secret();
+    const now = 2_000 * 30_000;
+    expect(await verifyTotpOnce(s, await totpCode(s, now), now)).toBe(true);
+    const previous = await totpCode(s, now - 30_000);
+    expect(await verifyTotpOnce(s, previous, now)).toBe(false);
+    // The next step's code is still fine.
+    const next = await totpCode(s, now + 30_000);
+    expect(await verifyTotpOnce(s, next, now + 30_000)).toBe(true);
+  });
+
+  it("lets only one of two concurrent submissions through", async () => {
+    const s = secret();
+    const now = 3_000 * 30_000;
+    const code = await totpCode(s, now);
+    const results = await Promise.all([
+      verifyTotpOnce(s, code, now),
+      verifyTotpOnce(s, code, now),
+    ]);
+    expect(results.filter(Boolean)).toHaveLength(1);
   });
 });
 

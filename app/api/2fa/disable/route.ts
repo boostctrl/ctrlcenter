@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/lib/api-auth";
 import { readConfigInternal, disableTotp } from "@/lib/config";
 import { rateLimit, pruneRateLimit, clientKey } from "@/lib/rate-limit";
-import { verifyTotp } from "@/lib/totp";
+import { verifyTotpOnce } from "@/lib/totp";
 import { verifyRecoveryCode } from "@/lib/recovery-codes";
 import { totpDisableSchema } from "@/lib/schema";
 
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
   }
   const { code } = parsed.data;
   const ok =
-    (await verifyTotp(auth.totp.secret, code)) ||
+    (await verifyTotpOnce(auth.totp.secret, code)) ||
     (await verifyRecoveryCode(code, auth.totp.recoveryCodes)).ok;
   if (!ok) {
     return NextResponse.json(

@@ -603,6 +603,25 @@ describe("write queue serialization", () => {
   });
 });
 
+describe("spendTotpRecoveryCode", () => {
+  it("spends a code exactly once, even when two logins race", async () => {
+    const codes = [
+      { hash: "h1", salt: "s1" },
+      { hash: "h2", salt: "s2" },
+    ];
+    await config.activateTotp("SECRET", codes);
+    const results = await Promise.all([
+      config.spendTotpRecoveryCode("h1"),
+      config.spendTotpRecoveryCode("h1"),
+    ]);
+    expect(results.sort()).toEqual([false, true]);
+    const { auth } = await config.readConfigInternal();
+    expect(auth.totp.recoveryCodes.map((c) => c.hash)).toEqual(["h2"]);
+    expect(await config.spendTotpRecoveryCode("nope")).toBe(false);
+    await config.disableTotp();
+  });
+});
+
 // Structural guard for #147: private apps/bookmarks are pre-filtered by
 // readPublicConfig (lib/api-auth.ts), so the raw read must stay off public
 // surfaces. Every file under app/ that touches readConfigInternal has to be

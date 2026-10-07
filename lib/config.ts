@@ -357,13 +357,19 @@ export async function disableTotp(): Promise<void> {
   });
 }
 
-// Replace the stored recovery codes — used to drop a code once it's been spent
-// on a login.
-export async function setTotpRecoveryCodes(
-  recoveryCodes: TotpAuth["recoveryCodes"]
-): Promise<void> {
-  await mutate((config) => {
-    config.auth.totp = { ...config.auth.totp, recoveryCodes };
+// Spend one recovery code, identified by its stored hash, inside the write
+// queue: true if it was still there (and is now gone), false if a concurrent
+// login already spent it. The caller verifies the code first (PBKDF2, outside
+// the queue); this makes the check-and-remove atomic.
+export async function spendTotpRecoveryCode(hash: string): Promise<boolean> {
+  return mutate((config) => {
+    const codes = config.auth.totp.recoveryCodes;
+    if (!codes.some((c) => c.hash === hash)) return false;
+    config.auth.totp = {
+      ...config.auth.totp,
+      recoveryCodes: codes.filter((c) => c.hash !== hash),
+    };
+    return true;
   });
 }
 
@@ -376,7 +382,7 @@ export async function getSettings(): Promise<Settings> {
 // a private CalDAV/ICS feed server-side — reads them here instead of from the
 // config it hands to client components, keeping them off any client-serializable
 // object (#157). The CTRLCENTER_CALDAV_PASS env override is applied downstream in
-// lib/calendar; this returns the stored values as-is.
+// lib/calendar-fetch; this returns the stored values as-is.
 export async function getCalendarAuth(): Promise<{
   username: string;
   password: string;

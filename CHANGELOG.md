@@ -42,6 +42,9 @@ here.
   `SESSION_SECRET`, CtrlCenter now generates one on first start and keeps it in
   your config folder, instead of deriving it from `ADMIN_PASSWORD`. You'll be
   signed out once after upgrading. (#254)
+- **Two-factor codes work only once.** A code that's already been used can't
+  be used again, and a recovery code can't be spent by two sign-ins at the
+  same moment. (#255)
 
 ## [2.9.0] - 2026-07-25
 
