@@ -15,6 +15,7 @@ import {
   loadHistory,
   flush,
   recordResults,
+  pruneHistory,
   setOutageNote,
   getHistory,
   getAppDetail,
@@ -51,6 +52,7 @@ const bkt = (
 const g = globalThis as unknown as {
   __ctrlcenterStatusHistory?: {
     loaded: boolean;
+    loading?: Promise<void>;
     store: Map<string, unknown>;
     recent: Map<string, unknown>;
     downSince: Map<string, unknown>;
@@ -61,6 +63,7 @@ function resetHistoryState() {
   const s = g.__ctrlcenterStatusHistory;
   if (s) {
     s.loaded = false;
+    s.loading = undefined;
     s.store = new Map();
     s.recent = new Map();
     s.downSince = new Map();
@@ -472,6 +475,27 @@ describe("recordResults completed-outage records (#175)", () => {
     expect(list).toHaveLength(500);
     expect(list[list.length - 1].start).toBe(base + 519 * 2 * MIN);
     expect(list[0].start).toBe(base + 20 * 2 * MIN); // oldest 20 dropped
+  });
+});
+
+describe("pruneHistory", () => {
+  it("forgets apps that are no longer configured", () => {
+    resetHistoryState();
+    const now = Date.now();
+    recordResults(
+      [
+        { id: "kept", up: true, status: 200, ms: 10 },
+        { id: "deleted", up: false, status: 503, ms: 5000 },
+      ],
+      now
+    );
+    expect(pruneHistory(["kept"])).toBe(1);
+    const s = g.__ctrlcenterStatusHistory!;
+    for (const map of [s.store, s.recent, s.downSince, s.outages]) {
+      expect(map.has("deleted")).toBe(false);
+    }
+    expect(s.store.has("kept")).toBe(true);
+    expect(pruneHistory(["kept"])).toBe(0);
   });
 });
 

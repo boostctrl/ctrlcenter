@@ -26,6 +26,11 @@ here.
   now saves only what you changed in it, so a layout arranged on the home
   page, a theme from the theme builder, or a reordered bookmark category stays
   put even if Settings was open in another tab at the time. (#261)
+- **Uptime history forgets deleted services.** Their history is no longer kept
+  (and rewritten) indefinitely, and history that can't be saved — a full disk,
+  say — is now reported in the logs instead of silently. Several open
+  dashboards also no longer multiply the status checks sent to your services.
+  (#262)
 
 ### Security
 

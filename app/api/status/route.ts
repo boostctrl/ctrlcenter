@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { readConfigInternal } from "@/lib/config";
 import { isAdminRequest, visibleItems } from "@/lib/api-auth";
-import { checkApp } from "@/lib/status-check";
+import { checkApp, CHECK_CONCURRENCY } from "@/lib/status-check";
+import { mapLimit } from "@/lib/concurrency";
 import type { StatusResult, StatusResponse } from "@/lib/status";
 
 // Public endpoint (not behind the admin proxy) the dashboard polls to render
@@ -16,6 +17,10 @@ export const dynamic = "force-dynamic";
 const CACHE_MS = 30_000;
 
 let cache: { at: number; data: StatusResult[] } | null = null;
+// The check round in progress, if any. Every caller that finds the cache
+// stale while one is running shares it — several dashboard tabs polling at
+// once used to each fan out to every app.
+let inFlight: Promise<StatusResult[]> | null = null;
 
 // The response now varies with the caller's session (private apps are filtered
 // out for guests), and Next sends no Cache-Control of its own here — a shared
@@ -49,12 +54,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(cached, { headers: NO_SHARED_CACHE });
   }
 
-  const results: StatusResult[] = await Promise.all(
-    apps.map(async (app) => ({ id: app.id, ...(await checkApp(app)) }))
-  );
-  cache = { at: Date.now(), data: results };
+  inFlight ??= mapLimit(apps, CHECK_CONCURRENCY, async (app) => ({
+    id: app.id,
+    ...(await checkApp(app)),
+  }))
+    .then((data) => {
+      cache = { at: Date.now(), data };
+      return data;
+    })
+    .finally(() => {
+      inFlight = null;
+    });
+  const results = await inFlight;
   const body: StatusResponse = {
-    checkedAt: cache.at,
+    checkedAt: cache?.at ?? Date.now(),
     results: toCaller(results),
   };
   return NextResponse.json(body, { headers: NO_SHARED_CACHE });

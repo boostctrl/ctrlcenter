@@ -1,6 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 import { TIMELINE_BARS, DETAIL_BARS } from "./status";
+import { log, errorReason } from "./log";
 import type {
   StatusResult,
   StatusHistory,
@@ -499,6 +500,8 @@ type HistoryState = {
   // pairs the poller persisted at each recovery. See RecordedOutage.
   outages: Map<string, RecordedOutage[]>;
   loaded: boolean;
+  // The in-flight (or finished) load, shared by every caller — see loadHistory.
+  loading?: Promise<void>;
   flushQueue: Promise<unknown>;
 };
 
@@ -540,7 +543,15 @@ function historyPath(): string {
 // undefined), no outage marks, and no outage records. Same migration posture as
 // the rest of the config — old files must load without error. `downSince`
 // carries only apps that were down at the last recorded poll.
-export async function loadHistory(): Promise<void> {
+export function loadHistory(): Promise<void> {
+  // Every caller awaits the same load: a request (or the poller's first tick)
+  // arriving while the file is still being read must wait for it, not see an
+  // empty store — the poller flushing that empty store would wipe the file.
+  state.loading ??= readHistoryFile();
+  return state.loading;
+}
+
+async function readHistoryFile(): Promise<void> {
   if (state.loaded) return;
   state.loaded = true;
   try {
@@ -700,6 +711,24 @@ export function recordResults(results: StatusResult[], at: number): void {
   }
 }
 
+// Forget every app not in `keepIds` — its hourly buckets, recent readings,
+// open-outage mark, and recorded outages. Called by the poller with the
+// configured app list, so a deleted app's history stops being carried (and
+// rewritten on every flush) indefinitely. Returns how many apps were dropped.
+export function pruneHistory(keepIds: readonly string[]): number {
+  const keep = new Set(keepIds);
+  const gone = new Set<string>();
+  for (const map of [state.store, state.recent, state.downSince, state.outages]) {
+    for (const id of map.keys()) {
+      if (!keep.has(id)) {
+        map.delete(id);
+        gone.add(id);
+      }
+    }
+  }
+  return gone.size;
+}
+
 // Serialized, atomic write of the in-memory store to disk (temp file + rename so
 // a concurrent read never sees a torn JSON file).
 export function flush(): Promise<void> {
@@ -745,8 +774,11 @@ export function flush(): Promise<void> {
         "utf8"
       );
       await fs.rename(tmp, file);
-    } catch {
-      // best-effort; history is non-critical
+    } catch (e) {
+      // Best-effort — history is non-critical and the next flush retries —
+      // but leave a trace, or a full disk or read-only volume would silently
+      // stop the uptime history from persisting.
+      log.warn("status history write failed", { reason: errorReason(e) });
     }
   });
   return state.flushQueue as Promise<void>;

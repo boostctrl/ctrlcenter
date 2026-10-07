@@ -20,6 +20,11 @@ type CheckInput = Pick<
   "url" | "expectStatus" | "checkType" | "port" | "keyword"
 >;
 
+// Checks in flight at once when probing every app (the poller, /api/status).
+// Enough to finish a typical homelab list in a few seconds, without opening a
+// socket to every service in the same instant.
+export const CHECK_CONCURRENCY = 8;
+
 // Check one app and decide up/down. Dispatches on `checkType`; every branch
 // returns the same { up, status, ms } shape and treats a timeout/error as down.
 // `status` carries the HTTP code for http/keyword checks and is null for the

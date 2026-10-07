@@ -1,6 +1,13 @@
 import { readConfigInternal } from "./config";
-import { checkApp } from "./status-check";
-import { loadHistory, recordResults, flush, lastReadings } from "./status-history";
+import { checkApp, CHECK_CONCURRENCY } from "./status-check";
+import {
+  loadHistory,
+  recordResults,
+  flush,
+  lastReadings,
+  pruneHistory,
+} from "./status-history";
+import { mapLimit } from "./concurrency";
 import { processAlerts } from "./alerts";
 import { log, errorReason } from "./log";
 import type { StatusResult } from "./status";
@@ -19,18 +26,26 @@ const FIRST_DELAY_MS = 8_000;
 // takes effect without restarting the timer.
 async function tick(): Promise<void> {
   try {
+    // Recording into a store that hasn't loaded yet would let the next flush
+    // overwrite the persisted history, so every tick waits for the load.
+    await loadHistory();
     const { settings, apps } = await readConfigInternal();
     if (!settings.statusChecks || apps.length === 0) return;
     const intervalMs = (settings.statusInterval ?? 5) * 60_000;
     if (Date.now() - lastRun < intervalMs) return;
     lastRun = Date.now(); // claim the slot before the awaits to avoid re-entry
-    const results: StatusResult[] = await Promise.all(
-      apps.map(async (app) => ({ id: app.id, ...(await checkApp(app)) }))
+    const results: StatusResult[] = await mapLimit(
+      apps,
+      CHECK_CONCURRENCY,
+      async (app) => ({ id: app.id, ...(await checkApp(app)) })
     );
     // Capture the prior per-app state before recording this tick, so alert
     // seeding on first run reflects the previous reading, not the current one.
     const prior = lastReadings(apps.map((a) => a.id));
     recordResults(results, lastRun);
+    // Drop the history of apps that no longer exist, so a deleted app's
+    // buckets, outages and readings don't ride along in every flush forever.
+    pruneHistory(apps.map((a) => a.id));
     await flush();
     await processAlerts(results, apps, settings.alerts, prior);
   } catch (e) {
