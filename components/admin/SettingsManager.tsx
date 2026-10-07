@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import type { Settings, FeedConfig } from "@/lib/schema";
 import {
@@ -66,12 +66,16 @@ import { useConfirm } from "./Confirm";
 import { replaceUrlParams } from "./urlState";
 import { apiErrorMessage } from "./apiError";
 import { useAutosave, SaveStatus, type SaveOptions } from "./useAutosave";
+import { settingsPatch } from "./settingsPatch";
 
-async function saveSettings(settings: Settings, opts?: SaveOptions): Promise<void> {
+async function saveSettings(
+  patch: Partial<Settings>,
+  opts?: SaveOptions
+): Promise<void> {
   const res = await fetch("/api/settings", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(settings),
+    body: JSON.stringify(patch),
     keepalive: opts?.keepalive,
   });
   if (!res.ok) {
@@ -603,8 +607,19 @@ export default function SettingsManager({
   // A ticking clock so each announcement's derived state chip (Active /
   // Scheduled / Expired) stays current without a reload.
   const now = useNow(30_000);
-  // Persistence is automatic: every change debounce-saves via useAutosave.
-  const { status, error } = useAutosave(settings, saveSettings);
+  // Persistence is automatic: every change debounce-saves via useAutosave —
+  // only the keys that changed since the last successful save (settingsPatch),
+  // so this tab can't revert what another surface saved meanwhile. `saved`
+  // starts as the initial state; useAutosave serializes saves, and a failed
+  // save leaves it unchanged so its keys go out again with the next one.
+  const saved = useRef<Settings>(settings);
+  const save = useCallback(async (next: Settings, opts?: SaveOptions) => {
+    const patch = settingsPatch(saved.current, next);
+    if (Object.keys(patch).length === 0) return;
+    await saveSettings(patch, opts);
+    saved.current = next;
+  }, []);
+  const { status, error } = useAutosave(settings, save);
   const confirm = useConfirm();
   // Empty on the server and during hydration, the browser's own list after
   // mount — see the NO_ZONES/getBrowserZones comment above.

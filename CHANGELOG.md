@@ -20,6 +20,13 @@ here.
   orchestrators see it without extra config; the example compose file drops
   its copy and adds `no-new-privileges`. (#258)
 
+### Fixed
+
+- **An open Settings tab no longer undoes changes made elsewhere.** Settings
+  now saves only what you changed in it, so a layout arranged on the home
+  page, a theme from the theme builder, or a reordered bookmark category stays
+  put even if Settings was open in another tab at the time. (#261)
+
 ### Security
 
 - **Admin pages and APIs now check your sign-in themselves.** Next.js 16.2.9
