@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-10-07
+
 ### Added
 
 - **Friendlier "page not found" and error pages.** A mistyped address now gets
@@ -2606,7 +2608,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.9.0...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.10.0...HEAD
+[2.10.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.9.0...v2.10.0
 [2.9.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.7...v2.9.0
 [2.8.7]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.6...v2.8.7
 [2.8.6]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.5...v2.8.6
