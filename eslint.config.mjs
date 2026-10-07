@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Claude Code agent worktrees: separate checkouts, linted on their own.
+    ".claude/worktrees/**",
   ]),
 ]);
 

@@ -55,3 +55,6 @@ next-env.d.ts
 
 # browser smoke-test screenshots (npm run smoke)
 /smoke-screenshots/
+
+# Claude Code agent worktrees
+/.claude/worktrees/
