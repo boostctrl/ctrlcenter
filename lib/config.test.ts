@@ -5,6 +5,7 @@ import path from "path";
 import * as YAML from "js-yaml";
 import type { z } from "zod";
 import {
+  CONFIG_SCHEMA_VERSION,
   appInputSchema,
   bookmarkInputSchema,
   integrationsSchema,
@@ -79,6 +80,18 @@ describe("readConfigInternal", () => {
     expect(result.settings.title).toBe("2026-12-25");
   });
 
+  it("stamps the schema version on write, and reads files without one", async () => {
+    // A pre-field file (no schemaVersion) reads fine…
+    await fs.writeFile(configPath, YAML.dump({ settings: { title: "Old" } }), "utf8");
+    expect((await config.readConfigInternal()).settings.title).toBe("Old");
+    // …and the next write records the current version.
+    await config.updateSettings(settingsInput({ title: "New" }));
+    const onDisk = YAML.load(await fs.readFile(configPath, "utf8")) as {
+      schemaVersion: number;
+    };
+    expect(onDisk.schemaVersion).toBe(CONFIG_SCHEMA_VERSION);
+  });
+
   it("rejects a file with more than one YAML document", () => {
     expect(() => config.parseConfigYaml("a: 1\n---\nb: 2\n")).toThrow(
       /single YAML document/
@@ -100,6 +113,31 @@ describe("readConfigInternal", () => {
     );
     const result = await config.readConfigInternal();
     expect(result.apps.map((a) => a.id)).toEqual(["a"]);
+  });
+});
+
+describe("read cache", () => {
+  it("hands each caller its own copy", async () => {
+    const a = await config.readConfigInternal();
+    a.settings.title = "mutated by a caller";
+    a.apps.push({ ...a.apps[0], id: "ghost" } as (typeof a.apps)[number]);
+    const b = await config.readConfigInternal();
+    expect(b.settings.title).toBe("Home");
+    expect(b.apps.find((x) => x.id === "ghost")).toBeUndefined();
+  });
+
+  it("sees writes and hand edits immediately", async () => {
+    await config.readConfigInternal();
+    await config.updateSettings(settingsInput({ title: "Via API" }));
+    expect((await config.readConfigInternal()).settings.title).toBe("Via API");
+
+    // A hand edit replaces the file outside the app (new mtime/size).
+    const onDisk = YAML.load(await fs.readFile(configPath, "utf8")) as {
+      settings: { title: string };
+    };
+    onDisk.settings.title = "Hand edited";
+    await fs.writeFile(configPath, YAML.dump(onDisk), "utf8");
+    expect((await config.readConfigInternal()).settings.title).toBe("Hand edited");
   });
 });
 

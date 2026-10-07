@@ -5,6 +5,7 @@ import { GRID_COLUMNS } from "./layout";
 import { migrateConfigShape } from "./config-migrate";
 import { log, errorReason } from "./log";
 import {
+  CONFIG_SCHEMA_VERSION,
   configSchema,
   configReadSchema,
   totpAuthSchema,
@@ -48,6 +49,8 @@ const g = globalThis as unknown as {
     queue: Promise<unknown>;
     migrationTask: Promise<void> | null;
     migrationFailed: boolean;
+    // The last parsed read, keyed on the file's identity — see cachedRead.
+    readCache?: { key: string; config: Config; changed: boolean } | null;
   };
 };
 const writes = (g.__ctrlcenterConfigWrites ??= {
@@ -99,6 +102,29 @@ async function loadMigrated(): Promise<{
   return { config: configReadSchema.parse(value), changed, raw };
 }
 
+// loadMigrated for the read path, minus the repeat work: a page render reads
+// the config several times (layout, page, proxy, each API call), and each read
+// used to re-read, YAML-parse, migrate, and Zod-parse the file. The parsed
+// result is cached against the file's inode, size, and mtime; every write
+// renames a fresh file into place (new inode) and a hand edit bumps the mtime,
+// so either invalidates it. Callers get their own structuredClone, so one can't
+// mutate what the next one sees. Queue-internal writers keep calling
+// loadMigrated directly — they must see the file as it is right now.
+async function cachedRead(): Promise<{ config: Config; changed: boolean }> {
+  await ensureConfigExists();
+  const st = await fs.stat(CONFIG_PATH);
+  const key = `${st.ino}:${st.size}:${st.mtimeMs}`;
+  const hit = writes.readCache;
+  if (hit && hit.key === key) {
+    return { config: structuredClone(hit.config), changed: hit.changed };
+  }
+  const { config, changed } = await loadMigrated();
+  // Stat-then-read can race a write: then this entry holds newer content under
+  // the older key, and the next read's stat simply misses and reloads.
+  writes.readCache = { key, config: structuredClone(config), changed };
+  return { config, changed };
+}
+
 // The raw, unfiltered config — private apps/bookmarks and the admin credential
 // included. "Internal" is deliberate: anything rendering for a possibly
 // signed-out visitor must go through readPublicConfig() (lib/api-auth.ts),
@@ -111,7 +137,7 @@ async function loadMigrated(): Promise<{
 // — awaiting a queued rewrite from inside the queue would deadlock — and take
 // the same .bak snapshot themselves before their own write normalizes the file.
 export async function readConfigInternal(): Promise<Config> {
-  const { config, changed } = await loadMigrated();
+  const { config, changed } = await cachedRead();
   if (changed) await persistShapeMigration();
   return config;
 }
@@ -179,7 +205,11 @@ async function dumpYaml(dest: string, config: Config): Promise<void> {
 }
 
 async function writeConfig(config: Config): Promise<void> {
-  const validated = configSchema.parse(config);
+  // Whatever version the file was read at, it's written in this build's shape.
+  const validated = configSchema.parse({
+    ...config,
+    schemaVersion: CONFIG_SCHEMA_VERSION,
+  });
   await dumpYaml(CONFIG_PATH, validated);
 }
 

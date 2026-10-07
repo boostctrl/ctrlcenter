@@ -728,7 +728,14 @@ export const themePackSchema = z.object({
 // stored `themes` wholesale, so resetting a pack just omits it.
 export const themesInputSchema = z.array(themePackSchema);
 
+// The on-disk config shape's version, written on every save. Files without it
+// predate the field (2.9 and earlier) and are in the 2.0 shape or older, which
+// lib/config-migrate.ts detects heuristically; a future shape change bumps
+// this, so its migration can key off the number instead of guessing.
+export const CONFIG_SCHEMA_VERSION = 2;
+
 export const configSchema = z.object({
+  schemaVersion: z.number().int().default(CONFIG_SCHEMA_VERSION),
   settings: settingsSchema.default(settingsSchema.parse({})),
   apps: z.array(appItemSchema).default([]),
   bookmarks: z.array(bookmarkItemSchema).default([]),
