@@ -1,4 +1,4 @@
-import { readCapped } from "./fetch-body";
+import { readCapped, fetchWithTimeout } from "./fetch-body";
 import { log, hostOf, errorReason } from "./log";
 import { MAX_FEED_URLS } from "./schema";
 
@@ -310,8 +310,6 @@ async function requestFeed(
   target: string,
   validators?: { etag?: string; lastModified?: string }
 ): Promise<FeedFetchResult> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FEED_TIMEOUT_MS);
   try {
     const headers: Record<string, string> = {
       Accept: "application/rss+xml, application/atom+xml, application/feed+json, application/json, application/xml, text/xml, */*",
@@ -319,7 +317,7 @@ async function requestFeed(
     if (validators?.etag) headers["If-None-Match"] = validators.etag;
     if (validators?.lastModified)
       headers["If-Modified-Since"] = validators.lastModified;
-    const res = await fetch(target, { headers, signal: controller.signal });
+    const res = await fetchWithTimeout(target, { headers }, FEED_TIMEOUT_MS);
     if (res.status === 304)
       return { feed: null, error: null, notModified: true };
     if (!res.ok) return { feed: null, error: `HTTP ${res.status}` };
@@ -346,8 +344,6 @@ async function requestFeed(
     const aborted = e instanceof Error && e.name === "AbortError";
     log.warn("feed fetch error", { host: hostOf(target), reason: errorReason(e) });
     return { feed: null, error: aborted ? "Timed out" : "Couldn't connect" };
-  } finally {
-    clearTimeout(timer);
   }
 }
 

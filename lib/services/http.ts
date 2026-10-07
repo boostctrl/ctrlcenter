@@ -6,10 +6,10 @@
 // ever runs in the browser.
 
 import https from "node:https";
-import { readCapped } from "../fetch-body";
+import { readCapped, fetchWithTimeout } from "../fetch-body";
 import { log, hostOf, errorReason } from "../log";
 
-const SERVICE_TIMEOUT_MS = 6000;
+export const SERVICE_TIMEOUT_MS = 6000;
 // Default cap on a service response body — enough for the small status/queue
 // payloads. A specific call that legitimately returns a larger body (the
 // qBittorrent torrent list on a big instance) passes its own higher cap; see
@@ -41,10 +41,8 @@ export async function serviceRequest(
   init: RequestInit = {},
   maxBytes: number = SERVICE_MAX_BYTES
 ): Promise<{ res: Response; text: string }> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), SERVICE_TIMEOUT_MS);
   try {
-    const res = await fetch(url, { ...init, signal: controller.signal });
+    const res = await fetchWithTimeout(url, init, SERVICE_TIMEOUT_MS);
     // Read the actual body and cap on its real size — do NOT reject on a
     // declared Content-Length that may not match (a service or a middlebox in
     // front of it can send a header far larger than the body, which used to
@@ -60,8 +58,6 @@ export async function serviceRequest(
     });
     const aborted = e instanceof Error && e.name === "AbortError";
     throw new ServiceError(aborted ? "Timed out" : "Couldn't connect");
-  } finally {
-    clearTimeout(timer);
   }
 }
 

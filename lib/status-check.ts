@@ -2,7 +2,7 @@ import net from "node:net";
 import dns from "node:dns/promises";
 import { execFile } from "node:child_process";
 import { matchesStatus, type AppStatus } from "./status";
-import { readCapped } from "./fetch-body";
+import { readCapped, timeoutSignal } from "./fetch-body";
 import type { AppItem } from "./schema";
 
 const TIMEOUT_MS = 5000;
@@ -55,12 +55,11 @@ export async function checkApp(app: CheckInput): Promise<AppStatus> {
 // we must read the body (always GET) and also require the keyword to appear in
 // it — catching "up but broken" pages.
 async function checkHttp(app: CheckInput, keyword: string): Promise<AppStatus> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const signal = timeoutSignal(TIMEOUT_MS);
   const start = Date.now();
   // Shared across the HEAD and its GET fallback so the whole check stays within
   // one TIMEOUT_MS budget.
-  const opts = { redirect: "manual" as const, signal: controller.signal };
+  const opts = { redirect: "manual" as const, signal };
   try {
     if (keyword) {
       const res = await fetch(app.url, { method: "GET", ...opts });
@@ -90,7 +89,7 @@ async function checkHttp(app: CheckInput, keyword: string): Promise<AppStatus> {
       // HEAD threw. If the abort timer fired the budget is spent, so report down
       // without retrying; otherwise it's a dropped/reset connection (some
       // servers hang up on HEAD) and the shared timer still has room for a GET.
-      if (controller.signal.aborted) {
+      if (signal.aborted) {
         return { up: false, status: null, ms: Date.now() - start };
       }
       needGet = true;
@@ -112,8 +111,6 @@ async function checkHttp(app: CheckInput, keyword: string): Promise<AppStatus> {
     };
   } catch {
     return { up: false, status: null, ms: Date.now() - start };
-  } finally {
-    clearTimeout(timer);
   }
 }
 

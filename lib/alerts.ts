@@ -1,6 +1,7 @@
 import type { AlertConfig, AlertEmailConfig, AlertType } from "./schema";
 import { log, hostOf, errorReason } from "./log";
 import { resolveSecret } from "./secrets";
+import { fetchWithTimeout } from "./fetch-body";
 
 // Outbound uptime alerting. The background poller (lib/status-poller.ts) feeds
 // each tick's results through here; we detect down/recovery transitions and
@@ -271,15 +272,11 @@ export type ChannelResult = { ok: boolean; detail: string };
 // both the poller (which logs) and the test path (which shows the result) can
 // share the exact same request logic. Never throws.
 async function runAlert(req: AlertRequest): Promise<ChannelResult> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), ALERT_TIMEOUT_MS);
   try {
-    const res = await fetch(req.url, { ...req.init, signal: controller.signal });
+    const res = await fetchWithTimeout(req.url, req.init, ALERT_TIMEOUT_MS);
     return { ok: res.ok, detail: `HTTP ${res.status}` };
   } catch (e) {
     return { ok: false, detail: errorReason(e) };
-  } finally {
-    clearTimeout(timer);
   }
 }
 

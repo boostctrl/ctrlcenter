@@ -14,10 +14,12 @@ import {
   serviceRequest,
   serviceJson,
   runProbe,
+  SERVICE_TIMEOUT_MS,
   type ProbeResult,
 } from "./http";
 import { resolveSecret } from "../secrets";
 import { log, hostOf, errorReason } from "../log";
+import { fetchWithTimeout } from "../fetch-body";
 
 export type PortainerConfig = { url: string; apiKey: string };
 
@@ -263,13 +265,12 @@ export async function containerLogs(
   const url =
     `${base}/api/endpoints/${endpointId}/docker/containers/${containerId}` +
     `/logs?stdout=1&stderr=1&timestamps=0&tail=${PORTAINER_LOG_TAIL}`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 6000);
   try {
-    const res = await fetch(url, {
-      headers: { "X-API-Key": resolvePortainerApiKey(cfg) },
-      signal: controller.signal,
-    });
+    const res = await fetchWithTimeout(
+      url,
+      { headers: { "X-API-Key": resolvePortainerApiKey(cfg) } },
+      SERVICE_TIMEOUT_MS
+    );
     if (res.status === 401 || res.status === 403) {
       throw new ServiceError("Invalid API key");
     }
@@ -292,7 +293,5 @@ export async function containerLogs(
     });
     const aborted = e instanceof Error && e.name === "AbortError";
     throw new ServiceError(aborted ? "Timed out" : "Couldn't connect");
-  } finally {
-    clearTimeout(timer);
   }
 }

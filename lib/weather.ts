@@ -2,6 +2,7 @@
 // (to render the admin-default location into the initial HTML) and client-side
 // (to re-fetch when a visitor's detected/overridden location differs).
 import { log, hostOf, errorReason } from "./log";
+import { fetchWithTimeout } from "./fetch-body";
 
 export type Units = "imperial" | "metric";
 
@@ -41,14 +42,13 @@ export async function fetchWeather(
   });
 
   const url = `${WEATHER_API_BASE}/v1/forecast?${params}`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), WEATHER_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(
+      url,
       // Server-side, cache for 30 min; the option is ignored in the browser.
-      next: { revalidate: 1800 },
-      signal: controller.signal,
-    });
+      { next: { revalidate: 1800 } },
+      WEATHER_TIMEOUT_MS
+    );
     if (!res.ok) {
       log.warn("weather fetch failed", { host: hostOf(url), status: res.status });
       return null;
@@ -76,8 +76,6 @@ export async function fetchWeather(
   } catch (e) {
     log.warn("weather fetch error", { host: hostOf(url), reason: errorReason(e) });
     return null;
-  } finally {
-    clearTimeout(timer);
   }
 }
 
@@ -147,13 +145,12 @@ export async function fetchForecast(
   });
 
   const url = `${WEATHER_API_BASE}/v1/forecast?${params}`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), WEATHER_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      next: { revalidate: 1800 },
-      signal: controller.signal,
-    });
+    const res = await fetchWithTimeout(
+      url,
+      { next: { revalidate: 1800 } },
+      WEATHER_TIMEOUT_MS
+    );
     if (!res.ok) {
       log.warn("forecast fetch failed", { host: hostOf(url), status: res.status });
       return null;
@@ -213,8 +210,6 @@ export async function fetchForecast(
   } catch (e) {
     log.warn("forecast fetch error", { host: hostOf(url), reason: errorReason(e) });
     return null;
-  } finally {
-    clearTimeout(timer);
   }
 }
 

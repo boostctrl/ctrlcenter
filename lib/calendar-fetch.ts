@@ -10,7 +10,7 @@ import {
   upcomingEvents,
   type CalendarEvent,
 } from "./calendar";
-import { readCapped } from "./fetch-body";
+import { readCapped, fetchWithTimeout } from "./fetch-body";
 import { log, hostOf, errorReason } from "./log";
 import { resolveSecret } from "./secrets";
 
@@ -56,10 +56,8 @@ async function getIcs(
   target: string,
   headers: HeadersInit
 ): Promise<{ text: string | null; error: string | null }> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), CAL_TIMEOUT_MS);
   try {
-    const res = await fetch(target, { headers, signal: controller.signal });
+    const res = await fetchWithTimeout(target, { headers }, CAL_TIMEOUT_MS);
     if (!res.ok) return { text: null, error: `HTTP ${res.status}` };
     const text = await readCapped(res, CAL_MAX_BYTES);
     if (text === null) return { text: null, error: "Response too large" };
@@ -70,8 +68,6 @@ async function getIcs(
     const aborted = e instanceof Error && e.name === "AbortError";
     log.warn("calendar fetch error", { host: hostOf(target), reason: errorReason(e) });
     return { text: null, error: aborted ? "Timed out" : "Couldn't connect" };
-  } finally {
-    clearTimeout(timer);
   }
 }
 
