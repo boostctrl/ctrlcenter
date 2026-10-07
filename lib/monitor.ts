@@ -21,6 +21,7 @@ import {
 } from "./services/registry";
 import { ServiceError } from "./services/http";
 import { log, errorReason } from "./log";
+import { globalSingleton } from "./singleton";
 
 // One service's slice of the dashboard: the last good snapshot when there is
 // one, the latest failure when there isn't — or both, when a refresh fails
@@ -64,21 +65,25 @@ type CacheEntry = {
   at: number;
 };
 
-const g = globalThis as unknown as {
-  __ctrlcenterMonitorCache?: Map<ServiceId, CacheEntry>;
-  __ctrlcenterMonitorRefresh?: Map<string, Promise<void>>;
-  __ctrlcenterMonitorLatest?: Map<ServiceId, string>;
-};
-const cache = (g.__ctrlcenterMonitorCache ??= new Map());
+const cache = globalSingleton(
+  "__ctrlcenterMonitorCache",
+  () => new Map<ServiceId, CacheEntry>()
+);
 // Keyed by service + fingerprint, so concurrent same-config requests share one
 // fetch while a config edit isn't blocked behind the old config's request.
-const inFlight = (g.__ctrlcenterMonitorRefresh ??= new Map());
+const inFlight = globalSingleton(
+  "__ctrlcenterMonitorRefresh",
+  () => new Map<string, Promise<void>>()
+);
 // The most recently requested fingerprint per service. Two quick edits (A then
 // B) within one fetch window run concurrent refreshes for the same service; a
 // completed refresh only writes if its key is still the latest, so a slow A can
 // no longer clobber B's fresh entry and force a redundant blocking refetch
 // (#211).
-const latestKey = (g.__ctrlcenterMonitorLatest ??= new Map());
+const latestKey = globalSingleton(
+  "__ctrlcenterMonitorLatest",
+  () => new Map<ServiceId, string>()
+);
 
 function refresh(
   id: ServiceId,

@@ -13,6 +13,7 @@ import {
 import { readCapped, fetchWithTimeout } from "./fetch-body";
 import { log, hostOf, errorReason } from "./log";
 import { resolveSecret } from "./secrets";
+import { globalSingleton } from "./singleton";
 
 const CAL_TIMEOUT_MS = 6000;
 const CAL_CACHE_TTL_MS = 5 * 60_000;
@@ -27,12 +28,14 @@ const CAL_MAX_BYTES = 5 * 1024 * 1024;
 // dedupes in-flight background refreshes so a stale entry triggers at most one
 // refetch per URL however many renders want it (the same shape lib/feed.ts uses).
 type CalCacheEntry = { events: CalendarEvent[]; at: number };
-const g = globalThis as unknown as {
-  __ctrlcenterCalCache?: Map<string, CalCacheEntry>;
-  __ctrlcenterCalRefresh?: Map<string, Promise<void>>;
-};
-const calCache = (g.__ctrlcenterCalCache ??= new Map());
-const calRefreshInFlight = (g.__ctrlcenterCalRefresh ??= new Map());
+const calCache = globalSingleton(
+  "__ctrlcenterCalCache",
+  () => new Map<string, CalCacheEntry>()
+);
+const calRefreshInFlight = globalSingleton(
+  "__ctrlcenterCalRefresh",
+  () => new Map<string, Promise<void>>()
+);
 
 export type CalendarAuth = { username?: string; password?: string };
 

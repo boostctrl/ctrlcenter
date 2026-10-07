@@ -33,6 +33,7 @@ import {
   type ProbeResult,
 } from "./http";
 import { resolveSecret } from "../secrets";
+import { globalSingleton } from "../singleton";
 
 export type UnifiConfig = {
   url: string;
@@ -216,12 +217,14 @@ export function mapUnifiHealth(raw: unknown): UnifiSnapshot {
 
 type Session = { cookie: string; prefix: string };
 
-const g = globalThis as unknown as {
-  __ctrlcenterUnifiSessions?: Map<string, Session>;
-  __ctrlcenterUnifiLogins?: Map<string, Promise<Session>>;
-};
-const sessions = (g.__ctrlcenterUnifiSessions ??= new Map());
-const loginsInFlight = (g.__ctrlcenterUnifiLogins ??= new Map());
+const sessions = globalSingleton(
+  "__ctrlcenterUnifiSessions",
+  () => new Map<string, Session>()
+);
+const loginsInFlight = globalSingleton(
+  "__ctrlcenterUnifiLogins",
+  () => new Map<string, Promise<Session>>()
+);
 
 const sessionKey = (base: string, username: string) => `${base}|${username}`;
 

@@ -16,6 +16,7 @@ import fs from "fs/promises";
 import path from "path";
 import { CONFIG_DIR } from "./config";
 import { log, hostOf, errorReason } from "./log";
+import { globalSingleton } from "./singleton";
 
 // Cached CDN icons live in their own subdir (not uploads/ — an upload's name
 // could otherwise collide with a slug) inside the same mounted volume. Untraced
@@ -108,20 +109,17 @@ type IconCacheState = {
   // slug → last time we bumped its file mtime, to debounce serve-time touches.
   lastServed: Map<string, number>;
 };
-const g = globalThis as unknown as { __ctrlcenterIconCache?: IconCacheState };
-const state = (g.__ctrlcenterIconCache ??= {
+const state = globalSingleton<IconCacheState>("__ctrlcenterIconCache", () => ({
   inflight: new Map(),
   negativeUntil: new Map(),
   metadata: null,
   metadataInflight: null,
   active: 0,
-  // Annotated: a bare [] in the ??= initializer infers never[], poisoning
-  // every push through the expression's union type.
-  waiters: [] as (() => void)[],
+  waiters: [],
   diskBytes: null,
   evictInFlight: null,
   lastServed: new Map(),
-});
+}));
 
 // Remember a slug the CDN didn't serve, so the next request degrades instead
 // of re-fetching for NEGATIVE_TTL_MS — bounding the map so a flood of distinct

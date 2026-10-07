@@ -1,6 +1,7 @@
 import { readCapped, fetchWithTimeout } from "./fetch-body";
 import { log, hostOf, errorReason } from "./log";
 import { MAX_FEED_URLS } from "./schema";
+import { globalSingleton } from "./singleton";
 
 // Minimal RSS 2.0 / Atom / JSON Feed reader for the home-page Feed widget.
 // Hand-rolled (no dependency) and deliberately forgiving: it pulls each
@@ -276,14 +277,18 @@ export type FeedHealth = {
   at: number;
 };
 
-const g = globalThis as unknown as {
-  __ctrlcenterFeedCache?: Map<string, FeedCacheEntry>;
-  __ctrlcenterFeedRefresh?: Map<string, Promise<void>>;
-  __ctrlcenterFeedHealth?: Map<string, FeedHealth>;
-};
-const feedCache = (g.__ctrlcenterFeedCache ??= new Map());
-const refreshInFlight = (g.__ctrlcenterFeedRefresh ??= new Map());
-const feedHealthMap = (g.__ctrlcenterFeedHealth ??= new Map());
+const feedCache = globalSingleton(
+  "__ctrlcenterFeedCache",
+  () => new Map<string, FeedCacheEntry>()
+);
+const refreshInFlight = globalSingleton(
+  "__ctrlcenterFeedRefresh",
+  () => new Map<string, Promise<void>>()
+);
+const feedHealthMap = globalSingleton(
+  "__ctrlcenterFeedHealth",
+  () => new Map<string, FeedHealth>()
+);
 
 // Snapshot of every recorded outcome, keyed by feed URL, for the admin
 // health endpoint.

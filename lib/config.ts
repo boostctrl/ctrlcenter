@@ -4,6 +4,7 @@ import * as YAML from "js-yaml";
 import { GRID_COLUMNS } from "./layout";
 import { migrateConfigShape } from "./config-migrate";
 import { log, errorReason } from "./log";
+import { globalSingleton } from "./singleton";
 import {
   CONFIG_SCHEMA_VERSION,
   configSchema,
@@ -37,27 +38,24 @@ export const CONFIG_DIR = path.dirname(CONFIG_PATH);
 const CONFIG_BAK = `${CONFIG_PATH}.bak`;
 
 // Serializes read-modify-write operations so concurrent admin requests can't
-// clobber each other's changes to the on-disk YAML file. Held on globalThis so
-// every route's module graph shares ONE queue — Next bundles lib/* separately
-// per entry, so a plain module-level variable here would give each API route
-// its own "serialization" and let writes from different endpoints interleave
-// (same duplication the alert/status/calendar/feed singletons work around).
-// The one-time shape migration's state rides along for the same reason: one
+// clobber each other's changes to the on-disk YAML file. A process-wide
+// singleton (lib/singleton.ts) so every route's module graph shares ONE queue —
+// a plain module-level variable here would give each API route its own
+// "serialization" and let writes from different endpoints interleave. The
+// one-time shape migration's state rides along for the same reason: one
 // attempt and one warn per process, not per route bundle.
-const g = globalThis as unknown as {
-  __ctrlcenterConfigWrites?: {
-    queue: Promise<unknown>;
-    migrationTask: Promise<void> | null;
-    migrationFailed: boolean;
-    // The last parsed read, keyed on the file's identity — see cachedRead.
-    readCache?: { key: string; config: Config; changed: boolean } | null;
-  };
+type ConfigWrites = {
+  queue: Promise<unknown>;
+  migrationTask: Promise<void> | null;
+  migrationFailed: boolean;
+  // The last parsed read, keyed on the file's identity — see cachedRead.
+  readCache?: { key: string; config: Config; changed: boolean } | null;
 };
-const writes = (g.__ctrlcenterConfigWrites ??= {
+const writes = globalSingleton<ConfigWrites>("__ctrlcenterConfigWrites", () => ({
   queue: Promise.resolve(),
   migrationTask: null,
   migrationFailed: false,
-});
+}));
 
 async function ensureConfigExists(): Promise<void> {
   try {

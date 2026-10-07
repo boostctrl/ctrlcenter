@@ -23,6 +23,7 @@ import {
 } from "./http";
 import { resolveSecret } from "../secrets";
 import { log, hostOf } from "../log";
+import { globalSingleton } from "../singleton";
 
 export type QbittorrentConfig = {
   url: string;
@@ -168,19 +169,25 @@ export function simplifyTorrentState(raw: string): TorrentState {
 // password change just makes the next 403 re-login with the new one. The
 // in-flight map dedupes concurrent logins — a snapshot fires its endpoint
 // calls in parallel, and each would otherwise mint its own session.
-const g = globalThis as unknown as {
-  __ctrlcenterQbitSessions?: Map<string, string>;
-  __ctrlcenterQbitLogins?: Map<string, Promise<string>>;
-  __ctrlcenterQbitSync?: Map<string, QbitSyncState>;
-  __ctrlcenterQbitSyncLocks?: Map<string, Promise<QbitSyncState>>;
-};
-const sessions = (g.__ctrlcenterQbitSessions ??= new Map());
-const loginsInFlight = (g.__ctrlcenterQbitLogins ??= new Map());
+const sessions = globalSingleton(
+  "__ctrlcenterQbitSessions",
+  () => new Map<string, string>()
+);
+const loginsInFlight = globalSingleton(
+  "__ctrlcenterQbitLogins",
+  () => new Map<string, Promise<string>>()
+);
 // The maintained /sync/maindata view per connection, plus a per-connection
 // lock so two concurrent polls can't both consume the same rid (which would
 // drop the delta the loser never applied).
-const syncStates = (g.__ctrlcenterQbitSync ??= new Map());
-const syncLocks = (g.__ctrlcenterQbitSyncLocks ??= new Map());
+const syncStates = globalSingleton(
+  "__ctrlcenterQbitSync",
+  () => new Map<string, QbitSyncState>()
+);
+const syncLocks = globalSingleton(
+  "__ctrlcenterQbitSyncLocks",
+  () => new Map<string, Promise<QbitSyncState>>()
+);
 
 function sessionKey(base: string, username: string): string {
   return `${base}|${username}`;

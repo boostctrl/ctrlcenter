@@ -22,6 +22,7 @@ import { basename } from "path";
 import { CONFIG_DIR } from "./config";
 import { MAX_STAT_DISKS } from "./schema";
 import { log, errorReason } from "./log";
+import { globalSingleton } from "./singleton";
 
 export type SystemStatsSource = "container" | "host";
 
@@ -137,13 +138,14 @@ type CpuCounter =
   | { kind: "cgroup"; usec: number; at: number }
   | { kind: "proc"; idleTicks: number; totalTicks: number; at: number };
 
-const g = globalThis as unknown as {
-  __ctrlcenterSystemStats?: {
-    prev: { key: string; counter: CpuCounter } | null;
-    cache: { stats: SystemStats | null; disksKey: string; at: number } | null;
-  };
+type StatsState = {
+  prev: { key: string; counter: CpuCounter } | null;
+  cache: { stats: SystemStats | null; disksKey: string; at: number } | null;
 };
-const state = (g.__ctrlcenterSystemStats ??= { prev: null, cache: null });
+const state = globalSingleton<StatsState>("__ctrlcenterSystemStats", () => ({
+  prev: null,
+  cache: null,
+}));
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

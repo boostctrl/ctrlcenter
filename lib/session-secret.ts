@@ -2,6 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import { randomBytes } from "crypto";
 import { log, errorReason } from "./log";
+import { globalSingleton } from "./singleton";
 
 // The session-signing secret when SESSION_SECRET isn't set: 32 random bytes
 // generated on first use and kept beside config.yaml in the mounted volume, so
@@ -16,10 +17,12 @@ import { log, errorReason } from "./log";
 
 const FILE_NAME = "session-secret";
 
-const g = globalThis as unknown as {
-  __ctrlcenterSessionSecret?: Map<string, Promise<string | null>>;
-};
-const cache = (g.__ctrlcenterSessionSecret ??= new Map());
+// Per secret-file path; a process-wide singleton so every route bundle shares
+// one load (and one first-run create).
+const cache = globalSingleton(
+  "__ctrlcenterSessionSecret",
+  () => new Map<string, Promise<string | null>>()
+);
 
 // Resolved lazily (not at module load) so tests can point CONFIG_PATH at a
 // scratch directory. Untraced like CONFIG_PATH in lib/config.ts.

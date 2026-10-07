@@ -5,6 +5,8 @@
 // after enrollment, and stripAuth keeps it out of every public/exported
 // config (the #157 precedent).
 
+import { globalSingleton } from "./singleton";
+
 const PERIOD_SECONDS = 30;
 const DIGITS = 6;
 // Accept the adjacent time steps too, so a code entered a few seconds either
@@ -143,8 +145,7 @@ export async function verifyTotp(
 // Highest time step accepted so far, per secret. Held on globalThis so the
 // login and 2FA routes (separate module graphs) share it. In memory only: a
 // restart forgets it, which reopens at most the ~90 s a code stays valid.
-const g = globalThis as unknown as { __ctrlcenterTotpUsed?: Map<string, number> };
-const usedSteps = (g.__ctrlcenterTotpUsed ??= new Map());
+const usedSteps = globalSingleton("__ctrlcenterTotpUsed", () => new Map<string, number>());
 
 // verifyTotp, but each code works once: a code (or an older one) from a step
 // that's already been accepted is refused, so a code observed over a shoulder

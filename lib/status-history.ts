@@ -13,6 +13,7 @@ import type {
   AppDetail,
   OutageEntry,
 } from "./status";
+import { globalSingleton } from "./singleton";
 
 // Persisted uptime history for the /status page. The background poller
 // (instrumentation.ts) records one up/down tally per app per hour; we keep 90
@@ -509,15 +510,14 @@ type HistoryState = {
 // route share ONE instance even if Next bundles them into separate module
 // graphs — otherwise the reader loads the file once and never sees the poller's
 // ongoing writes ("one reading, then frozen").
-const g = globalThis as unknown as { __ctrlcenterStatusHistory?: HistoryState };
-const state: HistoryState = (g.__ctrlcenterStatusHistory ??= {
+const state = globalSingleton<HistoryState>("__ctrlcenterStatusHistory", () => ({
   store: new Map(),
   recent: new Map(),
   downSince: new Map(),
   outages: new Map(),
   loaded: false,
   flushQueue: Promise.resolve(),
-});
+}));
 state.recent ??= new Map(); // tolerate a state created by an older build
 state.downSince ??= new Map(); // ditto — added after the recent ring
 state.outages ??= new Map(); // ditto — added with the recorded outages (#175)
