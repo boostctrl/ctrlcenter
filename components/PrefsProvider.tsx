@@ -16,7 +16,6 @@ import {
   loadActiveTheme,
   saveActiveTheme,
   loadThemes,
-  saveThemes,
   loadAccentOverride,
   saveAccentOverride,
   loadDesign,
@@ -27,9 +26,7 @@ import {
   saveFont,
   loadFavorites,
   saveFavorites,
-  newThemeId,
   type Units,
-  type VisitorLocation,
   type VisitorPrefs,
   NO_ACCENT_OVERRIDES,
   type CustomTheme,
@@ -37,150 +34,37 @@ import {
   type AccentOverrides,
   type ModePair,
 } from "@/lib/prefs";
-import {
-  DESIGN_IDS,
-  SCENE_IDS,
-  type ColorSet,
-  type DesignId,
-  type ModeColors,
-  type SceneId,
-  type ThemePack,
+import type {
+  ColorSet,
+  DesignId,
+  ModeColors,
+  SceneId,
+  ThemePack,
 } from "@/lib/theme";
-import { FONT_IDS, type FontId } from "@/lib/fonts";
-import { deepenForLight } from "./scenes/color";
+import type { FontId } from "@/lib/fonts";
+import {
+  applyAll,
+  applyDesign,
+  applyFont,
+  applyScene,
+  isLightColor,
+  overrideFor,
+  resolveAccent,
+  resolveDark,
+  variantFor,
+  type Accent,
+  type Mode,
+  type Theme,
+} from "./prefs/themeApply";
+import { useLocationDetect } from "./prefs/useLocationDetect";
+import { useSavedThemes } from "./prefs/useSavedThemes";
 
-export type Theme = "system" | "light" | "dark";
-// The two resolved appearance modes a theme part can be chosen for independently.
-export type Mode = "dark" | "light";
+// The theme helpers (DOM application, luminance, accent resolution) live in
+// ./prefs/themeApply, location detection in ./prefs/useLocationDetect and the
+// saved-theme CRUD in ./prefs/useSavedThemes; this provider owns the state and
+// assembles the one context every consumer reads through useVisitorPrefs.
+export type { Theme, Mode };
 export const THEME_KEY = "ctrlcenter:theme";
-
-type Accent = AccentColors;
-
-// Resolve whether the given mode renders dark right now ("system" follows the
-// OS). Kept in sync with the no-flash inline script in app/layout.tsx.
-function resolveDark(theme: Theme): boolean {
-  if (typeof window === "undefined") return true;
-  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  return theme === "dark" || (theme === "system" && prefersDark);
-}
-
-function applyAccent(accent: Accent, dark: boolean): void {
-  if (typeof document === "undefined") return;
-  const s = document.documentElement.style;
-  s.setProperty("--accent-from", accent.from);
-  s.setProperty("--accent-to", accent.to);
-  // Legible ink for content on the accent gradient (.btn-accent): near-black on
-  // bright accents, white on dark ones, from the average luminance of the two
-  // stops. Mirrors lm() in the no-flash script (app/layout.tsx).
-  const accentLum = (luminance(accent.from) + luminance(accent.to)) / 2;
-  s.setProperty("--accent-fg", accentLum >= 0.6 ? "#000000" : "#ffffff");
-  // Scene backdrops read --scene-* so they can deepen + saturate the accent on
-  // the near-white light surface (where the raw accent washes out) while keeping
-  // it as-is on dark. Both modes are set explicitly so switching light→dark
-  // clears any deepened value left on <html>.
-  s.setProperty("--scene-from", dark ? accent.from : `rgb(${deepenForLight(accent.from)})`);
-  s.setProperty("--scene-to", dark ? accent.to : `rgb(${deepenForLight(accent.to)})`);
-}
-
-// Swap the active design class on <html>. The default ("glass") uses the :root
-// tokens and carries no class.
-function applyDesign(design: DesignId): void {
-  if (typeof document === "undefined") return;
-  const el = document.documentElement;
-  DESIGN_IDS.forEach((d) => el.classList.remove(`design-${d}`));
-  if (design !== "glass") el.classList.add(`design-${design}`);
-}
-
-// Swap the active scene class on <html>. <SceneLayer> renders the matching
-// backdrop/ornament components; the class lets any pure-CSS scene styling apply
-// before hydration. The default ("aurora") carries no class.
-function applyScene(scene: SceneId): void {
-  if (typeof document === "undefined") return;
-  const el = document.documentElement;
-  SCENE_IDS.forEach((s) => el.classList.remove(`scene-${s}`));
-  if (scene !== "aurora") el.classList.add(`scene-${scene}`);
-}
-
-// Swap the active font class on <html>, which repoints --font-sans. The default
-// ("jakarta") uses the :root token and carries no class. See lib/fonts.ts.
-function applyFont(font: FontId): void {
-  if (typeof document === "undefined") return;
-  const el = document.documentElement;
-  FONT_IDS.forEach((f) => el.classList.remove(`font-${f}`));
-  if (font !== "jakarta") el.classList.add(`font-${font}`);
-}
-
-// Perceived luminance (0–1) of a #rrggbb color; non-hex falls back to mid-gray.
-function luminance(hex: string): number {
-  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex.trim());
-  if (!m) return 0.5;
-  const n = parseInt(m[1], 16);
-  const r = (n >> 16) & 255;
-  const g = (n >> 8) & 255;
-  const b = n & 255;
-  return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-}
-
-// Whether a surface color reads as light (so themed icons can pick a legible
-// variant).
-function isLightColor(hex: string): boolean {
-  return luminance(hex) > 0.5;
-}
-
-// Resolve the effective accent: an explicit per-visitor override wins, then the
-// active look's own accent, then the admin-configured default.
-function resolveAccent(
-  override: AccentColors | null,
-  colors: ColorSet | null,
-  fallback: Accent
-): Accent {
-  if (override) return override;
-  if (colors) return { from: colors.accentFrom, to: colors.accentTo };
-  return fallback;
-}
-
-// The accent override a mode contributes (overrides are chosen per mode).
-function overrideFor(overrides: AccentOverrides, dark: boolean): AccentColors | null {
-  return dark ? overrides.dark : overrides.light;
-}
-
-// The color set a look contributes for the resolved mode.
-function variantFor(look: ModeColors | null, dark: boolean): ColorSet | null {
-  if (!look) return null;
-  return dark ? look.dark : look.light;
-}
-
-// Apply the whole theme state in one place. `.theme-light` ALWAYS tracks the
-// resolved mode, so the light/dark toggle is always live. A look (visitor
-// custom or admin default) contributes the surface colors for that mode;
-// without one, the CSS defaults (`:root` dark / `.theme-light` light) apply. The
-// accent is layered on last, so an accent-only override leaves the rest as-is.
-function applyAll(opts: {
-  theme: Theme;
-  look: ModeColors | null;
-  accentOverride: AccentOverrides;
-  defaultAccent: Accent;
-}): void {
-  if (typeof document === "undefined") return;
-  const el = document.documentElement;
-  const s = el.style;
-  const dark = resolveDark(opts.theme);
-  el.classList.toggle("theme-light", !dark);
-  const cs = variantFor(opts.look, dark);
-  if (cs) {
-    s.setProperty("--background", cs.background);
-    s.setProperty("--foreground", cs.foreground);
-    s.setProperty("--fg", cs.foreground);
-  } else {
-    s.removeProperty("--background");
-    s.removeProperty("--foreground");
-    s.removeProperty("--fg");
-  }
-  applyAccent(
-    resolveAccent(overrideFor(opts.accentOverride, dark), cs, opts.defaultAccent),
-    dark
-  );
-}
 
 type EffectiveLocation = {
   latitude: number;
@@ -362,8 +246,6 @@ export function PrefsProvider({
   // the admin defaults); detection/overrides are applied after mount.
   const [prefs, setPrefs] = useState<VisitorPrefs>({});
   const [detectedTz, setDetectedTz] = useState<string | undefined>();
-  const [detecting, setDetecting] = useState(false);
-  const [locationError, setLocationError] = useState<string | null>(null);
   const [theme, setThemeState] = useState<Theme>(defaultTheme.mode);
   // Per-mode visitor overrides; a null per mode means "use the admin default".
   const [designs, setDesigns] = useState<ModePair<DesignId | null>>({
@@ -378,7 +260,6 @@ export function PrefsProvider({
     dark: null,
     light: null,
   });
-  const [customThemes, setCustomThemes] = useState<CustomTheme[]>([]);
   const [activeLook, setActiveLook] = useState<ModeColors | null>(null);
   const [accentOverride, setAccentOverrideState] =
     useState<AccentOverrides>(NO_ACCENT_OVERRIDES);
@@ -473,6 +354,16 @@ export function PrefsProvider({
     setPrefs(next);
     savePrefs(next);
   }, []);
+
+  const {
+    detecting,
+    locationError,
+    detectFromIp,
+    setManualLocation,
+    clearLocation,
+    useMyLocation,
+  } = useLocationDetect({ prefs, persist, weatherEnabled });
+
 
   const setTheme = useCallback(
     (next: Theme) => {
@@ -642,151 +533,29 @@ export function PrefsProvider({
     [accentOverride, displayTheme, defaultAccent, activeLook, resolveLook]
   );
 
-  // Persist-before-commit for every saved-themes mutation: a list that can't
-  // be stored would vanish on reload, so state only advances (and true is only
-  // returned) when the write lands.
-  const commitThemes = useCallback((next: CustomTheme[]) => {
-    if (!saveThemes(next)) return false;
-    setCustomThemes(next);
-    return true;
-  }, []);
+  const {
+    customThemes,
+    setCustomThemes,
+    saveNamedTheme,
+    applyNamedTheme,
+    renameNamedTheme,
+    deleteNamedTheme,
+    importNamedThemes,
+  } = useSavedThemes({
+    activeLook,
+    seedColorSet,
+    accentOverride,
+    defaultAccent,
+    resolveDesign,
+    resolveScene,
+    resolveFont,
+    applyThemeColors,
+    displayTheme,
+    setDesigns,
+    setScenes,
+    setFonts,
+  });
 
-  // Capture the current full look — both modes' design/scene/font and colors —
-  // as a saved theme, baking each mode's effective accent into its colorset so it
-  // restores exactly as shown.
-  const saveNamedTheme = useCallback(
-    (name: string, overwriteId?: string) => {
-      const look =
-        activeLook ?? { dark: seedColorSet(true), light: seedColorSet(false) };
-      // Bake each mode's own effective accent into its colorset.
-      const withAccent = (cs: ColorSet, dark: boolean): ColorSet => {
-        const a = resolveAccent(overrideFor(accentOverride, dark), cs, defaultAccent);
-        return { ...cs, accentFrom: a.from, accentTo: a.to };
-      };
-      // Overwriting keeps the target's id (and its slot in the list); everything
-      // else — name and both modes' design/scene/font/colors — is recaptured
-      // fresh, exactly as a new save would.
-      const existing = overwriteId
-        ? customThemes.find((t) => t.id === overwriteId)
-        : undefined;
-      const entry: CustomTheme = {
-        id: existing ? existing.id : newThemeId(),
-        name: name.trim().slice(0, 40) || "Custom",
-        design: resolveDesign(true),
-        scene: resolveScene(true),
-        font: resolveFont(true),
-        designLight: resolveDesign(false),
-        sceneLight: resolveScene(false),
-        fontLight: resolveFont(false),
-        dark: withAccent(look.dark, true),
-        light: withAccent(look.light, false),
-      };
-      return commitThemes(
-        existing
-          ? customThemes.map((t) => (t.id === existing.id ? entry : t))
-          : [...customThemes, entry]
-      );
-    },
-    [
-      customThemes,
-      commitThemes,
-      activeLook,
-      seedColorSet,
-      accentOverride,
-      defaultAccent,
-      resolveDesign,
-      resolveScene,
-      resolveFont,
-    ]
-  );
-
-  // Restore a saved theme: both modes' design/scene/font and colors, then apply
-  // the chrome for whichever mode is displayed now — from the theme's own parts,
-  // not applyChrome, which would resolve from this render's designs/scenes/fonts
-  // state (the values from before the setState calls above commit) and re-apply
-  // the old chrome until a mode toggle or reload (#120).
-  const applyNamedTheme = useCallback(
-    (id: string) => {
-      const t = customThemes.find((x) => x.id === id);
-      if (!t) return;
-      const nextDesigns = { dark: t.design, light: t.designLight };
-      const nextScenes = { dark: t.scene, light: t.sceneLight };
-      const nextFonts = { dark: t.font, light: t.fontLight };
-      setDesigns(nextDesigns);
-      saveDesign(nextDesigns);
-      setScenes(nextScenes);
-      saveScene(nextScenes);
-      setFonts(nextFonts);
-      saveFont(nextFonts);
-      applyThemeColors({ dark: t.dark, light: t.light });
-      const dark = resolveDark(displayTheme);
-      applyDesign(dark ? t.design : t.designLight);
-      applyScene(dark ? t.scene : t.sceneLight);
-      applyFont(dark ? t.font : t.fontLight);
-    },
-    [customThemes, applyThemeColors, displayTheme]
-  );
-
-  const deleteNamedTheme = useCallback((id: string) => {
-    setCustomThemes((prev) => {
-      const next = prev.filter((t) => t.id !== id);
-      saveThemes(next);
-      return next;
-    });
-  }, []);
-
-  // Rename one saved theme in place, leaving the rest of its look untouched.
-  const renameNamedTheme = useCallback(
-    (id: string, name: string) => {
-      const trimmed = name.trim().slice(0, 40);
-      if (!trimmed || !customThemes.some((t) => t.id === id)) return false;
-      return commitThemes(
-        customThemes.map((t) => (t.id === id ? { ...t, name: trimmed } : t))
-      );
-    },
-    [customThemes, commitThemes]
-  );
-
-  // Append imported themes (already sanitized by parseThemesExport), skipping
-  // any that duplicate one already saved or an earlier one in the same import.
-  // Ids differ by construction, so de-dupe on content with the id excluded —
-  // field by field, not JSON of the whole object, so the key can't silently
-  // start depending on key insertion order across the places themes are built.
-  const importNamedThemes = useCallback(
-    (themes: CustomTheme[]) => {
-      const colorKey = (c: ColorSet) => [
-        c.background,
-        c.foreground,
-        c.accentFrom,
-        c.accentTo,
-      ];
-      const keyOf = (t: CustomTheme) =>
-        JSON.stringify([
-          t.name,
-          t.design,
-          t.scene,
-          t.font,
-          t.designLight,
-          t.sceneLight,
-          t.fontLight,
-          colorKey(t.dark),
-          colorKey(t.light),
-        ]);
-      const seen = new Set(customThemes.map(keyOf));
-      const added: CustomTheme[] = [];
-      for (const t of themes) {
-        const key = keyOf(t);
-        if (seen.has(key)) continue;
-        seen.add(key);
-        added.push(t);
-      }
-      // Nothing new: the stored list is already correct, so this is a success
-      // with a zero count, not a storage failure.
-      if (added.length === 0) return 0;
-      return commitThemes([...customThemes, ...added]) ? added.length : null;
-    },
-    [customThemes, commitThemes]
-  );
 
   const clearCustomTheme = useCallback(() => {
     setActiveLook(null);
@@ -922,34 +691,8 @@ export function PrefsProvider({
     setDetectedTz(detectTimezone());
     setFavorites(loadFavorites());
 
-    // Location only matters for weather; skip the IP lookup entirely when the
-    // weather widget is off, or once the visitor has set/reset their location.
-    if (!weatherEnabled || stored.location || stored.dismissedAuto) return;
-    let active = true;
-    setDetecting(true);
-    fetch("https://ipwho.is/?fields=success,latitude,longitude,city,country_code")
-      .then((r) => r.json())
-      .then((d) => {
-        if (!active) return;
-        if (d?.success && typeof d.latitude === "number") {
-          const label = d.city
-            ? `${d.city}${d.country_code ? `, ${d.country_code}` : ""}`
-            : undefined;
-          const location: VisitorLocation = {
-            latitude: d.latitude,
-            longitude: d.longitude,
-            label,
-            source: "ip",
-          };
-          persist({ ...stored, location });
-        }
-      })
-      .catch(() => {})
-      .finally(() => active && setDetecting(false));
-    return () => {
-      active = false;
-    };
-  }, [persist, weatherEnabled]);
+    return detectFromIp(stored);
+  }, [detectFromIp]);
 
   const toggleFavorite = useCallback((id: string) => {
     setFavorites((prev) => {
@@ -1017,76 +760,6 @@ export function PrefsProvider({
     adminLook,
     defaultAccent,
   ]);
-
-  const setManualLocation = useCallback(
-    (latitude: number, longitude: number, label?: string) => {
-      setLocationError(null);
-      persist({
-        ...prefs,
-        location: { latitude, longitude, label, source: "manual" },
-      });
-    },
-    [prefs, persist]
-  );
-
-  const clearLocation = useCallback(() => {
-    setLocationError(null);
-    // dismissedAuto: an explicit "back to the site default" must stick — without
-    // it the first-visit IP detection would re-fill the location on reload.
-    persist({ ...prefs, location: undefined, dismissedAuto: true });
-  }, [prefs, persist]);
-
-  const useMyLocation = useCallback(() => {
-    setLocationError(null);
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      setLocationError("This browser doesn't support location.");
-      return;
-    }
-    // Geolocation only works in a secure context (HTTPS or localhost). This app
-    // is often self-hosted over plain HTTP on a LAN, where the call fails
-    // silently — so say so up front rather than spin forever.
-    if (!window.isSecureContext) {
-      setLocationError(
-        "Location needs a secure (HTTPS) connection. Set it manually instead."
-      );
-      return;
-    }
-    setDetecting(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude } = pos.coords;
-        let label: string | undefined;
-        try {
-          const r = await fetch(
-            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
-          );
-          const d = await r.json();
-          label = d.city || d.locality || undefined;
-        } catch {
-          // No label is fine; coordinates still drive the weather.
-        }
-        persist({
-          ...prefs,
-          location: { latitude, longitude, label, source: "device" },
-        });
-        setDetecting(false);
-      },
-      (err) => {
-        setDetecting(false);
-        setLocationError(
-          err.code === err.PERMISSION_DENIED
-            ? "Location permission denied."
-            : err.code === err.TIMEOUT
-              ? "Location request timed out."
-              : "Couldn't get your location."
-        );
-      },
-      // A generous timeout: the countdown includes the time the permission
-      // prompt is open, so a short one often "times out" before the visitor has
-      // even answered.
-      { enableHighAccuracy: false, timeout: 30000, maximumAge: 600000 }
-    );
-  }, [prefs, persist]);
 
   const value = useMemo<PrefsValue>(() => {
     const timezone = prefs.timezone || detectedTz || defaults.timezone;

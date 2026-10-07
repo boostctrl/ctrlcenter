@@ -110,7 +110,8 @@ export default async function RootLayout({
   // for that mode — the look carries both variants, so picking a mode just flips
   // which one shows — else the CSS defaults apply. Accent override and
   // design/scene classes are layered on last. Runs as the first node in <body>.
-  // MUST mirror applyAll() / resolveLook() in PrefsProvider — including the
+  // MUST mirror applyAll() (components/prefs/themeApply.ts) / resolveLook() in
+  // PrefsProvider — including the
   // --scene-* deepen for light (dp() mirrors deepenForLight in scenes/color.ts),
   // so scene backdrops paint saturated on the first frame rather than washing in,
   // and the --accent-fg contrast pick (lm() mirrors applyAccent's luminance), so
