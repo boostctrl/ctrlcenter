@@ -211,12 +211,12 @@ export function feedUrls(feed: Pick<FeedConfig, "urls">): string[] {
 // leniently (a half-typed row never fails the config load); rows without a
 // valid YYYY-MM-DD date are ignored at render time.
 //
-// The date needs a preprocess: YAML parses an unquoted `date: 2026-09-01` in a
-// hand-edited file as a JS Date (its timestamp type), and a plain z.string()
-// would then fail the WHOLE config load — every page 500s over one countdown
-// row. Fold it back to the calendar date the admin wrote (YAML timestamps
-// parse as UTC midnight, so the ISO slice is that same date); anything else
-// non-string degrades to an empty date rather than an error.
+// The date keeps a preprocess from the js-yaml 4 days, when an unquoted
+// `date: 2026-09-01` in a hand-edited file parsed as a JS Date and a plain
+// z.string() would fail the WHOLE config load. js-yaml 5's core schema keeps
+// it a string, but a Date from any other source still folds back to the
+// calendar date (UTC midnight, so the ISO slice is that same date); anything
+// else non-string degrades to an empty date rather than an error.
 export const countdownItemSchema = z.object({
   label: z.string().default(""),
   date: z.preprocess(

@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "jose": "^6.2.12",
-    "js-yaml": "^4.3.2",
+    "js-yaml": "^5.4.3",
     "next": "16.4.0",
     "nodemailer": "^10.0.15",
     "qrcode": "^1.5.4",
@@ -29,7 +29,6 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
-    "@types/js-yaml": "^4.0.9",
     "@types/node": "^24",
     "@types/nodemailer": "^8.0.2",
     "@types/qrcode": "^1.5.6",

@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
-import YAML from "js-yaml";
+import * as YAML from "js-yaml";
 import { GRID_COLUMNS } from "./layout";
 import { migrateConfigShape } from "./config-migrate";
 import { log, errorReason } from "./log";
@@ -65,6 +65,21 @@ async function ensureConfigExists(): Promise<void> {
   }
 }
 
+// Parse config.yaml text. Keeps js-yaml 4's tolerance, which 5 dropped: an
+// empty or comment-only file reads as {} (all defaults) instead of throwing,
+// and `<<: *anchor` merge keys in a hand-edited file still work. Unquoted
+// dates now stay strings (js-yaml 5's core schema), which is what the config
+// schema expects anyway. More than one document is still an error.
+const YAML_SCHEMA = YAML.CORE_SCHEMA.withTags(YAML.mergeTag);
+
+export function parseConfigYaml(raw: string): unknown {
+  const docs = YAML.loadAll(raw, { schema: YAML_SCHEMA });
+  if (docs.length > 1) {
+    throw new Error("config.yaml must contain a single YAML document");
+  }
+  return docs[0] ?? {};
+}
+
 // Read + migrate + leniently parse the on-disk file. The pre-2.0 shape
 // migration (lib/config-migrate.ts) is applied in memory on every read, so a
 // legacy file serves correctly even before (or without) the one-time rewrite
@@ -78,7 +93,7 @@ async function loadMigrated(): Promise<{
 }> {
   await ensureConfigExists();
   const raw = await fs.readFile(CONFIG_PATH, "utf8");
-  const { value, changed } = migrateConfigShape(YAML.load(raw) ?? {});
+  const { value, changed } = migrateConfigShape(parseConfigYaml(raw));
   // Lenient read: a single malformed row is dropped rather than 500-ing every
   // page on a hand-edited file (see configReadSchema). Writes/imports stay strict.
   return { config: configReadSchema.parse(value), changed, raw };
@@ -120,7 +135,7 @@ function persistShapeMigration(): Promise<void> {
       // Re-read inside the queue: a write that landed since detection has
       // already normalized the file, making this a no-op.
       const raw = await fs.readFile(CONFIG_PATH, "utf8");
-      const { value, changed } = migrateConfigShape(YAML.load(raw) ?? {});
+      const { value, changed } = migrateConfigShape(parseConfigYaml(raw));
       if (!changed) return;
       await writeFileAtomic(CONFIG_BAK, raw);
       await writeFileAtomic(CONFIG_PATH, YAML.dump(value, { lineWidth: 100 }));

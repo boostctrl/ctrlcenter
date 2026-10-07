@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import fs from "fs/promises";
 import os from "os";
 import path from "path";
-import YAML from "js-yaml";
+import * as YAML from "js-yaml";
 import type { z } from "zod";
 import {
   appInputSchema,
@@ -45,6 +45,44 @@ describe("readConfigInternal", () => {
     // The file should now exist on disk.
     const onDisk = YAML.load(await fs.readFile(configPath, "utf8"));
     expect(onDisk).toBeTruthy();
+  });
+
+  it("treats an empty or comment-only file as all defaults", async () => {
+    for (const text of ["", "\n   \n", "# nothing configured yet\n"]) {
+      await fs.writeFile(configPath, text, "utf8");
+      const result = await config.readConfigInternal();
+      expect(result.settings.title).toBe("Home");
+      expect(result.apps).toEqual([]);
+    }
+  });
+
+  it("honors YAML merge keys and keeps unquoted dates as strings", async () => {
+    await fs.writeFile(
+      configPath,
+      [
+        "defaults: &app",
+        "  subtitle: shared",
+        "  icon: ''",
+        "apps:",
+        "  - <<: *app",
+        "    id: a1",
+        "    name: Plex",
+        "    url: https://plex.example.com",
+        "settings:",
+        "  title: 2026-12-25",
+        "",
+      ].join("\n"),
+      "utf8"
+    );
+    const result = await config.readConfigInternal();
+    expect(result.apps[0]).toMatchObject({ name: "Plex", subtitle: "shared" });
+    expect(result.settings.title).toBe("2026-12-25");
+  });
+
+  it("rejects a file with more than one YAML document", () => {
+    expect(() => config.parseConfigYaml("a: 1\n---\nb: 2\n")).toThrow(
+      /single YAML document/
+    );
   });
 
   it("drops a malformed hand-edited row instead of failing the whole load", async () => {
