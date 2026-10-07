@@ -1,15 +1,17 @@
-FROM node:22-alpine AS deps
+# Node 24 (active LTS), pinned by digest so rebuilding a release tag gives the
+# same base image; Dependabot proposes digest bumps (.github/dependabot.yml).
+FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-FROM node:22-alpine AS builder
+FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
-FROM node:22-alpine AS runner
+FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
@@ -35,6 +37,11 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 EXPOSE 3000
 VOLUME ["/config"]
+
+# Liveness for plain `docker run` and orchestrators, not just compose. Honors a
+# PORT override; HOSTNAME=0.0.0.0 above means localhost reaches the server.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD ["node", "-e", "fetch('http://localhost:'+(process.env.PORT||3000)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
 
 # Start as root so the entrypoint can chown /config, then it drops to `nextjs`.
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

@@ -12,6 +12,14 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **The Docker image now runs on Node.js 24** (the current long-term-support
+  release), on a base image pinned by digest so every rebuild of a version is
+  identical. The image also carries its own health check, so `docker run` and
+  orchestrators see it without extra config; the example compose file drops
+  its copy and adds `no-new-privileges`. (#258)
+
 ### Security
 
 - **Admin pages and APIs now check your sign-in themselves.** Next.js 16.2.9

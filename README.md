@@ -299,7 +299,7 @@ for reuse. You can also paste a direct image URL or a `data:` URI.
 
 ## Development
 
-Requires **Node.js 22+**.
+Requires **Node.js 24+** (the version CI and the Docker image use).
 
 ```bash
 npm install

@@ -2,6 +2,7 @@ services:
   ctrlcenter:
     # Pull the published image. To build locally from source instead, comment
     # out `image:` and uncomment `build: .`.
+    # Pin a release (e.g. :2.10.0) instead of :latest to upgrade on your terms.
     image: ghcr.io/boostctrl/ctrlcenter:latest
     # build: .
     container_name: ctrlcenter
@@ -19,13 +20,11 @@ services:
       # ownership of this mount on startup, so it works regardless of the host
       # directory's original uid/gid.
       - ./config:/config
-    healthcheck:
-      test:
-        ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
+    # The image has a built-in healthcheck (GET /api/health).
+    # The entrypoint only ever drops privileges (root -> app user), so the
+    # container never needs to gain any.
+    security_opt:
+      - no-new-privileges:true
     environment:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
       # Optional: cookie-signing secret. If unset, one is generated on first
