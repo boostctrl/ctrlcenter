@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import fs from "fs/promises";
 import path from "path";
+import { NextRequest } from "next/server";
+import { isSameOriginRequest } from "./api-auth";
 
 // Structural guard: admin authorization must not live only in proxy.ts. A
 // proxy bypass (GHSA-6gpp-xcg3-4w24 affected Next ≤16.3.5) would otherwise hand
@@ -84,5 +86,65 @@ describe("admin authorization doesn't rely on the proxy alone", () => {
     }
     expect(pages.length).toBeGreaterThan(1);
     expect(unguarded).toEqual([]);
+  });
+});
+
+describe("isSameOriginRequest (CSRF)", () => {
+  const req = (headers: Record<string, string>) =>
+    new NextRequest("http://dash.home.lan/api/settings", {
+      method: "PUT",
+      headers,
+    });
+
+  it("trusts Sec-Fetch-Site when the browser sends it", () => {
+    expect(isSameOriginRequest(req({ "sec-fetch-site": "same-origin" }))).toBe(true);
+    expect(isSameOriginRequest(req({ "sec-fetch-site": "none" }))).toBe(true);
+    expect(isSameOriginRequest(req({ "sec-fetch-site": "same-site" }))).toBe(false);
+    expect(isSameOriginRequest(req({ "sec-fetch-site": "cross-site" }))).toBe(false);
+  });
+
+  it("Sec-Fetch-Site wins over a matching Origin", () => {
+    expect(
+      isSameOriginRequest(
+        req({
+          "sec-fetch-site": "same-site",
+          origin: "http://dash.home.lan",
+          host: "dash.home.lan",
+        })
+      )
+    ).toBe(false);
+  });
+
+  it("falls back to comparing Origin with Host", () => {
+    expect(
+      isSameOriginRequest(req({ origin: "http://dash.home.lan", host: "dash.home.lan" }))
+    ).toBe(true);
+    expect(
+      isSameOriginRequest(req({ origin: "http://evil.home.lan", host: "dash.home.lan" }))
+    ).toBe(false);
+    // Port is part of the origin.
+    expect(
+      isSameOriginRequest(req({ origin: "http://dash.home.lan:8080", host: "dash.home.lan" }))
+    ).toBe(false);
+  });
+
+  it("accepts the public host a reverse proxy forwards", () => {
+    expect(
+      isSameOriginRequest(
+        req({
+          origin: "https://dash.example.com",
+          host: "ctrlcenter:3000",
+          "x-forwarded-host": "dash.example.com",
+        })
+      )
+    ).toBe(true);
+  });
+
+  it("rejects opaque or malformed origins", () => {
+    expect(isSameOriginRequest(req({ origin: "null", host: "dash.home.lan" }))).toBe(false);
+  });
+
+  it("allows non-browser clients that send neither header", () => {
+    expect(isSameOriginRequest(req({ host: "dash.home.lan" }))).toBe(true);
   });
 });

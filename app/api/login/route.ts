@@ -10,6 +10,7 @@ import { readConfigInternal, setTotpRecoveryCodes } from "@/lib/config";
 import { rateLimit, pruneRateLimit, clientKey } from "@/lib/rate-limit";
 import { verifyTotp } from "@/lib/totp";
 import { verifyRecoveryCode } from "@/lib/recovery-codes";
+import { isSameOriginRequest } from "@/lib/api-auth";
 
 // Allow a small burst of attempts per client, then lock that source out for the
 // window — the primary gate, checked before any password hashing. A separate,
@@ -22,6 +23,11 @@ const GLOBAL_MAX_ATTEMPTS = 50;
 const WINDOW_MS = 5 * 60 * 1000;
 
 export async function POST(request: NextRequest) {
+  // A cross-site page must not be able to sign the browser in (login CSRF) —
+  // nor spend this client's attempt budget on its behalf.
+  if (!isSameOriginRequest(request)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   pruneRateLimit();
   // Per-client throttle first — checked and consumed before any PBKDF2 work, so
   // one source can't run unbounded password hashing, and behind the documented

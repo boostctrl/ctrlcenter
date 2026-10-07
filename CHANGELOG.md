@@ -31,6 +31,9 @@ here.
   build the image yourself from a checkout you've also run locally, your
   `config/` folder (with the password hash and integration credentials) is now
   excluded. The published images were never affected.
+- **Admin changes must come from CtrlCenter's own pages.** A page on another
+  site — including another service on the same domain — can no longer make
+  changes, sign you in, or sign you out using your admin session. (#252)
 
 ## [2.9.0] - 2026-07-25
 
