@@ -76,10 +76,14 @@ if [ "$dry_run" = 1 ]; then
 fi
 
 # --- Quality gate (same as CI) ----------------------------------------------
+# The full gate from CLAUDE.md. The smoke run needs a Chromium for
+# playwright-core: `npx playwright-core install chromium`, or CHROMIUM_PATH.
 
 npm run lint
+npm run typecheck
 npm test
 npm run build
+npm run smoke
 
 # --- Finalize the changelog and bump versions -------------------------------
 
