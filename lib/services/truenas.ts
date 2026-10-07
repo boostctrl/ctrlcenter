@@ -9,9 +9,10 @@
 // write actions are permanently out of scope for the dashboard.
 
 import {
-  ServiceError,
   serviceBase,
-  serviceJson,
+  serviceRequest,
+  parseJson,
+  throwForStatus,
   runProbe,
   type ProbeResult,
 } from "./http";
@@ -214,21 +215,13 @@ async function truenasJson<T>(
   maxBytes?: number
 ): Promise<T> {
   const base = serviceBase(cfg.url);
-  try {
-    return await serviceJson<T>(
-      `${base}${path}`,
-      { headers: { Authorization: `Bearer ${resolveTruenasApiKey(cfg)}` } },
-      maxBytes
-    );
-  } catch (e) {
-    if (
-      e instanceof ServiceError &&
-      (e.message === "HTTP 401" || e.message === "HTTP 403")
-    ) {
-      throw new ServiceError("Invalid API key");
-    }
-    throw e;
-  }
+  const { res, text } = await serviceRequest(
+    `${base}${path}`,
+    { headers: { Authorization: `Bearer ${resolveTruenasApiKey(cfg)}` } },
+    maxBytes
+  );
+  throwForStatus(res, { 401: "Invalid API key", 403: "Invalid API key" });
+  return parseJson<T>(text);
 }
 
 export async function getTruenasSnapshot(

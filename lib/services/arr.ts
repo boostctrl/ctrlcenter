@@ -8,9 +8,10 @@
 // the most recent grabs and imports from history, and any health warnings.
 
 import {
-  ServiceError,
   serviceBase,
-  serviceJson,
+  serviceRequest,
+  parseJson,
+  throwForStatus,
   runProbe,
   type ProbeResult,
 } from "./http";
@@ -98,17 +99,12 @@ async function arrJson<T>(
   path: string
 ): Promise<T> {
   const base = serviceBase(cfg.url);
-  try {
-    return await serviceJson<T>(`${base}${path}`, {
-      headers: { "X-Api-Key": resolveArrApiKey(kind, cfg) },
-    });
-  } catch (e) {
-    // 401 has exactly one meaning here; say it in the admin's terms.
-    if (e instanceof ServiceError && e.message === "HTTP 401") {
-      throw new ServiceError("Invalid API key");
-    }
-    throw e;
-  }
+  const { res, text } = await serviceRequest(`${base}${path}`, {
+    headers: { "X-Api-Key": resolveArrApiKey(kind, cfg) },
+  });
+  // 401 has exactly one meaning here; say it in the admin's terms.
+  throwForStatus(res, { 401: "Invalid API key" });
+  return parseJson<T>(text);
 }
 
 // --- Pure parse helpers ---

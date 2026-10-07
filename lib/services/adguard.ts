@@ -11,7 +11,9 @@
 import {
   ServiceError,
   serviceBase,
-  serviceJson,
+  serviceRequest,
+  parseJson,
+  throwForStatus,
   runProbe,
   type ProbeResult,
 } from "./http";
@@ -135,22 +137,16 @@ function adguardHeaders(cfg: AdguardConfig): Record<string, string> {
   };
 }
 
+const LOGIN_FAILED = "Login failed — check the username and password";
+
 async function adguardJson<T>(cfg: AdguardConfig, path: string): Promise<T> {
   const base = serviceBase(cfg.url);
-  try {
-    return await serviceJson<T>(`${base}${path}`, {
-      headers: adguardHeaders(cfg),
-    });
-  } catch (e) {
-    // AdGuard answers 403 to bad or missing credentials; say it plainly.
-    if (
-      e instanceof ServiceError &&
-      (e.message === "HTTP 403" || e.message === "HTTP 401")
-    ) {
-      throw new ServiceError("Login failed — check the username and password");
-    }
-    throw e;
-  }
+  const { res, text } = await serviceRequest(`${base}${path}`, {
+    headers: adguardHeaders(cfg),
+  });
+  // AdGuard answers 403 to bad or missing credentials; say it plainly.
+  throwForStatus(res, { 401: LOGIN_FAILED, 403: LOGIN_FAILED });
+  return parseJson<T>(text);
 }
 
 export async function getAdguardSnapshot(

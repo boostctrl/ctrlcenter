@@ -11,10 +11,10 @@
 // follow-up movie/tv lookup (bounded by the list cap, failures tolerated).
 
 import {
-  ServiceError,
   serviceBase,
-  serviceJson,
   serviceRequest,
+  parseJson,
+  throwForStatus,
   runProbe,
   type ProbeResult,
 } from "./http";
@@ -132,18 +132,16 @@ export function mapSeerrRequest(raw: RawRequest, title: string): SeerrRequest {
   };
 }
 
+// Seerr answers 403 to a bad API key.
+const KEY_ERRORS = { 403: "Invalid API key" };
+
 async function seerrJson<T>(cfg: SeerrConfig, path: string): Promise<T> {
   const base = serviceBase(cfg.url);
-  try {
-    return await serviceJson<T>(`${base}${path}`, {
-      headers: { "X-Api-Key": resolveSeerrApiKey(cfg) },
-    });
-  } catch (e) {
-    if (e instanceof ServiceError && e.message === "HTTP 403") {
-      throw new ServiceError("Invalid API key");
-    }
-    throw e;
-  }
+  const { res, text } = await serviceRequest(`${base}${path}`, {
+    headers: { "X-Api-Key": resolveSeerrApiKey(cfg) },
+  });
+  throwForStatus(res, KEY_ERRORS);
+  return parseJson<T>(text);
 }
 
 // Resolve a request's media title from its tmdbId. Best-effort: a failed or
@@ -202,8 +200,7 @@ async function seerrAction(cfg: SeerrConfig, path: string): Promise<void> {
     method: "POST",
     headers: { "X-Api-Key": resolveSeerrApiKey(cfg) },
   });
-  if (res.status === 403) throw new ServiceError("Invalid API key");
-  if (!res.ok) throw new ServiceError(`HTTP ${res.status}`);
+  throwForStatus(res, KEY_ERRORS);
 }
 
 export function approveRequest(cfg: SeerrConfig, id: number): Promise<void> {

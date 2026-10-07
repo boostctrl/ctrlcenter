@@ -12,7 +12,8 @@ import {
   ServiceError,
   serviceBase,
   serviceRequest,
-  serviceJson,
+  parseJson,
+  throwForStatus,
   runProbe,
   SERVICE_TIMEOUT_MS,
   type ProbeResult,
@@ -102,21 +103,16 @@ export function mapPortainerEndpoints(raw: unknown): PortainerSnapshot {
   return { endpoints, totals };
 }
 
+// Portainer rejects a bad API key with 401 or 403; both mean the same thing.
+const KEY_ERRORS = { 401: "Invalid API key", 403: "Invalid API key" };
+
 async function portainerJson<T>(cfg: PortainerConfig, path: string): Promise<T> {
   const base = serviceBase(cfg.url);
-  try {
-    return await serviceJson<T>(`${base}${path}`, {
-      headers: { "X-API-Key": resolvePortainerApiKey(cfg) },
-    });
-  } catch (e) {
-    if (
-      e instanceof ServiceError &&
-      (e.message === "HTTP 401" || e.message === "HTTP 403")
-    ) {
-      throw new ServiceError("Invalid API key");
-    }
-    throw e;
-  }
+  const { res, text } = await serviceRequest(`${base}${path}`, {
+    headers: { "X-API-Key": resolvePortainerApiKey(cfg) },
+  });
+  throwForStatus(res, KEY_ERRORS);
+  return parseJson<T>(text);
 }
 
 export async function getPortainerSnapshot(
@@ -212,10 +208,7 @@ async function containerCommand(
     `${base}/api/endpoints/${endpointId}/docker/containers/${containerId}/${action}`,
     { method: "POST", headers: { "X-API-Key": resolvePortainerApiKey(cfg) } }
   );
-  if (res.status === 401 || res.status === 403) {
-    throw new ServiceError("Invalid API key");
-  }
-  if (!res.ok && res.status !== 304) throw new ServiceError(`HTTP ${res.status}`);
+  if (res.status !== 304) throwForStatus(res, KEY_ERRORS);
 }
 
 export function startContainer(cfg: PortainerConfig, endpointId: number, id: string) {
@@ -271,10 +264,7 @@ export async function containerLogs(
       { headers: { "X-API-Key": resolvePortainerApiKey(cfg) } },
       SERVICE_TIMEOUT_MS
     );
-    if (res.status === 401 || res.status === 403) {
-      throw new ServiceError("Invalid API key");
-    }
-    if (!res.ok) throw new ServiceError(`HTTP ${res.status}`);
+    throwForStatus(res, KEY_ERRORS);
     const bytes = Buffer.from(await res.arrayBuffer());
     // Demux the whole framed body first, THEN cap the decoded text. Capping the
     // raw bytes before demuxing could slice mid-frame, so demuxDockerLog would

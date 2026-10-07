@@ -156,8 +156,22 @@ export async function serviceJson<T>(
   maxBytes: number = SERVICE_MAX_BYTES
 ): Promise<T> {
   const { res, text } = await serviceRequest(url, init, maxBytes);
-  if (!res.ok) throw new ServiceError(`HTTP ${res.status}`);
+  throwForStatus(res);
   return parseJson<T>(text);
+}
+
+// Throw the admin-facing ServiceError for a failed response. `messages` maps
+// the statuses a service uses to mean something specific (a rejected API key,
+// a banned IP) to a message in the admin's terms; any other non-2xx becomes
+// `HTTP <status>`. A 2xx passes. Takes any { status, ok } so the fetch
+// Response and insecureHttpsRequest's result map identically.
+export function throwForStatus(
+  res: { status: number; ok: boolean },
+  messages: Readonly<Record<number, string>> = {}
+): void {
+  const message = messages[res.status];
+  if (message !== undefined) throw new ServiceError(message);
+  if (!res.ok) throw new ServiceError(`HTTP ${res.status}`);
 }
 
 export function parseJson<T>(text: string): T {

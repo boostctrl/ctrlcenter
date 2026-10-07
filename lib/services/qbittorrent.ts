@@ -17,6 +17,7 @@ import {
   serviceBase,
   serviceRequest,
   parseJson,
+  throwForStatus,
   runProbe,
   type ProbeResult,
 } from "./http";
@@ -212,10 +213,7 @@ async function mintSession(
       password: resolveQbittorrentPassword(cfg),
     }).toString(),
   });
-  if (res.status === 403) {
-    throw new ServiceError("Login refused — IP temporarily banned?");
-  }
-  if (!res.ok) throw new ServiceError(`HTTP ${res.status}`);
+  throwForStatus(res, { 403: "Login refused — IP temporarily banned?" });
   const body = text.trim();
   // qBittorrent <5.2 answers 200 with "Ok."/"Fails." in the body; 5.2+ answers
   // 204 No Content with an empty body on a successful login — the session
@@ -313,7 +311,7 @@ async function qbitRequest(
       opts.maxBytes
     ));
   }
-  if (!res.ok) throw new ServiceError(`HTTP ${res.status}`);
+  throwForStatus(res);
   return text;
 }
 

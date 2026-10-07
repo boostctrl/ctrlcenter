@@ -28,6 +28,7 @@ import {
   serviceRequest,
   insecureHttpsRequest,
   parseJson,
+  throwForStatus,
   runProbe,
   type ProbeResult,
 } from "./http";
@@ -287,13 +288,11 @@ async function mintSession(base: string, cfg: UnifiConfig): Promise<Session> {
     result = await attempt("/api/login");
     prefix = "";
   }
-  if (result.status === 400 || result.status === 401) {
-    throw new ServiceError("Login failed — check the username and password");
-  }
-  if (result.status === 404) {
-    throw new ServiceError("Is the URL a UniFi controller?");
-  }
-  if (!result.ok) throw new ServiceError(`HTTP ${result.status}`);
+  throwForStatus(result, {
+    400: "Login failed — check the username and password",
+    401: "Login failed — check the username and password",
+    404: "Is the URL a UniFi controller?",
+  });
   const cookie = cookieHeader(result.setCookie);
   if (!cookie) {
     throw new ServiceError("Login succeeded but no session cookie came back");
@@ -322,7 +321,7 @@ async function unifiGet(
       headers: { Cookie: session.cookie },
     });
   }
-  if (!res.ok) throw new ServiceError(`HTTP ${res.status}`);
+  throwForStatus(res);
   return res.text;
 }
 

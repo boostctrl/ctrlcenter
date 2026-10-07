@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { serviceRequest, serviceBase, ServiceError } from "./http";
+import { serviceRequest, serviceBase, ServiceError, throwForStatus } from "./http";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -47,5 +47,39 @@ describe("serviceBase", () => {
     expect(serviceBase("http://x.local:8080/")).toBe("http://x.local:8080");
     expect(serviceBase("https://x.local///")).toBe("https://x.local");
     expect(() => serviceBase("x.local:8080")).toThrow(ServiceError);
+  });
+});
+
+describe("throwForStatus", () => {
+  const res = (status: number) => new Response(null, { status });
+  const KEY = { 401: "Invalid API key", 403: "Invalid API key" };
+
+  it("passes a 2xx", () => {
+    expect(() => throwForStatus(res(200))).not.toThrow();
+    expect(() => throwForStatus(res(204), KEY)).not.toThrow();
+  });
+
+  it("maps a listed status to its message, as a ServiceError", () => {
+    expect(() => throwForStatus(res(401), KEY)).toThrow(ServiceError);
+    expect(() => throwForStatus(res(401), KEY)).toThrow("Invalid API key");
+    expect(() => throwForStatus(res(403), KEY)).toThrow("Invalid API key");
+  });
+
+  it("reports any other failure as HTTP <status>", () => {
+    expect(() => throwForStatus(res(500), KEY)).toThrow(ServiceError);
+    expect(() => throwForStatus(res(500), KEY)).toThrow("HTTP 500");
+    // Without a mapping an auth status is just another HTTP failure.
+    expect(() => throwForStatus(res(401))).toThrow("HTTP 401");
+  });
+
+  it("accepts a plain { status, ok } (insecureHttpsRequest's shape)", () => {
+    const login = { 400: "Login failed", 404: "Not a controller" };
+    expect(() => throwForStatus({ status: 400, ok: false }, login)).toThrow(
+      "Login failed"
+    );
+    expect(() => throwForStatus({ status: 404, ok: false }, login)).toThrow(
+      "Not a controller"
+    );
+    expect(() => throwForStatus({ status: 200, ok: true }, login)).not.toThrow();
   });
 });
