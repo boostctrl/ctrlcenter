@@ -34,6 +34,10 @@ here.
 - **Admin changes must come from CtrlCenter's own pages.** A page on another
   site — including another service on the same domain — can no longer make
   changes, sign you in, or sign you out using your admin session. (#252)
+- **"Test connection" no longer sends credentials kept in environment
+  variables to a URL you've just typed.** An integration key or password set
+  through a `CTRLCENTER_*` variable is only used for that service's saved URL;
+  testing any other URL uses just what's in the form. (#253)
 
 ## [2.9.0] - 2026-07-25
 

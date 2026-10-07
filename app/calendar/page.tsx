@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getSettings } from "@/lib/config";
-import { fetchCalendar, fetchCalendarRange } from "@/lib/calendar";
+import { fetchCalendar, fetchCalendarRange } from "@/lib/calendar-fetch";
 import CalendarView from "@/components/CalendarView";
 import PageNav from "@/components/PageNav";
 import FloatingNav from "@/components/FloatingNav";

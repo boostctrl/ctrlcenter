@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { isAdminRequest } from "@/lib/api-auth";
 import { SERVICE_IDS, SERVICES } from "@/lib/services/registry";
+import { getSettings } from "@/lib/config";
+import { isSavedUrl, withoutEnvSecrets } from "@/lib/secrets";
 
 // Admin-only "Test connection" for the Integrations settings: probes the
 // values currently in the form — before saving — and reports what answered
@@ -30,5 +32,12 @@ export async function POST(request: NextRequest) {
   if (!fields.url.trim()) {
     return NextResponse.json({ ok: false, error: "No URL set" });
   }
-  return NextResponse.json(await SERVICES[service].probe(fields));
+  // Env-held credentials (CTRLCENTER_*_KEY/PASS) only go to the saved URL; a
+  // probe of a newly typed URL uses just what the form sent.
+  const saved = (await getSettings()).integrations[service].url;
+  const probe = () => SERVICES[service].probe(fields);
+  const result = isSavedUrl(fields.url, saved)
+    ? await probe()
+    : await withoutEnvSecrets(probe);
+  return NextResponse.json(result);
 }

@@ -59,6 +59,9 @@ deployment safe.
   instead of `config.yaml` — leave the field blank in the admin. That keeps the
   secret out of the file, out of backups, and out of the config volume. The
   full list is in the environment-variable table in the [README](README.md).
+  An env-held credential is only ever sent to the URL saved for that service:
+  **Test connection** against a different URL uses just what's typed in the
+  form.
 - **Assume each service key is all-powerful.** Sonarr, Radarr, qBittorrent, and
   most others expose a single unscoped API key or a full-control account, which
   ctrlcenter cannot narrow. Treat every configured credential as full access to

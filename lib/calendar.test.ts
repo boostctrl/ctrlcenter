@@ -6,13 +6,12 @@ import {
   expandRecurring,
   upcomingEvents,
   eventWhen,
-  fetchCalendar,
-  fetchCalendarRange,
   buildMonthGrid,
   eventDayKey,
   bucketByDay,
   type CalendarEvent,
 } from "./calendar";
+import { fetchCalendar, fetchCalendarRange } from "./calendar-fetch";
 
 const DAY = 86_400_000;
 

@@ -3,7 +3,7 @@ import FloatingNav from "@/components/FloatingNav";
 import CalendarWidget from "@/components/CalendarWidget";
 import { StatusProvider } from "@/components/StatusProvider";
 import { EditModeProvider } from "@/components/EditMode";
-import { fetchCalendar, fetchCalendarRange } from "@/lib/calendar";
+import { fetchCalendar, fetchCalendarRange } from "@/lib/calendar-fetch";
 import { fetchFeeds } from "@/lib/feed";
 import { fetchWeather } from "@/lib/weather";
 import { collectSystemStats } from "@/lib/system-stats";

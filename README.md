@@ -339,9 +339,10 @@ changelog, issue hygiene — live in [CLAUDE.md](CLAUDE.md).
 - [`instrumentation.ts`](instrumentation.ts) starts the background uptime poller
   ([`lib/status-poller.ts`](lib/status-poller.ts) → [`lib/status-history.ts`](lib/status-history.ts)),
   which also drives down/recovery [`alerts`](lib/alerts.ts).
-- [`lib/calendar.ts`](lib/calendar.ts) fetches and parses the iCal agenda feed
-  (with recurrence expansion); [`lib/search.ts`](lib/search.ts) resolves search
-  bangs.
+- [`lib/calendar-fetch.ts`](lib/calendar-fetch.ts) fetches the iCal agenda
+  feed (server-side, cached); [`lib/calendar.ts`](lib/calendar.ts) parses it
+  (with recurrence expansion) and holds the client-safe display helpers;
+  [`lib/search.ts`](lib/search.ts) resolves search bangs.
 - `app/api/` holds the admin CRUD/reorder routes plus `status`,
   `status/history` (the list, each service's detail with its outage log, and
   the admin's incident notes), and `health`.
