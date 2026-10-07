@@ -61,7 +61,10 @@ here.
   excluded. The published images were never affected.
 - **Admin changes must come from CtrlCenter's own pages.** A page on another
   site — including another service on the same domain — can no longer make
-  changes, sign you in, or sign you out using your admin session. (#252)
+  changes, sign you in, or sign you out using your admin session. If saving
+  in the admin starts failing with "Unauthorized" behind a reverse proxy
+  served over plain HTTP, make the proxy pass the original `Host` header (or
+  set `X-Forwarded-Host`). (#252)
 - **"Test connection" no longer sends credentials kept in environment
   variables to a URL you've just typed.** An integration key or password set
   through a `CTRLCENTER_*` variable is only used for that service's saved URL;
