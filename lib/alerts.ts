@@ -159,6 +159,18 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
+// The link line of an alert email. Only http(s) URLs become a link: the URL
+// can come from an inbound webhook payload (#204), and a javascript: or data:
+// href in an HTML email is a phishing/XSS vector in mail clients that honor
+// it. Anything else still shows, as plain text.
+function linkRow(url: string, accent: string): string {
+  const safe = escapeHtml(url);
+  const body = /^https?:\/\//i.test(url)
+    ? `<a href="${safe}" style="color:${accent};text-decoration:none">${safe}</a>`
+    : safe;
+  return `<p style="margin:0 0 4px">${body}</p>`;
+}
+
 // Render the subject from its template, substituting {service}/{status}. CR/LF
 // are stripped (the service name is admin-controlled but flows into a header) and
 // the length is capped; an empty template falls back to the default.
@@ -195,9 +207,7 @@ export function buildEmailMessage(
     (app.url ? `\n${app.url}` : "") +
     `\n\nAt ${when}`;
   const accent = down ? "#dc2626" : "#16a34a";
-  const urlRow = app.url
-    ? `<p style="margin:0 0 4px"><a href="${escapeHtml(app.url)}" style="color:${accent};text-decoration:none">${escapeHtml(app.url)}</a></p>`
-    : "";
+  const urlRow = app.url ? linkRow(app.url, accent) : "";
   const html = `<!doctype html><html><body style="margin:0;background:#f4f4f5;padding:24px">
 <table role="presentation" cellpadding="0" cellspacing="0" style="max-width:480px;margin:0 auto;width:100%;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
 <tr><td style="background:#ffffff;border-radius:12px;border-left:4px solid ${accent};padding:20px 24px">
@@ -226,9 +236,7 @@ export function buildNotificationEmail(
   const bodyRow = c.body?.trim()
     ? `<p style="margin:0 0 8px;font-size:14px;color:#3f3f46;white-space:pre-line">${escapeHtml(c.body.trim())}</p>`
     : "";
-  const urlRow = c.url?.trim()
-    ? `<p style="margin:0 0 4px"><a href="${escapeHtml(c.url.trim())}" style="color:${accent};text-decoration:none">${escapeHtml(c.url.trim())}</a></p>`
-    : "";
+  const urlRow = c.url?.trim() ? linkRow(c.url.trim(), accent) : "";
   const html = `<!doctype html><html><body style="margin:0;background:#f4f4f5;padding:24px">
 <table role="presentation" cellpadding="0" cellspacing="0" style="max-width:480px;margin:0 auto;width:100%;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
 <tr><td style="background:#ffffff;border-radius:12px;border-left:4px solid ${accent};padding:20px 24px">

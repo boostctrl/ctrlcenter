@@ -45,6 +45,9 @@ here.
 - **Two-factor codes work only once.** A code that's already been used can't
   be used again, and a recovery code can't be spent by two sign-ins at the
   same moment. (#255)
+- **Alert emails only link web addresses.** A link in a webhook-triggered
+  email is clickable only if it's an http(s) address; anything else is shown
+  as plain text. (#256)
 
 ## [2.9.0] - 2026-07-25
 

@@ -138,4 +138,12 @@ describe("notification channel shaping", () => {
     expect(mail.text).toContain("Wicked");
     expect(mail.html).toContain("New request");
   });
+
+  it("email links only http(s) URLs from the payload", () => {
+    const ok = buildNotificationEmail({ title: "T", url: "https://sonarr.lan/x" });
+    expect(ok.html).toContain('href="https://sonarr.lan/x"');
+    const bad = buildNotificationEmail({ title: "T", url: "javascript:alert(1)" });
+    expect(bad.html).not.toContain("href=");
+    expect(bad.html).toContain("javascript:alert(1)"); // still shown, as text
+  });
 });
