@@ -3,6 +3,15 @@ import net from "node:net";
 import dnsPromises from "node:dns/promises";
 import { checkApp } from "./status-check";
 
+// Whether this host can bind IPv6 loopback at all. Some containers and CI
+// sandboxes can't (listen → EAFNOSUPPORT), and the IPv6-literal test below
+// should skip there rather than hang until its timeout (#249).
+const hasIPv6Loopback = await new Promise<boolean>((resolve) => {
+  const probe = net.createServer();
+  probe.once("error", () => resolve(false));
+  probe.listen(0, "::1", () => probe.close(() => resolve(true)));
+});
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -202,12 +211,15 @@ describe("checkApp · tcp", () => {
     expect(r.up).toBe(false);
   });
 
-  it("connects when the URL host is a bracketed IPv6 literal", async () => {
+  it.skipIf(!hasIPv6Loopback)("connects when the URL host is a bracketed IPv6 literal", async () => {
     // Regression test for #136: hostFromUrl must strip the brackets URL.hostname
     // leaves on IPv6 literals, or net.Socket#connect treats "[::1]" as a literal
     // (invalid) hostname and the connect fails even though the port is open.
     const server = net.createServer();
-    await new Promise<void>((res) => server.listen(0, "::1", res));
+    await new Promise<void>((res, rej) => {
+      server.once("error", rej);
+      server.listen(0, "::1", res);
+    });
     const port = (server.address() as net.AddressInfo).port;
     try {
       const r = await checkApp({
