@@ -26,13 +26,15 @@ but can't be arranged, or arranges but renders nothing.
   which missing widgets get *prepended* (old fixed-header position) instead of
   appended. New widgets are body widgets.
 
-## 2. Settings schema — `lib/schema.ts` (only if configurable)
+## 2. Settings schema — `lib/schema/` (only if configurable)
 
 The layout entry itself needs no schema change (it's generic by id). But if the
 widget has its own settings (like the calendar's iCal URL), add them to the
 stored-config schema **leniently** (`.catch()` on every field — a bad stored
 value must never fail the whole config load) and to the strict admin PUT
-schemas further down the file. Follow `calendarSchema` as the template.
+schema beside it (most widgets live in `lib/schema/widgets.ts`, wired into
+`settingsSchema`/`settingsInputSchema` in `lib/schema/settings.ts`). Follow
+`calendarSchema` as the template.
 
 ## 3. Component — `components/widgets/YourWidget.tsx`
 
@@ -40,6 +42,11 @@ Follow `ClockWidget`/`WeatherWidget` for a self-contained widget. Server-fetched
 data comes in as props wired through `app/page.tsx` → `Dashboard`.
 
 ## 4. Dashboard — `components/Dashboard.tsx`, three switches
+
+Both switches are exhaustive (`const unhandled: never = id`), so typecheck
+fails until the new id has a case in each — and `WIDGET_LABELS` is a
+`Record<LayoutWidgetId, string>`, so it fails there too. Let the compiler walk
+you through them.
 
 - `blockFor(widget)`: return the widget's node, or `null` when it has nothing
   to show (feature off, no data). Note the edit-mode contract in the comment

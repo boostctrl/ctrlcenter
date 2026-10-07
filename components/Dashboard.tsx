@@ -775,14 +775,21 @@ export default function Dashboard({
           </section>
         ) : null;
       }
-      default:
-        return null;
+      default: {
+        // Exhaustive: a widget id added to LAYOUT_WIDGET_IDS without a case
+        // here fails to compile instead of rendering an empty cell.
+        const unhandled: never = id;
+        return unhandled;
+      }
     }
   }
 
   // Why a widget's cell is empty right now — shown in its edit-mode placeholder.
   function emptyReason(id: LayoutWidgetId): string {
     switch (id) {
+      case "greeting":
+        // Always has content; listed so the switch stays exhaustive.
+        return "Nothing to show yet.";
       case "headerCard":
         return "Everything this card shows is off — enable the clock, weather, or status checks. The separate Clock, Weather and Status widgets are an alternative to this combined card.";
       case "clock":
@@ -813,8 +820,11 @@ export default function Dashboard({
         return "No applications yet — add them in the admin portal.";
       case "bookmarks":
         return "No bookmarks yet — add them in the admin portal.";
-      default:
-        return "Nothing to show yet.";
+      default: {
+        // Exhaustive, like blockFor: every widget id needs its own reason.
+        const unhandled: never = id;
+        return unhandled;
+      }
     }
   }
 
