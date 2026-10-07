@@ -141,7 +141,7 @@ at your own risk**, and review the code yourself first.
 1. Set an admin password:
    ```bash
    cp .env.example .env
-   # edit .env: set ADMIN_PASSWORD (and, recommended, SESSION_SECRET)
+   # edit .env: set ADMIN_PASSWORD
    ```
 2. Pull and run the published image:
    ```bash
@@ -277,8 +277,8 @@ for reuse. You can also paste a direct image URL or a `data:` URI.
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `ADMIN_PASSWORD` | yes | Bootstrap password for `/admin`. After you set one in **Settings → Reset password**, login uses that — but keep this set (or set `SESSION_SECRET`), as it also signs sessions. **Special characters:** quote the value in `.env` and double any literal `$` as `$$` (docker compose interpolates `$`), or a complex password can be mangled before the app sees it. |
-| `SESSION_SECRET` | no | Secret used to sign session cookies. If unset, derived from `ADMIN_PASSWORD`. Recommended so sessions don't depend on the password. Generate with `openssl rand -base64 32`. |
+| `ADMIN_PASSWORD` | yes | Bootstrap password for `/admin`. After you set one in **Settings → Reset password**, login uses that. **Special characters:** quote the value in `.env` and double any literal `$` as `$$` (docker compose interpolates `$`), or a complex password can be mangled before the app sees it. |
+| `SESSION_SECRET` | no | Secret used to sign session cookies. If unset, a random one is generated on first start and kept in the config volume (`session-secret`); only if that volume isn't writable does it fall back to deriving one from `ADMIN_PASSWORD`. Set it yourself to manage the secret explicitly (e.g. `openssl rand -base64 32`). |
 | `CONFIG_PATH` | no | Path to the config file (default `./config/config.yaml`; the container sets `/config/config.yaml`). The uptime history (`status-history.json`) and uploaded custom icons (`uploads/`) are written beside it. |
 | `CTRLCENTER_SMTP_PASS` | no | Overrides the email-alert SMTP password, so the secret can stay out of `config.yaml`. |
 | `CTRLCENTER_CALDAV_PASS` | no | Overrides the private-calendar (CalDAV/WebDAV) password, so that secret can stay out of `config.yaml` too. |

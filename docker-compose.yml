@@ -28,5 +28,6 @@ services:
       start_period: 15s
     environment:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
-      # Optional: dedicated cookie-signing secret (falls back to ADMIN_PASSWORD).
+      # Optional: cookie-signing secret. If unset, one is generated on first
+      # start and kept in the config volume.
       - SESSION_SECRET=${SESSION_SECRET:-}

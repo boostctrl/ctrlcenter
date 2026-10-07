@@ -1,4 +1,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
+import fs from "fs";
+import os from "os";
+import path from "path";
 import {
   verifyEnvPassword,
   hashPassword,
@@ -56,23 +59,49 @@ describe("password hashing", () => {
   });
 });
 
+// Session-token tests choose where the persisted secret lives: a fresh scratch
+// volume (the normal case), or one it can't be written to, which falls back to
+// ADMIN_PASSWORD like deployments did before the secret was persisted.
+function useVolume(): string {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ctrl-auth-"));
+  vi.stubEnv("CONFIG_PATH", path.join(dir, "config.yaml"));
+  return dir;
+}
+function noVolume() {
+  vi.stubEnv("CONFIG_PATH", "/dev/null/config.yaml");
+}
+
 describe("session tokens", () => {
   it("round-trips a token signed and verified with the same secret", async () => {
-    vi.stubEnv("ADMIN_PASSWORD", "pw");
+    useVolume();
     const token = await createSessionToken();
     expect(await verifySessionToken(token)).toBe(true);
   });
 
   it("rejects an undefined or garbage token", async () => {
-    vi.stubEnv("ADMIN_PASSWORD", "pw");
+    useVolume();
     expect(await verifySessionToken(undefined)).toBe(false);
     expect(await verifySessionToken("not-a-jwt")).toBe(false);
   });
 
-  it("invalidates tokens when the password-derived key changes", async () => {
+  it("persists a random secret in the volume when SESSION_SECRET is unset", async () => {
+    vi.stubEnv("SESSION_SECRET", "");
+    vi.stubEnv("ADMIN_PASSWORD", "old-password");
+    const dir = useVolume();
+    const token = await createSessionToken();
+    const secret = fs.readFileSync(path.join(dir, "session-secret"), "utf8").trim();
+    expect(secret.length).toBeGreaterThanOrEqual(40);
+    expect(fs.statSync(path.join(dir, "session-secret")).mode & 0o777).toBe(0o600);
+    // Signing no longer depends on the admin password.
+    vi.stubEnv("ADMIN_PASSWORD", "new-password");
+    expect(await verifySessionToken(token)).toBe(true);
+  });
+
+  it("falls back to ADMIN_PASSWORD when the volume can't hold the secret", async () => {
+    vi.stubEnv("SESSION_SECRET", "");
+    noVolume();
     vi.stubEnv("ADMIN_PASSWORD", "old-password");
     const token = await createSessionToken();
-
     vi.stubEnv("ADMIN_PASSWORD", "new-password");
     expect(await verifySessionToken(token)).toBe(false);
   });
@@ -96,23 +125,24 @@ describe("session tokens", () => {
     expect(await verifySessionToken(token, "password-hash-B")).toBe(false);
   });
 
-  it("fails closed when no secret is configured", async () => {
+  it("fails closed when no secret is available at all", async () => {
     vi.stubEnv("SESSION_SECRET", "");
     vi.stubEnv("ADMIN_PASSWORD", "");
+    noVolume();
     // Signing must refuse rather than derive a guessable empty-string key...
     await expect(createSessionToken()).rejects.toThrow();
     // ...and verification of any token returns false (never accepts a forgery).
     expect(await verifySessionToken("anything")).toBe(false);
   });
 
-  it("prefers SESSION_SECRET over ADMIN_PASSWORD for signing", async () => {
+  it("prefers SESSION_SECRET over the persisted secret", async () => {
     // Sign with a SESSION_SECRET in place...
+    useVolume();
     vi.stubEnv("SESSION_SECRET", "the-real-secret");
-    vi.stubEnv("ADMIN_PASSWORD", "pw");
     const token = await createSessionToken();
 
-    // ...then drop SESSION_SECRET so only ADMIN_PASSWORD remains. The key now
-    // differs, so the previously issued token must no longer verify.
+    // ...then drop SESSION_SECRET so the persisted secret signs instead. The
+    // key now differs, so the previously issued token must no longer verify.
     vi.stubEnv("SESSION_SECRET", "");
     expect(await verifySessionToken(token)).toBe(false);
   });

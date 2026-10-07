@@ -38,6 +38,10 @@ here.
   variables to a URL you've just typed.** An integration key or password set
   through a `CTRLCENTER_*` variable is only used for that service's saved URL;
   testing any other URL uses just what's in the form. (#253)
+- **Sessions are signed with a random secret by default.** If you don't set
+  `SESSION_SECRET`, CtrlCenter now generates one on first start and keeps it in
+  your config folder, instead of deriving it from `ADMIN_PASSWORD`. You'll be
+  signed out once after upgrading. (#254)
 
 ## [2.9.0] - 2026-07-25
 
