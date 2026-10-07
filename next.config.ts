@@ -17,6 +17,11 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // Automatic memoization: the compiler inserts what hand-written useMemo /
+  // useCallback would, so the large client providers (PrefsProvider, the
+  // dashboard) stop re-rendering every consumer on unrelated changes. The
+  // react-hooks lint rules (eslint-config-next) enforce the code it needs.
+  reactCompiler: true,
   // The app renders icons with plain <img> (arbitrary admin-chosen URLs) and
   // never uses next/image, so the /_next/image optimizer is dead weight — and
   // it's had its own advisories (AVIF RCE, SVG DoS). Unoptimized means Next
