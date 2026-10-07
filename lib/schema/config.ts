@@ -1,0 +1,38 @@
+// The top-level config.yaml document (strict and lenient-read variants).
+import { z } from "zod";
+import { lenientArray } from "./shared";
+import { settingsSchema } from "./settings";
+import { appItemSchema, bookmarkItemSchema } from "./apps-bookmarks";
+import { themePackSchema } from "./theme";
+import { authSchema } from "./auth";
+
+// The on-disk config shape's version, written on every save. Files without it
+// predate the field (2.9 and earlier) and are in the 2.0 shape or older, which
+// lib/config-migrate.ts detects heuristically; a future shape change bumps
+// this, so its migration can key off the number instead of guessing.
+export const CONFIG_SCHEMA_VERSION = 2;
+
+export const configSchema = z.object({
+  schemaVersion: z.number().int().default(CONFIG_SCHEMA_VERSION),
+  settings: settingsSchema.default(settingsSchema.parse({})),
+  apps: z.array(appItemSchema).default([]),
+  bookmarks: z.array(bookmarkItemSchema).default([]),
+  // Admin overrides of the built-in theme packs (edit-and-reset; see
+  // resolveThemePacks). Empty = every pack shows its built-in values.
+  themes: z.array(themePackSchema).default([]),
+  auth: authSchema.default(authSchema.parse({})),
+});
+
+// Resilient variant used only when READING config.yaml from disk: a single
+// malformed app/bookmark/theme row is dropped rather than failing the whole load
+// (which would 500 every page on a hand-edited file). Import and write still use
+// the strict `configSchema` above, so the admin gets clear feedback on a bad
+// file instead of silently losing rows. Extends the per-field `.catch()`
+// resilience to whole rows.
+export const configReadSchema = configSchema.extend({
+  apps: lenientArray(appItemSchema),
+  bookmarks: lenientArray(bookmarkItemSchema),
+  themes: lenientArray(themePackSchema),
+});
+
+export type Config = z.infer<typeof configSchema>;
