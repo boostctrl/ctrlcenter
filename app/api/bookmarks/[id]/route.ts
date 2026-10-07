@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isAdminRequest } from "@/lib/api-auth";
 import { updateBookmark, deleteBookmark } from "@/lib/config";
 import { itemMutationErrorResponse } from "@/lib/api-errors";
 import { bookmarkUpdateSchema } from "@/lib/schema";
@@ -7,6 +8,9 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!(await isAdminRequest(request))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const { id } = await params;
   const body = await request.json().catch(() => null);
   const parsed = bookmarkUpdateSchema.safeParse(body);
@@ -22,9 +26,12 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!(await isAdminRequest(request))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const { id } = await params;
   await deleteBookmark(id);
   return NextResponse.json({ ok: true });

@@ -1,4 +1,5 @@
 import { readConfigInternal } from "@/lib/config";
+import { requireAdminPage } from "@/lib/api-auth";
 import AdminDashboard from "@/components/admin/AdminDashboard";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +15,7 @@ export default async function AdminPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const config = await readConfigInternal();
+  await requireAdminPage("/admin", config.auth.passwordHash);
   const params = await searchParams;
 
   return (

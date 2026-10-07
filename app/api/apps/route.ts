@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isAdminRequest } from "@/lib/api-auth";
 import { listApps, createApp, reorderApps } from "@/lib/config";
 import { appInputSchema, reorderSchema } from "@/lib/schema";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  if (!(await isAdminRequest(request))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const apps = await listApps();
   return NextResponse.json(apps);
 }
 
 export async function POST(request: NextRequest) {
+  if (!(await isAdminRequest(request))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const body = await request.json().catch(() => null);
   const parsed = appInputSchema.safeParse(body);
   if (!parsed.success) {
@@ -18,6 +25,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  if (!(await isAdminRequest(request))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const body = await request.json().catch(() => null);
   const parsed = reorderSchema.safeParse(body);
   if (!parsed.success) {

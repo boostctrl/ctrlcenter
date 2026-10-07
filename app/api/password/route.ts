@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isAdminRequest } from "@/lib/api-auth";
 import {
   verifyEnvPassword,
   verifyPasswordHash,
@@ -10,9 +11,13 @@ import {
 import { readConfigInternal, setPasswordHash } from "@/lib/config";
 import { passwordChangeSchema } from "@/lib/schema";
 
-// Admin-only (gated by the proxy matcher). Changing the password still requires
-// the current one as defense-in-depth, even with a valid session.
+// Admin-only (gated by the proxy matcher and re-checked here). Changing the
+// password still requires the current one as defense-in-depth, even with a
+// valid session.
 export async function POST(request: NextRequest) {
+  if (!(await isAdminRequest(request))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const body = await request.json().catch(() => null);
   const parsed = passwordChangeSchema.safeParse(body);
   if (!parsed.success) {

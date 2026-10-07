@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isAdminRequest } from "@/lib/api-auth";
 import { listBookmarks, createBookmark, reorderBookmarks } from "@/lib/config";
 import { bookmarkInputSchema, reorderSchema } from "@/lib/schema";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  if (!(await isAdminRequest(request))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const bookmarks = await listBookmarks();
   return NextResponse.json(bookmarks);
 }
 
 export async function POST(request: NextRequest) {
+  if (!(await isAdminRequest(request))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const body = await request.json().catch(() => null);
   const parsed = bookmarkInputSchema.safeParse(body);
   if (!parsed.success) {
@@ -18,6 +25,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  if (!(await isAdminRequest(request))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const body = await request.json().catch(() => null);
   const parsed = reorderSchema.safeParse(body);
   if (!parsed.success) {

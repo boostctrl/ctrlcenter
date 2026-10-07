@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isAdminRequest } from "@/lib/api-auth";
 import { readConfigInternal, replaceConfig, stripAuth } from "@/lib/config";
 import { migrateConfigShape } from "@/lib/config-migrate";
 import { configSchema } from "@/lib/schema";
@@ -8,11 +9,13 @@ import {
   writeBundledIcons,
 } from "@/lib/uploads";
 
-// Admin-only (gated by the proxy matcher). GET exports the config for backup;
-// POST imports/replaces it after validation. The admin credential never crosses
-// this boundary in either direction (stripAuth on the way out; replaceConfig
-// keeps the instance's own auth on the way in) — a backup file shouldn't leak a
-// password hash or be able to change/wipe the password.
+// Admin-only: gated by the proxy matcher AND re-checked here, so a proxy
+// bypass can't reach the export or the import on its own. GET exports the
+// config for backup; POST imports/replaces it after validation. The admin
+// credential never crosses this boundary in either direction (stripAuth on the
+// way out; replaceConfig keeps the instance's own auth on the way in) — a
+// backup file shouldn't leak a password hash or be able to change/wipe the
+// password.
 //
 // Uploaded icons are bundled into the export as base64 `uploads` entries and
 // re-materialized on import, so a backup restored on a different instance
@@ -20,8 +23,11 @@ import {
 // field and import as before.
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const config = await readConfigInternal();
+  if (!(await isAdminRequest(request, config.auth.passwordHash))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const uploads = await exportIcons();
   const body =
     uploads.length > 0
@@ -35,6 +41,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  if (!(await isAdminRequest(request))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const body = await request.json().catch(() => null);
   // Upgrade a pre-2.0 backup BEFORE validating: zod strips keys it doesn't
   // know, so parsing the raw body first would silently launder the legacy

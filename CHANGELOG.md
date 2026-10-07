@@ -12,6 +12,16 @@ here.
 
 ## [Unreleased]
 
+### Security
+
+- **Admin pages and APIs now check your sign-in themselves.** Next.js 16.2.9
+  had an advisory (GHSA-6gpp-xcg3-4w24) that could let requests skip the layer
+  that checks the admin session. Some admin endpoints — including the config
+  export, settings, and app/bookmark changes — and the admin pages relied on
+  that layer alone. They now verify the session in every request as well, so
+  they stay protected even if that layer is ever bypassed. Upgrading is
+  strongly recommended. (#248)
+
 ## [2.9.0] - 2026-07-25
 
 ### Added

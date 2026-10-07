@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getSettings } from "@/lib/config";
+import { requireAdminPage } from "@/lib/api-auth";
 import { getMonitorSnapshot } from "@/lib/monitor";
 import MonitorDashboard from "@/components/monitor/MonitorDashboard";
 import FloatingNav from "@/components/FloatingNav";
@@ -10,10 +11,12 @@ export const dynamic = "force-dynamic";
 
 // The private control dashboard (#207): a read-only, admin-only view of the
 // configured integrations (#190, #191). It lives under /admin so the proxy's
-// session gate covers the page with no second check to forget, and its data
-// plane (/api/monitor) sits behind the same gate — integration snapshots
-// never reach an anonymous request, even by direct URL.
+// session gate covers it, and the page re-checks the session itself so a proxy
+// bypass can't serve it; its data plane (/api/monitor) is gated the same two
+// ways — integration snapshots never reach an anonymous request, even by
+// direct URL.
 export default async function MonitorPage() {
+  await requireAdminPage("/admin/monitor");
   const settings = await getSettings();
   const snapshot = await getMonitorSnapshot(settings.integrations);
   return (

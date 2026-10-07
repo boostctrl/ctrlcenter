@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { SESSION_COOKIE_NAME, verifySessionToken } from "./auth";
 import { readConfigInternal, stripAuth, stripSecrets } from "./config";
 import type { Config } from "./schema";
@@ -26,13 +27,27 @@ export async function isAdminRequest(
 
 // Same check for server components (no NextRequest there — the cookie comes
 // from next/headers). Lets a page decide whether to offer admin affordances
-// like the home-page layout editor; the APIs those affordances call are still
-// gated by the proxy, so this is presentation-only trust. Same optional
+// like the home-page layout editor; the APIs those affordances call re-check
+// the session themselves, so this is presentation-only trust. Same optional
 // `passwordHash` fast path as isAdminRequest.
 export async function isAdminSession(passwordHash?: string): Promise<boolean> {
   const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
   const hash = passwordHash ?? (await readConfigInternal()).auth.passwordHash;
   return verifySessionToken(token, hash);
+}
+
+// Page-level gate for everything under /admin (except the login page itself).
+// The proxy already redirects signed-out visitors, but a page that renders
+// secrets (the admin portal hands the full settings to its client tree) must
+// not depend on the proxy alone: a proxy bypass would otherwise serve them.
+// Redirects exactly like the proxy does, so the login page sends the admin
+// back here afterwards.
+export async function requireAdminPage(
+  next: string,
+  passwordHash?: string
+): Promise<void> {
+  if (await isAdminSession(passwordHash)) return;
+  redirect(`/admin/login?next=${encodeURIComponent(next)}`);
 }
 
 // Items flagged `private` (apps and bookmarks) exist only for the admin
