@@ -27,6 +27,10 @@ here.
   (nodemailer) and YAML libraries. (#209, #224)
 - **Turned off Next.js's built-in image optimizer.** CtrlCenter never used it,
   and it has had its own security advisories, so it's no longer served at all.
+- **Local Docker builds no longer copy your config into the image.** If you
+  build the image yourself from a checkout you've also run locally, your
+  `config/` folder (with the password hash and integration credentials) is now
+  excluded. The published images were never affected.
 
 ## [2.9.0] - 2026-07-25
 

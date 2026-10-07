@@ -520,8 +520,10 @@ state.downSince ??= new Map(); // ditto — added after the recent ring
 state.outages ??= new Map(); // ditto — added with the recorded outages (#175)
 
 function historyPath(): string {
+  // Untraced like CONFIG_PATH (lib/config.ts): a runtime path, not a build input.
   const configPath =
-    process.env.CONFIG_PATH || path.join(process.cwd(), "config", "config.yaml");
+    process.env.CONFIG_PATH ||
+    path.join(/* turbopackIgnore: true */ process.cwd(), "config", "config.yaml");
   return path.join(path.dirname(configPath), HISTORY_FILE);
 }
 

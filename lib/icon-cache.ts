@@ -18,8 +18,9 @@ import { CONFIG_DIR } from "./config";
 import { log, hostOf, errorReason } from "./log";
 
 // Cached CDN icons live in their own subdir (not uploads/ — an upload's name
-// could otherwise collide with a slug) inside the same mounted volume.
-const CACHE_DIR = path.join(CONFIG_DIR, "icons");
+// could otherwise collide with a slug) inside the same mounted volume. Untraced
+// like CONFIG_PATH (lib/config.ts): a runtime dir, not a build input.
+const CACHE_DIR = path.join(/* turbopackIgnore: true */ CONFIG_DIR, "icons");
 
 const CDN_SVG_BASE =
   "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@main/svg";

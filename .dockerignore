@@ -4,3 +4,6 @@ node_modules
 .env
 .env.local
 npm-debug.log*
+# A dev checkout's runtime data (config.yaml with the password hash and
+# integration credentials, uploads, status history) must never reach the image.
+config/

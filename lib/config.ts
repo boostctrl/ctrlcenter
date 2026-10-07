@@ -17,8 +17,12 @@ import {
   type TotpAuth,
 } from "./schema";
 
+// turbopackIgnore: a runtime path, not a build input. Without it Next's file
+// tracing can't bound the fs reads below and copies the whole project — a dev
+// checkout's config/ directory included — into the standalone output.
 const CONFIG_PATH =
-  process.env.CONFIG_PATH || path.join(process.cwd(), "config", "config.yaml");
+  process.env.CONFIG_PATH ||
+  path.join(/* turbopackIgnore: true */ process.cwd(), "config", "config.yaml");
 
 // Directory holding config.yaml and other runtime-written data (uploaded custom
 // icons live in an `uploads/` subdir). Derived from CONFIG_PATH so everything
