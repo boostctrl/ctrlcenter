@@ -17,6 +17,11 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // The app renders icons with plain <img> (arbitrary admin-chosen URLs) and
+  // never uses next/image, so the /_next/image optimizer is dead weight — and
+  // it's had its own advisories (AVIF RCE, SVG DoS). Unoptimized means Next
+  // doesn't serve that endpoint at all.
+  images: { unoptimized: true },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

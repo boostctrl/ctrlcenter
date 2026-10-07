@@ -21,6 +21,12 @@ here.
   that layer alone. They now verify the session in every request as well, so
   they stay protected even if that layer is ever bypassed. Upgrading is
   strongly recommended. (#248)
+- **Updated Next.js to 16.4.0 and refreshed dependencies.** This picks up fixes
+  for the advisory above and other Next.js advisories, the image libraries'
+  (libvips/libheif/librsvg) vulnerabilities, and advisories in the email
+  (nodemailer) and YAML libraries. (#209, #224)
+- **Turned off Next.js's built-in image optimizer.** CtrlCenter never used it,
+  and it has had its own security advisories, so it's no longer served at all.
 
 ## [2.9.0] - 2026-07-25
 

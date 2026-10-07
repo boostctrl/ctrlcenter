@@ -93,6 +93,9 @@ function AdminBody({
 
   async function handleLogout() {
     await fetch("/api/logout", { method: "POST" });
+    // A full load on purpose: it drops the admin's client state and router
+    // cache, which a soft router.push would keep alive after sign-out.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.href = "/";
   }
 
