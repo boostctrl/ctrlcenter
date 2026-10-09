@@ -63,6 +63,14 @@ here.
   `http://` for you. The app form says when status checks are switched off,
   and the Monitor page's "Set up" buttons open that service's settings
   directly. (#277)
+- **Layout polish.** The corner menu button no longer covers the end of a page,
+  and its menu is opaque instead of see-through. The Settings page groups its
+  fields without gaps and keeps "Reset all settings" apart from them. A
+  service's status page shows the full address being checked. Bold scenes
+  like Horizon and Rays are softened in light mode so card text stays clear.
+  The Help page opens with a table of contents linking to every section, and
+  the menu labels the status page "Status", matching the rest of the site.
+  (#277)
 
 ## [2.10.1] - 2026-10-09
 

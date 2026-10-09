@@ -37,7 +37,7 @@ export default async function StatusDetailRoute({ params }: Params) {
 
   return (
     <>
-      <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 py-12 sm:px-10 lg:py-16">
+      <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 pt-12 pb-24 sm:px-10 lg:pt-16">
         <div>
           {/* The strip's emphasized (unlinked) Status entry would strand a
               detail page without a way back up, so here — one level below a

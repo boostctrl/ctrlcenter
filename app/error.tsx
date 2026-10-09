@@ -21,7 +21,7 @@ export default function ErrorPage({
   }, [error]);
 
   return (
-    <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 py-12 sm:px-10 lg:py-16">
+    <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 pt-12 pb-24 sm:px-10 lg:pt-16">
       <h1 className="text-3xl font-bold">Something went wrong</h1>
       <p className="text-ink-50">
         This page hit an unexpected error. Trying again often helps; if it

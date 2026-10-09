@@ -10,6 +10,7 @@ import {
   StatusTimeline,
   StateDot,
   host,
+  checkTarget,
   relativeTime,
   downDuration,
   instantLabel,
@@ -461,7 +462,11 @@ export default function StatusDetail({
           <dt className="text-ink-45">Method</dt>
           <dd className="text-ink-80">{checkTypeLabel}</dd>
           <dt className="text-ink-45">Target</dt>
-          <dd className="truncate text-ink-80">{host(app.url)}</dd>
+          {/* HTTP and keyword checks request the whole URL, so show it (minus
+              any credentials); the socket-level checks only use the host. */}
+          <dd className="truncate text-ink-80" title={checkTarget(app.url, check.type)}>
+            {checkTarget(app.url, check.type)}
+          </dd>
           {check.type === "tcp" && check.port != null && (
             <>
               <dt className="text-ink-45">Port</dt>

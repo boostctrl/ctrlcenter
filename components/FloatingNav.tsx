@@ -47,7 +47,7 @@ export default function FloatingNav({
     [
       { href: "/", label: "Dashboard" },
       weather ? { href: "/weather", label: "Weather" } : null,
-      status ? { href: "/status", label: "Service Status" } : null,
+      status ? { href: "/status", label: "Status" } : null,
       calendar ? { href: "/calendar", label: "Calendar" } : null,
       { href: "/help", label: "Help" },
       { href: "/settings", label: "Settings" },
@@ -61,7 +61,7 @@ export default function FloatingNav({
   return (
     <div ref={ref} className="fixed right-5 bottom-5 z-40 flex flex-col items-end">
       {open && (
-        <nav className="mb-2 flex min-w-44 flex-col overflow-hidden rounded-2xl border border-fg/10 bg-fg/5 py-1 shadow-lg backdrop-blur-xl">
+        <nav className="mb-2 flex min-w-44 flex-col overflow-hidden rounded-2xl border border-fg/10 bg-[var(--background)]/90 py-1 shadow-lg backdrop-blur-xl">
           {links.map((l) => (
             <Link
               key={l.href}

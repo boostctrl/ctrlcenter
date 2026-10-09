@@ -143,7 +143,7 @@ export default async function HomePage({
           "--top-gap-lg": `${topGap}px`,
         } as React.CSSProperties
       }
-      className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-12 px-6 pt-[var(--top-gap)] pb-12 sm:px-10 lg:pt-[var(--top-gap-lg)] lg:pb-16"
+      className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-12 px-6 pt-[var(--top-gap)] pb-24 sm:px-10 lg:pt-[var(--top-gap-lg)]"
     >
       <StatusProvider enabled={statusEnabled}>
         <EditModeProvider isAdmin={isAdmin} initialEditing={initialEditing}>

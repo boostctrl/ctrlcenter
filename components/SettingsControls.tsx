@@ -118,6 +118,23 @@ export default function SettingsControls() {
         {weatherEnabled && (
           <>
             <div className="space-y-1.5">
+              <span className="text-ink-50">Units</span>
+              <ChipGroup
+                label="Units"
+                size="md"
+                fit
+                options={(["imperial", "metric"] as const).map((u) => ({
+                  value: u,
+                  label: u === "imperial" ? "°F" : "°C",
+                }))}
+                value={units}
+                onChange={setUnits}
+              />
+            </div>
+
+            {/* Full width: the city search makes it the tallest field, and
+                beside a short one it left a dead gap (#277). */}
+            <div className="space-y-1.5 sm:col-span-2">
               <span className="text-ink-50">Weather location</span>
               <div className="flex items-center justify-between gap-2 rounded-lg border border-fg/10 bg-fg/5 px-3 py-2">
                 <span className="truncate text-ink-70">{locationText}</span>
@@ -157,48 +174,32 @@ export default function SettingsControls() {
                 <p className="text-xs text-red-400">{locationError}</p>
               )}
             </div>
-
-            <div className="space-y-1.5">
-              <span className="text-ink-50">Units</span>
-              <ChipGroup
-                label="Units"
-                size="md"
-                fit
-                options={(["imperial", "metric"] as const).map((u) => ({
-                  value: u,
-                  label: u === "imperial" ? "°F" : "°C",
-                }))}
-                value={units}
-                onChange={setUnits}
-              />
-            </div>
           </>
         )}
+      </div>
 
-        {/* Sits in the right column, bottom-aligned so it lines up with the
-            Units toggle in the left column. */}
-        <div className="flex items-end justify-start">
-          <button
-            type="button"
-            onClick={async () => {
-              // Instant and irreversible without this — it also discards an
-              // unsaved theme-builder look someone may have just built (#121).
-              if (
-                await confirm({
-                  title: "Reset all settings?",
-                  message:
-                    "Clears your greeting, time zone, units, weather location, appearance mode, and any theme customizations in this browser — including an unsaved look. Your saved themes and favorites are kept.",
-                  confirmLabel: "Reset everything",
-                  danger: true,
-                })
-              )
-                reset();
-            }}
-            className="rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-xs text-ink-60 transition-colors hover:bg-red-500/10 hover:text-red-400"
-          >
-            Reset all settings
-          </button>
-        </div>
+      {/* Its own footer row, apart from the preferences it clears (#277). */}
+      <div className="flex justify-end border-t border-fg/10 pt-4">
+        <button
+          type="button"
+          onClick={async () => {
+            // Instant and irreversible without this — it also discards an
+            // unsaved theme-builder look someone may have just built (#121).
+            if (
+              await confirm({
+                title: "Reset all settings?",
+                message:
+                  "Clears your greeting, time zone, units, weather location, appearance mode, and any theme customizations in this browser — including an unsaved look. Your saved themes and favorites are kept.",
+                confirmLabel: "Reset everything",
+                danger: true,
+              })
+            )
+              reset();
+          }}
+          className="rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-xs text-ink-60 transition-colors hover:bg-red-500/10 hover:text-red-400"
+        >
+          Reset all settings
+        </button>
       </div>
     </div>
   );
