@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function LoginPage() {
   const { auth } = await readConfigInternal();
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-6">
+    <main id="main-content" className="flex min-h-screen flex-col items-center justify-center gap-6 px-6">
       <Suspense>
         <LoginForm passwordConfigured={adminPasswordConfigured(auth)} />
       </Suspense>

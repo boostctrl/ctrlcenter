@@ -116,7 +116,7 @@ export default async function HelpPage() {
 
   return (
     <>
-      <main className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 py-12 sm:px-10 lg:py-16">
+      <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 py-12 sm:px-10 lg:py-16">
         <div>
           <PageNav current="help" {...navPages(settings)} />
           <h1 className="mt-3 text-3xl font-bold">Help</h1>
@@ -162,13 +162,21 @@ export default async function HelpPage() {
               <li className="flex items-baseline gap-3">
                 <Kbd>Enter</Kbd>
                 <span>
-                  Open the top match. A <Code>!bang</Code> takes priority, and if
-                  nothing matches it runs a web search instead.
+                  Open the top match, which is outlined while you type. A{" "}
+                  <Code>!bang</Code> takes priority, and if nothing matches it
+                  runs a web search instead.
                 </span>
               </li>
               <li className="flex items-baseline gap-3">
                 <Kbd>Esc</Kbd>
                 <span>Clear the box and unfocus it.</span>
+              </li>
+              <li className="flex items-baseline gap-3">
+                <Kbd>P</Kbd>
+                <span>
+                  With an app card focused (<Kbd>Tab</Kbd> to it), pin it to or
+                  unpin it from your favorites.
+                </span>
               </li>
             </ul>
           </Card>

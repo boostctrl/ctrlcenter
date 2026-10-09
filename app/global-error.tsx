@@ -22,7 +22,7 @@ export default function GlobalError({
   return (
     <html lang="en">
       <body className="min-h-screen antialiased">
-        <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col justify-center gap-6 px-6 py-12">
+        <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-3xl flex-col justify-center gap-6 px-6 py-12">
           <h1 className="text-3xl font-bold">CtrlCenter couldn&apos;t load</h1>
           <p className="text-ink-60">
             Something failed before any page could render — often a problem

@@ -148,6 +148,14 @@ export default async function RootLayout({
     >
       <body className="relative min-h-full overflow-x-hidden antialiased">
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeScript }} />
+        {/* First Tab stop on every page (#274); every page's <main> carries
+            id="main-content". Visible only while focused. */}
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[60] focus:rounded-lg focus:bg-[var(--background)] focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-lg"
+        >
+          Skip to content
+        </a>
         <PrefsProvider
           weatherEnabled={weather.enabled}
           defaultTheme={defaultTheme}

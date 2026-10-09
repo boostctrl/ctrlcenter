@@ -475,6 +475,17 @@
   );
 }
 
+/* One visible keyboard-focus ring for every interactive element (#274), in
+   the accent shade already deepened for light surfaces (--scene-from) so it
+   holds 3:1 against either scheme. Base layer, so a component's own focus
+   treatment (outline-none + something better) still wins. */
+@layer base {
+  :where(a, button, summary, select, [tabindex]:not([tabindex="-1"]), [role="slider"]):focus-visible {
+    outline: 2px solid var(--scene-from);
+    outline-offset: 2px;
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -605,6 +616,11 @@ select optgroup {
   }
   .accent-focus:focus {
     border-color: var(--accent-to);
+  }
+  /* A glow on top of the border tint: the 1px border change alone was barely
+     visible, and links using this class have no border at all (#274). */
+  .accent-focus:focus-visible {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--scene-from) 55%, transparent);
   }
   /* Native color inputs in the theme builder. The UA renders a bordered square
      swatch inside the control's padding; strip that chrome so the chosen color

@@ -47,6 +47,12 @@ here.
   all designs, in both light and dark mode, and Delete buttons no longer look
   disabled. A service that's down shows a hollow ring instead of a solid dot,
   so up and down are distinguishable without relying on color. (#273)
+- **Better keyboard navigation.** Everything you can Tab to now shows a clear
+  focus ring, a "Skip to content" link comes first on every page, and each
+  app card is a single Tab stop — press **P** on a focused card to pin or
+  unpin it. While you search, the match that Enter will open is outlined, and
+  the search box shows its **/** shortcut. Screen readers get proper page
+  landmarks and heading order in the admin portal. (#274)
 
 ## [2.10.1] - 2026-10-09
 

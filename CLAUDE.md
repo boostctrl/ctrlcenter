@@ -71,7 +71,8 @@ Step-by-step recipes for this repo's mistake-prone workflows live in
   checking types, so nothing else in the gate catches TS errors (#135). It
   covers the test files too (#259).
 - `npm run smoke` renders the standalone build's key pages in Chromium in both
-  color schemes, audits each against WCAG 2.1 AA with axe-core, and signs in
+  color schemes, audits each with axe-core (WCAG 2.1 AA plus best practices),
+  and signs in
   through the real login form (needs `npx playwright-core install
   chromium` once, or `CHROMIUM_PATH` set to a Chromium binary).
 - For visual changes, also look at the pages you changed: copy `.next/static`

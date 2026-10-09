@@ -203,6 +203,8 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(320px,380px)] xl:grid-cols-[minmax(0,1fr)_minmax(360px,440px)]">
       <div className="space-y-3">
+        {/* Keeps the heading outline h1 → h2 → h3 for screen readers (#274). */}
+        <h2 className="sr-only">Your applications</h2>
         {/* Phones stack the form below the list; this jumps to it (#272). */}
         <div className="lg:hidden">
           <AddButton

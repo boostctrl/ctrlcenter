@@ -179,7 +179,10 @@ function AdminBody({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-8xl flex-col gap-8 px-6 py-12 sm:px-10">
+    <main
+      id="main-content"
+      className="mx-auto flex w-full max-w-8xl flex-col gap-8 px-6 py-12 sm:px-10"
+    >
       <div>
         {/* The admin portal isn't one of the strip's listed pages (it's a
             gated portal, reachable from the floating menu and /settings), so
@@ -271,6 +274,6 @@ function AdminBody({
           initialTwoFactorEnabled={initialTwoFactorEnabled}
         />
       )}
-    </div>
+    </main>
   );
 }

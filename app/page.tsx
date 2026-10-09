@@ -136,6 +136,7 @@ export default async function HomePage({
 
   return (
     <main
+      id="main-content"
       style={
         {
           "--top-gap": `${smallScreenTopGap(topGap)}px`,

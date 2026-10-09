@@ -570,6 +570,13 @@ export default function Dashboard({
     return groupBookmarks(matches, categoryOrder);
   }, [bookmarks, q, categoryOrder, showBookmarks]);
 
+  // What Enter opens while searching (see topResultUrl), highlighted so the
+  // keyboard shortcut isn't a guess (#274). A matching bang takes precedence.
+  const topMatchId =
+    q && !editing && !bangHit
+      ? (filteredApps[0]?.id ?? filteredGroups[0]?.[1][0]?.id ?? null)
+      : null;
+
   // Pinned apps, in pin order, dropping any that no longer exist. Shown only when
   // not searching — during a search the filtered results take over.
   const favoriteApps = useMemo(() => {
@@ -660,8 +667,19 @@ export default function Dashboard({
               onKeyDown={onSearchKeyDown}
               placeholder="Search"
               aria-label="Search applications and bookmarks"
-              className="accent-focus w-full rounded-2xl border border-fg/10 bg-fg/[0.04] px-5 py-3.5 text-fg placeholder-fg/30 outline-none backdrop-blur-xl transition-colors"
+              aria-keyshortcuts="/"
+              className="accent-focus w-full rounded-2xl border border-fg/10 bg-fg/[0.04] py-3.5 pr-12 pl-5 text-fg placeholder-fg/30 outline-none backdrop-blur-xl transition-colors"
             />
+            {/* The "/" shortcut, advertised where people look for it; hidden
+                once typing starts, and on touch where there's no keyboard. */}
+            {!query && (
+              <kbd
+                aria-hidden
+                className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 rounded-md border border-fg/15 px-1.5 py-0.5 font-mono text-xs text-ink-50 pointer-coarse:hidden"
+              >
+                /
+              </kbd>
+            )}
           </div>
         ) : null;
       case "calendar":
@@ -733,7 +751,7 @@ export default function Dashboard({
                 {!widget.hideLabel && <SectionTitle>Applications</SectionTitle>}
                 <div className={cardGridClass(widget, "gap-4")}>
                   {publicApps.map((app) => (
-                    <AppCard key={app.id} app={app} />
+                    <AppCard key={app.id} app={app} top={app.id === topMatchId} />
                   ))}
                 </div>
               </>
@@ -746,7 +764,7 @@ export default function Dashboard({
                 <SectionTitle>Private Applications</SectionTitle>
                 <div className={cardGridClass(widget, "gap-4")}>
                   {privateApps.map((app) => (
-                    <AppCard key={app.id} app={app} />
+                    <AppCard key={app.id} app={app} top={app.id === topMatchId} />
                   ))}
                 </div>
               </div>
@@ -763,7 +781,12 @@ export default function Dashboard({
             {!widget.hideLabel && <SectionTitle>Bookmarks</SectionTitle>}
             <div className={cardGridClass(widget, "gap-6")}>
               {groups.map(([category, items]) => (
-                <BookmarkGroup key={category} category={category} items={items} />
+                <BookmarkGroup
+                  key={category}
+                  category={category}
+                  items={items}
+                  topId={topMatchId}
+                />
               ))}
             </div>
           </section>

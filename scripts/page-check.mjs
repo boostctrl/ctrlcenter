@@ -8,13 +8,14 @@
 // aborted Next.js ?_rsc= prefetches are reported as warnings only.
 //
 // With `axe: true` the page is also audited with axe-core against WCAG 2.1 A
-// and AA (contrast, labels, landmarks, …); every violation is a failure, so
-// regressions like light-mode text dropping under 4.5:1 can't land (#273).
+// and AA plus axe's best-practice rules (contrast, labels, landmarks, heading
+// order, …); every violation is a failure, so regressions like light-mode text
+// dropping under 4.5:1 (#273) or content outside a landmark (#274) can't land.
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import { chromium } from "playwright-core";
 
-const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
+const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "best-practice"];
 let axeSource;
 function axeScript() {
   axeSource ??= fs.readFileSync(

@@ -130,7 +130,7 @@ export default function MonitorDashboard({
   }, [refresh]);
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-6 px-6 py-12 sm:px-10 lg:py-16">
+    <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-6 px-6 py-12 sm:px-10 lg:py-16">
       <div>
         <PageNav current={null} {...nav} />
         <div className="mt-3 flex flex-wrap items-start justify-between gap-x-6 gap-y-2">

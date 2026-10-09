@@ -20,7 +20,7 @@ export default async function SettingsPage() {
   const packs = resolveThemePacks(themes);
   return (
     <>
-      <main className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 py-12 sm:px-10 lg:py-16">
+      <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 py-12 sm:px-10 lg:py-16">
       <div>
         <PageNav current="settings" {...navPages(settings)} />
         <div className="mt-3 flex flex-wrap items-center justify-between gap-4">

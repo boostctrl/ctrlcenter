@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: "Page not found" };
 export default async function NotFound() {
   const settings = await getSettings();
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 py-12 sm:px-10 lg:py-16">
+    <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 py-12 sm:px-10 lg:py-16">
       <div>
         <PageNav current={null} {...navPages(settings)} />
         <h1 className="mt-3 text-3xl font-bold">Page not found</h1>
