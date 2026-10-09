@@ -75,6 +75,14 @@ Sizes: **S** ≈ under a day, **M** ≈ 1–3 days, **L** ≈ a week or more.
 
 ## 2.11 — Polish pass
 
+> **Status: landed on `develop`** (2026-10-09), ready to release as 2.11.0.
+> All items below plus undo for deletes (#307). Results:
+> - A cold `/` load dropped from 1.85 MB to about 357 KB.
+> - `npm run smoke` now audits every page in both schemes with axe-core
+>   (WCAG 2.1 AA plus best practices) and is clean.
+>
+> Split out: #308 (light-mode designs that look alike).
+
 Fixes everything the UX audit found. No config changes.
 
 | # | Item | Size | Issue |
