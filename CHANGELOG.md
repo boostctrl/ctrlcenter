@@ -38,6 +38,16 @@ here.
   happy. If the history file is ever damaged, it's set aside and a fresh one
   is started instead of the checks failing. (#278)
 
+### Fixed
+
+- **Saving from the admin portal keeps your config.yaml comments.** Editing
+  settings, apps or bookmarks in the UI used to rewrite the whole file, which
+  threw away your comments and formatting and filled it with every default
+  value. Now only what you changed is written: comments, key order and
+  quoting stay as you left them, and settings you never set stay out of the
+  file. A file using YAML anchors or merge keys is still written out in full,
+  since editing it in place could change other parts that share them. (#279)
+
 ## [2.11.0] - 2026-10-09
 
 ### Added

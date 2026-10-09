@@ -3,6 +3,7 @@ import path from "path";
 import * as YAML from "js-yaml";
 import { GRID_COLUMNS } from "./layout";
 import { migrateConfig } from "./config-migrate";
+import { updateYamlText } from "./config-yaml";
 import { log, errorReason } from "./log";
 import { globalSingleton } from "./singleton";
 import {
@@ -62,7 +63,7 @@ async function ensureConfigExists(): Promise<void> {
     await fs.access(CONFIG_PATH);
   } catch {
     await fs.mkdir(path.dirname(CONFIG_PATH), { recursive: true });
-    await fs.writeFile(CONFIG_PATH, YAML.dump(configSchema.parse({})), "utf8");
+    await fs.writeFile(CONFIG_PATH, dump(configSchema.parse({})), "utf8");
   }
 }
 
@@ -99,6 +100,10 @@ async function loadMigrated(): Promise<{
   // page on a hand-edited file (see configReadSchema). Writes/imports stay strict.
   return { config: configReadSchema.parse(value), changed, raw };
 }
+
+// What the app loads from config text (the read path above, minus the file).
+const readConfigText = (text: string): Config =>
+  configReadSchema.parse(migrateConfig(parseConfigYaml(text)).value);
 
 // loadMigrated for the read path, minus the repeat work: a page render reads
 // the config several times (layout, page, proxy, each API call), and each read
@@ -162,7 +167,10 @@ function persistShapeMigration(): Promise<void> {
       const { value, changed } = migrateConfig(parseConfigYaml(raw));
       if (!changed) return;
       await writeFileAtomic(CONFIG_BAK, raw);
-      await writeFileAtomic(CONFIG_PATH, YAML.dump(value, { lineWidth: 100 }));
+      await writeFileAtomic(
+        CONFIG_PATH,
+        updateYamlText(raw, value, parseConfigYaml, parseConfigYaml(raw)) ?? dump(value)
+      );
       log.info("migrated config.yaml to the 2.0 shape", {
         backup: CONFIG_BAK,
       });
@@ -196,19 +204,33 @@ async function writeFileAtomic(dest: string, text: string): Promise<void> {
   await fs.rename(tmp, dest);
 }
 
-// Dump a config as YAML to `dest`, atomically. Used for both the live config
-// and its .bak safety copy so they serialize identically.
-async function dumpYaml(dest: string, config: Config): Promise<void> {
-  await writeFileAtomic(dest, YAML.dump(config, { lineWidth: 100 }));
+function dump(value: unknown): string {
+  return YAML.dump(value, { lineWidth: 100 });
 }
 
-async function writeConfig(config: Config): Promise<void> {
+// Write a config. Given the file it replaces (`previous`: its text and what
+// it read as before the edit), the change is applied onto that file so its
+// comments, key order and formatting survive, and keys it leaves to their
+// defaults stay out (#279; lib/config-yaml.ts). Without one — an import,
+// whose replaced config shouldn't inherit the old file's comments — or when
+// that can't be done safely, a plain dump.
+async function writeConfig(
+  config: Config,
+  previous?: { raw: string; config: Config }
+): Promise<void> {
   // Whatever version the file was read at, it's written in this build's shape.
   const validated = configSchema.parse({
     ...config,
     schemaVersion: CONFIG_SCHEMA_VERSION,
   });
-  await dumpYaml(CONFIG_PATH, validated);
+  let text: string | null = null;
+  if (previous) {
+    // Always (re)stamp the version, even into a file that left it implicit.
+    const before: Partial<Config> = { ...previous.config };
+    delete before.schemaVersion;
+    text = updateYamlText(previous.raw, validated, readConfigText, before);
+  }
+  await writeFileAtomic(CONFIG_PATH, text ?? dump(validated));
 }
 
 // Thrown by an item mutator when the target id/category isn't in the config, so
@@ -227,8 +249,9 @@ async function mutate<T>(fn: (config: Config) => T): Promise<T> {
     // write before any page read triggered persistShapeMigration), so the
     // backup can't be left only to the read path.
     if (changed) await writeFileAtomic(CONFIG_BAK, raw);
+    const before = structuredClone(config);
     const out = fn(config);
-    await writeConfig(config);
+    await writeConfig(config, { raw, config: before });
     return out;
   });
   // Keep the queue alive even if this mutation failed, but don't let one

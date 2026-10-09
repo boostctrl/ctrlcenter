@@ -38,6 +38,43 @@ beforeEach(async () => {
   await fs.rm(`${configPath}.bak`, { force: true });
 });
 
+describe("comment-preserving writes (#279)", () => {
+  const comments = (text: string) =>
+    text.split("\n").filter((l) => /^\s*#/.test(l) || / #/.test(l));
+
+  it("keeps the example config's comments through admin edits", async () => {
+    const example = await fs.readFile(
+      path.join(__dirname, "..", "config", "config.example.yaml"),
+      "utf8"
+    );
+    await fs.writeFile(configPath, example, "utf8");
+    const before = comments(example);
+    expect(before.length).toBeGreaterThan(5);
+
+    const app = await config.createApp(appInput({ name: "Added", url: "https://added.test" }));
+    await config.updateSettings(settingsInput({ title: "Renamed" }));
+    const ids = (await config.listApps()).map((a) => a.id);
+    await config.reorderApps([...ids].reverse());
+    await config.deleteApp(app.id);
+
+    const after = await fs.readFile(configPath, "utf8");
+    for (const line of before) expect(after).toContain(line.trim());
+    const read = await config.readConfigInternal();
+    expect(read.settings.title).toBe("Renamed");
+    expect(read.apps.map((a) => a.id)).toEqual(ids.filter((id) => id !== app.id).reverse());
+  });
+
+  it("still writes a file it can't edit in place (merge keys)", async () => {
+    await fs.writeFile(
+      configPath,
+      "# anchored\nbase: &b\n  title: Home\nsettings:\n  <<: *b\n",
+      "utf8"
+    );
+    await config.updateSettings(settingsInput({ title: "Merged" }));
+    expect((await config.readConfigInternal()).settings.title).toBe("Merged");
+  });
+});
+
 describe("readConfigInternal", () => {
   it("creates a default config when the file is missing", async () => {
     const result = await config.readConfigInternal();
