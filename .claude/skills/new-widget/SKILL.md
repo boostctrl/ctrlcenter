@@ -1,75 +1,114 @@
 ---
 name: new-widget
-description: Add a new widget type to the home-page dashboard grid, or change what an existing widget id renders. Walks every registry touchpoint and the config-migration traps — widget ids ripple through the schema, resolver, Dashboard, layout editor, and help page. Candidates live in tracker issue #79.
+description: Add a new widget type to the home-page dashboard grid, or change what an existing widget id renders. Walks the widget registries (metadata, renderer, data loader, admin editor, help) and the config-migration traps. Candidates live in tracker issue #79.
 ---
 
 # Add a widget to the layout grid
 
-A widget id ripples through several files that must stay in agreement. Work
-through the touchpoints in order; skipping one produces a widget that renders
-but can't be arranged, or arranges but renders nothing.
+Since #285 every widget is described by keyed entries in a few small
+registries, one per concern. The server/client boundary is why there are
+several: metadata is shared, renderers are client code, loaders are
+server-only. Work through them in order. The renderer registry is typed over
+every widget id, so `npm run typecheck` fails until the new widget has one.
 
-## 1. Registry — `lib/layout.ts` (the source of truth)
+## 1. Metadata: `lib/widgets/defs.ts` (the source of truth)
 
-- Add the id to `LAYOUT_WIDGET_IDS` and a human label to `WIDGET_LABELS`.
-- Add an entry to `DEFAULT_WIDGETS` with a default `span` (grid is 24 columns;
-  24 = full row, 8 = third) and a deliberate `hidden` choice — **this is the
-  upgrade-path decision**: `resolveLayoutWidgets` appends any widget missing
-  from a saved layout using its default, so `hidden: false` makes the new
-  widget appear on every existing dashboard after upgrade, while
-  `hidden: true` ships it dormant until the admin enables it in the layout
-  editor. New widgets should almost always ship `hidden: true` (the split
-  clock/weather/status widgets set the precedent).
-- If the widget shows a grid of cards, add it to `CARD_WIDGET_IDS` — that's
-  what grants it the cards-per-row stepper in the layout editor.
-- Do **not** touch `HEADER_WIDGET_IDS`: it's a frozen legacy list that decides
-  which missing widgets get *prepended* (old fixed-header position) instead of
-  appended. New widgets are body widgets.
+Add an entry to `WIDGET_DEFS`. Its position is the default layout order.
 
-## 2. Settings schema — `lib/schema/` (only if configurable)
+- `id` and `label` (the label shows in the layout editor's frame and tray).
+- `span`: the default width on the 24-column grid (24 is a full row, 8 a
+  third).
+- `hidden`: **this is the upgrade-path decision.** `resolveLayoutWidgets` adds
+  any widget a saved layout is missing, using these defaults, so
+  `hidden: false` makes the widget appear on every existing dashboard after
+  upgrade. New widgets ship `hidden: true`.
+- Capabilities:
+  - `cards`: a grid of cards; gets the cards-per-row stepper.
+  - `titled`: has a section heading the editor can toggle.
+  - `sized`: scrolls at an explicit height instead of centering.
+  - `align`: extra cell classes.
+  - `instanceable`: can appear several times, bound to config instances.
+- `empty`: the edit-mode placeholder that says why the cell is empty and where
+  to fix it ("… enable X in admin Settings → Widgets → Y").
+- **Never set `legacyHeader`.** It's the frozen list of former fixed-header
+  widgets, which get prepended to old layouts instead of appended. A test pins
+  it.
 
-The layout entry itself needs no schema change (it's generic by id). But if the
-widget has its own settings (like the calendar's iCal URL), add them to the
-stored-config schema **leniently** (`.catch()` on every field — a bad stored
-value must never fail the whole config load) and to the strict admin PUT
-schema beside it (most widgets live in `lib/schema/widgets.ts`, wired into
-`settingsSchema`/`settingsInputSchema` in `lib/schema/settings.ts`). Follow
-`calendarSchema` as the template.
+`lib/layout.ts` derives `LAYOUT_WIDGET_IDS`, `WIDGET_LABELS`,
+`DEFAULT_WIDGETS` and the capability lists from this table, so don't edit
+those directly.
 
-## 3. Component — `components/widgets/YourWidget.tsx`
+## 2. Settings schema: `lib/schema/` (only if configurable)
 
-Follow `ClockWidget`/`WeatherWidget` for a self-contained widget. Server-fetched
-data comes in as props wired through `app/page.tsx` → `Dashboard`.
+The layout entry needs no schema change; it's generic by id. If the widget has
+settings of its own:
 
-## 4. Dashboard — `components/Dashboard.tsx`, three switches
+- Add a **lenient** stored schema, with defaults or `.catch()` on every field,
+  so a bad hand-edited value never fails the config load.
+- Wire it into `settingsSchema` (`lib/schema/settings.ts`).
+- Derive its input with `patchOf(...)` (`lib/schema/input.ts`) for
+  `settingsInputSchema`, layering on any admin-only rules with
+  `.extend()`/`.refine()`. A guard test fails if a stored section isn't
+  accepted on input.
+- Mark any credential field with `secretFields` (`lib/schema/meta.ts`); the
+  redaction guard test fails otherwise. Follow `calendarSchema` as the
+  template.
 
-Both switches are exhaustive (`const unhandled: never = id`), so typecheck
-fails until the new id has a case in each — and `WIDGET_LABELS` is a
-`Record<LayoutWidgetId, string>`, so it fails there too. Let the compiler walk
-you through them.
+## 3. Render: `components/widgets/`
 
-- `blockFor(widget)`: return the widget's node, or `null` when it has nothing
-  to show (feature off, no data). Note the edit-mode contract in the comment
-  above it: in edit mode, search filtering and content-gates are suspended so
-  every widget previews real content.
-- `emptyReason(id)`: the edit-mode placeholder text explaining *why* the cell
-  is empty and where to fix it ("… enable X in the admin Y settings").
-- `CELL_ALIGN` if the widget needs non-default vertical alignment.
+- Write the component (`components/widgets/YourWidget.tsx`). Follow
+  `NotesWidget`/`ClockWidget`.
+- Add its renderer to `WIDGET_RENDERERS` in `components/widgets/registry.tsx`.
+  - It returns the node, or `null` when there's nothing to show, and reads
+    `ctx.data` (server data) plus the live state (`editing`, `q`, search).
+  - Mind the edit-mode contract in that file's header: in edit mode, search
+    gates are suspended so every widget previews real content.
+  - Titled widgets honour `widget.hideLabel`.
 
-## 5. Tests — `lib/layout.test.ts`
+## 4. Server data: `lib/widgets/` (only if it needs any)
 
-The resolver tests enumerate expected widget lists, so adding an id breaks
-them — that's the guard working. Update the expectations and add a case for
-your widget's upgrade path: a saved layout *without* the new id must resolve
-with the widget appended, carrying your chosen default span/hidden.
+- Add the field to `HomeData` (`lib/widgets/data.ts`).
+- If it comes straight from config, set it in `loadHomeData`'s `base`
+  (`lib/widgets/load.tsx`).
+- If it's fetched at request time, add a loader under the widget's id in
+  `LOADERS`. Loaders run concurrently.
+  - Time-box the fetch.
+  - Degrade to null on failure.
+  - Skip the work when the widget can't show; see the `systemStats` gate for
+    hidden widgets on guest renders.
+  - Credentials come from server-only accessors and never go into `HomeData`.
 
-## 6. Docs and finish
+## 5. Admin editor: `components/admin/settings/widgets/` (if configurable)
 
-- Describe the widget in the `/help` page (`app/help/page.tsx`).
-- CHANGELOG entry under `## [Unreleased]`, written for end users, referencing
-  the issue (`(#NN)`). File/label the issue first if it doesn't exist; check
-  tracker #79.
-- Quality gate, then run the **visual-verify** skill: check `/` with the widget
-  enabled, hidden, and at narrow spans, in light and dark. Also verify the
-  upgrade path live: point `CONFIG_PATH` at a copy of a config saved before
-  your change and confirm the page renders unchanged.
+Add `YourWidgetSettings.tsx`, a `Card` taking `{ d }: { d: SettingsDraft }`,
+and list it in `WIDGET_SETTINGS` in `index.ts`. Key order is card order. A
+dormant widget's card usually carries a "Show on the home page" toggle via
+`d.isWidgetShown` / `d.setWidgetShown` (see `NotesSettings`).
+
+## 6. Help: `app/help/widget-help.tsx`
+
+Add a `{ title, body }` entry under the widget's id. It renders as a card under
+"For admins: the home page", in registry order, and joins the table of
+contents automatically.
+
+## 7. Tests
+
+- `lib/layout.test.ts`: the resolver tests enumerate expected widget lists,
+  so adding an id breaks them. That's the guard working. Update the
+  expectations, and add a case for your upgrade path: a saved layout
+  *without* the new id must resolve with it appended, carrying your chosen
+  span and hidden state.
+- `lib/widgets/defs.test.ts` checks labels, spans, empty reasons and the
+  frozen legacy-header list.
+
+## 8. Finish
+
+- CHANGELOG entry under `## [Unreleased]`, written for end users, with the
+  issue reference (`(#NN)`). File and label the issue first if it doesn't
+  exist; check tracker #79.
+- Run the quality gate, then the **visual-verify** skill.
+  - Check `/` with the widget enabled, hidden, and at narrow spans, in light
+    and dark.
+  - Check the editor (empty placeholder, tray) and admin Settings → Widgets.
+  - Verify the upgrade path live: point `CONFIG_PATH` at a copy of a config
+    saved before your change and confirm the page renders unchanged.
