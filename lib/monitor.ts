@@ -5,7 +5,7 @@
 // entry is served as-is, an expired one is served immediately with the
 // refresh running behind the response, only a cold cache blocks, and a failed
 // refresh keeps the last good data (stale-on-failure) with the error beside
-// it. Held on globalThis because lib module state forks per route bundle.
+// it. Built on the shared lib/swr-cache.ts.
 //
 // Everything here is admin-only data — the /api/monitor route and the
 // /admin/monitor page are the only consumers, both behind the session gate.
@@ -21,7 +21,7 @@ import {
 } from "./services/registry";
 import { ServiceError } from "./services/http";
 import { log, errorReason } from "./log";
-import { globalSingleton } from "./singleton";
+import { swrCache, type SwrEntry } from "./swr-cache";
 
 // One service's slice of the dashboard: the last good snapshot when there is
 // one, the latest failure when there isn't — or both, when a refresh fails
@@ -56,74 +56,39 @@ export type MonitorSnapshot = {
 // right now" — while still collapsing a burst of open tabs into one fetch.
 const MONITOR_TTL_MS = 30_000;
 
-type CacheEntry = {
-  // Fingerprint of the config that produced the entry: an edit invalidates
-  // immediately instead of serving the old target's data for another TTL.
-  key: string;
-  data: unknown;
-  error: string | null;
-  at: number;
-};
+// Keyed `${id}|${fingerprint}` — the fingerprint of the config that produced
+// the entry — so an edit invalidates immediately instead of serving the old
+// target's data for another TTL. The error rides beside the data, so a failed
+// refresh keeps serving the last good snapshot (stale-on-failure) and says why.
+type MonitorValue = { data: unknown; error: string | null };
+const snapshots = swrCache<MonitorValue>("monitor", MONITOR_TTL_MS);
 
-const cache = globalSingleton(
-  "__ctrlcenterMonitorCache",
-  () => new Map<ServiceId, CacheEntry>()
-);
-// Keyed by service + fingerprint, so concurrent same-config requests share one
-// fetch while a config edit isn't blocked behind the old config's request.
-const inFlight = globalSingleton(
-  "__ctrlcenterMonitorRefresh",
-  () => new Map<string, Promise<void>>()
-);
-// The most recently requested fingerprint per service. Two quick edits (A then
-// B) within one fetch window run concurrent refreshes for the same service; a
-// completed refresh only writes if its key is still the latest, so a slow A can
-// no longer clobber B's fresh entry and force a redundant blocking refetch
+const servicePrefix = (id: ServiceId) => `${id}|`;
+
+// Drop every cached snapshot for a service. Deleting through the cache also
+// fences off any refresh still running for it, so a fetch begun before a
+// config change or a dashboard action can't write its stale result back
 // (#211).
-const latestKey = globalSingleton(
-  "__ctrlcenterMonitorLatest",
-  () => new Map<ServiceId, string>()
-);
+function forgetService(id: ServiceId, keep?: string): void {
+  snapshots.deleteWhere((k) => k.startsWith(servicePrefix(id)) && k !== keep);
+}
 
-function refresh(
+async function loadSnapshot(
   id: ServiceId,
-  key: string,
-  fetcher: () => Promise<unknown>
-): Promise<void> {
-  const flightKey = `${id}|${key}`;
-  const running = inFlight.get(flightKey);
-  if (running) return running;
-  latestKey.set(id, key);
-  const run = (async () => {
-    try {
-      const data = await fetcher();
-      // Drop the write if a newer config superseded this one while it ran.
-      if (latestKey.get(id) === key) {
-        cache.set(id, { key, data, error: null, at: Date.now() });
-      }
-    } catch (e) {
-      const reason =
-        e instanceof ServiceError ? e.message : "Snapshot failed";
-      if (!(e instanceof ServiceError)) {
-        log.warn("monitor snapshot error", { service: id, reason: errorReason(e) });
-      }
-      if (latestKey.get(id) === key) {
-        const prior = cache.get(id);
-        cache.set(id, {
-          key,
-          // Keep serving the last good data only if it came from this same
-          // config — an edited URL's stale data would be the wrong service's.
-          data: prior && prior.key === key ? prior.data : null,
-          error: reason,
-          at: Date.now(),
-        });
-      }
-    } finally {
-      inFlight.delete(flightKey);
+  fetcher: () => Promise<unknown>,
+  prev: SwrEntry<MonitorValue> | undefined
+): Promise<MonitorValue> {
+  try {
+    return { data: await fetcher(), error: null };
+  } catch (e) {
+    const reason = e instanceof ServiceError ? e.message : "Snapshot failed";
+    if (!(e instanceof ServiceError)) {
+      log.warn("monitor snapshot error", { service: id, reason: errorReason(e) });
     }
-  })();
-  inFlight.set(flightKey, run);
-  return run;
+    // `prev` is this same key, i.e. the same config, so its data is still
+    // the right service's.
+    return { data: prev?.value.data ?? null, error: reason };
+  }
 }
 
 async function serviceStatus<T>(
@@ -136,10 +101,7 @@ async function serviceStatus<T>(
   fetcher: () => Promise<T>
 ): Promise<ServiceStatus<T>> {
   if (!configured) {
-    cache.delete(id);
-    // Also forget the latest key, so an in-flight refresh that started before
-    // the service was disabled can't write its result back in.
-    latestKey.delete(id);
+    forgetService(id);
     return {
       configured: false,
       enabled,
@@ -150,13 +112,12 @@ async function serviceStatus<T>(
       at: null,
     };
   }
-  const entry = cache.get(id);
-  if (!entry || entry.key !== key) {
-    await refresh(id, key, fetcher);
-  } else if (Date.now() - entry.at >= MONITOR_TTL_MS) {
-    void refresh(id, key, fetcher);
-  }
-  const now = cache.get(id);
+  const cacheKey = servicePrefix(id) + key;
+  // A previous config's snapshots are the wrong target's now.
+  forgetService(id, cacheKey);
+  const now = await snapshots.get(cacheKey, (prev) =>
+    loadSnapshot(id, fetcher, prev)
+  );
   return {
     configured: true,
     enabled,
@@ -164,7 +125,7 @@ async function serviceStatus<T>(
     actionsAllowed,
     data: (now?.data as T) ?? null,
     error: now?.error ?? null,
-    at: now?.at ?? null,
+    at: snapshots.peek(cacheKey)?.at ?? null,
   };
 }
 
@@ -200,10 +161,7 @@ function statusFor<K extends ServiceId>(
 // just-paused torrent or stopped container would linger. The next getMonitor
 // snapshot for this service then blocks on a cold cache and reflects the change.
 export function invalidateService(id: ServiceId): void {
-  cache.delete(id);
-  // Forget the latest key too, so an in-flight refresh begun before the action
-  // can't write its now-stale result back in.
-  latestKey.delete(id);
+  forgetService(id);
 }
 
 export async function getMonitorSnapshot(

@@ -3,12 +3,13 @@
 import Link from "next/link";
 import {
   createContext,
+  useCallback,
   useContext,
-  useEffect,
   useState,
   type ReactNode,
 } from "react";
 import { statusMessage, type AppStatus, type StatusResponse } from "@/lib/status";
+import { usePolling } from "./usePolling";
 
 const StatusContext = createContext<Map<string, AppStatus> | null>(null);
 
@@ -27,26 +28,17 @@ export function StatusProvider({
 }) {
   const [statuses, setStatuses] = useState<Map<string, AppStatus>>(new Map());
 
-  useEffect(() => {
-    if (!enabled) return;
-    let active = true;
-    async function load() {
-      try {
-        const res = await fetch("/api/status", { cache: "no-store" });
-        if (!res.ok) return;
-        const data: StatusResponse = await res.json();
-        if (active) setStatuses(new Map(data.results.map((d) => [d.id, d])));
-      } catch {
-        // Network hiccups just leave the previous statuses in place.
-      }
+  const load = useCallback(async (signal: AbortSignal) => {
+    try {
+      const res = await fetch("/api/status", { cache: "no-store", signal });
+      if (!res.ok) return;
+      const data: StatusResponse = await res.json();
+      if (!signal.aborted) setStatuses(new Map(data.results.map((d) => [d.id, d])));
+    } catch {
+      // Network hiccups just leave the previous statuses in place.
     }
-    load();
-    const timer = setInterval(load, POLL_MS);
-    return () => {
-      active = false;
-      clearInterval(timer);
-    };
-  }, [enabled]);
+  }, []);
+  usePolling(load, POLL_MS, { enabled });
 
   return (
     <StatusContext.Provider value={statuses}>{children}</StatusContext.Provider>

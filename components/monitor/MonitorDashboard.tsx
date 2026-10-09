@@ -9,6 +9,8 @@ import Complication from "./Complication";
 import { serviceState, sinceLabel, type ServiceState } from "./MonitorCard";
 import { GLANCES, type GlanceVisual } from "./glances";
 import { settingsCardId } from "@/lib/nav";
+import { usePolling } from "@/components/usePolling";
+import { useNow } from "@/components/useNow";
 
 // The private Monitor cockpit (#207, #208): one cohesive "instrument face" — a
 // system-health hero over domain-grouped clusters of clickable complications,
@@ -92,46 +94,38 @@ export default function MonitorDashboard({
   nav: { weather: boolean; status: boolean; calendar: boolean };
 }) {
   const [snapshot, setSnapshot] = useState(initial);
-  // Client-time for relative dates ("in 3d"). Null on the server render and the
-  // first client paint so those strings can't mismatch on hydration; set on
-  // mount and kept current as data refreshes.
-  const [now, setNow] = useState<number | null>(null);
   // When the shown snapshot last came back, for the header's freshness read —
-  // also null until mount so the "updated Xs ago" label can't mismatch either.
+  // null on the server render and the first client paint so neither it nor
+  // the relative dates ("in 3d") can mismatch on hydration; set after paint
+  // and on every good refresh.
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  // A lighter clock so the freshness label re-ticks between polls rather than
+  // sitting frozen for a whole 45s refresh window. Client-time for relative
+  // dates; null until mount, and never behind the last refresh.
+  const clock = useNow(10_000);
+  const now = updatedAt === null ? null : Math.max(clock, updatedAt);
 
-  const refresh = useCallback(async () => {
-    if (document.hidden) return;
+  const load = useCallback(async (signal: AbortSignal) => {
     try {
-      const res = await fetch("/api/monitor");
+      const res = await fetch("/api/monitor", { signal });
       if (!res.ok) return;
-      setSnapshot((await res.json()) as MonitorSnapshot);
-      const at = Date.now();
-      setNow(at);
-      setUpdatedAt(at);
+      const next = (await res.json()) as MonitorSnapshot;
+      if (signal.aborted) return;
+      setSnapshot(next);
+      setUpdatedAt(Date.now());
     } catch {
-      // Network blip — the interval will try again.
+      // Network blip — the next poll will try again.
     }
   }, []);
+  // Seeded with server data, so the first poll waits a full interval.
+  usePolling(load, REFRESH_MS, { immediate: false });
 
   useEffect(() => {
     // After paint (not synchronously in the effect) so relative dates appear
     // without risking a hydration mismatch on the first render.
-    const raf = requestAnimationFrame(() => {
-      const at = Date.now();
-      setNow(at);
-      setUpdatedAt(at);
-    });
-    const timer = setInterval(refresh, REFRESH_MS);
-    // A lighter clock so the header freshness label re-ticks between polls
-    // rather than sitting frozen for a whole 45s refresh window.
-    const clock = setInterval(() => setNow(Date.now()), 10_000);
-    return () => {
-      cancelAnimationFrame(raf);
-      clearInterval(timer);
-      clearInterval(clock);
-    };
-  }, [refresh]);
+    const raf = requestAnimationFrame(() => setUpdatedAt(Date.now()));
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   return (
     <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-6 px-6 pt-12 pb-24 sm:px-10 lg:pt-16">

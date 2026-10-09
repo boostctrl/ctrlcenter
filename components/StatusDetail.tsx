@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import Icon from "./Icon";
 import { ChipGroup } from "./ChipGroup";
 import { ConfirmProvider, useConfirm } from "./admin/Confirm";
 import { RenameButton, RenameField } from "./InlineRename";
 import { useVisitorPrefs } from "./PrefsProvider";
+import { usePolling } from "./usePolling";
+import { useNow } from "./useNow";
 import {
   StatusTimeline,
   StateDot,
@@ -228,24 +230,22 @@ export default function StatusDetail({
   const [detail, setDetail] = useState<AppDetail | null>(null);
   const [live, setLive] = useState<AppStatus | undefined>(undefined);
   const [checkedAt, setCheckedAt] = useState<number | null>(null);
-  const [now, setNow] = useState(() => Date.now());
   const [range, setRange] = useState<StatusRangeKey>(defaultRange);
   const { timezone } = useVisitorPrefs();
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (signal: AbortSignal) => {
     try {
       const [statusRes, detailRes] = await Promise.all([
-        fetch("/api/status", { cache: "no-store" }),
+        fetch("/api/status", { cache: "no-store", signal }),
         fetch(
           `/api/status/history/${app.id}?tz=${encodeURIComponent(timezone)}`,
-          { cache: "no-store" }
+          { cache: "no-store", signal }
         ),
       ]);
       if (statusRes.ok) {
         const data: StatusResponse = await statusRes.json();
         setLive(data.results.find((r) => r.id === app.id));
         setCheckedAt(data.checkedAt);
-        setNow(Date.now());
       }
       if (detailRes.ok) {
         const d: StatusDetailResponse = await detailRes.json();
@@ -255,6 +255,10 @@ export default function StatusDetail({
       // Leave the previous data in place on a network hiccup.
     }
   }, [app.id, timezone]);
+  // The same 30s poll cadence as /status; reloads at once on a time-zone change.
+  const refresh = usePolling(load, POLL_MS);
+  // Ticks the relative times between polls; never behind the last check.
+  const now = Math.max(useNow(10_000), checkedAt ?? 0);
 
   // Write one outage's incident note (#176) and refresh the log so the row
   // shows what the server accepted. `false` surfaces as the row's inline
@@ -268,28 +272,14 @@ export default function StatusDetail({
           body: JSON.stringify({ start: startMs, note }),
         });
         if (!res.ok) return false;
-        await load();
+        await refresh();
         return true;
       } catch {
         return false;
       }
     },
-    [app.id, load]
+    [app.id, refresh]
   );
-
-  useEffect(() => {
-    // Initial fetch on mount, then the same 30s poll cadence as /status.
-    // load() touches state synchronously, which is the intended behavior here
-    // (kick off the first poll right away) — same posture as StatusPage.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
-    const poll = setInterval(load, POLL_MS);
-    const tick = setInterval(() => setNow(Date.now()), 10_000);
-    return () => {
-      clearInterval(poll);
-      clearInterval(tick);
-    };
-  }, [load]);
 
   const uptime = detail ? detail.uptime[range as keyof UptimeWindows] : null;
   const latency = detail ? detail.latency[range as keyof LatencyWindows] : null;

@@ -19,6 +19,10 @@ here.
   says why — restore the backup or upgrade again — instead of quietly dropping
   the settings it doesn't understand. Importing a backup from a newer version
   explains the same thing. (#288)
+- **Quieter background tabs.** The dashboard, Status, Weather and Monitor
+  pages stop checking for updates while their tab is hidden and catch up as
+  soon as you come back to it, so a dashboard left open in the background no
+  longer keeps pinging your services and the weather API. (#286)
 
 ## [2.11.0] - 2026-10-09
 

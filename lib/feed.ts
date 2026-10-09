@@ -2,6 +2,7 @@ import { readCapped, fetchWithTimeout } from "./fetch-body";
 import { log, hostOf, errorReason } from "./log";
 import { MAX_FEED_URLS } from "./schema";
 import { globalSingleton } from "./singleton";
+import { swrCache, type SwrEntry } from "./swr-cache";
 
 // Minimal RSS 2.0 / Atom / JSON Feed reader for the home-page Feed widget.
 // Hand-rolled (no dependency) and deliberately forgiving: it pulls each
@@ -254,13 +255,11 @@ const FEED_MAX_BYTES = 3 * 1024 * 1024;
 
 // Parsed-feed cache keyed by URL, like the calendar's — the homepage is
 // force-dynamic, so without it every render would block on the third party.
-// Held on globalThis to survive module-graph duplication, as is the in-flight
-// refresh map that keeps concurrent renders from stacking duplicate fetches.
-// The entry keeps the response's ETag / Last-Modified so revalidations can be
+// Stale-while-revalidate with one in-flight refetch per URL (lib/swr-cache.ts).
+// The value keeps the response's ETag / Last-Modified so revalidations can be
 // conditional — a 304 just re-arms the TTL without re-downloading the body.
-type FeedCacheEntry = {
+type FeedCacheValue = {
   feed: Feed;
-  at: number;
   etag?: string;
   lastModified?: string;
 };
@@ -277,14 +276,7 @@ export type FeedHealth = {
   at: number;
 };
 
-const feedCache = globalSingleton(
-  "__ctrlcenterFeedCache",
-  () => new Map<string, FeedCacheEntry>()
-);
-const refreshInFlight = globalSingleton(
-  "__ctrlcenterFeedRefresh",
-  () => new Map<string, Promise<void>>()
-);
+const feeds = swrCache<FeedCacheValue>("feed", FEED_CACHE_TTL_MS);
 const feedHealthMap = globalSingleton(
   "__ctrlcenterFeedHealth",
   () => new Map<string, FeedHealth>()
@@ -352,54 +344,40 @@ async function requestFeed(
   }
 }
 
-// Refresh one URL's cache entry, deduped so at most one fetch per URL is in
-// flight however many renders want it. Revalidations are conditional: a 304
-// re-arms the existing entry's TTL without re-downloading or re-parsing the
-// body. Only a good parse replaces the entry — a failure keeps serving the
-// last good cache (stale-on-failure). Never rejects (requestFeed never
-// throws), so a fire-and-forget call can't become an unhandled rejection.
-function refreshFeed(target: string): Promise<void> {
-  const inFlight = refreshInFlight.get(target);
-  if (inFlight) return inFlight;
-  const run = (async () => {
-    try {
-      const result = await requestFeed(target, feedCache.get(target));
-      const at = Date.now();
-      if (result.notModified) {
-        const entry = feedCache.get(target);
-        if (entry) {
-          feedCache.set(target, { ...entry, at });
-          feedHealthMap.set(target, {
-            ok: true,
-            count: entry.feed.items.length,
-            at,
-          });
-        }
-      } else if (result.feed && result.feed.items.length > 0) {
-        feedCache.set(target, {
-          feed: result.feed,
-          at,
-          etag: result.etag,
-          lastModified: result.lastModified,
-        });
-        feedHealthMap.set(target, {
-          ok: true,
-          count: result.feed.items.length,
-          at,
-        });
-      } else {
-        feedHealthMap.set(target, {
-          ok: false,
-          error: result.error ?? "Unreadable feed",
-          at,
-        });
-      }
-    } finally {
-      refreshInFlight.delete(target);
-    }
-  })();
-  refreshInFlight.set(target, run);
-  return run;
+// Revalidate one URL for the cache, recording the outcome in the health map.
+// A 304 returns the previous value unchanged, which re-arms its TTL without
+// re-downloading or re-parsing the body. Only a good parse replaces the entry —
+// a failure returns undefined, so the last good one keeps serving
+// (stale-on-failure). Never throws (requestFeed never throws).
+async function loadFeed(
+  target: string,
+  prev: SwrEntry<FeedCacheValue> | undefined
+): Promise<FeedCacheValue | undefined> {
+  const result = await requestFeed(target, prev?.value);
+  const at = Date.now();
+  if (result.notModified) {
+    if (!prev) return undefined;
+    feedHealthMap.set(target, {
+      ok: true,
+      count: prev.value.feed.items.length,
+      at,
+    });
+    return prev.value;
+  }
+  if (result.feed && result.feed.items.length > 0) {
+    feedHealthMap.set(target, { ok: true, count: result.feed.items.length, at });
+    return {
+      feed: result.feed,
+      etag: result.etag,
+      lastModified: result.lastModified,
+    };
+  }
+  feedHealthMap.set(target, {
+    ok: false,
+    error: result.error ?? "Unreadable feed",
+    at,
+  });
+  return undefined;
 }
 
 // Fetch + parse one feed, cached for a few minutes; `cap` limits the items so a
@@ -411,13 +389,8 @@ function refreshFeed(target: string): Promise<void> {
 async function fetchOneFeed(url: string, cap: number): Promise<Feed | null> {
   const target = url.trim();
   if (!/^https?:\/\//i.test(target)) return null;
-  const cached = feedCache.get(target);
-  if (!cached) {
-    await refreshFeed(target);
-  } else if (Date.now() - cached.at >= FEED_CACHE_TTL_MS) {
-    void refreshFeed(target);
-  }
-  const feed = (feedCache.get(target) ?? cached)?.feed;
+  const feed = (await feeds.get(target, (prev) => loadFeed(target, prev)))
+    ?.feed;
   if (!feed) return null;
   return { ...feed, items: feed.items.slice(0, cap) };
 }

@@ -13,7 +13,7 @@ import {
 import { readCapped, fetchWithTimeout } from "./fetch-body";
 import { log, hostOf, errorReason } from "./log";
 import { resolveSecret } from "./secrets";
-import { globalSingleton } from "./singleton";
+import { swrCache } from "./swr-cache";
 
 const CAL_TIMEOUT_MS = 6000;
 const CAL_CACHE_TTL_MS = 5 * 60_000;
@@ -23,19 +23,9 @@ const CAL_CACHE_TTL_MS = 5 * 60_000;
 const CAL_MAX_BYTES = 5 * 1024 * 1024;
 
 // Parsed-event cache keyed by URL, so the homepage (force-dynamic) doesn't make
-// a blocking third-party request on every render. Held on globalThis to survive
-// module-graph duplication, like the status-history store. A companion map
-// dedupes in-flight background refreshes so a stale entry triggers at most one
-// refetch per URL however many renders want it (the same shape lib/feed.ts uses).
-type CalCacheEntry = { events: CalendarEvent[]; at: number };
-const calCache = globalSingleton(
-  "__ctrlcenterCalCache",
-  () => new Map<string, CalCacheEntry>()
-);
-const calRefreshInFlight = globalSingleton(
-  "__ctrlcenterCalRefresh",
-  () => new Map<string, Promise<void>>()
-);
+// a blocking third-party request on every render. Stale-while-revalidate with
+// one in-flight refetch per URL and stale-on-failure (see lib/swr-cache.ts).
+const calendars = swrCache<CalendarEvent[]>("calendar", CAL_CACHE_TTL_MS);
 
 export type CalendarAuth = { username?: string; password?: string };
 
@@ -90,27 +80,6 @@ async function requestIcs(
   return second.text ? second : first;
 }
 
-// Refresh one calendar URL's cache entry, deduped so at most one fetch per URL
-// is in flight however many renders want it. Only a successful ICS parse
-// replaces the entry — a fetch/parse failure keeps serving the last good cache
-// (stale-on-failure). Never rejects (requestIcs never throws), so a
-// fire-and-forget call can't become an unhandled rejection.
-function refreshCalendar(target: string, auth?: CalendarAuth): Promise<void> {
-  const inFlight = calRefreshInFlight.get(target);
-  if (inFlight) return inFlight;
-  const run = (async () => {
-    try {
-      const { text } = await requestIcs(target, calendarHeaders(auth));
-      if (text) calCache.set(target, { events: parseICS(text), at: Date.now() });
-      // On failure, keep the last good cache (leave the entry untouched).
-    } finally {
-      calRefreshInFlight.delete(target);
-    }
-  })();
-  calRefreshInFlight.set(target, run);
-  return run;
-}
-
 // Fetch + parse a calendar's raw (unexpanded) VEVENTs, cached for a few minutes
 // so repeated home/calendar renders don't each hit the third-party feed. Returns
 // [] for a non-http(s) URL; on a fetch/parse failure serves the last good cache
@@ -126,13 +95,13 @@ async function loadParsedEvents(
 ): Promise<CalendarEvent[]> {
   const target = url.trim().replace(/^webcal:\/\//i, "https://");
   if (!/^https?:\/\//i.test(target)) return [];
-  const cached = calCache.get(target);
-  if (!cached) {
-    await refreshCalendar(target, auth);
-  } else if (Date.now() - cached.at >= CAL_CACHE_TTL_MS) {
-    void refreshCalendar(target, auth);
-  }
-  return (calCache.get(target) ?? cached)?.events ?? [];
+  // Only a successful ICS parse replaces the entry; a failure (undefined)
+  // keeps serving the last good one.
+  const events = await calendars.get(target, async () => {
+    const { text } = await requestIcs(target, calendarHeaders(auth));
+    return text ? parseICS(text) : undefined;
+  });
+  return events ?? [];
 }
 
 // The next `count` upcoming events (recurring series expanded over the near

@@ -7,6 +7,8 @@ import type { ServiceStatus } from "@/lib/monitor";
 import { SERVICE_LABELS } from "@/lib/services/ids";
 import { ConfirmProvider } from "@/components/admin/Confirm";
 import PageNav from "@/components/PageNav";
+import { usePolling } from "@/components/usePolling";
+import { useNow } from "@/components/useNow";
 import {
   InDetailContext,
   serviceState,
@@ -123,41 +125,37 @@ export default function MonitorDetail({
   const [result, setResult] = useState(initial);
   const id = initial.service;
   // When the shown data last came back fresh, and a client clock that ticks
-  // between polls — both null until mount so the "updated Xs ago" label can't
-  // mismatch on hydration, then set on first paint and on every good refresh.
+  // between polls — the label is hidden until mount so it can't mismatch on
+  // hydration, then set on first paint and on every good refresh.
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
-  const [now, setNow] = useState<number | null>(null);
+  const clock = useNow(CLOCK_MS);
+  const now = updatedAt === null ? null : Math.max(clock, updatedAt);
 
-  const refresh = useCallback(async () => {
-    if (document.hidden) return;
-    try {
-      const res = await fetch(`/api/monitor/${id}`);
-      if (!res.ok) return; // keep the last result; the body shows its own errors
-      setResult((await res.json()) as DetailResult);
-      const at = Date.now();
-      setUpdatedAt(at);
-      setNow(at);
-    } catch {
-      // Network blip — the interval will try again.
-    }
-  }, [id]);
+  const load = useCallback(
+    async (signal: AbortSignal) => {
+      try {
+        const res = await fetch(`/api/monitor/${id}`, { signal });
+        if (!res.ok) return; // keep the last result; the body shows its own errors
+        const next = (await res.json()) as DetailResult;
+        if (signal.aborted) return;
+        setResult(next);
+        setUpdatedAt(Date.now());
+      } catch {
+        // Network blip — the next poll will try again.
+      }
+    },
+    [id]
+  );
+  // Seeded with server data, so the first poll waits a full interval; a card
+  // action calls `refresh` to reflect its change right away.
+  const refresh = usePolling(load, REFRESH_MS, { immediate: false });
 
   useEffect(() => {
     // After paint (not synchronously) so the relative freshness label appears
     // without risking a hydration mismatch on the first render.
-    const raf = requestAnimationFrame(() => {
-      const at = Date.now();
-      setUpdatedAt(at);
-      setNow(at);
-    });
-    const refreshTimer = setInterval(refresh, REFRESH_MS);
-    const clockTimer = setInterval(() => setNow(Date.now()), CLOCK_MS);
-    return () => {
-      cancelAnimationFrame(raf);
-      clearInterval(refreshTimer);
-      clearInterval(clockTimer);
-    };
-  }, [refresh]);
+    const raf = requestAnimationFrame(() => setUpdatedAt(Date.now()));
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   // The live health read, from the same serviceState the cockpit tiles use. A
   // detail page only renders for a configured service, so those flags are fixed

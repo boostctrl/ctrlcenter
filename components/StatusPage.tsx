@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import Icon from "./Icon";
 import StatusAnnouncements from "./StatusAnnouncements";
 import { ChipGroup } from "./ChipGroup";
 import { useVisitorPrefs } from "./PrefsProvider";
+import { usePolling } from "./usePolling";
+import { useNow } from "./useNow";
 import {
   StatusTimeline,
   StateDot,
@@ -52,29 +54,28 @@ export default function StatusPage({
   const [statuses, setStatuses] = useState<Map<string, AppStatus>>(new Map());
   const [history, setHistory] = useState<Map<string, AppHistory>>(new Map());
   const [checkedAt, setCheckedAt] = useState<number | null>(null);
-  const [now, setNow] = useState(() => Date.now());
   const [loading, setLoading] = useState(false);
   const [range, setRange] = useState<StatusRangeKey>(defaultRange);
   // Render timeline times in the visitor's effective time zone, like the rest of
   // the app (the header clock, greeting), rather than UTC.
   const { timezone } = useVisitorPrefs();
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (signal: AbortSignal) => {
     setLoading(true);
     try {
       const [statusRes, historyRes] = await Promise.all([
-        fetch("/api/status", { cache: "no-store" }),
+        fetch("/api/status", { cache: "no-store", signal }),
         // Pass the effective time zone so the daily timeline is bucketed by the
         // visitor's calendar day, not UTC.
         fetch(`/api/status/history?tz=${encodeURIComponent(timezone)}`, {
           cache: "no-store",
+          signal,
         }),
       ]);
       if (statusRes.ok) {
         const data: StatusResponse = await statusRes.json();
         setStatuses(new Map(data.results.map((d) => [d.id, d])));
         setCheckedAt(data.checkedAt);
-        setNow(Date.now());
       }
       if (historyRes.ok) {
         const h: StatusHistory = await historyRes.json();
@@ -83,22 +84,16 @@ export default function StatusPage({
     } catch {
       // Leave the previous results in place on a network hiccup.
     } finally {
-      setLoading(false);
+      // A superseded run leaves the flag to the run that replaced it.
+      if (!signal.aborted) setLoading(false);
     }
   }, [timezone]);
 
-  useEffect(() => {
-    // Initial fetch on mount; load() flips a loading flag synchronously, which
-    // is the intended behavior here (kick off the first poll right away).
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
-    const poll = setInterval(load, POLL_MS);
-    const tick = setInterval(() => setNow(Date.now()), 10_000);
-    return () => {
-      clearInterval(poll);
-      clearInterval(tick);
-    };
-  }, [load]);
+  // Polls every 30s while the tab is visible; reloads at once on a time-zone
+  // change.
+  const refresh = usePolling(load, POLL_MS);
+  // Ticks the "checked Xs ago" read between polls; never behind the last check.
+  const now = Math.max(useNow(10_000), checkedAt ?? 0);
 
   const { total, allUp } = summarize(
     apps.flatMap((a) => {
@@ -144,7 +139,7 @@ export default function StatusPage({
         </div>
         <button
           type="button"
-          onClick={load}
+          onClick={() => void refresh()}
           disabled={loading}
           className="shrink-0 rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-ink-70 transition-colors hover:bg-fg/10 disabled:opacity-50"
         >

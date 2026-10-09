@@ -34,7 +34,10 @@ export type CurrentWeather = {
 export async function fetchWeather(
   latitude: number,
   longitude: number,
-  units: Units
+  units: Units,
+  // The client poll's signal (components/usePolling.ts): an aborted request
+  // resolves to null without logging.
+  signal?: AbortSignal
 ): Promise<CurrentWeather | null> {
   const params = new URLSearchParams({
     latitude: String(latitude),
@@ -49,7 +52,7 @@ export async function fetchWeather(
     const res = await fetchWithTimeout(
       url,
       // Server-side, cache for 30 min; the option is ignored in the browser.
-      { next: { revalidate: 1800 } },
+      { next: { revalidate: 1800 }, signal },
       WEATHER_TIMEOUT_MS
     );
     if (!res.ok) {
@@ -78,6 +81,7 @@ export async function fetchWeather(
       isDay: current.is_day !== 0,
     };
   } catch (e) {
+    if (signal?.aborted) return null;
     log.warn("weather fetch error", { host: hostOf(url), reason: errorReason(e) });
     return null;
   }
@@ -130,7 +134,10 @@ export type Forecast = {
 export async function fetchForecast(
   latitude: number,
   longitude: number,
-  units: Units
+  units: Units,
+  // The client poll's signal (components/usePolling.ts): an aborted request
+  // resolves to null without logging.
+  signal?: AbortSignal
 ): Promise<Forecast | null> {
   const params = new URLSearchParams({
     latitude: String(latitude),
@@ -152,7 +159,7 @@ export async function fetchForecast(
   try {
     const res = await fetchWithTimeout(
       url,
-      { next: { revalidate: 1800 } },
+      { next: { revalidate: 1800 }, signal },
       WEATHER_TIMEOUT_MS
     );
     if (!res.ok) {
@@ -212,6 +219,7 @@ export async function fetchForecast(
       daily,
     };
   } catch (e) {
+    if (signal?.aborted) return null;
     log.warn("forecast fetch error", { host: hostOf(url), reason: errorReason(e) });
     return null;
   }

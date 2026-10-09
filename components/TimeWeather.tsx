@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useVisitorPrefs } from "./PrefsProvider";
+import { usePolling } from "./usePolling";
 import { shortDate, timeString } from "@/lib/datetime";
 import {
   fetchWeather,
@@ -40,24 +41,19 @@ export default function TimeWeather({
     return () => clearTimeout(timer);
   }, [showClock]);
 
-  // Always refetch live on mount (and every 10 min) for the effective location/
-  // units, rather than relying on the server-cached SSR seed. This keeps the
-  // widget current and in sync with the /weather page, which refetches the same
-  // way — the two no longer drift apart on independent 30-min cache windows.
-  useEffect(() => {
-    if (!weatherEnabled) return;
-    let active = true;
-    const load = () =>
-      fetchWeather(location.latitude, location.longitude, units).then((w) => {
-        if (active && w) setFetched(w);
-      });
-    load();
-    const timer = setInterval(load, 10 * 60 * 1000);
-    return () => {
-      active = false;
-      clearInterval(timer);
-    };
-  }, [weatherEnabled, location.latitude, location.longitude, units]);
+  // Always refetch live on mount (and every 10 min, while the tab is visible)
+  // for the effective location/units, rather than relying on the server-cached
+  // SSR seed. This keeps the widget current and in sync with the /weather page,
+  // which refetches the same way — the two no longer drift apart on
+  // independent 30-min cache windows.
+  const loadWeather = useCallback(
+    async (signal: AbortSignal) => {
+      const w = await fetchWeather(location.latitude, location.longitude, units, signal);
+      if (w && !signal.aborted) setFetched(w);
+    },
+    [location.latitude, location.longitude, units]
+  );
+  usePolling(loadWeather, 10 * 60 * 1000, { enabled: weatherEnabled });
 
   const weather = fetched ?? initial;
   const time = now ? timeString(now, timezone) : " ";

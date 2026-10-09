@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getMonitorSnapshot, invalidateService } from "./monitor";
+import { swrCache } from "./swr-cache";
 import type { IntegrationsConfig } from "./schema";
 
 const TTL = 30_000;
@@ -63,14 +64,7 @@ function deferred() {
 
 beforeEach(() => {
   // The cache lives on globalThis and survives across tests in a run.
-  const g = globalThis as {
-    __ctrlcenterMonitorCache?: Map<string, unknown>;
-    __ctrlcenterMonitorRefresh?: Map<string, unknown>;
-    __ctrlcenterMonitorLatest?: Map<string, unknown>;
-  };
-  g.__ctrlcenterMonitorCache?.clear();
-  g.__ctrlcenterMonitorRefresh?.clear();
-  g.__ctrlcenterMonitorLatest?.clear();
+  swrCache("monitor", 0).deleteWhere(() => true);
 });
 
 afterEach(() => {

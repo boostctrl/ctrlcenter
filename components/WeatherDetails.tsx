@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useVisitorPrefs } from "./PrefsProvider";
 import { useEdgeFade } from "./useEdgeFade";
+import { usePolling } from "./usePolling";
 import WeatherEffects from "./WeatherEffects";
 import {
   fetchForecast,
@@ -168,19 +169,14 @@ export default function WeatherDetails({
 
   // Always refetch live on mount (and every 10 min) so the page stays current and
   // in sync with the header widget.
-  useEffect(() => {
-    let active = true;
-    const load = () =>
-      fetchForecast(location.latitude, location.longitude, units).then((f) => {
-        if (active && f) setFetched(f);
-      });
-    load();
-    const timer = setInterval(load, 10 * 60 * 1000);
-    return () => {
-      active = false;
-      clearInterval(timer);
-    };
-  }, [location.latitude, location.longitude, units]);
+  const loadForecast = useCallback(
+    async (signal: AbortSignal) => {
+      const f = await fetchForecast(location.latitude, location.longitude, units, signal);
+      if (f && !signal.aborted) setFetched(f);
+    },
+    [location.latitude, location.longitude, units]
+  );
+  usePolling(loadForecast, 10 * 60 * 1000);
 
   // Local minute-of-day for the sun arc, after mount (avoids SSR/clock mismatch).
   useEffect(() => {

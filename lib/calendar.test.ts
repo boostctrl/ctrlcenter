@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   parseICS,
   parseICalDate,
@@ -12,6 +12,7 @@ import {
   type CalendarEvent,
 } from "./calendar";
 import { fetchCalendar, fetchCalendarRange } from "./calendar-fetch";
+import { swrCache } from "./swr-cache";
 
 const DAY = 86_400_000;
 
@@ -373,10 +374,8 @@ describe("fetchCalendar caching", () => {
         "END:VEVENT",
         "END:VCALENDAR",
       ].join("\r\n");
-    const calGlobals = globalThis as unknown as {
-      __ctrlcenterCalCache?: Map<string, { events: unknown[]; at: number }>;
-      __ctrlcenterCalRefresh?: Map<string, Promise<void>>;
-    };
+    // Same name, same globalThis-backed state as the fetcher's cache.
+    const cache = swrCache<CalendarEvent[]>("calendar", 0);
     let body = cal("First", "20990101T120000Z");
     let calls = 0;
     const orig = globalThis.fetch;
@@ -391,8 +390,7 @@ describe("fetchCalendar caching", () => {
       expect(calls).toBe(1);
 
       // Age the cache entry past its 5-minute TTL so the next read is stale.
-      const entry = calGlobals.__ctrlcenterCalCache!.get(url)!;
-      entry.at = Date.now() - 6 * 60_000;
+      cache.peek(url)!.at = Date.now() - 6 * 60_000;
       body = cal("Second", "20990201T120000Z");
 
       // Stale-while-revalidate: this render is served the OLD event without
@@ -402,7 +400,9 @@ describe("fetchCalendar caching", () => {
       expect(calls).toBe(2); // the background refetch fired
 
       // Once it settles, the fresh event is cached — served without another fetch.
-      await calGlobals.__ctrlcenterCalRefresh?.get(url);
+      await vi.waitFor(() =>
+        expect(cache.peek(url)?.value[0]?.summary).toBe("Second")
+      );
       const fresh = await fetchCalendar(url, 5);
       expect(fresh[0]?.summary).toBe("Second");
       expect(calls).toBe(2);
