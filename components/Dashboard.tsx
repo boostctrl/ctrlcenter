@@ -59,6 +59,7 @@ import { reorder } from "./admin/useReorder";
 import { WidgetFrame, EditToolbar, useFlowReorder } from "./LayoutEditor";
 import { useGridLayout } from "./useGridLayout";
 import { useLayoutEditor } from "./useLayoutEditor";
+import { emptyReason as widgetEmptyReason, widgetDef } from "@/lib/widgets/defs";
 
 // Apply the per-widget label toggle to a widget passed in as a pre-rendered
 // node (the calendar and feed are built in app/page.tsx). Cloning lets the
@@ -117,12 +118,6 @@ const COL_SPAN: Record<number, string> = {
   24: "lg:col-span-24",
 };
 
-// The former header widgets center against whatever shares their row (the old
-// header vertically centered the greeting beside the card).
-const CELL_ALIGN: Partial<Record<LayoutWidgetId, string>> = {
-  greeting: "lg:self-center",
-  headerCard: "lg:self-center",
-};
 
 // How the inner card/bookmark grids reflow. An explicit `cards` override wins;
 // otherwise the count derives from the widget's span (a wide widget, ≥18 of 24
@@ -584,48 +579,8 @@ export default function Dashboard({
   }
 
   // Why a widget's cell is empty right now — shown in its edit-mode placeholder.
-  function emptyReason(id: LayoutWidgetId): string {
-    switch (id) {
-      case "greeting":
-        // Always has content; listed so the switch stays exhaustive.
-        return "Nothing to show yet.";
-      case "headerCard":
-        return "Everything this card shows is off — enable the clock, weather, or status checks. The separate Clock, Weather and Status widgets are an alternative to this combined card.";
-      case "clock":
-        return "Date & clock is toggled off in the admin Layout settings.";
-      case "weather":
-        return "Weather is disabled in the admin Weather settings.";
-      case "status":
-        return statusEnabled
-          ? "Waiting for the first status check…"
-          : "Status checks are off, or there are no apps to monitor.";
-      case "search":
-        return "The search bar appears once there are apps or bookmarks to search.";
-      case "calendar":
-        return "The calendar is disabled, or it has no upcoming events to show.";
-      case "notes":
-        return "The note is empty — write it in admin Settings → Widgets → Notes.";
-      case "feed":
-        return "The RSS feed is off or has no feeds — set it up in admin Settings → Widgets → RSS feed.";
-      case "countdown":
-        return "No dates yet — add them in admin Settings → Widgets → Countdown.";
-      case "worldClocks":
-        return "No time zones yet — add them in admin Settings → Widgets → World clocks.";
-      case "systemStats":
-        return "System stats couldn't be read on this server — check the server logs.";
-      case "favorites":
-        return "No pinned favorites yet.";
-      case "apps":
-        return "No applications yet — add them in the admin portal.";
-      case "bookmarks":
-        return "No bookmarks yet — add them in the admin portal.";
-      default: {
-        // Exhaustive, like blockFor: every widget id needs its own reason.
-        const unhandled: never = id;
-        return unhandled;
-      }
-    }
-  }
+  const emptyReason = (id: LayoutWidgetId): string =>
+    widgetEmptyReason(id, { statusEnabled });
 
   // Every widget with its rendered node. Only the visible cells — not hidden,
   // with content — enter the grid, in BOTH modes: previously edit mode gave
@@ -669,7 +624,7 @@ export default function Dashboard({
         className="grid grid-cols-1 gap-x-8 gap-y-8 lg:grid-cols-24 lg:items-start"
       >
         {liveCells.map(({ widget, node }, vIndex) => {
-          const cellClass = `${COL_SPAN[widget.span]} ${CELL_ALIGN[widget.id] ?? ""}`;
+          const cellClass = `${COL_SPAN[widget.span]} ${widgetDef(widget.id).align ?? ""}`;
           // An explicit height sizes the cell exactly: content widgets scroll
           // their overflow, the others center their content (so a sized greeting
           // sits centered beside the header card, restoring the classic header).

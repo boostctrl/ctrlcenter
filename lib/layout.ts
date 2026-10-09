@@ -1,25 +1,13 @@
+import { WIDGET_DEFS, WIDGET_IDS, widgetsWith, type WidgetDef } from "./widgets/defs";
+
 // The home-page widgets the admin can arrange on the dashboard's 24-column flow
 // grid. Every widget has a position (its place in the ordered list), a column
 // span (1–24) and a hidden flag; heights stay content-driven and rows pack
 // automatically — there is no pinned x/y placement.
 
-export const LAYOUT_WIDGET_IDS = [
-  "greeting",
-  "headerCard",
-  "clock",
-  "weather",
-  "status",
-  "search",
-  "calendar",
-  "notes",
-  "feed",
-  "countdown",
-  "worldClocks",
-  "systemStats",
-  "favorites",
-  "apps",
-  "bookmarks",
-] as const;
+// The widget ids, labels, defaults and capability lists below are derived
+// from the widget registry (lib/widgets/defs.ts, #285) — add a widget there.
+export const LAYOUT_WIDGET_IDS = WIDGET_IDS;
 
 export type LayoutWidgetId = (typeof LAYOUT_WIDGET_IDS)[number];
 
@@ -29,7 +17,7 @@ export type LayoutWidgetId = (typeof LAYOUT_WIDGET_IDS)[number];
 // edits is that instanceId, not the type id. Single-instance widgets omit it
 // and are identified by their type id as before. Feed is the first (and today
 // only) instanceable type — the same machinery generalizes to notes/countdown.
-export const INSTANCEABLE_WIDGET_IDS: readonly LayoutWidgetId[] = ["feed"];
+export const INSTANCEABLE_WIDGET_IDS: readonly LayoutWidgetId[] = widgetsWith("instanceable");
 
 // The default feed instance's id: the sole instance a fresh install ships and
 // the target the single→list migration folds a pre-2.1 feed into. Shared by the
@@ -49,43 +37,19 @@ export const GRID_COLUMNS = 24;
 // favorites). `cards` on a layout entry is an explicit override; absent means
 // "auto" — derived from the widget's span (see cardGridClass in Dashboard).
 export const MAX_CARD_COLUMNS = 4;
-export const CARD_WIDGET_IDS: readonly LayoutWidgetId[] = [
-  "favorites",
-  "apps",
-  "bookmarks",
-];
+export const CARD_WIDGET_IDS: readonly LayoutWidgetId[] = widgetsWith("cards");
 
 // Widgets that render a section heading (the shared SectionTitle) and so can
 // have it toggled off per-widget from the layout editor (see `hideLabel`). The
 // header widgets, search and the split clock/weather/status have no heading.
-export const TITLED_WIDGET_IDS: readonly LayoutWidgetId[] = [
-  "calendar",
-  "notes",
-  "feed",
-  "countdown",
-  "worldClocks",
-  "systemStats",
-  "favorites",
-  "apps",
-  "bookmarks",
-];
+export const TITLED_WIDGET_IDS: readonly LayoutWidgetId[] = widgetsWith("titled");
 
 // The content/list widgets. When given an explicit `height` these scroll their
 // overflow; the others (header widgets, search) center their content in the
 // set height instead, so sizing the greeting/header card restores the classic
 // centered header. Any widget can take a height — this set only decides
 // scroll-vs-center behavior.
-export const SIZED_WIDGET_IDS: readonly LayoutWidgetId[] = [
-  "calendar",
-  "notes",
-  "feed",
-  "countdown",
-  "worldClocks",
-  "systemStats",
-  "favorites",
-  "apps",
-  "bookmarks",
-];
+export const SIZED_WIDGET_IDS: readonly LayoutWidgetId[] = widgetsWith("sized");
 
 // Per-widget explicit height (px): the card is exactly this tall — taller than
 // its content (breathing room / a header band) or shorter (content scrolls or
@@ -157,59 +121,27 @@ export type LayoutWidget = {
   space?: WidgetSpace;
 };
 
-export const WIDGET_LABELS: Record<LayoutWidgetId, string> = {
-  greeting: "Greeting",
-  headerCard: "Header card",
-  clock: "Clock",
-  weather: "Weather",
-  status: "Status",
-  search: "Search",
-  calendar: "Calendar",
-  notes: "Notes",
-  feed: "RSS feed",
-  countdown: "Countdown",
-  worldClocks: "World clocks",
-  systemStats: "System stats",
-  favorites: "Favorites",
-  apps: "Applications",
-  bookmarks: "Bookmarks",
-};
+export const WIDGET_LABELS = Object.fromEntries(
+  WIDGET_DEFS.map((d) => [d.id, d.label])
+) as Record<LayoutWidgetId, string>;
 
-// The default arrangement reproduces the pre-widget-grid page exactly: greeting
-// beside the combined header card up top, the body sections full-width below.
-// The split clock/weather/status widgets exist hidden, ready to be shown from
-// the layout editor as an alternative to the combined card.
-export const DEFAULT_WIDGETS: LayoutWidget[] = [
-  { id: "greeting", span: 16, hidden: false },
-  { id: "headerCard", span: 8, hidden: false },
-  { id: "clock", span: 8, hidden: true },
-  { id: "weather", span: 8, hidden: true },
-  { id: "status", span: 8, hidden: true },
-  { id: "search", span: 24, hidden: false },
-  { id: "calendar", span: 24, hidden: false },
-  // Ship dormant (hidden) so upgrades don't surprise existing dashboards;
-  // the admin shows them from the layout editor or Settings → Layout.
-  { id: "notes", span: 8, hidden: true },
-  { id: "feed", instanceId: FEED_DEFAULT_ID, span: 8, hidden: true },
-  { id: "countdown", span: 8, hidden: true },
-  { id: "worldClocks", span: 8, hidden: true },
-  { id: "systemStats", span: 8, hidden: true },
-  { id: "favorites", span: 24, hidden: false },
-  { id: "apps", span: 24, hidden: false },
-  { id: "bookmarks", span: 24, hidden: false },
-];
+// The default arrangement reproduces the pre-widget-grid page exactly:
+// greeting beside the combined header card up top, the body sections
+// full-width below (registry order and defaults). An instanceable widget's
+// default entry is bound to the instance named after its type — for the feed,
+// FEED_DEFAULT_ID.
+export const DEFAULT_WIDGETS: LayoutWidget[] = WIDGET_DEFS.map((d: WidgetDef) => ({
+  id: d.id as LayoutWidgetId,
+  ...(d.instanceable ? { instanceId: d.id } : {}),
+  span: d.span,
+  hidden: d.hidden,
+}));
 
 // The widgets that used to live in the fixed header. When missing from a saved
 // layout they're PREPENDED in this order (body widgets are appended), so a
 // config saved before they were placeable renders with them on top — exactly
 // where the fixed header used to be.
-export const HEADER_WIDGET_IDS: readonly LayoutWidgetId[] = [
-  "greeting",
-  "headerCard",
-  "clock",
-  "weather",
-  "status",
-];
+export const HEADER_WIDGET_IDS: readonly LayoutWidgetId[] = widgetsWith("legacyHeader");
 
 const DEFAULT_BY_ID = Object.fromEntries(
   DEFAULT_WIDGETS.map((w) => [w.id, w])
