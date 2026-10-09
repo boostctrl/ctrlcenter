@@ -40,7 +40,9 @@ export default function Complication({
   // on phones) and grow to fill, so a group of five lays out as a clean 3 + 2.
   // An off / not-set-up tile stays a compact chip that doesn't grow, so a
   // service you aren't using (e.g. Portainer) collapses out of the way instead
-  // of claiming an equal slot.
+  // of claiming an equal slot. It recedes through the surface (no fill, no
+  // shadow, dashed edge) rather than whole-tile opacity, which dragged its text
+  // down to ~1.6:1 contrast (#273).
   const sizing = dim
     ? "grow-0 basis-60"
     : "grow basis-full sm:basis-[calc(50%-0.375rem)] lg:basis-[calc(33.333%-0.5rem)]";
@@ -48,7 +50,9 @@ export default function Complication({
     <Link
       href={href}
       className={`glass-card flex min-h-[7rem] items-center gap-4 p-4 ${sizing} ${
-        dim ? "opacity-45 hover:opacity-80" : ""
+        dim
+          ? "[--surface-bg:transparent] [--surface-border-style:dashed] [--surface-shadow:none]"
+          : ""
       }`}
     >
       {ring !== undefined ? (
@@ -62,7 +66,7 @@ export default function Complication({
             aria-hidden
             className={`h-1.5 w-1.5 shrink-0 rounded-full ${STATE_DOT[state]}`}
           />
-          <span className="truncate text-[11px] font-medium tracking-wide text-fg/40 uppercase">
+          <span className="truncate text-[11px] font-medium tracking-wide text-ink-40 uppercase">
             {label}
           </span>
         </span>
@@ -70,7 +74,7 @@ export default function Complication({
           <span
             key={i}
             className={`truncate ${
-              i === 0 ? "text-sm font-semibold text-fg/90" : "text-xs text-fg/45"
+              i === 0 ? "text-sm font-semibold text-ink-90" : "text-xs text-ink-45"
             }`}
             title={text}
           >
@@ -131,9 +135,9 @@ function Gauge({
         />
       </svg>
       <span className="flex max-w-[3.25rem] flex-col items-center leading-none">
-        <span className="truncate text-[15px] font-bold text-fg/90">{center}</span>
+        <span className="truncate text-[15px] font-bold text-ink-90">{center}</span>
         {caption && (
-          <span className="mt-0.5 truncate text-[7px] font-medium tracking-wide text-fg/40 uppercase">
+          <span className="mt-0.5 truncate text-[7px] font-medium tracking-wide text-ink-40 uppercase">
             {caption}
           </span>
         )}
@@ -156,12 +160,12 @@ function NumberBadge({
   return (
     <span className="flex h-16 w-16 shrink-0 flex-col items-center justify-center leading-none">
       <span
-        className={`truncate text-3xl font-bold ${alert ? "text-red-400" : "text-fg/90"}`}
+        className={`truncate text-3xl font-bold ${alert ? "text-red-400" : "text-ink-90"}`}
       >
         {center}
       </span>
       {caption && (
-        <span className="mt-1 truncate text-[8px] font-medium tracking-wide text-fg/40 uppercase">
+        <span className="mt-1 truncate text-[8px] font-medium tracking-wide text-ink-40 uppercase">
           {caption}
         </span>
       )}

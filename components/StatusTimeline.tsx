@@ -16,6 +16,21 @@ import {
 // when the detail page became the second consumer.
 
 // Display host (no scheme/path) for an app URL; falls back to the raw string.
+// What a check actually contacts, for the status detail's "Target" row: the
+// full URL (credentials stripped) for HTTP/keyword checks, which request it,
+// else just the host (#277).
+export function checkTarget(url: string, type: string): string {
+  if (type !== "http" && type !== "keyword") return host(url);
+  try {
+    const u = new URL(url);
+    u.username = "";
+    u.password = "";
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 export function host(url: string): string {
   try {
     return new URL(url).host;
@@ -204,7 +219,7 @@ export const StatusTimeline = memo(function StatusTimeline({
           says nothing until a bucket is picked. */}
       <p
         aria-live="polite"
-        className={`text-xs text-fg/45 tabular-nums ${
+        className={`text-xs text-ink-45 tabular-nums ${
           active == null ? "sr-only" : ""
         }`}
       >

@@ -18,7 +18,7 @@ export default async function WeatherPage() {
 
   return (
     <>
-      <main className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 py-12 sm:px-10 lg:py-16">
+      <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 pt-12 pb-24 sm:px-10 lg:pt-16">
         <div>
           <PageNav current="weather" {...navPages(settings)} />
           <h1 className="mt-3 text-3xl font-bold">Weather</h1>
@@ -27,7 +27,7 @@ export default async function WeatherPage() {
         {weather.enabled ? (
           <WeatherDetails initial={initial} />
         ) : (
-          <p className="text-fg/50">
+          <p className="text-ink-50">
             The weather widget is turned off in settings.
           </p>
         )}

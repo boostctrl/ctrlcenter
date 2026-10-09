@@ -264,3 +264,28 @@ describe("getCdnIconMetadata", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("compactIconMetadata (#276)", () => {
+  it("keeps only slugs with light/dark variants, and only their names", () => {
+    const full = JSON.stringify({
+      plex: {
+        base: "svg",
+        aliases: ["plex media server"],
+        categories: ["media"],
+        colors: { light: "plex-light", dark: "plex-dark" },
+      },
+      sonarr: { base: "svg", aliases: [], categories: ["media"] },
+      emby: { colors: { light: "emby-light" } },
+      odd: { colors: { light: 42 } },
+    });
+    expect(JSON.parse(cache.compactIconMetadata(full))).toEqual({
+      plex: { colors: { light: "plex-light", dark: "plex-dark" } },
+      emby: { colors: { light: "emby-light" } },
+    });
+  });
+
+  it("degrades to an empty index on malformed input", () => {
+    expect(cache.compactIconMetadata("not json")).toBe("{}");
+    expect(cache.compactIconMetadata("null")).toBe("{}");
+  });
+});

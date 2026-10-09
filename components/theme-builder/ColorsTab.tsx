@@ -64,10 +64,10 @@ export default function ColorsTab({ d }: { d: ThemeDraft }) {
     >
       <div className="space-y-2">
         <div>
-          <span className="text-[10px] font-semibold tracking-[0.15em] text-fg/45 uppercase">
+          <span className="text-[10px] font-semibold tracking-[0.15em] text-ink-45 uppercase">
             Palettes
           </span>
-          <p className="text-xs text-fg/40">
+          <p className="text-xs text-ink-40">
             Ready-made color sets — one tap recolors both modes (each swatch
             shows its dark and light halves).
           </p>
@@ -88,16 +88,16 @@ export default function ColorsTab({ d }: { d: ThemeDraft }) {
 
       <div className="space-y-3 border-t border-fg/10 pt-4">
         <div>
-          <span className="text-[10px] font-semibold tracking-[0.15em] text-fg/45 uppercase">
+          <span className="text-[10px] font-semibold tracking-[0.15em] text-ink-45 uppercase">
             Custom
           </span>
-          <p className="text-xs text-fg/40">
+          <p className="text-xs text-ink-40">
             Or pick each color yourself — changes apply instantly.
           </p>
         </div>
         <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <span className="block text-[11px] font-medium text-fg/55">
+            <span className="block text-[11px] font-medium text-ink-55">
               Surface — {editMode} theme only
             </span>
             <div className="grid grid-cols-2 gap-2">
@@ -114,10 +114,10 @@ export default function ColorsTab({ d }: { d: ThemeDraft }) {
                     className="color-well h-9 w-9 shrink-0 cursor-pointer rounded-full"
                   />
                   <span className="min-w-0">
-                    <span className="block truncate text-xs text-fg/75">
+                    <span className="block truncate text-xs text-ink-75">
                       {label}
                     </span>
-                    <span className="block font-mono text-[10px] text-fg/40 uppercase">
+                    <span className="block font-mono text-[10px] text-ink-40 uppercase">
                       {draft[key]}
                     </span>
                   </span>
@@ -150,7 +150,7 @@ export default function ColorsTab({ d }: { d: ThemeDraft }) {
 
           <div className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-[11px] font-medium text-fg/55">
+              <span className="text-[11px] font-medium text-ink-55">
                 Accent — {editMode} theme only
               </span>
               <ChipGroup
@@ -200,7 +200,7 @@ export default function ColorsTab({ d }: { d: ThemeDraft }) {
               )}
             </div>
             <div
-              className={`flex font-mono text-[10px] text-fg/40 uppercase ${
+              className={`flex font-mono text-[10px] text-ink-40 uppercase ${
                 accentStyle === "gradient"
                   ? "justify-between"
                   : "justify-center"
@@ -209,7 +209,7 @@ export default function ColorsTab({ d }: { d: ThemeDraft }) {
               <span>{draft.accentFrom}</span>
               {accentStyle === "gradient" && <span>{draft.accentTo}</span>}
             </div>
-            <p className="text-xs text-fg/40">
+            <p className="text-xs text-ink-40">
               Colors buttons, highlights &amp; the scene glow.
             </p>
           </div>

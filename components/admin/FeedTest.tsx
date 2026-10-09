@@ -44,7 +44,7 @@ export default function FeedTest({
       renderExtra={(data) =>
         data.discovered && data.discovered.length > 0 ? (
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-fg/45">
+            <span className="text-xs text-ink-45">
               {data.discovered.length === 1 ? "Found a feed" : "Found feeds"} —
               use{data.discovered.length === 1 ? " it" : " one"}:
             </span>

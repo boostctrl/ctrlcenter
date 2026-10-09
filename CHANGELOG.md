@@ -12,6 +12,84 @@ here.
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-10-09
+
+### Added
+
+- **Undo for deletes in the admin portal.** Deleting an app or bookmark shows
+  an Undo button for a few seconds; it brings the item back exactly where it
+  was, with its uptime history and favorites intact. (#307)
+- **Smoother admin setup.** Widget cards in Settings (Notes, Countdown, World
+  clocks, System stats) have their own "show on the home page" switch, so you
+  no longer have to visit the layout editor just to turn one on. App and
+  bookmark URLs accept a bare address like `plex.local:32400` and add the
+  `http://` for you. The app form says when status checks are switched off,
+  and the Monitor page's "Set up" buttons open that service's settings
+  directly. (#277)
+
+### Changed
+
+- **Pages load about five times lighter.** A first visit to the dashboard
+  downloaded around 1.8 MB, mostly an icon index and every selectable font.
+  It now fetches only the icon details it needs and only the font in use,
+  bringing a cold load to roughly 350 KB — noticeably faster on phones and
+  slow connections. (#276)
+- **Better keyboard navigation.** Everything you can Tab to now shows a clear
+  focus ring, a "Skip to content" link comes first on every page, and each
+  app card is a single Tab stop — press **P** on a focused card to pin or
+  unpin it. While you search, the match that Enter will open is outlined, and
+  the search box shows its **/** shortcut. Screen readers get proper page
+  landmarks and heading order in the admin portal. (#274)
+- **Layout polish.** The corner menu button no longer covers the end of a page,
+  and its menu is opaque instead of see-through. The Settings page groups its
+  fields without gaps and keeps "Reset all settings" apart from them. A
+  service's status page shows the full address being checked. Bold scenes
+  like Horizon and Rays are softened in light mode so card text stays clear.
+  The Help page opens with a table of contents linking to every section, and
+  the menu labels the status page "Status", matching the rest of the site.
+  (#277)
+
+### Fixed
+
+- **The home page weather shows a moon at night.** The header card used the
+  daytime icon around the clock; it now matches the /weather page. White
+  weather icons (clouds, fog, snow) also stay visible in light mode. (#270)
+- **A clear message when no admin password is set.** A fresh install without
+  `ADMIN_PASSWORD` used to show a normal sign-in form that rejected every
+  password. The sign-in page now explains what to set, and the server log
+  says so at startup. (#275)
+- **The delete confirmation is readable in light mode** and names what you're
+  deleting ("Delete “Plex”?"). For destructive actions it now starts on
+  Cancel, so a reflexive Enter backs out instead of deleting. (#269)
+- **Edit layout works on phones.** The editing toolbar is now a bar along the
+  bottom of the screen with Done and Undo always in reach (it used to grow
+  into a circle that ran off-screen), each widget shows a single row of
+  controls, and the page no longer scrolls sideways while editing. On large
+  screens the toolbar stays on one line. (#271)
+- **The admin portal fits a phone screen.** The Applications and Bookmarks
+  lists no longer scroll sideways, an "Add" button at the top jumps to the
+  form, and tapping Edit brings the form into view. The selected admin tab
+  stays visible, the header buttons sit in a tidy grid, and the page links
+  at the top of every page fit on one line. (#272)
+- **Text is easier to read in light mode.** Secondary text, error and warning
+  messages, and status labels now meet the WCAG AA contrast standard across
+  all designs, in both light and dark mode, and Delete buttons no longer look
+  disabled. A service that's down shows a hollow ring instead of a solid dot,
+  so up and down are distinguishable without relying on color. (#273)
+- **Signing in successfully no longer counts toward the login limit.** Only
+  wrong passwords and codes do, so signing in a few times in a row can't lock
+  you out. (#277)
+## [2.10.1] - 2026-10-09
+
+### Security
+
+- **The login limit works without a reverse proxy.** When CtrlCenter is
+  reached directly (`TRUSTED_PROXY_HOPS=0`), the Docker image now limits
+  sign-in attempts per visitor by their actual connection, instead of one
+  shared limit — so someone guessing passwords can no longer lock you out of
+  your own dashboard, and can't dodge the limit by faking their address.
+  (#257)
+
 ## [2.10.0] - 2026-10-07
 
 ### Added
@@ -2608,7 +2686,9 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.10.0...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.11.0...HEAD
+[2.11.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.10.1...v2.11.0
+[2.10.1]: https://github.com/boostctrl/ctrlcenter/compare/v2.10.0...v2.10.1
 [2.10.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.9.0...v2.10.0
 [2.9.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.7...v2.9.0
 [2.8.7]: https://github.com/boostctrl/ctrlcenter/compare/v2.8.6...v2.8.7

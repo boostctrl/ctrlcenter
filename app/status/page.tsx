@@ -25,7 +25,7 @@ export default async function StatusRoute() {
 
   return (
     <>
-      <main className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 py-12 sm:px-10 lg:py-16">
+      <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 pt-12 pb-24 sm:px-10 lg:pt-16">
         <div>
           <PageNav current="status" {...navPages(settings)} />
           <h1 className="mt-3 text-3xl font-bold">Status</h1>
@@ -45,9 +45,9 @@ export default async function StatusRoute() {
                 maintenance notice is content in its own right — it renders
                 above the "turned off" note. */}
             <StatusAnnouncements announcements={settings.statusAnnouncements} />
-            <p className="text-fg/50">
+            <p className="text-ink-50">
               Status checks are turned off.{" "}
-              <Link href="/admin" className="underline hover:text-fg/80">
+              <Link href="/admin" className="underline hover:text-ink-80">
                 Enable them in admin settings
               </Link>
               .

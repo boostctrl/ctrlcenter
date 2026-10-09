@@ -10,14 +10,18 @@ import Link from "next/link";
 export default function BackHome({
   className = "",
   label = "Back to dashboard",
+  compact = false,
 }: {
   className?: string;
   label?: string;
+  // Icon-only on phones (the label stays for screen readers), so the PageNav
+  // strip fits one line at phone width (#272).
+  compact?: boolean;
 }) {
   return (
     <Link
       href="/"
-      className={`inline-flex items-center gap-1.5 text-sm text-fg/50 transition-colors hover:text-fg/80 ${className}`}
+      className={`inline-flex items-center gap-1.5 text-sm text-ink-50 transition-colors hover:text-ink-80 ${className}`}
     >
       <svg
         width="16"
@@ -33,7 +37,7 @@ export default function BackHome({
         <path d="M19 12H5" />
         <path d="m12 19-7-7 7-7" />
       </svg>
-      {label}
+      <span className={compact ? "max-sm:sr-only" : undefined}>{label}</span>
     </Link>
   );
 }

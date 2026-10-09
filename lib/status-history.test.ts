@@ -16,6 +16,7 @@ import {
   flush,
   recordResults,
   pruneHistory,
+  PRUNE_GRACE_MS,
   setOutageNote,
   getHistory,
   getAppDetail,
@@ -57,6 +58,7 @@ const g = globalThis as unknown as {
     recent: Map<string, unknown>;
     downSince: Map<string, unknown>;
     outages: Map<string, unknown>;
+    missingSince: Map<string, number>;
   };
 };
 function resetHistoryState() {
@@ -68,6 +70,7 @@ function resetHistoryState() {
     s.recent = new Map();
     s.downSince = new Map();
     s.outages = new Map();
+    s.missingSince = new Map();
   }
 }
 
@@ -489,13 +492,28 @@ describe("pruneHistory", () => {
       ],
       now
     );
-    expect(pruneHistory(["kept"])).toBe(1);
+    // First sighting only starts the grace period (#307)…
+    expect(pruneHistory(["kept"], now)).toBe(0);
+    expect(pruneHistory(["kept"], now + PRUNE_GRACE_MS - 1)).toBe(0);
+    // …and once it has passed, the history goes.
+    expect(pruneHistory(["kept"], now + PRUNE_GRACE_MS)).toBe(1);
     const s = g.__ctrlcenterStatusHistory!;
     for (const map of [s.store, s.recent, s.downSince, s.outages]) {
       expect(map.has("deleted")).toBe(false);
     }
     expect(s.store.has("kept")).toBe(true);
-    expect(pruneHistory(["kept"])).toBe(0);
+    expect(pruneHistory(["kept"], now + PRUNE_GRACE_MS)).toBe(0);
+  });
+
+  it("keeps a deleted app's history when it comes back within the grace (#307)", () => {
+    resetHistoryState();
+    const now = Date.now();
+    recordResults([{ id: "undone", up: true, status: 200, ms: 10 }], now);
+    pruneHistory([], now); // deleted: grace starts
+    pruneHistory(["undone"], now + 5_000); // restored by Undo
+    // Deleted again much later: a fresh grace period, not the stale one.
+    expect(pruneHistory([], now + PRUNE_GRACE_MS * 2)).toBe(0);
+    expect(g.__ctrlcenterStatusHistory!.store.has("undone")).toBe(true);
   });
 });
 

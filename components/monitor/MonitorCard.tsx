@@ -5,6 +5,7 @@ import { createContext, useContext, type ReactNode } from "react";
 import type { ServiceStatus } from "@/lib/monitor";
 import { buttonClasses } from "@/lib/buttons";
 import { formatBytes } from "@/components/widgets/SystemStatsWidget";
+import { settingsCardId } from "@/lib/nav";
 
 // Set on a service's detail page (#208), where the page's own <h1> already names
 // the service. A card rendered under this context drops its dot+title header and
@@ -61,7 +62,11 @@ export const STATE_DOT: Record<ServiceState, string> = {
   unconfigured: "border border-dashed border-fg/30",
 };
 
-const SETTINGS_LINK = "/admin?tab=settings&section=integrations";
+// Deep link to this service's card in Admin → Settings → Integrations; card
+// titles are the service labels.
+function settingsLink(title: string): string {
+  return `/admin?tab=settings&section=integrations#${settingsCardId(title)}`;
+}
 
 // The three non-data bodies. Kept deliberately calm and centered so a cockpit
 // that is mostly unconfigured still reads as designed rather than broken.
@@ -74,15 +79,15 @@ function OfflineBody({ title, error }: { title: string; error: string | null }) 
           <path d="M6 6l12 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
         </svg>
       }
-      tone="text-fg/30"
+      tone="text-ink-30"
     >
-      <p className="text-sm text-fg/55">Can’t reach {title}</p>
-      {error && <p className="max-w-[22ch] text-xs text-fg/35">{error}</p>}
+      <p className="text-sm text-ink-55">Can’t reach {title}</p>
+      {error && <p className="max-w-[22ch] text-xs text-ink-45">{error}</p>}
     </Placeholder>
   );
 }
 
-function DisabledBody() {
+function DisabledBody({ title }: { title: string }) {
   return (
     <Placeholder
       icon={
@@ -96,10 +101,10 @@ function DisabledBody() {
           />
         </svg>
       }
-      tone="text-fg/25"
+      tone="text-ink-25"
     >
-      <p className="text-sm text-fg/45">Disabled</p>
-      <Link href={SETTINGS_LINK} className={buttonClasses("ghost", "sm")}>
+      <p className="text-sm text-ink-45">Disabled</p>
+      <Link href={settingsLink(title)} className={buttonClasses("ghost", "sm")}>
         Enable in Settings
       </Link>
     </Placeholder>
@@ -121,8 +126,8 @@ function ConnectBody({ title }: { title: string }) {
       }
       tone="text-[var(--accent-from)]/70"
     >
-      <p className="text-sm text-fg/55">Connect {title}</p>
-      <Link href={SETTINGS_LINK} className={buttonClasses("ghost", "sm")}>
+      <p className="text-sm text-ink-55">Connect {title}</p>
+      <Link href={settingsLink(title)} className={buttonClasses("ghost", "sm")}>
         Set up
       </Link>
     </Placeholder>
@@ -172,7 +177,7 @@ export default function MonitorCard({
   ) : state === "unreachable" ? (
     <OfflineBody title={title} error={status.error} />
   ) : state === "disabled" ? (
-    <DisabledBody />
+    <DisabledBody title={title} />
   ) : (
     <ConnectBody title={title} />
   );
@@ -186,7 +191,7 @@ export default function MonitorCard({
   }
   const header = (
     <div className="flex items-baseline justify-between gap-3 border-b border-fg/10 pb-2.5">
-        <h2 className="flex items-center gap-2 text-[15px] font-semibold text-fg/90">
+        <h2 className="flex items-center gap-2 text-[15px] font-semibold text-ink-90">
           <span
             aria-hidden
             className={`h-2 w-2 shrink-0 rounded-full ${STATE_DOT[state]}`}

@@ -47,7 +47,7 @@ export default function FloatingNav({
     [
       { href: "/", label: "Dashboard" },
       weather ? { href: "/weather", label: "Weather" } : null,
-      status ? { href: "/status", label: "Service Status" } : null,
+      status ? { href: "/status", label: "Status" } : null,
       calendar ? { href: "/calendar", label: "Calendar" } : null,
       { href: "/help", label: "Help" },
       { href: "/settings", label: "Settings" },
@@ -61,13 +61,13 @@ export default function FloatingNav({
   return (
     <div ref={ref} className="fixed right-5 bottom-5 z-40 flex flex-col items-end">
       {open && (
-        <nav className="mb-2 flex min-w-44 flex-col overflow-hidden rounded-2xl border border-fg/10 bg-fg/5 py-1 shadow-lg backdrop-blur-xl">
+        <nav className="mb-2 flex min-w-44 flex-col overflow-hidden rounded-2xl border border-fg/10 bg-[var(--background)]/90 py-1 shadow-lg backdrop-blur-xl">
           {links.map((l) => (
             <Link
               key={l.href}
               href={l.href}
               onClick={() => setOpen(false)}
-              className="px-4 py-2 text-sm text-fg/70 transition-colors hover:bg-fg/10 hover:text-fg"
+              className="px-4 py-2 text-sm text-ink-70 transition-colors hover:bg-fg/10 hover:text-fg"
             >
               {l.label}
             </Link>
@@ -79,7 +79,7 @@ export default function FloatingNav({
                 setEditing(true);
                 setOpen(false);
               }}
-              className="border-t border-fg/10 px-4 py-2 text-left text-sm text-fg/70 transition-colors hover:bg-fg/10 hover:text-fg"
+              className="border-t border-fg/10 px-4 py-2 text-left text-sm text-ink-70 transition-colors hover:bg-fg/10 hover:text-fg"
             >
               Edit layout
             </button>
@@ -92,7 +92,7 @@ export default function FloatingNav({
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => setOpen((o) => !o)}
-        className="flex h-12 w-12 items-center justify-center rounded-full border border-fg/10 bg-fg/5 text-fg/60 shadow-lg backdrop-blur-xl transition-colors hover:bg-fg/10 hover:text-fg"
+        className="flex h-12 w-12 items-center justify-center rounded-full border border-fg/10 bg-fg/5 text-ink-60 shadow-lg backdrop-blur-xl transition-colors hover:bg-fg/10 hover:text-fg"
       >
         {open ? (
           <svg

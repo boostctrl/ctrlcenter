@@ -127,8 +127,8 @@ export default function TwoFactor({ initialEnabled }: { initialEnabled: boolean 
   return (
     <div className="flex items-center justify-between gap-4">
       <div>
-        <span className="text-sm text-fg/70">Two-factor authentication</span>
-        <p className="text-xs text-fg/40">
+        <span className="text-sm text-ink-70">Two-factor authentication</span>
+        <p className="text-xs text-ink-40">
           {enabled
             ? "On — a code from your authenticator app is required at sign-in."
             : "Require a time-based code from an authenticator app in addition to your password."}
@@ -159,7 +159,7 @@ export default function TwoFactor({ initialEnabled }: { initialEnabled: boolean 
             {step === "enroll" && (
               <form onSubmit={activate} className="flex flex-col gap-4">
                 <h3 className="font-semibold">Set up two-factor authentication</h3>
-                <p className="text-sm text-fg/60">
+                <p className="text-sm text-ink-60">
                   Scan this QR code with your authenticator app, or enter the
                   secret manually, then type the 6-digit code it shows.
                 </p>
@@ -176,7 +176,7 @@ export default function TwoFactor({ initialEnabled }: { initialEnabled: boolean 
                         className="rounded-lg bg-white p-2"
                       />
                     </div>
-                    <p className="text-center text-xs tracking-wider text-fg/50 select-all">
+                    <p className="text-center text-xs tracking-wider text-ink-50 select-all">
                       {formatSecret(setup.secret)}
                     </p>
                     <TextField
@@ -199,7 +199,7 @@ export default function TwoFactor({ initialEnabled }: { initialEnabled: boolean 
                     </div>
                   </>
                 ) : (
-                  <p className="text-sm text-fg/40">Preparing…</p>
+                  <p className="text-sm text-ink-40">Preparing…</p>
                 )}
               </form>
             )}
@@ -207,7 +207,7 @@ export default function TwoFactor({ initialEnabled }: { initialEnabled: boolean 
             {step === "recovery" && (
               <div className="flex flex-col gap-4">
                 <h3 className="font-semibold">Save your recovery codes</h3>
-                <p className="text-sm text-fg/60">
+                <p className="text-sm text-ink-60">
                   Each code works once, to sign in if you lose your
                   authenticator. Store them somewhere safe — they won&apos;t be
                   shown again.
@@ -235,7 +235,7 @@ export default function TwoFactor({ initialEnabled }: { initialEnabled: boolean 
             {step === "disable" && (
               <form onSubmit={disable} className="flex flex-col gap-4">
                 <h3 className="font-semibold">Turn off two-factor authentication</h3>
-                <p className="text-sm text-fg/60">
+                <p className="text-sm text-ink-60">
                   Enter a current authenticator code (or a recovery code) to
                   confirm.
                 </p>

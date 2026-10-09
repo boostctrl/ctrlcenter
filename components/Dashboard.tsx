@@ -570,6 +570,13 @@ export default function Dashboard({
     return groupBookmarks(matches, categoryOrder);
   }, [bookmarks, q, categoryOrder, showBookmarks]);
 
+  // What Enter opens while searching (see topResultUrl), highlighted so the
+  // keyboard shortcut isn't a guess (#274). A matching bang takes precedence.
+  const topMatchId =
+    q && !editing && !bangHit
+      ? (filteredApps[0]?.id ?? filteredGroups[0]?.[1][0]?.id ?? null)
+      : null;
+
   // Pinned apps, in pin order, dropping any that no longer exist. Shown only when
   // not searching — during a search the filtered results take over.
   const favoriteApps = useMemo(() => {
@@ -660,8 +667,19 @@ export default function Dashboard({
               onKeyDown={onSearchKeyDown}
               placeholder="Search"
               aria-label="Search applications and bookmarks"
-              className="accent-focus w-full rounded-2xl border border-fg/10 bg-fg/[0.04] px-5 py-3.5 text-fg placeholder-fg/30 outline-none backdrop-blur-xl transition-colors"
+              aria-keyshortcuts="/"
+              className="accent-focus w-full rounded-2xl border border-fg/10 bg-fg/[0.04] py-3.5 pr-12 pl-5 text-fg placeholder-fg/30 outline-none backdrop-blur-xl transition-colors"
             />
+            {/* The "/" shortcut, advertised where people look for it; hidden
+                once typing starts, and on touch where there's no keyboard. */}
+            {!query && (
+              <kbd
+                aria-hidden
+                className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 rounded-md border border-fg/15 px-1.5 py-0.5 font-mono text-xs text-ink-50 pointer-coarse:hidden"
+              >
+                /
+              </kbd>
+            )}
           </div>
         ) : null;
       case "calendar":
@@ -733,7 +751,7 @@ export default function Dashboard({
                 {!widget.hideLabel && <SectionTitle>Applications</SectionTitle>}
                 <div className={cardGridClass(widget, "gap-4")}>
                   {publicApps.map((app) => (
-                    <AppCard key={app.id} app={app} />
+                    <AppCard key={app.id} app={app} top={app.id === topMatchId} />
                   ))}
                 </div>
               </>
@@ -746,7 +764,7 @@ export default function Dashboard({
                 <SectionTitle>Private Applications</SectionTitle>
                 <div className={cardGridClass(widget, "gap-4")}>
                   {privateApps.map((app) => (
-                    <AppCard key={app.id} app={app} />
+                    <AppCard key={app.id} app={app} top={app.id === topMatchId} />
                   ))}
                 </div>
               </div>
@@ -763,7 +781,12 @@ export default function Dashboard({
             {!widget.hideLabel && <SectionTitle>Bookmarks</SectionTitle>}
             <div className={cardGridClass(widget, "gap-6")}>
               {groups.map(([category, items]) => (
-                <BookmarkGroup key={category} category={category} items={items} />
+                <BookmarkGroup
+                  key={category}
+                  category={category}
+                  items={items}
+                  topId={topMatchId}
+                />
               ))}
             </div>
           </section>
@@ -944,8 +967,8 @@ export default function Dashboard({
           say what would give them content. */}
       {editing && trayCells.length > 0 && (
         <div className="rounded-2xl border border-dashed border-fg/15 p-4">
-          <p className="text-xs font-medium text-fg/70">Not on the live page</p>
-          <p className="mt-0.5 max-w-prose text-xs text-fg/55">
+          <p className="text-xs font-medium text-ink-70">Not on the live page</p>
+          <p className="mt-0.5 max-w-prose text-xs text-ink-55">
             These widgets don&apos;t render for visitors right now — hidden ones
             by choice, empty ones until they have something to show. The grid
             above packs exactly like the live page. Show a hidden widget to
@@ -956,22 +979,24 @@ export default function Dashboard({
               <div
                 key={widgetKey(widget)}
                 title={node === null ? emptyReason(widget.id) : undefined}
-                className="flex items-center gap-2 rounded-lg border border-fg/10 bg-fg/5 px-2.5 py-1.5 text-xs text-fg/60"
+                className="flex max-w-full min-w-0 items-center gap-2 rounded-lg border border-fg/10 bg-fg/5 px-2.5 py-1.5 text-xs text-ink-60"
               >
-                <span className="font-medium">{labelFor(widget)}</span>
-                <span className="rounded bg-fg/10 px-1.5 py-0.5 text-[10px] tracking-wide text-fg/60 uppercase">
+                <span className="shrink-0 font-medium">{labelFor(widget)}</span>
+                <span className="shrink-0 rounded bg-fg/10 px-1.5 py-0.5 text-[10px] tracking-wide text-ink-60 uppercase">
                   {widget.hidden ? "Hidden" : "Empty"}
                 </span>
                 {widget.hidden ? (
                   <button
                     type="button"
                     onClick={() => toggleWidgetHidden(widgetKey(widget))}
-                    className="rounded-md border border-fg/10 px-2 py-0.5 text-fg/70 transition-colors hover:bg-fg/10 hover:text-fg"
+                    className="rounded-md border border-fg/10 px-2 py-0.5 text-ink-70 transition-colors hover:bg-fg/10 hover:text-fg"
                   >
                     Show
                   </button>
                 ) : (
-                  <span className="max-w-72 truncate text-fg/55">
+                  // min-w-0 so the reason truncates inside a phone-width
+                  // chip instead of widening the page (#271).
+                  <span className="max-w-72 min-w-0 truncate text-ink-55">
                     {emptyReason(widget.id)}
                   </span>
                 )}
@@ -982,16 +1007,16 @@ export default function Dashboard({
       )}
 
       {!editing && hasVisibleContent && !hasResults && parsedBang && (
-        <p className="text-fg/50">
+        <p className="text-ink-50">
           {bangHit ? (
             <>
-              <span className="text-fg/40">↵</span>{" "}
+              <span className="text-ink-40">↵</span>{" "}
               {bangHit.term
                 ? `Search ${bangHit.label} for “${bangHit.term}”`
                 : `Open ${bangHit.label}`}
             </>
           ) : (
-            <span className="text-fg/40">
+            <span className="text-ink-40">
               No bang “!{parsedBang.key}”. Press Enter to search the web.
             </span>
           )}
@@ -999,13 +1024,13 @@ export default function Dashboard({
       )}
 
       {!editing && hasVisibleContent && !hasResults && !parsedBang && (
-        <p className="text-fg/40">
+        <p className="text-ink-40">
           No matches for “{query}”.{" "}
           {buildSearchUrl(search, query) && (
             <button
               type="button"
               onClick={webSearch}
-              className="text-fg/60 underline transition-colors hover:text-fg/90"
+              className="text-ink-60 underline transition-colors hover:text-ink-90"
             >
               Search {engineLabel(search)} for “{query}” →
             </button>
@@ -1014,9 +1039,9 @@ export default function Dashboard({
       )}
 
       {!editing && !hasAnyContent && (
-        <p className="text-fg/40">
+        <p className="text-ink-40">
           Nothing here yet.{" "}
-          <Link href="/admin" className="underline hover:text-fg/70">
+          <Link href="/admin" className="underline hover:text-ink-70">
             Add your first app or bookmark
           </Link>
           .

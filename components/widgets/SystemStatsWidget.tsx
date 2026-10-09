@@ -56,8 +56,8 @@ function StatRow({
           line under the label instead of eating it ("Memory" must not become
           "Me…" — the #145 rule). */}
       <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-        <span className="break-words text-sm text-fg/80">{label}</span>
-        <span className="shrink-0 text-sm tabular-nums text-fg/60">{detail}</span>
+        <span className="break-words text-sm text-ink-80">{label}</span>
+        <span className="shrink-0 text-sm tabular-nums text-ink-60">{detail}</span>
       </div>
       <Meter percent={percent} />
     </li>
@@ -109,7 +109,7 @@ export default function SystemStatsWidget({
             <StatRow key={`${row.label}-${i}`} {...row} />
           ))}
         </ul>
-        <p className="mt-3 text-[11px] text-fg/35">
+        <p className="mt-3 text-[11px] text-ink-45">
           {stats.source === "container"
             ? "Measuring this container's resources"
             : "Measuring the host machine"}

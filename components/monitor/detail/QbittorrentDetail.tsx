@@ -31,8 +31,8 @@ const STATE_LABELS: Record<TorrentState, string> = {
 const STATE_TONES: Record<TorrentState, string> = {
   downloading: "text-emerald-400/90",
   seeding: "text-sky-400/80",
-  paused: "text-fg/40",
-  queued: "text-fg/40",
+  paused: "text-ink-40",
+  queued: "text-ink-40",
   checking: "text-amber-400/80",
   stalled: "text-amber-400/80",
   error: "text-red-400",
@@ -100,12 +100,12 @@ function TorrentRow({
   return (
     <li className="flex flex-col gap-1.5 py-2.5 first:pt-0 last:pb-0">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="min-w-0 truncate text-sm text-fg/80" title={torrent.name}>
+        <span className="min-w-0 truncate text-sm text-ink-80" title={torrent.name}>
           {torrent.name}
         </span>
         <span className="flex shrink-0 items-baseline gap-2 text-xs tabular-nums">
           {transferring && (
-            <span className="text-fg/50">
+            <span className="text-ink-50">
               {torrent.downSpeed > 0
                 ? `↓ ${formatSpeed(torrent.downSpeed)}`
                 : `↑ ${formatSpeed(torrent.upSpeed)}`}
@@ -114,7 +114,7 @@ function TorrentRow({
           <span className={STATE_TONES[torrent.state]}>
             {STATE_LABELS[torrent.state]}
           </span>
-          <span className="text-fg/60">{detail}</span>
+          <span className="text-ink-60">{detail}</span>
         </span>
       </div>
       <Meter percent={pct} />
@@ -170,8 +170,8 @@ function DeleteTorrentModal({
         onMouseDown={(e) => e.stopPropagation()}
       >
         <h3 className="font-semibold">Delete torrent</h3>
-        <p className="text-sm break-words text-fg/60">
-          Remove <span className="text-fg/80">{torrent.name}</span> from
+        <p className="text-sm break-words text-ink-60">
+          Remove <span className="text-ink-80">{torrent.name}</span> from
           qBittorrent. Choose whether to also delete the files it downloaded —
           deleting the data can’t be undone.
         </p>
@@ -197,8 +197,8 @@ function DeleteTorrentModal({
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-lg font-semibold tabular-nums text-fg/90">{value}</span>
-      <span className="text-[11px] tracking-wide text-fg/40 uppercase">{label}</span>
+      <span className="text-lg font-semibold tabular-nums text-ink-90">{value}</span>
+      <span className="text-[11px] tracking-wide text-ink-40 uppercase">{label}</span>
     </div>
   );
 }
@@ -223,8 +223,8 @@ export default function QbittorrentDetail({
   if (!data) {
     return (
       <section className="glass-card flex flex-col items-center gap-2 p-8 text-center">
-        <p className="text-sm text-fg/55">Can’t reach qBittorrent</p>
-        {error && <p className="text-xs text-fg/35">{error}</p>}
+        <p className="text-sm text-ink-55">Can’t reach qBittorrent</p>
+        {error && <p className="text-xs text-ink-45">{error}</p>}
       </section>
     );
   }
@@ -260,14 +260,14 @@ export default function QbittorrentDetail({
     <div className="flex flex-col gap-4">
       <section className="glass-card flex flex-col gap-4 p-6">
         <div className="flex flex-wrap items-baseline gap-x-8 gap-y-1">
-          <span className="text-2xl font-semibold tabular-nums text-fg/90">
+          <span className="text-2xl font-semibold tabular-nums text-ink-90">
             ↓ {formatSpeed(data.downSpeed)}
           </span>
-          <span className="text-2xl font-semibold tabular-nums text-fg/90">
+          <span className="text-2xl font-semibold tabular-nums text-ink-90">
             ↑ {formatSpeed(data.upSpeed)}
           </span>
           {s.connection && (
-            <span className="text-xs text-fg/50">{s.connection}</span>
+            <span className="text-xs text-ink-50">{s.connection}</span>
           )}
         </div>
         <div className="grid grid-cols-2 gap-4 border-t border-fg/10 pt-4 sm:grid-cols-4">
@@ -280,7 +280,7 @@ export default function QbittorrentDetail({
             <Stat label="Free space" value={formatBytes(s.freeSpace)} />
           )}
         </div>
-        <p className="text-xs text-fg/50">
+        <p className="text-xs text-ink-50">
           {data.counts.total} torrent{data.counts.total === 1 ? "" : "s"} —{" "}
           {data.counts.downloading} downloading · {data.counts.seeding} seeding ·{" "}
           {data.counts.paused} paused
@@ -293,10 +293,10 @@ export default function QbittorrentDetail({
 
       <section className="glass-card flex flex-col gap-3 p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-[15px] font-semibold text-fg/90">Torrents</h2>
+          <h2 className="text-[15px] font-semibold text-ink-90">Torrents</h2>
           {data.torrents.length > 1 && (
             <div className="flex items-center gap-1 text-xs">
-              <span className="mr-1 text-fg/40">Sort</span>
+              <span className="mr-1 text-ink-40">Sort</span>
               {SORT_OPTIONS.map((opt) => (
                 <button
                   key={opt.key}
@@ -304,8 +304,8 @@ export default function QbittorrentDetail({
                   onClick={() => setSortBy(opt.key)}
                   className={`rounded-full px-2.5 py-1 transition-colors ${
                     sortBy === opt.key
-                      ? "bg-fg/10 text-fg/90"
-                      : "text-fg/50 hover:text-fg/80"
+                      ? "bg-fg/10 text-ink-90"
+                      : "text-ink-50 hover:text-ink-80"
                   }`}
                 >
                   {opt.label}
@@ -321,7 +321,7 @@ export default function QbittorrentDetail({
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-fg/40">No torrents.</p>
+          <p className="text-sm text-ink-40">No torrents.</p>
         )}
       </section>
 

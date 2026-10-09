@@ -41,18 +41,21 @@ export default function PageNav({
   );
 
   return (
+    // One line at every width (#272): tighter gaps and an icon-only back link
+    // on phones, and a sideways scroll rather than a wrap if a long page list
+    // still doesn't fit. py/-my keep focus rings clear of the scroll clip.
     <nav
       aria-label="Site pages"
-      className="flex flex-wrap items-center gap-x-4 gap-y-1"
+      className="-my-1 flex items-center gap-x-3 overflow-x-auto py-1 whitespace-nowrap sm:gap-x-4"
     >
-      <BackHome label="Dashboard" />
-      <span aria-hidden className="h-3.5 w-px bg-fg/15" />
+      <BackHome label="Dashboard" compact />
+      <span aria-hidden className="h-3.5 w-px shrink-0 bg-fg/15" />
       {pages.map((p) =>
         p.key === current ? (
           <span
             key={p.key}
             aria-current="page"
-            className="text-sm font-medium text-fg/90"
+            className="text-sm font-medium text-ink-90"
           >
             {p.label}
           </span>
@@ -60,7 +63,7 @@ export default function PageNav({
           <Link
             key={p.key}
             href={p.href}
-            className="text-sm text-fg/50 transition-colors hover:text-fg/80"
+            className="text-sm text-ink-50 transition-colors hover:text-ink-80"
           >
             {p.label}
           </Link>

@@ -11,6 +11,7 @@ import {
   SelectField,
   ToggleRow,
   Button,
+  AddButton,
   MoveButtons,
   DragGrip,
   PrivateChip,
@@ -23,6 +24,8 @@ import IconField from "./IconField";
 import { useReorder, dropIndicatorClass } from "./useReorder";
 import { useToast } from "./Toast";
 import { useConfirm } from "./Confirm";
+import { useRevealForm } from "./useRevealForm";
+import { withHttpScheme } from "@/lib/urls";
 import { apiErrorMessage } from "./apiError";
 
 type FormState = {
@@ -75,7 +78,15 @@ function modeFromExpect(v: string): UpMode {
   return "custom";
 }
 
-export default function AppsManager({ initialApps }: { initialApps: AppItem[] }) {
+export default function AppsManager({
+  initialApps,
+  statusChecksEnabled,
+}: {
+  initialApps: AppItem[];
+  // From the server-rendered settings; toggling checks this session updates on
+  // reload, like the nav flags.
+  statusChecksEnabled: boolean;
+}) {
   const [apps, setApps] = useState(initialApps);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [upMode, setUpMode] = useState<UpMode>("any");
@@ -83,6 +94,7 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
   const [saving, setSaving] = useState(false);
   const toast = useToast();
   const confirm = useConfirm();
+  const { ref: formRef, reveal: revealForm } = useRevealForm<HTMLDivElement>();
 
   function startEdit(app: AppItem) {
     setEditingId(app.id);
@@ -98,6 +110,7 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
       keyword: app.keyword ?? "",
     });
     setUpMode(modeFromExpect(app.expectStatus ?? ""));
+    revealForm();
   }
 
   function resetForm() {
@@ -117,7 +130,7 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
       const payload = {
         name: form.name,
         subtitle: form.subtitle,
-        url: form.url,
+        url: withHttpScheme(form.url),
         icon: form.icon,
         private: form.private,
         checkType: form.checkType,
@@ -153,8 +166,12 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
   }
 
   async function handleDelete(id: string) {
+    const index = apps.findIndex((a) => a.id === id);
+    const removed = index >= 0 ? apps[index] : undefined;
+    const name = removed?.name;
     const ok = await confirm({
-      title: "Delete this application?",
+      title: name ? `Delete “${name}”?` : "Delete this application?",
+      message: "It's removed from the dashboard, search, and the status page.",
       confirmLabel: "Delete",
       danger: true,
     });
@@ -172,7 +189,31 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
     }
     setApps((prev) => prev.filter((a) => a.id !== id));
     if (editingId === id) resetForm();
-    toast("Application deleted");
+    if (!removed) {
+      toast("Application deleted");
+      return;
+    }
+    // Undo restores the same row (same id, so history and favorites still
+    // match) at its old position (#307).
+    toast(`Deleted “${removed.name}”`, "success", {
+      label: "Undo",
+      onClick: () => void undoDelete(removed, index),
+    });
+  }
+
+  async function undoDelete(item: AppItem, index: number) {
+    try {
+      const res = await fetch("/api/apps/restore", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ item, index }),
+      });
+      if (!res.ok) throw new Error();
+      setApps(await res.json());
+      toast(`Restored “${item.name}”`);
+    } catch {
+      toast("Couldn't undo the delete", "error");
+    }
   }
 
   async function persistOrder(next: AppItem[]) {
@@ -195,10 +236,23 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
   );
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1fr_minmax(320px,380px)] xl:grid-cols-[1fr_minmax(360px,440px)]">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(320px,380px)] xl:grid-cols-[minmax(0,1fr)_minmax(360px,440px)]">
       <div className="space-y-3">
+        {/* Keeps the heading outline h1 → h2 → h3 for screen readers (#274). */}
+        <h2 className="sr-only">Your applications</h2>
+        {/* Phones stack the form below the list; this jumps to it (#272). */}
+        <div className="lg:hidden">
+          <AddButton
+            onClick={() => {
+              resetForm();
+              revealForm();
+            }}
+          >
+            + Add application
+          </AddButton>
+        </div>
         {apps.length === 0 && (
-          <p className="text-sm text-fg/40">No applications yet. Add your first one.</p>
+          <p className="text-sm text-ink-40">No applications yet. Add your first one.</p>
         )}
         {apps.map((app, index) => (
           <div
@@ -220,7 +274,7 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
                   <span className="min-w-0 truncate">{app.name}</span>
                   {app.private && <PrivateChip />}
                 </p>
-                <p className="truncate text-xs text-fg/40">
+                <p className="truncate text-xs text-ink-40">
                   {app.subtitle ? `${app.subtitle} · ${app.url}` : app.url}
                 </p>
               </div>
@@ -247,7 +301,7 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
         ))}
       </div>
 
-      <div className="h-fit">
+      <div ref={formRef} className="h-fit scroll-mt-6">
         <Card title={editingId ? "Edit application" : "Add application"}>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <TextField
@@ -264,10 +318,14 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
             <TextField
               label="URL"
               required
-              type="url"
+              inputMode="url"
+              autoCapitalize="off"
+              spellCheck={false}
               placeholder="https://"
               value={form.url}
               onChange={(e) => setForm({ ...form, url: e.target.value })}
+              // A bare host ("plex.local:32400") gets http:// (#277).
+              onBlur={(e) => setForm({ ...form, url: withHttpScheme(e.target.value) })}
             />
             <IconField
               value={form.icon}
@@ -280,6 +338,21 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
               checked={form.private}
               onChange={(v) => setForm({ ...form, private: v })}
             />
+            {/* The per-app check settings only matter once checks are on;
+                say so rather than let them look live (#277). */}
+            {!statusChecksEnabled && (
+              <p className="rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-xs text-ink-70">
+                Status checks are off, so these settings won&apos;t run yet. Turn
+                them on in the{" "}
+                <a
+                  href="/admin?tab=settings&section=monitoring"
+                  className="underline underline-offset-2 hover:text-fg"
+                >
+                  Monitoring settings
+                </a>
+                .
+              </p>
+            )}
             <SelectField
               label="Check method"
               hint={checkTypeHint(form.checkType)}

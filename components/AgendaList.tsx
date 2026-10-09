@@ -23,19 +23,19 @@ export default function AgendaList({
           <li key={i} className="flex items-baseline gap-4">
             <div className="w-24 shrink-0">
               <span
-                className="block text-sm font-medium text-fg/80"
+                className="block text-sm font-medium text-ink-80"
                 suppressHydrationWarning
               >
                 {day}
               </span>
-              <span className="text-xs text-fg/45" suppressHydrationWarning>
+              <span className="text-xs text-ink-45" suppressHydrationWarning>
                 {time}
               </span>
             </div>
             <div className="min-w-0">
-              <p className="truncate text-fg/90">{e.summary}</p>
+              <p className="truncate text-ink-90">{e.summary}</p>
               {e.location && (
-                <p className="truncate text-xs text-fg/45">{e.location}</p>
+                <p className="truncate text-xs text-ink-45">{e.location}</p>
               )}
             </div>
           </li>

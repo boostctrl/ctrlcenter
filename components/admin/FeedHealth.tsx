@@ -42,7 +42,7 @@ function agoLabel(at: number): string {
 export function FeedHealthBadge({ health }: { health?: FeedHealth }) {
   if (!health) return null;
   return health.ok ? (
-    <span className="text-xs text-fg/45">
+    <span className="text-xs text-ink-45">
       OK · {health.count ?? 0} entr{health.count === 1 ? "y" : "ies"} ·{" "}
       {agoLabel(health.at)}
     </span>

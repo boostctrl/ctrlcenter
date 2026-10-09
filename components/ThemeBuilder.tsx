@@ -57,14 +57,14 @@ export default function ThemeBuilder({
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
         <div>
           <h2 className="font-semibold">Theme builder</h2>
-          <p className="text-xs text-fg/50">
+          <p className="text-xs text-ink-50">
             Light and dark are two independent themes — design each with its own
             style, scene, font &amp; colors. Everything applies live.
           </p>
         </div>
         <div className="flex flex-col items-end gap-1">
           <div className="flex items-center gap-2">
-            <span className="text-xs text-fg/50">Editing</span>
+            <span className="text-xs text-ink-50">Editing</span>
             <ChipGroup
               label="Editing mode"
               capitalize
@@ -100,7 +100,7 @@ export default function ThemeBuilder({
               onChange={setPreviewMode}
             />
           </div>
-          <p className="text-[10px] text-fg/40">
+          <p className="text-[10px] text-ink-40">
             Previews live — your saved Appearance mode is untouched.
           </p>
         </div>
@@ -126,7 +126,7 @@ export default function ThemeBuilder({
               aria-controls={`tb-panel-${t.id}`}
               onClick={() => setTab(t.id)}
               className={`relative shrink-0 px-3 py-2 text-xs font-medium transition-colors ${
-                active ? "text-fg" : "text-fg/50 hover:text-fg/80"
+                active ? "text-fg" : "text-ink-50 hover:text-ink-80"
               }`}
             >
               {t.name}

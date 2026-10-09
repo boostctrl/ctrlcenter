@@ -66,9 +66,9 @@ function StatTile({
 }) {
   return (
     <div className="glass-card flex flex-col gap-1 p-4">
-      <span className="text-xs tracking-wide text-fg/45 uppercase">{label}</span>
+      <span className="text-xs tracking-wide text-ink-45 uppercase">{label}</span>
       <span className="text-lg font-semibold tabular-nums">{value}</span>
-      {sub != null && <span className="text-xs text-fg/45">{sub}</span>}
+      {sub != null && <span className="text-xs text-ink-45">{sub}</span>}
     </div>
   );
 }
@@ -112,7 +112,7 @@ function SunArc({
 
   return (
     <div className="glass-card flex flex-col p-5">
-      <span className="mb-2 text-xs font-semibold tracking-[0.18em] text-fg/50 uppercase">
+      <span className="mb-2 text-xs font-semibold tracking-[0.18em] text-ink-50 uppercase">
         Sun
       </span>
       <svg viewBox="0 0 200 92" className="w-full" aria-hidden>
@@ -142,11 +142,11 @@ function SunArc({
       </svg>
       <div className="mt-1 flex justify-between text-sm">
         <div>
-          <p className="text-fg/45 text-xs">Sunrise</p>
+          <p className="text-ink-45 text-xs">Sunrise</p>
           <p className="font-medium tabular-nums">{formatClock(sunrise)}</p>
         </div>
         <div className="text-right">
-          <p className="text-fg/45 text-xs">Sunset</p>
+          <p className="text-ink-45 text-xs">Sunset</p>
           <p className="font-medium tabular-nums">{formatClock(sunset)}</p>
         </div>
       </div>
@@ -202,7 +202,7 @@ export default function WeatherDetails({
 
   const forecast = fetched ?? initial;
   if (!forecast) {
-    return <p className="text-fg/50">Couldn&apos;t load the forecast.</p>;
+    return <p className="text-ink-50">Couldn&apos;t load the forecast.</p>;
   }
 
   const sym = unitSymbol(units);
@@ -230,7 +230,7 @@ export default function WeatherDetails({
             light={surfaceIsLight}
           />
           <div className="relative flex flex-wrap items-center gap-x-6 gap-y-3">
-            <span className="text-7xl leading-none" data-weather-fx-anchor aria-hidden>
+            <span className="wx-icon text-7xl leading-none" data-weather-fx-anchor aria-hidden>
               {weatherCodeToIcon(current.code, current.isDay)}
             </span>
             <div>
@@ -238,13 +238,13 @@ export default function WeatherDetails({
                 {Math.round(current.temperature)}
                 {sym}
               </p>
-              <p className="mt-1 text-fg/70">
+              <p className="mt-1 text-ink-70">
                 {weatherCodeLabel(current.code)} · Feels like{" "}
                 {Math.round(current.feelsLike)}
                 {sym}
               </p>
               {location.label && (
-                <p className="text-sm text-fg/45">{location.label}</p>
+                <p className="text-sm text-ink-45">{location.label}</p>
               )}
             </div>
           </div>
@@ -264,7 +264,7 @@ export default function WeatherDetails({
             <span className="flex items-center gap-1.5">
               <WindArrow deg={current.windDirection} />
               {Math.round(current.windSpeed)}{" "}
-              <span className="text-sm font-normal text-fg/50">{windUnit}</span>
+              <span className="text-sm font-normal text-ink-50">{windUnit}</span>
             </span>
           }
           sub={`${windDirectionLabel(current.windDirection)} · gusts ${Math.round(
@@ -281,7 +281,7 @@ export default function WeatherDetails({
           value={
             <>
               {current.precipitation.toFixed(1)}{" "}
-              <span className="text-sm font-normal text-fg/50">
+              <span className="text-sm font-normal text-ink-50">
                 {precipUnitLabel(units)}
               </span>
             </>
@@ -303,7 +303,7 @@ export default function WeatherDetails({
           value={
             <>
               {Math.round(current.pressure)}{" "}
-              <span className="text-sm font-normal text-fg/50">hPa</span>
+              <span className="text-sm font-normal text-ink-50">hPa</span>
             </>
           }
         />
@@ -312,7 +312,7 @@ export default function WeatherDetails({
       {/* Next 24 hours */}
       {hourly.length > 0 && (
         <div className="glass-card p-5">
-          <h2 className="mb-3 text-xs font-semibold tracking-[0.18em] text-fg/50 uppercase">
+          <h2 className="mb-3 text-xs font-semibold tracking-[0.18em] text-ink-50 uppercase">
             Hourly forecast
           </h2>
           <div
@@ -326,8 +326,8 @@ export default function WeatherDetails({
                 key={h.time}
                 className="flex shrink-0 grow flex-col items-center gap-1 text-center"
               >
-                <span className="text-xs text-fg/50">{hourLabel(h.time)}</span>
-                <span className="text-xl" aria-hidden>
+                <span className="text-xs text-ink-50">{hourLabel(h.time)}</span>
+                <span className="wx-icon text-xl" aria-hidden>
                   {weatherCodeToIcon(h.code, h.isDay)}
                 </span>
                 <span className="text-sm font-medium tabular-nums">
@@ -335,7 +335,7 @@ export default function WeatherDetails({
                   {sym}
                 </span>
                 <span
-                  className="text-[11px] tabular-nums text-fg/40"
+                  className="text-[11px] tabular-nums text-ink-40"
                   style={{ visibility: h.precipProbability > 0 ? "visible" : "hidden" }}
                 >
                   {h.precipProbability}%
@@ -349,7 +349,7 @@ export default function WeatherDetails({
       {/* 7-day */}
       {daily.length > 0 && (
         <div className="glass-card p-5">
-          <h2 className="mb-2 text-xs font-semibold tracking-[0.18em] text-fg/50 uppercase">
+          <h2 className="mb-2 text-xs font-semibold tracking-[0.18em] text-ink-50 uppercase">
             7-day forecast
           </h2>
           <ul className="divide-y divide-fg/10">
@@ -358,16 +358,16 @@ export default function WeatherDetails({
               const hi = ((d.max - weekMin) / span) * 100;
               return (
                 <li key={d.date} className="flex items-center gap-3 py-2.5 text-sm">
-                  <span className="w-12 shrink-0 text-fg/70">
+                  <span className="w-12 shrink-0 text-ink-70">
                     {dayLabel(d.date, i)}
                   </span>
-                  <span className="w-6 shrink-0 text-center text-lg" aria-hidden>
+                  <span className="wx-icon w-6 shrink-0 text-center text-lg" aria-hidden>
                     {weatherCodeToIcon(d.code)}
                   </span>
-                  <span className="hidden w-10 shrink-0 text-right text-xs tabular-nums text-fg/45 sm:block">
+                  <span className="hidden w-10 shrink-0 text-right text-xs tabular-nums text-ink-45 sm:block">
                     {d.precipProbabilityMax > 0 ? `${d.precipProbabilityMax}%` : ""}
                   </span>
-                  <span className="shrink-0 text-right tabular-nums text-fg/40">
+                  <span className="shrink-0 text-right tabular-nums text-ink-40">
                     {Math.round(d.min)}°
                   </span>
                   <span className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-fg/10">

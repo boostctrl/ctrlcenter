@@ -77,7 +77,15 @@ describe("fetchWeather", () => {
       temperature: 21,
       humidity: 60,
       code: 1,
+      isDay: true,
     });
+  });
+
+  it("reports night when the API says is_day: 0 (header shows a moon, #270)", async () => {
+    mockFetch({
+      current: { temperature_2m: 12, relative_humidity_2m: 80, weather_code: 0, is_day: 0 },
+    });
+    expect((await fetchWeather(0, 0, "metric"))?.isDay).toBe(false);
   });
 
   it("returns null when a required numeric field is missing (no NaN render)", async () => {
@@ -91,6 +99,7 @@ describe("fetchWeather", () => {
       temperature: 21,
       humidity: 0,
       code: 1,
+      isDay: true,
     });
   });
 });

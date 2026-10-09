@@ -20,7 +20,7 @@ function Chip({
   children: ReactNode;
 }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-fg/10 bg-fg/5 px-3 py-1 text-xs text-fg/70">
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-fg/10 bg-fg/5 px-3 py-1 text-xs text-ink-70">
       {dot && <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${dot}`} />}
       {children}
     </span>
@@ -81,7 +81,7 @@ export default function SystemHealthBar({
           className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${overall.dot}`}
         />
         <div className="min-w-0">
-          <h2 className="text-lg font-semibold text-fg/90">{overall.text}</h2>
+          <h2 className="text-lg font-semibold text-ink-90">{overall.text}</h2>
           {showProblems ? (
             <ul
               className={`mt-1 space-y-0.5 text-xs ${
@@ -92,13 +92,13 @@ export default function SystemHealthBar({
                 <li key={i}>{p}</li>
               ))}
               {problems.length > PROBLEM_CAP && (
-                <li className="text-fg/40">
+                <li className="text-ink-40">
                   +{problems.length - PROBLEM_CAP} more
                 </li>
               )}
             </ul>
           ) : (
-            <p className="text-xs text-fg/45">
+            <p className="text-xs text-ink-45">
               {connected === 0
                 ? "Connect a service in Settings to get started."
                 : `${connected} of ${SERVICE_IDS.length} services connected`}

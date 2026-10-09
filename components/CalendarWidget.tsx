@@ -51,7 +51,7 @@ export default function CalendarWidget({
           action={
             <Link
               href="/calendar"
-              className="text-xs text-fg/45 transition-colors hover:text-fg/80"
+              className="text-xs text-ink-45 transition-colors hover:text-ink-80"
             >
               View calendar
             </Link>
@@ -64,7 +64,7 @@ export default function CalendarWidget({
         {events.length > 0 ? (
           <AgendaList events={events} now={now} />
         ) : (
-          <p className="text-sm text-fg/45">No upcoming events.</p>
+          <p className="text-sm text-ink-45">No upcoming events.</p>
         )}
       </div>
     </section>

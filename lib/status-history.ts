@@ -500,6 +500,10 @@ type HistoryState = {
   // Completed outages per app (#175), oldest first: the exact {start, end}
   // pairs the poller persisted at each recovery. See RecordedOutage.
   outages: Map<string, RecordedOutage[]>;
+  // When each app with history was first seen missing from the config. Pruning
+  // waits PRUNE_GRACE_MS past this, so undoing a delete (#307) finds the
+  // app's history still there.
+  missingSince: Map<string, number>;
   loaded: boolean;
   // The in-flight (or finished) load, shared by every caller — see loadHistory.
   loading?: Promise<void>;
@@ -515,12 +519,14 @@ const state = globalSingleton<HistoryState>("__ctrlcenterStatusHistory", () => (
   recent: new Map(),
   downSince: new Map(),
   outages: new Map(),
+  missingSince: new Map(),
   loaded: false,
   flushQueue: Promise.resolve(),
 }));
 state.recent ??= new Map(); // tolerate a state created by an older build
 state.downSince ??= new Map(); // ditto — added after the recent ring
 state.outages ??= new Map(); // ditto — added with the recorded outages (#175)
+state.missingSince ??= new Map(); // ditto — added with the prune grace (#307)
 
 function historyPath(): string {
   // Untraced like CONFIG_PATH (lib/config.ts): a runtime path, not a build input.
@@ -711,20 +717,34 @@ export function recordResults(results: StatusResult[], at: number): void {
   }
 }
 
-// Forget every app not in `keepIds` — its hourly buckets, recent readings,
-// open-outage mark, and recorded outages. Called by the poller with the
-// configured app list, so a deleted app's history stops being carried (and
-// rewritten on every flush) indefinitely. Returns how many apps were dropped.
-export function pruneHistory(keepIds: readonly string[]): number {
+// How long an app must be gone from the config before its history is dropped:
+// comfortably past the admin's Undo window (#307), short enough that a deleted
+// app doesn't linger in the file.
+export const PRUNE_GRACE_MS = 10 * 60 * 1000;
+
+// Forget every app not in `keepIds` once it has been missing for
+// PRUNE_GRACE_MS — its hourly buckets, recent readings, open-outage mark, and
+// recorded outages. Called by the poller with the configured app list, so a
+// deleted app's history stops being carried (and rewritten on every flush)
+// indefinitely. Returns how many apps were dropped.
+export function pruneHistory(keepIds: readonly string[], now = Date.now()): number {
   const keep = new Set(keepIds);
+  for (const id of state.missingSince.keys()) {
+    if (keep.has(id)) state.missingSince.delete(id); // restored in time
+  }
+  const maps = [state.store, state.recent, state.downSince, state.outages];
   const gone = new Set<string>();
-  for (const map of [state.store, state.recent, state.downSince, state.outages]) {
+  for (const map of maps) {
     for (const id of map.keys()) {
-      if (!keep.has(id)) {
-        map.delete(id);
-        gone.add(id);
-      }
+      if (keep.has(id)) continue;
+      const since = state.missingSince.get(id);
+      if (since === undefined) state.missingSince.set(id, now);
+      else if (now - since >= PRUNE_GRACE_MS) gone.add(id);
     }
+  }
+  for (const id of gone) {
+    for (const map of maps) map.delete(id);
+    state.missingSince.delete(id);
   }
   return gone.size;
 }

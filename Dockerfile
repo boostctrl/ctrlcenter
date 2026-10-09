@@ -32,6 +32,9 @@ RUN apk add --no-cache su-exec \
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# The production entry wraps Next's server.js to hand the app each request's
+# real socket address (login throttling, #257); see the file for why.
+COPY --chown=nextjs:nodejs scripts/server-entry.mjs ./server-entry.mjs
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
@@ -45,4 +48,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
 
 # Start as root so the entrypoint can chown /config, then it drops to `nextjs`.
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
-CMD ["node", "server.js"]
+CMD ["node", "server-entry.mjs"]

@@ -117,12 +117,12 @@ export default function CountdownWidget({
                 <div className="min-w-0">
                   <p
                     className={`truncate text-sm ${
-                      past ? "text-fg/40" : "text-fg/80"
+                      past ? "text-ink-40" : "text-ink-80"
                     }`}
                   >
                     {item.label.trim() || dateLabel(item.date)}
                   </p>
-                  <p className="text-xs text-fg/40">{dateLabel(item.date)}</p>
+                  <p className="text-xs text-ink-40">{dateLabel(item.date)}</p>
                 </div>
                 {days !== null && (
                   <span
@@ -130,8 +130,8 @@ export default function CountdownWidget({
                       highlight
                         ? "font-medium"
                         : past
-                          ? "text-fg/35"
-                          : "bg-fg/10 text-fg/60"
+                          ? "text-ink-45"
+                          : "bg-fg/10 text-ink-60"
                     }`}
                     style={
                       highlight

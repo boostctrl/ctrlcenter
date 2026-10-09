@@ -11,7 +11,7 @@ export default function SectionTitle({
 }) {
   return (
     <div className="mb-5 flex items-baseline justify-between gap-4">
-      <h2 className="text-sm font-semibold tracking-[0.2em] text-fg/60 uppercase">
+      <h2 className="text-sm font-semibold tracking-[0.2em] text-ink-60 uppercase">
         {children}
       </h2>
       {action}

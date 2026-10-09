@@ -46,7 +46,7 @@ export default function TautulliDetail({
       <TautulliCard status={status} />
       {status.data && (
         <section className="glass-card flex flex-col gap-3 p-6">
-          <h2 className="text-[15px] font-semibold text-fg/90">Recently watched</h2>
+          <h2 className="text-[15px] font-semibold text-ink-90">Recently watched</h2>
           {history.length > 0 ? (
             <ul className="divide-y divide-fg/10">
               {history.map((h, i) => (
@@ -54,11 +54,11 @@ export default function TautulliDetail({
                   key={`${h.title}-${h.at ?? i}-${i}`}
                   className="flex items-baseline justify-between gap-3 py-2 first:pt-0 last:pb-0"
                 >
-                  <span className="min-w-0 truncate text-sm text-fg/80" title={h.title}>
+                  <span className="min-w-0 truncate text-sm text-ink-80" title={h.title}>
                     {h.title}
-                    <span className="text-fg/45"> · {h.user}</span>
+                    <span className="text-ink-45"> · {h.user}</span>
                   </span>
-                  <span className="flex shrink-0 items-baseline gap-2 text-xs tabular-nums text-fg/50">
+                  <span className="flex shrink-0 items-baseline gap-2 text-xs tabular-nums text-ink-50">
                     {h.playback === "transcode" && (
                       <span className="text-amber-400/80">transcode</span>
                     )}
@@ -68,7 +68,7 @@ export default function TautulliDetail({
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-fg/40">No recent history.</p>
+            <p className="text-sm text-ink-40">No recent history.</p>
           )}
         </section>
       )}

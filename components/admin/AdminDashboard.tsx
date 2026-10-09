@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import type {
   AppItem,
   BookmarkItem,
@@ -81,6 +81,19 @@ function AdminBody({
     onScroll: onTabScroll,
     style: tabFadeStyle,
   } = useEdgeFade<HTMLDivElement>();
+
+  // Keep the active tab in view when the strip scrolls on a phone: a
+  // ?tab=settings deep link otherwise opened with its highlighted tab clipped
+  // off the right edge (#272).
+  useEffect(() => {
+    const row = tabFadeRef.current;
+    const active = row?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!row || !active) return;
+    const r = row.getBoundingClientRect();
+    const a = active.getBoundingClientRect();
+    if (a.left < r.left) row.scrollLeft -= r.left - a.left + 16;
+    else if (a.right > r.right) row.scrollLeft += a.right - r.right + 16;
+  }, [tab, tabFadeRef]);
 
   function selectTab(next: Tab) {
     setTab(next);
@@ -166,7 +179,10 @@ function AdminBody({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-8xl flex-col gap-8 px-6 py-12 sm:px-10">
+    <main
+      id="main-content"
+      className="mx-auto flex w-full max-w-8xl flex-col gap-8 px-6 pt-12 pb-24 sm:px-10"
+    >
       <div>
         {/* The admin portal isn't one of the strip's listed pages (it's a
             gated portal, reachable from the floating menu and /settings), so
@@ -175,10 +191,12 @@ function AdminBody({
         <PageNav current={null} {...navPages(initialSettings)} />
         <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-3xl font-bold">Manage your dashboard</h1>
-          <div className="flex flex-wrap items-center gap-3">
+          {/* A 2×2 grid on phones rather than a wrap that strands "Log out"
+              alone on its own row (#272). */}
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:gap-3">
             <Link
               href="/admin/monitor"
-              className={buttonClasses("ghost", "md")}
+              className={`${buttonClasses("ghost", "md")} text-center`}
               title="Live status of your connected integrations — admin-only."
             >
               Monitor
@@ -220,15 +238,19 @@ function AdminBody({
         ref={tabFadeRef}
         onScroll={onTabScroll}
         style={tabFadeStyle}
-        className="flex gap-2 overflow-x-auto border-b border-fg/10 pb-2"
+        role="tablist"
+        aria-label="Admin sections"
+        className="flex gap-1 overflow-x-auto border-b border-fg/10 pb-2 sm:gap-2"
       >
         {TABS.map((t) => (
           <button
             key={t.key}
             type="button"
+            role="tab"
+            aria-selected={tab === t.key}
             onClick={() => selectTab(t.key)}
-            className={`shrink-0 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-              tab === t.key ? "bg-fg/10 text-fg" : "text-fg/50 hover:text-fg/80"
+            className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:px-4 ${
+              tab === t.key ? "bg-fg/10 text-fg" : "text-ink-50 hover:text-ink-80"
             }`}
           >
             {t.label}
@@ -236,7 +258,12 @@ function AdminBody({
         ))}
       </div>
 
-      {tab === "apps" && <AppsManager initialApps={initialApps} />}
+      {tab === "apps" && (
+        <AppsManager
+          initialApps={initialApps}
+          statusChecksEnabled={initialSettings.statusChecks}
+        />
+      )}
       {tab === "bookmarks" && (
         <BookmarksManager
           initialBookmarks={initialBookmarks}
@@ -252,6 +279,6 @@ function AdminBody({
           initialTwoFactorEnabled={initialTwoFactorEnabled}
         />
       )}
-    </div>
+    </main>
   );
 }

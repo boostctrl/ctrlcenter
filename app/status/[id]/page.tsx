@@ -37,7 +37,7 @@ export default async function StatusDetailRoute({ params }: Params) {
 
   return (
     <>
-      <main className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 py-12 sm:px-10 lg:py-16">
+      <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 pt-12 pb-24 sm:px-10 lg:pt-16">
         <div>
           {/* The strip's emphasized (unlinked) Status entry would strand a
               detail page without a way back up, so here — one level below a
@@ -64,9 +64,9 @@ export default async function StatusDetailRoute({ params }: Params) {
             isAdmin={isAdmin}
           />
         ) : (
-          <p className="text-fg/50">
+          <p className="text-ink-50">
             Status checks are turned off.{" "}
-            <Link href="/admin" className="underline hover:text-fg/80">
+            <Link href="/admin" className="underline hover:text-ink-80">
               Enable them in admin settings
             </Link>
             .

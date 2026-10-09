@@ -2,8 +2,9 @@
 // (and locally via `npm run smoke`). Assembles the standalone output the way
 // the Dockerfile does, serves it against a scratch copy of the example config,
 // and renders the key pages in headless Chromium — failing on broken assets,
-// same-origin errors, page errors, or a missing stylesheet. Then signs in
-// through the real login form and renders the admin pages.
+// same-origin errors, page errors, a missing stylesheet, or a WCAG 2.1 AA
+// violation (axe-core, in both color schemes). Then signs in through the real
+// login form and renders the admin pages.
 //
 // Screenshots land in $SMOKE_OUT (default smoke-screenshots/) for upload as a
 // CI artifact. Needs a Chromium for playwright-core: `npx playwright-core
@@ -34,6 +35,12 @@ for (const [from, to] of [
   fs.rmSync(to, { recursive: true, force: true });
   fs.cpSync(from, to, { recursive: true });
 }
+// And the image's entry point beside server.js, so the smoke run serves
+// through the same wrapper production does.
+fs.copyFileSync(
+  path.join(ROOT, "scripts", "server-entry.mjs"),
+  path.join(STANDALONE, "server-entry.mjs")
+);
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "ctrlcenter-smoke-"));
 const configPath = path.join(dataDir, "config.yaml");
@@ -51,7 +58,7 @@ const base = `http://127.0.0.1:${port}`;
 
 const logPath = path.join(dataDir, "server.log");
 const log = fs.openSync(logPath, "w");
-const server = spawn(process.execPath, [path.join(STANDALONE, "server.js")], {
+const server = spawn(process.execPath, [path.join(STANDALONE, "server-entry.mjs")], {
   env: {
     ...process.env,
     NODE_ENV: "production",
@@ -82,6 +89,7 @@ try {
   const run = async (context, pathname, shot) => {
     const result = await checkPage(context, base + pathname, {
       screenshot: path.join(OUT, `${shot}.png`),
+      axe: true,
     });
     for (const w of result.warnings) console.log(`WARN  ${pathname}: ${w}`);
     for (const f of result.failures) failures.push(`${pathname}: ${f}`);
@@ -95,10 +103,7 @@ try {
       viewport: { width: 1440, height: 900 },
       colorScheme: scheme,
     });
-    const pages =
-      scheme === "light"
-        ? ["/", "/status", "/weather", "/calendar", "/help", "/settings", "/admin/login"]
-        : ["/", "/status"];
+    const pages = ["/", "/status", "/weather", "/calendar", "/help", "/settings", "/admin/login"];
     for (const p of pages) {
       await run(ctx, p, `${p === "/" ? "home" : p.slice(1).replace(/\//g, "-")}-${scheme}`);
     }
@@ -112,23 +117,30 @@ try {
     await ctx.close();
   }
 
-  // Sign in through the real form, then render the admin pages.
-  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-  const login = await ctx.newPage();
-  await login.goto(`${base}/admin/login`);
-  await login.fill('input[type="password"]', PASSWORD);
-  await login.keyboard.press("Enter");
-  await login.waitForURL((u) => u.pathname === "/admin", { timeout: 15_000 });
-  await login.close();
-  console.log("ok    signed in through /admin/login");
-  for (const [p, shot] of [
-    ["/admin", "admin"],
-    ["/admin?tab=settings", "admin-settings"],
-    ["/admin/monitor", "admin-monitor"],
-  ]) {
-    await run(ctx, p, shot);
+  // Sign in through the real form, then render the admin pages — in both
+  // schemes, since contrast regressions tend to be scheme-specific.
+  for (const scheme of ["light", "dark"]) {
+    const ctx = await browser.newContext({
+      viewport: { width: 1440, height: 900 },
+      colorScheme: scheme,
+    });
+    const login = await ctx.newPage();
+    await login.goto(`${base}/admin/login`);
+    await login.fill('input[type="password"]', PASSWORD);
+    await login.keyboard.press("Enter");
+    await login.waitForURL((u) => u.pathname === "/admin", { timeout: 15_000 });
+    await login.close();
+    console.log(`ok    signed in through /admin/login (${scheme})`);
+    for (const [p, shot] of [
+      ["/admin", "admin"],
+      ["/admin?tab=bookmarks", "admin-bookmarks"],
+      ["/admin?tab=settings", "admin-settings"],
+      ["/admin/monitor", "admin-monitor"],
+    ]) {
+      await run(ctx, p, `${shot}-${scheme}`);
+    }
+    await ctx.close();
   }
-  await ctx.close();
 } catch (e) {
   failures.push(`smoke run aborted: ${e instanceof Error ? e.message : e}`);
 } finally {

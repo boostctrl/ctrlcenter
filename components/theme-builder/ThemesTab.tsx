@@ -43,7 +43,7 @@ export default function ThemesTab({
       aria-labelledby="tb-tab-themes"
       className="space-y-4"
     >
-      <p className="text-xs text-fg/40">
+      <p className="text-xs text-ink-40">
         Curated looks — one tap sets the design, scene &amp; colors of your{" "}
         {editMode} theme.{" "}
         Tweak it in the other tabs, then name &amp; save your own below.
@@ -67,7 +67,7 @@ export default function ThemesTab({
       </div>
       <div className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-[10px] font-semibold tracking-[0.15em] text-fg/45 uppercase">
+          <span className="text-[10px] font-semibold tracking-[0.15em] text-ink-45 uppercase">
             Your themes
           </span>
           {/* Import always (so an empty list can still receive a file);
@@ -100,17 +100,17 @@ export default function ThemesTab({
           </div>
         </div>
         {customThemes.length === 0 && (
-          <p className="text-xs text-fg/40">
+          <p className="text-xs text-ink-40">
             Import a themes file exported from another browser.
           </p>
         )}
         {importStatus && (
-          <p role="status" className="text-xs text-fg/50">
+          <p role="status" className="text-xs text-ink-50">
             {importStatus}
           </p>
         )}
         {promoteStatus && (
-          <p role="status" className="text-xs text-fg/50">
+          <p role="status" className="text-xs text-ink-50">
             {promoteStatus}
           </p>
         )}
@@ -120,7 +120,7 @@ export default function ThemesTab({
             user to give duplicates distinct names so Save is unambiguous
             (#144). */}
         {hasDuplicateNames && (
-          <p className="text-[11px] text-fg/45">
+          <p className="text-[11px] text-ink-45">
             Some saved themes share a name — rename them so saving updates the
             one you mean.
           </p>
@@ -172,7 +172,7 @@ export default function ThemesTab({
                       disabled={promoting}
                       aria-label={`Set ${t.name} as the site theme`}
                       title="Set as site theme"
-                      className="absolute top-1 right-13 rounded-md bg-background/70 px-1 py-1 text-fg/50 transition-colors hover:text-fg/90 disabled:opacity-40"
+                      className="absolute top-1 right-13 rounded-md bg-background/70 px-1 py-1 text-ink-50 transition-colors hover:text-ink-90 disabled:opacity-40"
                     >
                       <svg
                         width="11"
@@ -194,7 +194,7 @@ export default function ThemesTab({
                   <RenameButton
                     label={`Rename ${t.name}`}
                     onClick={() => setRenamingId(t.id)}
-                    className="absolute top-1 right-7 rounded-md bg-background/70 px-1 py-1 text-fg/50 transition-colors hover:text-fg/90"
+                    className="absolute top-1 right-7 rounded-md bg-background/70 px-1 py-1 text-ink-50 transition-colors hover:text-ink-90"
                   />
                   <button
                     type="button"
@@ -211,7 +211,7 @@ export default function ThemesTab({
                         deleteNamedTheme(t.id);
                     }}
                     aria-label={`Delete ${t.name}`}
-                    className="absolute top-1 right-1 rounded-md bg-background/70 px-1 text-xs text-fg/50 transition-colors hover:text-red-400"
+                    className="absolute top-1 right-1 rounded-md bg-background/70 px-1 text-xs text-ink-50 transition-colors hover:text-red-400"
                   >
                     ✕
                   </button>

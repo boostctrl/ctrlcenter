@@ -25,14 +25,14 @@ export default function UnifiCard({
                 data.internet.up ? "bg-emerald-400" : "bg-red-400"
               }`}
             />
-            <span className="text-lg font-semibold text-fg/90">
+            <span className="text-lg font-semibold text-ink-90">
               {data.internet.up ? "Internet up" : "Internet down"}
             </span>
             {data.internet.isp && (
-              <span className="text-sm text-fg/50">· {data.internet.isp}</span>
+              <span className="text-sm text-ink-50">· {data.internet.isp}</span>
             )}
           </div>
-          <p className="text-xs text-fg/50">
+          <p className="text-xs text-ink-50">
             {data.internet.wanIp ?? "no WAN IP"}
             {data.internet.latencyMs !== null && (
               <> · {data.internet.latencyMs} ms latency</>
@@ -40,19 +40,19 @@ export default function UnifiCard({
           </p>
 
           <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 border-t border-fg/10 pt-3">
-            <span className="text-sm text-fg/80">
-              <span className="text-base font-semibold tabular-nums text-fg/90">
+            <span className="text-sm text-ink-80">
+              <span className="text-base font-semibold tabular-nums text-ink-90">
                 {data.clients.total}
               </span>{" "}
               client{data.clients.total === 1 ? "" : "s"}
-              <span className="text-fg/45">
+              <span className="text-ink-45">
                 {" "}
                 ({data.clients.wireless} WiFi · {data.clients.wired} wired
                 {data.clients.guests > 0 && <> · {data.clients.guests} guest</>})
               </span>
             </span>
           </div>
-          <p className="text-xs text-fg/50">
+          <p className="text-xs text-ink-50">
             {data.devices.adopted} device{data.devices.adopted === 1 ? "" : "s"} online
             {data.devices.disconnected > 0 && (
               <span className="text-red-400">

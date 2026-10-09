@@ -112,7 +112,7 @@ export default function ThemesManager({
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="max-w-prose text-sm text-fg/50">
+        <p className="max-w-prose text-sm text-ink-50">
           Edit the built-in themes visitors can pick in the theme builder. Rename
           a theme, recolor it, or change its design and scene; changes apply
           site-wide. Reset any theme to restore its original.
@@ -167,17 +167,17 @@ function PackEditor({
             className="accent-focus min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1 py-0.5 font-semibold text-fg outline-none transition-colors hover:border-fg/15 focus:border-fg/25 focus:bg-fg/5"
           />
           {isDefault && (
-            <span className="shrink-0 rounded bg-fg/15 px-1 text-[9px] font-medium tracking-wide text-fg/70 uppercase">
+            <span className="shrink-0 rounded bg-fg/15 px-1 text-[9px] font-medium tracking-wide text-ink-70 uppercase">
               Default
             </span>
           )}
-          {edited && <span className="shrink-0 text-xs text-fg/40">· edited</span>}
+          {edited && <span className="shrink-0 text-xs text-ink-40">· edited</span>}
         </div>
         {edited && (
           <button
             type="button"
             onClick={onReset}
-            className="shrink-0 rounded-md px-2 py-1 text-xs text-fg/50 transition-colors hover:bg-fg/10 hover:text-fg/80"
+            className="shrink-0 rounded-md px-2 py-1 text-xs text-ink-50 transition-colors hover:bg-fg/10 hover:text-ink-80"
           >
             Reset
           </button>
@@ -240,7 +240,7 @@ function PackEditor({
               aria-label={`${pack.name} ${mode} ${f.label}`}
               className={colorClass}
             />
-            <span className="text-fg/60">{f.label}</span>
+            <span className="text-ink-60">{f.label}</span>
           </label>
         ))}
       </div>

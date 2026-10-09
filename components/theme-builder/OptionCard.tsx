@@ -55,18 +55,18 @@ export function OptionCard({
       <span className="min-w-0">
         <span
           className={`block truncate text-xs ${
-            selected ? "text-fg/90" : "text-fg/60 group-hover:text-fg/90"
+            selected ? "text-ink-90" : "text-ink-60 group-hover:text-ink-90"
           }`}
           style={nameStyle}
         >
           {name}
         </span>
         {desc && (
-          <span className="block truncate text-[10px] text-fg/40">{desc}</span>
+          <span className="block truncate text-[10px] text-ink-40">{desc}</span>
         )}
       </span>
       {badge && (
-        <span className="absolute top-1 right-1 rounded bg-fg/15 px-1 text-[9px] font-medium tracking-wide text-fg/70 uppercase">
+        <span className="absolute top-1 right-1 rounded bg-fg/15 px-1 text-[9px] font-medium tracking-wide text-ink-70 uppercase">
           {badge}
         </span>
       )}

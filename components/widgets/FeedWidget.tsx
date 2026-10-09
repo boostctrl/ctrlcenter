@@ -44,22 +44,22 @@ export default function FeedWidget({
               const row = (
                 <>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm text-fg/80">
+                    <span className="block truncate text-sm text-ink-80">
                       {item.title}
                     </span>
                     {showSummaries && item.summary && (
-                      <span className="line-clamp-2 text-xs leading-snug text-fg/55">
+                      <span className="line-clamp-2 text-xs leading-snug text-ink-55">
                         {item.summary}
                       </span>
                     )}
                     {item.source && (
-                      <span className="block truncate text-xs text-fg/40">
+                      <span className="block truncate text-xs text-ink-40">
                         {item.source}
                       </span>
                     )}
                   </span>
                   {date && (
-                    <span className="shrink-0 text-xs text-fg/40 tabular-nums">
+                    <span className="shrink-0 text-xs text-ink-40 tabular-nums">
                       {date}
                     </span>
                   )}
@@ -84,7 +84,7 @@ export default function FeedWidget({
             })}
           </ul>
         ) : (
-          <p className="text-sm text-fg/45">
+          <p className="text-sm text-ink-45">
             Couldn&apos;t load the feed right now.
           </p>
         )}

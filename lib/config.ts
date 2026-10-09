@@ -576,6 +576,31 @@ export async function deleteApp(id: string): Promise<void> {
   });
 }
 
+// Re-inserts a deleted row at `index` (clamped), for undo (#307). Idempotent:
+// if the id is already back (a double-clicked Undo), nothing changes.
+function restoreAt<T extends { id: string }>(items: T[], item: T, index: number): T[] {
+  if (items.some((existing) => existing.id === item.id)) return items;
+  const at = Math.min(Math.max(0, index), items.length);
+  return [...items.slice(0, at), item, ...items.slice(at)];
+}
+
+export async function restoreApp(item: AppItem, index: number): Promise<AppItem[]> {
+  return mutate((config) => {
+    config.apps = restoreAt(config.apps, item, index);
+    return config.apps;
+  });
+}
+
+export async function restoreBookmark(
+  item: BookmarkItem,
+  index: number
+): Promise<BookmarkItem[]> {
+  return mutate((config) => {
+    config.bookmarks = restoreAt(config.bookmarks, item, index);
+    return config.bookmarks;
+  });
+}
+
 // Reorders `items` to match the order of `ids`. Ids not present in `items`
 // are ignored; items whose id isn't listed are kept and appended in their
 // existing order, so a stale or partial id list can never drop data.

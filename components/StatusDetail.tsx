@@ -10,6 +10,7 @@ import {
   StatusTimeline,
   StateDot,
   host,
+  checkTarget,
   relativeTime,
   downDuration,
   instantLabel,
@@ -63,7 +64,7 @@ function LatencyChart({
     (p): p is { at: string; ms: number } => p.ms != null
   );
   if (withMs.length === 0) {
-    return <p className="text-sm text-fg/40">No response-time samples yet.</p>;
+    return <p className="text-sm text-ink-40">No response-time samples yet.</p>;
   }
   const max = Math.max(...withMs.map((p) => p.ms));
   const bucketMs = STATUS_RANGE_MS[range] / points.length;
@@ -145,7 +146,7 @@ function OutageRow({
   return (
     <li className="space-y-1 py-2.5 first:pt-0 last:pb-0">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <span className="text-sm text-fg/80">
+        <span className="text-sm text-ink-80">
           {instantLabel(outage.startMs, timeZone)}
           {" – "}
           {ongoing ? (
@@ -156,12 +157,12 @@ function OutageRow({
           {/* Hour-granular entries derived from old buckets say so instead of
               implying to-the-minute knowledge the data doesn't have. */}
           {!outage.exact && (
-            <span className="text-xs text-fg/40"> · approximate</span>
+            <span className="text-xs text-ink-40"> · approximate</span>
           )}
         </span>
         <span
           className={`text-sm tabular-nums ${
-            ongoing ? "text-red-400" : "text-fg/55"
+            ongoing ? "text-red-400" : "text-ink-55"
           }`}
         >
           down {ongoing ? downDuration(outage.startMs, now) : fmtDuration(outage.downMs)}
@@ -182,12 +183,12 @@ function OutageRow({
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
             {outage.note ? (
               <>
-                <p className="text-sm text-fg/55">{outage.note}</p>
+                <p className="text-sm text-ink-55">{outage.note}</p>
                 {editable && (
                   <RenameButton
                     label={`Edit ${noteLabel}`}
                     onClick={beginEdit}
-                    className="shrink-0 self-center text-fg/35 hover:text-fg/80"
+                    className="shrink-0 self-center text-ink-35 hover:text-ink-80"
                   />
                 )}
               </>
@@ -195,7 +196,7 @@ function OutageRow({
               <button
                 type="button"
                 onClick={beginEdit}
-                className="text-xs text-fg/40 underline decoration-fg/20 underline-offset-2 hover:text-fg/75"
+                className="text-xs text-ink-40 underline decoration-fg/20 underline-offset-2 hover:text-ink-75"
               >
                 Add note
               </button>
@@ -329,7 +330,7 @@ export default function StatusDetail({
           <Icon icon={app.icon} name={app.name} size={24} />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm text-fg/55">
+          <p className="truncate text-sm text-ink-55">
             {app.subtitle ? `${app.subtitle} · ${host(app.url)}` : host(app.url)}
           </p>
           <p
@@ -338,13 +339,13 @@ export default function StatusDetail({
                 ? `down since ${instantLabel(outageStart, timezone)}`
                 : undefined
             }
-            className={`text-sm ${live && !live.up ? "text-red-400" : "text-fg/70"}`}
+            className={`text-sm ${live && !live.up ? "text-red-400" : "text-ink-70"}`}
           >
             {liveDetail}
           </p>
         </div>
         {checkedAt !== null && (
-          <p className="shrink-0 text-xs text-fg/40">
+          <p className="shrink-0 text-xs text-ink-40">
             Updated {relativeTime(checkedAt, now)}
           </p>
         )}
@@ -365,13 +366,13 @@ export default function StatusDetail({
               : null;
           return (
             <div key={r.key} className="glass-card px-4 py-3">
-              <p className="text-xs text-fg/45">{r.label}</p>
+              <p className="text-xs text-ink-45">{r.label}</p>
               <p className="text-lg font-semibold tabular-nums">{fmtPct(pct)}</p>
-              <p className="text-xs text-fg/45 tabular-nums">
+              <p className="text-xs text-ink-45 tabular-nums">
                 {lat ? `avg ${lat.avg} ms · max ${lat.max} ms` : " "}
               </p>
               {since != null && (
-                <p className="text-xs text-fg/45">
+                <p className="text-xs text-ink-45">
                   since {formatSince(since, timezone, r.key)}
                 </p>
               )}
@@ -383,13 +384,13 @@ export default function StatusDetail({
       {/* The large uptime graph. */}
       <div className="glass-card space-y-3 px-5 py-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-fg/70">
+          <p className="text-sm text-ink-70">
             Uptime over {rangeLabel}
-            <span className="ml-2 font-semibold tabular-nums text-fg/90">
+            <span className="ml-2 font-semibold tabular-nums text-ink-90">
               {fmtPct(uptime)}
             </span>
             {coverageSince != null && (
-              <span className="ml-2 text-xs text-fg/45">
+              <span className="ml-2 text-xs text-ink-45">
                 since {formatSince(coverageSince, timezone, range)}
               </span>
             )}
@@ -411,16 +412,16 @@ export default function StatusDetail({
             detail
           />
         ) : (
-          <p className="text-sm text-fg/40">No recorded history yet.</p>
+          <p className="text-sm text-ink-40">No recorded history yet.</p>
         )}
       </div>
 
       {/* Response time over the same window. */}
       <div className="glass-card space-y-3 px-5 py-4">
-        <p className="text-sm text-fg/70">
+        <p className="text-sm text-ink-70">
           Response time over {rangeLabel}
           {latency && (
-            <span className="ml-2 text-xs tabular-nums text-fg/45">
+            <span className="ml-2 text-xs tabular-nums text-ink-45">
               avg {latency.avg} ms · max {latency.max} ms
             </span>
           )}
@@ -432,7 +433,7 @@ export default function StatusDetail({
           editor's delete confirmation; it renders nothing until asked. */}
       <ConfirmProvider>
         <div className="glass-card px-5 py-4">
-          <p className="mb-2 text-sm text-fg/70">Outages</p>
+          <p className="mb-2 text-sm text-ink-70">Outages</p>
           {detail && detail.outages.length > 0 ? (
             <ul className="divide-y divide-fg/10">
               {detail.outages.map((o) => (
@@ -447,7 +448,7 @@ export default function StatusDetail({
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-fg/40">
+            <p className="text-sm text-ink-40">
               No outages in the recorded history.
             </p>
           )}
@@ -456,22 +457,26 @@ export default function StatusDetail({
 
       {/* How this app is checked — read-only context for the graphs above. */}
       <div className="glass-card px-5 py-4">
-        <p className="mb-2 text-sm text-fg/70">Check configuration</p>
+        <p className="mb-2 text-sm text-ink-70">Check configuration</p>
         <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm">
-          <dt className="text-fg/45">Method</dt>
-          <dd className="text-fg/80">{checkTypeLabel}</dd>
-          <dt className="text-fg/45">Target</dt>
-          <dd className="truncate text-fg/80">{host(app.url)}</dd>
+          <dt className="text-ink-45">Method</dt>
+          <dd className="text-ink-80">{checkTypeLabel}</dd>
+          <dt className="text-ink-45">Target</dt>
+          {/* HTTP and keyword checks request the whole URL, so show it (minus
+              any credentials); the socket-level checks only use the host. */}
+          <dd className="truncate text-ink-80" title={checkTarget(app.url, check.type)}>
+            {checkTarget(app.url, check.type)}
+          </dd>
           {check.type === "tcp" && check.port != null && (
             <>
-              <dt className="text-fg/45">Port</dt>
-              <dd className="tabular-nums text-fg/80">{check.port}</dd>
+              <dt className="text-ink-45">Port</dt>
+              <dd className="tabular-nums text-ink-80">{check.port}</dd>
             </>
           )}
           {(check.type === "http" || check.type === "keyword") && (
             <>
-              <dt className="text-fg/45">Expected status</dt>
-              <dd className="tabular-nums text-fg/80">
+              <dt className="text-ink-45">Expected status</dt>
+              <dd className="tabular-nums text-ink-80">
                 {check.expectStatus.trim() === ""
                   ? "Any response counts as up"
                   : check.expectStatus}

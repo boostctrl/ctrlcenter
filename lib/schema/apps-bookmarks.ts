@@ -84,6 +84,19 @@ export const bookmarkUpdateSchema = z.object({
   private: z.boolean().optional(),
 });
 
+// Undo a delete (#307): put the deleted row back whole — same id, so status
+// history, outage notes and visitors' favorites still match — at the index it
+// was removed from.
+export const appRestoreSchema = z.object({
+  item: appItemSchema,
+  index: z.number().int().min(0),
+});
+
+export const bookmarkRestoreSchema = z.object({
+  item: bookmarkItemSchema,
+  index: z.number().int().min(0),
+});
+
 // Rename a bookmark category across its bookmarks (PATCH /api/bookmarks/category).
 // `from` is NOT trimmed — it must match the stored category verbatim, and stored
 // names can carry stray whitespace (bookmark input doesn't trim); trimming here

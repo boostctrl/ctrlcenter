@@ -85,10 +85,10 @@ export default function AnnouncementsSection({ d }: { d: SettingsDraft }) {
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-fg/60">
+                    <span className="text-xs font-medium text-ink-60">
                       Announcement {i + 1}
                     </span>
-                    <span className="rounded-full bg-fg/10 px-2 py-0.5 text-[0.7rem] font-medium text-fg/60">
+                    <span className="rounded-full bg-fg/10 px-2 py-0.5 text-[0.7rem] font-medium text-ink-60">
                       {STATUS_STATE_LABELS[state]}
                     </span>
                   </div>

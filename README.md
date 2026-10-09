@@ -224,19 +224,20 @@ settings:
     # still honored for old configs, but layout `hidden` (below) is the source
     # of truth once set.
   layout:                   # the home-page widget grid — best edited visually:
-    sections:               # sign in and pick "Edit layout" from the corner menu
-      - { id: greeting, span: 8 }         # order = position; widgets flow row
-      - { id: headerCard, span: 4 }       #   by row across 12 columns
-      - { id: clock, span: 4, hidden: true }    # split clock/weather/status
-      - { id: weather, span: 4, hidden: true }  #   widgets — show them as an
-      - { id: status, span: 4, hidden: true }   #   alternative to headerCard
-      - { id: search, span: 12 }
-      - { id: calendar, span: 12 }
-      - { id: favorites, span: 12 }
-      - { id: apps, span: 12 }
-      - { id: bookmarks, span: 12 }
-    # pre-1.3 configs used `width: full|twoThirds|half|third` — still accepted,
-    # auto-migrated to spans (12/8/6/4) on the next save.
+    columns: 24             # sign in and pick "Edit layout" from the corner menu
+    sections:
+      - { id: greeting, span: 16 }        # order = position; widgets flow row
+      - { id: headerCard, span: 8 }       #   by row across 24 columns
+      - { id: clock, span: 8, hidden: true }    # split clock/weather/status
+      - { id: weather, span: 8, hidden: true }  #   widgets — show them as an
+      - { id: status, span: 8, hidden: true }   #   alternative to headerCard
+      - { id: search, span: 24 }
+      - { id: calendar, span: 24 }
+      - { id: favorites, span: 24 }
+      - { id: apps, span: 24 }
+      - { id: bookmarks, span: 24 }
+    # Older configs (12-column spans, or pre-1.3 `width: full|twoThirds|…`)
+    # are still accepted and migrated to 24-column spans on the next save.
 
 apps:
   - id: <uuid>
@@ -295,7 +296,7 @@ for reuse. You can also paste a direct image URL or a `data:` URI.
 | `CTRLCENTER_HOST_PROC` | no | Where the System stats widget looks for a host-mode `/proc` mount (default `/host/proc`). In a container the widget normally reports the *container's* cgroup-scoped CPU/memory; to show the host machine instead, bind-mount the host's `/proc` read-only — `-v /proc:/host/proc:ro` (compose: `- /proc:/host/proc:ro`) — and the widget switches to host mode automatically, no privileges needed. Disks are separate: a path must be mounted into the container to be measured. |
 | `CTRLCENTER_ICON_CACHE_MAX_BYTES` | no | Cap, in bytes, on the on-disk cache of icons fetched from the icon CDN (stored beside your config). Default `67108864` (64 MB) — far more than any real dashboard uses. When the cap is exceeded, the least-recently-served icons are evicted (and simply re-fetched next time they're needed). Lower it on a very small data volume. |
 | `LOG_LEVEL` | no | Server log verbosity: `debug`, `info` (default), `warn`, or `error`. Diagnostics — a timed-out weather/feed/calendar fetch, a rejected alert — are logged to the container's stdout/stderr. |
-| `TRUSTED_PROXY_HOPS` | no | Number of trusted reverse proxies in front of the app, used to find the real client IP in `X-Forwarded-For` for login throttling. Default `1` (the app sits behind one reverse proxy). **Set `0` if the app is exposed directly** — otherwise a client can spoof `X-Forwarded-For` to forge a fresh source IP per request and slip past the per-IP login throttle. A global attempt cap still applies as a backstop, but the per-IP limit is your first line of defense. |
+| `TRUSTED_PROXY_HOPS` | no | Number of trusted reverse proxies in front of the app, used to find the real client IP in `X-Forwarded-For` for login throttling. Default `1` (the app sits behind one reverse proxy). **Set `0` if the app is exposed directly** — the Docker image then throttles each client by its actual connection address; otherwise a client can spoof `X-Forwarded-For` to forge a fresh source IP per request and slip past the per-IP login throttle. A global attempt cap still applies as a backstop, but the per-IP limit is your first line of defense. (Run outside the image — `next start` — the app can't see connection addresses, so with `0` every client shares one limit.) |
 
 ## Development
 

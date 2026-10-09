@@ -80,7 +80,7 @@ export function ChipGroup<T extends string | number>({
           className={`${chip} ${
             value === o.value
               ? "bg-fg/15 text-fg"
-              : "text-fg/50 hover:text-fg/80"
+              : "text-ink-50 hover:text-ink-80"
           }`}
         >
           {o.label}

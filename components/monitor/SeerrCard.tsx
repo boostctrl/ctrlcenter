@@ -72,15 +72,15 @@ function RequestRow({
   return (
     <li className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="min-w-0 truncate text-sm text-fg/80" title={request.title}>
+        <span className="min-w-0 truncate text-sm text-ink-80" title={request.title}>
           {request.title}
-          <span className="text-fg/45"> · {request.requester}</span>
+          <span className="text-ink-45"> · {request.requester}</span>
         </span>
         <span className="flex shrink-0 items-baseline gap-2 text-xs tabular-nums">
           <span className={STATUS_TONES[request.status]}>
             {STATUS_LABELS[request.status]}
           </span>
-          {meta && <span className="text-fg/50">{meta}</span>}
+          {meta && <span className="text-ink-50">{meta}</span>}
         </span>
       </div>
       {actions && (
@@ -136,13 +136,13 @@ export default function SeerrCard({
       {data && (
         <>
           <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-            <span className="text-lg font-semibold tabular-nums text-fg/90">
+            <span className="text-lg font-semibold tabular-nums text-ink-90">
               {data.pending}
-              <span className="ml-1.5 text-xs font-normal text-fg/50">
+              <span className="ml-1.5 text-xs font-normal text-ink-50">
                 pending
               </span>
             </span>
-            <span className="text-xs text-fg/50">
+            <span className="text-xs text-ink-50">
               {data.processing} processing · {data.available} available ·{" "}
               {data.totalRequests} total
             </span>
@@ -150,7 +150,7 @@ export default function SeerrCard({
           {error && <p className="text-xs text-red-400">{error}</p>}
           {data.requests.length > 0 ? (
             <div className="flex flex-col gap-2">
-              <p className="text-[11px] font-medium tracking-wide text-fg/40 uppercase">
+              <p className="text-[11px] font-medium tracking-wide text-ink-40 uppercase">
                 Recent requests
               </p>
               {/* Two independent columns on wide screens so the list fills the
@@ -186,7 +186,7 @@ export default function SeerrCard({
               </div>
             </div>
           ) : (
-            <p className="text-sm text-fg/40">No requests yet.</p>
+            <p className="text-sm text-ink-40">No requests yet.</p>
           )}
         </>
       )}

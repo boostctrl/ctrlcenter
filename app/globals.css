@@ -413,6 +413,21 @@
      before hydration. */
 }
 
+/* Status colors (#273): the pale -200…-400 shades used for error, warning and
+   up/down text and dots are tuned for the dark surface; on the light one they
+   fall to ~2–3:1. Tailwind reads each palette color from a variable, so
+   remapping these here deepens every use (text, dots, /NN variants) in light
+   mode only, leaving the dark theme untouched. */
+.theme-light {
+  --color-red-300: var(--color-red-700);
+  --color-red-400: var(--color-red-700);
+  --color-amber-200: var(--color-amber-800);
+  --color-amber-300: var(--color-amber-700);
+  --color-amber-400: var(--color-amber-700);
+  --color-emerald-400: var(--color-emerald-700);
+  --color-sky-400: var(--color-sky-700);
+}
+
 /* Emboss's light-source highlight must be a true white in light mode — the
    --fg-based one would invert into a dark smudge on the pale surface. */
 .theme-light.design-emboss {
@@ -429,6 +444,46 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.7);
   --surface-shadow-hover: 0 10px 28px rgba(var(--shadow-tint), 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+/* Weather emoji: white glyphs (☁️, 🌫️, ❄️) vanish on the pale light surface, so
+   give them a soft slate outline in light mode only (#270). */
+.theme-light .wx-icon {
+  filter: drop-shadow(0 1px 1px rgba(var(--shadow-tint), 0.45))
+    drop-shadow(0 0 1px rgba(var(--shadow-tint), 0.35));
+}
+
+/* Secondary text ink (#273). `text-ink-50` reads like `text-fg/50`, with its
+   opacity lifted part-way toward full (`--ink-lift`) — slightly in dark mode,
+   more in light mode, because a translucent dark ink on the pale surfaces can't
+   reach 4.5:1 at the low opacities the dark theme reads fine at (e.g. /50 is
+   ~3.2:1 on light glass, ~5:1 lifted). One knob instead of per-class tuning;
+   use `text-ink-*` for any text whose opacity is below 100. */
+:root {
+  /* A small lift in dark mode too: white at /40–/45 lands just under 4.5:1 on
+     the near-black surfaces (3.8–4.49 measured). */
+  --ink-lift: 0.15;
+}
+.theme-light {
+  --ink-lift: 0.4;
+}
+@utility text-ink-* {
+  color: color-mix(
+    in oklab,
+    var(--fg) calc(100% - (100% - --value(integer) * 1%) * (1 - var(--ink-lift))),
+    transparent
+  );
+}
+
+/* One visible keyboard-focus ring for every interactive element (#274), in
+   the accent shade already deepened for light surfaces (--scene-from) so it
+   holds 3:1 against either scheme. Base layer, so a component's own focus
+   treatment (outline-none + something better) still wins. */
+@layer base {
+  :where(a, button, summary, select, [tabindex]:not([tabindex="-1"]), [role="slider"]):focus-visible {
+    outline: 2px solid var(--scene-from);
+    outline-offset: 2px;
+  }
 }
 
 @theme inline {
@@ -561,6 +616,11 @@ select optgroup {
   }
   .accent-focus:focus {
     border-color: var(--accent-to);
+  }
+  /* A glow on top of the border tint: the 1px border change alone was barely
+     visible, and links using this class have no border at all (#274). */
+  .accent-focus:focus-visible {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--scene-from) 55%, transparent);
   }
   /* Native color inputs in the theme builder. The UA renders a bordered square
      swatch inside the control's padding; strip that chrome so the chosen color

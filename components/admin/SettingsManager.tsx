@@ -96,7 +96,7 @@ export default function SettingsManager({
             className={`shrink-0 rounded-lg px-3 py-2 text-left text-sm whitespace-nowrap transition-colors ${
               section === s.id
                 ? "bg-fg/10 font-medium text-fg"
-                : "text-fg/50 hover:bg-fg/5 hover:text-fg/80"
+                : "text-ink-50 hover:bg-fg/5 hover:text-ink-80"
             }`}
           >
             {s.label}
@@ -110,7 +110,7 @@ export default function SettingsManager({
         <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
           <div>
             <h2 className="text-lg font-semibold">{activeSection.label}</h2>
-            <p className="text-xs text-fg/40">{activeSection.blurb}</p>
+            <p className="text-xs text-ink-40">{activeSection.blurb}</p>
           </div>
           <SaveStatus status={status} error={error} />
         </div>
