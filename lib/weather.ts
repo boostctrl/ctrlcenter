@@ -26,6 +26,9 @@ export type CurrentWeather = {
   temperature: number;
   humidity: number;
   code: number;
+  // Night swaps the clear-sky sun for a moon (weatherCodeToIcon). Defaults to
+  // day when the API omits it.
+  isDay: boolean;
 };
 
 export async function fetchWeather(
@@ -36,7 +39,7 @@ export async function fetchWeather(
   const params = new URLSearchParams({
     latitude: String(latitude),
     longitude: String(longitude),
-    current: "temperature_2m,relative_humidity_2m,weather_code",
+    current: "temperature_2m,relative_humidity_2m,weather_code,is_day",
     temperature_unit: units === "metric" ? "celsius" : "fahrenheit",
     timezone: "auto",
   });
@@ -72,6 +75,7 @@ export async function fetchWeather(
           ? current.relative_humidity_2m
           : 0,
       code: current.weather_code,
+      isDay: current.is_day !== 0,
     };
   } catch (e) {
     log.warn("weather fetch error", { host: hostOf(url), reason: errorReason(e) });

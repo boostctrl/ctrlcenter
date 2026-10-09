@@ -431,6 +431,13 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.85);
 }
 
+/* Weather emoji: white glyphs (☁️, 🌫️, ❄️) vanish on the pale light surface, so
+   give them a soft slate outline in light mode only (#270). */
+.theme-light .wx-icon {
+  filter: drop-shadow(0 1px 1px rgba(var(--shadow-tint), 0.45))
+    drop-shadow(0 0 1px rgba(var(--shadow-tint), 0.35));
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

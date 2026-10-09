@@ -12,6 +12,12 @@ here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The home page weather shows a moon at night.** The header card used the
+  daytime icon around the clock; it now matches the /weather page. White
+  weather icons (clouds, fog, snow) also stay visible in light mode. (#270)
+
 ## [2.10.1] - 2026-10-09
 
 ### Security

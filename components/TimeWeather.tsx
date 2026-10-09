@@ -74,8 +74,8 @@ export default function TimeWeather({
       {showWeather && (
         <>
           <div className="flex items-center gap-3">
-            <span className="text-4xl" aria-hidden>
-              {weatherCodeToIcon(weather.code)}
+            <span className="wx-icon text-4xl" aria-hidden>
+              {weatherCodeToIcon(weather.code, weather.isDay)}
             </span>
             <div>
               <p className="text-2xl leading-tight font-semibold">

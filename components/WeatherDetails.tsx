@@ -230,7 +230,7 @@ export default function WeatherDetails({
             light={surfaceIsLight}
           />
           <div className="relative flex flex-wrap items-center gap-x-6 gap-y-3">
-            <span className="text-7xl leading-none" data-weather-fx-anchor aria-hidden>
+            <span className="wx-icon text-7xl leading-none" data-weather-fx-anchor aria-hidden>
               {weatherCodeToIcon(current.code, current.isDay)}
             </span>
             <div>
@@ -327,7 +327,7 @@ export default function WeatherDetails({
                 className="flex shrink-0 grow flex-col items-center gap-1 text-center"
               >
                 <span className="text-xs text-fg/50">{hourLabel(h.time)}</span>
-                <span className="text-xl" aria-hidden>
+                <span className="wx-icon text-xl" aria-hidden>
                   {weatherCodeToIcon(h.code, h.isDay)}
                 </span>
                 <span className="text-sm font-medium tabular-nums">
@@ -361,7 +361,7 @@ export default function WeatherDetails({
                   <span className="w-12 shrink-0 text-fg/70">
                     {dayLabel(d.date, i)}
                   </span>
-                  <span className="w-6 shrink-0 text-center text-lg" aria-hidden>
+                  <span className="wx-icon w-6 shrink-0 text-center text-lg" aria-hidden>
                     {weatherCodeToIcon(d.code)}
                   </span>
                   <span className="hidden w-10 shrink-0 text-right text-xs tabular-nums text-fg/45 sm:block">
