@@ -32,7 +32,7 @@ function TrendChart({
   windowLabel: string | null;
 }) {
   if (series.length < 2) {
-    return <p className="text-sm text-fg/40">Not enough data yet for a trend.</p>;
+    return <p className="text-sm text-ink-40">Not enough data yet for a trend.</p>;
   }
   const max = Math.max(...series, 1);
   const peak = Math.max(...series);
@@ -73,7 +73,7 @@ function TrendChart({
           />
         )}
       </svg>
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-fg/45">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-ink-45">
         <span className="flex items-center gap-3">
           <span className="flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full bg-[var(--accent-from)]" />
@@ -108,7 +108,7 @@ export default function AdguardDetail({
       <AdguardCard status={status} />
       {data && (
         <section className="glass-card flex flex-col gap-3 p-6">
-          <h2 className="text-[15px] font-semibold text-fg/90">Query activity</h2>
+          <h2 className="text-[15px] font-semibold text-ink-90">Query activity</h2>
           <TrendChart
             series={data.series}
             blockedSeries={data.blockedSeries}

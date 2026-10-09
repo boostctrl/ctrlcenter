@@ -83,11 +83,11 @@ export default function WidgetsSection({ d }: { d: SettingsDraft }) {
         title="Custom bangs"
         intro={
           <>
-            Type <span className="text-fg/60">!key term</span> in the search
-            bar to jump to a site (use <span className="text-fg/60">%s</span>{" "}
-            for the term). Built-ins (<span className="text-fg/60">!yt</span>,{" "}
-            <span className="text-fg/60">!gh</span>,{" "}
-            <span className="text-fg/60">!w</span>…) plus your app names and
+            Type <span className="text-ink-60">!key term</span> in the search
+            bar to jump to a site (use <span className="text-ink-60">%s</span>{" "}
+            for the term). Built-ins (<span className="text-ink-60">!yt</span>,{" "}
+            <span className="text-ink-60">!gh</span>,{" "}
+            <span className="text-ink-60">!w</span>…) plus your app names and
             subtitles work already.
           </>
         }
@@ -95,7 +95,7 @@ export default function WidgetsSection({ d }: { d: SettingsDraft }) {
         <ListPanel>
           {bangs.map((b, i) => (
             <div key={bangRows.keys[i] ?? i} className="flex items-center gap-2">
-              <span className="text-fg/40">!</span>
+              <span className="text-ink-40">!</span>
               <input
                 value={b.key}
                 onChange={(e) =>

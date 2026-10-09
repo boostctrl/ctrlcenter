@@ -24,7 +24,7 @@ export default function GlobalError({
       <body className="min-h-screen antialiased">
         <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col justify-center gap-6 px-6 py-12">
           <h1 className="text-3xl font-bold">CtrlCenter couldn&apos;t load</h1>
-          <p className="text-fg/60">
+          <p className="text-ink-60">
             Something failed before any page could render — often a problem
             reading the config file (config.yaml). The server log has the
             details{error.digest ? ` (look for ${error.digest})` : ""}.

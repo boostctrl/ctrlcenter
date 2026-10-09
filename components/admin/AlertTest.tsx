@@ -47,7 +47,7 @@ export default function AlertTest({
           </>
         )}
       />
-      <p className="text-xs text-fg/40">
+      <p className="text-xs text-ink-40">
         Sends a test notification through the saved settings.
       </p>
     </div>

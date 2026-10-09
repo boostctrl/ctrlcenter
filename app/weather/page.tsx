@@ -27,7 +27,7 @@ export default async function WeatherPage() {
         {weather.enabled ? (
           <WeatherDetails initial={initial} />
         ) : (
-          <p className="text-fg/50">
+          <p className="text-ink-50">
             The weather widget is turned off in settings.
           </p>
         )}

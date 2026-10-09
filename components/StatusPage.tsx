@@ -132,11 +132,11 @@ export default function StatusPage({
             aria-hidden
           />
           <div>
-            <p className="font-semibold text-fg/90">
+            <p className="font-semibold text-ink-90">
               {statusMessage(downNames, total)}
             </p>
             {checkedAt !== null && (
-              <p className="text-xs text-fg/40">
+              <p className="text-xs text-ink-40">
                 Updated {relativeTime(checkedAt, now)}
               </p>
             )}
@@ -146,7 +146,7 @@ export default function StatusPage({
           type="button"
           onClick={load}
           disabled={loading}
-          className="shrink-0 rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10 disabled:opacity-50"
+          className="shrink-0 rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-ink-70 transition-colors hover:bg-fg/10 disabled:opacity-50"
         >
           {loading ? "Refreshing…" : "Refresh"}
         </button>
@@ -159,11 +159,11 @@ export default function StatusPage({
 
       {/* Per-app rows */}
       {apps.length === 0 ? (
-        <p className="text-fg/40">No applications to monitor yet.</p>
+        <p className="text-ink-40">No applications to monitor yet.</p>
       ) : (
         <>
           <div className="flex items-center justify-between gap-2 px-1">
-            <span className="text-xs text-fg/40">Uptime over {rangeLabel}</span>
+            <span className="text-xs text-ink-40">Uptime over {rangeLabel}</span>
             <ChipGroup
               label="Uptime range"
               size="xs"
@@ -228,7 +228,7 @@ export default function StatusPage({
                   <p className="flex flex-wrap items-baseline justify-end gap-x-1 tabular-nums">
                     <span className="font-semibold">{fmtPct(uptime)}</span>
                     {latency && (
-                      <span className="text-xs text-fg/45">
+                      <span className="text-xs text-ink-45">
                         · avg {latency.avg} ms
                       </span>
                     )}
@@ -241,7 +241,7 @@ export default function StatusPage({
                       of a young app's "100.0%" is the whole point of #112, and
                       tooltips are exactly the mouse-only channel #116 retired. */}
                   {coverageSince != null && (
-                    <p className="text-xs text-fg/45">
+                    <p className="text-xs text-ink-45">
                       since {formatSince(coverageSince, timezone, range)}
                     </p>
                   )}
@@ -301,11 +301,11 @@ export default function StatusPage({
                         aria-label={`${app.name} — uptime details`}
                         className="group/name accent-focus rounded-sm outline-none after:absolute after:inset-0"
                       >
-                        <p className="truncate font-semibold text-fg/90 underline-offset-4 group-hover/name:underline group-focus-visible/name:underline">
+                        <p className="truncate font-semibold text-ink-90 underline-offset-4 group-hover/name:underline group-focus-visible/name:underline">
                           {app.name}
                         </p>
                       </Link>
-                      <p className="truncate text-sm text-fg/55">
+                      <p className="truncate text-sm text-ink-55">
                         {app.subtitle
                           ? `${app.subtitle} · ${host(app.url)}`
                           : host(app.url)}

@@ -19,7 +19,7 @@ export default async function NotFound() {
         <PageNav current={null} {...navPages(settings)} />
         <h1 className="mt-3 text-3xl font-bold">Page not found</h1>
       </div>
-      <p className="text-fg/50">
+      <p className="text-ink-50">
         There&apos;s nothing at this address. It may have moved, or the link may
         be mistyped.
       </p>

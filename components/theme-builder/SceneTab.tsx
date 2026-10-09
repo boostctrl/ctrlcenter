@@ -20,7 +20,7 @@ export default function SceneTab({ d }: { d: ThemeDraft }) {
       aria-labelledby="tb-tab-scene"
       className="space-y-3"
     >
-      <p className="text-xs text-fg/40">
+      <p className="text-xs text-ink-40">
         The animated backdrop behind your {editMode} theme.
       </p>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">

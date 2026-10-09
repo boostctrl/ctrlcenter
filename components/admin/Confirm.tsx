@@ -112,7 +112,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                 {pending.title}
               </h2>
               {pending.message && (
-                <p id={messageId} className="text-sm text-fg/75">
+                <p id={messageId} className="text-sm text-ink-75">
                   {pending.message}
                 </p>
               )}

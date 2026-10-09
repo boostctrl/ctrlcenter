@@ -102,7 +102,7 @@ export default function AnnouncementBanner({
         >
           {ICON[tone]}
         </svg>
-        <p className="min-w-0 flex-1 text-sm text-fg/85">
+        <p className="min-w-0 flex-1 text-sm text-ink-85">
           <InlineMarkdown tokens={tokens} />
         </p>
         {dismissible && (
@@ -113,7 +113,7 @@ export default function AnnouncementBanner({
               setDismissed(true);
             }}
             aria-label="Dismiss announcement"
-            className="-mr-1 shrink-0 rounded-md p-1 text-fg/40 transition-colors hover:bg-fg/10 hover:text-fg/80"
+            className="-mr-1 shrink-0 rounded-md p-1 text-ink-40 transition-colors hover:bg-fg/10 hover:text-ink-80"
           >
             <svg
               width="16"

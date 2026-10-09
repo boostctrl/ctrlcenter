@@ -253,7 +253,7 @@ export default function BookmarksManager({
           </AddButton>
         </div>
         {bookmarks.length === 0 && (
-          <p className="text-sm text-fg/40">No bookmarks yet. Add your first one.</p>
+          <p className="text-sm text-ink-40">No bookmarks yet. Add your first one.</p>
         )}
         {groups.map(([category, items], catIndex) => (
           <div key={category} className="space-y-2">
@@ -285,13 +285,13 @@ export default function BookmarksManager({
                 />
               ) : (
                 <>
-                  <h3 className="text-xs font-semibold tracking-[0.18em] text-fg/50 uppercase">
+                  <h3 className="text-xs font-semibold tracking-[0.18em] text-ink-50 uppercase">
                     {category}
                   </h3>
                   <RenameButton
                     label={`Rename category ${category}`}
                     onClick={() => setRenamingCategory(category)}
-                    className="shrink-0 rounded-md p-1 text-fg/40 transition-colors hover:bg-fg/10 hover:text-fg/80"
+                    className="shrink-0 rounded-md p-1 text-ink-40 transition-colors hover:bg-fg/10 hover:text-ink-80"
                   />
                 </>
               )}
@@ -415,7 +415,7 @@ function CategoryGroup({
                 <span className="min-w-0 truncate">{bookmark.name}</span>
                 {bookmark.private && <PrivateChip />}
               </p>
-              <p className="truncate text-xs text-fg/40">{bookmark.url}</p>
+              <p className="truncate text-xs text-ink-40">{bookmark.url}</p>
             </div>
           </div>
           <div className="flex shrink-0 gap-2">

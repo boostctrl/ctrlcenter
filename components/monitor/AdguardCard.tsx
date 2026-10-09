@@ -27,20 +27,20 @@ export default function AdguardCard({
       {data && (
         <>
           <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-            <span className="text-lg font-semibold tabular-nums text-fg/90">
+            <span className="text-lg font-semibold tabular-nums text-ink-90">
               {formatCount(data.totalQueries)}
-              <span className="ml-1.5 text-xs font-normal text-fg/50">
+              <span className="ml-1.5 text-xs font-normal text-ink-50">
                 queries
               </span>
             </span>
-            <span className="text-lg font-semibold tabular-nums text-fg/90">
+            <span className="text-lg font-semibold tabular-nums text-ink-90">
               {formatCount(data.blocked)}
-              <span className="ml-1.5 text-xs font-normal text-fg/50">
+              <span className="ml-1.5 text-xs font-normal text-ink-50">
                 blocked · {(data.blockedRatio * 100).toFixed(1)}%
               </span>
             </span>
           </div>
-          <p className="text-xs text-fg/50">
+          <p className="text-xs text-ink-50">
             <span
               className={
                 data.protectionEnabled ? "text-emerald-400/90" : "text-amber-400/90"
@@ -57,7 +57,7 @@ export default function AdguardCard({
           </p>
           {data.topBlocked.length > 0 && (
             <div className="flex flex-col gap-2">
-              <p className="text-[11px] font-medium tracking-wide text-fg/40 uppercase">
+              <p className="text-[11px] font-medium tracking-wide text-ink-40 uppercase">
                 Top blocked
               </p>
               <ul className="flex flex-col gap-1.5">
@@ -67,12 +67,12 @@ export default function AdguardCard({
                     className="flex items-baseline justify-between gap-3"
                   >
                     <span
-                      className="min-w-0 truncate text-sm text-fg/80"
+                      className="min-w-0 truncate text-sm text-ink-80"
                       title={d.domain}
                     >
                       {d.domain}
                     </span>
-                    <span className="shrink-0 text-xs tabular-nums text-fg/50">
+                    <span className="shrink-0 text-xs tabular-nums text-ink-50">
                       {formatCount(d.count)}
                     </span>
                   </li>

@@ -82,7 +82,7 @@ export default function TimeWeather({
                 {Math.round(weather.temperature)}
                 {unitSymbol(units)}
               </p>
-              <p className="text-xs text-fg/50">
+              <p className="text-xs text-ink-50">
                 {Math.round(weather.humidity)}% humidity
               </p>
             </div>
@@ -99,7 +99,7 @@ export default function TimeWeather({
             {time}
           </p>
           <p
-            className="text-xs tracking-wide text-fg/50"
+            className="text-xs tracking-wide text-ink-50"
             suppressHydrationWarning
           >
             {date}

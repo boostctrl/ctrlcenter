@@ -55,7 +55,7 @@ export default function CalendarView({
           <AgendaList events={agendaEvents} now={now} />
         </section>
       ) : (
-        <p className="text-fg/50">No upcoming events.</p>
+        <p className="text-ink-50">No upcoming events.</p>
       )}
     </div>
   );

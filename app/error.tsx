@@ -23,7 +23,7 @@ export default function ErrorPage({
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 py-12 sm:px-10 lg:py-16">
       <h1 className="text-3xl font-bold">Something went wrong</h1>
-      <p className="text-fg/50">
+      <p className="text-ink-50">
         This page hit an unexpected error. Trying again often helps; if it
         keeps happening, the server log has the details
         {error.digest ? ` (look for ${error.digest})` : ""}.

@@ -41,9 +41,9 @@ export default async function CalendarPage() {
         </div>
 
         {!enabled ? (
-          <p className="text-fg/50">
+          <p className="text-ink-50">
             The calendar is turned off.{" "}
-            <Link href="/admin" className="underline hover:text-fg/80">
+            <Link href="/admin" className="underline hover:text-ink-80">
               Enable it in admin settings
             </Link>
             .

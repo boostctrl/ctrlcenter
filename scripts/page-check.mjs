@@ -6,7 +6,23 @@
 //
 // Off-origin trouble (weather geolocation rate limits, …), console errors and
 // aborted Next.js ?_rsc= prefetches are reported as warnings only.
+//
+// With `axe: true` the page is also audited with axe-core against WCAG 2.1 A
+// and AA (contrast, labels, landmarks, …); every violation is a failure, so
+// regressions like light-mode text dropping under 4.5:1 can't land (#273).
+import fs from "node:fs";
+import { createRequire } from "node:module";
 import { chromium } from "playwright-core";
+
+const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
+let axeSource;
+function axeScript() {
+  axeSource ??= fs.readFileSync(
+    createRequire(import.meta.url).resolve("axe-core/axe.min.js"),
+    "utf8"
+  );
+  return axeSource;
+}
 
 // Uses Playwright's own Chromium (`npx playwright-core install chromium`), or
 // the binary at CHROMIUM_PATH when that's set — e.g. a preinstalled browser
@@ -44,8 +60,9 @@ async function settle(page, origin, { quietMs = 500, timeoutMs = 15000 } = {}) {
 }
 
 // Check one page. `context` is a Playwright BrowserContext (so callers control
-// cookies and color scheme); `screenshot` is an optional output path.
-export async function checkPage(context, url, { screenshot } = {}) {
+// cookies and color scheme); `screenshot` is an optional output path; `axe`
+// adds the accessibility audit.
+export async function checkPage(context, url, { screenshot, axe = false } = {}) {
   const origin = new URL(url).origin;
   const ours = (u) => u.startsWith(origin);
   const failures = [];
@@ -74,6 +91,27 @@ export async function checkPage(context, url, { screenshot } = {}) {
     failures.push(
       "no stylesheets loaded — was .next/static copied into .next/standalone/.next/ ?"
     );
+  if (axe) {
+    await page.addScriptTag({ content: axeScript() });
+    const violations = await page.evaluate(async (tags) => {
+      const { violations } = await window.axe.run(document, {
+        runOnly: { type: "tag", values: tags },
+        resultTypes: ["violations"],
+      });
+      return violations.map((v) => ({
+        id: v.id,
+        nodes: v.nodes.map(
+          (n) =>
+            `${n.target.join(" ")} — ${(n.any[0] ?? n.all[0] ?? n.none[0])?.message ?? v.help}`
+        ),
+      }));
+    }, AXE_TAGS);
+    for (const v of violations) {
+      failures.push(
+        `a11y ${v.id} (${v.nodes.length}): ${v.nodes.slice(0, 3).join(" | ")}`
+      );
+    }
+  }
   if (screenshot) await page.screenshot({ path: screenshot, fullPage: true });
   const finalUrl = page.url();
   await page.close();

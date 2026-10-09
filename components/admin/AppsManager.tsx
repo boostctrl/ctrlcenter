@@ -215,7 +215,7 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
           </AddButton>
         </div>
         {apps.length === 0 && (
-          <p className="text-sm text-fg/40">No applications yet. Add your first one.</p>
+          <p className="text-sm text-ink-40">No applications yet. Add your first one.</p>
         )}
         {apps.map((app, index) => (
           <div
@@ -237,7 +237,7 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
                   <span className="min-w-0 truncate">{app.name}</span>
                   {app.private && <PrivateChip />}
                 </p>
-                <p className="truncate text-xs text-fg/40">
+                <p className="truncate text-xs text-ink-40">
                   {app.subtitle ? `${app.subtitle} · ${app.url}` : app.url}
                 </p>
               </div>

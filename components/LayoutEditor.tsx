@@ -127,7 +127,7 @@ const DROP_BAR: Record<`${DropSide}:${DropAxis}`, string> = {
 };
 
 const stepBtn =
-  "px-2 py-1 text-fg/60 transition-colors select-none touch-none hover:bg-fg/10 hover:text-fg disabled:pointer-events-none disabled:opacity-30 pointer-coarse:px-3 pointer-coarse:py-2.5";
+  "px-2 py-1 text-ink-60 transition-colors select-none touch-none hover:bg-fg/10 hover:text-fg disabled:pointer-events-none disabled:opacity-30 pointer-coarse:px-3 pointer-coarse:py-2.5";
 
 // Press-and-hold auto-repeat for a stepper button (#102): a click steps once
 // as before; holding the button repeats the step after a short delay, so
@@ -234,7 +234,7 @@ function StepGroup({
       >
         −
       </button>
-      <span className="px-1 text-fg/70 tabular-nums">{display}</span>
+      <span className="px-1 text-ink-70 tabular-nums">{display}</span>
       <button
         type="button"
         aria-label={incLabel}
@@ -289,7 +289,7 @@ function MoreMenu({ children }: { children: ReactNode }) {
       className="relative"
       onToggle={(e) => setOpen(e.currentTarget.open)}
     >
-      <summary className="flex cursor-pointer list-none items-center rounded-lg border border-fg/10 px-2 py-1 text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer list-none items-center rounded-lg border border-fg/10 px-2 py-1 text-ink-60 transition-colors hover:bg-fg/10 hover:text-fg [&::-webkit-details-marker]:hidden">
         More
       </summary>
       <div className="absolute top-full right-0 z-10 mt-1 flex w-56 flex-col gap-3 rounded-xl border border-fg/10 bg-[var(--background)] p-3 shadow-lg">
@@ -433,7 +433,7 @@ export function WidgetFrame({
       {drop && (
         <span className={DROP_BAR[`${drop.side}:${drop.axis}`]} aria-hidden />
       )}
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-fg/60">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-60">
         {/* The whole label strip — grip, label, and the empty run before the
             controls — is the drag source, not just the 16px grip: grabbing the
             card's title is the natural first gesture, and the resize handles
@@ -445,7 +445,7 @@ export function WidgetFrame({
           className="flex min-w-0 flex-1 cursor-grab items-center gap-x-2 active:cursor-grabbing"
           title="Drag to move"
         >
-          <span className="hidden text-fg/50 sm:inline" aria-hidden>
+          <span className="hidden text-ink-50 sm:inline" aria-hidden>
             ⠿
           </span>
           <span className="font-medium">{label}</span>
@@ -479,7 +479,7 @@ export function WidgetFrame({
               type="button"
               onClick={() => onSpan(key, fillTo)}
               title={`Widen ${label} to fill the empty space in its row`}
-              className="rounded-lg border border-fg/10 px-2 py-1 text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg max-lg:hidden"
+              className="rounded-lg border border-fg/10 px-2 py-1 text-ink-60 transition-colors hover:bg-fg/10 hover:text-fg max-lg:hidden"
             >
               Fill
             </button>
@@ -489,13 +489,13 @@ export function WidgetFrame({
               <div
                 className={`flex items-center justify-between gap-2 ${narrow ? "" : "lg:hidden"}`}
               >
-                <span className="text-[10px] tracking-wide text-fg/60 uppercase">
+                <span className="text-[10px] tracking-wide text-ink-60 uppercase">
                   Height
                 </span>
                 {heightStepper()}
               </div>
             <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] tracking-wide text-fg/60 uppercase">
+                <span className="text-[10px] tracking-wide text-ink-60 uppercase">
                   Space around card
                 </span>
                 <div className="grid grid-cols-2 gap-1.5">
@@ -537,7 +537,7 @@ export function WidgetFrame({
               </div>
               {effectiveCards !== undefined && (
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] tracking-wide text-fg/60 uppercase">
+                  <span className="text-[10px] tracking-wide text-ink-60 uppercase">
                     Cards / row
                   </span>
                   <StepGroup
@@ -568,7 +568,7 @@ export function WidgetFrame({
                   type="button"
                   aria-pressed={!widget.hideLabel}
                   onClick={() => onToggleLabel(key)}
-                  className="rounded-lg border border-fg/10 px-2 py-1 text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg"
+                  className="rounded-lg border border-fg/10 px-2 py-1 text-ink-60 transition-colors hover:bg-fg/10 hover:text-fg"
                 >
                   {widget.hideLabel ? "Show heading" : "Hide heading"}
                 </button>
@@ -578,7 +578,7 @@ export function WidgetFrame({
             type="button"
             onClick={() => onToggleHidden(key)}
             title={`Hide ${label} from the page (it moves to the tray below)`}
-            className="rounded-lg border border-fg/10 px-2 py-1 text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg"
+            className="rounded-lg border border-fg/10 px-2 py-1 text-ink-60 transition-colors hover:bg-fg/10 hover:text-fg"
           >
             Hide
           </button>
@@ -708,7 +708,7 @@ function ToolbarStepper({
   canInc: boolean;
 }) {
   const btn =
-    "px-2.5 py-1 text-sm text-fg/60 transition-colors select-none touch-none hover:bg-fg/10 hover:text-fg disabled:pointer-events-none disabled:opacity-30 pointer-coarse:py-2.5";
+    "px-2.5 py-1 text-sm text-ink-60 transition-colors select-none touch-none hover:bg-fg/10 hover:text-fg disabled:pointer-events-none disabled:opacity-30 pointer-coarse:py-2.5";
   const holdDec = useHoldRepeat(onDec, canDec);
   const holdInc = useHoldRepeat(onInc, canInc);
   return (
@@ -716,7 +716,7 @@ function ToolbarStepper({
       className="flex items-center overflow-hidden rounded-full border border-fg/10"
       title={title}
     >
-      <span className="pl-2.5 text-[10px] font-medium tracking-wide text-fg/60 uppercase">
+      <span className="pl-2.5 text-[10px] font-medium tracking-wide text-ink-60 uppercase">
         {label}
       </span>
       <button
@@ -728,7 +728,7 @@ function ToolbarStepper({
       >
         −
       </button>
-      <span className="px-0.5 text-xs text-fg/60 tabular-nums">{display}</span>
+      <span className="px-0.5 text-xs text-ink-60 tabular-nums">{display}</span>
       <button
         type="button"
         aria-label={incLabel}
@@ -788,7 +788,7 @@ export function EditToolbar({
 }) {
   const confirm = useConfirm();
   const ghostBtn =
-    "shrink-0 rounded-full border border-fg/10 bg-fg/5 px-3 py-1.5 text-sm text-fg/80 transition-colors hover:bg-fg/10 disabled:pointer-events-none disabled:opacity-40";
+    "shrink-0 rounded-full border border-fg/10 bg-fg/5 px-3 py-1.5 text-sm text-ink-80 transition-colors hover:bg-fg/10 disabled:pointer-events-none disabled:opacity-40";
   return (
     <div
       role="toolbar"
@@ -796,7 +796,7 @@ export function EditToolbar({
       className="fixed inset-x-0 bottom-0 z-[45] flex flex-col gap-2 border-t border-fg/10 bg-[var(--background)]/90 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-lg backdrop-blur-xl lg:inset-x-auto lg:bottom-5 lg:left-1/2 lg:w-max lg:max-w-[calc(100vw-2rem)] lg:-translate-x-1/2 lg:flex-row lg:flex-wrap lg:items-center lg:justify-center lg:gap-x-3 lg:gap-y-1 lg:rounded-full lg:border lg:py-2 lg:pr-2 lg:pl-4"
     >
       <div className="flex items-center gap-2 lg:contents">
-        <span className="text-sm font-medium text-fg/80">Editing layout</span>
+        <span className="text-sm font-medium text-ink-80">Editing layout</span>
         <span className="lg:order-5">
           <SaveStatus status={status} error={error} />
         </span>
@@ -819,7 +819,7 @@ export function EditToolbar({
         </button>
       </div>
       <div className="-mx-3 flex items-center gap-2 overflow-x-auto px-3 pb-0.5 lg:contents">
-        <span className="shrink-0 text-xs text-fg/60 lg:hidden">
+        <span className="shrink-0 text-xs text-ink-60 lg:hidden">
           Widths apply on large screens
         </span>
         <div className="flex shrink-0 items-center gap-2 lg:contents">

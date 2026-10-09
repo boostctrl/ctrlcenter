@@ -17,7 +17,7 @@ export default function FontTab({ d }: { d: ThemeDraft }) {
       aria-labelledby="tb-tab-font"
       className="space-y-3"
     >
-      <p className="text-xs text-fg/40">
+      <p className="text-xs text-ink-40">
         The interface typeface of your {editMode} theme.
       </p>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
@@ -31,7 +31,7 @@ export default function FontTab({ d }: { d: ThemeDraft }) {
             nameStyle={{ fontFamily: fontVar(f.id) }}
           >
             <span
-              className="block text-2xl leading-tight text-fg/90"
+              className="block text-2xl leading-tight text-ink-90"
               style={{ fontFamily: fontVar(f.id) }}
               aria-hidden
             >

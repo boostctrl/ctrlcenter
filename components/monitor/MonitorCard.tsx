@@ -74,10 +74,10 @@ function OfflineBody({ title, error }: { title: string; error: string | null }) 
           <path d="M6 6l12 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
         </svg>
       }
-      tone="text-fg/30"
+      tone="text-ink-30"
     >
-      <p className="text-sm text-fg/55">Can’t reach {title}</p>
-      {error && <p className="max-w-[22ch] text-xs text-fg/35">{error}</p>}
+      <p className="text-sm text-ink-55">Can’t reach {title}</p>
+      {error && <p className="max-w-[22ch] text-xs text-ink-45">{error}</p>}
     </Placeholder>
   );
 }
@@ -96,9 +96,9 @@ function DisabledBody() {
           />
         </svg>
       }
-      tone="text-fg/25"
+      tone="text-ink-25"
     >
-      <p className="text-sm text-fg/45">Disabled</p>
+      <p className="text-sm text-ink-45">Disabled</p>
       <Link href={SETTINGS_LINK} className={buttonClasses("ghost", "sm")}>
         Enable in Settings
       </Link>
@@ -121,7 +121,7 @@ function ConnectBody({ title }: { title: string }) {
       }
       tone="text-[var(--accent-from)]/70"
     >
-      <p className="text-sm text-fg/55">Connect {title}</p>
+      <p className="text-sm text-ink-55">Connect {title}</p>
       <Link href={SETTINGS_LINK} className={buttonClasses("ghost", "sm")}>
         Set up
       </Link>
@@ -186,7 +186,7 @@ export default function MonitorCard({
   }
   const header = (
     <div className="flex items-baseline justify-between gap-3 border-b border-fg/10 pb-2.5">
-        <h2 className="flex items-center gap-2 text-[15px] font-semibold text-fg/90">
+        <h2 className="flex items-center gap-2 text-[15px] font-semibold text-ink-90">
           <span
             aria-hidden
             className={`h-2 w-2 shrink-0 rounded-full ${STATE_DOT[state]}`}

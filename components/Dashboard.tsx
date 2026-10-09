@@ -944,8 +944,8 @@ export default function Dashboard({
           say what would give them content. */}
       {editing && trayCells.length > 0 && (
         <div className="rounded-2xl border border-dashed border-fg/15 p-4">
-          <p className="text-xs font-medium text-fg/70">Not on the live page</p>
-          <p className="mt-0.5 max-w-prose text-xs text-fg/55">
+          <p className="text-xs font-medium text-ink-70">Not on the live page</p>
+          <p className="mt-0.5 max-w-prose text-xs text-ink-55">
             These widgets don&apos;t render for visitors right now — hidden ones
             by choice, empty ones until they have something to show. The grid
             above packs exactly like the live page. Show a hidden widget to
@@ -956,24 +956,24 @@ export default function Dashboard({
               <div
                 key={widgetKey(widget)}
                 title={node === null ? emptyReason(widget.id) : undefined}
-                className="flex max-w-full min-w-0 items-center gap-2 rounded-lg border border-fg/10 bg-fg/5 px-2.5 py-1.5 text-xs text-fg/60"
+                className="flex max-w-full min-w-0 items-center gap-2 rounded-lg border border-fg/10 bg-fg/5 px-2.5 py-1.5 text-xs text-ink-60"
               >
                 <span className="shrink-0 font-medium">{labelFor(widget)}</span>
-                <span className="shrink-0 rounded bg-fg/10 px-1.5 py-0.5 text-[10px] tracking-wide text-fg/60 uppercase">
+                <span className="shrink-0 rounded bg-fg/10 px-1.5 py-0.5 text-[10px] tracking-wide text-ink-60 uppercase">
                   {widget.hidden ? "Hidden" : "Empty"}
                 </span>
                 {widget.hidden ? (
                   <button
                     type="button"
                     onClick={() => toggleWidgetHidden(widgetKey(widget))}
-                    className="rounded-md border border-fg/10 px-2 py-0.5 text-fg/70 transition-colors hover:bg-fg/10 hover:text-fg"
+                    className="rounded-md border border-fg/10 px-2 py-0.5 text-ink-70 transition-colors hover:bg-fg/10 hover:text-fg"
                   >
                     Show
                   </button>
                 ) : (
                   // min-w-0 so the reason truncates inside a phone-width
                   // chip instead of widening the page (#271).
-                  <span className="max-w-72 min-w-0 truncate text-fg/55">
+                  <span className="max-w-72 min-w-0 truncate text-ink-55">
                     {emptyReason(widget.id)}
                   </span>
                 )}
@@ -984,16 +984,16 @@ export default function Dashboard({
       )}
 
       {!editing && hasVisibleContent && !hasResults && parsedBang && (
-        <p className="text-fg/50">
+        <p className="text-ink-50">
           {bangHit ? (
             <>
-              <span className="text-fg/40">↵</span>{" "}
+              <span className="text-ink-40">↵</span>{" "}
               {bangHit.term
                 ? `Search ${bangHit.label} for “${bangHit.term}”`
                 : `Open ${bangHit.label}`}
             </>
           ) : (
-            <span className="text-fg/40">
+            <span className="text-ink-40">
               No bang “!{parsedBang.key}”. Press Enter to search the web.
             </span>
           )}
@@ -1001,13 +1001,13 @@ export default function Dashboard({
       )}
 
       {!editing && hasVisibleContent && !hasResults && !parsedBang && (
-        <p className="text-fg/40">
+        <p className="text-ink-40">
           No matches for “{query}”.{" "}
           {buildSearchUrl(search, query) && (
             <button
               type="button"
               onClick={webSearch}
-              className="text-fg/60 underline transition-colors hover:text-fg/90"
+              className="text-ink-60 underline transition-colors hover:text-ink-90"
             >
               Search {engineLabel(search)} for “{query}” →
             </button>
@@ -1016,9 +1016,9 @@ export default function Dashboard({
       )}
 
       {!editing && !hasAnyContent && (
-        <p className="text-fg/40">
+        <p className="text-ink-40">
           Nothing here yet.{" "}
-          <Link href="/admin" className="underline hover:text-fg/70">
+          <Link href="/admin" className="underline hover:text-ink-70">
             Add your first app or bookmark
           </Link>
           .

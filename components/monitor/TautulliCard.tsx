@@ -18,9 +18,9 @@ function SessionRow({ session }: { session: TautulliSession }) {
   return (
     <li className="flex flex-col gap-1.5 py-2.5 first:pt-0 last:pb-0">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="min-w-0 truncate text-sm text-fg/80" title={session.title}>
+        <span className="min-w-0 truncate text-sm text-ink-80" title={session.title}>
           {session.title}
-          <span className="text-fg/45"> · {session.user}</span>
+          <span className="text-ink-45"> · {session.user}</span>
         </span>
         <span className="flex shrink-0 items-baseline gap-2 text-xs tabular-nums">
           {session.state !== "playing" && (
@@ -35,8 +35,8 @@ function SessionRow({ session }: { session: TautulliSession }) {
           >
             {session.playback === "transcode" ? "transcode" : "direct"}
           </span>
-          {session.quality && <span className="text-fg/50">{session.quality}</span>}
-          <span className="text-fg/60">{session.progress.toFixed(0)}%</span>
+          {session.quality && <span className="text-ink-50">{session.quality}</span>}
+          <span className="text-ink-60">{session.progress.toFixed(0)}%</span>
         </span>
       </div>
       <Meter percent={session.progress} />
@@ -55,14 +55,14 @@ export default function TautulliCard({
       {data && (
         <>
           <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-            <span className="text-lg font-semibold tabular-nums text-fg/90">
+            <span className="text-lg font-semibold tabular-nums text-ink-90">
               {data.streamCount}
-              <span className="ml-1.5 text-xs font-normal text-fg/50">
+              <span className="ml-1.5 text-xs font-normal text-ink-50">
                 stream{data.streamCount === 1 ? "" : "s"}
               </span>
             </span>
             {data.totalBandwidthKbps !== null && data.totalBandwidthKbps > 0 && (
-              <span className="text-lg font-semibold tabular-nums text-fg/90">
+              <span className="text-lg font-semibold tabular-nums text-ink-90">
                 {formatBandwidth(data.totalBandwidthKbps)}
               </span>
             )}
@@ -81,7 +81,7 @@ export default function TautulliCard({
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-fg/40">Nothing is playing.</p>
+            <p className="text-sm text-ink-40">Nothing is playing.</p>
           )}
         </>
       )}

@@ -58,8 +58,8 @@ function StatusPill({
   return (
     <span className="inline-flex items-center gap-2 rounded-full border border-fg/10 bg-fg/5 px-3.5 py-1.5 text-xs">
       <span aria-hidden className={`h-2 w-2 rounded-full ${STATE_DOT[state]}`} />
-      <span className="font-medium text-fg/80">{label}</span>
-      {since && <span className="text-fg/40">· updated {since}</span>}
+      <span className="font-medium text-ink-80">{label}</span>
+      {since && <span className="text-ink-40">· updated {since}</span>}
     </span>
   );
 }
@@ -182,7 +182,7 @@ export default function MonitorDetail({
             {/* Breadcrumb back to the cockpit — a plain text link, no arrow. */}
             <Link
               href="/admin/monitor"
-              className="mt-3 inline-block text-sm text-fg/50 transition-colors hover:text-fg/80"
+              className="mt-3 inline-block text-sm text-ink-50 transition-colors hover:text-ink-80"
             >
               Monitor
             </Link>

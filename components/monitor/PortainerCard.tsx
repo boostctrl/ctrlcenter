@@ -27,7 +27,7 @@ import {
 function stateTone(state: string): string {
   if (state === "running") return "text-emerald-400/90";
   if (state === "exited" || state === "dead" || state === "created")
-    return "text-fg/45";
+    return "text-ink-45";
   return "text-amber-400/80"; // restarting, paused, removing, …
 }
 
@@ -69,7 +69,7 @@ function LogModal({
           </Button>
         </div>
         {loading ? (
-          <p className="text-sm text-fg/50">Loading…</p>
+          <p className="text-sm text-ink-50">Loading…</p>
         ) : error ? (
           <p className="text-sm text-red-400">{error}</p>
         ) : (
@@ -101,7 +101,7 @@ function ContainerRow({
   return (
     <li className="flex flex-col gap-1 py-2 first:pt-0 last:pb-0">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="min-w-0 truncate text-sm text-fg/80" title={container.name}>
+        <span className="min-w-0 truncate text-sm text-ink-80" title={container.name}>
           {container.name}
         </span>
         <span className={`shrink-0 text-xs ${stateTone(container.state)}`}>
@@ -146,21 +146,21 @@ function EndpointRow({
 }) {
   const summary = (
     <div className="flex items-baseline justify-between gap-3">
-      <span className="min-w-0 truncate text-sm text-fg/80" title={endpoint.name}>
+      <span className="min-w-0 truncate text-sm text-ink-80" title={endpoint.name}>
         {endpoint.name}
       </span>
       {endpoint.hasSnapshot ? (
         <span className="flex shrink-0 items-baseline gap-2 text-xs tabular-nums">
           <span className="text-emerald-400/90">{endpoint.running} up</span>
           {endpoint.stopped > 0 && (
-            <span className="text-fg/50">{endpoint.stopped} stopped</span>
+            <span className="text-ink-50">{endpoint.stopped} stopped</span>
           )}
           {endpoint.unhealthy > 0 && (
             <span className="text-red-400">{endpoint.unhealthy} unhealthy</span>
           )}
         </span>
       ) : (
-        <span className="shrink-0 text-xs text-fg/40">no snapshot</span>
+        <span className="shrink-0 text-xs text-ink-40">no snapshot</span>
       )}
     </div>
   );
@@ -282,13 +282,13 @@ export default function PortainerCard({
       {data && (
         <>
           <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-            <span className="text-lg font-semibold tabular-nums text-fg/90">
+            <span className="text-lg font-semibold tabular-nums text-ink-90">
               {data.totals.running}
-              <span className="ml-1.5 text-xs font-normal text-fg/50">
+              <span className="ml-1.5 text-xs font-normal text-ink-50">
                 running
               </span>
             </span>
-            <span className="text-xs text-fg/50">
+            <span className="text-xs text-ink-50">
               {data.totals.stopped} stopped
               {data.totals.unhealthy > 0 && (
                 <span className="text-red-400">
@@ -319,7 +319,7 @@ export default function PortainerCard({
                     {expandable && isOpen && (
                       <div className="ml-2 border-l border-fg/10 pl-3">
                         {loadingList ? (
-                          <p className="py-2 text-xs text-fg/50">Loading…</p>
+                          <p className="py-2 text-xs text-ink-50">Loading…</p>
                         ) : listError ? (
                           <p className="py-2 text-xs text-red-400">{listError}</p>
                         ) : containers.length > 0 ? (
@@ -335,7 +335,7 @@ export default function PortainerCard({
                             ))}
                           </ul>
                         ) : (
-                          <p className="py-2 text-xs text-fg/40">No containers.</p>
+                          <p className="py-2 text-xs text-ink-40">No containers.</p>
                         )}
                       </div>
                     )}
@@ -344,7 +344,7 @@ export default function PortainerCard({
               })}
             </ul>
           ) : (
-            <p className="text-sm text-fg/40">No environments.</p>
+            <p className="text-sm text-ink-40">No environments.</p>
           )}
         </>
       )}

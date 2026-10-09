@@ -54,7 +54,7 @@ function relTime(at: number | null): string {
 
 function SectionLabel({ children }: { children: ReactNode }) {
   return (
-    <p className="text-[11px] font-medium tracking-wide text-fg/40 uppercase">
+    <p className="text-[11px] font-medium tracking-wide text-ink-40 uppercase">
       {children}
     </p>
   );
@@ -63,12 +63,12 @@ function SectionLabel({ children }: { children: ReactNode }) {
 function Row({ title, subtitle, meta }: { title: string; subtitle: string; meta: string }) {
   return (
     <li className="flex items-baseline justify-between gap-3">
-      <span className="min-w-0 truncate text-sm text-fg/80" title={title}>
+      <span className="min-w-0 truncate text-sm text-ink-80" title={title}>
         {title}
-        {subtitle && <span className="text-fg/45"> · {subtitle}</span>}
+        {subtitle && <span className="text-ink-45"> · {subtitle}</span>}
       </span>
       {meta && (
-        <span className="shrink-0 text-xs tabular-nums text-fg/50">{meta}</span>
+        <span className="shrink-0 text-xs tabular-nums text-ink-50">{meta}</span>
       )}
     </li>
   );
@@ -104,7 +104,7 @@ export default function ArrCard({
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm text-fg/40">
+                <p className="text-sm text-ink-40">
                   Nothing scheduled in the next two weeks.
                 </p>
               )}

@@ -64,9 +64,9 @@ export default async function StatusDetailRoute({ params }: Params) {
             isAdmin={isAdmin}
           />
         ) : (
-          <p className="text-fg/50">
+          <p className="text-ink-50">
             Status checks are turned off.{" "}
-            <Link href="/admin" className="underline hover:text-fg/80">
+            <Link href="/admin" className="underline hover:text-ink-80">
               Enable them in admin settings
             </Link>
             .

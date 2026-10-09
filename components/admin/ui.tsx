@@ -27,11 +27,11 @@ export const controlClasses =
 
 // The label above a stacked field, and the heading of a list panel — one
 // class so every field name in the portal carries the same weight.
-export const fieldLabelClasses = "text-[13px] font-medium text-fg/60";
+export const fieldLabelClasses = "text-[13px] font-medium text-ink-60";
 
 // The muted explainer under a control or at the end of a card.
 export function Hint({ children }: { children: ReactNode }) {
-  return <p className="text-xs text-fg/40">{children}</p>;
+  return <p className="text-xs text-ink-40">{children}</p>;
 }
 
 export function TextField({
@@ -46,7 +46,7 @@ export function TextField({
     <label className="flex flex-col gap-1.5 text-sm">
       <span className={fieldLabelClasses}>{label}</span>
       <input {...props} className={controlClasses} />
-      {hint && <span className="text-xs text-fg/40">{hint}</span>}
+      {hint && <span className="text-xs text-ink-40">{hint}</span>}
     </label>
   );
 }
@@ -73,7 +73,7 @@ export function SelectField({
           aria-hidden
           viewBox="0 0 16 16"
           fill="none"
-          className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-fg/40"
+          className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-ink-40"
         >
           <path
             d="M4 6l4 4 4-4"
@@ -84,7 +84,7 @@ export function SelectField({
           />
         </svg>
       </span>
-      {hint && <span className="text-xs text-fg/40">{hint}</span>}
+      {hint && <span className="text-xs text-ink-40">{hint}</span>}
     </label>
   );
 }
@@ -109,7 +109,7 @@ export function TextArea({
           mono ? "font-mono text-xs" : "text-sm"
         }`}
       />
-      {hint && <span className="text-xs text-fg/40">{hint}</span>}
+      {hint && <span className="text-xs text-ink-40">{hint}</span>}
     </label>
   );
 }
@@ -154,7 +154,7 @@ export function NumberField({
         onChange={(e) => clampedChange(e.target.value, min, max, onChange)}
         className={controlClasses}
       />
-      {hint && <span className="text-xs text-fg/40">{hint}</span>}
+      {hint && <span className="text-xs text-ink-40">{hint}</span>}
     </label>
   );
 }
@@ -178,9 +178,9 @@ export function NumberRow({
 }) {
   return (
     <label className="flex items-center justify-between gap-4 text-sm">
-      <span className="text-fg/70">
+      <span className="text-ink-70">
         {label}
-        {hint && <span className="block text-xs text-fg/40">{hint}</span>}
+        {hint && <span className="block text-xs text-ink-40">{hint}</span>}
       </span>
       <input
         type="number"
@@ -242,9 +242,9 @@ export function ToggleRow({
 }) {
   return (
     <label className="flex cursor-pointer items-center justify-between gap-4 text-sm">
-      <span className="text-fg/70">
+      <span className="text-ink-70">
         {label}
-        {hint && <span className="block text-xs text-fg/40">{hint}</span>}
+        {hint && <span className="block text-xs text-ink-40">{hint}</span>}
       </span>
       <Switch checked={checked} onChange={onChange} label={label} />
     </label>
@@ -264,9 +264,9 @@ export function ControlRow({
 }) {
   return (
     <div className="flex items-center justify-between gap-4 text-sm">
-      <div className="text-fg/70">
+      <div className="text-ink-70">
         {label}
-        {hint && <p className="text-xs text-fg/40">{hint}</p>}
+        {hint && <p className="text-xs text-ink-40">{hint}</p>}
       </div>
       {children}
     </div>
@@ -322,7 +322,7 @@ export function RemoveButton({
       type="button"
       onClick={onClick}
       aria-label={label}
-      className="shrink-0 rounded-md px-2 py-1 text-fg/40 transition-colors hover:bg-fg/10 hover:text-red-400"
+      className="shrink-0 rounded-md px-2 py-1 text-ink-40 transition-colors hover:bg-fg/10 hover:text-red-400"
     >
       ✕
     </button>
@@ -362,10 +362,10 @@ export function Card({
           broken. */}
       <div className="flex items-start justify-between gap-4 [&:not(:only-child)]:border-b [&:not(:only-child)]:border-fg/10 [&:not(:only-child)]:pb-4">
         <div>
-          <h3 className="text-[15px] leading-snug font-semibold text-fg/90">
+          <h3 className="text-[15px] leading-snug font-semibold text-ink-90">
             {title}
           </h3>
-          {intro && <p className="mt-1 text-[13px] text-fg/45">{intro}</p>}
+          {intro && <p className="mt-1 text-[13px] text-ink-45">{intro}</p>}
         </div>
         {toggle && (
           <label className="flex shrink-0 cursor-pointer items-center pt-0.5">
@@ -425,7 +425,7 @@ export function MoveButtons({
   // On coarse pointers these are the ONLY reorder path (HTML5 drag needs a
   // mouse), so they grow toward the touch-target guideline there (#102).
   const btn =
-    "flex h-4 w-5 items-center justify-center rounded text-[10px] leading-none text-fg/55 select-none hover:bg-fg/10 hover:text-fg disabled:pointer-events-none disabled:opacity-20 pointer-coarse:h-9 pointer-coarse:w-9 pointer-coarse:text-sm";
+    "flex h-4 w-5 items-center justify-center rounded text-[10px] leading-none text-ink-55 select-none hover:bg-fg/10 hover:text-fg disabled:pointer-events-none disabled:opacity-20 pointer-coarse:h-9 pointer-coarse:w-9 pointer-coarse:text-sm";
   const prevLabel = flow ? `Move ${label} earlier` : `Move ${label} up`;
   const nextLabel = flow ? `Move ${label} later` : `Move ${label} down`;
   return (
@@ -477,7 +477,7 @@ export function MoveButtons({
 export function PrivateChip() {
   return (
     <span
-      className="shrink-0 rounded-full border border-fg/15 px-2 py-0.5 text-[10px] font-normal tracking-wide text-fg/45 uppercase"
+      className="shrink-0 rounded-full border border-fg/15 px-2 py-0.5 text-[10px] font-normal tracking-wide text-ink-45 uppercase"
       title="Only shown when logged in"
     >
       Private
@@ -492,7 +492,7 @@ export function PrivateChip() {
 export function DragGrip(props: React.ComponentProps<"span">) {
   return (
     <span
-      className="hidden cursor-grab text-fg/30 select-none active:cursor-grabbing sm:inline"
+      className="hidden cursor-grab text-ink-30 select-none active:cursor-grabbing sm:inline"
       aria-hidden
       title="Drag to reorder"
       {...props}

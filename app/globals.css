@@ -413,6 +413,21 @@
      before hydration. */
 }
 
+/* Status colors (#273): the pale -200…-400 shades used for error, warning and
+   up/down text and dots are tuned for the dark surface; on the light one they
+   fall to ~2–3:1. Tailwind reads each palette color from a variable, so
+   remapping these here deepens every use (text, dots, /NN variants) in light
+   mode only, leaving the dark theme untouched. */
+.theme-light {
+  --color-red-300: var(--color-red-700);
+  --color-red-400: var(--color-red-700);
+  --color-amber-200: var(--color-amber-800);
+  --color-amber-300: var(--color-amber-700);
+  --color-amber-400: var(--color-amber-700);
+  --color-emerald-400: var(--color-emerald-700);
+  --color-sky-400: var(--color-sky-700);
+}
+
 /* Emboss's light-source highlight must be a true white in light mode — the
    --fg-based one would invert into a dark smudge on the pale surface. */
 .theme-light.design-emboss {
@@ -436,6 +451,28 @@
 .theme-light .wx-icon {
   filter: drop-shadow(0 1px 1px rgba(var(--shadow-tint), 0.45))
     drop-shadow(0 0 1px rgba(var(--shadow-tint), 0.35));
+}
+
+/* Secondary text ink (#273). `text-ink-50` reads like `text-fg/50`, with its
+   opacity lifted part-way toward full (`--ink-lift`) — slightly in dark mode,
+   more in light mode, because a translucent dark ink on the pale surfaces can't
+   reach 4.5:1 at the low opacities the dark theme reads fine at (e.g. /50 is
+   ~3.2:1 on light glass, ~5:1 lifted). One knob instead of per-class tuning;
+   use `text-ink-*` for any text whose opacity is below 100. */
+:root {
+  /* A small lift in dark mode too: white at /40–/45 lands just under 4.5:1 on
+     the near-black surfaces (3.8–4.49 measured). */
+  --ink-lift: 0.15;
+}
+.theme-light {
+  --ink-lift: 0.4;
+}
+@utility text-ink-* {
+  color: color-mix(
+    in oklab,
+    var(--fg) calc(100% - (100% - --value(integer) * 1%) * (1 - var(--ink-lift))),
+    transparent
+  );
 }
 
 @theme inline {

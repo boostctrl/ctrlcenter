@@ -63,10 +63,10 @@ export default function WorldClocksWidget({
                 className="flex items-baseline justify-between gap-3 py-2 first:pt-0 last:pb-0"
               >
                 <div className="min-w-0">
-                  <p className="truncate text-sm text-fg/80">
+                  <p className="truncate text-sm text-ink-80">
                     {item.label.trim() || zoneCity(zone)}
                   </p>
-                  <p className="text-xs text-fg/40">
+                  <p className="text-xs text-ink-40">
                     {formatInZone(now, zone, {
                       weekday: "short",
                       month: "short",
@@ -74,7 +74,7 @@ export default function WorldClocksWidget({
                     })}
                   </p>
                 </div>
-                <span className="shrink-0 text-lg font-medium tabular-nums text-fg/90">
+                <span className="shrink-0 text-lg font-medium tabular-nums text-ink-90">
                   {timeString(now, zone)}
                 </span>
               </li>

@@ -70,8 +70,9 @@ Step-by-step recipes for this repo's mistake-prone workflows live in
   Typecheck is not optional — `next build` (Next 16) compiles without
   checking types, so nothing else in the gate catches TS errors (#135). It
   covers the test files too (#259).
-- `npm run smoke` renders the standalone build's key pages in Chromium and
-  signs in through the real login form (needs `npx playwright-core install
+- `npm run smoke` renders the standalone build's key pages in Chromium in both
+  color schemes, audits each against WCAG 2.1 AA with axe-core, and signs in
+  through the real login form (needs `npx playwright-core install
   chromium` once, or `CHROMIUM_PATH` set to a Chromium binary).
 - For visual changes, also look at the pages you changed: copy `.next/static`
   into the standalone output and drive it with Playwright Chromium. HTML-only
@@ -80,5 +81,8 @@ Step-by-step recipes for this repo's mistake-prone workflows live in
 ## UI conventions
 
 - Reuse the app's canonical button recipe instead of one-off styles.
+- Secondary text uses `text-ink-NN`, not `text-fg/NN`: it lifts the opacity in
+  light mode so text keeps 4.5:1 contrast (#273). Keep `fg/NN` for borders,
+  fills and decorative glyphs.
 - No decorative "→" arrows on links or buttons.
 - Never widen the header horizontally to fit new affordances.

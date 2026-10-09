@@ -19,7 +19,7 @@ function PoolRow({ pool }: { pool: TruenasPool }) {
   return (
     <li className="flex flex-col gap-1.5 py-2.5 first:pt-0 last:pb-0">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="flex min-w-0 items-center gap-2 text-sm text-fg/80">
+        <span className="flex min-w-0 items-center gap-2 text-sm text-ink-80">
           <span
             aria-hidden
             className={`h-2 w-2 shrink-0 rounded-full ${
@@ -31,14 +31,14 @@ function PoolRow({ pool }: { pool: TruenasPool }) {
           </span>
           <span
             className={`text-xs ${
-              pool.healthy ? "text-fg/45" : "text-red-400"
+              pool.healthy ? "text-ink-45" : "text-red-400"
             }`}
           >
             {pool.status}
           </span>
         </span>
         {pool.usedRatio !== null && (
-          <span className="shrink-0 text-xs tabular-nums text-fg/50">
+          <span className="shrink-0 text-xs tabular-nums text-ink-50">
             {(pool.usedRatio * 100).toFixed(0)}% used
             {pool.free !== null && <> · {formatBytes(pool.free)} free</>}
           </span>
@@ -69,7 +69,7 @@ function containerDot(state: string): string {
 function ContainerRow({ container }: { container: TruenasContainer }) {
   return (
     <li className="flex items-baseline justify-between gap-3 text-xs">
-      <span className="flex min-w-0 items-center gap-2 text-fg/65">
+      <span className="flex min-w-0 items-center gap-2 text-ink-65">
         <span
           aria-hidden
           className={`h-1.5 w-1.5 shrink-0 rounded-full ${containerDot(container.state)}`}
@@ -80,7 +80,7 @@ function ContainerRow({ container }: { container: TruenasContainer }) {
       </span>
       {container.image && (
         <span
-          className="max-w-[45%] shrink-0 truncate text-fg/35"
+          className="max-w-[45%] shrink-0 truncate text-ink-45"
           title={container.image}
         >
           {container.image}
@@ -95,7 +95,7 @@ function AppRow({ app }: { app: TruenasApp }) {
   return (
     <li className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="flex min-w-0 items-center gap-2 text-sm text-fg/80">
+        <span className="flex min-w-0 items-center gap-2 text-sm text-ink-80">
           <span
             aria-hidden
             className={`h-2 w-2 shrink-0 rounded-full ${appDot(app)}`}
@@ -106,14 +106,14 @@ function AppRow({ app }: { app: TruenasApp }) {
           {!app.running && (
             <span
               className={`shrink-0 text-xs ${
-                app.state === "CRASHED" ? "text-red-400" : "text-fg/45"
+                app.state === "CRASHED" ? "text-red-400" : "text-ink-45"
               }`}
             >
               {app.state.toLowerCase()}
             </span>
           )}
         </span>
-        <span className="flex shrink-0 items-baseline gap-2 text-xs tabular-nums text-fg/50">
+        <span className="flex shrink-0 items-baseline gap-2 text-xs tabular-nums text-ink-50">
           {app.upgradeAvailable && (
             <span className="rounded border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-amber-200/90 uppercase">
               update
@@ -176,11 +176,11 @@ export default function TruenasCard({
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-fg/40">No pools reported.</p>
+            <p className="text-sm text-ink-40">No pools reported.</p>
           )}
           {data.apps.length > 0 && (
             <div className="flex flex-col gap-2 border-t border-fg/10 pt-3">
-              <p className="text-[11px] font-medium tracking-wide text-fg/40 uppercase">
+              <p className="text-[11px] font-medium tracking-wide text-ink-40 uppercase">
                 Apps
               </p>
               {/* Two independent columns on wide screens so the roster fills the

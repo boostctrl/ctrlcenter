@@ -34,7 +34,7 @@ export default function CalendarMonth({
   const byDay = useMemo(() => bucketByDay(events, timezone), [events, timezone]);
 
   const navBtn =
-    "flex h-8 w-8 items-center justify-center rounded-lg border border-fg/10 bg-fg/[0.04] text-lg text-fg/70 transition-colors hover:bg-fg/10 disabled:cursor-not-allowed disabled:opacity-30";
+    "flex h-8 w-8 items-center justify-center rounded-lg border border-fg/10 bg-fg/[0.04] text-lg text-ink-70 transition-colors hover:bg-fg/10 disabled:cursor-not-allowed disabled:opacity-30";
 
   return (
     <div className="flex flex-col gap-4">
@@ -50,7 +50,7 @@ export default function CalendarMonth({
             <button
               type="button"
               onClick={() => setOffset(0)}
-              className="rounded-lg border border-fg/10 bg-fg/[0.04] px-3 py-1.5 text-xs text-fg/70 transition-colors hover:bg-fg/10"
+              className="rounded-lg border border-fg/10 bg-fg/[0.04] px-3 py-1.5 text-xs text-ink-70 transition-colors hover:bg-fg/10"
             >
               Today
             </button>
@@ -80,7 +80,7 @@ export default function CalendarMonth({
         {WEEKDAYS.map((d) => (
           <div
             key={d}
-            className="pb-1 text-center text-xs font-medium tracking-wide text-fg/40 uppercase"
+            className="pb-1 text-center text-xs font-medium tracking-wide text-ink-40 uppercase"
           >
             <span className="hidden sm:inline">{d}</span>
             <span className="sm:hidden">{d[0]}</span>
@@ -102,8 +102,8 @@ export default function CalendarMonth({
                   cell.isToday
                     ? "bg-[color:var(--accent-from)] font-semibold text-[color:var(--accent-fg)]"
                     : cell.inMonth
-                      ? "text-fg/70"
-                      : "text-fg/30"
+                      ? "text-ink-70"
+                      : "text-ink-40"
                 }`}
               >
                 {cell.day}
@@ -113,7 +113,7 @@ export default function CalendarMonth({
                   <li
                     key={i}
                     title={e.summary}
-                    className="flex items-center gap-1 rounded bg-fg/[0.06] px-1.5 py-0.5 text-[0.7rem] leading-tight text-fg/80"
+                    className="flex items-center gap-1 rounded bg-fg/[0.06] px-1.5 py-0.5 text-[0.7rem] leading-tight text-ink-80"
                   >
                     <span
                       className="h-1.5 w-1.5 shrink-0 rounded-full bg-[color:var(--accent-from)]"
@@ -123,7 +123,7 @@ export default function CalendarMonth({
                   </li>
                 ))}
                 {dayEvents.length > MAX_CHIPS && (
-                  <li className="px-1 text-[0.7rem] text-fg/45">
+                  <li className="px-1 text-[0.7rem] text-ink-45">
                     +{dayEvents.length - MAX_CHIPS} more
                   </li>
                 )}
@@ -156,7 +156,7 @@ export function MiniMonth({
     <div className="flex flex-col gap-2">
       <div className="mb-1 flex items-center justify-between gap-4">
         <span
-          className="text-sm font-semibold tracking-tight text-fg/80"
+          className="text-sm font-semibold tracking-tight text-ink-80"
           suppressHydrationWarning
         >
           {grid.label}
@@ -167,7 +167,7 @@ export function MiniMonth({
         {WEEKDAYS.map((d) => (
           <div
             key={d}
-            className="text-center text-[0.65rem] font-medium tracking-wide text-fg/35 uppercase"
+            className="text-center text-[0.65rem] font-medium tracking-wide text-ink-45 uppercase"
           >
             {d[0]}
           </div>
@@ -185,8 +185,8 @@ export function MiniMonth({
                   cell.isToday
                     ? "bg-[color:var(--accent-from)] font-semibold text-[color:var(--accent-fg)]"
                     : cell.inMonth
-                      ? "text-fg/75"
-                      : "text-fg/30"
+                      ? "text-ink-75"
+                      : "text-ink-40"
                 }`}
               >
                 {cell.day}

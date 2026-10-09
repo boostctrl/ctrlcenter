@@ -23,7 +23,9 @@ export function buttonClasses(
   const base = `rounded-[var(--control-radius)] ${geometry} transition-colors disabled:opacity-50 disabled:cursor-not-allowed`;
   const variants: Record<ButtonVariant, string> = {
     primary: "btn-accent",
-    ghost: "border border-fg/10 bg-fg/5 text-fg/80 hover:bg-fg/10",
+    ghost: "border border-fg/10 bg-fg/5 text-ink-80 hover:bg-fg/10",
+    // text-red-300 deepens to red-700 in light mode (app/globals.css), so the
+    // button reads as active there, not disabled (#277).
     danger:
       "border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20",
   };

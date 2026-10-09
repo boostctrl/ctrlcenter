@@ -21,7 +21,7 @@ export default function BackHome({
   return (
     <Link
       href="/"
-      className={`inline-flex items-center gap-1.5 text-sm text-fg/50 transition-colors hover:text-fg/80 ${className}`}
+      className={`inline-flex items-center gap-1.5 text-sm text-ink-50 transition-colors hover:text-ink-80 ${className}`}
     >
       <svg
         width="16"

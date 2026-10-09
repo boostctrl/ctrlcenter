@@ -125,7 +125,7 @@ export function SaveStatus({
     <span
       role="status"
       className={`inline-flex items-center gap-1.5 text-xs ${
-        status === "error" ? "text-red-400" : "text-fg/45"
+        status === "error" ? "text-red-400" : "text-ink-45"
       }`}
     >
       <span

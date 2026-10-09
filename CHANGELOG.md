@@ -42,6 +42,11 @@ here.
   form, and tapping Edit brings the form into view. The selected admin tab
   stays visible, the header buttons sit in a tidy grid, and the page links
   at the top of every page fit on one line. (#272)
+- **Text is easier to read in light mode.** Secondary text, error and warning
+  messages, and status labels now meet the WCAG AA contrast standard across
+  all designs, in both light and dark mode, and Delete buttons no longer look
+  disabled. A service that's down shows a hollow ring instead of a solid dot,
+  so up and down are distinguishable without relying on color. (#273)
 
 ## [2.10.1] - 2026-10-09
 

@@ -38,7 +38,7 @@ export default function IconField({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="self-start text-xs text-fg/50 underline transition-colors hover:text-fg/80"
+        className="self-start text-xs text-ink-50 underline transition-colors hover:text-ink-80"
       >
         Browse icons
       </button>

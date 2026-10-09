@@ -65,7 +65,7 @@ export function WebhookUrlRow({
         </Button>
       </div>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs text-fg/45">
+        <p className="text-xs text-ink-45">
           Paste into {label} → Settings → Connect → Webhook (method POST).
         </p>
         <Button variant="ghost" size="sm" type="button" onClick={onRegenerate}>

@@ -22,7 +22,7 @@ function uptimeLabel(seconds: number | null): string {
 function DeviceRow({ device }: { device: UnifiDevice }) {
   return (
     <li className="flex items-baseline justify-between gap-3 py-2 first:pt-0 last:pb-0">
-      <span className="flex min-w-0 items-center gap-2 text-sm text-fg/80">
+      <span className="flex min-w-0 items-center gap-2 text-sm text-ink-80">
         <span
           aria-hidden
           className={`h-2 w-2 shrink-0 rounded-full ${
@@ -32,9 +32,9 @@ function DeviceRow({ device }: { device: UnifiDevice }) {
         <span className="truncate" title={device.name}>
           {device.name}
         </span>
-        <span className="shrink-0 text-xs text-fg/45">{device.kind}</span>
+        <span className="shrink-0 text-xs text-ink-45">{device.kind}</span>
       </span>
-      <span className="flex shrink-0 items-baseline gap-3 text-xs tabular-nums text-fg/50">
+      <span className="flex shrink-0 items-baseline gap-3 text-xs tabular-nums text-ink-50">
         {device.up ? (
           <>
             <span>
@@ -66,7 +66,7 @@ export default function UnifiDetail({
       <UnifiCard status={status} />
       {status.data && (
         <section className="glass-card flex flex-col gap-3 p-6">
-          <h2 className="text-[15px] font-semibold text-fg/90">Devices</h2>
+          <h2 className="text-[15px] font-semibold text-ink-90">Devices</h2>
           {devices.length > 0 ? (
             <div className="grid gap-x-12 sm:grid-cols-2">
               {columns.map((col, ci) => (
@@ -78,7 +78,7 @@ export default function UnifiDetail({
               ))}
             </div>
           ) : (
-            <p className="text-sm text-fg/40">No devices reported.</p>
+            <p className="text-sm text-ink-40">No devices reported.</p>
           )}
         </section>
       )}

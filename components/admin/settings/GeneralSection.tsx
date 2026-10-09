@@ -56,7 +56,7 @@ export default function GeneralSection({
           <>
             The site-wide default look visitors see before they customize
             their own. Pick a theme as the default; edit the themes themselves
-            in the <span className="text-fg/60">Themes</span> tab.
+            in the <span className="text-ink-60">Themes</span> tab.
           </>
         }
       >
@@ -98,7 +98,7 @@ export default function GeneralSection({
           hint={
             <>
               Give light mode its own design, scene &amp; colors — leave on{" "}
-              <span className="text-fg/60">Same as default</span> to mirror
+              <span className="text-ink-60">Same as default</span> to mirror
               the theme above.
             </>
           }

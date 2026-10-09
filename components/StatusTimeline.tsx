@@ -204,7 +204,7 @@ export const StatusTimeline = memo(function StatusTimeline({
           says nothing until a bucket is picked. */}
       <p
         aria-live="polite"
-        className={`text-xs text-fg/45 tabular-nums ${
+        className={`text-xs text-ink-45 tabular-nums ${
           active == null ? "sr-only" : ""
         }`}
       >

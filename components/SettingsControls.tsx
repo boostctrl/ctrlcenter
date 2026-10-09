@@ -51,14 +51,14 @@ export default function SettingsControls() {
     <div className="space-y-6 text-sm">
       <div>
         <h2 className="font-semibold">Preferences</h2>
-        <p className="text-xs text-fg/50">
+        <p className="text-xs text-ink-50">
           Personalize your view — saved in this browser only.
         </p>
       </div>
 
       <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <span className="text-fg/50">Appearance mode</span>
+          <span className="text-ink-50">Appearance mode</span>
           <ChipGroup
             label="Appearance mode"
             size="md"
@@ -71,13 +71,13 @@ export default function SettingsControls() {
             value={theme}
             onChange={setTheme}
           />
-          <p className="text-xs text-fg/40">
+          <p className="text-xs text-ink-40">
             Light, dark, or follow your device.
           </p>
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="greeting-name" className="text-fg/50">
+          <label htmlFor="greeting-name" className="text-ink-50">
             Greeting name
           </label>
           {/* Trim on blur, not in setGreetingName: the input is controlled by
@@ -92,13 +92,13 @@ export default function SettingsControls() {
             maxLength={60}
             className="accent-focus w-full rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-fg outline-none transition-colors"
           />
-          <p className="text-xs text-fg/40">
+          <p className="text-xs text-ink-40">
             Shown as “Good evening, {greetingName || "…"}!”
           </p>
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="tz-input" className="text-fg/50">
+          <label htmlFor="tz-input" className="text-ink-50">
             Time zone
           </label>
           <input
@@ -118,16 +118,16 @@ export default function SettingsControls() {
         {weatherEnabled && (
           <>
             <div className="space-y-1.5">
-              <span className="text-fg/50">Weather location</span>
+              <span className="text-ink-50">Weather location</span>
               <div className="flex items-center justify-between gap-2 rounded-lg border border-fg/10 bg-fg/5 px-3 py-2">
-                <span className="truncate text-fg/70">{locationText}</span>
+                <span className="truncate text-ink-70">{locationText}</span>
                 <div className="flex shrink-0 items-center gap-1.5">
                   {!location.isDefault && (
                     <button
                       type="button"
                       onClick={clearLocation}
                       title="Return to the site default location"
-                      className="rounded-md border border-fg/10 bg-fg/5 px-2.5 py-1 text-xs text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg/90"
+                      className="rounded-md border border-fg/10 bg-fg/5 px-2.5 py-1 text-xs text-ink-60 transition-colors hover:bg-fg/10 hover:text-ink-90"
                     >
                       Reset
                     </button>
@@ -136,7 +136,7 @@ export default function SettingsControls() {
                     type="button"
                     onClick={useMyLocation}
                     disabled={detecting}
-                    className="rounded-md border border-fg/10 bg-fg/5 px-2.5 py-1 text-xs text-fg/80 transition-colors hover:bg-fg/10 disabled:opacity-50"
+                    className="rounded-md border border-fg/10 bg-fg/5 px-2.5 py-1 text-xs text-ink-80 transition-colors hover:bg-fg/10 disabled:opacity-50"
                   >
                     {detecting ? "Locating…" : "Use my location"}
                   </button>
@@ -150,7 +150,7 @@ export default function SettingsControls() {
                   setManualLocation(latitude, longitude, label)
                 }
               />
-              <p className="text-xs text-fg/40">
+              <p className="text-xs text-ink-40">
                 Search a city, or use your device&apos;s location.
               </p>
               {locationError && (
@@ -159,7 +159,7 @@ export default function SettingsControls() {
             </div>
 
             <div className="space-y-1.5">
-              <span className="text-fg/50">Units</span>
+              <span className="text-ink-50">Units</span>
               <ChipGroup
                 label="Units"
                 size="md"
@@ -194,7 +194,7 @@ export default function SettingsControls() {
               )
                 reset();
             }}
-            className="rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-xs text-fg/60 transition-colors hover:bg-red-500/10 hover:text-red-400"
+            className="rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-xs text-ink-60 transition-colors hover:bg-red-500/10 hover:text-red-400"
           >
             Reset all settings
           </button>

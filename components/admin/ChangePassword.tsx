@@ -59,8 +59,8 @@ export default function ChangePassword() {
   return (
     <div className="flex items-center justify-between gap-4">
       <div>
-        <span className="text-sm text-fg/70">Admin password</span>
-        <p className="text-xs text-fg/40">
+        <span className="text-sm text-ink-70">Admin password</span>
+        <p className="text-xs text-ink-40">
           Set a password stored with the app. Until you do, the
           <code className="mx-1 rounded bg-fg/10 px-1">ADMIN_PASSWORD</code>
           environment variable is used.

@@ -39,7 +39,7 @@ export default function StatusAnnouncements({
     <section aria-labelledby="status-announcements-heading" className="space-y-3">
       <h2
         id="status-announcements-heading"
-        className="text-xs font-semibold tracking-[0.15em] text-fg/45 uppercase"
+        className="text-xs font-semibold tracking-[0.15em] text-ink-45 uppercase"
       >
         Announcements
       </h2>
@@ -66,23 +66,23 @@ export default function StatusAnnouncements({
                   {label}
                 </span>
                 {state === "scheduled" && (
-                  <span className="rounded-full bg-fg/10 px-2 py-0.5 text-[0.7rem] font-medium text-fg/60">
+                  <span className="rounded-full bg-fg/10 px-2 py-0.5 text-[0.7rem] font-medium text-ink-60">
                     Scheduled
                   </span>
                 )}
               </div>
               {announcement.title && (
-                <p className="mt-1.5 font-semibold text-fg/90">
+                <p className="mt-1.5 font-semibold text-ink-90">
                   {announcement.title}
                 </p>
               )}
               {announcement.body && (
-                <p className="mt-1 text-sm text-fg/70">
+                <p className="mt-1 text-sm text-ink-70">
                   <InlineMarkdown tokens={parseInline(announcement.body)} />
                 </p>
               )}
               {windowLabel && (
-                <p className="mt-2 text-xs text-fg/50">{windowLabel}</p>
+                <p className="mt-2 text-xs text-ink-50">{windowLabel}</p>
               )}
             </li>
           );

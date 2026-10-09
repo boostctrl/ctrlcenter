@@ -26,12 +26,12 @@ export default function AppCard({ app }: { app: AppItem }) {
           href={app.url}
           target="_blank"
           rel="noreferrer"
-          className="line-clamp-2 break-words font-semibold text-fg/90 outline-none after:absolute after:inset-0 after:rounded-[inherit] group-hover:text-fg focus-visible:underline"
+          className="line-clamp-2 break-words font-semibold text-ink-90 outline-none after:absolute after:inset-0 after:rounded-[inherit] group-hover:text-fg focus-visible:underline"
         >
           {app.name}
         </a>
         {app.subtitle && (
-          <p className="truncate text-sm text-fg/55">{app.subtitle}</p>
+          <p className="truncate text-sm text-ink-55">{app.subtitle}</p>
         )}
       </div>
       <button
@@ -44,7 +44,7 @@ export default function AppCard({ app }: { app: AppItem }) {
         className={`relative z-10 shrink-0 rounded-md p-1 transition hover:bg-fg/10 ${
           favorited
             ? "opacity-100"
-            : "text-fg/35 opacity-0 hover:text-fg/70 group-hover:opacity-100 focus-visible:opacity-100"
+            : "text-ink-35 opacity-0 hover:text-ink-70 group-hover:opacity-100 focus-visible:opacity-100"
         }`}
       >
         <svg

@@ -247,7 +247,7 @@ function AdminBody({
             aria-selected={tab === t.key}
             onClick={() => selectTab(t.key)}
             className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:px-4 ${
-              tab === t.key ? "bg-fg/10 text-fg" : "text-fg/50 hover:text-fg/80"
+              tab === t.key ? "bg-fg/10 text-fg" : "text-ink-50 hover:text-ink-80"
             }`}
           >
             {t.label}

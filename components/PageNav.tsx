@@ -55,7 +55,7 @@ export default function PageNav({
           <span
             key={p.key}
             aria-current="page"
-            className="text-sm font-medium text-fg/90"
+            className="text-sm font-medium text-ink-90"
           >
             {p.label}
           </span>
@@ -63,7 +63,7 @@ export default function PageNav({
           <Link
             key={p.key}
             href={p.href}
-            className="text-sm text-fg/50 transition-colors hover:text-fg/80"
+            className="text-sm text-ink-50 transition-colors hover:text-ink-80"
           >
             {p.label}
           </Link>

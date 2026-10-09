@@ -31,7 +31,7 @@ function Inline({ tokens }: { tokens: InlineToken[] }) {
         );
       case "bold":
         return (
-          <strong key={i} className="font-semibold text-fg/90">
+          <strong key={i} className="font-semibold text-ink-90">
             <Inline tokens={t.children} />
           </strong>
         );
@@ -48,7 +48,7 @@ function Inline({ tokens }: { tokens: InlineToken[] }) {
             href={t.href}
             target="_blank"
             rel="noreferrer"
-            className="underline decoration-fg/30 underline-offset-2 transition-colors hover:text-fg/90"
+            className="underline decoration-fg/30 underline-offset-2 transition-colors hover:text-ink-90"
           >
             <Inline tokens={t.children} />
           </a>
@@ -58,9 +58,9 @@ function Inline({ tokens }: { tokens: InlineToken[] }) {
 }
 
 const HEADING_CLASS: Record<1 | 2 | 3, string> = {
-  1: "text-base font-semibold text-fg/90",
-  2: "text-sm font-semibold text-fg/85",
-  3: "text-sm font-medium text-fg/75",
+  1: "text-base font-semibold text-ink-90",
+  2: "text-sm font-semibold text-ink-85",
+  3: "text-sm font-medium text-ink-75",
 };
 
 function Block({ block }: { block: MarkdownBlock }) {
@@ -86,17 +86,17 @@ function Block({ block }: { block: MarkdownBlock }) {
         </li>
       ));
       return block.ordered ? (
-        <ol className="list-decimal space-y-1 pl-5 marker:text-fg/40">
+        <ol className="list-decimal space-y-1 pl-5 marker:text-ink-40">
           {items}
         </ol>
       ) : (
-        <ul className="list-disc space-y-1 pl-5 marker:text-fg/40">{items}</ul>
+        <ul className="list-disc space-y-1 pl-5 marker:text-ink-40">{items}</ul>
       );
     }
     case "quote":
       return (
         <blockquote
-          className="border-l-2 pl-3 text-fg/55 italic"
+          className="border-l-2 pl-3 text-ink-55 italic"
           style={{
             borderColor:
               "color-mix(in srgb, var(--accent-from) 50%, transparent)",
@@ -131,7 +131,7 @@ export default function NotesWidget({
   return (
     <section>
       {showTitle && title.trim() !== "" && <SectionTitle>{title}</SectionTitle>}
-      <div className="glass-card space-y-3 p-6 text-sm leading-relaxed text-fg/70">
+      <div className="glass-card space-y-3 p-6 text-sm leading-relaxed text-ink-70">
         {blocks.map((b, i) => (
           <Block key={i} block={b} />
         ))}

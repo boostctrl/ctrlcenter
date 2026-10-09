@@ -75,10 +75,10 @@ export default function LoginForm({
     return (
       <div role="alert" className="glass-card flex w-full max-w-sm flex-col gap-3 p-8">
         <h1 className="text-2xl font-bold">Sign in</h1>
-        <p className="text-sm text-fg/80">
+        <p className="text-sm text-ink-80">
           No admin password is set, so nobody can sign in yet.
         </p>
-        <p className="text-sm text-fg/80">
+        <p className="text-sm text-ink-80">
           Set <code className="whitespace-nowrap rounded bg-fg/10 px-1 py-0.5">ADMIN_PASSWORD</code>{" "}
           in the container&apos;s environment (for example in{" "}
           <code className="whitespace-nowrap rounded bg-fg/10 px-1 py-0.5">docker-compose.yml</code>)
@@ -103,7 +103,7 @@ export default function LoginForm({
         />
       ) : (
         <>
-          <p className="text-sm text-fg/60">
+          <p className="text-sm text-ink-60">
             Enter the 6-digit code from your authenticator app, or a recovery
             code.
           </p>

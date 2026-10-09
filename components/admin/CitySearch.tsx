@@ -85,7 +85,7 @@ export default function CitySearch({
                 setQuery(label(r));
                 setOpen(false);
               }}
-              className="block w-full px-3 py-2 text-left text-sm text-fg/80 transition-colors hover:bg-fg/10"
+              className="block w-full px-3 py-2 text-left text-sm text-ink-80 transition-colors hover:bg-fg/10"
             >
               {label(r)}
             </button>

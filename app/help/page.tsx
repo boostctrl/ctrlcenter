@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 // A short keyboard-key chip.
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
-    <kbd className="rounded-md border border-fg/15 bg-fg/[0.06] px-1.5 py-0.5 font-mono text-xs text-fg/75">
+    <kbd className="rounded-md border border-fg/15 bg-fg/[0.06] px-1.5 py-0.5 font-mono text-xs text-ink-75">
       {children}
     </kbd>
   );
@@ -21,7 +21,7 @@ function Kbd({ children }: { children: React.ReactNode }) {
 // A monospace inline snippet (bang keys, config values).
 function Code({ children }: { children: React.ReactNode }) {
   return (
-    <code className="rounded bg-fg/[0.06] px-1 py-0.5 font-mono text-[0.85em] text-fg/80">
+    <code className="rounded bg-fg/[0.06] px-1 py-0.5 font-mono text-[0.85em] text-ink-80">
       {children}
     </code>
   );
@@ -38,7 +38,7 @@ function A({
   children: React.ReactNode;
 }) {
   const className =
-    "font-medium text-fg/85 underline underline-offset-2 hover:text-fg";
+    "font-medium text-ink-85 underline underline-offset-2 hover:text-fg";
   if (external) {
     return (
       <a
@@ -60,12 +60,12 @@ function A({
 
 // Body paragraph — the default prose style used throughout the cards.
 function P({ children }: { children: React.ReactNode }) {
-  return <p className="text-sm text-fg/70">{children}</p>;
+  return <p className="text-sm text-ink-70">{children}</p>;
 }
 
 // Shared class for the bulleted feature lists in the cards below.
 const LIST_CLASS =
-  "flex list-disc flex-col gap-1.5 pl-4 text-sm text-fg/70 marker:text-fg/30";
+  "flex list-disc flex-col gap-1.5 pl-4 text-sm text-ink-70 marker:text-ink-30";
 
 function Card({
   title,
@@ -76,7 +76,7 @@ function Card({
 }) {
   return (
     <section className="glass-card mb-4 flex break-inside-avoid flex-col gap-3 p-6">
-      <h3 className="text-sm font-semibold tracking-[0.15em] text-fg/60 uppercase">
+      <h3 className="text-sm font-semibold tracking-[0.15em] text-ink-60 uppercase">
         {title}
       </h3>
       {children}
@@ -98,7 +98,7 @@ function Section({
     <section className="flex flex-col gap-4">
       <div>
         <h2 className="text-xl font-bold tracking-tight">{title}</h2>
-        {note && <p className="mt-1 text-sm text-fg/50">{note}</p>}
+        {note && <p className="mt-1 text-sm text-ink-50">{note}</p>}
       </div>
       <div className="columns-1 gap-4 md:columns-2 xl:columns-3">{children}</div>
     </section>
@@ -120,7 +120,7 @@ export default async function HelpPage() {
         <div>
           <PageNav current="help" {...navPages(settings)} />
           <h1 className="mt-3 text-3xl font-bold">Help</h1>
-          <p className="mt-1 text-sm text-fg/50">
+          <p className="mt-1 text-sm text-ink-50">
             Everything ctrlcenter can do, plus setup notes for admins. Some
             features below appear only when the admin has turned them on.
           </p>
@@ -151,7 +151,7 @@ export default async function HelpPage() {
               on name, subtitle, URL, and a bookmark&apos;s category, and opening
               anything launches it in a new tab.
             </P>
-            <ul className="flex flex-col gap-2 text-sm text-fg/70">
+            <ul className="flex flex-col gap-2 text-sm text-ink-70">
               <li className="flex items-baseline gap-3">
                 <Kbd>/</Kbd>
                 <span>
@@ -181,7 +181,7 @@ export default async function HelpPage() {
               unrecognized bang falls back to a web search of your text.
             </P>
             <div>
-              <p className="mb-1.5 text-xs tracking-wide text-fg/45 uppercase">
+              <p className="mb-1.5 text-xs tracking-wide text-ink-45 uppercase">
                 Built-in
               </p>
               <div className="flex flex-wrap gap-1.5">
@@ -189,10 +189,10 @@ export default async function HelpPage() {
                   <span
                     key={key}
                     title={b.label}
-                    className="rounded-md border border-fg/10 bg-fg/[0.04] px-2 py-1 text-xs text-fg/70"
+                    className="rounded-md border border-fg/10 bg-fg/[0.04] px-2 py-1 text-xs text-ink-70"
                   >
-                    <span className="font-mono text-fg/90">!{key}</span>{" "}
-                    <span className="text-fg/45">{b.label}</span>
+                    <span className="font-mono text-ink-90">!{key}</span>{" "}
+                    <span className="text-ink-45">{b.label}</span>
                   </span>
                 ))}
               </div>

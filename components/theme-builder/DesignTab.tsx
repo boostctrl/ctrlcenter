@@ -18,7 +18,7 @@ export default function DesignTab({ d }: { d: ThemeDraft }) {
       aria-labelledby="tb-tab-design"
       className="space-y-3"
     >
-      <p className="text-xs text-fg/40">
+      <p className="text-xs text-ink-40">
         How cards &amp; panels are drawn — the surface style of your{" "}
         {editMode} theme.
       </p>
