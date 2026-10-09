@@ -13,6 +13,19 @@ updates:
       # Routine bumps in one PR; majors arrive one at a time.
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # Blocked upstream (#260): eslint-config-next's bundled plugins don't
+      # support ESLint 10, and typescript-eslint caps TypeScript below 6.1.
+      # Drop these two entries when #260 clears.
+      - dependency-name: eslint
+        versions: [">=10"]
+      - dependency-name: typescript
+        versions: [">=7"]
+      # The types track the runtime: the image runs Node 24 (Dockerfile),
+      # so a newer @types/node would admit APIs the container lacks. Bump
+      # by hand alongside the Node major.
+      - dependency-name: "@types/node"
+        update-types: [version-update:semver-major]
 
   - package-ecosystem: github-actions
     directory: /
