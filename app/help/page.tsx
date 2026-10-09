@@ -572,10 +572,25 @@ export default async function HelpPage() {
         <Card title="Alerts">
           <P>
             Get notified when a monitored service goes down and when it
-            recovers. Under the master <strong>Alerts</strong> switch,{" "}
-            <strong>email</strong> (via your SMTP server) and a{" "}
-            <strong>webhook</strong> are independent channels, so you can
-            enable either or both.
+            recovers. Under the master <strong>Alerts</strong> switch, add as
+            many <strong>channels</strong> as you like: a webhook (Discord,
+            Slack, ntfy or a generic JSON endpoint), email through your SMTP
+            server, <strong>Telegram</strong>, <strong>Gotify</strong>,{" "}
+            <strong>Pushover</strong>, or an <strong>Apprise</strong> API
+            server, which forwards to dozens of other services.
+          </P>
+          <P>
+            Each channel chooses what it sends (downs, recoveries, inbound
+            webhook events) and for which apps, so the outage of something
+            critical can go to your phone while everything else goes to a chat
+            room. <strong>Send test</strong> on a channel fires a sample alert
+            through it straight away.
+          </P>
+          <P>
+            A webhook or email set up before channels existed keeps working,
+            and shows under <em>Set up in an earlier version</em>.{" "}
+            <strong>Move into the channel list</strong> turns it into a regular
+            channel you can edit and filter.
           </P>
         </Card>
 
@@ -593,8 +608,8 @@ export default async function HelpPage() {
             <strong>Connect → Webhook</strong> settings paste the URL, set the
             method to <strong>POST</strong>, and pick which events to send. Each
             service has its own token in the URL — <strong>Regenerate</strong>{" "}
-            rotates it if one leaks — and events need a webhook or email channel
-            configured under Alerts to land anywhere.
+            rotates it if one leaks — and events need an alert channel that
+            sends inbound webhooks to land anywhere.
           </P>
         </Card>
 

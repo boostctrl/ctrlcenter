@@ -130,12 +130,7 @@ try {
       viewport: { width: 1440, height: 900 },
       colorScheme: scheme,
     });
-    const login = await ctx.newPage();
-    await login.goto(`${base}/admin/login`);
-    await login.fill('input[type="password"]', PASSWORD);
-    await login.keyboard.press("Enter");
-    await login.waitForURL((u) => u.pathname === "/admin", { timeout: 15_000 });
-    await login.close();
+    await signIn(ctx);
     console.log(`ok    signed in through /admin/login (${scheme})`);
     for (const [p, shot] of [
       ["/admin", "admin"],
@@ -159,7 +154,8 @@ try {
 
 // The status surfaces (#311): the example config has checks off (they'd reach
 // the example apps' real hosts), so switch them on against local targets
-// only, wait for each state to show up, and render where it surfaces.
+// only, wait for each state to show up, and render where it surfaces, plus
+// the monitoring settings with alerts set up.
 async function statusPhase(run) {
   const closedPort = await freePort();
   const apps = [
@@ -186,6 +182,19 @@ async function statusPhase(run) {
   const config = YAML.load(fs.readFileSync(configPath, "utf8"));
   config.settings.statusChecks = true;
   config.apps = [...config.apps.map((a) => ({ ...a, monitor: false })), ...apps];
+  // Alerts with every part of their settings card on show (#291), none able
+  // to send: the original webhook and one channel are switched off, the
+  // other channel is missing its chat ID.
+  config.settings.alerts = {
+    ...config.settings.alerts,
+    enabled: true,
+    webhookUrl: `http://127.0.0.1:${closedPort}/`,
+    webhookEnabled: false,
+    channels: [
+      { id: "smoke-webhook", type: "webhook", enabled: false, url: `http://127.0.0.1:${closedPort}/` },
+      { id: "smoke-telegram", type: "telegram", name: "Phone", token: "smoke", apps: ["smoke-down"] },
+    ],
+  };
   fs.writeFileSync(configPath, YAML.dump(config));
 
   // Each state as /api/status reports it.
@@ -220,8 +229,19 @@ async function statusPhase(run) {
     ]) {
       await run(ctx, p, `${shot}-${scheme}`);
     }
+    await signIn(ctx);
+    await run(ctx, "/admin?tab=settings&section=monitoring", `admin-monitoring-${scheme}`);
     await ctx.close();
   }
+}
+
+async function signIn(ctx) {
+  const login = await ctx.newPage();
+  await login.goto(`${base}/admin/login`);
+  await login.fill('input[type="password"]', PASSWORD);
+  await login.keyboard.press("Enter");
+  await login.waitForURL((u) => u.pathname === "/admin", { timeout: 15_000 });
+  await login.close();
 }
 
 // A port nothing listens on (bound then released).

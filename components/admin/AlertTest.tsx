@@ -2,54 +2,38 @@
 
 import TestConnectionButton from "./TestConnectionButton";
 
-type ChannelResult = { ok: boolean; detail: string };
-type Result = { webhook?: ChannelResult; email?: ChannelResult };
+type Result = { results: { id: string; label: string; ok: boolean; detail: string }[] };
 
-// "Send test alert" button for the admin Alerts section: fires a synthetic down
-// alert through the currently saved config so the admin can confirm the webhook
-// and/or email channel actually delivers, rather than waiting for a real outage.
-// Each channel's outcome is shown separately — the point is verifying each path.
-// A thin adapter over TestConnectionButton; the parent computes which channels
-// are configured (the button stays disabled until at least one is). Settings
-// autosave, so the saved config this tests is effectively the current form.
+// "Send test" for one alert channel (#291): fires a synthetic down alert
+// through the saved config so the admin can confirm the channel actually
+// delivers, rather than waiting for a real outage. Settings autosave, so the
+// saved config is the form, except while an edit is still saving; the button
+// waits that out so it never tests the old values.
 export default function AlertTest({
-  webhookConfigured,
-  emailConfigured,
+  channel,
+  ready,
+  saving,
 }: {
-  webhookConfigured: boolean;
-  emailConfigured: boolean;
+  channel: string;
+  ready: boolean;
+  saving: boolean;
 }) {
-  const configured = webhookConfigured || emailConfigured;
-
   return (
-    <div className="flex flex-col gap-2">
-      <TestConnectionButton<Result>
-        endpoint="/api/alerts/test"
-        label="Send test alert"
-        pendingLabel="Sending…"
-        disabled={!configured}
-        renderResult={(data) => (
-          <>
-            {data.webhook && (
-              <span
-                className={`text-xs ${data.webhook.ok ? "text-emerald-400" : "text-red-400"}`}
-              >
-                {data.webhook.ok ? "✓" : "✗"} Webhook — {data.webhook.detail}
-              </span>
-            )}
-            {data.email && (
-              <span
-                className={`text-xs ${data.email.ok ? "text-emerald-400" : "text-red-400"}`}
-              >
-                {data.email.ok ? "✓" : "✗"} Email — {data.email.detail}
-              </span>
-            )}
-          </>
-        )}
-      />
-      <p className="text-xs text-ink-40">
-        Sends a test notification through the saved settings.
-      </p>
-    </div>
+    <TestConnectionButton<Result>
+      endpoint="/api/alerts/test"
+      body={{ channel }}
+      label="Send test"
+      pendingLabel="Sending…"
+      disabled={!ready || saving}
+      renderResult={(data) => {
+        const r = data.results[0];
+        if (!r) return <span className="text-xs text-red-400">✗ Not sent</span>;
+        return (
+          <span className={`text-xs ${r.ok ? "text-emerald-400" : "text-red-400"}`}>
+            {r.ok ? "✓ Sent" : "✗ Failed"} ({r.detail})
+          </span>
+        );
+      }}
+    />
   );
 }

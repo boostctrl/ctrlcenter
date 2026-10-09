@@ -181,7 +181,7 @@ export function NumberRow({
     <label className="flex items-center justify-between gap-4 text-sm">
       <span className="text-ink-70">
         {label}
-        {hint && <span className="block text-xs text-ink-40">{hint}</span>}
+        {hint && <span className="block text-xs text-ink-45">{hint}</span>}
       </span>
       <input
         type="number"
@@ -245,7 +245,7 @@ export function ToggleRow({
     <label className="flex cursor-pointer items-center justify-between gap-4 text-sm">
       <span className="text-ink-70">
         {label}
-        {hint && <span className="block text-xs text-ink-40">{hint}</span>}
+        {hint && <span className="block text-xs text-ink-45">{hint}</span>}
       </span>
       <Switch checked={checked} onChange={onChange} label={label} />
     </label>
@@ -267,7 +267,7 @@ export function ControlRow({
     <div className="flex items-center justify-between gap-4 text-sm">
       <div className="text-ink-70">
         {label}
-        {hint && <p className="text-xs text-ink-40">{hint}</p>}
+        {hint && <p className="text-xs text-ink-45">{hint}</p>}
       </div>
       {children}
     </div>

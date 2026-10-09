@@ -26,11 +26,14 @@ import SecuritySection from "./settings/SecuritySection";
 
 export default function SettingsManager({
   initialSettings,
+  apps,
   themePacks,
   initialSection,
   initialTwoFactorEnabled,
 }: {
   initialSettings: Settings;
+  // The monitored apps, for the alert channels' app filter.
+  apps: { id: string; name: string }[];
   themePacks: ThemePack[];
   // The ?section deep-link param, read server-side by /admin's page (see
   // AdminDashboard's matching prop for why useSearchParams is avoided).
@@ -130,7 +133,7 @@ export default function SettingsManager({
         {section === "general" && <GeneralSection d={draft} themePacks={themePacks} />}
         {section === "layout" && <LayoutSection d={draft} />}
         {section === "widgets" && <WidgetsSection d={draft} />}
-        {section === "monitoring" && <MonitoringSection d={draft} />}
+        {section === "monitoring" && <MonitoringSection d={draft} apps={apps} />}
         {section === "integrations" && <IntegrationsSection d={draft} />}
         {section === "announcements" && <AnnouncementsSection d={draft} />}
         {section === "security" && (

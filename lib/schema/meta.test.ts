@@ -33,7 +33,8 @@ function fields(schema: z.ZodType, path: string[] = [], covered = false): { path
 
 describe("secret marks", () => {
   it("cover every settings field that looks like a credential", () => {
-    const credential = /(pass(word)?|token|apikey|secret|username|user)$/i;
+    // Any "…Key" (apiKey, userKey), but not a bare "key" like a search bang's.
+    const credential = /(pass(word)?|token|\wkey|secret|username|user|chatid)$/i;
     // Every settings and app field named like a credential.
     const uncovered = [...fields(settingsSchema), ...fields(appItemSchema, ["apps[]"])]
       .filter((f) => credential.test(f.path.split(".").pop()!))
@@ -50,6 +51,16 @@ describe("secret marks", () => {
     const out = redactSecrets(settingsSchema, settings);
     expect(out.calendar).toMatchObject({ url: "https://cal.test", username: "", password: "" });
     expect(out.integrations.sonarr).toMatchObject({ enabled: false, url: "", apiKey: "" });
+    // Into list entries too: an alert channel keeps its type, loses its keys.
+    const alerts = settingsSchema.parse({
+      alerts: {
+        channels: [
+          { id: "c", type: "telegram", token: "123:abc", chatId: "42", smtp: { pass: "pw", port: 25 } },
+        ],
+      },
+    }).alerts;
+    const [ch] = redactSecrets(settingsSchema, { ...settings, alerts }).alerts.channels;
+    expect(ch).toMatchObject({ type: "telegram", token: "", chatId: "", smtp: { pass: "", port: 25 } });
     // The input is left alone.
     expect(settings.calendar.password).toBe("pw");
   });

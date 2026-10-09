@@ -2,7 +2,8 @@
 
 import { useCallback, useRef, useState } from "react";
 import type { Settings, SettingsInput, FeedConfig } from "@/lib/schema";
-import { type WebhookService, feedUrls, MAX_FEED_CARDS } from "@/lib/schema";
+import { type WebhookService, alertChannelSchema, feedUrls, MAX_FEED_CARDS } from "@/lib/schema";
+import { moveLegacyIntoChannels } from "@/lib/alert-channels";
 import type { ThemePack } from "@/lib/theme";
 import { newThemeId } from "@/lib/prefs";
 import { resolveLayoutWidgets, type LayoutWidgetId } from "@/lib/layout";
@@ -64,10 +65,28 @@ export function useSettingsDraft(initialSettings: Settings, themePacks: ThemePac
   const alerts = settings.alerts;
   const updateAlerts = (patch: Partial<Settings["alerts"]>) =>
     setSettings((s) => ({ ...s, alerts: { ...s.alerts, ...patch } }));
-  const updateAlertEmail = (patch: Partial<Settings["alerts"]["email"]>) =>
+  // The channel list (#291). Updaters compose off the latest state, like the
+  // other list editors, so quick successive adds can't drop a row.
+  type Channel = Settings["alerts"]["channels"][number];
+  const setChannels = (update: (prev: Channel[]) => Channel[]) =>
+    setSettings((s) => ({ ...s, alerts: { ...s.alerts, channels: update(s.alerts.channels) } }));
+  const addChannel = () =>
+    setChannels((cs) => [...cs, alertChannelSchema.parse({ id: newThemeId(), type: "webhook" })]);
+  const updateChannel = (id: string, patch: Partial<Channel>) =>
+    setChannels((cs) => cs.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+  const removeChannel = async (id: string, label: string) => {
+    const ok = await confirm({
+      title: `Remove the ${label} channel?`,
+      confirmLabel: "Remove",
+      danger: true,
+    });
+    if (!ok) return;
+    setChannels((cs) => cs.filter((c) => c.id !== id));
+  };
+  const moveLegacyChannels = () =>
     setSettings((s) => ({
       ...s,
-      alerts: { ...s.alerts, email: { ...s.alerts.email, ...patch } },
+      alerts: { ...s.alerts, ...moveLegacyIntoChannels(s.alerts, newThemeId) },
     }));
 
   const integrations = settings.integrations;
@@ -370,7 +389,10 @@ export function useSettingsDraft(initialSettings: Settings, themePacks: ThemePac
     updateTheme,
     alerts,
     updateAlerts,
-    updateAlertEmail,
+    addChannel,
+    updateChannel,
+    removeChannel,
+    moveLegacyChannels,
     integrations,
     updateIntegration,
     webhooks,

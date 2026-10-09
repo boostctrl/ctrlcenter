@@ -1,13 +1,20 @@
-import type { AlertConfig, AlertEmailConfig, AlertType } from "./schema";
+import type { AlertChannel, AlertConfig, AlertType, SmtpConfig } from "./schema";
+import {
+  activeChannels,
+  alertChannels,
+  channelLabel,
+  channelReady,
+  wantsAlert,
+} from "./alert-channels";
 import { log, hostOf, errorReason } from "./log";
 import { resolveSecret } from "./secrets";
 import { fetchWithTimeout } from "./fetch-body";
 
 // Outbound uptime alerting. The background poller (lib/status-poller.ts) feeds
 // each tick's results through here; we detect down/recovery transitions and
-// notify the configured channels — a webhook and/or email. The transition logic
-// and payload shaping are pure (unit-tested); only sendAlert/sendEmailAlert/
-// processAlerts do IO.
+// notify the configured channels (lib/alert-channels.ts). The transition logic
+// and payload shaping are pure (unit-tested); only the delivery functions at
+// the bottom do IO.
 
 export type AlertEventType = "down" | "up";
 export type AlertEvent = { id: string; type: AlertEventType };
@@ -263,15 +270,126 @@ function jsonReq(url: string, payload: unknown): AlertRequest {
 
 const ALERT_TIMEOUT_MS = 5000;
 
+// What the services without a webhook-style payload get (Telegram, Gotify,
+// Pushover, Apprise): a title, a body for services that show the title
+// separately, the whole text for those that don't, an optional link, and
+// how urgent it is.
+export type PlainMessage = {
+  title: string;
+  body: string;
+  text: string;
+  url?: string;
+  level: "down" | "up" | "info";
+};
+
+export function plainAlert(event: AlertEvent, app: AlertApp): PlainMessage {
+  const down = event.type === "down";
+  const title = down ? `${app.name} is down` : `${app.name} recovered`;
+  const body = `${down ? "🔴" : "🟢"} ${title}`;
+  return { title, body, text: body, url: app.url.trim() || undefined, level: event.type };
+}
+
+export function plainNotification(c: NotificationContent): PlainMessage {
+  const detail = c.body?.trim() ?? "";
+  return {
+    title: c.title,
+    body: detail || c.title,
+    text: [c.title, detail].filter(Boolean).join("\n"),
+    url: c.url?.trim() || undefined,
+    level: "info",
+  };
+}
+
+// Telegram caps a message at 4096 characters; leave room for the link.
+const MAX_TEXT = 3500;
+const clip = (s: string) => (s.length > MAX_TEXT ? `${s.slice(0, MAX_TEXT)}…` : s);
+const withLink = (s: string, url?: string) => (url ? `${clip(s)}\n${url}` : clip(s));
+
+// Shape a message into the request one of the native services expects (#291).
+// Pure, so each service's payload is unit-tested.
+export function buildServiceRequest(
+  ch: Pick<AlertChannel, "type" | "url" | "token" | "chatId" | "userKey">,
+  m: PlainMessage
+): AlertRequest {
+  switch (ch.type) {
+    case "telegram":
+      // Plain text: no parse_mode, so names with * or _ need no escaping.
+      return jsonReq(`https://api.telegram.org/bot${ch.token.trim()}/sendMessage`, {
+        chat_id: ch.chatId.trim(),
+        text: withLink(m.text, m.url),
+        disable_web_page_preview: true,
+      });
+    case "gotify":
+      return {
+        url: `${ch.url.trim().replace(/\/+$/, "")}/message`,
+        init: {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Gotify-Key": ch.token.trim() },
+          body: JSON.stringify({
+            title: m.title,
+            message: withLink(m.body, m.url),
+            priority: m.level === "down" ? 8 : 5,
+          }),
+        },
+      };
+    case "pushover": {
+      const form = new URLSearchParams({
+        token: ch.token.trim(),
+        user: ch.userKey.trim(),
+        title: m.title.slice(0, 250),
+        message: clip(m.body).slice(0, 1024),
+        priority: m.level === "down" ? "1" : "0",
+      });
+      if (m.url && /^https?:\/\//i.test(m.url)) form.set("url", m.url.slice(0, 512));
+      return {
+        url: "https://api.pushover.net/1/messages.json",
+        init: {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: form.toString(),
+        },
+      };
+    }
+    case "apprise":
+    default:
+      // The Apprise API's /notify endpoint: it fans out to whatever services
+      // its URL (a stateless /notify or a saved /notify/<key>) points at.
+      return jsonReq(ch.url.trim(), {
+        title: m.title,
+        body: withLink(m.body, m.url),
+        type: m.level === "down" ? "failure" : m.level === "up" ? "success" : "info",
+      });
+  }
+}
+
+// One thing to deliver: an uptime transition, or a relayed notification.
+type Outgoing =
+  | { kind: "alert"; event: AlertEvent; app: AlertApp; at: number }
+  | { kind: "notification"; content: NotificationContent };
+
+// The HTTP request for one channel and one message (every type but email).
+function requestFor(ch: AlertChannel, out: Outgoing): AlertRequest {
+  if (ch.type === "webhook") {
+    const url = ch.url.trim();
+    return out.kind === "alert"
+      ? buildAlertRequest(ch.format, url, out.event, out.app, out.at)
+      : buildNotificationRequest(ch.format, url, out.content);
+  }
+  return buildServiceRequest(
+    ch,
+    out.kind === "alert" ? plainAlert(out.event, out.app) : plainNotification(out.content)
+  );
+}
+
 // One channel's delivery outcome, reported so a test can show it. `detail` is a
-// short human string: for a webhook, the HTTP status ("HTTP 204" / "HTTP 404")
+// short human string: for an HTTP channel, the status ("HTTP 204" / "HTTP 404")
 // or the network errorReason on a throw; for email, "sent" or the errorReason.
 export type ChannelResult = { ok: boolean; detail: string };
 
-// Fire one webhook, time-boxed, and report the outcome instead of throwing so
-// both the poller (which logs) and the test path (which shows the result) can
-// share the exact same request logic. Never throws.
-async function runAlert(req: AlertRequest): Promise<ChannelResult> {
+// Fire one request, time-boxed, and report the outcome instead of throwing so
+// both the poller (which logs) and the test path (which shows the result) share
+// the exact same request logic.
+async function runRequest(req: AlertRequest): Promise<ChannelResult> {
   try {
     const res = await fetchWithTimeout(req.url, req.init, ALERT_TIMEOUT_MS);
     return { ok: res.ok, detail: `HTTP ${res.status}` };
@@ -280,27 +398,10 @@ async function runAlert(req: AlertRequest): Promise<ChannelResult> {
   }
 }
 
-// Fire one webhook, best-effort: a failed or slow alert must never disturb the
-// poller, so errors are swallowed and the request is time-boxed.
-async function sendAlert(req: AlertRequest): Promise<void> {
-  const result = await runAlert(req);
-  if (result.ok) return;
-  const host = hostOf(req.url);
-  const rejected = /^HTTP (\d+)$/.exec(result.detail);
-  // The request didn't throw but the endpoint rejected it — surface that, or
-  // the alert silently "sent" while nothing was delivered.
-  if (rejected) log.warn("alert webhook rejected", { host, status: Number(rejected[1]) });
-  else log.warn("alert webhook failed", { host, reason: result.detail });
-}
-
-
-// Send one alert email over SMTP and report the outcome. nodemailer is imported
-// lazily so it never lands in a client/edge bundle and only loads inside the
-// Node poller. Time-boxed; never throws (mirrors runAlert for the mail path).
-// Build a time-boxed SMTP transport from the alert email config. nodemailer is
-// imported lazily so it never lands in a client/edge bundle and only loads
-// inside the Node poller / webhook route.
-async function makeTransport(cfg: AlertEmailConfig) {
+// Build a time-boxed SMTP transport. nodemailer is imported lazily so it never
+// lands in a client/edge bundle and only loads inside the Node poller /
+// webhook route.
+async function makeTransport(cfg: SmtpConfig) {
   const { default: nodemailer } = await import("nodemailer");
   const pass = resolveSecret("CTRLCENTER_SMTP_PASS", cfg.pass);
   return nodemailer.createTransport({
@@ -314,15 +415,13 @@ async function makeTransport(cfg: AlertEmailConfig) {
   });
 }
 
-async function runEmailAlert(
-  cfg: AlertEmailConfig,
-  event: AlertEvent,
-  app: AlertApp,
-  at: number
-): Promise<ChannelResult> {
+async function runEmail(cfg: SmtpConfig, out: Outgoing): Promise<ChannelResult> {
   try {
     const transport = await makeTransport(cfg);
-    const { subject, text, html } = buildEmailMessage(event, app, at, cfg.subject);
+    const { subject, text, html } =
+      out.kind === "alert"
+        ? buildEmailMessage(out.event, out.app, out.at, cfg.subject)
+        : buildNotificationEmail(out.content);
     await transport.sendMail({ from: cfg.from, to: cfg.to, subject, text, html });
     return { ok: true, detail: "sent" };
   } catch (e) {
@@ -330,65 +429,40 @@ async function runEmailAlert(
   }
 }
 
-// Relay one free-form notification out to the configured alert channels (#204),
-// best-effort: a failed or slow channel must never block the webhook response,
-// so errors are swallowed (and logged). A no-op when neither the webhook nor
-// the email channel is configured — the caller checks that first.
+// Deliver to one channel. Never throws.
+function deliver(ch: AlertChannel, out: Outgoing): Promise<ChannelResult> {
+  return ch.type === "email" ? runEmail(ch.smtp, out) : runRequest(requestFor(ch, out));
+}
+
+// Deliver best-effort: a failed or slow channel must never disturb the poller
+// or the webhook response, so failures are swallowed, but logged so an
+// undelivered alert can be traced. Only the host is logged: Telegram's URL
+// carries the bot token.
+async function deliverLogged(ch: AlertChannel, out: Outgoing): Promise<void> {
+  const result = await deliver(ch, out);
+  if (result.ok) return;
+  log.warn("alert channel failed", {
+    channel: channelLabel(ch),
+    host: ch.type === "email" ? ch.smtp.host : hostOf(requestFor(ch, out).url),
+    reason: result.detail,
+  });
+}
+
+// Relay one free-form notification (#204) out to every active channel that
+// takes inbound webhook events. A no-op when there's none; the caller checks
+// anyChannelReady first to answer clearly.
 export async function sendNotification(
   config: AlertConfig,
   c: NotificationContent
 ): Promise<void> {
-  const webhookUrl = config.webhookUrl.trim();
-  const sendWebhook = config.webhookEnabled && webhookUrl !== "";
-  const sendEmail = emailReady(config.email);
-  const tasks: Promise<void>[] = [];
-  if (sendWebhook)
-    tasks.push(sendAlert(buildNotificationRequest(config.type, webhookUrl, c)));
-  if (sendEmail) {
-    tasks.push(
-      (async () => {
-        try {
-          const transport = await makeTransport(config.email);
-          const { subject, text, html } = buildNotificationEmail(c);
-          await transport.sendMail({
-            from: config.email.from,
-            to: config.email.to,
-            subject,
-            text,
-            html,
-          });
-        } catch (e) {
-          log.warn("notification email failed", {
-            host: config.email.host,
-            reason: errorReason(e),
-          });
-        }
-      })()
-    );
-  }
-  await Promise.all(tasks);
+  const channels = activeChannels(config).filter((ch) => ch.onWebhooks);
+  await Promise.all(channels.map((ch) => deliverLogged(ch, { kind: "notification", content: c })));
 }
 
-// Whether any alert channel is configured to receive a relayed notification —
-// the webhook route uses this to 503 clearly when there's nowhere to send.
+// Whether any channel would receive a relayed notification: the webhook route
+// uses this to say clearly when there's nowhere to send.
 export function anyChannelReady(config: AlertConfig): boolean {
-  return (
-    (config.webhookEnabled && config.webhookUrl.trim() !== "") ||
-    emailReady(config.email)
-  );
-}
-
-// Send one alert email over SMTP, best-effort. A mail failure must never disturb
-// the poller, so it's swallowed here — but logged so a silently-undelivered
-// alert can be traced.
-async function sendEmailAlert(
-  cfg: AlertEmailConfig,
-  event: AlertEvent,
-  app: AlertApp,
-  at: number
-): Promise<void> {
-  const result = await runEmailAlert(cfg, event, app, at);
-  if (!result.ok) log.warn("alert email failed", { host: cfg.host, reason: result.detail });
+  return activeChannels(config).some((ch) => ch.onWebhooks);
 }
 
 // Alert state is held on globalThis so the poller and any other module graph
@@ -405,51 +479,42 @@ function seedState(priorReadings: Map<string, boolean>): Map<string, AppAlertSta
   return m;
 }
 
-// Whether the email channel has the minimum config to send.
-export function emailReady(email: AlertEmailConfig): boolean {
-  return !!(
-    email.enabled &&
-    email.host.trim() &&
-    email.from.trim() &&
-    email.to.trim()
-  );
-}
+export type TestResult = ChannelResult & { id: string; label: string };
 
-// Send a synthetic "down" alert through the real webhook/email paths so the
-// admin can verify each configured channel without waiting for a real outage.
-// Unlike the poller this reports every attempted channel's outcome (and never
-// throws), and deliberately ignores `config.enabled` — the master switch gates
-// the poller, not the admin's ability to test a channel. Both channels are sent
-// in parallel; the result carries a key only for the channels we attempted.
+// Send a synthetic "down" alert through the real delivery path so the admin
+// can check a channel without waiting for a real outage. With `channelId`,
+// that one channel is tested even while switched off (it's being set up);
+// without, every active one. Ignores `config.enabled`: the master switch gates
+// the poller, not the admin's test. Channels missing a required field are
+// skipped; the form says what's missing. Never throws.
 export async function sendTestAlert(
-  config: AlertConfig
-): Promise<{ webhook?: ChannelResult; email?: ChannelResult }> {
-  const event: AlertEvent = { id: "test", type: "down" };
+  config: AlertConfig,
+  channelId?: string
+): Promise<{ results: TestResult[] }> {
+  const channels =
+    channelId === undefined
+      ? activeChannels(config)
+      : alertChannels(config).filter((ch) => ch.id === channelId && channelReady(ch));
   // A distinctly-named app so the notification reads "🔴 CtrlCenter test alert
-  // is down" — unmistakably a test, yet still exercising the real down-path
-  // formatting (ntfy priority/tags, the email subject template, etc.).
-  const app: AlertApp = { name: "CtrlCenter test alert", url: "" };
-  const at = Date.now();
-  const webhookUrl = config.webhookUrl.trim();
-  const testWebhook = config.webhookEnabled && webhookUrl !== "";
-  const testEmail = emailReady(config.email);
-  const [webhook, email] = await Promise.all([
-    testWebhook
-      ? runAlert(buildAlertRequest(config.type, webhookUrl, event, app, at))
-      : Promise.resolve(undefined),
-    testEmail ? runEmailAlert(config.email, event, app, at) : Promise.resolve(undefined),
-  ]);
-  const out: { webhook?: ChannelResult; email?: ChannelResult } = {};
-  if (webhook) out.webhook = webhook;
-  if (email) out.email = email;
-  return out;
+  // is down": unmistakably a test, yet the real down-path formatting (ntfy
+  // priority/tags, the email subject template, etc.).
+  const out: Outgoing = {
+    kind: "alert",
+    event: { id: "test", type: "down" },
+    app: { name: "CtrlCenter test alert", url: "" },
+    at: Date.now(),
+  };
+  const results = await Promise.all(
+    channels.map(async (ch) => ({ id: ch.id, label: channelLabel(ch), ...(await deliver(ch, out)) }))
+  );
+  return { results };
 }
 
 // Called by the poller each tick. `priorReadings` is the last-known up/down per
-// app from BEFORE this tick (from history) — used once to seed the in-memory
+// app from BEFORE this tick (from history), used once to seed the in-memory
 // state so a restart doesn't re-alert an app that was already down. No-op when
-// alerts are off or no channel (webhook or email) is configured. A single
-// transition fans out to every configured channel.
+// alerts are off or no channel is active. Each transition goes to every
+// channel whose event and app filters take it.
 export async function processAlerts(
   results: { id: string; up: boolean }[],
   apps: { id: string; name: string; url: string }[],
@@ -457,12 +522,14 @@ export async function processAlerts(
   priorReadings: Map<string, boolean>
 ): Promise<void> {
   if (!config.enabled) return;
-  const webhookUrl = config.webhookUrl.trim();
-  const sendWebhook = config.webhookEnabled && webhookUrl !== "";
-  const sendEmail = emailReady(config.email);
-  if (!sendWebhook && !sendEmail) return;
+  const channels = activeChannels(config);
+  if (channels.length === 0) return;
   if (!g.__ctrlcenterAlertState) g.__ctrlcenterAlertState = seedState(priorReadings);
-  const { next, events } = evaluateTransitions(g.__ctrlcenterAlertState, results, config);
+  // Recoveries are always computed; each channel decides whether it wants them.
+  const { next, events } = evaluateTransitions(g.__ctrlcenterAlertState, results, {
+    confirmations: config.confirmations,
+    notifyOnRecovery: true,
+  });
   g.__ctrlcenterAlertState = next;
   if (events.length === 0) return;
   const byId = new Map(apps.map((a) => [a.id, a]));
@@ -471,18 +538,19 @@ export async function processAlerts(
     events.flatMap((e) => {
       const found = byId.get(e.id);
       if (!found) return [];
-      const app = { name: found.name, url: found.url };
+      const targets = channels.filter((ch) => wantsAlert(ch, e.type, e.id));
       log.info("alert firing", {
         app: found.name,
         event: e.type,
-        webhook: sendWebhook,
-        email: sendEmail,
+        channels: targets.map(channelLabel).join(", ") || "none",
       });
-      const tasks: Promise<void>[] = [];
-      if (sendWebhook)
-        tasks.push(sendAlert(buildAlertRequest(config.type, webhookUrl, e, app, at)));
-      if (sendEmail) tasks.push(sendEmailAlert(config.email, e, app, at));
-      return tasks;
+      const out: Outgoing = {
+        kind: "alert",
+        event: e,
+        app: { name: found.name, url: found.url },
+        at,
+      };
+      return targets.map((ch) => deliverLogged(ch, out));
     })
   );
 }

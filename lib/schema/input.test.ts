@@ -35,6 +35,10 @@ describe("derived input schemas", () => {
     expect(calendarUpdateSchema.safeParse({ url: "ftp://x" }).success).toBe(false);
     const disk = { label: "d", path: "/d" };
     expect(systemStatsUpdateSchema.safeParse({ disks: Array(9).fill(disk) }).success).toBe(false);
+    const ch = settingsSchema.parse({ alerts: { channels: [{ id: "c", type: "gotify" }] } }).alerts
+      .channels[0];
+    expect(alertsUpdateSchema.safeParse({ channels: [{ ...ch, url: "https://g.test" }] }).success).toBe(true);
+    expect(alertsUpdateSchema.safeParse({ channels: [{ ...ch, url: "javascript:x" }] }).success).toBe(false);
   });
 
   it("accept every stored settings section, so a new one can't be silently dropped", () => {

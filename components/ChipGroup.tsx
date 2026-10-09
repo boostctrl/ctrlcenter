@@ -92,3 +92,43 @@ export function ChipGroup<T extends string | number>({
     </div>
   );
 }
+
+// The multi-select sibling of ChipGroup: each chip toggles on its own
+// (aria-pressed), for picking any number of things, like which events or apps
+// an alert channel takes. Wraps, so a long list stays inside its container.
+export function ChipToggles<T extends string>({
+  label,
+  options,
+  selected,
+  onChange,
+  size = "xs",
+}: {
+  label: string;
+  options: readonly ChipOption<T>[];
+  selected: readonly T[];
+  onChange: (selected: T[]) => void;
+  size?: ChipSize;
+}) {
+  return (
+    <div role="group" aria-label={label} className="flex flex-wrap gap-1.5">
+      {options.map((o) => {
+        const on = selected.includes(o.value);
+        return (
+          <button
+            key={o.value}
+            type="button"
+            aria-pressed={on}
+            onClick={() =>
+              onChange(on ? selected.filter((v) => v !== o.value) : [...selected, o.value])
+            }
+            className={`inline-flex items-center rounded-lg border border-fg/10 transition-colors ${CHIP_SIZE[size]} ${
+              on ? "bg-fg/15 text-fg" : "text-ink-50 hover:text-ink-80"
+            }`}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}

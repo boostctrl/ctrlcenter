@@ -11,6 +11,7 @@ import type {
 import AppsManager from "./AppsManager";
 import BookmarksManager from "./BookmarksManager";
 import SettingsManager from "./SettingsManager";
+import { monitoredApps } from "@/lib/schema";
 import ThemesManager from "./ThemesManager";
 import PageNav from "@/components/PageNav";
 import { useEdgeFade } from "@/components/useEdgeFade";
@@ -275,6 +276,7 @@ function AdminBody({
       {tab === "settings" && (
         <SettingsManager
           initialSettings={initialSettings}
+          apps={monitoredApps(initialApps).map(({ id, name }) => ({ id, name }))}
           themePacks={resolveThemePacks(initialThemes)}
           initialSection={initialSection}
           initialTwoFactorEnabled={initialTwoFactorEnabled}

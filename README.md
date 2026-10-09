@@ -45,9 +45,11 @@ Built with Next.js 16, React 19, and Tailwind v4.
   method** — HTTP (choose which status codes count as up, so a `404` reads as
   **down**), **TCP port**, **keyword** in the response body, **DNS** resolution, or
   **ICMP ping** — so non-web services can be monitored too. **Alerts** fire when a
-  service goes down or recovers: to a **webhook** (generic JSON, Discord, Slack, or
-  ntfy) and/or by **email** over SMTP (works with SMTP2GO, Gmail, Fastmail, any
-  relay), with flap-dampening confirmations so a single blip stays quiet.
+  service goes down or recovers, to as many channels as you like: a **webhook**
+  (generic JSON, Discord, Slack, or ntfy), **email** over SMTP (works with
+  SMTP2GO, Gmail, Fastmail, any relay), **Telegram**, **Gotify**, **Pushover**,
+  or an **Apprise** API server. Each channel picks its events and apps, and
+  flap-dampening confirmations keep a single blip quiet.
 
 - **Theming.** Combine three independent axes and save the result:
   - **Designs** (18) — the card surface: `glass`, `aero`, `flat`, `soft`,
@@ -197,17 +199,30 @@ settings:
     units: imperial         # imperial | metric
   alerts:                   # notify when a service goes down / recovers
     enabled: false
-    type: discord           # generic | discord | slack | ntfy   (webhook channel)
-    webhookUrl: ""
     confirmations: 2        # consecutive failed checks before "down" (flap dampening)
-    email:                  # optional SMTP channel, sent alongside the webhook
-      enabled: false
-      host: mail.smtp2go.com
-      port: 587             # 587/STARTTLS, or 465 with secure: true
-      from: ctrlcenter@example.com
-      to: you@example.com
-      # user: ""            # SMTP username
-      # pass: ""            # or set the CTRLCENTER_SMTP_PASS env var instead
+    channels:               # any number; each type reads only its own fields
+      - id: discord
+        type: webhook       # webhook | email | telegram | gotify | pushover | apprise
+        format: discord     # webhook payload: generic | discord | slack | ntfy
+        url: ""
+      - id: phone
+        type: telegram
+        token: ""           # from @BotFather
+        chatId: ""
+        onRecovery: false   # also onDown, onWebhooks (inbound events); all default true
+        apps: [plex]        # only these app ids; leave out for every app
+      - id: mail
+        type: email
+        smtp:
+          host: mail.smtp2go.com
+          port: 587         # 587/STARTTLS, or 465 with secure: true
+          from: ctrlcenter@example.com
+          to: you@example.com
+          # user: ""        # SMTP username
+          # pass: ""        # or set the CTRLCENTER_SMTP_PASS env var instead
+    # Before 2.13 there was one webhook (type, webhookUrl) and one email
+    # section; those keys still work and can be moved into the list from
+    # Settings → Monitoring → Alerts.
   calendar:                 # the Upcoming agenda card
     enabled: false
     url: ""                 # a published iCal (.ics) URL

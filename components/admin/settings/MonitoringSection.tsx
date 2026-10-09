@@ -1,22 +1,42 @@
 "use client";
 
-import type { Settings } from "@/lib/schema";
-import { ALERT_TYPES, WEBHOOK_SERVICES } from "@/lib/schema";
+import { WEBHOOK_SERVICES } from "@/lib/schema";
+import { activeChannels, channelLabel, channelReady, legacyChannels } from "@/lib/alert-channels";
 import { STATUS_RANGES } from "@/lib/status";
-import { Card, ControlRow, NumberField, NumberRow, SelectField, TextField, ToggleRow } from "../ui";
+import {
+  AddButton,
+  Button,
+  Card,
+  ControlRow,
+  NumberRow,
+  ToggleRow,
+  fieldLabelClasses,
+  subCardClasses,
+} from "../ui";
 import { ChipGroup } from "@/components/ChipGroup";
 import AlertTest from "../AlertTest";
 import { WEBHOOK_LABELS, WebhookUrlRow } from "./WebhookUrlRow";
+import { AlertChannelEditor } from "./AlertChannelEditor";
 import { INTERVAL_PRESETS } from "./constants";
 import type { SettingsDraft } from "./useSettingsDraft";
 
-export default function MonitoringSection({ d }: { d: SettingsDraft }) {
+export default function MonitoringSection({
+  d,
+  apps,
+}: {
+  d: SettingsDraft;
+  apps: { id: string; name: string }[];
+}) {
   const {
     settings,
     setSettings,
     alerts,
     updateAlerts,
-    updateAlertEmail,
+    addChannel,
+    updateChannel,
+    removeChannel,
+    moveLegacyChannels,
+    status,
     webhooks,
     updateWebhooks,
     updateWebhookService,
@@ -25,6 +45,9 @@ export default function MonitoringSection({ d }: { d: SettingsDraft }) {
     alertTypeLabel,
     alertUrlPlaceholder,
   } = d;
+  const legacy = legacyChannels(alerts);
+  // A Send test waits out a pending autosave so it never tests old values.
+  const saving = status === "saving";
   return (
     <>
       <Card
@@ -81,7 +104,7 @@ export default function MonitoringSection({ d }: { d: SettingsDraft }) {
 
       <Card
         title="Alerts"
-        intro="Notify a webhook and/or email when an app goes down or recovers. Requires the status checks to be on."
+        intro="Notify you when an app goes down or recovers, through as many channels as you like. Requires the status checks to be on."
         toggle={{
           checked: alerts.enabled,
           onChange: (enabled) => updateAlerts({ enabled }),
@@ -89,14 +112,6 @@ export default function MonitoringSection({ d }: { d: SettingsDraft }) {
       >
         {alerts.enabled && (
           <>
-            <ToggleRow
-              label="Notify on recovery"
-              checked={alerts.notifyOnRecovery}
-              onChange={(notifyOnRecovery) =>
-                updateAlerts({ notifyOnRecovery })
-              }
-            />
-
             <NumberRow
               label="Confirmations before down"
               hint="Consecutive failed checks required first."
@@ -106,146 +121,59 @@ export default function MonitoringSection({ d }: { d: SettingsDraft }) {
               onChange={(confirmations) => updateAlerts({ confirmations })}
             />
 
-            {/* Two independent channels, each with its own toggle — enable
-                either, both, or neither. */}
-            <div className="mt-1 flex flex-col gap-3 border-t border-fg/10 pt-4">
-              <ToggleRow
-                label="Webhook"
-                hint="Post to a generic JSON endpoint, Discord, Slack, or ntfy."
-                checked={alerts.webhookEnabled}
-                onChange={(webhookEnabled) =>
-                  updateAlerts({ webhookEnabled })
-                }
-              />
-              {alerts.webhookEnabled && (
-                <div className="flex flex-col gap-3">
-                  <SelectField
-                    label="Notify via"
-                    value={alerts.type}
-                    onChange={(e) =>
-                      updateAlerts({
-                        type: e.target.value as Settings["alerts"]["type"],
-                      })
-                    }
-                  >
-                    {ALERT_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {alertTypeLabel[t]}
-                      </option>
-                    ))}
-                  </SelectField>
-                  <TextField
-                    label="Webhook URL"
-                    placeholder={alertUrlPlaceholder[alerts.type]}
-                    value={alerts.webhookUrl}
-                    onChange={(e) => updateAlerts({ webhookUrl: e.target.value })}
-                  />
+            {legacy.length > 0 && (
+              <div className={`${subCardClasses} flex flex-col gap-3 p-3`}>
+                <div>
+                  <p className={fieldLabelClasses}>Set up in an earlier version</p>
+                  <p className="text-xs text-ink-45">
+                    These still send, for every app. Move them into the
+                    channel list to edit them or choose their events and apps.
+                  </p>
                 </div>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-3 border-t border-fg/10 pt-4">
-              <ToggleRow
-                label="Email (SMTP)"
-                hint="Optional — email on down/recovery, independent of the webhook. Works with any SMTP service (SMTP2GO, Gmail, Fastmail, a relay)."
-                checked={alerts.email.enabled}
-                onChange={(enabled) => updateAlertEmail({ enabled })}
-              />
-
-              {alerts.email.enabled && (
-                <div className="flex flex-col gap-3">
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="col-span-2">
-                      <TextField
-                        label="SMTP host"
-                        placeholder="mail.smtp2go.com"
-                        value={alerts.email.host}
-                        onChange={(e) => updateAlertEmail({ host: e.target.value })}
-                      />
-                    </div>
-                    <NumberField
-                      label="Port"
-                      min={1}
-                      max={65535}
-                      value={alerts.email.port}
-                      onChange={(port) => updateAlertEmail({ port })}
-                    />
+                {legacy.map((ch) => (
+                  <div key={ch.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                    <span className="text-sm text-ink-70">
+                      {ch.type === "webhook"
+                        ? `Webhook (${alertTypeLabel[ch.format]})`
+                        : `Email via ${ch.smtp.host || "SMTP"}`}
+                      {!ch.enabled && <span className="text-ink-45"> · off</span>}
+                    </span>
+                    <AlertTest channel={ch.id} ready={channelReady(ch)} saving={saving} />
                   </div>
+                ))}
+                <ToggleRow
+                  label="Notify on recovery"
+                  checked={alerts.notifyOnRecovery}
+                  onChange={(notifyOnRecovery) => updateAlerts({ notifyOnRecovery })}
+                />
+                <Button variant="ghost" size="sm" className="self-start" onClick={moveLegacyChannels}>
+                  Move into the channel list
+                </Button>
+              </div>
+            )}
 
-                  <ToggleRow
-                    label="Implicit TLS (port 465)"
-                    hint="Leave off for 587/STARTTLS."
-                    checked={alerts.email.secure}
-                    onChange={(secure) => updateAlertEmail({ secure })}
-                  />
-
-                  <TextField
-                    label="Username"
-                    autoComplete="off"
-                    value={alerts.email.user}
-                    onChange={(e) => updateAlertEmail({ user: e.target.value })}
-                  />
-                  <TextField
-                    label="Password"
-                    type="password"
-                    autoComplete="new-password"
-                    value={alerts.email.pass}
-                    onChange={(e) => updateAlertEmail({ pass: e.target.value })}
-                    hint="Stored in config.yaml. Set the CTRLCENTER_SMTP_PASS env var to keep it out of the file instead."
-                  />
-                  <TextField
-                    label="From address"
-                    placeholder="ctrlcenter@yourdomain.com"
-                    value={alerts.email.from}
-                    onChange={(e) => updateAlertEmail({ from: e.target.value })}
-                  />
-                  <TextField
-                    label="To address"
-                    placeholder="you@example.com"
-                    value={alerts.email.to}
-                    onChange={(e) => updateAlertEmail({ to: e.target.value })}
-                  />
-                  <TextField
-                    label="Subject"
-                    placeholder="{service} is {status}"
-                    value={alerts.email.subject}
-                    onChange={(e) =>
-                      updateAlertEmail({ subject: e.target.value })
-                    }
-                    hint={
-                      <>
-                        Variables: <code>{"{service}"}</code> and{" "}
-                        <code>{"{status}"}</code> (down/up). Blank uses the
-                        default.
-                      </>
-                    }
-                  />
-                  {!(
-                    alerts.email.host.trim() &&
-                    alerts.email.from.trim() &&
-                    alerts.email.to.trim()
-                  ) && (
-                    <p className="text-xs text-amber-400/80">
-                      Add an SMTP host and from/to addresses to start sending —
-                      email stays off until then.
-                    </p>
-                  )}
-                </div>
+            <div className="flex flex-col gap-2">
+              <span className={fieldLabelClasses}>Channels</span>
+              {alerts.channels.length === 0 && legacy.length === 0 && (
+                <p className="text-xs text-ink-45">
+                  Add a channel to start sending: a webhook (Discord, Slack,
+                  ntfy or your own), email, Telegram, Gotify, Pushover, or an
+                  Apprise server for anything else.
+                </p>
               )}
-            </div>
-
-            <div className="border-t border-fg/10 pt-4">
-              <AlertTest
-                webhookConfigured={
-                  alerts.webhookEnabled && alerts.webhookUrl.trim() !== ""
-                }
-                emailConfigured={
-                  alerts.email.enabled &&
-                  alerts.email.host.trim() !== "" &&
-                  alerts.email.from.trim() !== "" &&
-                  alerts.email.to.trim() !== ""
-                }
-              />
+              {alerts.channels.map((ch) => (
+                <AlertChannelEditor
+                  key={ch.id}
+                  channel={ch}
+                  apps={apps}
+                  saving={saving}
+                  formatLabel={alertTypeLabel}
+                  urlPlaceholder={alertUrlPlaceholder}
+                  onChange={(patch) => updateChannel(ch.id, patch)}
+                  onRemove={() => removeChannel(ch.id, channelLabel(ch))}
+                />
+              ))}
+              <AddButton onClick={addChannel}>+ Add channel</AddButton>
             </div>
           </>
         )}
@@ -261,16 +189,10 @@ export default function MonitoringSection({ d }: { d: SettingsDraft }) {
       >
         {webhooks.enabled && (
           <>
-            {!(
-              (alerts.webhookEnabled && alerts.webhookUrl.trim() !== "") ||
-              (alerts.email.enabled &&
-                alerts.email.host.trim() !== "" &&
-                alerts.email.from.trim() !== "" &&
-                alerts.email.to.trim() !== "")
-            ) && (
-              <p className="text-xs text-amber-400/80">
-                Set up a webhook or email channel in Alerts above — inbound
-                events have nowhere to go until then.
+            {!activeChannels(alerts).some((ch) => ch.onWebhooks) && (
+              <p className="text-xs text-amber-200">
+                Add an alert channel that sends inbound webhooks, in Alerts
+                above. Events have nowhere to go until then.
               </p>
             )}
             {WEBHOOK_SERVICES.map((svc) => {

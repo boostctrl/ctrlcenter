@@ -42,6 +42,14 @@ here.
   counts as down once it has expired. Any HTTPS check can watch its
   certificate the same way, from *Certificate warning* under Advanced.
   (#294)
+- **Alert channels.** Alerts can now go to any number of channels, and
+  besides webhooks and email there are **Telegram**, **Gotify**,
+  **Pushover** and **Apprise** (an Apprise API server reaches dozens more
+  services). Each channel picks which events it sends (downs, recoveries,
+  inbound webhook events) and for which apps, and has its own *Send test*
+  button. Your existing webhook and email alerts keep working as they are;
+  *Move into the channel list* in Settings turns them into channels you can
+  filter. (#291)
 
 ### Fixed
 
