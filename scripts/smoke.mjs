@@ -4,12 +4,16 @@
 // and renders the key pages in headless Chromium — failing on broken assets,
 // same-origin errors, page errors, a missing stylesheet, or a WCAG 2.1 AA
 // violation (axe-core, in both color schemes). Then signs in through the real
-// login form and renders the admin pages.
+// login form and renders the admin pages. Last, it turns status checks on
+// against local targets — one up, one down, one with a certificate warning —
+// and renders the status surfaces in each state (#311).
 //
 // Screenshots land in $SMOKE_OUT (default smoke-screenshots/) for upload as a
 // CI artifact. Needs a Chromium for playwright-core: `npx playwright-core
 // install chromium`, or CHROMIUM_PATH pointing at one.
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
+import tls from "node:tls";
+import * as YAML from "js-yaml";
 import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
@@ -72,6 +76,8 @@ const server = spawn(process.execPath, [path.join(STANDALONE, "server-entry.mjs"
 
 const failures = [];
 let browser;
+// The status phase's local TLS target (see startTlsServer).
+let tlsServer;
 try {
   // Wait for /api/health.
   const deadline = Date.now() + 30_000;
@@ -141,11 +147,113 @@ try {
     }
     await ctx.close();
   }
+
+  await statusPhase(run);
 } catch (e) {
   failures.push(`smoke run aborted: ${e instanceof Error ? e.message : e}`);
 } finally {
   await browser?.close();
   server.kill();
+  tlsServer?.close();
+}
+
+// The status surfaces (#311): the example config has checks off (they'd reach
+// the example apps' real hosts), so switch them on against local targets
+// only, wait for each state to show up, and render where it surfaces.
+async function statusPhase(run) {
+  const closedPort = await freePort();
+  const apps = [
+    {
+      id: "smoke-up",
+      name: "Smoke Up",
+      url: `${base}/api/health`,
+      checkType: "json",
+      jsonQuery: '$.status == "ok"',
+    },
+    { id: "smoke-down", name: "Smoke Down", url: `http://127.0.0.1:${closedPort}/`, checkType: "tcp" },
+  ];
+  const tlsPort = await startTlsServer();
+  if (tlsPort) {
+    apps.push({
+      id: "smoke-warn",
+      name: "Smoke Cert",
+      url: `https://localhost:${tlsPort}/`,
+      checkType: "tls",
+    });
+  } else {
+    console.log("skip  certificate warning state (no openssl to mint a test certificate)");
+  }
+  const config = YAML.load(fs.readFileSync(configPath, "utf8"));
+  config.settings.statusChecks = true;
+  config.apps = [...config.apps.map((a) => ({ ...a, monitor: false })), ...apps];
+  fs.writeFileSync(configPath, YAML.dump(config));
+
+  // Each state as /api/status reports it.
+  const expected = { "smoke-up": "up", "smoke-down": "down", "smoke-warn": "warning" };
+  const deadline = Date.now() + 30_000;
+  for (;;) {
+    const { results } = await (await fetch(`${base}/api/status`)).json();
+    const seen = Object.fromEntries(
+      results.map((r) => [r.id, r.up ? (r.warning ? "warning" : "up") : "down"])
+    );
+    const pending = apps.filter((a) => seen[a.id] !== expected[a.id]);
+    if (pending.length === 0) break;
+    if (Date.now() > deadline) {
+      failures.push(
+        `status states never settled: ${pending.map((a) => `${a.id}=${seen[a.id] ?? "none"}`).join(", ")}`
+      );
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  console.log(`ok    status states: ${apps.map((a) => `${a.id}=${expected[a.id]}`).join(", ")}`);
+
+  for (const scheme of ["light", "dark"]) {
+    const ctx = await browser.newContext({
+      viewport: { width: 1440, height: 900 },
+      colorScheme: scheme,
+    });
+    for (const [p, shot] of [
+      ["/", "status-home"],
+      ["/status", "status-states"],
+      ...apps.map((a) => [`/status/${a.id}`, `status-${a.id}`]),
+    ]) {
+      await run(ctx, p, `${shot}-${scheme}`);
+    }
+    await ctx.close();
+  }
+}
+
+// A port nothing listens on (bound then released).
+function freePort() {
+  return new Promise((resolve) => {
+    const srv = net.createServer();
+    srv.listen(0, "127.0.0.1", () => {
+      const { port } = srv.address();
+      srv.close(() => resolve(port));
+    });
+  });
+}
+
+// A local TLS server whose certificate expires in five days — inside the TLS
+// check's default 14-day warning window. Null when openssl isn't available.
+async function startTlsServer() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ctrlcenter-smoke-tls-"));
+  try {
+    execFileSync(
+      "openssl",
+      ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "5", "-subj", "/CN=localhost",
+        "-keyout", path.join(dir, "key.pem"), "-out", path.join(dir, "cert.pem")],
+      { stdio: "ignore" }
+    );
+  } catch {
+    return null;
+  }
+  tlsServer = tls.createServer(
+    { key: fs.readFileSync(path.join(dir, "key.pem")), cert: fs.readFileSync(path.join(dir, "cert.pem")) },
+    (socket) => socket.end()
+  );
+  return new Promise((resolve) => tlsServer.listen(0, "127.0.0.1", () => resolve(tlsServer.address().port)));
 }
 
 if (failures.length) {
