@@ -478,6 +478,12 @@ export default async function HelpPage() {
               <strong>Ping.</strong> An ICMP echo (the container must be
               allowed to ping).
             </li>
+            <li>
+              <strong>JSON query.</strong> Fetches a JSON endpoint and checks
+              a field, e.g. <code>$.status == &quot;ok&quot;</code> or{" "}
+              <code>$.queue.depth &lt; 50</code>. Without a comparison the
+              field only has to be present and truthy.
+            </li>
           </ul>
           <P>
             A background poller records history on its own schedule, so uptime

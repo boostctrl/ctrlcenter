@@ -3,6 +3,13 @@
 import { z } from "zod";
 import { CHECK_TYPE_KEYS } from "../status";
 import { httpUrl } from "./shared";
+import { parseJsonQuery } from "../json-query";
+
+// A JSON query must parse (#294); an empty one is allowed while editing, and
+// fails the check until it's filled in.
+const jsonQuery = z.string().refine((q) => q.trim() === "" || !("error" in parseJsonQuery(q)), {
+  message: "That JSON query doesn't parse — e.g. $.status == \"ok\"",
+});
 
 // `expectStatus` is an optional comma list of HTTP codes/ranges (e.g.
 // "200-299, 401") that count as "up" for the status check. Empty = any reachable
@@ -22,6 +29,8 @@ export const appItemSchema = z.object({
   checkType: z.enum(CHECK_TYPE_KEYS).catch("http").default("http"),
   port: z.number().int().min(1).max(65535).optional(),
   keyword: z.string().default(""),
+  // The JSON query check's expression (#294), e.g. `$.status == "ok"`.
+  jsonQuery: z.string().catch("").default(""),
   // Whether this app gets status checks at all (#296). Off = no dot, no
   // status-page row, no alerts; its history is kept for when it's back on.
   monitor: z.boolean().catch(true).default(true),
@@ -70,6 +79,7 @@ export const appInputSchema = z.object({
   checkType: z.enum(CHECK_TYPE_KEYS).optional().default("http"),
   port: z.number().int().min(1).max(65535).optional(),
   keyword: z.string().optional().default(""),
+  jsonQuery: jsonQuery.optional().default(""),
   monitor: z.boolean().optional().default(true),
   interval: z.number().int().min(1).max(60).optional(),
   timeout: z.number().int().min(1).max(60).optional(),
@@ -96,6 +106,7 @@ export const appUpdateSchema = z.object({
   // keeps the stored value, since updates merge).
   port: z.number().int().min(1).max(65535).nullable().optional(),
   keyword: z.string().optional(),
+  jsonQuery: jsonQuery.optional(),
   monitor: z.boolean().optional(),
   interval: z.number().int().min(1).max(60).nullable().optional(),
   timeout: z.number().int().min(1).max(60).nullable().optional(),

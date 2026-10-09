@@ -374,3 +374,37 @@ describe("checkApp · per-app timeout and retries (#292)", () => {
     }
   });
 });
+
+describe("checkApp · json (#294)", () => {
+  const json = (jsonQuery: string, expectStatus = "") => ({
+    ...base,
+    expectStatus,
+    url: "https://api.example/health",
+    checkType: "json" as const,
+    jsonQuery,
+  });
+
+  it("is up when the query holds", async () => {
+    mockFetch(200, JSON.stringify({ status: "ok", queue: 3 }));
+    expect((await checkApp(json('$.status == "ok"'))).up).toBe(true);
+  });
+
+  it("is down when the query fails", async () => {
+    mockFetch(200, JSON.stringify({ queue: 90 }));
+    const r = await checkApp(json("$.queue < 50"));
+    expect(r.up).toBe(false);
+    expect(r.status).toBe(200);
+  });
+
+  it("is down when the body isn't JSON or the query doesn't parse", async () => {
+    mockFetch(200, "<html>oops</html>");
+    expect((await checkApp(json("$.status"))).up).toBe(false);
+    mockFetch(200, "{}");
+    expect((await checkApp(json("status"))).up).toBe(false);
+  });
+
+  it("honours expectStatus", async () => {
+    mockFetch(503, JSON.stringify({ status: "ok" }));
+    expect((await checkApp(json('$.status == "ok"', "200-299"))).up).toBe(false);
+  });
+});

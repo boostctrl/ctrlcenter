@@ -24,6 +24,7 @@ const app: AppItem = {
   keyword: "",
   private: false,
   monitor: true,
+  jsonQuery: "",
 };
 
 beforeEach(() => {

@@ -27,6 +27,7 @@ import { useToast } from "./Toast";
 import { useConfirm } from "./Confirm";
 import { useRevealForm } from "./useRevealForm";
 import { guessCheckType, withHttpScheme } from "@/lib/urls";
+import { parseJsonQuery } from "@/lib/json-query";
 import { apiErrorMessage } from "./apiError";
 
 type FormState = {
@@ -39,6 +40,7 @@ type FormState = {
   checkType: CheckType;
   port: string;
   keyword: string;
+  jsonQuery: string;
   // Whether the app gets status checks at all (#296).
   monitor: boolean;
   // Per-app check overrides (#292); "" = the global setting.
@@ -56,6 +58,7 @@ const emptyForm: FormState = {
   checkType: "http",
   port: "",
   keyword: "",
+  jsonQuery: "",
   monitor: true,
   interval: "",
   timeout: "",
@@ -73,6 +76,8 @@ function checkTypeHint(t: CheckType): string {
       return "Sends a DNS query to the URL's host — up when it answers. For DNS servers like Pi-hole.";
     case "icmp":
       return "Pings the URL's host. Needs ICMP (NET_RAW) in containers.";
+    case "json":
+      return "Fetches the URL as JSON; up only if the query below holds.";
     case "http":
     default:
       return "Sends an HTTP request to the URL and checks the response code.";
@@ -126,6 +131,7 @@ export default function AppsManager({
       checkType: app.checkType ?? "http",
       port: app.port != null ? String(app.port) : "",
       keyword: app.keyword ?? "",
+      jsonQuery: app.jsonQuery ?? "",
       monitor: app.monitor !== false,
       interval: app.interval != null ? String(app.interval) : "",
       timeout: app.timeout != null ? String(app.timeout) : "",
@@ -163,6 +169,7 @@ export default function AppsManager({
         checkType: form.checkType,
         expectStatus: form.checkType === "http" ? form.expectStatus : "",
         keyword: form.checkType === "keyword" ? form.keyword : "",
+        jsonQuery: form.checkType === "json" ? form.jsonQuery : "",
         port: optionalNumber(form.port, form.checkType === "tcp" || form.checkType === "dns"),
         interval: optionalNumber(form.interval),
         timeout: optionalNumber(form.timeout),
@@ -425,6 +432,24 @@ export default function AppsManager({
                     }
                     value={form.port}
                     onChange={(e) => setForm({ ...form, port: e.target.value })}
+                  />
+                )}
+
+                {form.checkType === "json" && (
+                  <TextField
+                    label="JSON query"
+                    placeholder='$.status == "ok"'
+                    value={form.jsonQuery}
+                    onChange={(e) => setForm({ ...form, jsonQuery: e.target.value })}
+                    hint={
+                      form.jsonQuery.trim() && "error" in parseJsonQuery(form.jsonQuery) ? (
+                        <span className="text-red-400">
+                          {(parseJsonQuery(form.jsonQuery) as { error: string }).error}
+                        </span>
+                      ) : (
+                        "A path from $, then optionally ==, !=, <, >, <= or >= and a value. Without a comparison the field just has to be there and truthy."
+                      )
+                    }
                   />
                 )}
 

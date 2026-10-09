@@ -26,6 +26,10 @@ here.
   add an app, its check method now follows the address you type: a bare
   `host:22` gets a TCP check and port 53 a DNS check, until you pick one
   yourself. (#296)
+- **JSON query checks.** A new check method fetches a JSON endpoint and
+  checks one field — `$.status == "ok"`, `$.queue.depth < 50`, or just
+  `$.healthy` — so an app whose health endpoint answers but reports a
+  problem counts as down. (#294)
 
 ### Fixed
 

@@ -3,6 +3,7 @@ import dns from "node:dns/promises";
 import { execFile } from "node:child_process";
 import { matchesStatus, type AppStatus } from "./status";
 import { readCapped, timeoutSignal } from "./fetch-body";
+import { evaluateJsonQuery, parseJsonQuery } from "./json-query";
 import type { AppItem } from "./schema";
 
 // A check's time budget when the app doesn't set its own `timeout` (#292).
@@ -22,7 +23,8 @@ const KEYWORD_MAX_BYTES = 2 * 1024 * 1024;
 type CheckInput = Pick<
   AppItem,
   "url" | "expectStatus" | "checkType" | "port" | "keyword" | "timeout" | "retries"
->;
+> &
+  Partial<Pick<AppItem, "jsonQuery">>;
 
 // The app's time budget for one attempt.
 const timeoutOf = (app: CheckInput): number =>
@@ -31,7 +33,14 @@ const timeoutOf = (app: CheckInput): number =>
 // What a check depends on, as a string: equal signatures mean a stored result
 // still describes the app as configured now (#278).
 export function checkSignature(app: CheckInput): string {
-  return JSON.stringify([app.url, app.expectStatus, app.checkType, app.port, app.keyword]);
+  return JSON.stringify([
+    app.url,
+    app.expectStatus,
+    app.checkType,
+    app.port,
+    app.keyword,
+    app.jsonQuery,
+  ]);
 }
 
 // Checks in flight at once when probing every app (the poller, /api/status).
@@ -67,6 +76,8 @@ function checkOnce(app: CheckInput): Promise<AppStatus> {
       return checkIcmp(app);
     case "keyword":
       return checkHttp(app, (app.keyword ?? "").trim());
+    case "json":
+      return checkJson(app);
     case "http":
     default:
       return checkHttp(app, "");
@@ -137,6 +148,38 @@ async function checkHttp(app: CheckInput, keyword: string): Promise<AppStatus> {
       status: res!.status,
       ms: Date.now() - start,
     };
+  } catch {
+    return { up: false, status: null, ms: Date.now() - start };
+  }
+}
+
+// JSON query (#294): GET the URL, parse the body as JSON, and require the
+// query (`$.status == "ok"`) to hold — plus the status code, when
+// `expectStatus` restricts it. A body that isn't JSON, or a query that doesn't
+// parse, counts as down: the check can't vouch for the service.
+async function checkJson(app: CheckInput): Promise<AppStatus> {
+  const start = Date.now();
+  const query = parseJsonQuery(app.jsonQuery ?? "");
+  try {
+    const res = await fetch(app.url, {
+      method: "GET",
+      redirect: "manual",
+      headers: { Accept: "application/json" },
+      signal: timeoutSignal(timeoutOf(app)),
+    });
+    const body = await readCapped(res, KEYWORD_MAX_BYTES);
+    let data: unknown;
+    try {
+      data = body === null ? undefined : JSON.parse(body);
+    } catch {
+      data = undefined;
+    }
+    const up =
+      matchesStatus(res.status, app.expectStatus ?? "") &&
+      data !== undefined &&
+      !("error" in query) &&
+      evaluateJsonQuery(query, data);
+    return { up, status: res.status, ms: Date.now() - start };
   } catch {
     return { up: false, status: null, ms: Date.now() - start };
   }
