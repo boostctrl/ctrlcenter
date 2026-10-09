@@ -4,8 +4,9 @@ _Analysis of `develop` @ `7b30a69` (v2.10.1), 2026-10-09. Built from three
 audits: the codebase (architecture, complexity, flexibility), the rendered app
 (desktop and mobile, light and dark, axe-core, keyboard, first run), and the
 competition (Homepage, Homarr, Dashy, Glance, Heimdall, Homer, Organizr,
-Flame, Uptime Kuma). Every confirmed defect is filed (#269–#279). New feature
-work gets issues once its release is scheduled._
+Flame, Uptime Kuma). Every confirmed defect is filed (#269–#279), and each
+release has a tracker issue with one sub-issue per item: 2.11 #280, 2.12 #281,
+2.13 #282, 3.0 #283, and the post-3.0 backlog #284._
 
 ## Where things stand
 
@@ -95,28 +96,28 @@ comments and a lighter status system.
 
 | # | Item | Size | Issue |
 |---|---|---|---|
-| F1 | **Widget registry.** One module per widget type with schema, defaults, label, render, empty state, admin editor and help entry. It replaces the seven parallel id lists in `lib/layout.ts`, the `blockFor` and `emptyReason` switches in `Dashboard.tsx`, and the per-widget props from `app/page.tsx`. A new widget becomes one folder. | L | — |
-| F2 | **One server cache and one polling hook.** `swrCache(key, ttl, fetcher)` with dedupe of concurrent requests and stale-on-error replaces the copies in feed, calendar-fetch, monitor and `/api/status`. `usePolling(url, ms)` replaces the 7 hand-rolled intervals. | M | — |
+| F1 | **Widget registry.** One module per widget type with schema, defaults, label, render, empty state, admin editor and help entry. It replaces the seven parallel id lists in `lib/layout.ts`, the `blockFor` and `emptyReason` switches in `Dashboard.tsx`, and the per-widget props from `app/page.tsx`. A new widget becomes one folder. | L | #285 |
+| F2 | **One server cache and one polling hook.** `swrCache(key, ttl, fetcher)` with dedupe of concurrent requests and stale-on-error replaces the copies in feed, calendar-fetch, monitor and `/api/status`. `usePolling(url, ms)` replaces the 7 hand-rolled intervals. | M | #286 |
 | F3 | **Status: one source of truth.** `/api/status` serves the poller's readings instead of probing again. History moves to `node:sqlite`, built into Node 24, so a tick becomes a few inserts and retention a `DELETE`. Import the existing JSON once. Outage notes join config Export/Import. | M | #278 |
 | F4 | **Comment-preserving config writes** with the `yaml` Document API. The atomic write and the write queue stay. | M | #279 |
-| F5 | **Schema-driven config.** Derive the update schemas from the stored ones; this cuts about 200 lines of duplicated fields. Mark secrets in the schema so `stripSecrets` and `withoutEnvSecrets` stop being hand-maintained deny-lists. Replace the 14 merge branches with a generic merge driven by metadata. | M | — |
-| F6 | **Versioned migrations.** Read `schemaVersion` and run a chain of steps (`v1→v2` frozen, `v2→v3` added in 3.0) instead of shape heuristics. | S | — |
-| F7 | **Test infrastructure.** Route-handler tests: call the exported handlers with a `NextRequest`, covering monitor actions, hooks, settings, config import and status. Component tests with jsdom and Testing Library for Dashboard, LayoutEditor and the settings draft. Tests for the status poller. | M | — |
-| F8 | **Split what's still large.** `PrefsProvider` into three contexts (location/units, look, favourites), which stops pref changes re-rendering everything. `config.ts` into store, migrate and CRUD. `status-history` into aggregate, store and query. Dashboard shrinks naturally after F1. | M | — |
+| F5 | **Schema-driven config.** Derive the update schemas from the stored ones; this cuts about 200 lines of duplicated fields. Mark secrets in the schema so `stripSecrets` and `withoutEnvSecrets` stop being hand-maintained deny-lists. Replace the 14 merge branches with a generic merge driven by metadata. | M | #287 |
+| F6 | **Versioned migrations.** Read `schemaVersion` and run a chain of steps (`v1→v2` frozen, `v2→v3` added in 3.0) instead of shape heuristics. | S | #288 |
+| F7 | **Test infrastructure.** Route-handler tests: call the exported handlers with a `NextRequest`, covering monitor actions, hooks, settings, config import and status. Component tests with jsdom and Testing Library for Dashboard, LayoutEditor and the settings draft. Tests for the status poller. | M | #289 |
+| F8 | **Split what's still large.** `PrefsProvider` into three contexts (location/units, look, favourites), which stops pref changes re-rendering everything. `config.ts` into store, migrate and CRUD. `status-history` into aggregate, store and query. Dashboard shrinks naturally after F1. | M | #290 |
 
 ## 2.13 — Status and alerts depth
 
 Additive config only. This is the "Homepage + Uptime Kuma in one container"
 release: it deepens the one area where CtrlCenter already leads.
 
-| # | Item | Size |
-|---|---|---|
-| S1 | **Notification channels as a list**, so several webhooks and several email recipients are possible. Add Telegram, Gotify and Pushover, or one Apprise URL that covers 90+ services. The old single-channel keys keep working and move into the list in 3.0. | M |
-| S2 | **Per-app check settings**: interval, timeout and retries. Today it's one global interval and a hard-coded 5-second timeout. | S |
-| S3 | **Maintenance windows.** A scheduled announcement can mute alerts for the affected apps and paint the timeline as "maintenance" instead of "down". | M |
-| S4 | **New check types:** TLS certificate expiry (warn N days ahead), push/heartbeat (a cron job pings a URL; silence counts as down), and JSON query (HTTP plus a check on a field value). | M |
-| S5 | **SVG status badges** per app, and an incidents RSS/Atom feed. | S |
-| S6 | **Every tile is a monitor.** When global checks are on, new apps are monitored by default with a sensible method guessed from the URL. | S |
+| # | Item | Size | Issue |
+|---|---|---|---|
+| S1 | **Notification channels as a list**, so several webhooks and several email recipients are possible. Add Telegram, Gotify and Pushover, or one Apprise URL that covers 90+ services. The old single-channel keys keep working and move into the list in 3.0. | M | #291 |
+| S2 | **Per-app check settings**: interval, timeout and retries. Today it's one global interval and a hard-coded 5-second timeout. | S | #292 |
+| S3 | **Maintenance windows.** A scheduled announcement can mute alerts for the affected apps and paint the timeline as "maintenance" instead of "down". | M | #293 |
+| S4 | **New check types:** TLS certificate expiry (warn N days ahead), push/heartbeat (a cron job pings a URL; silence counts as down), and JSON query (HTTP plus a check on a field value). | M | #294 |
+| S5 | **SVG status badges** per app, and an incidents RSS/Atom feed. | S | #295 |
+| S6 | **Every tile is a monitor.** When global checks are on, new apps are monitored by default with a sensible method guessed from the URL. | S | #296 |
 
 ---
 
@@ -162,18 +163,18 @@ integrations:                 # an array: as many of each type as you run
 
 ### Work items
 
-| # | Item | Size |
-|---|---|---|
-| A | **Widget instances.** Every widget type can appear any number of times, and its content lives on the instance. This removes `settings.<widget>`, `settings.components`, the header-prepend shim and the feed-only instance plumbing. It builds directly on F1. | L |
-| B | **Boards.** Multiple dashboards, each with its own layout and visibility (public or signed-in only), switched from the page nav without widening the header. Board URLs are `/b/<slug>`; the home page is the first board. Weather, status and calendar stay as routes. | L |
-| C | **App groups and tags.** An apps widget shows a group, a tag, or everything. Bookmarks use the same grouping, which replaces `groupPrivateApps` and the free-text category ordering. | M |
-| D | **Integration instances.** The fixed keys become an array, so two Sonarrs or three Portainers are fine. Secrets use generic `${ENV}` references; the per-service env names migrate. Adding an integration type shrinks from about 9 touchpoints to 2: the client module plus its registry entry. | L |
-| E | **Integration widgets on boards.** The same tile components drive the Monitor cockpit and the home grid. Tiles are admin-only by default; a per-widget "show to visitors" switch uses a redacted public view of the data, never the raw snapshot. | M |
-| F | **Generic API widget.** URL, headers holding secret references, a JSONPath mapping, and a display style (stat, list, key/value or gauge). Refresh comes from the shared cache, size and timeout caps from `serviceRequest`, and a Test button from `runProbe`. Optional thresholds tint the tile; they feed alerts in 3.1. This answers the long tail of "a widget for X" requests without writing 160 adapters. | M |
-| G | **Layout editor 2.0.** An "Add widget" palette with configuration inline, so you no longer configure a widget in Settings and then show it in the editor. Phone-friendly controls carried over from #271, and editing per board. | L |
-| H | **First-run setup.** Detect a missing password (#275), then a short flow: location and time zone, first apps (with optional starter content), status checks on or off. | M |
-| I | **Drop legacy shims.** The 1.x layout heuristics, `settings.components`, retired scene ids, bare-string localStorage prefs, the two-element history tuples, and the alias for the old settings deep link. | S |
-| J | **Upgrade path.** On first start, migrate v2 to v3 automatically and write `config.v2.bak.yaml` next to it. The admin UI shows a one-time banner with what changed. The release notes explain rolling back: restore the backup and pin `:2.13`. | M |
+| # | Item | Size | Issue |
+|---|---|---|---|
+| A | **Widget instances.** Every widget type can appear any number of times, and its content lives on the instance. This removes `settings.<widget>`, `settings.components`, the header-prepend shim and the feed-only instance plumbing. It builds directly on F1. | L | #297 |
+| B | **Boards.** Multiple dashboards, each with its own layout and visibility (public or signed-in only), switched from the page nav without widening the header. Board URLs are `/b/<slug>`; the home page is the first board. Weather, status and calendar stay as routes. | L | #298 |
+| C | **App groups and tags.** An apps widget shows a group, a tag, or everything. Bookmarks use the same grouping, which replaces `groupPrivateApps` and the free-text category ordering. | M | #299 |
+| D | **Integration instances.** The fixed keys become an array, so two Sonarrs or three Portainers are fine. Secrets use generic `${ENV}` references; the per-service env names migrate. Adding an integration type shrinks from about 9 touchpoints to 2: the client module plus its registry entry. | L | #300 |
+| E | **Integration widgets on boards.** The same tile components drive the Monitor cockpit and the home grid. Tiles are admin-only by default; a per-widget "show to visitors" switch uses a redacted public view of the data, never the raw snapshot. | M | #301 |
+| F | **Generic API widget.** URL, headers holding secret references, a JSONPath mapping, and a display style (stat, list, key/value or gauge). Refresh comes from the shared cache, size and timeout caps from `serviceRequest`, and a Test button from `runProbe`. Optional thresholds tint the tile; they feed alerts in 3.1. This answers the long tail of "a widget for X" requests without writing 160 adapters. | M | #302 |
+| G | **Layout editor 2.0.** An "Add widget" palette with configuration inline, so you no longer configure a widget in Settings and then show it in the editor. Phone-friendly controls carried over from #271, and editing per board. | L | #303 |
+| H | **First-run setup.** Detect a missing password (#275), then a short flow: location and time zone, first apps (with optional starter content), status checks on or off. | M | #304 |
+| I | **Drop legacy shims.** The 1.x layout heuristics, `settings.components`, retired scene ids, bare-string localStorage prefs, the two-element history tuples, and the alias for the old settings deep link. | S | #305 |
+| J | **Upgrade path.** On first start, migrate v2 to v3 automatically and write `config.v2.bak.yaml` next to it. The admin UI shows a one-time banner with what changed. The release notes explain rolling back: restore the backup and pin `:2.13`. | M | #306 |
 
 **Beta plan**
 - **beta.1:** A–D. The new config model, with the UI at parity.
@@ -217,19 +218,14 @@ Ordered by user demand and by how well each one builds on 3.0:
 **Out of scope:** full multi-user accounts with their own database
 (Homarr-style), and moving the config into a database.
 
-## Decisions needed
+## Decisions (resolved 2026-10-09)
 
-1. **Status-history storage.** Recommended: `node:sqlite`, with the JSON file
-   imported once. Alternative: append-only daily JSON files.
-2. **Configs older than 2.0 in 3.0.** Recommended: keep a frozen `v1→v2`
-   step so the chain still works, but stop maintaining the 1.x heuristics.
-   Alternative: require users to step through 2.13 first.
-3. **Board URLs.** Recommended: `/b/<slug>`, with home at `/`. Alternatives:
-   top-level slugs (these collide with `/status`, `/weather`, …) or tabs
-   inside the home page only.
-4. **Monitor page.** Recommended: keep the bespoke cockpit page, built from
-   the same tile components as board widgets. Alternative: turn it into a
-   built-in private board.
-5. **Identity timing.** Recommended: 3.1, with the 3.0 visibility model built
-   to take groups. Alternative: pull forward-auth headers into 3.0. They're
-   cheap; native OIDC is not.
+1. **Status-history storage:** `node:sqlite`, with the existing JSON file
+   imported once (#278).
+2. **Configs older than 2.0 in 3.0:** a frozen `v1→v2` step stays in the
+   migration chain, but the 1.x heuristics are no longer maintained (#288).
+3. **Board URLs:** `/b/<slug>`, with the home board at `/` (#298).
+4. **Monitor page:** it keeps its own cockpit design, built from the same tile
+   components as board widgets (#301).
+5. **Identity timing:** 3.1. The 3.0 visibility model (`public` / `private`)
+   is built so group rules can be added later (#284).
