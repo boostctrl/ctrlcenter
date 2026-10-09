@@ -40,7 +40,7 @@ const LEGACY_HISTORY_FILE = "status-history.json";
 
 type AppBuckets = Map<
   number,
-  { up: number; down: number; msCount: number; msSum: number; msMax: number }
+  { up: number; down: number; maint: number; msCount: number; msSum: number; msMax: number }
 >;
 type HistoryState = {
   store: Map<string, AppBuckets>;
@@ -187,6 +187,7 @@ function applyRows(rows: HistoryRows): void {
     m.set(b.hour, {
       up: b.up,
       down: b.down,
+      maint: b.maint ?? 0,
       msCount: b.msCount,
       msSum: b.msSum,
       msMax: b.msMax,
@@ -196,6 +197,7 @@ function applyRows(rows: HistoryRows): void {
   for (const r of rows.readings) {
     const reading: Reading = { t: r.t, up: r.up };
     if (r.ms != null) reading.ms = r.ms;
+    if (r.maint) reading.maint = true;
     const list = recent.get(r.app);
     if (list) list.push(reading);
     else recent.set(r.app, [reading]);
@@ -326,15 +328,23 @@ export function parseLegacyHistory(data: unknown, now: number): HistoryRows {
 export function lastReadings(ids: string[]): Map<string, boolean> {
   const out = new Map<string, boolean>();
   for (const id of ids) {
-    const list = state.recent.get(id);
-    if (list && list.length) out.set(id, list[list.length - 1].up);
+    // The last reading outside maintenance (#293): a maintenance window's
+    // downs never reached the alert state, so they mustn't seed it either.
+    const last = state.recent.get(id)?.findLast((r) => !r.maint);
+    if (last) out.set(id, last.up);
   }
   return out;
 }
 
 // Tally one round of results into the current hour, pruning anything older than
-// the retention window.
-export function recordResults(results: StatusResult[], at: number): void {
+// the retention window. `maintenance` holds the apps under an active maintenance window (#293):
+// their down checks are tallied as maintenance, which stays out of uptime and
+// never opens an outage (one already open stays open until the app is back).
+export function recordResults(
+  results: StatusResult[],
+  at: number,
+  maintenance: ReadonlySet<string> = new Set()
+): void {
   const hour = hourOf(at);
   const cutoff = hour - RETENTION_HOURS;
   const recentCutoff = at - RECENT_KEEP_MS;
@@ -344,7 +354,8 @@ export function recordResults(results: StatusResult[], at: number): void {
       m = new Map();
       state.store.set(r.id, m);
     }
-    const b = m.get(hour) ?? { up: 0, down: 0, msCount: 0, msSum: 0, msMax: 0 };
+    const b = m.get(hour) ?? { up: 0, down: 0, maint: 0, msCount: 0, msSum: 0, msMax: 0 };
+    const maint = !r.up && maintenance.has(r.id);
     if (r.up) {
       b.up++;
       // Latency is accumulated from up checks only. A down check's `ms` is its
@@ -356,6 +367,8 @@ export function recordResults(results: StatusResult[], at: number): void {
       b.msCount++;
       b.msSum += r.ms;
       if (r.ms > b.msMax) b.msMax = r.ms;
+    } else if (maint) {
+      b.maint++;
     } else {
       b.down++;
     }
@@ -368,6 +381,7 @@ export function recordResults(results: StatusResult[], at: number): void {
     // undefined so the read path never averages its time-to-failure.
     const reading: Reading = { t: at, up: r.up };
     if (r.up) reading.ms = r.ms;
+    if (maint) reading.maint = true;
     const list = state.recent.get(r.id) ?? [];
     list.push(reading);
     state.dirty.readings.push({ app: r.id, ...reading });
@@ -404,7 +418,7 @@ export function recordResults(results: StatusResult[], at: number): void {
         state.dirty.downSince.add(r.id);
         state.dirty.outages.add(r.id);
       }
-    } else if (!state.downSince.has(r.id)) {
+    } else if (!maint && !state.downSince.has(r.id)) {
       state.downSince.set(r.id, at);
       state.dirty.downSince.add(r.id);
     }
@@ -539,6 +553,7 @@ export function appData(id: string): { buckets: Bucket[]; readings: Reading[] } 
         hour,
         up: b.up,
         down: b.down,
+        maint: b.maint,
         msCount: b.msCount,
         msSum: b.msSum,
         msMax: b.msMax,

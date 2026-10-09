@@ -17,6 +17,7 @@ describe("summarize", () => {
     expect(summarize([up, up, up])).toEqual({
       up: 3,
       down: 0,
+      maintenance: 0,
       total: 3,
       allUp: true,
     });
@@ -26,13 +27,24 @@ describe("summarize", () => {
     expect(summarize([up, down, up, down])).toEqual({
       up: 2,
       down: 2,
+      maintenance: 0,
       total: 4,
       allUp: false,
     });
   });
 
+  it("counts an app down for maintenance apart, without breaking all-up (#293)", () => {
+    expect(summarize([up, { up: false, maintenance: true }])).toEqual({
+      up: 1,
+      down: 0,
+      maintenance: 1,
+      total: 2,
+      allUp: true,
+    });
+  });
+
   it("treats empty input as not-all-up (nothing to report)", () => {
-    expect(summarize([])).toEqual({ up: 0, down: 0, total: 0, allUp: false });
+    expect(summarize([])).toEqual({ up: 0, down: 0, maintenance: 0, total: 0, allUp: false });
   });
 });
 
@@ -64,6 +76,11 @@ describe("matchesStatus", () => {
 });
 
 describe("statusMessage", () => {
+  it("names maintenance when nothing is actually down (#293)", () => {
+    expect(statusMessage([], 3, ["NAS"])).toBe("NAS is under maintenance");
+    expect(statusMessage([], 3, ["NAS", "Plex"])).toBe("Maintenance in progress");
+    expect(statusMessage(["Plex"], 3, ["NAS"])).toBe("Plex is down");
+  });
   it("reports nothing to check yet", () => {
     expect(statusMessage([], 0)).toBe("Checking services…");
   });

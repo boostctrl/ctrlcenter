@@ -133,7 +133,7 @@ describe("configSchema defaults", () => {
       },
     });
     expect(config.settings.statusAnnouncements).toEqual([
-      { id: "x", kind: "info", title: "", body: "hi", startsAt: "", endsAt: "" },
+      { id: "x", kind: "info", title: "", body: "hi", startsAt: "", endsAt: "", apps: [] },
     ]);
   });
 

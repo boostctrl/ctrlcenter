@@ -3,7 +3,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 // The background poller's tick (#289): when it checks, and the order of the
 // record → prune → flush → alert steps. Every collaborator is mocked.
 const calls: string[] = [];
-let settings: { statusChecks: boolean; statusInterval?: number; alerts: object };
+let settings: {
+  statusChecks: boolean;
+  statusInterval?: number;
+  alerts: object;
+  statusAnnouncements: object[];
+};
 let apps: { id: string; interval?: number; monitor?: boolean }[];
 
 vi.mock("./config", () => ({
@@ -45,7 +50,7 @@ beforeEach(async () => {
   vi.setSystemTime(new Date("2026-10-09T12:00:00Z"));
   calls.length = 0;
   warn.mockClear();
-  settings = { statusChecks: true, statusInterval: 5, alerts: {} };
+  settings = { statusChecks: true, statusInterval: 5, alerts: {}, statusAnnouncements: [] };
   apps = [{ id: "a" }, { id: "b" }];
   vi.resetModules(); // fresh per-app schedule per test
   ({ tick } = await import("./status-poller"));
@@ -95,6 +100,18 @@ describe("status poller tick", () => {
     await tick();
     expect(calls.filter((c) => c.startsWith("check:"))).toEqual(["check:a"]);
     expect(calls).toContain("prune:a,b");
+  });
+
+  it("records apps under maintenance as such and keeps them out of alerting (#293)", async () => {
+    const { recordResults } = await import("./status-history");
+    const { processAlerts } = await import("./alerts");
+    settings.statusAnnouncements = [
+      { id: "m", kind: "maintenance", title: "", body: "", startsAt: "", endsAt: "", apps: ["b"] },
+    ];
+    await tick();
+    expect(vi.mocked(recordResults).mock.lastCall?.[2]).toEqual(new Set(["b"]));
+    const alerted = vi.mocked(processAlerts).mock.lastCall?.[0] as { id: string }[];
+    expect(alerted.map((r) => r.id)).toEqual(["a"]);
   });
 
   it("checks each app on its own interval (#292)", async () => {

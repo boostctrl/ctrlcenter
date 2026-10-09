@@ -5,12 +5,19 @@ import { ANNOUNCEMENT_TONES, STATUS_ANNOUNCEMENT_KINDS } from "@/lib/schema";
 import { STATUS_ANNOUNCEMENT_KIND_META, announcementState } from "@/lib/status-announcements";
 import { useNow } from "../../useNow";
 import { AddButton, Card, Hint, RemoveButton, SelectField, TextArea, TextField, ToggleRow, controlClasses, fieldLabelClasses, subCardClasses } from "../ui";
-import { ChipGroup } from "@/components/ChipGroup";
+import { ChipGroup, ChipToggles } from "@/components/ChipGroup";
 import { STATUS_STATE_LABELS, TONE_LABELS } from "./constants";
 import { isoToLocalInput, localInputToIso } from "./datetime";
 import type { SettingsDraft } from "./useSettingsDraft";
 
-export default function AnnouncementsSection({ d }: { d: SettingsDraft }) {
+export default function AnnouncementsSection({
+  d,
+  apps,
+}: {
+  d: SettingsDraft;
+  // The monitored apps, for a maintenance window's app picker (#293).
+  apps: { id: string; name: string }[];
+}) {
   const {
     announcement,
     updateAnnouncement,
@@ -130,6 +137,22 @@ export default function AnnouncementsSection({ d }: { d: SettingsDraft }) {
                     onChange={(kind) => updateStatusAnnouncement(i, { kind })}
                   />
                 </div>
+
+                {a.kind === "maintenance" && apps.length > 0 && (
+                  <div className="flex flex-col gap-1.5">
+                    <span className={fieldLabelClasses}>Apps under maintenance</span>
+                    <ChipToggles
+                      label={`Announcement ${i + 1}: apps under maintenance`}
+                      options={apps.map((app) => ({ value: app.id, label: app.name }))}
+                      selected={a.apps}
+                      onChange={(ids) => updateStatusAnnouncement(i, { apps: ids })}
+                    />
+                    <Hint>
+                      While the window is on, these apps&apos; alerts are held
+                      and their downtime shows as maintenance, outside uptime.
+                    </Hint>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-3">
                   <label className="flex flex-col gap-1.5 text-sm">

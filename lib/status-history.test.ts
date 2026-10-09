@@ -404,6 +404,65 @@ describe("recordResults latency accumulation", () => {
   });
 });
 
+describe("recordResults maintenance (#293)", () => {
+  beforeEach(resetHistoryState);
+  const down = (id: string) => ({ id, up: false, status: 503, ms: 5000 });
+  const up = (id: string) => ({ id, up: true, status: 200, ms: 100 });
+
+  it("keeps maintenance downtime out of uptime and out of the outage log", () => {
+    const t0 = Date.now() - 10 * MIN;
+    recordResults([up("m")], t0);
+    recordResults([down("m")], t0 + MIN, new Set(["m"]));
+    recordResults([down("m")], t0 + 2 * MIN, new Set(["m"]));
+    const h = getHistory(["m"]).apps[0];
+    expect(h.uptime.h1).toBe(100);
+    expect(h.uptime.d1).toBe(100);
+    expect(h.downSince).toBeNull();
+    expect(getAppDetail("m").outages).toEqual([]);
+    // The bars covering it are maintenance bars.
+    expect(h.series.h1.some((b) => b.maint)).toBe(true);
+    expect(h.series.d1.some((b) => b.maint)).toBe(true);
+  });
+
+  it("counts a down check outside the window as usual", () => {
+    const t0 = Date.now();
+    recordResults([down("x")], t0, new Set(["other"]));
+    const h = getHistory(["x"]).apps[0];
+    expect(h.uptime.h1).toBe(0);
+    expect(h.downSince).toBe(t0);
+  });
+
+  it("leaves an outage that began before the window open until the app is back", () => {
+    const t0 = Date.now() - 10 * MIN;
+    recordResults([down("o")], t0);
+    recordResults([down("o")], t0 + MIN, new Set(["o"]));
+    expect(getHistory(["o"]).apps[0].downSince).toBe(t0);
+    recordResults([up("o")], t0 + 2 * MIN, new Set(["o"]));
+    expect(getHistory(["o"]).apps[0].downSince).toBeNull();
+  });
+
+  it("draws a bar with real downtime by its uptime, not as maintenance", () => {
+    const hour = hourOf(Date.now());
+    const bars = fixedBarsFromBuckets(
+      [{ ...bkt(hour, 1, 1), maint: 2 }],
+      hour * HOUR,
+      (hour + 1) * HOUR,
+      1,
+      (ms) => String(ms)
+    );
+    expect(bars[0]).toMatchObject({ uptime: 50 });
+    expect(bars[0].maint).toBeUndefined();
+    const maintOnly = fixedBarsFromBuckets(
+      [{ ...bkt(hour, 1, 0), maint: 2 }],
+      hour * HOUR,
+      (hour + 1) * HOUR,
+      1,
+      (ms) => String(ms)
+    );
+    expect(maintOnly[0]).toMatchObject({ uptime: 100, maint: true });
+  });
+});
+
 describe("recordResults downSince (current-outage tracking)", () => {
   beforeEach(resetHistoryState);
 
@@ -701,6 +760,42 @@ describe("history database (#278)", () => {
     const h = getHistory(["a"]).apps[0];
     expect(h.uptime.h1).toBe(50);
     expect(h.downSince).toBe(t0 + 5 * MIN);
+  });
+
+  it("round-trips maintenance tallies through flush → load (#293)", async () => {
+    const t0 = Date.now() - 10 * MIN;
+    recordResults([{ id: "a", up: true, status: 200, ms: 100 }], t0);
+    recordResults([{ id: "a", up: false, status: 503, ms: 5000 }], t0 + MIN, new Set(["a"]));
+    await flush();
+    await reload();
+    const h = getHistory(["a"]).apps[0];
+    expect(h.uptime.h1).toBe(100);
+    expect(h.uptime.d1).toBe(100);
+    expect(h.series.h1.some((b) => b.maint)).toBe(true);
+  });
+
+  it("adds the maintenance columns to a database from an older build", async () => {
+    const { DatabaseSync } = await import("node:sqlite");
+    const old = new DatabaseSync(path.join(dir, "status-history.db"));
+    old.exec(`
+      CREATE TABLE buckets (app TEXT NOT NULL, hour INTEGER NOT NULL, up INTEGER NOT NULL,
+        down INTEGER NOT NULL, ms_count INTEGER NOT NULL, ms_sum INTEGER NOT NULL,
+        ms_max INTEGER NOT NULL, PRIMARY KEY (app, hour)) WITHOUT ROWID;
+      CREATE TABLE readings (app TEXT NOT NULL, t INTEGER NOT NULL, up INTEGER NOT NULL, ms INTEGER);
+      CREATE TABLE down_since (app TEXT PRIMARY KEY, since INTEGER NOT NULL);
+      CREATE TABLE outages (app TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL, note TEXT);
+      CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+      INSERT INTO meta VALUES ('legacyImport', 'none');
+      PRAGMA user_version = 1;
+    `);
+    old.prepare("INSERT INTO buckets VALUES (?, ?, 3, 1, 0, 0, 0)").run("a", hourOf(Date.now()));
+    old.close();
+    await loadHistory();
+    expect(getHistory(["a"]).apps[0].uptime.d1).toBeCloseTo(75, 6);
+    recordResults([{ id: "a", up: false, status: 503, ms: 5000 }], Date.now(), new Set(["a"]));
+    await flush();
+    await reload();
+    expect(getHistory(["a"]).apps[0].uptime.d1).toBeCloseTo(75, 6);
   });
 
   it("deletes a pruned app's history from the database", async () => {

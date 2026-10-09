@@ -157,6 +157,26 @@ describe("GET /api/status", () => {
     }
   });
 
+  it("marks a down app inside a maintenance window (#293)", async () => {
+    const configPath = process.env.CONFIG_PATH!;
+    const original = await fs.readFile(configPath, "utf8");
+    const raw = YAML.load(original) as { settings: Record<string, unknown> };
+    raw.settings.statusAnnouncements = [
+      { id: "m", kind: "maintenance", title: "NAS work", apps: [configured[0].id] },
+    ];
+    await fs.writeFile(configPath, YAML.dump(raw), "utf8");
+    try {
+      pollerRound(Date.now() - 60_000);
+      const body = await (await GET(request("/api/status", { session }))).json();
+      expect(body.results.map((r: { maintenance?: boolean }) => r.maintenance ?? false)).toEqual([
+        true,
+        false,
+      ]);
+    } finally {
+      await fs.writeFile(configPath, original, "utf8");
+    }
+  });
+
   it("leaves out apps with monitoring off (#296)", async () => {
     const configPath = process.env.CONFIG_PATH!;
     const raw = YAML.load(await fs.readFile(configPath, "utf8")) as { apps: Record<string, unknown>[] };

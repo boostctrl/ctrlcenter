@@ -7,6 +7,7 @@ import { latestCheck } from "@/lib/status-latest";
 import { swrCache } from "@/lib/swr-cache";
 import type { StatusResponse, StatusResult } from "@/lib/status";
 import { monitoredApps } from "@/lib/schema";
+import { maintenanceApps } from "@/lib/status-announcements";
 
 // Public endpoint (not behind the admin proxy) the dashboard polls to render
 // online/offline dots. It only ever pings the admin-configured app URLs, never
@@ -87,11 +88,14 @@ export async function GET(request: NextRequest) {
     if (probe) checkedAt = Math.min(checkedAt, probe.at);
   }
 
+  // A down app inside a maintenance window reads as under maintenance (#293).
+  const maintenance = maintenanceApps(settings.statusAnnouncements, now);
   const body: StatusResponse = {
     checkedAt,
     results: apps.flatMap((a) => {
       const r = byId.get(a.id);
-      return r && ids.has(a.id) ? [r] : [];
+      if (!r || !ids.has(a.id)) return [];
+      return [!r.up && maintenance.has(a.id) ? { ...r, maintenance: true } : r];
     }),
   };
   return NextResponse.json(body, { headers: NO_SHARED_CACHE });

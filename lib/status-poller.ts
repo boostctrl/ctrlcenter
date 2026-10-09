@@ -11,6 +11,7 @@ import { mapLimit } from "./concurrency";
 import { publishChecks } from "./status-latest";
 import { monitoredApps } from "./schema";
 import { processAlerts } from "./alerts";
+import { maintenanceApps } from "./status-announcements";
 import { log, errorReason } from "./log";
 import type { StatusResult } from "./status";
 
@@ -57,7 +58,10 @@ export async function tick(): Promise<void> {
     // Capture the prior per-app state before recording this tick, so alert
     // seeding on first run reflects the previous reading, not the current one.
     const prior = lastReadings(apps.map((a) => a.id));
-    recordResults(results, now);
+    // Apps under an active maintenance window (#293): recorded as maintenance
+    // and left out of alerting until the window ends.
+    const maintenance = maintenanceApps(settings.statusAnnouncements, now);
+    recordResults(results, now, maintenance);
     // /api/status serves these rather than re-probing every app (#278).
     const byId = new Map(due.map((a) => [a.id, a]));
     publishChecks(
@@ -74,7 +78,15 @@ export async function tick(): Promise<void> {
     for (const id of lastChecked.keys()) if (!ids.has(id)) lastChecked.delete(id);
     pruneHistory(allApps.map((a) => a.id));
     await flush();
-    await processAlerts(results, apps, settings.alerts, prior);
+    // Held apps skip alerting entirely rather than having their alerts
+    // dropped: their alert state stays as it was, so one still down when the
+    // window ends alerts then.
+    await processAlerts(
+      results.filter((r) => !maintenance.has(r.id)),
+      apps,
+      settings.alerts,
+      prior
+    );
   } catch (e) {
     // Best-effort; try again next tick. But leave a trace — a persistently
     // failing config read or history flush would otherwise silently stop the

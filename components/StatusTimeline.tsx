@@ -80,6 +80,9 @@ export function instantLabel(from: number, timeZone: string): string {
   }
 }
 
+// A maintenance bar (#293) is neutral: the downtime was planned.
+const MAINT_BAR = "bg-sky-400/60";
+
 export function uptimeColor(u: number | null): string {
   // No-data bars read as clearly empty slots (much fainter than any colored
   // "has-data" bar) so gaps don't get mistaken for a red "down" reading.
@@ -99,7 +102,9 @@ export function StateDot({ status }: { status: AppStatus | undefined }) {
       ? "bg-amber-400"
       : status.up
         ? "bg-emerald-400"
-        : "bg-red-400";
+        : status.maintenance
+          ? "bg-sky-400"
+          : "bg-red-400";
   return (
     <span className="relative flex h-2.5 w-2.5 shrink-0">
       {status?.up && !warn && (
@@ -156,9 +161,11 @@ export const StatusTimeline = memo(function StatusTimeline({
   // for the traversal's live region and its visible readout so keyboard, touch,
   // and screen-reader users all get exactly what a hover reveals.
   const bucketLabel = (p: BarPoint) =>
-    p.uptime == null
-      ? `${formatBarLabel(p.at, timeZone, bucketMs)}: no data`
-      : `${formatBarLabel(p.at, timeZone, bucketMs)}: ${p.uptime.toFixed(1)}% up${
+    p.maint
+      ? `${formatBarLabel(p.at, timeZone, bucketMs)}: maintenance`
+      : p.uptime == null
+        ? `${formatBarLabel(p.at, timeZone, bucketMs)}: no data`
+        : `${formatBarLabel(p.at, timeZone, bucketMs)}: ${p.uptime.toFixed(1)}% up${
           // Append the bar's average latency when it recorded any up
           // check; omitted for bars with no latency sample.
           p.ms == null ? "" : ` · avg ${p.ms}ms`
@@ -208,7 +215,7 @@ export const StatusTimeline = memo(function StatusTimeline({
             // Tapping a bar is the touch path: it sets the active bucket (and
             // focuses the strip), surfacing the same label a hover would.
             onClick={() => setActive(i)}
-            className={`min-w-0 flex-1 rounded-full ${uptimeColor(p.uptime)}${
+            className={`min-w-0 flex-1 rounded-full ${p.maint ? MAINT_BAR : uptimeColor(p.uptime)}${
               active === i ? " ring-2 ring-fg/70" : ""
             }`}
           />

@@ -44,6 +44,10 @@ export const statusAnnouncementSchema = z.object({
   kind: z.enum(STATUS_ANNOUNCEMENT_KINDS).catch("info"),
   startsAt: z.string().catch(""),
   endsAt: z.string().catch(""),
+  // Maintenance only (#293): the app ids this window covers. While it's
+  // active their alerts are muted and their downtime is recorded as
+  // maintenance, outside uptime. Empty = a plain notice.
+  apps: z.array(z.string()).catch([]).default([]),
 });
 export type StatusAnnouncement = z.infer<typeof statusAnnouncementSchema>;
 

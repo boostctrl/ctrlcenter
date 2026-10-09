@@ -300,7 +300,7 @@ export function useSettingsDraft(initialSettings: Settings, themePacks: ThemePac
   const addStatusAnnouncement = () =>
     setStatusAnnouncements((items) => [
       ...items,
-      { id: newThemeId(), title: "", body: "", kind: "info", startsAt: "", endsAt: "" },
+      { id: newThemeId(), title: "", body: "", kind: "info", startsAt: "", endsAt: "", apps: [] },
     ]);
   const removeStatusAnnouncement = async (i: number) => {
     const ok = await confirm({

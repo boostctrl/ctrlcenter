@@ -167,6 +167,8 @@ async function statusPhase(run) {
       jsonQuery: '$.status == "ok"',
     },
     { id: "smoke-down", name: "Smoke Down", url: `http://127.0.0.1:${closedPort}/`, checkType: "tcp" },
+    // Down too, but inside a maintenance window (#293).
+    { id: "smoke-maint", name: "Smoke Maint", url: `http://127.0.0.1:${closedPort}/`, checkType: "tcp" },
   ];
   const tlsPort = await startTlsServer();
   if (tlsPort) {
@@ -182,6 +184,15 @@ async function statusPhase(run) {
   const config = YAML.load(fs.readFileSync(configPath, "utf8"));
   config.settings.statusChecks = true;
   config.apps = [...config.apps.map((a) => ({ ...a, monitor: false })), ...apps];
+  config.settings.statusAnnouncements = [
+    {
+      id: "smoke-window",
+      kind: "maintenance",
+      title: "Smoke maintenance",
+      body: "Planned work on **Smoke Maint**.",
+      apps: ["smoke-maint"],
+    },
+  ];
   // Alerts with every part of their settings card on show (#291), none able
   // to send: the original webhook and one channel are switched off, the
   // other channel is missing its chat ID.
@@ -198,12 +209,20 @@ async function statusPhase(run) {
   fs.writeFileSync(configPath, YAML.dump(config));
 
   // Each state as /api/status reports it.
-  const expected = { "smoke-up": "up", "smoke-down": "down", "smoke-warn": "warning" };
+  const expected = {
+    "smoke-up": "up",
+    "smoke-down": "down",
+    "smoke-maint": "maintenance",
+    "smoke-warn": "warning",
+  };
   const deadline = Date.now() + 30_000;
   for (;;) {
     const { results } = await (await fetch(`${base}/api/status`)).json();
     const seen = Object.fromEntries(
-      results.map((r) => [r.id, r.up ? (r.warning ? "warning" : "up") : "down"])
+      results.map((r) => [
+        r.id,
+        r.up ? (r.warning ? "warning" : "up") : r.maintenance ? "maintenance" : "down",
+      ])
     );
     const pending = apps.filter((a) => seen[a.id] !== expected[a.id]);
     if (pending.length === 0) break;

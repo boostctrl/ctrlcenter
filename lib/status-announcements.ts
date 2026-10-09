@@ -151,3 +151,14 @@ export function announcementWindowLabel(
   if (end !== null) return `Until ${formatInstant(end, timeZone)}`;
   return "";
 }
+
+// The app ids under an active maintenance window right now (#293): their
+// downtime is recorded as maintenance and their alerts are held.
+export function maintenanceApps(list: StatusAnnouncement[], now: number): Set<string> {
+  const out = new Set<string>();
+  for (const a of list) {
+    if (a.kind !== "maintenance" || announcementState(a, now) !== "active") continue;
+    for (const id of a.apps) out.add(id);
+  }
+  return out;
+}

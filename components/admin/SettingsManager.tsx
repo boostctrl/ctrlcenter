@@ -32,7 +32,8 @@ export default function SettingsManager({
   initialTwoFactorEnabled,
 }: {
   initialSettings: Settings;
-  // The monitored apps, for the alert channels' app filter.
+  // The monitored apps, for the alert channels' app filter and maintenance
+  // windows.
   apps: { id: string; name: string }[];
   themePacks: ThemePack[];
   // The ?section deep-link param, read server-side by /admin's page (see
@@ -135,7 +136,7 @@ export default function SettingsManager({
         {section === "widgets" && <WidgetsSection d={draft} />}
         {section === "monitoring" && <MonitoringSection d={draft} apps={apps} />}
         {section === "integrations" && <IntegrationsSection d={draft} />}
-        {section === "announcements" && <AnnouncementsSection d={draft} />}
+        {section === "announcements" && <AnnouncementsSection d={draft} apps={apps} />}
         {section === "security" && (
           <SecuritySection initialTwoFactorEnabled={initialTwoFactorEnabled} />
         )}

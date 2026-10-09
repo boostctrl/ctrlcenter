@@ -61,7 +61,10 @@ export default function StatusAnnouncements({
               <div className="flex flex-wrap items-center gap-2">
                 <span
                   className="text-[0.7rem] font-semibold tracking-[0.12em] uppercase"
-                  style={{ color }}
+                  // The tone colours are tuned for marks, not small text: on a
+                  // light surface they fall below 4.5:1. Blending toward the
+                  // foreground keeps the hue and reads in both schemes.
+                  style={{ color: `color-mix(in srgb, ${color} 45%, var(--fg))` }}
                 >
                   {label}
                 </span>

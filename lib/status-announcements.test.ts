@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   announcementState,
+  maintenanceApps,
   visibleAnnouncements,
   announcementWindowLabel,
 } from "./status-announcements";
@@ -17,6 +18,7 @@ function entry(overrides: Partial<StatusAnnouncement> = {}): StatusAnnouncement 
     kind: "info",
     startsAt: "",
     endsAt: "",
+    apps: [],
     ...overrides,
   };
 }
@@ -227,5 +229,29 @@ describe("announcementWindowLabel", () => {
         "UTC"
       )
     ).toBe("Starts Mon, Jul 20, 1:00 PM");
+  });
+});
+
+describe("maintenanceApps (#293)", () => {
+  const hour = 3_600_000;
+  it("collects the apps of active maintenance windows only", () => {
+    const list = [
+      entry({ id: "1", kind: "maintenance", apps: ["a", "b"] }),
+      entry({ id: "2", kind: "incident", apps: ["c"] }),
+      entry({
+        id: "3",
+        kind: "maintenance",
+        apps: ["d"],
+        startsAt: new Date(NOW + hour).toISOString(),
+      }),
+      entry({
+        id: "4",
+        kind: "maintenance",
+        apps: ["e"],
+        endsAt: new Date(NOW - hour).toISOString(),
+      }),
+      entry({ id: "5", kind: "maintenance", apps: ["b", "f"] }),
+    ];
+    expect([...maintenanceApps(list, NOW)].sort()).toEqual(["a", "b", "f"]);
   });
 });

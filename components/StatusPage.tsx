@@ -17,7 +17,7 @@ import {
   instantLabel,
 } from "./StatusTimeline";
 import {
-  summarize,
+  isOutage,  summarize,
   statusMessage,
   formatSince,
   STATUS_RANGES,
@@ -104,9 +104,10 @@ export default function StatusPage({
   const downNames = apps
     .filter((a) => {
       const s = statuses.get(a.id);
-      return s && !s.up;
+      return s && isOutage(s);
     })
     .map((a) => a.name);
+  const maintenanceNames = apps.filter((a) => statuses.get(a.id)?.maintenance).map((a) => a.name);
   const polled = checkedAt !== null && total > 0;
   const fmtPct = (u: number | null) => (u == null ? "—" : `${u.toFixed(1)}%`);
   const rangeLabel = STATUS_RANGES.find((r) => r.key === range)!.label;
@@ -122,13 +123,19 @@ export default function StatusPage({
         <div className="flex items-center gap-3">
           <span
             className={`h-3 w-3 rounded-full ${
-              !polled ? "bg-fg/25" : allUp ? "bg-emerald-400" : "bg-red-400"
+              !polled
+                ? "bg-fg/25"
+                : !allUp
+                  ? "bg-red-400"
+                  : maintenanceNames.length
+                    ? "bg-sky-400"
+                    : "bg-emerald-400"
             }`}
             aria-hidden
           />
           <div>
             <p className="font-semibold text-ink-90">
-              {statusMessage(downNames, total)}
+              {statusMessage(downNames, total, maintenanceNames)}
             </p>
             {checkedAt !== null && (
               <p className="text-xs text-ink-40">
@@ -200,7 +207,7 @@ export default function StatusPage({
               // this outage yet (downSince null) we keep the plain wording rather
               // than fabricate a duration. `now` ticks, so the duration updates.
               const outageStart =
-                s && !s.up && h?.downSince != null ? h.downSince : null;
+                s && isOutage(s) && h?.downSince != null ? h.downSince : null;
               const dur = outageStart != null ? downDuration(outageStart, now) : null;
               // The row's figures, used in two places: the fixed-width right
               // column from sm up, and the second row below sm. Deliberately
@@ -240,7 +247,10 @@ export default function StatusPage({
                       since {formatSince(coverageSince, timezone, range)}
                     </p>
                   )}
-                  {s && !s.up && (
+                  {s?.maintenance && (
+                    <p className="text-xs text-sky-400">Under maintenance</p>
+                  )}
+                  {s && isOutage(s) && (
                     <p
                       // Absolute outage start on hover, in the visitor's zone,
                       // so "Down for 23m" reveals exactly when it began. Before
@@ -275,11 +285,13 @@ export default function StatusPage({
                 <div
                   key={app.id}
                   className={`glass-card relative px-5 py-4 transition-colors hover:bg-fg/[0.03] ${
-                    s && !s.up
-                      ? "ring-1 ring-red-400/30"
-                      : s?.warning
-                        ? "ring-1 ring-amber-400/30"
-                        : ""
+                    s?.maintenance
+                      ? "ring-1 ring-sky-400/30"
+                      : s && !s.up
+                        ? "ring-1 ring-red-400/30"
+                        : s?.warning
+                          ? "ring-1 ring-amber-400/30"
+                          : ""
                   }`}
                 >
                   <div className="flex items-center gap-4">

@@ -18,7 +18,7 @@ import {
   instantLabel,
 } from "./StatusTimeline";
 import {
-  formatBarLabel,
+  isOutage,  formatBarLabel,
   formatSince,
   CHECK_TYPES,
   STATUS_RANGES,
@@ -290,11 +290,13 @@ export default function StatusDetail({
       ? detail.since
       : null;
   const outageStart =
-    live && !live.up && detail?.downSince != null ? detail.downSince : null;
+    live && isOutage(live) && detail?.downSince != null ? detail.downSince : null;
   const dur = outageStart != null ? downDuration(outageStart, now) : null;
   const liveDetail = !live
     ? "Checking…"
-    : live.up
+    : live.maintenance
+      ? "Under maintenance"
+      : live.up
       ? live.warning
         ? live.warning
         : check.type === "push"
@@ -316,11 +318,13 @@ export default function StatusDetail({
       {/* Live header: the same identity + state the row shows, full width. */}
       <div
         className={`glass-card flex items-center gap-4 px-5 py-4 ${
-          live && !live.up
-            ? "ring-1 ring-red-400/30"
-            : live?.warning
-              ? "ring-1 ring-amber-400/30"
-              : ""
+          live?.maintenance
+            ? "ring-1 ring-sky-400/30"
+            : live && !live.up
+              ? "ring-1 ring-red-400/30"
+              : live?.warning
+                ? "ring-1 ring-amber-400/30"
+                : ""
         }`}
       >
         <StateDot status={live} />
@@ -338,7 +342,13 @@ export default function StatusDetail({
                 : undefined
             }
             className={`text-sm ${
-              live && !live.up ? "text-red-400" : live?.warning ? "text-amber-200" : "text-ink-70"
+              live?.maintenance
+                ? "text-sky-400"
+                : live && !live.up
+                  ? "text-red-400"
+                  : live?.warning
+                    ? "text-amber-200"
+                    : "text-ink-70"
             }`}
           >
             {liveDetail}

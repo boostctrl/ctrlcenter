@@ -24,10 +24,14 @@ export const RECENT_VIEW_MS = 60 * MIN_MS; // window the 1h view / h1 % actually
 // contributed and understate the average across the upgrade boundary. Only up
 // checks feed the latency accumulators (see recordResults), so on fully-recorded
 // hours msCount == up anyway.
+//
+// `maint` counts down checks inside a maintenance window (#293): kept apart
+// from `down` so they never lower uptime, and so the bar can show them.
 export type Bucket = {
   hour: number;
   up: number;
   down: number;
+  maint?: number;
   msCount: number;
   msSum: number;
   msMax: number;
@@ -61,7 +65,9 @@ export function minuteStr(ts: number): string {
 // round-trip latency, stamped on up readings only (a down reading's ms is
 // time-to-failure, excluded from latency the same way it is in the buckets);
 // undefined on down readings and on pre-upgrade entries loaded from an old file.
-export type Reading = { t: number; up: boolean; ms?: number };
+// `maint` marks a down reading inside a maintenance window (#293), which
+// counts neither for nor against uptime.
+export type Reading = { t: number; up: boolean; ms?: number; maint?: boolean };
 
 // One completed outage as the poller recorded it (#175): the exact down- and
 // up-transition instants (ms). Written at the moment of recovery from the
@@ -97,6 +103,7 @@ export function fixedBarsFromReadings(
   const acc = Array.from({ length: bars }, () => ({
     up: 0,
     total: 0,
+    maint: 0,
     msWsum: 0,
     msWtime: 0,
   }));
@@ -116,6 +123,10 @@ export function fixedBarsFromReadings(
       if (bStart >= hi) break;
       const overlap = Math.min(bStart + span, hi) - Math.max(bStart, lo);
       if (overlap <= 0) continue;
+      if (r.maint) {
+        acc[i].maint += overlap;
+        continue;
+      }
       acc[i].total += overlap;
       if (r.up) acc[i].up += overlap;
       if (r.up && r.ms != null) {
@@ -124,11 +135,16 @@ export function fixedBarsFromReadings(
       }
     }
   }
-  return acc.map((a, i) => ({
-    at: minuteStr(startMs + i * span),
-    uptime: a.total === 0 ? null : (a.up / a.total) * 100,
-    ms: a.msWtime === 0 ? null : Math.round(a.msWsum / a.msWtime),
-  }));
+  return acc.map((a, i) =>
+    withMaint(
+      {
+        at: minuteStr(startMs + i * span),
+        uptime: a.total === 0 ? null : (a.up / a.total) * 100,
+        ms: a.msWtime === 0 ? null : Math.round(a.msWsum / a.msWtime),
+      },
+      a.maint > 0 && a.up === a.total
+    )
+  );
 }
 
 // Resample hourly up/down buckets into `bars` equal time buckets over
@@ -148,6 +164,7 @@ export function fixedBarsFromBuckets(
   const acc = Array.from({ length: bars }, () => ({
     up: 0,
     down: 0,
+    maint: 0,
     msCount: 0,
     msSum: 0,
   }));
@@ -164,6 +181,7 @@ export function fixedBarsFromBuckets(
       const w = overlap / HOUR_MS;
       acc[i].up += b.up * w;
       acc[i].down += b.down * w;
+      acc[i].maint += (b.maint ?? 0) * w;
       // Latency rides along with the same hour-overlap weight as up/down. The
       // weight cancels in the msSum/msCount ratio within a single hour and
       // correctly blends the ratios when a bar straddles several hours.
@@ -173,12 +191,21 @@ export function fixedBarsFromBuckets(
   }
   return acc.map((a, i) => {
     const total = a.up + a.down;
-    return {
-      at: atOf(startMs + i * span),
-      uptime: total === 0 ? null : (a.up / total) * 100,
-      ms: a.msCount === 0 ? null : Math.round(a.msSum / a.msCount),
-    };
+    return withMaint(
+      {
+        at: atOf(startMs + i * span),
+        uptime: total === 0 ? null : (a.up / total) * 100,
+        ms: a.msCount === 0 ? null : Math.round(a.msSum / a.msCount),
+      },
+      a.maint > 0 && a.down === 0
+    );
   });
+}
+
+// A bar with maintenance downtime and no real downtime is a maintenance bar
+// (#293); real downtime in the same bar wins, since that's the news.
+function withMaint(p: BarPoint, maint: boolean): BarPoint {
+  return maint ? { ...p, maint: true } : p;
 }
 
 // Uptime % (0–100) across readings at/after `sinceMs`, or null if none.
@@ -186,7 +213,7 @@ export function recentPct(readings: Reading[], sinceMs: number): number | null {
   let up = 0;
   let total = 0;
   for (const r of readings) {
-    if (r.t < sinceMs) continue;
+    if (r.t < sinceMs || r.maint) continue;
     total++;
     if (r.up) up++;
   }
@@ -348,6 +375,7 @@ export function extractOutages(
   // file without the mark).
   let runStart: number | null = null;
   for (const r of sorted) {
+    if (r.maint) continue; // maintenance is not an outage (#293)
     if (!r.up && runStart === null) runStart = r.t;
     if (r.up && runStart !== null) {
       if (runStart < historyEnd && runStart < firstRecordedMs) {

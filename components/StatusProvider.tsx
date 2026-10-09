@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { statusMessage, type AppStatus, type StatusResponse } from "@/lib/status";
+import { isOutage, statusMessage, type AppStatus, type StatusResponse } from "@/lib/status";
 import { usePolling } from "./usePolling";
 
 const StatusContext = createContext<Map<string, AppStatus> | null>(null);
@@ -56,16 +56,26 @@ export function StatusDot({ id }: { id: string }) {
     ? status.warning
       ? `Online · ${status.warning}`
       : `Online${status.status ? ` · HTTP ${status.status}` : ""} · ${status.ms}ms`
-    : `Offline${status.status ? ` · HTTP ${status.status}` : ""}`;
-  // Up with a warning (a certificate near expiry, #294) shows amber.
+    : status.maintenance
+      ? "Under maintenance"
+      : `Offline${status.status ? ` · HTTP ${status.status}` : ""}`;
+  // Up with a warning (a certificate near expiry, #294) shows amber; down for
+  // maintenance (#293) a sky ring.
   const warn = status.up && Boolean(status.warning);
+  const label = status.up
+    ? warn
+      ? `Online, ${status.warning}`
+      : "Online"
+    : status.maintenance
+      ? "Under maintenance"
+      : "Offline";
 
   return (
     <span
       className="absolute top-3 right-3 flex h-2.5 w-2.5"
       title={title}
       role="img"
-      aria-label={status.up ? (warn ? `Online, ${status.warning}` : "Online") : "Offline"}
+      aria-label={label}
     >
       {status.up && !warn && (
         <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-emerald-400/60" />
@@ -74,7 +84,13 @@ export function StatusDot({ id }: { id: string }) {
           as well as color for color-blind visitors (#273). */}
       <span
         className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
-          warn ? "bg-amber-400" : status.up ? "bg-emerald-400" : "border-2 border-red-400"
+          warn
+            ? "bg-amber-400"
+            : status.up
+              ? "bg-emerald-400"
+              : status.maintenance
+                ? "border-2 border-sky-400"
+                : "border-2 border-red-400"
         }`}
       />
     </span>
@@ -103,10 +119,13 @@ export function StatusSummary({
   const monitored = apps.filter((a) => statuses.has(a.id));
   if (monitored.length === 0) return null;
   const downNames = monitored
-    .filter((a) => !statuses.get(a.id)!.up)
+    .filter((a) => isOutage(statuses.get(a.id)!))
+    .map((a) => a.name);
+  const maintenanceNames = monitored
+    .filter((a) => statuses.get(a.id)!.maintenance)
     .map((a) => a.name);
   const allUp = downNames.length === 0;
-  const message = statusMessage(downNames, monitored.length);
+  const message = statusMessage(downNames, monitored.length, maintenanceNames);
 
   return (
     <Link
@@ -118,11 +137,13 @@ export function StatusSummary({
       className={SUMMARY_VARIANTS[variant]}
     >
       <span className="relative flex h-2.5 w-2.5" aria-hidden>
-        {allUp && (
+        {allUp && !maintenanceNames.length && (
           <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-emerald-400/60" />
         )}
         <span
-          className={`relative inline-flex h-2.5 w-2.5 rounded-full ${allUp ? "bg-emerald-400" : "bg-red-400"}`}
+          className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
+            !allUp ? "bg-red-400" : maintenanceNames.length ? "bg-sky-400" : "bg-emerald-400"
+          }`}
         />
       </span>
       <span className="font-medium">{message}</span>

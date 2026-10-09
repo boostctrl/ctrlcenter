@@ -641,6 +641,15 @@ export default async function HelpPage() {
             each visitor&apos;s own time zone, and the section appears even when
             status checks are off.
           </P>
+          <P>
+            A <strong>maintenance</strong> entry can also name the apps it
+            covers, which makes it a maintenance window. While it runs, those
+            apps&apos; alerts are held, and if they go down they show as{" "}
+            <em>Under maintenance</em> in blue rather than as an outage: the
+            timeline marks the time in blue too, and it doesn&apos;t count
+            against uptime. An app still down when the window closes alerts as
+            usual.
+          </P>
         </Card>
       </Section>
 

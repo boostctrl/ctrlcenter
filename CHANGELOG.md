@@ -50,6 +50,12 @@ here.
   button. Your existing webhook and email alerts keep working as they are;
   *Move into the channel list* in Settings turns them into channels you can
   filter. (#291)
+- **Maintenance windows.** A maintenance announcement on the status page can
+  now name the apps it covers. While it runs, their alerts are held, and
+  downtime shows as *Under maintenance* in blue on the dashboard and status
+  pages, with the time marked in blue on the timeline and left out of the
+  uptime figures. An app still down when the window ends alerts as usual.
+  (#293)
 - **Warning alerts.** When an app starts warning, for instance a certificate
   about to expire, its alert channels now hear about it, with a reminder once
   a day while it lasts and a note when it clears. Each channel can switch
@@ -62,6 +68,8 @@ here.
 - The home page's service-status link now presents its visible text to
   screen readers and voice control, so "Uptime & outages" can be spoken to
   open it. (#294)
+- The kind label on status page announcements ("Maintenance", "Incident",
+  "Notice") is now readable in light mode. (#293)
 
 ## [2.12.0] - 2026-10-09
 

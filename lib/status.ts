@@ -14,7 +14,15 @@ export type AppStatus = {
   // Up, but with something to fix soon (#294) — today a TLS certificate near
   // expiry. Counts as up for uptime and alerts; shown amber with this text.
   warning?: string;
+  // Down, but inside a maintenance window for this app (#293): shown as "Under
+  // maintenance" in a neutral colour, not as an outage.
+  maintenance?: boolean;
 };
+
+// A real outage: down and not under maintenance.
+export function isOutage(s: Pick<AppStatus, "up" | "maintenance">): boolean {
+  return !s.up && !s.maintenance;
+}
 
 // A status keyed by the app id it belongs to.
 export type StatusResult = AppStatus & { id: string };
@@ -26,6 +34,7 @@ export type StatusResponse = { checkedAt: number; results: StatusResult[] };
 export type StatusSummary = {
   up: number;
   down: number;
+  maintenance: number;
   total: number;
   allUp: boolean;
 };
@@ -33,12 +42,14 @@ export type StatusSummary = {
 // Roll a set of per-app results up into overall counts for the summary banner
 // and dashboard pill. Takes anything carrying an `up` flag. Empty input is
 // treated as "nothing to report" (not all up), so a pre-first-poll page doesn't
-// flash "all systems operational".
-export function summarize(results: { up: boolean }[]): StatusSummary {
+// flash "all systems operational". An app down for maintenance (#293) counts
+// apart, and doesn't break "all up".
+export function summarize(results: { up: boolean; maintenance?: boolean }[]): StatusSummary {
   const total = results.length;
   const up = results.filter((r) => r.up).length;
-  const down = total - up;
-  return { up, down, total, allUp: total > 0 && down === 0 };
+  const maintenance = results.filter((r) => !r.up && r.maintenance).length;
+  const down = total - up - maintenance;
+  return { up, down, maintenance, total, allUp: total > 0 && down === 0 };
 }
 
 // Whether an HTTP status code satisfies an app's `expectStatus` spec — a comma
@@ -156,7 +167,9 @@ export const DETAIL_BARS = 90;
 // `ms` is the average up-check latency for that bucket, or null when the bucket
 // has no up-check samples (empty, or down the whole time) — see fixedBars* in
 // status-history/aggregate.ts.
-export type BarPoint = { at: string; uptime: number | null; ms: number | null };
+// `maint` marks a bar that holds maintenance downtime (#293) and no real
+// downtime: it's drawn in a neutral colour rather than by its uptime.
+export type BarPoint = { at: string; uptime: number | null; ms: number | null; maint?: boolean };
 
 // Format a BarPoint's `at` for the timeline tooltip in the visitor's time zone,
 // so the status page reads in the same zone as the rest of the app instead of
@@ -332,9 +345,17 @@ export type StatusDetailResponse = { generatedAt: number; app: AppDetail };
 
 // The summary line for the status banner / dashboard pill. Names the single down
 // service; collapses to "Multiple services down" beyond one.
-export function statusMessage(downNames: string[], total: number): string {
+export function statusMessage(
+  downNames: string[],
+  total: number,
+  maintenanceNames: string[] = []
+): string {
   if (total === 0) return "Checking services…";
-  if (downNames.length === 0) return "All systems operational";
+  if (downNames.length === 0) {
+    if (maintenanceNames.length === 1) return `${maintenanceNames[0]} is under maintenance`;
+    if (maintenanceNames.length > 1) return "Maintenance in progress";
+    return "All systems operational";
+  }
   if (downNames.length === 1) return `${downNames[0]} is down`;
   return "Multiple services down";
 }

@@ -20,8 +20,9 @@ export type BucketRow = {
   msCount: number;
   msSum: number;
   msMax: number;
+  maint?: number;
 };
-export type ReadingRow = { app: string; t: number; up: boolean; ms?: number };
+export type ReadingRow = { app: string; t: number; up: boolean; ms?: number; maint?: boolean };
 export type OutageRow = { app: string; start: number; end: number; note?: string };
 
 export type HistoryRows = {
@@ -96,10 +97,24 @@ export function openHistoryDb(file: string): DatabaseSync {
         COMMIT;
       `);
     }
+    addMaintColumns(db);
     return db;
   } catch (e) {
     db.close();
     throw e;
+  }
+}
+
+// Maintenance tallies (#293) as added columns rather than a schema version:
+// an older build still opens the file (its statements name their columns, so
+// it never reads these and its inserts take the default), where a version
+// bump would make a downgrade refuse the whole history.
+function addMaintColumns(db: DatabaseSync): void {
+  for (const table of ["buckets", "readings"]) {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+    if (!cols.some((c) => c.name === "maint")) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN maint INTEGER NOT NULL DEFAULT 0`);
+    }
   }
 }
 
@@ -109,16 +124,23 @@ export function readHistoryRows(
 ): HistoryRows {
   const buckets = db
     .prepare(
-      "SELECT app, hour, up, down, ms_count AS msCount, ms_sum AS msSum, ms_max AS msMax FROM buckets"
+      "SELECT app, hour, up, down, maint, ms_count AS msCount, ms_sum AS msSum, ms_max AS msMax FROM buckets"
     )
     .all() as BucketRow[];
   const readings = (
     db
-      .prepare("SELECT app, t, up, ms FROM readings WHERE t >= ? ORDER BY rowid")
-      .all(cutoffs.minReadingT) as { app: string; t: number; up: number; ms: number | null }[]
+      .prepare("SELECT app, t, up, ms, maint FROM readings WHERE t >= ? ORDER BY rowid")
+      .all(cutoffs.minReadingT) as {
+      app: string;
+      t: number;
+      up: number;
+      ms: number | null;
+      maint: number;
+    }[]
   ).map((r) => {
     const row: ReadingRow = { app: r.app, t: r.t, up: r.up === 1 };
     if (r.ms != null) row.ms = r.ms;
+    if (r.maint) row.maint = true;
     return row;
   });
   const downSince = db.prepare("SELECT app, since FROM down_since").all() as {
@@ -160,15 +182,18 @@ export function writeHistoryChanges(db: DatabaseSync, c: HistoryChanges): void {
       for (const app of c.dropApps) del.run(app);
     }
     const bucket = db.prepare(`
-      INSERT INTO buckets (app, hour, up, down, ms_count, ms_sum, ms_max)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO buckets (app, hour, up, down, maint, ms_count, ms_sum, ms_max)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (app, hour) DO UPDATE SET
-        up = excluded.up, down = excluded.down, ms_count = excluded.ms_count,
-        ms_sum = excluded.ms_sum, ms_max = excluded.ms_max`);
+        up = excluded.up, down = excluded.down, maint = excluded.maint,
+        ms_count = excluded.ms_count, ms_sum = excluded.ms_sum, ms_max = excluded.ms_max`);
     for (const b of c.buckets)
-      bucket.run(b.app, b.hour, b.up, b.down, b.msCount, b.msSum, b.msMax);
-    const reading = db.prepare("INSERT INTO readings (app, t, up, ms) VALUES (?, ?, ?, ?)");
-    for (const r of c.readings) reading.run(r.app, r.t, r.up ? 1 : 0, r.ms ?? null);
+      bucket.run(b.app, b.hour, b.up, b.down, b.maint ?? 0, b.msCount, b.msSum, b.msMax);
+    const reading = db.prepare(
+      "INSERT INTO readings (app, t, up, ms, maint) VALUES (?, ?, ?, ?, ?)"
+    );
+    for (const r of c.readings)
+      reading.run(r.app, r.t, r.up ? 1 : 0, r.ms ?? null, r.maint ? 1 : 0);
     const setDown = db.prepare(
       "INSERT INTO down_since (app, since) VALUES (?, ?) ON CONFLICT (app) DO UPDATE SET since = excluded.since"
     );
