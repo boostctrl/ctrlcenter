@@ -10,6 +10,8 @@ export {
   PRUNE_GRACE_MS,
   flush,
   setOutageNote,
+  exportOutageNotes,
+  importOutageNotes,
   parseLegacyHistory,
 } from "./store";
 export * from "./query";

@@ -60,6 +60,24 @@ export const outageNoteSchema = z.object({
   note: z.string().max(500),
 });
 
+// Outage records that carry a note, bundled into the config export (#309): the
+// notes are hand-written and live with the uptime history, not config.yaml,
+// so a move to a new host would otherwise lose them. The cap bounds what an
+// import can write (MAX_OUTAGES per app is 500).
+export const bundledOutageNotesSchema = z
+  .array(
+    z
+      .object({
+        app: z.string().min(1).max(200),
+        start: z.number().int().positive(),
+        end: z.number().int().positive(),
+        note: z.string().trim().min(1).max(500),
+      })
+      .refine((o) => o.end >= o.start)
+  )
+  .max(10_000);
+export type BundledOutageNote = z.infer<typeof bundledOutageNotesSchema>[number];
+
 // Admin input, derived from the stored schemas (lib/schema/input.ts).
 export const announcementUpdateSchema = patchOf(announcementSchema);
 // The admin sends the whole notices list (each entry carries a client-minted

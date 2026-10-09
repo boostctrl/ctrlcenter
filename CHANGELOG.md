@@ -63,6 +63,10 @@ here.
 
 ### Fixed
 
+- **Export keeps your incident notes.** Notes you wrote on outages live with
+  the uptime history rather than the config, so exporting and importing to
+  move hosts used to lose them. Export now bundles each noted outage, and
+  Import restores it. (#309)
 - Clearing an app's TCP or DNS port in the admin portal now actually removes
   it, rather than keeping the old one. (#292)
 - The home page's service-status link now presents its visible text to

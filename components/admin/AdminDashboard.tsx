@@ -148,6 +148,9 @@ function AdminBody({
     const plural = (n: number, word: string) =>
       `${n} ${word}${n === 1 ? "" : "s"}`;
     const titleClause = title ? ` and sets the title to “${title}”` : "";
+    const noteCount = Array.isArray(c.outageNotes) ? c.outageNotes.length : 0;
+    const notesClause =
+      noteCount > 0 ? ` It also brings back ${plural(noteCount, "incident note")}.` : "";
     const ok = await confirm({
       title: "Replace the entire configuration?",
       message:
@@ -155,7 +158,8 @@ function AdminBody({
         `${plural(bookmarkCount, "bookmark")}${titleClause}. Importing it ` +
         "replaces your entire configuration — apps, bookmarks, settings, " +
         "layout, and themes. Your current configuration is first saved beside " +
-        "the config file as config.yaml.bak, so you can restore it.",
+        "the config file as config.yaml.bak, so you can restore it." +
+        notesClause,
       confirmLabel: "Replace configuration",
       danger: true,
     });

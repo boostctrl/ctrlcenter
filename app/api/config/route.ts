@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/lib/api-auth";
 import { readConfigInternal, replaceConfig, stripAuth } from "@/lib/config";
 import { migrateConfig, NewerConfigError } from "@/lib/config-migrate";
-import { configSchema } from "@/lib/schema";
+import { bundledOutageNotesSchema, configSchema } from "@/lib/schema";
+import { exportOutageNotes, flush, importOutageNotes, loadHistory } from "@/lib/status-history";
 import {
   exportIcons,
   sanitizeBundledIcons,
@@ -21,6 +22,10 @@ import {
 // re-materialized on import, so a backup restored on a different instance
 // keeps its custom icons (#72). Backups from before bundling simply lack the
 // field and import as before.
+//
+// Outage incident notes (#176) live with the uptime history, not the config,
+// so they ride along the same way, as `outageNotes`: each recorded outage that
+// carries a note (#309). The rest of the history rebuilds on its own.
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
@@ -29,10 +34,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const uploads = await exportIcons();
-  const body =
-    uploads.length > 0
-      ? { ...stripAuth(config), uploads }
-      : stripAuth(config);
+  await loadHistory();
+  const outageNotes = exportOutageNotes();
+  const body = {
+    ...stripAuth(config),
+    ...(uploads.length > 0 ? { uploads } : {}),
+    ...(outageNotes.length > 0 ? { outageNotes } : {}),
+  };
   return NextResponse.json(body, {
     headers: {
       "Content-Disposition": 'attachment; filename="ctrlcenter-config.json"',
@@ -78,7 +86,20 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
+  const rawNotes = (body as Record<string, unknown>).outageNotes;
+  const notes = bundledOutageNotesSchema.safeParse(rawNotes ?? []);
+  if (!notes.success) {
+    return NextResponse.json(
+      { error: "The incident notes bundled in that file are invalid." },
+      { status: 400 }
+    );
+  }
   const config = await replaceConfig(parsed.data);
   await writeBundledIcons(icons);
+  if (notes.data.length > 0) {
+    await loadHistory();
+    importOutageNotes(notes.data);
+    await flush();
+  }
   return NextResponse.json(stripAuth(config));
 }

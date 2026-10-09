@@ -8,6 +8,7 @@ import fs from "fs/promises";
 import path from "path";
 import { log, errorReason } from "../log";
 import type { StatusResult } from "../status";
+import type { BundledOutageNote } from "../schema";
 import { globalSingleton } from "../singleton";
 import {
   openHistoryDb,
@@ -528,8 +529,8 @@ function mergeDirty(failed: Dirty): void {
 // Set, replace, or clear (empty string) the incident note on one recorded
 // outage (#176), anchored by the app id + the record's exact start instant.
 // Notes live with the outage records in the history database — server-recorded
-// state, not config — so they don't travel with config export/import, same as
-// the outage history they annotate. Returns false when no record of `id`
+// state, not config. The config export bundles them anyway (exportOutageNotes,
+// #309), being the one part of the history no one can regenerate. Returns false when no record of `id`
 // starts at `startMs` (unknown app, a legacy pre-#175 entry, or a record that
 // aged out): there is nothing stable to anchor the note to. The caller flushes.
 export function setOutageNote(
@@ -543,6 +544,38 @@ export function setOutageNote(
   else rec.note = note;
   state.dirty.outages.add(id);
   return true;
+}
+
+// Every recorded outage that carries a note (#309), for the config export.
+export function exportOutageNotes(): BundledOutageNote[] {
+  const out: BundledOutageNote[] = [];
+  for (const [app, list] of state.outages) {
+    for (const o of list) if (o.note) out.push({ app, start: o.start, end: o.end, note: o.note });
+  }
+  return out;
+}
+
+// Restore exported notes (#309): onto the matching recorded outage when this
+// instance has it, else as the recorded outage itself, so a move to a new host
+// keeps the outage its note describes. Records past retention are skipped.
+// Returns how many landed; the caller flushes.
+export function importOutageNotes(notes: BundledOutageNote[], now = Date.now()): number {
+  const cutoff = now - RETENTION_HOURS * HOUR_MS;
+  let landed = 0;
+  for (const n of notes) {
+    if (n.end < cutoff) continue;
+    const list = state.outages.get(n.app) ?? [];
+    const rec = list.find((o) => o.start === n.start);
+    if (rec) rec.note = n.note;
+    else list.push({ start: n.start, end: n.end, note: n.note });
+    state.outages.set(
+      n.app,
+      list.sort((a, b) => a.start - b.start).slice(-MAX_OUTAGES)
+    );
+    state.dirty.outages.add(n.app);
+    landed++;
+  }
+  return landed;
 }
 
 // One app's stored data as plain arrays (empty when the id has none).

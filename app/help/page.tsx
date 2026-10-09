@@ -564,8 +564,10 @@ export default async function HelpPage() {
           </P>
           <P>
             Notes are stored with the recorded uptime history, not the
-            configuration, so they stay out of config export and import —
-            same as the outage history they annotate.
+            configuration, but config <strong>Export</strong> bundles them
+            with the outages they describe, and <strong>Import</strong> puts
+            them back, so a move to a new host keeps them. The rest of the
+            history starts over there.
           </P>
         </Card>
 
