@@ -64,6 +64,7 @@ export const CHECK_TYPES = [
   { key: "dns", label: "DNS" },
   { key: "icmp", label: "Ping (ICMP)" },
   { key: "json", label: "JSON query" },
+  { key: "push", label: "Push (heartbeat)" },
 ] as const;
 export type CheckType = (typeof CHECK_TYPES)[number]["key"];
 export const CHECK_TYPE_KEYS = CHECK_TYPES.map((c) => c.key) as [

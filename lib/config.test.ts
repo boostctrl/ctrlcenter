@@ -186,6 +186,18 @@ describe("read cache", () => {
 });
 
 describe("apps CRUD", () => {
+  it("mints a push token when an app switches to push, and keeps it (#294)", async () => {
+    const created = await config.createApp(appInput({ name: "Job", url: "https://job.test" }));
+    expect(created.pushToken).toBe("");
+    const pushed = await config.updateApp(created.id, { checkType: "push" });
+    expect(pushed.pushToken).toMatch(/^[\w-]{20,}$/);
+    await config.updateApp(created.id, { checkType: "http" });
+    const back = await config.updateApp(created.id, { checkType: "push" });
+    expect(back.pushToken).toBe(pushed.pushToken);
+    // Never handed to a public surface.
+    expect(config.stripSecrets(await config.readConfigInternal()).apps.find((a) => a.id === created.id)!.pushToken).toBe("");
+  });
+
   it("stores per-app check overrides, and null clears one back to the default (#292)", async () => {
     const created = await config.createApp(
       appInput({ name: "NAS", url: "https://nas.test", interval: 15, timeout: 10, retries: 2, port: 8080 })
@@ -851,6 +863,9 @@ describe("readConfigInternal stays off public surfaces", () => {
     // config to check the per-service token and to read the alert-channel
     // secrets it relays through. It never serializes config back to the caller.
     "app/api/hooks/[service]/route.ts",
+    // Public but token-gated push pings (#294): matches the per-app token,
+    // which only the unfiltered config carries. Answers with no config data.
+    "app/api/push/[token]/route.ts",
   ];
 
   it("only allowlisted files under app/ use the unfiltered read", async () => {

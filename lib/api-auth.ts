@@ -126,11 +126,12 @@ export async function readPublicConfig(request?: NextRequest): Promise<{
   const isAdmin = request
     ? await isAdminRequest(request, config.auth.passwordHash)
     : await isAdminSession(config.auth.passwordHash);
+  const safe = stripSecrets(stripAuth(config));
   return {
     config: {
-      ...stripSecrets(stripAuth(config)),
-      apps: visibleItems(config.apps, isAdmin),
-      bookmarks: visibleItems(config.bookmarks, isAdmin),
+      ...safe,
+      apps: visibleItems(safe.apps, isAdmin),
+      bookmarks: visibleItems(safe.bookmarks, isAdmin),
     },
     isAdmin,
   };

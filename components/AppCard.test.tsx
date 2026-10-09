@@ -25,6 +25,7 @@ const app: AppItem = {
   private: false,
   monitor: true,
   jsonQuery: "",
+  pushToken: "",
 };
 
 beforeEach(() => {

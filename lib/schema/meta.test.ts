@@ -3,6 +3,7 @@ import { z } from "zod";
 import { redactSecrets, secretFields } from "./meta";
 import { lenientItems } from "./shared";
 import { settingsSchema } from "./settings";
+import { appItemSchema } from "./apps-bookmarks";
 
 // Schema-driven redaction (#287).
 
@@ -33,7 +34,8 @@ function fields(schema: z.ZodType, path: string[] = [], covered = false): { path
 describe("secret marks", () => {
   it("cover every settings field that looks like a credential", () => {
     const credential = /(pass(word)?|token|apikey|secret|username|user)$/i;
-    const uncovered = fields(settingsSchema)
+    // Every settings and app field named like a credential.
+    const uncovered = [...fields(settingsSchema), ...fields(appItemSchema, ["apps[]"])]
       .filter((f) => credential.test(f.path.split(".").pop()!))
       .filter((f) => !f.covered)
       .map((f) => f.path);

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { CHECK_TYPE_KEYS } from "../status";
 import { httpUrl } from "./shared";
 import { parseJsonQuery } from "../json-query";
+import { secretFields } from "./meta";
 
 // A JSON query must parse (#294); an empty one is allowed while editing, and
 // fails the check until it's filled in.
@@ -31,6 +32,14 @@ export const appItemSchema = z.object({
   keyword: z.string().default(""),
   // The JSON query check's expression (#294), e.g. `$.status == "ok"`.
   jsonQuery: z.string().catch("").default(""),
+  // The push check's secret (#294): its URL is /api/push/<token>. Generated
+  // server-side when the app is switched to push, never taken from input, and
+  // redacted from public reads like any credential.
+  pushToken: z
+    .string()
+    .catch("")
+    .default("")
+    .register(secretFields, { redact: "blank" }),
   // Whether this app gets status checks at all (#296). Off = no dot, no
   // status-page row, no alerts; its history is kept for when it's back on.
   monitor: z.boolean().catch(true).default(true),

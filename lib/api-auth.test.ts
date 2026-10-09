@@ -32,6 +32,8 @@ const PUBLIC_ROUTES = [
   "app/api/logout/route.ts",
   // Inbound webhooks (#204): authenticated by a per-service URL token.
   "app/api/hooks/[service]/route.ts",
+  // Push checks (#294): authenticated by a per-app URL token.
+  "app/api/push/[token]/route.ts",
   // Icons render on the public dashboard; the /api/icons collection
   // (list/upload/delete) is not listed here and stays gated.
   "app/api/icons/[name]/route.ts",

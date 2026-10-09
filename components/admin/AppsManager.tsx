@@ -28,6 +28,7 @@ import { useConfirm } from "./Confirm";
 import { useRevealForm } from "./useRevealForm";
 import { guessCheckType, withHttpScheme } from "@/lib/urls";
 import { parseJsonQuery } from "@/lib/json-query";
+import { CopyUrlField, useOrigin } from "./CopyUrlField";
 import { apiErrorMessage } from "./apiError";
 
 type FormState = {
@@ -65,6 +66,26 @@ const emptyForm: FormState = {
   retries: "",
 };
 
+// A push-checked app's secret URL (#294), once the app is saved (the server
+// mints the token).
+function PushUrl({ token }: { token: string }) {
+  const origin = useOrigin();
+  if (!token) {
+    return <Hint>Save the app to get its push URL.</Hint>;
+  }
+  const url = origin ? `${origin}/api/push/${token}` : "";
+  return (
+    <div className="flex flex-col gap-2">
+      <CopyUrlField label="Push URL" ariaLabel="Push URL" url={url} />
+      <Hint>
+        Have your job call it each time it runs — e.g. <code>curl -fsS &lt;url&gt;</code> at
+        the end of a backup script — and set the interval under Advanced to how
+        often it runs. Missing a run plus a minute counts as down.
+      </Hint>
+    </div>
+  );
+}
+
 // One-line description of what each check method does, shown under the picker.
 function checkTypeHint(t: CheckType): string {
   switch (t) {
@@ -78,6 +99,8 @@ function checkTypeHint(t: CheckType): string {
       return "Pings the URL's host. Needs ICMP (NET_RAW) in containers.";
     case "json":
       return "Fetches the URL as JSON; up only if the query below holds.";
+    case "push":
+      return "Your job calls a secret URL each time it runs; up while those calls keep arriving.";
     case "http":
     default:
       return "Sends an HTTP request to the URL and checks the response code.";
@@ -190,8 +213,14 @@ export default function AppsManager({
       setApps((prev) =>
         wasEditing ? prev.map((a) => (a.id === wasEditing ? saved : a)) : [...prev, saved]
       );
-      resetForm();
-      toast(wasEditing ? "Application updated" : "Application added");
+      if (!wasEditing && saved.checkType === "push") {
+        // Stay on the new app so its freshly minted push URL shows (#294).
+        startEdit(saved);
+        toast("Application added — copy its push URL below");
+      } else {
+        resetForm();
+        toast(wasEditing ? "Application updated" : "Application added");
+      }
     } catch {
       toast("Failed to save", "error");
     } finally {
@@ -433,6 +462,10 @@ export default function AppsManager({
                     value={form.port}
                     onChange={(e) => setForm({ ...form, port: e.target.value })}
                   />
+                )}
+
+                {form.checkType === "push" && (
+                  <PushUrl token={apps.find((a) => a.id === editingId)?.pushToken ?? ""} />
                 )}
 
                 {form.checkType === "json" && (

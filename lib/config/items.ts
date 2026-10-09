@@ -1,6 +1,7 @@
 // Apps and bookmarks: create, update, delete, restore, reorder, and the
 // bookmark category rename (#290 split).
 import type { AppItem, BookmarkItem } from "../schema";
+import { newPushToken } from "../push";
 import { mutate, readConfigInternal, NotFoundError } from "./store";
 
 // zod's .partial() can produce own keys with an explicit `undefined` value
@@ -16,9 +17,18 @@ export async function listApps(): Promise<AppItem[]> {
   return (await readConfigInternal()).apps;
 }
 
-export async function createApp(input: Omit<AppItem, "id">): Promise<AppItem> {
+// A push-checked app needs its secret URL token (#294); mint one the first
+// time it's set to push, and keep it after (so a cron job's URL survives
+// edits and switching away and back).
+function withPushToken(app: AppItem): AppItem {
+  return app.checkType === "push" && !app.pushToken ? { ...app, pushToken: newPushToken() } : app;
+}
+
+export async function createApp(
+  input: Omit<AppItem, "id" | "pushToken">
+): Promise<AppItem> {
   return mutate((config) => {
-    const item: AppItem = { ...input, id: crypto.randomUUID() };
+    const item = withPushToken({ ...input, id: crypto.randomUUID(), pushToken: "" });
     config.apps.push(item);
     return item;
   });
@@ -26,7 +36,7 @@ export async function createApp(input: Omit<AppItem, "id">): Promise<AppItem> {
 
 // The optional app fields an update can clear by sending null.
 type Clearable = "port" | "interval" | "timeout" | "retries";
-export type AppUpdate = Partial<Omit<AppItem, "id" | Clearable>> & {
+export type AppUpdate = Partial<Omit<AppItem, "id" | "pushToken" | Clearable>> & {
   [K in Clearable]?: AppItem[K] | null;
 };
 
@@ -37,7 +47,7 @@ export async function updateApp(id: string, input: AppUpdate): Promise<AppItem> 
     const next: Record<string, unknown> = { ...config.apps[idx], ...withoutUndefined(input) };
     // null means "back to the default": drop the key.
     for (const [k, v] of Object.entries(next)) if (v === null) delete next[k];
-    config.apps[idx] = next as AppItem;
+    config.apps[idx] = withPushToken(next as AppItem);
     return config.apps[idx];
   });
 }

@@ -408,3 +408,30 @@ describe("checkApp · json (#294)", () => {
     expect((await checkApp(json('$.status == "ok"', "200-299"))).up).toBe(false);
   });
 });
+
+describe("checkApp · push (#294)", () => {
+  const push = (interval?: number) => ({
+    ...base,
+    id: "job",
+    url: "https://job.test",
+    checkType: "push" as const,
+    interval,
+  });
+
+  it("is up while the last ping is within the interval plus a minute", async () => {
+    const { recordPush, resetPushState } = await import("./push");
+    resetPushState(0);
+    recordPush("job", Date.now() - 5 * 60_000);
+    expect((await checkApp(push(), { intervalMinutes: 5 })).up).toBe(true);
+    recordPush("job", Date.now() - 7 * 60_000);
+    expect((await checkApp(push(), { intervalMinutes: 5 })).up).toBe(false);
+    // The app's own interval wins.
+    expect((await checkApp(push(10), { intervalMinutes: 5 })).up).toBe(true);
+  });
+
+  it("gives a fresh process one grace window before the first ping", async () => {
+    const { resetPushState } = await import("./push");
+    resetPushState(Date.now());
+    expect((await checkApp(push(), { intervalMinutes: 5 })).up).toBe(true);
+  });
+});

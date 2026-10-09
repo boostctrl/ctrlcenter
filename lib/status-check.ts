@@ -4,6 +4,7 @@ import { execFile } from "node:child_process";
 import { matchesStatus, type AppStatus } from "./status";
 import { readCapped, timeoutSignal } from "./fetch-body";
 import { evaluateJsonQuery, parseJsonQuery } from "./json-query";
+import { lastPushAt } from "./push";
 import type { AppItem } from "./schema";
 
 // A check's time budget when the app doesn't set its own `timeout` (#292).
@@ -22,9 +23,16 @@ const KEYWORD_MAX_BYTES = 2 * 1024 * 1024;
 // evaluate reachability identically.
 type CheckInput = Pick<
   AppItem,
-  "url" | "expectStatus" | "checkType" | "port" | "keyword" | "timeout" | "retries"
+  "url" | "expectStatus" | "checkType" | "port" | "keyword" | "timeout" | "retries" | "interval"
 > &
-  Partial<Pick<AppItem, "jsonQuery">>;
+  Partial<Pick<AppItem, "jsonQuery" | "id">>;
+
+// What a check can't read off the app itself.
+export type CheckContext = {
+  // The interval (minutes) the app is checked on, for the push check's grace
+  // period. Defaults to the global default.
+  intervalMinutes?: number;
+};
 
 // The app's time budget for one attempt.
 const timeoutOf = (app: CheckInput): number =>
@@ -56,7 +64,9 @@ export const CHECK_CONCURRENCY = 8;
 // A failed attempt is retried up to `retries` times (#292) before it counts:
 // the reported result is the first success, or the last failure. `ms` is that
 // attempt's own time, so a retry doesn't inflate the latency figures.
-export async function checkApp(app: CheckInput): Promise<AppStatus> {
+export async function checkApp(app: CheckInput, ctx: CheckContext = {}): Promise<AppStatus> {
+  // A push check reads what has arrived, so there's nothing to retry.
+  if (app.checkType === "push") return checkPush(app, ctx);
   const attempts = 1 + (app.retries ?? 0);
   let result = await checkOnce(app);
   for (let i = 1; i < attempts && !result.up; i++) {
@@ -64,6 +74,15 @@ export async function checkApp(app: CheckInput): Promise<AppStatus> {
     result = await checkOnce(app);
   }
   return result;
+}
+
+// Push (#294): up while the last ping to the app's secret URL is within its
+// interval plus a minute of slack — set the interval to how often the job
+// runs. There's no request to time, so `ms` is 0.
+function checkPush(app: CheckInput, ctx: CheckContext): AppStatus {
+  const sinceMs = Date.now() - lastPushAt(app.id ?? "");
+  const graceMs = ((app.interval ?? ctx.intervalMinutes ?? 5) + 1) * 60_000;
+  return { up: sinceMs <= graceMs, status: null, ms: 0 };
 }
 
 function checkOnce(app: CheckInput): Promise<AppStatus> {

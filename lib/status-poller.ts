@@ -52,7 +52,7 @@ export async function tick(): Promise<void> {
     const results: StatusResult[] = await mapLimit(
       due,
       CHECK_CONCURRENCY,
-      async (app) => ({ id: app.id, ...(await checkApp(app)) })
+      async (app) => ({ id: app.id, ...(await checkApp(app, { intervalMinutes: globalMinutes })) })
     );
     // Capture the prior per-app state before recording this tick, so alert
     // seeding on first run reflects the previous reading, not the current one.

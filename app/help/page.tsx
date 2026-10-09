@@ -484,6 +484,12 @@ export default async function HelpPage() {
               <code>$.queue.depth &lt; 50</code>. Without a comparison the
               field only has to be present and truthy.
             </li>
+            <li>
+              <strong>Push (heartbeat).</strong> For cron jobs and backups:
+              the app gets a secret URL that your job calls each time it runs
+              (<code>curl -fsS</code> is enough), and it counts as down when a
+              run is missed. Set its interval to how often the job runs.
+            </li>
           </ul>
           <P>
             A background poller records history on its own schedule, so uptime

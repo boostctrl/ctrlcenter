@@ -30,6 +30,12 @@ here.
   checks one field — `$.status == "ok"`, `$.queue.depth < 50`, or just
   `$.healthy` — so an app whose health endpoint answers but reports a
   problem counts as down. (#294)
+- **Push (heartbeat) checks** for cron jobs, backups and anything else that
+  runs on a schedule. The app gets a secret URL that the job calls each time
+  it runs (`curl -fsS <url>` is enough); when a run is missed, the app counts
+  as down and alerts fire like for any other outage. Set the app's interval to
+  how often the job runs. The URL is shown in the app form and never on a
+  public page. (#294)
 
 ### Fixed
 

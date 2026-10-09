@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
       at: Date.now(),
       results: await mapLimit(missing, CHECK_CONCURRENCY, async (app) => ({
         id: app.id,
-        ...(await checkApp(app)),
+        ...(await checkApp(app, { intervalMinutes: globalMinutes })),
       })),
     }));
     for (const r of probe?.results ?? []) byId.set(r.id, r);
