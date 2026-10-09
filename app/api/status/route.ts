@@ -3,9 +3,9 @@ import { readConfigInternal } from "@/lib/config";
 import { isAdminRequest, visibleItems } from "@/lib/api-auth";
 import { checkApp, checkSignature, CHECK_CONCURRENCY } from "@/lib/status-check";
 import { mapLimit } from "@/lib/concurrency";
-import { latestRound, type StatusRound } from "@/lib/status-latest";
+import { latestCheck } from "@/lib/status-latest";
 import { swrCache } from "@/lib/swr-cache";
-import type { StatusResponse } from "@/lib/status";
+import type { StatusResponse, StatusResult } from "@/lib/status";
 
 // Public endpoint (not behind the admin proxy) the dashboard polls to render
 // online/offline dots. It only ever pings the admin-configured app URLs, never
@@ -13,19 +13,20 @@ import type { StatusResponse } from "@/lib/status";
 // shown on the page.
 export const dynamic = "force-dynamic";
 
-// The background poller (lib/status-poller.ts) already checks every app on the
-// configured interval, so this endpoint serves its latest round instead of
-// probing on a second schedule (#278). It only probes on demand for what the
-// round can't answer: apps added since it ran, or everything when there's no
-// current round (just after boot, or a poller that has stopped ticking).
+// The background poller (lib/status-poller.ts) already checks every app on its
+// interval, so this endpoint serves each app's latest check instead of probing
+// on a second schedule (#278). It only probes on demand for what those can't
+// answer: apps added or edited since, or with no current check (just after
+// boot, or a poller that has stopped ticking).
 //
 // Those probes are cached briefly — the endpoint is public, so repeated or
 // abusive calls within the window are served from cache instead of
 // re-pinging, capping the outbound amplification.
 const PROBE_TTL_MS = 30_000;
-const probes = swrCache<StatusRound>("status-probe", PROBE_TTL_MS);
-// A round older than two intervals (plus a minute for a slow round) means the
-// poller isn't keeping up, so its readings no longer count as current.
+type Probe = { at: number; results: StatusResult[] };
+const probes = swrCache<Probe>("status-probe", PROBE_TTL_MS);
+// A check older than two of its app's intervals (plus a minute for a slow
+// round) means the poller isn't keeping up, so it no longer counts as current.
 const POLL_SLACK_MS = 60_000;
 
 // The response now varies with the caller's session (private apps are filtered
@@ -47,18 +48,27 @@ export async function GET(request: NextRequest) {
       (a) => a.id
     )
   );
-  const intervalMs = (settings.statusInterval ?? 5) * 60_000;
-  const round = latestRound();
-  const current =
-    round && Date.now() - round.at <= 2 * intervalMs + POLL_SLACK_MS ? round : null;
+  const globalMinutes = settings.statusInterval ?? 5;
+  const now = Date.now();
   // Every app's result, visibility aside: a probe filled by an anonymous
   // caller still serves a later admin request in full.
-  const byId = new Map((current?.results ?? []).map((r) => [r.id, r]));
-  // Apps the round has no result for, or checked against a since-edited URL.
-  const missing = apps.filter(
-    (a) => !byId.has(a.id) || current?.signatures[a.id] !== checkSignature(a)
-  );
-  let checkedAt = current?.at ?? Date.now();
+  const byId = new Map<string, StatusResult>();
+  let checkedAt = now;
+  const missing: typeof apps = [];
+  for (const app of apps) {
+    const c = latestCheck(app.id);
+    const current =
+      c &&
+      c.signature === checkSignature(app) &&
+      now - c.at <= 2 * (app.interval ?? globalMinutes) * 60_000 + POLL_SLACK_MS;
+    if (current) {
+      byId.set(app.id, c.result);
+      // The response's "checked at" is its oldest result the caller sees.
+      if (ids.has(app.id)) checkedAt = Math.min(checkedAt, c.at);
+    } else {
+      missing.push(app);
+    }
+  }
   if (missing.length > 0) {
     // Keyed by what's probed, so concurrent callers share one round of checks
     // and an edit gets a fresh probe.
@@ -69,10 +79,9 @@ export async function GET(request: NextRequest) {
         id: app.id,
         ...(await checkApp(app)),
       })),
-      signatures: Object.fromEntries(missing.map((a) => [a.id, checkSignature(a)])),
     }));
     for (const r of probe?.results ?? []) byId.set(r.id, r);
-    if (probe) checkedAt = current ? Math.min(current.at, probe.at) : probe.at;
+    if (probe) checkedAt = Math.min(checkedAt, probe.at);
   }
 
   const body: StatusResponse = {

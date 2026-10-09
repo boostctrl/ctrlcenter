@@ -8,7 +8,7 @@ import {
   pruneHistory,
 } from "./status-history";
 import { mapLimit } from "./concurrency";
-import { publishRound } from "./status-latest";
+import { publishChecks } from "./status-latest";
 import { processAlerts } from "./alerts";
 import { log, errorReason } from "./log";
 import type { StatusResult } from "./status";
@@ -18,13 +18,16 @@ import type { StatusResult } from "./status";
 // looking. Started once from instrumentation.ts.
 
 let started = false;
-let lastRun = 0;
+// When each app was last checked (epoch ms). Each app runs on its own interval
+// (#292), so a tick checks only the apps that are due; after a restart every
+// app is due at once.
+const lastChecked = new Map<string, number>();
 
 const TICK_MS = 60_000;
 const FIRST_DELAY_MS = 8_000;
 
-// Re-reads config every tick so changing the interval (or toggling status checks)
-// takes effect without restarting the timer. Exported for tests.
+// Re-reads config every tick so changing an interval (or toggling status
+// checks) takes effect without restarting the timer. Exported for tests.
 export async function tick(): Promise<void> {
   try {
     // Recording into a store that hasn't loaded yet would let the next flush
@@ -32,26 +35,39 @@ export async function tick(): Promise<void> {
     await loadHistory();
     const { settings, apps } = await readConfigInternal();
     if (!settings.statusChecks || apps.length === 0) return;
-    const intervalMs = (settings.statusInterval ?? 5) * 60_000;
-    if (Date.now() - lastRun < intervalMs) return;
-    lastRun = Date.now(); // claim the slot before the awaits to avoid re-entry
+    const globalMinutes = settings.statusInterval ?? 5;
+    const now = Date.now();
+    // An app is due once its interval (its own, else the global one) has
+    // passed since its last check. A tick is a minute, the smallest interval.
+    const due = apps.filter(
+      (a) => now - (lastChecked.get(a.id) ?? 0) >= (a.interval ?? globalMinutes) * 60_000
+    );
+    if (due.length === 0) return;
+    // Claim the slots before the awaits, so a slow round can't be re-entered.
+    for (const a of due) lastChecked.set(a.id, now);
     const results: StatusResult[] = await mapLimit(
-      apps,
+      due,
       CHECK_CONCURRENCY,
       async (app) => ({ id: app.id, ...(await checkApp(app)) })
     );
     // Capture the prior per-app state before recording this tick, so alert
     // seeding on first run reflects the previous reading, not the current one.
     const prior = lastReadings(apps.map((a) => a.id));
-    recordResults(results, lastRun);
-    // /api/status serves this round rather than re-probing every app (#278).
-    publishRound({
-      at: lastRun,
-      results,
-      signatures: Object.fromEntries(apps.map((a) => [a.id, checkSignature(a)])),
-    });
+    recordResults(results, now);
+    // /api/status serves these rather than re-probing every app (#278).
+    const byId = new Map(due.map((a) => [a.id, a]));
+    publishChecks(
+      results.map((result) => ({
+        result,
+        at: now,
+        signature: checkSignature(byId.get(result.id)!),
+      })),
+      apps.map((a) => a.id)
+    );
     // Drop the history of apps that no longer exist, so a deleted app's
-    // buckets, outages and readings don't ride along in every flush forever.
+    // buckets, outages and readings don't ride along forever.
+    const ids = new Set(apps.map((a) => a.id));
+    for (const id of lastChecked.keys()) if (!ids.has(id)) lastChecked.delete(id);
     pruneHistory(apps.map((a) => a.id));
     await flush();
     await processAlerts(results, apps, settings.alerts, prior);

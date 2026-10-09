@@ -38,6 +38,10 @@ type FormState = {
   checkType: CheckType;
   port: string;
   keyword: string;
+  // Per-app check overrides (#292); "" = the global setting.
+  interval: string;
+  timeout: string;
+  retries: string;
 };
 const emptyForm: FormState = {
   name: "",
@@ -49,6 +53,9 @@ const emptyForm: FormState = {
   checkType: "http",
   port: "",
   keyword: "",
+  interval: "",
+  timeout: "",
+  retries: "",
 };
 
 // One-line description of what each check method does, shown under the picker.
@@ -81,11 +88,14 @@ function modeFromExpect(v: string): UpMode {
 export default function AppsManager({
   initialApps,
   statusChecksEnabled,
+  statusInterval,
 }: {
   initialApps: AppItem[];
   // From the server-rendered settings; toggling checks this session updates on
   // reload, like the nav flags.
   statusChecksEnabled: boolean;
+  // The global check interval (minutes), shown as the per-app default.
+  statusInterval: number;
 }) {
   const [apps, setApps] = useState(initialApps);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -108,6 +118,9 @@ export default function AppsManager({
       checkType: app.checkType ?? "http",
       port: app.port != null ? String(app.port) : "",
       keyword: app.keyword ?? "",
+      interval: app.interval != null ? String(app.interval) : "",
+      timeout: app.timeout != null ? String(app.timeout) : "",
+      retries: app.retries != null ? String(app.retries) : "",
     });
     setUpMode(modeFromExpect(app.expectStatus ?? ""));
     revealForm();
@@ -125,8 +138,11 @@ export default function AppsManager({
     try {
       // Only send the fields relevant to the chosen check method; clear the
       // others (so switching method doesn't leave a stale keyword/expectStatus
-      // applying). `port` is sent as a number only when a TCP/DNS port was
-      // entered.
+      // applying). Optional numbers go as numbers when entered; a blank one is
+      // sent as null when editing, which clears it back to the default (an
+      // omitted field would keep the stored value).
+      const optionalNumber = (v: string, applies = true) =>
+        applies && v.trim() ? Number(v) : editingId ? null : undefined;
       const payload = {
         name: form.name,
         subtitle: form.subtitle,
@@ -136,10 +152,10 @@ export default function AppsManager({
         checkType: form.checkType,
         expectStatus: form.checkType === "http" ? form.expectStatus : "",
         keyword: form.checkType === "keyword" ? form.keyword : "",
-        ...((form.checkType === "tcp" || form.checkType === "dns") &&
-        form.port.trim()
-          ? { port: Number(form.port) }
-          : {}),
+        port: optionalNumber(form.port, form.checkType === "tcp" || form.checkType === "dns"),
+        interval: optionalNumber(form.interval),
+        timeout: optionalNumber(form.timeout),
+        retries: optionalNumber(form.retries),
       };
       const res = await fetch(editingId ? `/api/apps/${editingId}` : "/api/apps", {
         method: editingId ? "PUT" : "POST",
@@ -441,6 +457,50 @@ export default function AppsManager({
                 </Hint>
               </div>
             )}
+            {/* Per-app overrides of the global check settings (#292), tucked
+                away: the defaults suit almost every app. */}
+            <details
+              className="rounded-lg border border-fg/10 px-3 py-2"
+              open={Boolean(form.interval || form.timeout || form.retries)}
+            >
+              <summary className="cursor-pointer text-sm text-ink-70 select-none">
+                Advanced check settings
+              </summary>
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <TextField
+                  label="Interval (min)"
+                  type="number"
+                  min={1}
+                  max={60}
+                  placeholder={`${statusInterval} (default)`}
+                  value={form.interval}
+                  onChange={(e) => setForm({ ...form, interval: e.target.value })}
+                />
+                <TextField
+                  label="Timeout (s)"
+                  type="number"
+                  min={1}
+                  max={60}
+                  placeholder="5 (default)"
+                  value={form.timeout}
+                  onChange={(e) => setForm({ ...form, timeout: e.target.value })}
+                />
+                <TextField
+                  label="Retries"
+                  type="number"
+                  min={0}
+                  max={5}
+                  placeholder="0 (default)"
+                  value={form.retries}
+                  onChange={(e) => setForm({ ...form, retries: e.target.value })}
+                />
+              </div>
+              <Hint>
+                How often this app is checked, how long a check may take, and how
+                many quick re-tries a failed check gets before it counts as down.
+                Leave blank to use the defaults.
+              </Hint>
+            </details>
             <div className="flex gap-2">
               <Button type="submit" disabled={saving}>
                 {editingId ? "Save changes" : "Add"}

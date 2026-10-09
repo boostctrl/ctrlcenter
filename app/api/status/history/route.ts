@@ -26,14 +26,19 @@ export async function GET(request: NextRequest) {
   await loadHistory();
   const tz = request.nextUrl.searchParams.get("tz") ?? "";
   const timeZone = isValidTimeZone(tz) ? tz : "UTC";
-  // The poll cadence caps how long a 1h reading holds in the timeline. History
+  // Each app's poll cadence caps how long its 1h reading holds in the
+  // timeline (its own interval, else the global one, #292). History
   // is recorded for every app; only the caller's visible ids are read out.
   const visible = visibleItems(
     apps,
     await isAdminRequest(request, auth.passwordHash)
   );
   return NextResponse.json(
-    getHistory(visible.map((a) => a.id), timeZone, settings.statusInterval),
+    getHistory(
+      visible.map((a) => a.id),
+      timeZone,
+      (id) => visible.find((a) => a.id === id)?.interval ?? settings.statusInterval
+    ),
     { headers: NO_SHARED_CACHE }
   );
 }

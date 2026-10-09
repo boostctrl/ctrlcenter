@@ -36,7 +36,11 @@ export async function GET(
   const timeZone = isValidTimeZone(tz) ? tz : "UTC";
   const body: StatusDetailResponse = {
     generatedAt: Date.now(),
-    app: getAppDetail(id, timeZone, settings.statusInterval),
+    app: getAppDetail(
+      id,
+      timeZone,
+      apps.find((a) => a.id === id)?.interval ?? settings.statusInterval
+    ),
   };
   return NextResponse.json(body, { headers: NO_SHARED_CACHE });
 }

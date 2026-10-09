@@ -12,6 +12,19 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Check settings per app.** Under *Advanced check settings* in an app's
+  form you can give it its own check interval, a longer timeout for a slow
+  service (the default is still 5 seconds), and a few quick retries so a brief
+  blip doesn't paint the timeline red or set off an alert. Leave them blank to
+  use the defaults. (#292)
+
+### Fixed
+
+- Clearing an app's TCP or DNS port in the admin portal now actually removes
+  it, rather than keeping the old one. (#292)
+
 ## [2.12.0] - 2026-10-09
 
 ### Changed

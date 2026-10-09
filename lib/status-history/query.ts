@@ -68,17 +68,17 @@ function appHistory(
 // Every strip is TIMELINE_BARS long — the 1h view resamples the raw ring, the
 // day-scale views resample the hourly buckets — so all four ranges draw an
 // identically-sized heartbeat.
+// `intervalMinutes` may vary per app (#292).
 export function getHistory(
   ids: string[],
   timeZone = "UTC",
-  intervalMinutes = 5
+  intervalMinutes: number | ((id: string) => number) = 5
 ): StatusHistory {
   const now = Date.now();
+  const intervalOf = typeof intervalMinutes === "function" ? intervalMinutes : () => intervalMinutes;
   return {
     generatedAt: now,
-    apps: ids.map((id) =>
-      appHistory(id, now, timeZone, intervalMinutes, TIMELINE_BARS)
-    ),
+    apps: ids.map((id) => appHistory(id, now, timeZone, intervalOf(id), TIMELINE_BARS)),
   };
 }
 

@@ -486,6 +486,13 @@ export default async function HelpPage() {
             recovered, and each service&apos;s detail page lists them for 90
             days.
           </P>
+          <P>
+            Every app is checked on the interval set in{" "}
+            <strong>Settings → Monitoring</strong>. Under{" "}
+            <strong>Advanced check settings</strong> in an app&apos;s form you can
+            give it its own interval, a longer timeout for a slow service, and a
+            few quick retries so a brief blip doesn&apos;t count as an outage.
+          </P>
         </Card>
 
         <Card title="The Monitor page">

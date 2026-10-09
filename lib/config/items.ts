@@ -24,14 +24,20 @@ export async function createApp(input: Omit<AppItem, "id">): Promise<AppItem> {
   });
 }
 
-export async function updateApp(
-  id: string,
-  input: Partial<Omit<AppItem, "id">>
-): Promise<AppItem> {
+// The optional app fields an update can clear by sending null.
+type Clearable = "port" | "interval" | "timeout" | "retries";
+export type AppUpdate = Partial<Omit<AppItem, "id" | Clearable>> & {
+  [K in Clearable]?: AppItem[K] | null;
+};
+
+export async function updateApp(id: string, input: AppUpdate): Promise<AppItem> {
   return mutate((config) => {
     const idx = config.apps.findIndex((a) => a.id === id);
     if (idx === -1) throw new NotFoundError("App not found");
-    config.apps[idx] = { ...config.apps[idx], ...withoutUndefined(input) };
+    const next: Record<string, unknown> = { ...config.apps[idx], ...withoutUndefined(input) };
+    // null means "back to the default": drop the key.
+    for (const [k, v] of Object.entries(next)) if (v === null) delete next[k];
+    config.apps[idx] = next as AppItem;
     return config.apps[idx];
   });
 }

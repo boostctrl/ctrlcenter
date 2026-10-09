@@ -186,6 +186,20 @@ describe("read cache", () => {
 });
 
 describe("apps CRUD", () => {
+  it("stores per-app check overrides, and null clears one back to the default (#292)", async () => {
+    const created = await config.createApp(
+      appInput({ name: "NAS", url: "https://nas.test", interval: 15, timeout: 10, retries: 2, port: 8080 })
+    );
+    expect(created).toMatchObject({ interval: 15, timeout: 10, retries: 2, port: 8080 });
+    // An omitted field keeps its value; null removes it.
+    const updated = await config.updateApp(created.id, { interval: null, port: null, retries: 3 });
+    expect(updated.interval).toBeUndefined();
+    expect(updated.port).toBeUndefined();
+    expect(updated).toMatchObject({ timeout: 10, retries: 3 });
+    const stored = (await config.listApps()).find((a) => a.id === created.id)!;
+    expect("interval" in stored).toBe(false);
+  });
+
   it("creates an app with a generated id and persists it", async () => {
     const created = await config.createApp(appInput({
       name: "Plex",

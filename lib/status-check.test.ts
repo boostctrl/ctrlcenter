@@ -313,3 +313,64 @@ describe("checkApp · dns", () => {
     expect(resolver).not.toHaveBeenCalled();
   });
 });
+
+describe("checkApp · per-app timeout and retries (#292)", () => {
+  it("retries a failed check and reports the first success", async () => {
+    vi.useFakeTimers();
+    try {
+      // The first attempt fails outright (HEAD, then its GET fallback); the
+      // retry's HEAD answers.
+      const spy = vi
+        .spyOn(globalThis, "fetch")
+        .mockRejectedValueOnce(new Error("blip"))
+        .mockRejectedValueOnce(new Error("blip"))
+        .mockResolvedValue(new Response("", { status: 200 }));
+      const pending = checkApp({ ...base, url: "https://x.example", checkType: "http", retries: 2 });
+      await vi.runAllTimersAsync();
+      expect((await pending).up).toBe(true);
+      expect(spy).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("stops after its retries and reports the last failure", async () => {
+    vi.useFakeTimers();
+    try {
+      const spy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("down"));
+      const pending = checkApp({ ...base, url: "https://x.example", checkType: "http", retries: 2 });
+      await vi.runAllTimersAsync();
+      expect((await pending).up).toBe(false);
+      // Each attempt is a HEAD plus its GET fallback; three attempts.
+      expect(spy).toHaveBeenCalledTimes(6);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("doesn't retry without retries set", async () => {
+    const spy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("down"));
+    await checkApp({ ...base, url: "https://x.example", checkType: "http" });
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives up at the app's own timeout", async () => {
+    // A server that accepts and never answers.
+    const server = net.createServer(() => {});
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+    const { port } = server.address() as net.AddressInfo;
+    try {
+      const started = Date.now();
+      const r = await checkApp({
+        ...base,
+        url: `http://127.0.0.1:${port}/`,
+        checkType: "http",
+        timeout: 1,
+      });
+      expect(r.up).toBe(false);
+      expect(Date.now() - started).toBeLessThan(3000);
+    } finally {
+      server.close();
+    }
+  });
+});

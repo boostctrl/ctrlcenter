@@ -22,6 +22,14 @@ export const appItemSchema = z.object({
   checkType: z.enum(CHECK_TYPE_KEYS).catch("http").default("http"),
   port: z.number().int().min(1).max(65535).optional(),
   keyword: z.string().default(""),
+  // Per-app check overrides (#292); absent = the global setting. `interval`
+  // (minutes) replaces the global status interval, `timeout` (seconds) the
+  // 5-second default, and `retries` re-attempts a failed check that many times
+  // within one poll before it counts as down. Out-of-range hand edits drop
+  // back to the global value rather than failing the load.
+  interval: z.number().int().min(1).max(60).optional().catch(undefined),
+  timeout: z.number().int().min(1).max(60).optional().catch(undefined),
+  retries: z.number().int().min(0).max(5).optional().catch(undefined),
   // Render only for the admin session; readPublicConfig() (lib/api-auth.ts)
   // filters flagged items out of every public surface. Monitoring and alerts
   // ignore the flag.
@@ -53,6 +61,9 @@ export const appInputSchema = z.object({
   checkType: z.enum(CHECK_TYPE_KEYS).optional().default("http"),
   port: z.number().int().min(1).max(65535).optional(),
   keyword: z.string().optional().default(""),
+  interval: z.number().int().min(1).max(60).optional(),
+  timeout: z.number().int().min(1).max(60).optional(),
+  retries: z.number().int().min(0).max(5).optional(),
   private: z.boolean().optional().default(false),
 });
 
@@ -71,8 +82,13 @@ export const appUpdateSchema = z.object({
   icon: z.string().optional(),
   expectStatus: z.string().optional(),
   checkType: z.enum(CHECK_TYPE_KEYS).optional(),
-  port: z.number().int().min(1).max(65535).optional(),
+  // null clears an optional setting back to its default (an omitted field
+  // keeps the stored value, since updates merge).
+  port: z.number().int().min(1).max(65535).nullable().optional(),
   keyword: z.string().optional(),
+  interval: z.number().int().min(1).max(60).nullable().optional(),
+  timeout: z.number().int().min(1).max(60).nullable().optional(),
+  retries: z.number().int().min(0).max(5).nullable().optional(),
   private: z.boolean().optional(),
 });
 

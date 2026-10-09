@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 // record → prune → flush → alert steps. Every collaborator is mocked.
 const calls: string[] = [];
 let settings: { statusChecks: boolean; statusInterval?: number; alerts: object };
-let apps: { id: string }[];
+let apps: { id: string; interval?: number }[];
 
 vi.mock("./config", () => ({
   readConfigInternal: vi.fn(async () => ({ settings, apps })),
@@ -38,7 +38,7 @@ vi.mock("./log", () => ({
 }));
 
 let tick: () => Promise<void>;
-let latestRound: typeof import("./status-latest").latestRound;
+let latestCheck: typeof import("./status-latest").latestCheck;
 
 beforeEach(async () => {
   vi.useFakeTimers();
@@ -47,9 +47,11 @@ beforeEach(async () => {
   warn.mockClear();
   settings = { statusChecks: true, statusInterval: 5, alerts: {} };
   apps = [{ id: "a" }, { id: "b" }];
-  vi.resetModules(); // fresh lastRun per test
+  vi.resetModules(); // fresh per-app schedule per test
   ({ tick } = await import("./status-poller"));
-  ({ latestRound } = await import("./status-latest"));
+  const latest = await import("./status-latest");
+  latest.clearLatestChecks();
+  ({ latestCheck } = latest);
 });
 
 afterEach(() => {
@@ -79,16 +81,24 @@ describe("status poller tick", () => {
     ]);
   });
 
-  it("publishes the round for /api/status to serve (#278)", async () => {
+  it("publishes each check for /api/status to serve (#278)", async () => {
     await tick();
-    expect(latestRound()).toEqual({
+    expect(latestCheck("a")).toEqual({
+      result: { id: "a", up: true, status: 200, ms: 5 },
       at: Date.now(),
-      results: [
-        { id: "a", up: true, status: 200, ms: 5 },
-        { id: "b", up: true, status: 200, ms: 5 },
-      ],
-      signatures: { a: "sig:a", b: "sig:b" },
+      signature: "sig:a",
     });
+  });
+
+  it("checks each app on its own interval (#292)", async () => {
+    apps = [{ id: "a" }, { id: "b", interval: 1 }];
+    await tick();
+    expect(calls.filter((c) => c.startsWith("check:"))).toEqual(["check:a", "check:b"]);
+    calls.length = 0;
+    vi.advanceTimersByTime(60_000);
+    await tick();
+    // Only b's 1-minute interval has passed; a waits out the global 5.
+    expect(calls.filter((c) => c.startsWith("check:"))).toEqual(["check:b"]);
   });
 
   it("waits out the configured interval between rounds", async () => {

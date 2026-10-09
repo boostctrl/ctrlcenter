@@ -5,7 +5,11 @@ import { matchesStatus, type AppStatus } from "./status";
 import { readCapped, timeoutSignal } from "./fetch-body";
 import type { AppItem } from "./schema";
 
-const TIMEOUT_MS = 5000;
+// A check's time budget when the app doesn't set its own `timeout` (#292).
+export const DEFAULT_TIMEOUT_MS = 5000;
+// Pause between a failed attempt and its retry, so a brief blip (a restarting
+// container, a dropped packet) has a moment to clear.
+const RETRY_DELAY_MS = 1000;
 // Keyword checks read the body; cap what gets buffered so a check pointed at a
 // huge response (say, a download URL instead of a landing page) can't spike the
 // Node heap on every poll. The keyword is expected in page HTML, so 2 MB is
@@ -17,8 +21,12 @@ const KEYWORD_MAX_BYTES = 2 * 1024 * 1024;
 // evaluate reachability identically.
 type CheckInput = Pick<
   AppItem,
-  "url" | "expectStatus" | "checkType" | "port" | "keyword"
+  "url" | "expectStatus" | "checkType" | "port" | "keyword" | "timeout" | "retries"
 >;
+
+// The app's time budget for one attempt.
+const timeoutOf = (app: CheckInput): number =>
+  app.timeout ? app.timeout * 1000 : DEFAULT_TIMEOUT_MS;
 
 // What a check depends on, as a string: equal signatures mean a stored result
 // still describes the app as configured now (#278).
@@ -35,7 +43,21 @@ export const CHECK_CONCURRENCY = 8;
 // returns the same { up, status, ms } shape and treats a timeout/error as down.
 // `status` carries the HTTP code for http/keyword checks and is null for the
 // transport/name/ping checks (which have no HTTP code).
+//
+// A failed attempt is retried up to `retries` times (#292) before it counts:
+// the reported result is the first success, or the last failure. `ms` is that
+// attempt's own time, so a retry doesn't inflate the latency figures.
 export async function checkApp(app: CheckInput): Promise<AppStatus> {
+  const attempts = 1 + (app.retries ?? 0);
+  let result = await checkOnce(app);
+  for (let i = 1; i < attempts && !result.up; i++) {
+    await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+    result = await checkOnce(app);
+  }
+  return result;
+}
+
+function checkOnce(app: CheckInput): Promise<AppStatus> {
   switch (app.checkType) {
     case "tcp":
       return checkTcp(app);
@@ -61,10 +83,10 @@ export async function checkApp(app: CheckInput): Promise<AppStatus> {
 // we must read the body (always GET) and also require the keyword to appear in
 // it — catching "up but broken" pages.
 async function checkHttp(app: CheckInput, keyword: string): Promise<AppStatus> {
-  const signal = timeoutSignal(TIMEOUT_MS);
+  const signal = timeoutSignal(timeoutOf(app));
   const start = Date.now();
   // Shared across the HEAD and its GET fallback so the whole check stays within
-  // one TIMEOUT_MS budget.
+  // one time budget.
   const opts = { redirect: "manual" as const, signal };
   try {
     if (keyword) {
@@ -157,7 +179,7 @@ function checkTcp(app: CheckInput): Promise<AppStatus> {
       socket.destroy();
       resolve({ up, status: null, ms: Date.now() - start });
     };
-    socket.setTimeout(TIMEOUT_MS);
+    socket.setTimeout(timeoutOf(app));
     socket.once("connect", () => done(true));
     socket.once("timeout", () => done(false));
     socket.once("error", () => done(false));
@@ -192,7 +214,7 @@ async function checkDns(app: CheckInput): Promise<AppStatus> {
     if (net.isIP(host) !== 0) {
       address = host;
     } else {
-      const looked = await Promise.race([dns.lookup(host), rejectAfter(TIMEOUT_MS)]);
+      const looked = await Promise.race([dns.lookup(host), rejectAfter(timeoutOf(app))]);
       address = looked.address;
     }
   } catch {
@@ -212,8 +234,8 @@ async function checkDns(app: CheckInput): Promise<AppStatus> {
         : `${address}:${port}`;
 
   // The query only gets whatever budget the lookup left, so the whole check —
-  // like every other check type — stays within one TIMEOUT_MS.
-  const remaining = Math.max(1, TIMEOUT_MS - (Date.now() - start));
+  // like every other check type — stays within one time budget.
+  const remaining = Math.max(1, timeoutOf(app) - (Date.now() - start));
   const resolver = new dns.Resolver({ timeout: remaining, tries: 1 });
   resolver.setServers([server]);
   try {
@@ -240,7 +262,7 @@ function checkIcmp(app: CheckInput): Promise<AppStatus> {
   const { host } = hostFromUrl(app.url);
   return new Promise((resolve) => {
     if (!host) return resolve({ up: false, status: null, ms: 0 });
-    const deadline = Math.max(1, Math.ceil(TIMEOUT_MS / 1000));
+    const deadline = Math.max(1, Math.ceil(timeoutOf(app) / 1000));
     // A bare IPv6 literal is unambiguous, but nudge ping with -6 anyway: some
     // builds otherwise try to resolve it as a hostname first.
     const args =
@@ -250,7 +272,7 @@ function checkIcmp(app: CheckInput): Promise<AppStatus> {
     execFile(
       "ping",
       args,
-      { timeout: TIMEOUT_MS },
+      { timeout: timeoutOf(app) },
       (err) => {
         resolve({ up: !err, status: null, ms: Date.now() - start });
       }

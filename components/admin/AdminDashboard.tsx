@@ -262,6 +262,7 @@ function AdminBody({
         <AppsManager
           initialApps={initialApps}
           statusChecksEnabled={initialSettings.statusChecks}
+          statusInterval={initialSettings.statusInterval}
         />
       )}
       {tab === "bookmarks" && (
