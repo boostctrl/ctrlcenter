@@ -37,6 +37,11 @@ here.
   into a circle that ran off-screen), each widget shows a single row of
   controls, and the page no longer scrolls sideways while editing. On large
   screens the toolbar stays on one line. (#271)
+- **The admin portal fits a phone screen.** The Applications and Bookmarks
+  lists no longer scroll sideways, an "Add" button at the top jumps to the
+  form, and tapping Edit brings the form into view. The selected admin tab
+  stays visible, the header buttons sit in a tidy grid, and the page links
+  at the top of every page fit on one line. (#272)
 
 ## [2.10.1] - 2026-10-09
 

@@ -11,6 +11,7 @@ import {
   SelectField,
   ToggleRow,
   Button,
+  AddButton,
   MoveButtons,
   DragGrip,
   PrivateChip,
@@ -23,6 +24,7 @@ import IconField from "./IconField";
 import { useReorder, dropIndicatorClass } from "./useReorder";
 import { useToast } from "./Toast";
 import { useConfirm } from "./Confirm";
+import { useRevealForm } from "./useRevealForm";
 import { apiErrorMessage } from "./apiError";
 
 type FormState = {
@@ -83,6 +85,7 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
   const [saving, setSaving] = useState(false);
   const toast = useToast();
   const confirm = useConfirm();
+  const { ref: formRef, reveal: revealForm } = useRevealForm<HTMLDivElement>();
 
   function startEdit(app: AppItem) {
     setEditingId(app.id);
@@ -98,6 +101,7 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
       keyword: app.keyword ?? "",
     });
     setUpMode(modeFromExpect(app.expectStatus ?? ""));
+    revealForm();
   }
 
   function resetForm() {
@@ -197,8 +201,19 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
   );
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1fr_minmax(320px,380px)] xl:grid-cols-[1fr_minmax(360px,440px)]">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(320px,380px)] xl:grid-cols-[minmax(0,1fr)_minmax(360px,440px)]">
       <div className="space-y-3">
+        {/* Phones stack the form below the list; this jumps to it (#272). */}
+        <div className="lg:hidden">
+          <AddButton
+            onClick={() => {
+              resetForm();
+              revealForm();
+            }}
+          >
+            + Add application
+          </AddButton>
+        </div>
         {apps.length === 0 && (
           <p className="text-sm text-fg/40">No applications yet. Add your first one.</p>
         )}
@@ -249,7 +264,7 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
         ))}
       </div>
 
-      <div className="h-fit">
+      <div ref={formRef} className="h-fit scroll-mt-6">
         <Card title={editingId ? "Edit application" : "Add application"}>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <TextField
