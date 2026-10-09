@@ -20,7 +20,7 @@ import { globalSingleton } from "./singleton";
 
 // Cached CDN icons live in their own subdir (not uploads/ — an upload's name
 // could otherwise collide with a slug) inside the same mounted volume. Untraced
-// like CONFIG_PATH (lib/config.ts): a runtime dir, not a build input.
+// like CONFIG_PATH (lib/config/store.ts): a runtime dir, not a build input.
 const CACHE_DIR = path.join(/* turbopackIgnore: true */ CONFIG_DIR, "icons");
 
 const CDN_SVG_BASE =
@@ -92,7 +92,7 @@ export function isCdnIconSlug(slug: string): boolean {
 }
 
 // Cross-request state, on globalThis because Next bundles lib/* per route
-// entry (see lib/config.ts): one in-flight map so concurrent requests for a
+// entry (see lib/config/store.ts): one in-flight map so concurrent requests for a
 // slug share a single upstream fetch, one negative cache, one metadata memo,
 // and one upstream-fetch semaphore.
 type IconCacheState = {

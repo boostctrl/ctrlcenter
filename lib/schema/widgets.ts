@@ -72,7 +72,7 @@ export type WorldClocksConfig = z.infer<typeof worldClocksSchema>;
 // default data-dir row rides on top). Each is one statfs per render — bounded
 // like MAX_FEED_URLS, a guard against a hand-edited config fanning the
 // collector out. Lives here (not lib/system-stats.ts) because the collector
-// imports lib/config.ts, which imports this file — the constant would cycle.
+// imports lib/config, which imports this file — the constant would cycle.
 export const MAX_STAT_DISKS = 8;
 
 // System Stats widget: CPU / memory / disk usage of the machine (or container)

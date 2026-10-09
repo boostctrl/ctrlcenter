@@ -1,28 +1,16 @@
+// The config file store (#290 split): where config.yaml lives, the cached
+// read path (with the pre-2.0 shape migration applied on read and persisted
+// once — the migrations themselves live in lib/config-migrate.ts), and the
+// serialized write queue every mutation goes through. Per-domain CRUD lives
+// beside this file and writes via mutate().
 import fs from "fs/promises";
 import path from "path";
 import * as YAML from "js-yaml";
-import type { z } from "zod";
-import { GRID_COLUMNS } from "./layout";
-import { migrateConfig } from "./config-migrate";
-import { updateYamlText } from "./config-yaml";
-import { log, errorReason } from "./log";
-import { globalSingleton } from "./singleton";
-import {
-  CONFIG_SCHEMA_VERSION,
-  configSchema,
-  configReadSchema,
-  settingsSchema,
-  mergeRules,
-  redactSecrets,
-  totpAuthSchema,
-  type Config,
-  type AppItem,
-  type BookmarkItem,
-  type Settings,
-  type SettingsInput,
-  type ThemePackConfig,
-  type TotpAuth,
-} from "./schema";
+import { migrateConfig } from "../config-migrate";
+import { updateYamlText } from "../config-yaml";
+import { log, errorReason } from "../log";
+import { globalSingleton } from "../singleton";
+import { CONFIG_SCHEMA_VERSION, configSchema, configReadSchema, type Config } from "../schema";
 
 // turbopackIgnore: a runtime path, not a build input. Without it Next's file
 // tracing can't bound the fs reads below and copies the whole project — a dev
@@ -200,7 +188,7 @@ function persistShapeMigration(): Promise<void> {
 // Write `text` to `dest` via a temp file renamed into place (atomic on the same
 // filesystem), so a concurrent reader can never observe a torn, half-written
 // file and a crash mid-write can't leave a torn artifact. Mirrors the
-// persistence in lib/status-history.ts.
+// persistence in lib/status-history/store.ts.
 async function writeFileAtomic(dest: string, text: string): Promise<void> {
   const tmp = `${dest}.tmp`;
   await fs.mkdir(CONFIG_DIR, { recursive: true });
@@ -242,7 +230,7 @@ async function writeConfig(
 // failure (a full disk, a permissions problem, failed validation) the same way.
 export class NotFoundError extends Error {}
 
-async function mutate<T>(fn: (config: Config) => T): Promise<T> {
+export async function mutate<T>(fn: (config: Config) => T): Promise<T> {
   const result = writes.queue.then(async () => {
     const { config, changed, raw } = await loadMigrated();
     // writeConfig below rewrites the file in the current shape, so if the
@@ -262,33 +250,6 @@ async function mutate<T>(fn: (config: Config) => T): Promise<T> {
   // rejection take down all subsequent operations.
   writes.queue = result.catch(() => undefined);
   return result;
-}
-
-// The config without the admin credential — what's safe to send over the API
-// (export) and the surface an import is allowed to replace. The password lives
-// outside this: it's set only through the ChangePassword flow, never carried in
-// a backup file. See replaceConfig and the /api/config route.
-export function stripAuth(config: Config): Omit<Config, "auth"> {
-  const rest = { ...config };
-  delete (rest as Partial<Config>).auth;
-  return rest;
-}
-
-// Blank the secret-bearing settings fields so a signed-out visitor can never
-// receive them. Which fields those are is marked on the schemas themselves
-// (secretFields in lib/schema/meta.ts, #287): the calendar Basic-auth
-// credentials, the alert webhook URL and SMTP details, and — neutralized
-// whole — the integrations (#189: URLs map internal topology) and inbound
-// webhook tokens. stripAuth only removes the top-level admin credential;
-// these secrets live inside `settings`, where they'd otherwise ride along in
-// anything serialized from a public surface. readPublicConfig
-// (lib/api-auth.ts) applies this so its result is genuinely safe to hand to a
-// client component (#157). The server-side consumers that need the real
-// values read them separately — the calendar fetcher via getCalendarAuth, the
-// alert poller and the monitor snapshot via readConfigInternal-backed
-// accessors.
-export function stripSecrets<T extends { settings: Settings }>(config: T): T {
-  return { ...config, settings: redactSecrets(settingsSchema, config.settings) };
 }
 
 // Validate and write a whole config, replacing what's on disk (used by import).
@@ -319,306 +280,4 @@ export async function replaceConfig(input: unknown): Promise<Config> {
   });
   writes.queue = result.catch(() => undefined);
   return result;
-}
-
-export async function setPasswordHash(
-  passwordHash: string,
-  passwordSalt: string
-): Promise<void> {
-  await mutate((config) => {
-    // Spread the existing auth so a password change preserves the TOTP
-    // enrollment (#198) instead of wiping it.
-    config.auth = { ...config.auth, passwordHash, passwordSalt };
-  });
-}
-
-// --- TOTP second factor (#198), all mutations of config.auth.totp ---
-
-// Stash a freshly generated secret mid-enrollment. Not active until a code
-// verifies it (activateTotp); overwriting a prior pending secret is fine.
-export async function setTotpPendingSecret(pendingSecret: string): Promise<void> {
-  await mutate((config) => {
-    config.auth.totp = { ...config.auth.totp, pendingSecret };
-  });
-}
-
-// Turn the pending secret into the active one and store the (hashed) recovery
-// codes — called only after the enrollment code verified.
-export async function activateTotp(
-  secret: string,
-  recoveryCodes: TotpAuth["recoveryCodes"]
-): Promise<void> {
-  await mutate((config) => {
-    config.auth.totp = {
-      enabled: true,
-      secret,
-      pendingSecret: "",
-      recoveryCodes,
-    };
-  });
-}
-
-// Turn 2FA off and clear every trace of it.
-export async function disableTotp(): Promise<void> {
-  await mutate((config) => {
-    config.auth.totp = totpAuthSchema.parse({});
-  });
-}
-
-// Spend one recovery code, identified by its stored hash, inside the write
-// queue: true if it was still there (and is now gone), false if a concurrent
-// login already spent it. The caller verifies the code first (PBKDF2, outside
-// the queue); this makes the check-and-remove atomic.
-export async function spendTotpRecoveryCode(hash: string): Promise<boolean> {
-  return mutate((config) => {
-    const codes = config.auth.totp.recoveryCodes;
-    if (!codes.some((c) => c.hash === hash)) return false;
-    config.auth.totp = {
-      ...config.auth.totp,
-      recoveryCodes: codes.filter((c) => c.hash !== hash),
-    };
-    return true;
-  });
-}
-
-export async function getSettings(): Promise<Settings> {
-  return (await readConfigInternal()).settings;
-}
-
-// Server-only accessor for the calendar Basic-auth credentials. readPublicConfig
-// redacts these (stripSecrets), so the home page — a public surface that fetches
-// a private CalDAV/ICS feed server-side — reads them here instead of from the
-// config it hands to client components, keeping them off any client-serializable
-// object (#157). The CTRLCENTER_CALDAV_PASS env override is applied downstream in
-// lib/calendar-fetch; this returns the stored values as-is.
-export async function getCalendarAuth(): Promise<{
-  username: string;
-  password: string;
-}> {
-  const { calendar } = (await readConfigInternal()).settings;
-  return { username: calendar.username, password: calendar.password };
-}
-
-// zod's .partial() can produce own keys with an explicit `undefined` value
-// for omitted fields, which would otherwise clobber existing values when
-// spread (and then get silently replaced by schema defaults on write).
-function withoutUndefined<T extends object>(obj: T): Partial<T> {
-  return Object.fromEntries(
-    Object.entries(obj).filter(([, value]) => value !== undefined)
-  ) as Partial<T>;
-}
-
-export async function updateSettings(
-  partial: SettingsInput
-): Promise<Settings> {
-  return mutate((config) => {
-    config.settings = mergeSettings(config.settings, partial);
-    // Re-stamp the grid marker: writeConfig re-parses on save, and a stored
-    // layout without `columns` would re-trigger the 12→24 span migration.
-    if (partial.layout) {
-      config.settings.layout = { ...config.settings.layout, columns: GRID_COLUMNS };
-    }
-    return config.settings;
-  });
-}
-
-// Apply a settings PUT (#287): each section sent is deep-merged into the
-// stored one — plain objects key by key, arrays and scalars replaced,
-// undefined ignored — so only what the admin changed moves. Lists the admin
-// sends whole (feed cards, announcements, layout sections) replace, which is
-// how removing an entry persists. A section the schema marks
-// merge: "replace" (lib/schema/meta.ts) is swapped whole instead.
-function mergeSettings(current: Settings, patch: SettingsInput): Settings {
-  const next: Record<string, unknown> = { ...current };
-  const shape = settingsSchema.shape as Record<string, z.ZodType>;
-  for (const [key, value] of Object.entries(patch)) {
-    if (value === undefined) continue;
-    const field = shape[key];
-    next[key] =
-      field && mergeRules.get(field)?.merge === "replace" ? value : deepMerge(next[key], value);
-  }
-  return next as Settings;
-}
-
-const isPlainObject = (v: unknown): v is Record<string, unknown> =>
-  typeof v === "object" && v !== null && !Array.isArray(v);
-
-function deepMerge(base: unknown, patch: unknown): unknown {
-  if (!isPlainObject(base) || !isPlainObject(patch)) return patch;
-  const out: Record<string, unknown> = { ...base };
-  for (const [k, v] of Object.entries(patch)) {
-    if (v !== undefined) out[k] = deepMerge(base[k], v);
-  }
-  return out;
-}
-
-// Admin overrides of the built-in theme packs. Pair with resolveThemePacks()
-// (lib/theme.ts) to get the packs visitors actually see.
-export async function getThemeOverrides(): Promise<ThemePackConfig[]> {
-  return (await readConfigInternal()).themes;
-}
-
-// Replace the whole overrides array (the admin Themes editor sends all edited
-// packs at once; a reset omits that pack).
-export async function setThemeOverrides(
-  themes: ThemePackConfig[]
-): Promise<ThemePackConfig[]> {
-  return mutate((config) => {
-    config.themes = themes;
-    return config.themes;
-  });
-}
-
-export async function listApps(): Promise<AppItem[]> {
-  return (await readConfigInternal()).apps;
-}
-
-export async function createApp(input: Omit<AppItem, "id">): Promise<AppItem> {
-  return mutate((config) => {
-    const item: AppItem = { ...input, id: crypto.randomUUID() };
-    config.apps.push(item);
-    return item;
-  });
-}
-
-export async function updateApp(
-  id: string,
-  input: Partial<Omit<AppItem, "id">>
-): Promise<AppItem> {
-  return mutate((config) => {
-    const idx = config.apps.findIndex((a) => a.id === id);
-    if (idx === -1) throw new NotFoundError("App not found");
-    config.apps[idx] = { ...config.apps[idx], ...withoutUndefined(input) };
-    return config.apps[idx];
-  });
-}
-
-export async function deleteApp(id: string): Promise<void> {
-  await mutate((config) => {
-    config.apps = config.apps.filter((a) => a.id !== id);
-  });
-}
-
-// Re-inserts a deleted row at `index` (clamped), for undo (#307). Idempotent:
-// if the id is already back (a double-clicked Undo), nothing changes.
-function restoreAt<T extends { id: string }>(items: T[], item: T, index: number): T[] {
-  if (items.some((existing) => existing.id === item.id)) return items;
-  const at = Math.min(Math.max(0, index), items.length);
-  return [...items.slice(0, at), item, ...items.slice(at)];
-}
-
-export async function restoreApp(item: AppItem, index: number): Promise<AppItem[]> {
-  return mutate((config) => {
-    config.apps = restoreAt(config.apps, item, index);
-    return config.apps;
-  });
-}
-
-export async function restoreBookmark(
-  item: BookmarkItem,
-  index: number
-): Promise<BookmarkItem[]> {
-  return mutate((config) => {
-    config.bookmarks = restoreAt(config.bookmarks, item, index);
-    return config.bookmarks;
-  });
-}
-
-// Reorders `items` to match the order of `ids`. Ids not present in `items`
-// are ignored; items whose id isn't listed are kept and appended in their
-// existing order, so a stale or partial id list can never drop data.
-function applyOrder<T extends { id: string }>(items: T[], ids: string[]): T[] {
-  const byId = new Map(items.map((item) => [item.id, item]));
-  const ordered: T[] = [];
-  for (const id of ids) {
-    const item = byId.get(id);
-    if (item) {
-      ordered.push(item);
-      byId.delete(id);
-    }
-  }
-  for (const remaining of byId.values()) ordered.push(remaining);
-  return ordered;
-}
-
-export async function reorderApps(ids: string[]): Promise<AppItem[]> {
-  return mutate((config) => {
-    config.apps = applyOrder(config.apps, ids);
-    return config.apps;
-  });
-}
-
-export async function listBookmarks(): Promise<BookmarkItem[]> {
-  return (await readConfigInternal()).bookmarks;
-}
-
-export async function createBookmark(
-  input: Omit<BookmarkItem, "id">
-): Promise<BookmarkItem> {
-  return mutate((config) => {
-    const item: BookmarkItem = { ...input, id: crypto.randomUUID() };
-    config.bookmarks.push(item);
-    return item;
-  });
-}
-
-export async function updateBookmark(
-  id: string,
-  input: Partial<Omit<BookmarkItem, "id">>
-): Promise<BookmarkItem> {
-  return mutate((config) => {
-    const idx = config.bookmarks.findIndex((b) => b.id === id);
-    if (idx === -1) throw new NotFoundError("Bookmark not found");
-    config.bookmarks[idx] = { ...config.bookmarks[idx], ...withoutUndefined(input) };
-    return config.bookmarks[idx];
-  });
-}
-
-export async function deleteBookmark(id: string): Promise<void> {
-  await mutate((config) => {
-    config.bookmarks = config.bookmarks.filter((b) => b.id !== id);
-  });
-}
-
-export async function reorderBookmarks(ids: string[]): Promise<BookmarkItem[]> {
-  return mutate((config) => {
-    config.bookmarks = applyOrder(config.bookmarks, ids);
-    return config.bookmarks;
-  });
-}
-
-// Rename a whole bookmark category in one atomic write: retag every bookmark
-// with category `from` to `to`, and rewrite `bookmarkCategoryOrder` in place so
-// the renamed group keeps its display position instead of falling back to
-// first-seen order. Renaming onto a name that already exists (or is already in
-// the order) merges the two — the duplicate is dropped from the order, keeping
-// the earlier position. Throws when no bookmark carries `from` (the route maps
-// that to a 404, mirroring updateBookmark).
-export async function renameBookmarkCategory(
-  from: string,
-  to: string
-): Promise<{ bookmarks: BookmarkItem[]; bookmarkCategoryOrder: string[] }> {
-  return mutate((config) => {
-    const matches = config.bookmarks.filter((b) => b.category === from);
-    if (matches.length === 0) throw new NotFoundError("Category not found");
-    for (const b of config.bookmarks) {
-      if (b.category === from) b.category = to;
-    }
-    // Replace `from` with `to` in the display order, then de-duplicate so a
-    // merge collapses to a single entry at the earlier of the two positions.
-    const seen = new Set<string>();
-    config.settings.bookmarkCategoryOrder =
-      config.settings.bookmarkCategoryOrder.reduce<string[]>((acc, name) => {
-        const renamed = name === from ? to : name;
-        if (!seen.has(renamed)) {
-          seen.add(renamed);
-          acc.push(renamed);
-        }
-        return acc;
-      }, []);
-    return {
-      bookmarks: config.bookmarks,
-      bookmarkCategoryOrder: config.settings.bookmarkCategoryOrder,
-    };
-  });
 }

@@ -1,5 +1,5 @@
 // SQLite persistence for the uptime history (#278), on Node's built-in
-// node:sqlite (no native dependency). lib/status-history.ts keeps the whole
+// node:sqlite (no native dependency). ./store.ts keeps the whole
 // history in memory as its read model; this file only loads it at startup and
 // writes what changed since the last flush. That makes each poll a handful of
 // upserts and inserts instead of re-serializing 90 days of buckets, and
@@ -7,7 +7,7 @@
 //
 // The database (status-history.db) lives beside config.yaml, where the JSON
 // file used to. A file from an older build is imported once (see
-// lib/status-history.ts) and left where it is.
+// ./store.ts) and left where it is.
 import { DatabaseSync } from "node:sqlite";
 
 export type { DatabaseSync };

@@ -84,7 +84,7 @@ export type UptimeWindows = {
 // milliseconds. Only *up* checks contribute — a down check's `ms` is its
 // time-to-failure (usually the full request timeout) and would drag the average
 // up toward that ceiling, so those samples are dropped when recording (see
-// recordResults in status-history.ts).
+// recordResults in status-history/store.ts).
 export type LatencyStat = { avg: number; max: number };
 
 // The same set of windows as UptimeWindows, but for latency; null where a window
@@ -145,7 +145,7 @@ export const DETAIL_BARS = 90;
 // single recent poll. All three are UTC instants (produced via toISOString).
 // `ms` is the average up-check latency for that bucket, or null when the bucket
 // has no up-check samples (empty, or down the whole time) — see fixedBars* in
-// status-history.ts.
+// status-history/aggregate.ts.
 export type BarPoint = { at: string; uptime: number | null; ms: number | null };
 
 // Format a BarPoint's `at` for the timeline tooltip in the visitor's time zone,
@@ -269,14 +269,14 @@ export type AppHistory = {
   // One fixed-length bar strip per range (each TIMELINE_BARS long), so switching
   // ranges swaps the data under a strip that keeps its size. Built server-side
   // by resampling the raw ring (1h) or the hourly buckets (24h/30d/90d) into
-  // equal time buckets — see fixedBars* in status-history.ts.
+  // equal time buckets — see fixedBars* in status-history/aggregate.ts.
   series: Record<StatusRangeKey, BarPoint[]>;
   // Epoch ms of the app's oldest recorded sample, or null when it has none. It
   // lets the client say how far back the data actually goes when a range asks
   // for a longer window than exists: an app watched five minutes otherwise
   // shows "100.0%" over 90d — a figure typographically identical to one with 90
   // days behind it, claiming a window it doesn't cover. See oldestSampleMs in
-  // status-history.ts.
+  // status-history/aggregate.ts.
   since: number | null;
   // Epoch ms of the poller-observed start of the app's *current* outage, or null
   // when the app was up at the last poll. The row's live dot and detail come
@@ -285,7 +285,7 @@ export type AppHistory = {
   // (a red "Unreachable" beside a still-green strip); this lets the page answer
   // "how long has it been down?" straight from the poller's own view. Marked at
   // the transition into down and held there, so it's the outage's start, not the
-  // latest down poll — see recordResults in status-history.ts.
+  // latest down poll — see recordResults in status-history/store.ts.
   downSince: number | null;
 };
 

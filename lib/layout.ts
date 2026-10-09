@@ -337,7 +337,7 @@ function legacyHidden(
 // a config from any earlier version renders unchanged and a widget added in a
 // future version still shows. Spans are expected on the 24-column grid — the
 // one-time shape migration (lib/config-migrate.ts) rewrites pre-24 configs
-// before anything parses them. Mirrors applyOrder in lib/config.ts.
+// before anything parses them. Mirrors applyOrder in lib/config/items.ts.
 export function resolveLayoutWidgets(
   saved:
     | readonly {

@@ -25,7 +25,7 @@ const cache = globalSingleton(
 );
 
 // Resolved lazily (not at module load) so tests can point CONFIG_PATH at a
-// scratch directory. Untraced like CONFIG_PATH in lib/config.ts.
+// scratch directory. Untraced like CONFIG_PATH in lib/config/store.ts.
 function secretPath(): string {
   const configPath =
     process.env.CONFIG_PATH ||

@@ -7,7 +7,7 @@
 //   fallbacks are peeled off (input must be valid, not coerced) and lenient
 //   lists become strict arrays of whole items. Fields optional in the stored
 //   schema stay optional; the rest are required.
-// - patchOf: for a section the settings PUT deep-merges (lib/config.ts
+// - patchOf: for a section the settings PUT deep-merges (lib/config/settings.ts
 //   mergeSettings), every object field optional, all the way down, so a
 //   patch carries only what changes. Lists inside are still whole: a list
 //   replaces, so each item must be complete.

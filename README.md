@@ -329,7 +329,7 @@ changelog, issue hygiene — live in [CLAUDE.md](CLAUDE.md).
 
 ### How it fits together
 
-- [`lib/config.ts`](lib/config.ts) reads/writes `config.yaml`, validated by
+- [`lib/config/`](lib/config/) reads/writes `config.yaml`, validated by
   [`lib/schema.ts`](lib/schema.ts) (zod).
 - [`lib/auth.ts`](lib/auth.ts) + [`proxy.ts`](proxy.ts) gate `/admin` with a
   signed-cookie session, enforced by the Next.js middleware (which also sets a
@@ -338,7 +338,7 @@ changelog, issue hygiene — live in [CLAUDE.md](CLAUDE.md).
   [`components/ThemeBuilder.tsx`](components/ThemeBuilder.tsx) and persists
   per-visitor prefs via [`components/PrefsProvider.tsx`](components/PrefsProvider.tsx).
 - [`instrumentation.ts`](instrumentation.ts) starts the background uptime poller
-  ([`lib/status-poller.ts`](lib/status-poller.ts) → [`lib/status-history.ts`](lib/status-history.ts)),
+  ([`lib/status-poller.ts`](lib/status-poller.ts) → [`lib/status-history/`](lib/status-history/)),
   which also drives down/recovery [`alerts`](lib/alerts.ts).
 - [`lib/calendar-fetch.ts`](lib/calendar-fetch.ts) fetches the iCal agenda
   feed (server-side, cached); [`lib/calendar.ts`](lib/calendar.ts) parses it

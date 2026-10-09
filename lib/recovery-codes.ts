@@ -18,7 +18,7 @@ export async function hashRecoveryCodes(codes: string[]): Promise<StoredCode[]> 
 
 // Check a submitted recovery code against the stored hashes. On a match,
 // return the matched entry and the remaining codes (with it removed). Login
-// spends the match through spendTotpRecoveryCode (lib/config.ts), which
+// spends the match through spendTotpRecoveryCode (lib/config/auth.ts), which
 // removes it inside the config write queue, so a code works exactly once even
 // when two logins race with it.
 // Recovery codes normalize to exactly 10 characters (two groups of five).

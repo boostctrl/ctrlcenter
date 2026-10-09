@@ -12,7 +12,7 @@
 // stays out unless its value changed — so saving one setting doesn't write
 // every schema default into a minimal hand-written file.
 //
-// Reading stays on js-yaml (parseConfigYaml in lib/config.ts carries its
+// Reading stays on js-yaml (parseConfigYaml in lib/config/store.ts carries its
 // deliberate tolerance rules), so the writer proves itself against the app's
 // own read path: the output must read back as exactly the intended config,
 // otherwise the caller falls back to a plain dump. So do files this can't safely edit —

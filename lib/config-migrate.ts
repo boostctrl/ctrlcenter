@@ -5,7 +5,7 @@
 // One-time migration of pre-2.0 config shapes (#152). Everything the 1.x line
 // accepted but 2.0 no longer stores lives here, applied structurally to the
 // raw YAML object BEFORE zod parses it — the schemas themselves only know the
-// current shape. readConfigInternal (lib/config.ts) runs this on every read
+// current shape. readConfigInternal (lib/config/store.ts) runs this on every read
 // and persists the rewrite once (after snapshotting the original file to
 // config.yaml.bak); replaceConfig runs it on imported files so a pre-2.0
 // backup stays restorable.
