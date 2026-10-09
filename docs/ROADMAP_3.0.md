@@ -129,6 +129,19 @@ comments and a lighter status system.
 
 ## 2.13 — Status and alerts depth
 
+> **Status: released as 2.13.0** (2026-10-09).
+> All nine items are closed, plus two found along the way (#309, #310). What
+> users notice:
+> - Each app can have its own check interval, timeout and retries, can be left
+>   unmonitored, and can use the new JSON query, push (heartbeat) and TLS
+>   certificate checks.
+> - Alerts go to any number of channels: webhooks, email, Telegram, Gotify,
+>   Pushover and Apprise, each with its own events, apps and Send test. Apps
+>   that start warning (a certificate near expiry) alert too.
+> - Maintenance windows hold alerts and keep planned downtime out of uptime.
+> - Each app has an SVG badge, and the status page has an Atom feed.
+> - Export now carries incident notes.
+
 Additive config only. This is the "Homepage + Uptime Kuma in one container"
 release: it deepens the one area where CtrlCenter already leads.
 
