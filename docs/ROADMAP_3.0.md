@@ -75,7 +75,7 @@ Sizes: **S** ≈ under a day, **M** ≈ 1–3 days, **L** ≈ a week or more.
 
 ## 2.11 — Polish pass
 
-> **Status: landed on `develop`** (2026-10-09), ready to release as 2.11.0.
+> **Status: released as 2.11.0** (2026-10-09).
 > All items below plus undo for deletes (#307). Results:
 > - A cold `/` load dropped from 1.85 MB to about 357 KB.
 > - `npm run smoke` now audits every page in both schemes with axe-core
@@ -98,6 +98,20 @@ Fixes everything the UX audit found. No config changes.
 | 9 | Grab-bag: floating gear overlap, stretched settings cards, Delete button style, light-mode scene scrim, a "Show on home" switch inside each widget's settings card, a hint on Check method when checks are off, an integration toggle that waits for a URL, deep links from Monitor "Set up", refunding successful sign-ins to the throttle, the README 12→24 fix, the NUL byte in `lib/auth.ts`, and a table of contents on `/help`. | M | #277 |
 
 ## 2.12 — Foundations
+
+> **Status: landed on `develop`** (2026-10-09), ready to release as 2.12.0.
+> All eight items are closed. What users notice:
+> - Admin saves keep `config.yaml` comments, and only changed keys are written.
+> - Each app is checked once per interval.
+> - History lives in SQLite.
+> - Background tabs stop polling.
+> - A newer config is refused rather than silently downgraded.
+>
+> Underneath:
+> - The widget registry (#285) is the base for 3.0's widget instances.
+> - Settings input is derived from the schemas, with secrets marked in place.
+> - The large modules are split.
+> - The test suite has grown to 870 tests.
 
 Internal changes that 3.0 depends on. Users see none of it beyond kept
 comments and a lighter status system.
