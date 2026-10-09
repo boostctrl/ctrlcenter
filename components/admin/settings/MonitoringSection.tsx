@@ -43,7 +43,7 @@ export default function MonitoringSection({ d }: { d: SettingsDraft }) {
                 control never reads as "nothing selected". */}
             <ControlRow
               label="Uptime check interval"
-              hint="How often the server records each app's up/down for the 90-day history on the status page."
+              hint="How often the server checks each app. The dashboard's status dots, the status page and its 90-day history all show these checks."
             >
               <ChipGroup
                 label="Uptime check interval"

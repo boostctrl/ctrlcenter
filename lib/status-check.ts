@@ -20,6 +20,12 @@ type CheckInput = Pick<
   "url" | "expectStatus" | "checkType" | "port" | "keyword"
 >;
 
+// What a check depends on, as a string: equal signatures mean a stored result
+// still describes the app as configured now (#278).
+export function checkSignature(app: CheckInput): string {
+  return JSON.stringify([app.url, app.expectStatus, app.checkType, app.port, app.keyword]);
+}
+
 // Checks in flight at once when probing every app (the poller, /api/status).
 // Enough to finish a typical homelab list in a few seconds, without opening a
 // socket to every service in the same instant.

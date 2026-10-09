@@ -782,7 +782,8 @@ describe("readConfigInternal stays off public surfaces", () => {
       for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
         const full = path.join(dir, entry.name);
         if (entry.isDirectory()) await walk(full);
-        else if (/\.(ts|tsx)$/.test(entry.name)) {
+        // Tests aren't served, so they're no surface.
+        else if (/\.(ts|tsx)$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)) {
           const source = await fs.readFile(full, "utf8");
           if (source.includes("readConfigInternal")) {
             found.push(path.relative(path.join(__dirname, ".."), full));

@@ -22,7 +22,13 @@ here.
 - **Quieter background tabs.** The dashboard, Status, Weather and Monitor
   pages stop checking for updates while their tab is hidden and catch up as
   soon as you come back to it, so a dashboard left open in the background no
-  longer keeps pinging your services and the weather API. (#286)
+  longer keeps polling your server and the weather API. (#286)
+- **Each app is checked once per interval.** The status dots on the
+  dashboard now show the same background checks as the status page and its
+  history, instead of probing every app a second time on their own 30-second
+  schedule. The "Uptime check interval" in Settings now sets how fresh the
+  dots are too. An app you've just added or edited is checked straight away.
+  (#278)
 
 ## [2.11.0] - 2026-10-09
 

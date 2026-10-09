@@ -1,5 +1,5 @@
 import { readConfigInternal } from "./config";
-import { checkApp, CHECK_CONCURRENCY } from "./status-check";
+import { checkApp, checkSignature, CHECK_CONCURRENCY } from "./status-check";
 import {
   loadHistory,
   recordResults,
@@ -8,6 +8,7 @@ import {
   pruneHistory,
 } from "./status-history";
 import { mapLimit } from "./concurrency";
+import { publishRound } from "./status-latest";
 import { processAlerts } from "./alerts";
 import { log, errorReason } from "./log";
 import type { StatusResult } from "./status";
@@ -43,6 +44,12 @@ export async function tick(): Promise<void> {
     // seeding on first run reflects the previous reading, not the current one.
     const prior = lastReadings(apps.map((a) => a.id));
     recordResults(results, lastRun);
+    // /api/status serves this round rather than re-probing every app (#278).
+    publishRound({
+      at: lastRun,
+      results,
+      signatures: Object.fromEntries(apps.map((a) => [a.id, checkSignature(a)])),
+    });
     // Drop the history of apps that no longer exist, so a deleted app's
     // buckets, outages and readings don't ride along in every flush forever.
     pruneHistory(apps.map((a) => a.id));

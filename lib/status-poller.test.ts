@@ -11,6 +11,7 @@ vi.mock("./config", () => ({
 }));
 vi.mock("./status-check", () => ({
   CHECK_CONCURRENCY: 4,
+  checkSignature: (app: { id: string }) => `sig:${app.id}`,
   checkApp: vi.fn(async (app: { id: string }) => {
     calls.push(`check:${app.id}`);
     if (app.id === "boom") throw new Error("socket hang up");
@@ -37,6 +38,7 @@ vi.mock("./log", () => ({
 }));
 
 let tick: () => Promise<void>;
+let latestRound: typeof import("./status-latest").latestRound;
 
 beforeEach(async () => {
   vi.useFakeTimers();
@@ -47,6 +49,7 @@ beforeEach(async () => {
   apps = [{ id: "a" }, { id: "b" }];
   vi.resetModules(); // fresh lastRun per test
   ({ tick } = await import("./status-poller"));
+  ({ latestRound } = await import("./status-latest"));
 });
 
 afterEach(() => {
@@ -74,6 +77,18 @@ describe("status poller tick", () => {
       "flush",
       "alerts",
     ]);
+  });
+
+  it("publishes the round for /api/status to serve (#278)", async () => {
+    await tick();
+    expect(latestRound()).toEqual({
+      at: Date.now(),
+      results: [
+        { id: "a", up: true, status: 200, ms: 5 },
+        { id: "b", up: true, status: 200, ms: 5 },
+      ],
+      signatures: { a: "sig:a", b: "sig:b" },
+    });
   });
 
   it("waits out the configured interval between rounds", async () => {
