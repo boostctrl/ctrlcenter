@@ -1,45 +1,17 @@
 "use client";
 
-import {
-  cloneElement,
-  isValidElement,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import AppCard from "./AppCard";
-import BookmarkGroup from "./BookmarkGroup";
-import Greeting from "./Greeting";
-import HeaderCardWidget from "./widgets/HeaderCardWidget";
-import ClockWidget from "./widgets/ClockWidget";
-import WeatherWidget from "./widgets/WeatherWidget";
-import StatusWidget from "./widgets/StatusWidget";
-import NotesWidget from "./widgets/NotesWidget";
-import CountdownWidget, {
-  isValidCountdownDate,
-  type CountdownItem,
-} from "./widgets/CountdownWidget";
-import SystemStatsWidget from "./widgets/SystemStatsWidget";
-import type { SystemStats } from "@/lib/system-stats";
-import WorldClocksWidget, {
-  type WorldClockItem,
-} from "./widgets/WorldClocksWidget";
-import { isValidTimeZone } from "@/lib/datetime";
 import {
   buildSearchUrl,
   engineLabel,
   resolveBang,
   appBangMap,
   parseBang,
-  type SearchConfig,
 } from "@/lib/search";
-import { orderCategories } from "@/lib/bookmarks";
+import { groupBookmarks } from "@/lib/bookmarks";
 import { useFavorites } from "./PrefsProvider";
-import SectionTitle from "./SectionTitle";
-import type { AppItem, BookmarkItem } from "@/lib/schema";
-import type { CurrentWeather } from "@/lib/weather";
+import type { AppItem } from "@/lib/schema";
 import {
   DEFAULT_UI_SCALE,
   DEFAULT_GRID_GAP,
@@ -60,33 +32,10 @@ import { WidgetFrame, EditToolbar, useFlowReorder } from "./LayoutEditor";
 import { useGridLayout } from "./useGridLayout";
 import { useLayoutEditor } from "./useLayoutEditor";
 import { emptyReason as widgetEmptyReason, widgetDef } from "@/lib/widgets/defs";
+import type { HomeData } from "@/lib/widgets/data";
+import { WIDGET_RENDERERS, cardsFor, type WidgetRenderContext } from "./widgets/registry";
 
-// Apply the per-widget label toggle to a widget passed in as a pre-rendered
-// node (the calendar and feed are built in app/page.tsx). Cloning lets the
-// toggle preview live in the editor without re-fetching their server data.
-function withTitle(node: React.ReactNode, hideLabel?: boolean): React.ReactNode {
-  return isValidElement(node)
-    ? cloneElement(node as React.ReactElement<{ showTitle?: boolean }>, {
-        showTitle: !hideLabel,
-      })
-    : node;
-}
 
-function groupBookmarks(
-  bookmarks: BookmarkItem[],
-  categoryOrder: string[]
-): [string, BookmarkItem[]][] {
-  const map = new Map<string, BookmarkItem[]>();
-  for (const bookmark of bookmarks) {
-    const list = map.get(bookmark.category) ?? [];
-    list.push(bookmark);
-    map.set(bookmark.category, list);
-  }
-  return orderCategories(Array.from(map.keys()), categoryOrder).map((c) => [
-    c,
-    map.get(c)!,
-  ]);
-}
 
 
 // How many of the 24 columns each widget spans. Complete, static class strings
@@ -119,60 +68,13 @@ const COL_SPAN: Record<number, string> = {
 };
 
 
-// How the inner card/bookmark grids reflow. An explicit `cards` override wins;
-// otherwise the count derives from the widget's span (a wide widget, ≥18 of 24
-// columns, fits three cards across; a mid one ≥10 two; narrower stacks — the
-// same output the old bucket thresholds produced). The count is a cap: the
-// steps are container queries against the widget's own width (the section
-// around each grid is the @container), not viewport media queries — tile width
-// is a function of the card, and span, the page max-width, and the UI scale
-// all move it independently of the viewport (#145).
-//
-// Each rung's threshold is set so the tile stays at least ~280px wide at the
-// moment a column is added — the width where a real multi-word name (e.g.
-// "Network Attached Storage") still wraps to AppCard's two lines instead of
-// ellipsizing. The 1.9.5 rungs (@md/@3xl/@5xl) let tiles bottom out near 245px,
-// which truncated names before the grid ever dropped a column; the fix is to
-// step DOWN sooner, so a narrowing card sheds a column rather than squeezing
-// its tiles. `cards` therefore means "up to N across" — the dense end only
-// appears once the card is genuinely wide enough for it. Rem-based thresholds
-// track the UI scale, so a scaled-up dashboard collapses proportionally sooner.
-// Complete, static class strings so Tailwind's extractor keeps every variant.
-const CARD_COLS: Record<number, string> = {
-  1: "grid-cols-1",
-  2: "grid-cols-1 @xl:grid-cols-2",
-  3: "grid-cols-1 @xl:grid-cols-2 @4xl:grid-cols-3",
-  4: "grid-cols-1 @xl:grid-cols-2 @4xl:grid-cols-3 @7xl:grid-cols-4",
-};
-const cardsFor = (widget: LayoutWidget): number =>
-  widget.cards ?? (widget.span >= 18 ? 3 : widget.span >= 10 ? 2 : 1);
-const cardGridClass = (widget: LayoutWidget, gap: string): string =>
-  `grid ${gap} ${CARD_COLS[cardsFor(widget)] ?? CARD_COLS[1]}`;
 
 export default function Dashboard({
   widgets,
   scale = DEFAULT_UI_SCALE,
   gap = DEFAULT_GRID_GAP,
   topGap = DEFAULT_TOP_GAP,
-  apps,
-  bookmarks,
-  search,
-  categoryOrder = [],
-  groupPrivateApps = false,
-  calendar = null,
-  initialDate,
-  initialGreeting,
-  initialWeather,
-  weatherEnabled,
-  showClock,
-  statusEnabled,
-  notes,
-  feedNodes = {},
-  feedLabels = {},
-  countdown,
-  worldClocks,
-  systemStats,
-  initialNow,
+  data,
 }: {
   // The resolved widget arrangement (order + span + hidden), server-resolved so
   // legacy configs render unchanged.
@@ -185,48 +87,14 @@ export default function Dashboard({
   // The saved gap (px) above the first widget row; SSR renders it on <main>'s
   // CSS variables, this seeds the editor's stepper.
   topGap?: number;
-  apps: AppItem[];
-  bookmarks: BookmarkItem[];
-  search: SearchConfig;
-  categoryOrder?: string[];
-  // When on, the Apps widget splits private apps into their own labeled
-  // "Private Applications" group. Only affects the admin — guests never
-  // receive private apps, so the group is always empty for them.
-  groupPrivateApps?: boolean;
-  // The calendar widget (rendered server-side and passed in); hidden during an
-  // active search so results stay adjacent to the input. Passed as null when the
-  // widget wouldn't render, so its layout cell isn't left empty.
-  calendar?: React.ReactNode;
-  // Server-computed seeds for the header widgets (admin default tz / location),
-  // updated client-side to the visitor's effective prefs after mount.
-  initialDate: string;
-  initialGreeting: string;
-  initialWeather: CurrentWeather | null;
-  weatherEnabled: boolean;
-  showClock: boolean;
-  statusEnabled: boolean;
-  // The Notes widget's admin-authored title + markdown body.
-  notes: { title: string; content: string };
-  // The rendered RSS feed cards, keyed by feed instance id (rendered
-  // server-side and passed in, like `calendar`). A card missing from the map
-  // is off/empty and its layout cell renders nothing.
-  feedNodes?: Record<string, React.ReactNode>;
-  // Per-instance display label for the editor's frame/tray (the card's title,
-  // else a generic), so multiple feed cards stay distinguishable.
-  feedLabels?: Record<string, string>;
-  // The Countdown widget's admin-authored title + dated rows.
-  countdown: { title: string; items: CountdownItem[] };
-  // The World Clocks widget's admin-authored title + labeled time zones.
-  worldClocks: { title: string; items: WorldClockItem[] };
-  // The System Stats widget's title + the server-collected snapshot; null when
-  // collection was skipped (widget hidden for a guest) or failed.
-  systemStats: { title: string; stats: SystemStats | null };
-  // The server's request instant (ISO), seeding the World Clocks widget so its
-  // clocks render with the right time before the client tick takes over.
-  initialNow: string;
+  // Everything the widgets render, built server-side (lib/widgets/load.tsx).
+  data: HomeData;
 }) {
+  const { apps, bookmarks, search, categoryOrder, statusEnabled, feedLabels } = data;
   const [query, setQuery] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
+  // The search widget renders through the registry and hands its <input>
+  // back here (for the "/" hotkey); the state setter is the callback ref.
+  const [searchInput, setSearchInput] = useState<HTMLInputElement | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const { favorites } = useFavorites();
   const { editing, setEditing } = useEditMode();
@@ -302,15 +170,15 @@ export default function Dashboard({
           target.isContentEditable);
       if (e.key === "/" && !typing) {
         e.preventDefault();
-        inputRef.current?.focus();
-      } else if (e.key === "Escape" && target === inputRef.current) {
+        searchInput?.focus();
+      } else if (e.key === "Escape" && target === searchInput) {
         setQuery("");
-        inputRef.current?.blur();
+        searchInput?.blur();
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [editing]);
+  }, [editing, searchInput]);
 
   const q = query.trim().toLowerCase();
 
@@ -397,186 +265,23 @@ export default function Dashboard({
     }
   }
 
-  // Each widget as a node for its span/cards, or null when it has nothing to
-  // show right now (feature off, empty, or hidden during an active search).
-  // Hidden widgets are skipped by the render loop in view mode, so this only
-  // decides content-existence; in edit mode search filtering and the q-gates
-  // are suspended so every widget previews its real content.
-  function blockFor(widget: LayoutWidget): React.ReactNode {
-    const id = widget.id;
-    switch (id) {
-      case "greeting":
-        return <Greeting initialGreeting={initialGreeting} />;
-      case "headerCard":
-        return showClock || weatherEnabled || statusEnabled ? (
-          <HeaderCardWidget
-            initialDate={initialDate}
-            initialWeather={initialWeather}
-            weatherEnabled={weatherEnabled}
-            showClock={showClock}
-            statusEnabled={statusEnabled}
-            apps={apps}
-          />
-        ) : null;
-      case "clock":
-        return showClock ? (
-          <ClockWidget initialDate={initialDate} showClock={showClock} />
-        ) : null;
-      case "weather":
-        return weatherEnabled ? (
-          <WeatherWidget
-            initialWeather={initialWeather}
-            weatherEnabled={weatherEnabled}
-          />
-        ) : null;
-      case "status":
-        return statusEnabled ? (
-          <StatusWidget statusEnabled={statusEnabled} apps={apps} />
-        ) : null;
-      case "search":
-        return (editing ? hasAnyContent : hasVisibleContent) ? (
-          <div className="relative">
-            <input
-              ref={inputRef}
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={onSearchKeyDown}
-              placeholder="Search"
-              aria-label="Search applications and bookmarks"
-              aria-keyshortcuts="/"
-              className="accent-focus w-full rounded-2xl border border-fg/10 bg-fg/[0.04] py-3.5 pr-12 pl-5 text-fg placeholder-fg/30 outline-none backdrop-blur-xl transition-colors"
-            />
-            {/* The "/" shortcut, advertised where people look for it; hidden
-                once typing starts, and on touch where there's no keyboard. */}
-            {!query && (
-              <kbd
-                aria-hidden
-                className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 rounded-md border border-fg/15 px-1.5 py-0.5 font-mono text-xs text-ink-50 pointer-coarse:hidden"
-              >
-                /
-              </kbd>
-            )}
-          </div>
-        ) : null;
-      case "calendar":
-        return q && !editing ? null : withTitle(calendar, widget.hideLabel);
-      case "notes":
-        return notes.content.trim() !== "" ? (
-          <NotesWidget
-            title={notes.title}
-            content={notes.content}
-            showTitle={!widget.hideLabel}
-          />
-        ) : null;
-      case "feed": {
-        const node = feedNodes[widgetKey(widget)];
-        return !node || (q && !editing)
-          ? null
-          : withTitle(node, widget.hideLabel);
-      }
-      case "countdown":
-        return countdown.items.some((i) => isValidCountdownDate(i.date)) ? (
-          <CountdownWidget
-            title={countdown.title}
-            items={countdown.items}
-            showTitle={!widget.hideLabel}
-          />
-        ) : null;
-      case "worldClocks":
-        return worldClocks.items.some((i) => isValidTimeZone(i.timeZone.trim())) ? (
-          <WorldClocksWidget
-            title={worldClocks.title}
-            items={worldClocks.items}
-            initialNow={initialNow}
-            showTitle={!widget.hideLabel}
-          />
-        ) : null;
-      case "systemStats":
-        return systemStats.stats ? (
-          <SystemStatsWidget
-            title={systemStats.title}
-            stats={systemStats.stats}
-            showTitle={!widget.hideLabel}
-          />
-        ) : null;
-      case "favorites":
-        return (!q || editing) && favoriteApps.length > 0 ? (
-          <section className="@container">
-            {!widget.hideLabel && <SectionTitle>Favorites</SectionTitle>}
-            <div className={cardGridClass(widget, "gap-4")}>
-              {favoriteApps.map((app) => (
-                <AppCard key={app.id} app={app} />
-              ))}
-            </div>
-          </section>
-        ) : null;
-      case "apps": {
-        const list = editing ? apps : filteredApps;
-        if (list.length === 0) return null;
-        // With grouping on, private apps get their own labeled block below the
-        // public ones. The private slice is empty for guests (readPublicConfig
-        // filters private apps out upstream), so the second group only ever
-        // appears for the admin. Both slices keep the single ordered list's
-        // relative order.
-        const publicApps = groupPrivateApps ? list.filter((a) => !a.private) : list;
-        const privateApps = groupPrivateApps ? list.filter((a) => a.private) : [];
-        return (
-          <section className="@container">
-            {publicApps.length > 0 && (
-              <>
-                {!widget.hideLabel && <SectionTitle>Applications</SectionTitle>}
-                <div className={cardGridClass(widget, "gap-4")}>
-                  {publicApps.map((app) => (
-                    <AppCard key={app.id} app={app} top={app.id === topMatchId} />
-                  ))}
-                </div>
-              </>
-            )}
-            {privateApps.length > 0 && (
-              // Space the private group off the public grid above it; the
-              // SectionTitle only carries a bottom margin. No top gap when it's
-              // the only group (every app is private).
-              <div className={publicApps.length > 0 ? "mt-8" : undefined}>
-                <SectionTitle>Private Applications</SectionTitle>
-                <div className={cardGridClass(widget, "gap-4")}>
-                  {privateApps.map((app) => (
-                    <AppCard key={app.id} app={app} top={app.id === topMatchId} />
-                  ))}
-                </div>
-              </div>
-            )}
-          </section>
-        );
-      }
-      case "bookmarks": {
-        const groups = editing
-          ? groupBookmarks(bookmarks, categoryOrder)
-          : filteredGroups;
-        return groups.length > 0 ? (
-          <section className="@container">
-            {!widget.hideLabel && <SectionTitle>Bookmarks</SectionTitle>}
-            <div className={cardGridClass(widget, "gap-6")}>
-              {groups.map(([category, items]) => (
-                <BookmarkGroup
-                  key={category}
-                  category={category}
-                  items={items}
-                  topId={topMatchId}
-                />
-              ))}
-            </div>
-          </section>
-        ) : null;
-      }
-      default: {
-        // Exhaustive: a widget id added to LAYOUT_WIDGET_IDS without a case
-        // here fails to compile instead of rendering an empty cell.
-        const unhandled: never = id;
-        return unhandled;
-      }
-    }
-  }
+  // Each widget as a node, or null when it has nothing to show right now —
+  // see the renderer registry for the contract.
+  const renderContext: WidgetRenderContext = {
+    data,
+    editing,
+    q,
+    search: { query, setQuery, inputRef: setSearchInput, onKeyDown: onSearchKeyDown },
+    hasAnyContent,
+    hasVisibleContent,
+    favoriteApps,
+    filteredApps,
+    filteredGroups,
+    topMatchId,
+  };
+  const blockFor = (widget: LayoutWidget): React.ReactNode =>
+    WIDGET_RENDERERS[widget.id](widget, renderContext);
+
 
   // Why a widget's cell is empty right now — shown in its edit-mode placeholder.
   const emptyReason = (id: LayoutWidgetId): string =>

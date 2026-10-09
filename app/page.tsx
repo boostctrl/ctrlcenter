@@ -1,23 +1,13 @@
 import Dashboard from "@/components/Dashboard";
 import FloatingNav from "@/components/FloatingNav";
-import CalendarWidget from "@/components/CalendarWidget";
 import { StatusProvider } from "@/components/StatusProvider";
 import { EditModeProvider } from "@/components/EditMode";
-import { fetchCalendar, fetchCalendarRange } from "@/lib/calendar-fetch";
-import { fetchFeeds } from "@/lib/feed";
-import { fetchWeather } from "@/lib/weather";
-import { collectSystemStats } from "@/lib/system-stats";
-import FeedWidget from "@/components/widgets/FeedWidget";
-import { greetingFor, hourIn, shortDate } from "@/lib/datetime";
 import { resolveLayoutWidgets, smallScreenTopGap } from "@/lib/layout";
-import { feedUrls } from "@/lib/schema";
-import { getCalendarAuth } from "@/lib/config";
 import { readPublicConfig } from "@/lib/api-auth";
 import { navPages } from "@/lib/nav";
+import { loadHomeData } from "@/lib/widgets/load";
 
 export const dynamic = "force-dynamic";
-
-const DAY = 86_400_000;
 
 export default async function HomePage({
   searchParams,
@@ -32,99 +22,22 @@ export default async function HomePage({
   const { config, isAdmin } = await readPublicConfig();
   const { settings, apps, bookmarks } = config;
 
-  // One poller wraps both the status widgets and the per-app dots; only
-  // enable it when status checks are on and there are apps to monitor.
   const statusEnabled = settings.statusChecks && apps.length > 0;
-
-  const cal = settings.calendar;
-  const nowDate = new Date();
-  const now = nowDate.getTime();
-  // The month widget needs every event across the current month grid (a range),
-  // while the agenda widget needs the next N upcoming. A ~40-day window either
-  // side of now covers the current month plus its leading/trailing neighbour days
-  // in any time zone.
-  const calEnabled = cal.enabled && cal.url.trim() !== "";
-  // Calendar credentials are redacted from the public config (stripSecrets), so
-  // read them from the server-only accessor for the server-side fetch below —
-  // they must never reach a client component. Only when the widget is actually
-  // configured, so an unused calendar costs no extra config read.
-  const calAuth = calEnabled
-    ? await getCalendarAuth()
-    : { username: "", password: "" };
-  // Each configured feed card: its trimmed URL list and whether it should fetch
-  // (enabled with at least one URL). One home-page render can fan out to every
-  // active card — bounded by MAX_FEED_CARDS × MAX_FEED_URLS.
-  const feedCards = settings.feeds.map((config) => {
-    const urls = feedUrls(config);
-    return { config, urls, active: config.enabled && urls.length > 0 };
-  });
-  const feedInstanceIds = settings.feeds.map((f) => f.id);
-  const weather = settings.weather;
-
-  // Resolved before the fetches: the system-stats collection below is gated on
-  // the widget actually being shown (or the admin editing, where every widget
-  // previews), so a hidden card costs no reads on a guest render.
+  // Resolved before the widget data loads: a loader can skip work for a widget
+  // that's hidden (system stats on a guest render).
   const widgets = resolveLayoutWidgets(
     settings.layout.sections,
     settings.components,
-    feedInstanceIds
+    settings.feeds.map((f) => f.id)
   );
-  const statsShown =
-    isAdmin || widgets.some((w) => w.id === "systemStats" && !w.hidden);
-
-  // Fetch the widgets' server-side data (calendar, RSS feed, weather, system
-  // stats) concurrently rather than in series, so a slow upstream only costs
-  // its own time, not the sum. Each fetch is independently time-boxed and
-  // returns null/[] on failure, so one unresponsive service can never hang the
-  // render — the page loads and that widget simply degrades or fills in
-  // client-side.
-  const [events, feedResults, initialWeather, systemStats] = await Promise.all([
-    calEnabled
-      ? cal.homeView === "month"
-        ? fetchCalendarRange(cal.url, now - 40 * DAY, now + 40 * DAY, calAuth)
-        : fetchCalendar(cal.url, cal.count, calAuth)
-      : Promise.resolve([]),
-    Promise.all(
-      feedCards.map((c) =>
-        c.active ? fetchFeeds(c.urls, c.config.count) : Promise.resolve(null)
-      )
-    ),
-    weather.enabled
-      ? fetchWeather(weather.latitude, weather.longitude, weather.units)
-      : Promise.resolve(null),
-    statsShown
-      ? collectSystemStats(settings.systemStats.disks)
-      : Promise.resolve(null),
-  ]);
-
-  // One rendered FeedWidget per active card, keyed by instance id so the
-  // Dashboard can slot each into its layout cell; the label (title, else a
-  // generic) is what the editor's frame/tray shows to tell cards apart.
-  const feedNodes: Record<string, React.ReactNode> = {};
-  const feedLabels: Record<string, string> = {};
-  feedCards.forEach((c, i) => {
-    feedLabels[c.config.id] = c.config.title.trim() || "RSS feed";
-    if (c.active) {
-      feedNodes[c.config.id] = (
-        <FeedWidget
-          feed={feedResults[i]}
-          titleOverride={c.config.title}
-          showSummaries={c.config.summaries}
-        />
-      );
-    }
+  const data = await loadHomeData({
+    settings,
+    apps,
+    bookmarks,
+    widgets,
+    isAdmin,
+    now: new Date(),
   });
-
-  // Whether the calendar widget will actually render (matches CalendarWidget's
-  // own guards), so its layout cell isn't left empty when it won't.
-  const calendarVisible =
-    calEnabled && !(cal.hideWhenEmpty && events.length === 0);
-
-  // Server-computed seeds (admin default tz/location) so the SSR'd widgets have
-  // real content before the client applies the visitor's effective prefs.
-  const timeZone = settings.timezone || "UTC";
-  const initialDate = shortDate(nowDate, timeZone);
-  const initialGreeting = greetingFor(hourIn(nowDate, timeZone));
 
   const params = await searchParams;
   const initialEditing = isAdmin && params.edit === "1";
@@ -152,35 +65,7 @@ export default async function HomePage({
             scale={settings.layout.scale}
             gap={settings.layout.gap}
             topGap={topGap}
-            apps={apps}
-            bookmarks={bookmarks}
-            search={settings.search}
-            categoryOrder={settings.bookmarkCategoryOrder}
-            groupPrivateApps={settings.groupPrivateApps}
-            initialDate={initialDate}
-            initialGreeting={initialGreeting}
-            initialWeather={initialWeather}
-            weatherEnabled={weather.enabled}
-            showClock={settings.components.clock}
-            statusEnabled={statusEnabled}
-            notes={settings.notes}
-            countdown={settings.countdown}
-            worldClocks={settings.worldClocks}
-            systemStats={{ title: settings.systemStats.title, stats: systemStats }}
-            initialNow={nowDate.toISOString()}
-            feedNodes={feedNodes}
-            feedLabels={feedLabels}
-            calendar={
-              calendarVisible ? (
-                <CalendarWidget
-                  events={events}
-                  now={now}
-                  enabled
-                  view={cal.homeView}
-                  hideWhenEmpty={cal.hideWhenEmpty}
-                />
-              ) : null
-            }
+            data={data}
           />
 
           {settings.components.settingsButton && (

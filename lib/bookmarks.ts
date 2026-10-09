@@ -1,3 +1,5 @@
+import type { BookmarkItem } from "./schema";
+
 // Order the bookmark categories that are actually present by the admin-set
 // `order`, then append any present categories that aren't listed (in their given
 // first-seen order). Stale entries in `order` (deleted/renamed categories) are
@@ -18,4 +20,22 @@ export function orderCategories(present: string[], order: string[]): string[] {
     }
   }
   return result;
+}
+
+// Bookmarks grouped by category, categories in display order (see
+// orderCategories), each group keeping the list's own order.
+export function groupBookmarks(
+  bookmarks: BookmarkItem[],
+  categoryOrder: string[]
+): [string, BookmarkItem[]][] {
+  const map = new Map<string, BookmarkItem[]>();
+  for (const bookmark of bookmarks) {
+    const list = map.get(bookmark.category) ?? [];
+    list.push(bookmark);
+    map.set(bookmark.category, list);
+  }
+  return orderCategories(Array.from(map.keys()), categoryOrder).map((c) => [
+    c,
+    map.get(c)!,
+  ]);
 }
