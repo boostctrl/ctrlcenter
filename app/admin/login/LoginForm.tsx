@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, Suspense, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { TextField, Button } from "@/components/admin/ui";
-import BackHome from "@/components/BackHome";
 
 // Only follow `next` when it's a same-site, same-origin path: a single leading
 // slash, not "//" or "/\" (protocol-relative URLs the browser would treat as
@@ -14,7 +13,14 @@ function safeNext(next: string | null): string {
   return "/admin";
 }
 
-function LoginForm() {
+// `passwordConfigured` is decided on the server (page.tsx): with no stored
+// hash and no ADMIN_PASSWORD nobody can sign in, so explain that instead of
+// showing a form that can only ever answer "Invalid password" (#275).
+export default function LoginForm({
+  passwordConfigured,
+}: {
+  passwordConfigured: boolean;
+}) {
   const searchParams = useSearchParams();
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
@@ -65,6 +71,24 @@ function LoginForm() {
     window.location.assign(safeNext(searchParams.get("next")));
   }
 
+  if (!passwordConfigured) {
+    return (
+      <div role="alert" className="glass-card flex w-full max-w-sm flex-col gap-3 p-8">
+        <h1 className="text-2xl font-bold">Sign in</h1>
+        <p className="text-sm text-fg/80">
+          No admin password is set, so nobody can sign in yet.
+        </p>
+        <p className="text-sm text-fg/80">
+          Set <code className="whitespace-nowrap rounded bg-fg/10 px-1 py-0.5">ADMIN_PASSWORD</code>{" "}
+          in the container&apos;s environment (for example in{" "}
+          <code className="whitespace-nowrap rounded bg-fg/10 px-1 py-0.5">docker-compose.yml</code>)
+          and restart it. You can change the password from the admin portal
+          afterwards.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="glass-card flex w-full max-w-sm flex-col gap-4 p-8">
       <h1 className="text-2xl font-bold">Sign in</h1>
@@ -98,16 +122,5 @@ function LoginForm() {
         {loading ? "Signing in..." : needCode ? "Verify" : "Sign in"}
       </Button>
     </form>
-  );
-}
-
-export default function LoginPage() {
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-6">
-      <Suspense>
-        <LoginForm />
-      </Suspense>
-      <BackHome />
-    </main>
   );
 }

@@ -3,6 +3,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import {
+  adminPasswordConfigured,
   verifyEnvPassword,
   hashPassword,
   verifyPasswordHash,
@@ -34,6 +35,23 @@ describe("verifyEnvPassword", () => {
     vi.stubEnv("ADMIN_PASSWORD", "");
     expect(verifyEnvPassword("")).toBe(false);
     expect(verifyEnvPassword("anything")).toBe(false);
+  });
+});
+
+describe("adminPasswordConfigured (#275)", () => {
+  it("is false with no stored hash and no ADMIN_PASSWORD", () => {
+    vi.stubEnv("ADMIN_PASSWORD", "");
+    expect(adminPasswordConfigured({})).toBe(false);
+  });
+
+  it("is true with ADMIN_PASSWORD set", () => {
+    vi.stubEnv("ADMIN_PASSWORD", "s3cret");
+    expect(adminPasswordConfigured({})).toBe(true);
+  });
+
+  it("is true with a password set through the UI, even without the env var", () => {
+    vi.stubEnv("ADMIN_PASSWORD", "");
+    expect(adminPasswordConfigured({ passwordHash: "abc" })).toBe(true);
   });
 });
 

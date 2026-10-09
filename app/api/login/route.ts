@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  adminPasswordConfigured,
+  NO_PASSWORD_MESSAGE,
   verifyEnvPassword,
   verifyPasswordHash,
   createSessionToken,
@@ -56,6 +58,9 @@ export async function POST(request: NextRequest) {
   // Prefer a password set through the UI (stored hash); otherwise fall back to
   // the ADMIN_PASSWORD env var.
   const { auth } = await readConfigInternal();
+  if (!adminPasswordConfigured(auth)) {
+    return NextResponse.json({ error: NO_PASSWORD_MESSAGE }, { status: 503 });
+  }
   const ok = auth.passwordHash
     ? await verifyPasswordHash(password, auth.passwordHash, auth.passwordSalt)
     : verifyEnvPassword(password);

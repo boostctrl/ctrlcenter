@@ -17,6 +17,10 @@ here.
 - **The home page weather shows a moon at night.** The header card used the
   daytime icon around the clock; it now matches the /weather page. White
   weather icons (clouds, fog, snow) also stay visible in light mode. (#270)
+- **A clear message when no admin password is set.** A fresh install without
+  `ADMIN_PASSWORD` used to show a normal sign-in form that rejected every
+  password. The sign-in page now explains what to set, and the server log
+  says so at startup. (#275)
 
 ## [2.10.1] - 2026-10-09
 

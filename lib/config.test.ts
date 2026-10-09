@@ -734,6 +734,9 @@ describe("readConfigInternal stays off public surfaces", () => {
     "app/api/monitor/[id]/route.ts",
     // Auth itself: verifies the password / issues the session.
     "app/api/login/route.ts",
+    // Public login page: reads `auth` only to pass one boolean (is any admin
+    // password configured, #275) to the form. Nothing else reaches the client.
+    "app/admin/login/page.tsx",
     // Admin-only 2FA management: read the current TOTP state before mutating.
     "app/api/2fa/activate/route.ts",
     "app/api/2fa/disable/route.ts",
