@@ -956,10 +956,10 @@ export default function Dashboard({
               <div
                 key={widgetKey(widget)}
                 title={node === null ? emptyReason(widget.id) : undefined}
-                className="flex items-center gap-2 rounded-lg border border-fg/10 bg-fg/5 px-2.5 py-1.5 text-xs text-fg/60"
+                className="flex max-w-full min-w-0 items-center gap-2 rounded-lg border border-fg/10 bg-fg/5 px-2.5 py-1.5 text-xs text-fg/60"
               >
-                <span className="font-medium">{labelFor(widget)}</span>
-                <span className="rounded bg-fg/10 px-1.5 py-0.5 text-[10px] tracking-wide text-fg/60 uppercase">
+                <span className="shrink-0 font-medium">{labelFor(widget)}</span>
+                <span className="shrink-0 rounded bg-fg/10 px-1.5 py-0.5 text-[10px] tracking-wide text-fg/60 uppercase">
                   {widget.hidden ? "Hidden" : "Empty"}
                 </span>
                 {widget.hidden ? (
@@ -971,7 +971,9 @@ export default function Dashboard({
                     Show
                   </button>
                 ) : (
-                  <span className="max-w-72 truncate text-fg/55">
+                  // min-w-0 so the reason truncates inside a phone-width
+                  // chip instead of widening the page (#271).
+                  <span className="max-w-72 min-w-0 truncate text-fg/55">
                     {emptyReason(widget.id)}
                   </span>
                 )}

@@ -32,6 +32,11 @@ here.
 - **The delete confirmation is readable in light mode** and names what you're
   deleting ("Delete “Plex”?"). For destructive actions it now starts on
   Cancel, so a reflexive Enter backs out instead of deleting. (#269)
+- **Edit layout works on phones.** The editing toolbar is now a bar along the
+  bottom of the screen with Done and Undo always in reach (it used to grow
+  into a circle that ran off-screen), each widget shows a single row of
+  controls, and the page no longer scrolls sideways while editing. On large
+  screens the toolbar stays on one line. (#271)
 
 ## [2.10.1] - 2026-10-09
 

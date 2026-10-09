@@ -375,9 +375,13 @@ export function WidgetFrame({
   const space = widget.space ?? {};
   // Narrow cells can't fit the whole control strip beside the label without
   // wrapping over the preview, so the height stepper moves into More there.
+  // Below lg every widget stacks full-width, so the width stepper and Fill
+  // (which only matter on large screens) leave the strip entirely and height
+  // moves into More too — one row of move / More / Hide on a phone (#271).
   const narrow = widget.span < 8;
-  const heightStepper = (
+  const heightStepper = (className = "") => (
     <StepGroup
+      className={className}
       title="Card height — or drag the bottom edge; taller than the content adds breathing room, content widgets scroll. On small screens only scrolling widgets keep their height — the rest stack at auto height."
       display={widget.height !== undefined ? `${widget.height}px` : "Auto"}
       decLabel={`Shorter ${label}`}
@@ -466,7 +470,7 @@ export function WidgetFrame({
             onInc={() => onSpan(key, widget.span + 1)}
             canDec={widget.span > 1}
             canInc={widget.span < GRID_COLUMNS}
-            className="max-lg:opacity-60"
+            className="max-lg:hidden"
           />
           {/* Parked during a resize drag: the span changes every step, so the
               button popping in/out would reflow the strip mid-gesture. */}
@@ -475,21 +479,21 @@ export function WidgetFrame({
               type="button"
               onClick={() => onSpan(key, fillTo)}
               title={`Widen ${label} to fill the empty space in its row`}
-              className="rounded-lg border border-fg/10 px-2 py-1 text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg"
+              className="rounded-lg border border-fg/10 px-2 py-1 text-fg/60 transition-colors hover:bg-fg/10 hover:text-fg max-lg:hidden"
             >
               Fill
             </button>
           )}
-          {!narrow && heightStepper}
+          {!narrow && heightStepper("max-lg:hidden")}
           <MoreMenu>
-              {narrow && (
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] tracking-wide text-fg/60 uppercase">
-                    Height
-                  </span>
-                  {heightStepper}
-                </div>
-              )}
+              <div
+                className={`flex items-center justify-between gap-2 ${narrow ? "" : "lg:hidden"}`}
+              >
+                <span className="text-[10px] tracking-wide text-fg/60 uppercase">
+                  Height
+                </span>
+                {heightStepper()}
+              </div>
             <div className="flex flex-col gap-1.5">
                 <span className="text-[10px] tracking-wide text-fg/60 uppercase">
                   Space around card
@@ -738,9 +742,21 @@ function ToolbarStepper({
   );
 }
 
-// The fixed bottom pill shown while editing: the page-level steppers (UI
-// scale, card gap, top gap), autosave state, undo, revert to how the layout
-// looked when edit mode was entered, reset to the stock arrangement, and done.
+// The edit toolbar: the page-level steppers (UI scale, card gap, top gap),
+// autosave state, undo, revert to how the layout looked when edit mode was
+// entered, reset to the stock arrangement, and done.
+//
+// Large screens get one floating pill. Small screens get a full-width bar
+// pinned to the bottom edge (#271): a centered pill that wraps turned into a
+// tall circle running off-screen, hiding Done. There, row one keeps the
+// essentials (status, Undo, Done) always in reach and row two scrolls
+// sideways. The rows are `lg:contents`, so on large screens their children
+// flow into the single pill row: the label and steppers keep source order
+// (order 0) and `lg:order-*` puts status, Undo, Revert, Reset and Done after.
+// `lg:w-max`: centered with left-1/2, a fixed box's shrink-to-fit width is
+// capped at the right half of the screen, which wrapped the pill in two.
+// z-[45]: above the floating gear (z-40), which otherwise sat on the phone
+// bar's second row, and below dialogs (z-50).
 export function EditToolbar({
   status,
   error,
@@ -772,88 +788,101 @@ export function EditToolbar({
 }) {
   const confirm = useConfirm();
   const ghostBtn =
-    "rounded-full border border-fg/10 bg-fg/5 px-3 py-1.5 text-sm text-fg/80 transition-colors hover:bg-fg/10 disabled:pointer-events-none disabled:opacity-40";
+    "shrink-0 rounded-full border border-fg/10 bg-fg/5 px-3 py-1.5 text-sm text-fg/80 transition-colors hover:bg-fg/10 disabled:pointer-events-none disabled:opacity-40";
   return (
-    <div className="fixed bottom-5 left-1/2 z-40 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-full border border-fg/10 bg-fg/5 py-2 pr-2 pl-4 shadow-lg backdrop-blur-xl">
-      <span className="text-sm font-medium text-fg/80">Editing layout</span>
-      <span className="text-xs text-fg/60 lg:hidden">
-        Widths apply on large screens
-      </span>
-      <ToolbarStepper
-        label="Scale"
-        title="UI scale — resizes every element, site-wide"
-        display={`${scale}%`}
-        decLabel="Smaller UI"
-        incLabel="Larger UI"
-        onDec={() => onScale(Math.max(MIN_UI_SCALE, scale - UI_SCALE_STEP))}
-        onInc={() => onScale(Math.min(MAX_UI_SCALE, scale + UI_SCALE_STEP))}
-        canDec={scale > MIN_UI_SCALE}
-        canInc={scale < MAX_UI_SCALE}
-      />
-      <ToolbarStepper
-        label="Card gap"
-        title="Spacing between cards"
-        display={`${gap}px`}
-        decLabel="Less spacing between cards"
-        incLabel="More spacing between cards"
-        onDec={() => onGap(Math.max(MIN_GRID_GAP, gap - GRID_GAP_STEP))}
-        onInc={() => onGap(Math.min(MAX_GRID_GAP, gap + GRID_GAP_STEP))}
-        canDec={gap > MIN_GRID_GAP}
-        canInc={gap < MAX_GRID_GAP}
-      />
-      <ToolbarStepper
-        label="Top gap"
-        title="Space above the first row of widgets — small screens cap it at 48px"
-        display={`${topGap}px`}
-        decLabel="Less space above the first row"
-        incLabel="More space above the first row"
-        onDec={() => onTopGap(Math.max(MIN_TOP_GAP, topGap - TOP_GAP_STEP))}
-        onInc={() => onTopGap(Math.min(MAX_TOP_GAP, topGap + TOP_GAP_STEP))}
-        canDec={topGap > MIN_TOP_GAP}
-        canInc={topGap < MAX_TOP_GAP}
-      />
-      <SaveStatus status={status} error={error} />
-      <button
-        type="button"
-        disabled={!canUndo}
-        onClick={onUndo}
-        title="Undo the last change (Ctrl+Z)"
-        className={ghostBtn}
-      >
-        Undo
-      </button>
-      <button
-        type="button"
-        onClick={onRevert}
-        title="Go back to how the layout was when you started editing"
-        className={ghostBtn}
-      >
-        Revert
-      </button>
-      <button
-        type="button"
-        onClick={async () => {
-          const ok = await confirm({
-            title: "Reset the layout to its defaults?",
-            message:
-              "Every widget returns to its stock position, size and visibility, and the UI scale and card spacing go back to their defaults. Ctrl+Z can still undo this while you're editing.",
-            confirmLabel: "Reset layout",
-            danger: true,
-          });
-          if (ok) onReset();
-        }}
-        title="Restore the stock arrangement"
-        className={ghostBtn}
-      >
-        Reset
-      </button>
-      <button
-        type="button"
-        onClick={onDone}
-        className="btn-accent rounded-full px-4 py-1.5 text-sm font-medium"
-      >
-        Done
-      </button>
+    <div
+      role="toolbar"
+      aria-label="Layout editor"
+      className="fixed inset-x-0 bottom-0 z-[45] flex flex-col gap-2 border-t border-fg/10 bg-[var(--background)]/90 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-lg backdrop-blur-xl lg:inset-x-auto lg:bottom-5 lg:left-1/2 lg:w-max lg:max-w-[calc(100vw-2rem)] lg:-translate-x-1/2 lg:flex-row lg:flex-wrap lg:items-center lg:justify-center lg:gap-x-3 lg:gap-y-1 lg:rounded-full lg:border lg:py-2 lg:pr-2 lg:pl-4"
+    >
+      <div className="flex items-center gap-2 lg:contents">
+        <span className="text-sm font-medium text-fg/80">Editing layout</span>
+        <span className="lg:order-5">
+          <SaveStatus status={status} error={error} />
+        </span>
+        <span className="flex-1 lg:hidden" aria-hidden />
+        <button
+          type="button"
+          disabled={!canUndo}
+          onClick={onUndo}
+          title="Undo the last change (Ctrl+Z)"
+          className={`${ghostBtn} lg:order-6`}
+        >
+          Undo
+        </button>
+        <button
+          type="button"
+          onClick={onDone}
+          className="btn-accent shrink-0 rounded-full px-4 py-1.5 text-sm font-medium lg:order-9"
+        >
+          Done
+        </button>
+      </div>
+      <div className="-mx-3 flex items-center gap-2 overflow-x-auto px-3 pb-0.5 lg:contents">
+        <span className="shrink-0 text-xs text-fg/60 lg:hidden">
+          Widths apply on large screens
+        </span>
+        <div className="flex shrink-0 items-center gap-2 lg:contents">
+          <ToolbarStepper
+            label="Scale"
+            title="UI scale — resizes every element, site-wide"
+            display={`${scale}%`}
+            decLabel="Smaller UI"
+            incLabel="Larger UI"
+            onDec={() => onScale(Math.max(MIN_UI_SCALE, scale - UI_SCALE_STEP))}
+            onInc={() => onScale(Math.min(MAX_UI_SCALE, scale + UI_SCALE_STEP))}
+            canDec={scale > MIN_UI_SCALE}
+            canInc={scale < MAX_UI_SCALE}
+          />
+          <ToolbarStepper
+            label="Card gap"
+            title="Spacing between cards"
+            display={`${gap}px`}
+            decLabel="Less spacing between cards"
+            incLabel="More spacing between cards"
+            onDec={() => onGap(Math.max(MIN_GRID_GAP, gap - GRID_GAP_STEP))}
+            onInc={() => onGap(Math.min(MAX_GRID_GAP, gap + GRID_GAP_STEP))}
+            canDec={gap > MIN_GRID_GAP}
+            canInc={gap < MAX_GRID_GAP}
+          />
+          <ToolbarStepper
+            label="Top gap"
+            title="Space above the first row of widgets — small screens cap it at 48px"
+            display={`${topGap}px`}
+            decLabel="Less space above the first row"
+            incLabel="More space above the first row"
+            onDec={() => onTopGap(Math.max(MIN_TOP_GAP, topGap - TOP_GAP_STEP))}
+            onInc={() => onTopGap(Math.min(MAX_TOP_GAP, topGap + TOP_GAP_STEP))}
+            canDec={topGap > MIN_TOP_GAP}
+            canInc={topGap < MAX_TOP_GAP}
+          />
+        </div>
+        <button
+          type="button"
+          onClick={onRevert}
+          title="Go back to how the layout was when you started editing"
+          className={`${ghostBtn} lg:order-7`}
+        >
+          Revert
+        </button>
+        <button
+          type="button"
+          onClick={async () => {
+            const ok = await confirm({
+              title: "Reset the layout to its defaults?",
+              message:
+                "Every widget returns to its stock position, size and visibility, and the UI scale and card spacing go back to their defaults. Ctrl+Z can still undo this while you're editing.",
+              confirmLabel: "Reset layout",
+              danger: true,
+            });
+            if (ok) onReset();
+          }}
+          title="Restore the stock arrangement"
+          className={`${ghostBtn} lg:order-8`}
+        >
+          Reset
+        </button>
+      </div>
     </div>
   );
 }
