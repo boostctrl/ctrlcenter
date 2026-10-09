@@ -1,6 +1,6 @@
 // Config migrations, keyed on the file's `schemaVersion` (#288). migrateConfig
-// runs the ordered MIGRATIONS chain below; today it holds one frozen step, the
-// pre-2.0 shape migration (#152) described next, and 3.0 adds `v2 → v3`.
+// runs the ordered MIGRATIONS chain below: the frozen pre-2.0 shape migration
+// (#152) described next, then 3.0's `v2 → v3` (lib/config-migrate-v3.ts).
 //
 // One-time migration of pre-2.0 config shapes (#152). Everything the 1.x line
 // accepted but 2.0 no longer stores lives here, applied structurally to the
@@ -25,8 +25,12 @@
 // The deprecated d7 status windows (#117) are API payload, not config — they
 // were removed from lib/status.ts outright with no migration to run.
 
-import { FEED_DEFAULT_ID, GRID_COLUMNS, MAX_WIDGET_SPACE } from "./layout";
+import { GRID_COLUMNS, MAX_WIDGET_SPACE } from "./layout";
 import { CONFIG_SCHEMA_VERSION } from "./schema/config";
+import { migrateV2toV3 } from "./config-migrate-v3";
+
+// The pre-2.1 single feed card's id in the 2.x list.
+const FEED_DEFAULT_ID = "feed";
 
 // The 1.3 grid was 12 columns; spans saved against it double onto today's 24.
 // A `columns` marker on the persisted layout says which grid the spans were
@@ -231,6 +235,8 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   // stamped 2 — so a v2 file can still carry a pre-2.1 shape, and the step runs
   // for everything stamped 2 or lower. Files stamped 3+ never pay for it.
   { to: 2, appliesTo: (v) => v <= 2, run: migrateConfigShape },
+  // 3.0: widget instances (#297).
+  { to: 3, appliesTo: (v) => v <= 2, run: migrateV2toV3 },
 ];
 
 // The schema a raw config claims; unstamped files predate the field (≤ 2.9)

@@ -8,12 +8,12 @@ import type { Settings } from "@/lib/schema";
 // a theme promoted from the theme builder, a bookmark category reordered.
 // /api/settings merges partial updates key by key, so untouched keys stay as
 // the server has them.
-export function settingsPatch(prev: Settings, next: Settings): Partial<Settings> {
+export function settingsPatch<T extends object = Settings>(prev: T, next: T): Partial<T> {
   const patch: Record<string, unknown> = {};
-  for (const key of Object.keys(next) as (keyof Settings)[]) {
+  for (const key of Object.keys(next) as (keyof T)[]) {
     if (JSON.stringify(prev[key]) !== JSON.stringify(next[key])) {
-      patch[key] = next[key];
+      patch[key as string] = next[key];
     }
   }
-  return patch as Partial<Settings>;
+  return patch as Partial<T>;
 }

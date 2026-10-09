@@ -6,21 +6,14 @@ import { Card, Hint, ToggleRow } from "../ui";
 import type { SettingsDraft } from "./useSettingsDraft";
 
 export default function LayoutSection({ d }: { d: SettingsDraft }) {
-  const {
-    settings,
-    setSettings,
-    components,
-    setComponent,
-    isWidgetShown,
-    setWidgetShown,
-    widgetToggles,
-    componentToggles,
-  } = d;
+  const { settings, setSettings, isWidgetShown, setWidgetShown, widgetToggles, instancesOf, updateWidget, widgetLabels } =
+    d;
+  const headerCards = instancesOf("headerCard");
   return (
     <>
       <Card
         title="Visible widgets"
-        intro="Show or hide home-page widgets. Weather and the calendar are toggled under Widgets, the status row under Monitoring; the split clock/weather/status widgets are managed in the home-page editor."
+        intro="Show or hide home-page widgets. The content widgets (calendars, feeds, notes…) each have their own switch under Widgets; the split clock/weather/status widgets are managed in the home-page editor."
       >
         <div className="flex flex-col gap-2.5">
           {widgetToggles.map((t) => (
@@ -31,14 +24,23 @@ export default function LayoutSection({ d }: { d: SettingsDraft }) {
               onChange={(shown) => setWidgetShown(t.id, shown)}
             />
           ))}
-          {componentToggles.map((t) => (
+          {headerCards.map((w) => (
             <ToggleRow
-              key={t.key}
-              label={t.label}
-              checked={components[t.key]}
-              onChange={(value) => setComponent(t.key, value)}
+              key={w.id}
+              label={
+                headerCards.length > 1
+                  ? `Date & clock (inside ${widgetLabels[w.id]})`
+                  : "Date & clock (inside the header card)"
+              }
+              checked={w.type === "headerCard" && w.showClock}
+              onChange={(showClock) => updateWidget(w.id, { showClock })}
             />
           ))}
+          <ToggleRow
+            label="Floating navigation menu"
+            checked={settings.settingsButton}
+            onChange={(settingsButton) => setSettings({ ...settings, settingsButton })}
+          />
           <ToggleRow
             label="Group private apps separately"
             checked={settings.groupPrivateApps}
@@ -51,7 +53,7 @@ export default function LayoutSection({ d }: { d: SettingsDraft }) {
           Private apps only appear when you&apos;re signed in, so this
           &ldquo;Private Applications&rdquo; group is only ever visible to you.
         </Hint>
-        {!components.settingsButton && (
+        {!settings.settingsButton && (
           <Hint>
             With the floating navigation menu off, reach this page directly at
             /admin.

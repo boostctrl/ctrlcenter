@@ -136,6 +136,7 @@ try {
       ["/admin", "admin"],
       ["/admin?tab=bookmarks", "admin-bookmarks"],
       ["/admin?tab=settings", "admin-settings"],
+      ["/admin?tab=settings&section=widgets", "admin-widgets"],
       ["/admin/monitor", "admin-monitor"],
     ]) {
       await run(ctx, p, `${shot}-${scheme}`);

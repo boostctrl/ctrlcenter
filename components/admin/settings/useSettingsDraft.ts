@@ -1,61 +1,95 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import type { Settings, SettingsInput, FeedConfig } from "@/lib/schema";
-import { type WebhookService, alertChannelSchema, feedUrls, MAX_FEED_CARDS } from "@/lib/schema";
+import type { Settings, SettingsInput, WidgetInstance } from "@/lib/schema";
+import {
+  type WebhookService,
+  alertChannelSchema,
+  feedUrls,
+  newInstance,
+  MAX_FEED_CARDS,
+} from "@/lib/schema";
 import { moveLegacyIntoChannels } from "@/lib/alert-channels";
 import type { ThemePack } from "@/lib/theme";
 import { newThemeId } from "@/lib/prefs";
-import { resolveLayoutWidgets, type LayoutWidgetId } from "@/lib/layout";
-import { reorder } from "../useReorder";
+import {
+  defaultSpanFor,
+  resolveLayout,
+  toSections,
+  type LayoutWidget,
+  type WidgetType,
+} from "@/lib/layout";
+import { instanceLabels } from "@/lib/widgets/labels";
 import { useConfirm } from "../Confirm";
-import { useAutosave, type SaveOptions } from "../useAutosave";
+import { useAutosave, type SaveOptions, type SaveState } from "../useAutosave";
 import { settingsPatch } from "../settingsPatch";
-import { saveSettingsPatch } from "../settingsApi";
+import { saveSettingsPatch, saveWidgets } from "../settingsApi";
 import { useKeyedRows } from "./useKeyedRows";
 
 // The settings form's state: the draft settings object, the autosave that
 // persists it, and the per-section updaters every section component edits
 // it through. One hook so the sections share a single draft and autosave.
-export function useSettingsDraft(initialSettings: Settings, themePacks: ThemePack[]) {
-  // Resolve the layout up front: stored entries can omit `hidden` (the legacy
-  // components toggles fold in at resolve time), but this form saves the
-  // layout as one whole object whenever it changes, and the strict layout
-  // update schema requires every widget fully resolved.
-  const [settings, setSettings] = useState(() => ({
+// The settings as the form holds them: the layout resolved against the widget
+// instances (each row bound to its instance and type), stored back by id.
+export type DraftSettings = Omit<Settings, "layout"> & {
+  layout: Omit<Settings["layout"], "sections"> & { sections: LayoutWidget[] };
+};
+
+// A fresh instance id: the type, then a short random suffix.
+const newInstanceId = (type: WidgetType) => `${type}-${newThemeId().slice(0, 8)}`;
+
+export function useSettingsDraft(
+  initialSettings: Settings,
+  initialWidgets: WidgetInstance[],
+  themePacks: ThemePack[]
+) {
+  // Resolve the layout up front: this form saves the layout as one whole
+  // object whenever it changes, and the strict layout update schema requires
+  // every row complete.
+  const [settings, setSettings] = useState<DraftSettings>(() => ({
     ...initialSettings,
     layout: {
       // Keep columns/scale — this form autosaves the whole layout object, so
       // dropping them here would reset them on the next save.
       ...initialSettings.layout,
-      // Pass the configured feed instance ids (like app/page.tsx does):
-      // without them resolveLayoutWidgets keeps only the stock "feed" instance
-      // and drops every other feed card as an orphan — and since this form
-      // autosaves the whole layout, that drop would persist and un-place a
-      // placed RSS card the next time any setting is saved (#187).
-      sections: resolveLayoutWidgets(
-        initialSettings.layout.sections,
-        initialSettings.components,
-        initialSettings.feeds.map((f) => f.id)
-      ),
+      sections: resolveLayout(initialSettings.layout.sections, initialWidgets),
     },
-    // Trim each feed card's blank URL rows up front (the resolved list, like
-    // the home page uses), so a half-typed row saved earlier doesn't linger.
-    feeds: initialSettings.feeds.map((f) => ({ ...f, urls: feedUrls(f) })),
   }));
+  // The widget instances (#297), with their own autosave to /api/widgets. A
+  // feed card's blank URL rows are trimmed up front (the resolved list, like
+  // the home page uses), so a half-typed row saved earlier doesn't linger.
+  const [widgets, setWidgets] = useState<WidgetInstance[]>(() =>
+    initialWidgets.map((w) => (w.type === "feed" ? { ...w, urls: feedUrls(w) } : w))
+  );
   // Persistence is automatic: every change debounce-saves via useAutosave —
   // only the keys that changed since the last successful save (settingsPatch),
   // so this tab can't revert what another surface saved meanwhile. `saved`
   // starts as the initial state; useAutosave serializes saves, and a failed
   // save leaves it unchanged so its keys go out again with the next one.
-  const saved = useRef<Settings>(settings);
-  const save = useCallback(async (next: Settings, opts?: SaveOptions) => {
+  const saved = useRef<DraftSettings>(settings);
+  const save = useCallback(async (next: DraftSettings, opts?: SaveOptions) => {
     const patch = settingsPatch(saved.current, next);
     if (Object.keys(patch).length === 0) return;
-    await saveSettingsPatch(patch as SettingsInput, { keepalive: opts?.keepalive });
+    const body = patch.layout
+      ? { ...patch, layout: { ...patch.layout, sections: toSections(patch.layout.sections) } }
+      : patch;
+    await saveSettingsPatch(body as SettingsInput, { keepalive: opts?.keepalive });
     saved.current = next;
   }, []);
-  const { status, error } = useAutosave(settings, save);
+  const settingsSave = useAutosave(settings, save);
+  const widgetsSave = useAutosave(widgets, async (next, opts) => {
+    await saveWidgets(next, { keepalive: opts?.keepalive });
+  });
+  // One status for the header: saving while either is, else the latest error.
+  const status: SaveState =
+    settingsSave.status === "saving" || widgetsSave.status === "saving"
+      ? "saving"
+      : settingsSave.status === "error" || widgetsSave.status === "error"
+        ? "error"
+        : settingsSave.status === "saved" || widgetsSave.status === "saved"
+          ? "saved"
+          : "idle";
+  const error = settingsSave.error ?? widgetsSave.error;
   const confirm = useConfirm();
 
   const theme = settings.theme;
@@ -128,47 +162,62 @@ export function useSettingsDraft(initialSettings: Settings, themePacks: ThemePac
         : { enabled }
     );
 
-  const components = settings.components;
-  const setComponent = (key: keyof Settings["components"], value: boolean) =>
-    setSettings((s) => ({
-      ...s,
-      components: { ...s.components, [key]: value },
-    }));
-
-  // Widget visibility now lives on the layout entries themselves (the on-page
-  // editor owns arrangement; these checkboxes are the same `hidden` flags).
+  // Widget visibility lives on the layout rows (the on-page editor owns the
+  // arrangement; these switches are the same `hidden` flags), by instance id.
   const layoutWidgets = settings.layout.sections;
-  const isWidgetShown = (id: LayoutWidgetId) =>
-    !layoutWidgets.find((w) => w.id === id)?.hidden;
-  const setWidgetShown = (id: LayoutWidgetId, shown: boolean) =>
+  const isWidgetShown = (id: string) => !layoutWidgets.find((w) => w.id === id)?.hidden;
+  const setWidgetShown = (id: string, shown: boolean) =>
     setSettings((s) => ({
       ...s,
       layout: {
         ...s.layout,
-        sections: s.layout.sections.map((w) =>
-          w.id === id ? { ...w, hidden: !shown } : w
-        ),
+        sections: s.layout.sections.map((w) => (w.id === id ? { ...w, hidden: !shown } : w)),
       },
     }));
-  // Order mirrors roughly top-to-bottom on the page. The split
-  // clock/weather/status widgets are managed in the home-page editor instead —
-  // weather/status/calendar content keeps its own feature toggles.
-  const widgetToggles: { id: LayoutWidgetId; label: string }[] = [
-    { id: "greeting", label: "Greeting" },
-    { id: "headerCard", label: "Header card (clock, weather & status)" },
-    { id: "search", label: "Search bar" },
-    { id: "notes", label: "Notes card" },
-    { id: "countdown", label: "Countdown card" },
-    { id: "worldClocks", label: "World clocks card" },
-    { id: "systemStats", label: "System stats card" },
-    { id: "apps", label: "Applications" },
-    { id: "bookmarks", label: "Bookmarks" },
-    { id: "favorites", label: "Favorites row" },
-  ];
-  const componentToggles: { key: keyof Settings["components"]; label: string }[] = [
-    { key: "clock", label: "Date & clock (inside the header card)" },
-    { key: "settingsButton", label: "Floating navigation menu" },
-  ];
+
+  // The widget instances (#297).
+  const widgetLabels = instanceLabels(widgets);
+  const instancesOf = (type: WidgetType) => widgets.filter((w) => w.type === type);
+  const updateWidget = (id: string, patch: Partial<WidgetInstance>) =>
+    setWidgets((ws) =>
+      ws.map((w) => (w.id === id ? ({ ...w, ...patch } as WidgetInstance) : w))
+    );
+  // A new instance goes to the end of the list and onto the board, shown: the
+  // admin asked for it, and an empty one renders nothing until filled in.
+  const addWidget = (type: WidgetType) => {
+    if (type === "feed" && instancesOf("feed").length >= MAX_FEED_CARDS) return;
+    const id = newInstanceId(type);
+    const fresh = newInstance(type, id);
+    setWidgets((ws) => [...ws, type === "feed" ? { ...fresh, enabled: true, urls: [""] } : fresh]);
+    setSettings((s) => ({
+      ...s,
+      layout: {
+        ...s.layout,
+        sections: [...s.layout.sections, { id, type, span: defaultSpanFor(type), hidden: false }],
+      },
+    }));
+  };
+  const removeWidget = async (id: string) => {
+    const ok = await confirm({
+      title: `Remove ${widgetLabels[id] ?? "this widget"}?`,
+      message: "Its content goes with it.",
+      confirmLabel: "Remove",
+      danger: true,
+    });
+    if (!ok) return;
+    setWidgets((ws) => ws.filter((w) => w.id !== id));
+    setSettings((s) => ({
+      ...s,
+      layout: { ...s.layout, sections: s.layout.sections.filter((w) => w.id !== id) },
+    }));
+  };
+  // The widgets with no settings of their own, switched on and off here; the
+  // content widgets have their switch beside their editor (Widgets tab).
+  // Order mirrors roughly top-to-bottom on the page.
+  const PLAIN_TYPES: WidgetType[] = ["greeting", "headerCard", "search", "apps", "bookmarks", "favorites"];
+  const widgetToggles = PLAIN_TYPES.flatMap((type) =>
+    instancesOf(type).map((w) => ({ id: w.id, label: widgetLabels[w.id] }))
+  );
   const alertTypeLabel: Record<Settings["alerts"]["type"], string> = {
     generic: "Generic JSON webhook",
     discord: "Discord",
@@ -182,14 +231,6 @@ export function useSettingsDraft(initialSettings: Settings, themePacks: ThemePac
     ntfy: "https://ntfy.sh/your-topic",
   };
 
-  const calendar = settings.calendar;
-  const updateCalendar = (patch: Partial<Settings["calendar"]>) =>
-    setSettings((s) => ({ ...s, calendar: { ...s.calendar, ...patch } }));
-
-  const notes = settings.notes;
-  const updateNotes = (patch: Partial<Settings["notes"]>) =>
-    setSettings((s) => ({ ...s, notes: { ...s.notes, ...patch } }));
-
   const announcement = settings.announcement;
   const updateAnnouncement = (patch: Partial<Settings["announcement"]>) =>
     setSettings((s) => ({
@@ -200,84 +241,6 @@ export function useSettingsDraft(initialSettings: Settings, themePacks: ThemePac
   // Every list editor below threads a FUNCTIONAL updater through setSettings
   // (update off the latest sub-array, never a render-captured snapshot), so a
   // batched pair of row mutations can't drop data — see useKeyedRows.
-  // Feed cards: a list of instances (#167). Each is edited whole through its
-  // stable id; the layout editor places each by matching instanceId.
-  const feeds = settings.feeds;
-  const setFeeds = (update: (prev: FeedConfig[]) => FeedConfig[]) =>
-    setSettings((s) => ({ ...s, feeds: update(s.feeds) }));
-  const updateFeedCard = (id: string, next: FeedConfig) =>
-    setFeeds((fs) => fs.map((f) => (f.id === id ? next : f)));
-  const addFeedCard = () =>
-    setFeeds((fs) =>
-      fs.length >= MAX_FEED_CARDS
-        ? fs
-        : [
-            ...fs,
-            {
-              id: newThemeId(),
-              enabled: true,
-              urls: [""],
-              count: 6,
-              title: "",
-              summaries: false,
-            },
-          ]
-    );
-  const removeFeedCard = (id: string) =>
-    setFeeds((fs) => fs.filter((f) => f.id !== id));
-  const moveFeedCard = (from: number, to: number) =>
-    setFeeds((fs) => reorder(fs, from, to));
-  const countdown = settings.countdown;
-  const setCountdownItems = (
-    update: (prev: Settings["countdown"]["items"]) => Settings["countdown"]["items"]
-  ) =>
-    setSettings((s) => ({
-      ...s,
-      countdown: { ...s.countdown, items: update(s.countdown.items) },
-    }));
-  const countdownRows = useKeyedRows(countdown.items, setCountdownItems);
-  const updateCountdownItem = (
-    i: number,
-    patch: Partial<Settings["countdown"]["items"][number]>
-  ) =>
-    setCountdownItems((items) =>
-      items.map((item, idx) => (idx === i ? { ...item, ...patch } : item))
-    );
-
-  const worldClocks = settings.worldClocks;
-  const setWorldClockItems = (
-    update: (prev: Settings["worldClocks"]["items"]) => Settings["worldClocks"]["items"]
-  ) =>
-    setSettings((s) => ({
-      ...s,
-      worldClocks: { ...s.worldClocks, items: update(s.worldClocks.items) },
-    }));
-  const worldClockRows = useKeyedRows(worldClocks.items, setWorldClockItems);
-  const updateWorldClockItem = (
-    i: number,
-    patch: Partial<Settings["worldClocks"]["items"][number]>
-  ) =>
-    setWorldClockItems((items) =>
-      items.map((item, idx) => (idx === i ? { ...item, ...patch } : item))
-    );
-
-  const systemStats = settings.systemStats;
-  const setStatDisks = (
-    update: (prev: Settings["systemStats"]["disks"]) => Settings["systemStats"]["disks"]
-  ) =>
-    setSettings((s) => ({
-      ...s,
-      systemStats: { ...s.systemStats, disks: update(s.systemStats.disks) },
-    }));
-  const statDiskRows = useKeyedRows(systemStats.disks, setStatDisks);
-  const updateStatDisk = (
-    i: number,
-    patch: Partial<Settings["systemStats"]["disks"][number]>
-  ) =>
-    setStatDisks((disks) =>
-      disks.map((d, idx) => (idx === i ? { ...d, ...patch } : d))
-    );
-
   // Status-page announcements: a client-managed list saved whole through the
   // settings autosave (each entry carries a client-minted id, like a saved
   // theme). Start/end are stored as UTC ISO instants; the datetime-local inputs
@@ -400,39 +363,20 @@ export function useSettingsDraft(initialSettings: Settings, themePacks: ThemePac
     updateWebhookService,
     genWebhookToken,
     toggleWebhookService,
-    components,
-    setComponent,
     layoutWidgets,
     isWidgetShown,
     setWidgetShown,
     widgetToggles,
-    componentToggles,
+    widgets,
+    widgetLabels,
+    instancesOf,
+    updateWidget,
+    addWidget,
+    removeWidget,
     alertTypeLabel,
     alertUrlPlaceholder,
-    calendar,
-    updateCalendar,
-    notes,
-    updateNotes,
     announcement,
     updateAnnouncement,
-    feeds,
-    setFeeds,
-    updateFeedCard,
-    addFeedCard,
-    removeFeedCard,
-    moveFeedCard,
-    countdown,
-    setCountdownItems,
-    countdownRows,
-    updateCountdownItem,
-    worldClocks,
-    setWorldClockItems,
-    worldClockRows,
-    updateWorldClockItem,
-    systemStats,
-    setStatDisks,
-    statDiskRows,
-    updateStatDisk,
     statusAnnouncements,
     setStatusAnnouncements,
     updateStatusAnnouncement,

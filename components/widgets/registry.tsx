@@ -1,11 +1,12 @@
 "use client";
 
-// How each widget renders on the home page (#285): one renderer per widget id,
+// How each widget renders on the home page (#285): one renderer per widget type,
 // beside the metadata in lib/widgets/defs.ts. A renderer returns the widget's
 // node, or null when it has nothing to show right now (feature off, empty, or
 // hidden during an active search) — Dashboard then leaves it out of the grid
 // and, in the editor, shows its empty reason in the tray. Typed as a Record
-// over every widget id, so a widget without a renderer fails to compile.
+// over every widget type, so a type without a renderer fails to compile. A
+// renderer reads its own instance's content (#297) through `instanceOf`.
 //
 // The edit-mode contract: hidden widgets are skipped by Dashboard's render
 // loop in view mode, so a renderer only decides content-existence; in edit
@@ -31,8 +32,8 @@ import SystemStatsWidget from "./SystemStatsWidget";
 import WorldClocksWidget from "./WorldClocksWidget";
 import { isValidTimeZone } from "@/lib/datetime";
 import { groupBookmarks } from "@/lib/bookmarks";
-import { widgetKey, type LayoutWidget, type LayoutWidgetId } from "@/lib/layout";
-import type { AppItem, BookmarkItem } from "@/lib/schema";
+import type { LayoutWidget, WidgetType } from "@/lib/layout";
+import type { AppItem, BookmarkItem, InstanceOf } from "@/lib/schema";
 import type { HomeData } from "@/lib/widgets/data";
 
 // What a renderer can read: the server-built data, plus Dashboard's live
@@ -59,6 +60,17 @@ export type WidgetRenderContext = {
 };
 
 type Renderer = (widget: LayoutWidget, ctx: WidgetRenderContext) => ReactNode;
+
+// The instance a placed widget renders, typed by its type; undefined when the
+// data has no such instance (it was removed since the page loaded).
+function instanceOf<T extends WidgetType>(
+  type: T,
+  widget: LayoutWidget,
+  data: HomeData
+): InstanceOf<T> | undefined {
+  const i = data.instances[widget.id];
+  return i?.type === type ? (i as InstanceOf<T>) : undefined;
+}
 
 // Apply the per-widget label toggle to a widget passed in as a pre-rendered
 // node (the calendar and feed are built server-side). Cloning lets the toggle
@@ -101,25 +113,24 @@ export const cardsFor = (widget: LayoutWidget): number =>
 const cardGridClass = (widget: LayoutWidget, gap: string): string =>
   `grid ${gap} ${CARD_COLS[cardsFor(widget)] ?? CARD_COLS[1]}`;
 
-export const WIDGET_RENDERERS: Record<LayoutWidgetId, Renderer> = {
+export const WIDGET_RENDERERS: Record<WidgetType, Renderer> = {
   greeting: (_, { data }) => <Greeting initialGreeting={data.initialGreeting} />,
 
-  headerCard: (_, { data }) =>
-    data.showClock || data.weatherEnabled || data.statusEnabled ? (
+  headerCard: (widget, { data }) => {
+    const showClock = instanceOf("headerCard", widget, data)?.showClock ?? true;
+    return showClock || data.weatherEnabled || data.statusEnabled ? (
       <HeaderCardWidget
         initialDate={data.initialDate}
         initialWeather={data.initialWeather}
         weatherEnabled={data.weatherEnabled}
-        showClock={data.showClock}
+        showClock={showClock}
         statusEnabled={data.statusEnabled}
         apps={data.apps}
       />
-    ) : null,
+    ) : null;
+  },
 
-  clock: (_, { data }) =>
-    data.showClock ? (
-      <ClockWidget initialDate={data.initialDate} showClock={data.showClock} />
-    ) : null,
+  clock: (_, { data }) => <ClockWidget initialDate={data.initialDate} showClock />,
 
   weather: (_, { data }) =>
     data.weatherEnabled ? (
@@ -158,50 +169,49 @@ export const WIDGET_RENDERERS: Record<LayoutWidgetId, Renderer> = {
       </div>
     ) : null,
 
-  calendar: (widget, { data, q, editing }) =>
-    q && !editing ? null : withTitle(data.calendar, widget.hideLabel),
-
-  notes: (widget, { data }) =>
-    data.notes.content.trim() !== "" ? (
-      <NotesWidget
-        title={data.notes.title}
-        content={data.notes.content}
-        showTitle={!widget.hideLabel}
-      />
-    ) : null,
-
-  feed: (widget, { data, q, editing }) => {
-    const node = data.feedNodes[widgetKey(widget)];
+  calendar: (widget, { data, q, editing }) => {
+    const node = data.nodes[widget.id];
     return !node || (q && !editing) ? null : withTitle(node, widget.hideLabel);
   },
 
-  countdown: (widget, { data }) =>
-    data.countdown.items.some((i) => isValidCountdownDate(i.date)) ? (
-      <CountdownWidget
-        title={data.countdown.title}
-        items={data.countdown.items}
-        showTitle={!widget.hideLabel}
-      />
-    ) : null,
+  notes: (widget, { data }) => {
+    const notes = instanceOf("notes", widget, data);
+    return notes && notes.content.trim() !== "" ? (
+      <NotesWidget title={notes.title} content={notes.content} showTitle={!widget.hideLabel} />
+    ) : null;
+  },
 
-  worldClocks: (widget, { data }) =>
-    data.worldClocks.items.some((i) => isValidTimeZone(i.timeZone.trim())) ? (
+  feed: (widget, { data, q, editing }) => {
+    const node = data.nodes[widget.id];
+    return !node || (q && !editing) ? null : withTitle(node, widget.hideLabel);
+  },
+
+  countdown: (widget, { data }) => {
+    const c = instanceOf("countdown", widget, data);
+    return c && c.items.some((i) => isValidCountdownDate(i.date)) ? (
+      <CountdownWidget title={c.title} items={c.items} showTitle={!widget.hideLabel} />
+    ) : null;
+  },
+
+  worldClocks: (widget, { data }) => {
+    const w = instanceOf("worldClocks", widget, data);
+    return w && w.items.some((i) => isValidTimeZone(i.timeZone.trim())) ? (
       <WorldClocksWidget
-        title={data.worldClocks.title}
-        items={data.worldClocks.items}
+        title={w.title}
+        items={w.items}
         initialNow={data.initialNow}
         showTitle={!widget.hideLabel}
       />
-    ) : null,
+    ) : null;
+  },
 
-  systemStats: (widget, { data }) =>
-    data.systemStats.stats ? (
-      <SystemStatsWidget
-        title={data.systemStats.title}
-        stats={data.systemStats.stats}
-        showTitle={!widget.hideLabel}
-      />
-    ) : null,
+  systemStats: (widget, { data }) => {
+    const w = instanceOf("systemStats", widget, data);
+    const stats = data.systemStats[widget.id];
+    return w && stats ? (
+      <SystemStatsWidget title={w.title} stats={stats} showTitle={!widget.hideLabel} />
+    ) : null;
+  },
 
   favorites: (widget, { q, editing, favoriteApps }) =>
     (!q || editing) && favoriteApps.length > 0 ? (

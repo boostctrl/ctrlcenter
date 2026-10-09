@@ -2,10 +2,10 @@
 // widget registry (lib/widgets/defs.ts) and listed there in registry order,
 // under "For admins: the home page".
 import type { ReactNode } from "react";
-import type { LayoutWidgetId } from "@/lib/layout";
+import type { WidgetType } from "@/lib/layout";
 import { P } from "./ui";
 
-export const WIDGET_HELP: Partial<Record<LayoutWidgetId, { title: string; body: ReactNode }>> = {
+export const WIDGET_HELP: Partial<Record<WidgetType, { title: string; body: ReactNode }>> = {
   notes: {
     title: "Notes card",
     body: (
@@ -29,7 +29,7 @@ export const WIDGET_HELP: Partial<Record<LayoutWidgetId, { title: string; body: 
           Show the latest headlines from one or more RSS, Atom, or JSON
           feeds — news sites, blogs, release notes — merged into a single list,
           newest-first. Add feed URLs in{" "}
-          <strong>Settings → Widgets → RSS feed</strong> (the{" "}
+          <strong>Settings → Widgets → RSS feeds</strong> (the{" "}
           <strong>Test feed</strong> button confirms each is readable, and
           if you paste a site&apos;s home page it offers to fill in the
           feed it links to), pick how many entries to show, then show the
@@ -51,7 +51,7 @@ export const WIDGET_HELP: Partial<Record<LayoutWidgetId, { title: string; body: 
         <P>
           Labeled dates shown as &ldquo;in N days&rdquo; rows — domain
           renewals, birthdays, deadlines. Add them in{" "}
-          <strong>Settings → Widgets → Countdown</strong>, then show the card from
+          <strong>Settings → Widgets → Countdowns</strong>, then show the card from
           the home-page layout editor. Days count in each visitor&apos;s
           own time zone; today and tomorrow get an accent chip, and past
           dates dim and sink below the upcoming ones.

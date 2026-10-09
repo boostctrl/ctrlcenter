@@ -43,7 +43,7 @@ export default async function StatusDetailRoute({ params }: Params) {
           {/* The strip's emphasized (unlinked) Status entry would strand a
               detail page without a way back up, so here — one level below a
               listed page — it stays a link and nothing is current. */}
-          <PageNav current={null} {...navPages(settings)} />
+          <PageNav current={null} {...navPages(settings, config.widgets)} />
           <h1 className="mt-3 text-3xl font-bold">{app.name}</h1>
         </div>
 
@@ -74,8 +74,8 @@ export default async function StatusDetailRoute({ params }: Params) {
           </p>
         )}
       </main>
-      {settings.components.settingsButton && (
-        <FloatingNav {...navPages(settings)} />
+      {settings.settingsButton && (
+        <FloatingNav {...navPages(settings, config.widgets)} />
       )}
     </>
   );

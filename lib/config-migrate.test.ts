@@ -348,8 +348,11 @@ describe("migrateConfig: the versioned chain (#288)", () => {
     expect(configVersion({ schemaVersion: 2 })).toBe(2);
   });
 
+  // The frozen 2.x step on its own, as the chain ran before 3.0.
+  const frozen = [MIGRATIONS[0]];
+
   it("runs the frozen legacy step for unstamped files and stamps the result", () => {
-    const { value, changed } = migrateConfig(legacyFeed());
+    const { value, changed } = migrateConfig(legacyFeed(), frozen);
     expect(changed).toBe(true);
     const v = value as { schemaVersion: number; settings: Record<string, unknown> };
     expect(v.schemaVersion).toBe(2);
@@ -358,13 +361,13 @@ describe("migrateConfig: the versioned chain (#288)", () => {
   });
 
   it("still runs it for a v2 file: 2.1 changed the feed shape without a bump", () => {
-    const { value, changed } = migrateConfig(legacyFeed(2));
+    const { value, changed } = migrateConfig(legacyFeed(2), frozen);
     expect(changed).toBe(true);
     expect((value as { settings: Record<string, unknown> }).settings.feeds).toBeDefined();
   });
 
   it("leaves a current file alone, same reference, no stamp-only rewrite", () => {
-    const modern = { settings: { feeds: [] } };
+    const modern = { schemaVersion: CONFIG_SCHEMA_VERSION, settings: {}, widgets: [] };
     const result = migrateConfig(modern);
     expect(result.changed).toBe(false);
     expect(result.value).toBe(modern);
@@ -375,17 +378,28 @@ describe("migrateConfig: the versioned chain (#288)", () => {
       .toThrow(NewerConfigError);
   });
 
-  it("keys later steps on the version (a simulated v2 → v3)", () => {
-    const toV3: MigrationStep = {
-      to: 3,
-      appliesTo: (v) => v < 3,
-      run: (raw) => ({ value: { ...(raw as object), boards: [] }, changed: true }),
-    };
-    const steps = [...MIGRATIONS, toV3];
-    const fromV1 = migrateConfig(legacyFeed(), steps).value as Record<string, unknown>;
+  it("runs every step a file is behind, in order (v1 → v2 → v3, #297)", () => {
+    const fromV1 = migrateConfig(legacyFeed()).value as Record<string, unknown>;
     expect(fromV1.schemaVersion).toBe(3);
-    expect(fromV1.boards).toEqual([]);
-    expect((fromV1.settings as Record<string, unknown>).feeds).toBeDefined();
+    // The 2.x step folded the single feed into the list, then v3 made it an
+    // instance.
+    expect(fromV1.widgets).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "feed", type: "feed", urls: ["https://a.example/rss"] })])
+    );
+    expect((fromV1.settings as Record<string, unknown>).feeds).toBeUndefined();
+  });
+
+  it("keys later steps on the version (a simulated v3 → v4)", () => {
+    const toV4: MigrationStep = {
+      to: 4,
+      appliesTo: (v) => v < 4,
+      run: (raw) => ({ value: { ...(raw as object), next: true }, changed: true }),
+    };
+    const fromV3 = migrateConfig({ schemaVersion: 3, settings: {}, widgets: [] }, [...MIGRATIONS, toV4])
+      .value as Record<string, unknown>;
+    expect(fromV3.schemaVersion).toBe(4);
+    expect(fromV3.next).toBe(true);
+    expect(fromV3.widgets).toEqual([]);
   });
 });
 

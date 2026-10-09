@@ -33,7 +33,7 @@ export default async function StatusRoute() {
     <>
       <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 pt-12 pb-24 sm:px-10 lg:pt-16">
         <div>
-          <PageNav current="status" {...navPages(settings)} />
+          <PageNav current="status" {...navPages(settings, config.widgets)} />
           <h1 className="mt-3 text-3xl font-bold">Status</h1>
         </div>
 
@@ -69,8 +69,8 @@ export default async function StatusRoute() {
           .
         </p>
       </main>
-      {settings.components.settingsButton && (
-        <FloatingNav {...navPages(settings)} />
+      {settings.settingsButton && (
+        <FloatingNav {...navPages(settings, config.widgets)} />
       )}
     </>
   );

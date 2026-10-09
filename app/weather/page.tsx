@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getSettings } from "@/lib/config";
+import { getSiteConfig } from "@/lib/config";
 import { fetchForecast } from "@/lib/weather";
 import WeatherDetails from "@/components/WeatherDetails";
 import PageNav from "@/components/PageNav";
@@ -10,8 +10,8 @@ export const metadata: Metadata = { title: "Weather" };
 export const dynamic = "force-dynamic";
 
 export default async function WeatherPage() {
-  const settings = await getSettings();
-  const { weather, components } = settings;
+  const { settings, widgets } = await getSiteConfig();
+  const { weather } = settings;
   const initial = weather.enabled
     ? await fetchForecast(weather.latitude, weather.longitude, weather.units)
     : null;
@@ -20,7 +20,7 @@ export default async function WeatherPage() {
     <>
       <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 pt-12 pb-24 sm:px-10 lg:pt-16">
         <div>
-          <PageNav current="weather" {...navPages(settings)} />
+          <PageNav current="weather" {...navPages(settings, widgets)} />
           <h1 className="mt-3 text-3xl font-bold">Weather</h1>
         </div>
 
@@ -32,7 +32,7 @@ export default async function WeatherPage() {
           </p>
         )}
       </main>
-      {components.settingsButton && <FloatingNav {...navPages(settings)} />}
+      {settings.settingsButton && <FloatingNav {...navPages(settings, widgets)} />}
     </>
   );
 }

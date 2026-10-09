@@ -1,8 +1,9 @@
-// Single-instance home-page widget settings: weather, calendar, countdown,
-// world clocks, system stats, and notes.
+// Site-wide weather settings, and the content of the calendar, countdown,
+// world clocks, system stats and notes widgets (each a widget instance since
+// 3.0, lib/schema/instances.ts).
 import { z } from "zod";
 import { secretFields } from "./meta";
-import { patchOf, wholeOf } from "./input";
+import { patchOf } from "./input";
 
 export const weatherSchema = z.object({
   enabled: z.boolean().default(true),
@@ -12,9 +13,9 @@ export const weatherSchema = z.object({
 });
 
 // Agenda widget fed by a published iCal (.ics) URL. Stored leniently; the URL is
-// validated on the admin path.
+// validated on the admin path. No `enabled` flag since 3.0 (#297): the widget
+// shows while its layout row does, and an empty URL shows nothing.
 export const calendarSchema = z.object({
-  enabled: z.boolean().default(false),
   url: z.string().default(""),
   count: z.number().int().min(1).max(20).default(5),
   // The home-page widget's default view: the upcoming-events agenda (default) or a
@@ -108,23 +109,4 @@ export type NotesConfig = z.infer<typeof notesSchema>;
 export const weatherUpdateSchema = patchOf(weatherSchema).extend({
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
-});
-
-// The URL is optional (the widget stays off until set) but must be http(s) or
-// webcal when present.
-export const calendarUpdateSchema = patchOf(calendarSchema).refine(
-  (c) => c.url === undefined || c.url.trim() === "" || /^(https?|webcal):\/\//i.test(c.url.trim()),
-  { message: "Calendar URL must start with http(s) or webcal", path: ["url"] }
-);
-
-export const notesUpdateSchema = patchOf(notesSchema);
-
-// Rows stay lenient in content (a half-typed date or zone must not block
-// autosave; invalid ones simply aren't rendered).
-export const countdownUpdateSchema = patchOf(countdownSchema);
-export const worldClocksUpdateSchema = patchOf(worldClocksSchema);
-
-// Disk rows are capped on input — each is a per-render statfs.
-export const systemStatsUpdateSchema = patchOf(systemStatsSchema).extend({
-  disks: z.array(wholeOf(systemStatsDiskSchema)).max(MAX_STAT_DISKS).optional(),
 });

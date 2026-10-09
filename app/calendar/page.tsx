@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getSettings } from "@/lib/config";
-import { fetchCalendar, fetchCalendarRange } from "@/lib/calendar-fetch";
+import { getSiteConfig } from "@/lib/config";
+import { asCalendar, fetchCalendar, fetchCalendarRange } from "@/lib/calendar-fetch";
 import CalendarView from "@/components/CalendarView";
 import PageNav from "@/components/PageNav";
 import FloatingNav from "@/components/FloatingNav";
-import { navPages } from "@/lib/nav";
+import { activeCalendars, navPages } from "@/lib/nav";
 
 export const metadata: Metadata = { title: "Calendar" };
 export const dynamic = "force-dynamic";
@@ -17,26 +17,40 @@ const DAY = 86_400_000;
 const RANGE_BACK = 70 * DAY;
 const RANGE_FWD = 130 * DAY;
 
+// How many upcoming events the agenda view lists.
+const AGENDA_COUNT = 20;
+
 // The calendar's own page, mirroring /weather and /status. Defaults to a month
-// grid (the home widget defaults to the agenda) with an Agenda toggle.
+// grid (the home widget defaults to the agenda) with an Agenda toggle. Every
+// calendar widget with a feed contributes (#297), merged by start time.
 export default async function CalendarPage() {
-  const settings = await getSettings();
-  const { calendar, components } = settings;
-  const enabled = calendar.enabled && calendar.url.trim() !== "";
+  const { settings, widgets } = await getSiteConfig();
+  const calendars = activeCalendars(settings, widgets);
+  const enabled = calendars.length > 0;
   const now = new Date().getTime();
-  const auth = { username: calendar.username, password: calendar.password };
-  const [monthEvents, agendaEvents] = enabled
-    ? await Promise.all([
-        fetchCalendarRange(calendar.url, now - RANGE_BACK, now + RANGE_FWD, auth),
-        fetchCalendar(calendar.url, 20, auth),
-      ])
-    : [[], []];
+  const perCalendar = await Promise.all(
+    calendars.map((c) =>
+      asCalendar(c.id, () => {
+        const auth = { username: c.username, password: c.password };
+        return Promise.all([
+          fetchCalendarRange(c.url, now - RANGE_BACK, now + RANGE_FWD, auth),
+          fetchCalendar(c.url, AGENDA_COUNT, auth),
+        ]);
+      })
+    )
+  );
+  const byStart = (a: { start: number }, b: { start: number }) => a.start - b.start;
+  const monthEvents = perCalendar.flatMap(([month]) => month).sort(byStart);
+  const agendaEvents = perCalendar
+    .flatMap(([, agenda]) => agenda)
+    .sort(byStart)
+    .slice(0, AGENDA_COUNT);
 
   return (
     <>
       <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 pt-12 pb-24 sm:px-10 lg:pt-16">
         <div>
-          <PageNav current="calendar" {...navPages(settings)} />
+          <PageNav current="calendar" {...navPages(settings, widgets)} />
           <h1 className="mt-3 text-3xl font-bold">Calendar</h1>
         </div>
 
@@ -58,7 +72,7 @@ export default async function CalendarPage() {
           />
         )}
       </main>
-      {components.settingsButton && <FloatingNav {...navPages(settings)} />}
+      {settings.settingsButton && <FloatingNav {...navPages(settings, widgets)} />}
     </>
   );
 }

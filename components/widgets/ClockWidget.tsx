@@ -1,8 +1,8 @@
 import TimeWeather from "../TimeWeather";
 
 // A standalone date + clock card — the header card's clock row on its own glass
-// surface. Content is gated by the same components.clock flag as the combined
-// card, so "Date & clock" hides the clock everywhere at once.
+// surface. Since 3.0 (#297) the header card's clock switch is its own; this
+// widget always shows the clock, and hiding it is hiding the widget.
 export default function ClockWidget({
   initialDate,
   showClock,

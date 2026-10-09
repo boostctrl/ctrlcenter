@@ -12,7 +12,7 @@ import {
 } from "./calendar";
 import { readCapped, fetchWithTimeout } from "./fetch-body";
 import { log, hostOf, errorReason } from "./log";
-import { resolveSecret } from "./secrets";
+import { resolveSecret, withoutEnvSecrets } from "./secrets";
 import { swrCache } from "./swr-cache";
 
 const CAL_TIMEOUT_MS = 6000;
@@ -28,6 +28,15 @@ const CAL_MAX_BYTES = 5 * 1024 * 1024;
 const calendars = swrCache<CalendarEvent[]>("calendar", CAL_CACHE_TTL_MS);
 
 export type CalendarAuth = { username?: string; password?: string };
+
+// CTRLCENTER_CALDAV_PASS belongs to one calendar: the one 2.x had, which the
+// 3.0 migration made the instance with this id (#297). Every other calendar
+// widget fetches with only its own stored credentials, so the env password is
+// never sent to a host it wasn't set for.
+export const ENV_CALENDAR_ID = "calendar";
+export function asCalendar<T>(instanceId: string, fn: () => Promise<T>): Promise<T> {
+  return instanceId === ENV_CALENDAR_ID ? fn() : withoutEnvSecrets(fn);
+}
 
 // Build the request headers, attaching Basic auth for a private calendar. The
 // password may come from CTRLCENTER_CALDAV_PASS to keep it out of config.yaml.

@@ -23,6 +23,7 @@ export * from "./schema/alerts";
 export * from "./schema/webhooks";
 export * from "./schema/widgets";
 export * from "./schema/feeds";
+export * from "./schema/instances";
 export * from "./schema/integrations";
 export * from "./schema/announcements";
 export * from "./schema/layout";

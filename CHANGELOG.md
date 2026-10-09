@@ -12,6 +12,23 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **Every widget can appear any number of times (3.0).** Each widget on the
+  home page is now its own item with its own content: two notes cards, a
+  calendar per person, a feed per topic. In Settings → Widgets each kind
+  lists its widgets, with *Add*, *Remove*, and an *On the home page* switch
+  for each. Your configuration is upgraded automatically on first start,
+  and the previous file is kept beside it as `config.yaml.bak`; the home
+  page looks exactly as before. To go back to 2.13, restore that file and
+  run the `:2.13` image. (#297)
+- Feed cards and calendars no longer have a separate on/off switch: whether
+  one shows is the same *On the home page* switch (or the layout editor) as
+  every other widget, and one you had switched off comes through hidden.
+  The calendar page shows every calendar on the home page, merged. The
+  `CTRLCENTER_CALDAV_PASS` variable keeps applying to your existing
+  calendar, and only to it. (#297)
+
 ## [2.13.0] - 2026-10-09
 
 ### Added

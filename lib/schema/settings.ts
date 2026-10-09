@@ -7,21 +7,7 @@ import { themeSchema, themeInputSchema } from "./theme";
 import { searchSchema, searchUpdateSchema } from "./search";
 import { alertsSchema, alertsUpdateSchema } from "./alerts";
 import { webhooksSchema, webhooksUpdateSchema } from "./webhooks";
-import {
-  weatherSchema,
-  calendarSchema,
-  countdownSchema,
-  worldClocksSchema,
-  systemStatsSchema,
-  notesSchema,
-  weatherUpdateSchema,
-  calendarUpdateSchema,
-  notesUpdateSchema,
-  countdownUpdateSchema,
-  worldClocksUpdateSchema,
-  systemStatsUpdateSchema,
-} from "./widgets";
-import { feedsSchema, feedsUpdateSchema } from "./feeds";
+import { weatherSchema, weatherUpdateSchema } from "./widgets";
 import { integrationsSchema, integrationsUpdateSchema } from "./integrations";
 import {
   announcementSchema,
@@ -29,12 +15,7 @@ import {
   announcementUpdateSchema,
   statusAnnouncementsUpdateSchema,
 } from "./announcements";
-import {
-  componentsSchema,
-  layoutSchema,
-  componentsUpdateSchema,
-  layoutUpdateSchema,
-} from "./layout";
+import { layoutSchema, layoutUpdateSchema } from "./layout";
 
 export const settingsSchema = z.object({
   title: z.string().default("Home"),
@@ -61,19 +42,11 @@ export const settingsSchema = z.object({
   search: searchSchema.default(searchSchema.parse({})),
   weather: weatherSchema.default(weatherSchema.parse({})),
   alerts: alertsSchema.default(alertsSchema.parse({})),
-  calendar: calendarSchema.default(calendarSchema.parse({})),
-  notes: notesSchema.default(notesSchema.parse({})),
   announcement: announcementSchema.default(announcementSchema.parse({})),
   // Maintenance/upcoming-change notices for the /status page. Lenient like the
   // layout `sections` list (used directly in this shared schema): one malformed
   // hand-edited row is dropped rather than failing the whole settings parse.
   statusAnnouncements: lenientArray(statusAnnouncementSchema).default([]),
-  // Feed cards (RSS/Atom/JSON Feed) — a list since 2.1; the pre-2.1 single
-  // `feed` object is folded into it by the shape migration.
-  feeds: feedsSchema,
-  countdown: countdownSchema.default(countdownSchema.parse({})),
-  worldClocks: worldClocksSchema.default(worldClocksSchema.parse({})),
-  systemStats: systemStatsSchema.default(systemStatsSchema.parse({})),
   // Private wholesale (#157, #189): URLs are internal topology, the rest
   // credentials, and even which ones are switched on isn't a visitor's business.
   integrations: integrationsSchema
@@ -83,7 +56,9 @@ export const settingsSchema = z.object({
   webhooks: webhooksSchema
     .default(webhooksSchema.parse({}))
     .register(secretFields, { redact: "all" }),
-  components: componentsSchema.default(componentsSchema.parse({})),
+  // The floating corner menu (Weather, Status, Help, Settings…). Was
+  // `components.settingsButton` before 3.0.
+  settingsButton: z.boolean().default(true),
   layout: layoutSchema.default(layoutSchema.parse({})),
 });
 
@@ -102,21 +77,14 @@ export const settingsInputSchema = z.object({
   search: searchUpdateSchema.optional(),
   weather: weatherUpdateSchema.optional(),
   alerts: alertsUpdateSchema.optional(),
-  calendar: calendarUpdateSchema.optional(),
-  notes: notesUpdateSchema.optional(),
   announcement: announcementUpdateSchema.optional(),
   // The admin sends the whole list (each entry carries a client-minted id), so
   // updateSettings replaces it wholesale — it flows through `rest` like the
   // other plain settings arrays (e.g. bookmarkCategoryOrder).
   statusAnnouncements: statusAnnouncementsUpdateSchema.optional(),
-  // The whole feed-cards list, replaced wholesale like statusAnnouncements.
-  feeds: feedsUpdateSchema.optional(),
-  countdown: countdownUpdateSchema.optional(),
-  worldClocks: worldClocksUpdateSchema.optional(),
-  systemStats: systemStatsUpdateSchema.optional(),
   integrations: integrationsUpdateSchema.optional(),
   webhooks: webhooksUpdateSchema.optional(),
-  components: componentsUpdateSchema.optional(),
+  settingsButton: z.boolean().optional(),
   layout: layoutUpdateSchema.optional(),
 });
 export type SettingsInput = z.infer<typeof settingsInputSchema>;

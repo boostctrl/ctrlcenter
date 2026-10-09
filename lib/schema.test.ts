@@ -11,7 +11,9 @@ import {
   layoutSchema,
   bookmarkCategoryRenameSchema,
   feedUrls,
-  feedUpdateSchema,
+  widgetInstancesUpdateSchema,
+  newInstance,
+  MAX_FEED_CARDS,
   MAX_FEED_URLS,
 } from "./schema";
 
@@ -29,41 +31,36 @@ describe("feedUrls", () => {
   });
 });
 
-describe("feedUpdateSchema", () => {
-  it("rejects a non-http(s) url and more than the cap", () => {
+describe("widgetInstancesUpdateSchema (#297)", () => {
+  const feed = (over: Record<string, unknown> = {}) => ({
+    ...newInstance("feed", "feed"),
+    urls: ["https://a.example"],
+    ...over,
+  });
+  const ok = (list: unknown) => widgetInstancesUpdateSchema.safeParse(list).success;
+
+  it("rejects a non-http(s) feed url and more than the cap", () => {
+    expect(ok([feed({ urls: ["ftp://nope"] })])).toBe(false);
     expect(
-      feedUpdateSchema.safeParse({
-        id: "feed",
-        enabled: true,
-        urls: ["ftp://nope"],
-        count: 6,
-        title: "",
-        summaries: false,
-      }).success
-    ).toBe(false);
-    expect(
-      feedUpdateSchema.safeParse({
-        id: "feed",
-        enabled: true,
-        urls: Array.from({ length: MAX_FEED_URLS + 1 }, (_, i) => `https://a${i}.example`),
-        count: 6,
-        title: "",
-        summaries: false,
-      }).success
+      ok([feed({ urls: Array.from({ length: MAX_FEED_URLS + 1 }, (_, i) => `https://a${i}.example`) })])
     ).toBe(false);
   });
 
-  it("accepts blank rows (trimmed on read) up to the cap", () => {
-    expect(
-      feedUpdateSchema.safeParse({
-        id: "feed",
-        enabled: true,
-        urls: ["https://a.example", ""],
-        count: 6,
-        title: "",
-        summaries: false,
-      }).success
-    ).toBe(true);
+  it("accepts blank feed rows (trimmed on read) up to the cap", () => {
+    expect(ok([feed({ urls: ["https://a.example", ""] })])).toBe(true);
+  });
+
+  it("rejects duplicate ids, unsafe ids, too many feed cards, and a bad calendar url", () => {
+    expect(ok([feed(), feed()])).toBe(false);
+    expect(ok([feed({ id: "a b" })])).toBe(false);
+    expect(ok(Array.from({ length: MAX_FEED_CARDS + 1 }, (_, i) => feed({ id: `f${i}` })))).toBe(false);
+    expect(ok([{ ...newInstance("calendar", "c"), url: "javascript:x" }])).toBe(false);
+    expect(ok([{ ...newInstance("calendar", "c"), url: "webcal://x.test/a.ics" }])).toBe(true);
+  });
+
+  it("requires whole instances", () => {
+    expect(ok([{ id: "n", type: "notes", title: "x" }])).toBe(false);
+    expect(ok([newInstance("notes", "n")])).toBe(true);
   });
 });
 
@@ -362,23 +359,17 @@ describe("settingsInputSchema partial merge semantics", () => {
     expect("statusChecks" in parsed).toBe(false);
   });
 
-  it("preserves a feed entry's instanceId through a layout save (#187)", () => {
-    // The write path must round-trip instanceId: stripping it makes the feed
-    // entry id-less, and resolveLayoutWidgets then drops it and re-appends the
-    // card hidden — a placed RSS card vanishing after any settings save.
+  it("keeps each layout row's instance through a save (#187, #297)", () => {
     const parsed = settingsInputSchema.parse({
       layout: {
         sections: [
-          { id: "greeting", span: 24, hidden: false },
-          { id: "feed", instanceId: "feed-second", span: 12, hidden: false },
+          { widget: "greeting", span: 24, hidden: false },
+          { widget: "feed-second", span: 12, hidden: false },
         ],
         columns: 24,
       },
     });
-    const sections = parsed.layout!.sections;
-    expect(sections[1].instanceId).toBe("feed-second");
-    // A single-instance widget carries no instanceId.
-    expect("instanceId" in sections[0]).toBe(false);
+    expect(parsed.layout!.sections.map((r) => r.widget)).toEqual(["greeting", "feed-second"]);
   });
 
   it("accepts a valid theme and rejects an invalid one", () => {
@@ -454,17 +445,20 @@ describe("countdown date resilience", () => {
     // A hand-edited config's unquoted `date: 2026-09-01` reaches the schema as
     // a JS Date (YAML's timestamp type); one such row must not 500 every page.
     const config = configSchema.parse({
-      settings: {
-        countdown: {
+      widgets: [
+        {
+          id: "countdown",
+          type: "countdown",
           items: [
             { label: "Renewal", date: new Date("2026-09-01") },
             { label: "Typed", date: "2026-10-15" },
             { label: "Junk", date: 42 },
           ],
         },
-      },
+      ],
     });
-    expect(config.settings.countdown.items).toEqual([
+    const countdown = config.widgets[0];
+    expect(countdown.type === "countdown" && countdown.items).toEqual([
       { label: "Renewal", date: "2026-09-01" },
       { label: "Typed", date: "2026-10-15" },
       { label: "Junk", date: "" },

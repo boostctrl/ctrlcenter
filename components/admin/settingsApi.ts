@@ -33,3 +33,26 @@ export async function saveSettingsPatch(
     throw new Error(apiErrorMessage(data, fallback));
   }
 }
+
+// Save the whole widget-instance list (#297). Throws like saveSettingsPatch.
+export async function saveWidgets(
+  widgets: unknown[],
+  { keepalive }: { keepalive?: boolean } = {}
+): Promise<void> {
+  const fallback = "Failed to save widgets";
+  let res: Response;
+  try {
+    res = await fetch("/api/widgets", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(widgets),
+      keepalive,
+    });
+  } catch {
+    throw new Error(fallback);
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(apiErrorMessage(data, fallback));
+  }
+}

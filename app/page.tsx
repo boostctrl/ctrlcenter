@@ -2,7 +2,7 @@ import Dashboard from "@/components/Dashboard";
 import FloatingNav from "@/components/FloatingNav";
 import { StatusProvider } from "@/components/StatusProvider";
 import { EditModeProvider } from "@/components/EditMode";
-import { resolveLayoutWidgets, smallScreenTopGap } from "@/lib/layout";
+import { resolveLayout, smallScreenTopGap } from "@/lib/layout";
 import { readPublicConfig } from "@/lib/api-auth";
 import { navPages } from "@/lib/nav";
 import { monitoredApps } from "@/lib/schema";
@@ -26,13 +26,10 @@ export default async function HomePage({
   const statusEnabled = settings.statusChecks && monitoredApps(apps).length > 0;
   // Resolved before the widget data loads: a loader can skip work for a widget
   // that's hidden (system stats on a guest render).
-  const widgets = resolveLayoutWidgets(
-    settings.layout.sections,
-    settings.components,
-    settings.feeds.map((f) => f.id)
-  );
+  const widgets = resolveLayout(settings.layout.sections, config.widgets);
   const data = await loadHomeData({
     settings,
+    instances: config.widgets,
     apps,
     bookmarks,
     widgets,
@@ -69,8 +66,8 @@ export default async function HomePage({
             data={data}
           />
 
-          {settings.components.settingsButton && (
-            <FloatingNav {...navPages(settings)} />
+          {settings.settingsButton && (
+            <FloatingNav {...navPages(settings, config.widgets)} />
           )}
         </EditModeProvider>
       </StatusProvider>

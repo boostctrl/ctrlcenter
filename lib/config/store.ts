@@ -163,7 +163,8 @@ function persistShapeMigration(): Promise<void> {
         CONFIG_PATH,
         updateYamlText(raw, value, parseConfigYaml, parseConfigYaml(raw)) ?? dump(value)
       );
-      log.info("migrated config.yaml to the 2.0 shape", {
+      log.info("migrated config.yaml to the current schema", {
+        schemaVersion: (value as { schemaVersion?: unknown }).schemaVersion,
         backup: CONFIG_BAK,
       });
     });

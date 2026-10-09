@@ -1,7 +1,7 @@
 import React from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getSettings } from "@/lib/config";
+import { getSiteConfig } from "@/lib/config";
 import { BUILTIN_BANGS } from "@/lib/search";
 import PageNav from "@/components/PageNav";
 import FloatingNav from "@/components/FloatingNav";
@@ -140,11 +140,10 @@ function tableOfContents(content: React.ReactElement<{ children?: React.ReactNod
 
 // In-app usage guide, mirroring /weather, /status and /calendar so the docs are
 // discoverable without leaving the app. Static reference content; the only
-// runtime reads are the built-in bang list and the components flag that gates
+// runtime reads are the built-in bang list and the settings flag that gates
 // the floating navigation menu.
 export default async function HelpPage() {
-  const settings = await getSettings();
-  const { components } = settings;
+  const { settings, widgets } = await getSiteConfig();
   const builtins = Object.entries(BUILTIN_BANGS);
 
   // Every section, kept as one tree so the table of contents can be read off
@@ -450,6 +449,11 @@ export default async function HelpPage() {
             A <em>Hide when no upcoming events</em> option drops the home
             &ldquo;Upcoming&rdquo; card entirely when the agenda is empty.
           </P>
+          <P>
+            Add a calendar widget per feed, for each person or each kind of
+            event. The <A href="/calendar">calendar page</A> merges every
+            calendar shown on the home page.
+          </P>
         </Card>
       </Section>
 
@@ -686,6 +690,15 @@ export default async function HelpPage() {
             the favorites row, and the floating navigation menu — then shape
             the layout directly on the page.
           </P>
+          <P>
+            Any widget can appear more than once, each with its own content:
+            a notes card for the household and another for the homelab, a
+            calendar per person, a feed per topic. In{" "}
+            <strong>Settings → Widgets</strong>, <strong>Add</strong> puts
+            another of a kind on the board, each one has its own{" "}
+            <strong>On the home page</strong> switch, and{" "}
+            <strong>Remove</strong> takes it away with its content.
+          </P>
           <ul className={LIST_CLASS}>
             <li>
               <strong>Reorder.</strong> Drag a card by its{" "}
@@ -727,8 +740,8 @@ export default async function HelpPage() {
           </ul>
           <P>
             The editor previews exactly what the live page shows, keeping cards
-            in the order you place them. Weather, the status row, and the
-            calendar have their own enables alongside their setup.
+            in the order you place them. Weather and the status row have their
+            own switches alongside their setup.
           </P>
         </Card>
 
@@ -819,7 +832,7 @@ export default async function HelpPage() {
     <>
       <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 pt-12 pb-24 sm:px-10 lg:pt-16">
         <div>
-          <PageNav current="help" {...navPages(settings)} />
+          <PageNav current="help" {...navPages(settings, widgets)} />
           <h1 className="mt-3 text-3xl font-bold">Help</h1>
           <p className="mt-1 text-sm text-ink-50">
             Everything ctrlcenter can do, plus setup notes for admins. Some
@@ -858,7 +871,7 @@ export default async function HelpPage() {
         </nav>
         {content}
       </main>
-      {components.settingsButton && <FloatingNav {...navPages(settings)} />}
+      {settings.settingsButton && <FloatingNav {...navPages(settings, widgets)} />}
     </>
   );
 }

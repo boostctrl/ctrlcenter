@@ -1,8 +1,7 @@
-// Home-page component visibility and widget-grid layout.
+// The widget-grid layout: placed widget instances and the grid's spacing.
 import { z } from "zod";
 import {
-  LAYOUT_WIDGET_IDS,
-  DEFAULT_WIDGETS,
+  DEFAULT_SECTIONS,
   GRID_COLUMNS,
   MAX_CARD_COLUMNS,
   MIN_WIDGET_HEIGHT,
@@ -17,43 +16,14 @@ import {
   MIN_UI_SCALE,
   MAX_UI_SCALE,
   DEFAULT_UI_SCALE,
-  defaultSpanFor,
-  type LayoutWidgetId,
   type WidgetSpace,
 } from "../layout";
 import { lenientArray } from "./shared";
-import { patchOf } from "./input";
 
-// Per-component visibility for the home page. Each flag defaults on, so existing
-// configs keep showing everything. Weather, the status row, and the calendar have
-// their own dedicated toggles already, so they aren't duplicated here.
-//
-// greeting/search/apps/bookmarks/favorites are LEGACY inputs since the widget
-// grid: placement visibility lives in layout `hidden` now, and these flags are
-// only folded in by resolveLayoutWidgets for layout entries saved before that
-// (they're still honored so an old config renders unchanged). `clock` stays
-// live — it hides the date/time row inside the header card and gates the
-// standalone clock widget's content — as does `settingsButton`.
-export const componentsSchema = z.object({
-  greeting: z.boolean().default(true),
-  clock: z.boolean().default(true),
-  search: z.boolean().default(true),
-  apps: z.boolean().default(true),
-  bookmarks: z.boolean().default(true),
-  favorites: z.boolean().default(true),
-  settingsButton: z.boolean().default(true),
-});
-export type ComponentsConfig = z.infer<typeof componentsSchema>;
-
-// Home-page widget arrangement: an ordered list of widgets, each with a column
-// span on the 24-column grid, a hidden flag, and (for the card-grid widgets) an
-// optional cards-per-row override. Pre-2.0 shapes (`width` enums, `spaceBelow`,
-// 12-column spans) are rewritten by the one-time shape migration before this
-// schema ever sees them (lib/config-migrate.ts, ledger #152). `hidden`
-// deliberately stays absent (not defaulted) when a stored entry omits it, so
-// resolveLayoutWidgets (lib/layout.ts) can fold the legacy components
-// visibility toggles in; that resolver also rebuilds whatever this lenient
-// per-row parse drops.
+// Home-page widget arrangement: an ordered list of placed widget instances
+// (#297), each with a column span on the 24-column grid, a hidden flag, and
+// optional per-placement tweaks. Shapes from before 3.0 are rewritten by the
+// migration chain (lib/config-migrate.ts) before this schema sees them.
 // One side's spacing value (px). Reused by the lenient and strict space schemas.
 const spaceSideSchema = z.number().int().min(1).max(MAX_WIDGET_SPACE);
 // Per-side extra space around a card. Lenient variant catches a bad side to
@@ -82,13 +52,14 @@ function cleanSpace(space: WidgetSpace | undefined): WidgetSpace | undefined {
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
-export const layoutWidgetSchema = z
+// One placed widget on the grid (#297): which instance (`widget`, an id in the
+// top-level `widgets` list), its column span, a hidden flag, and the optional
+// per-placement tweaks. Every field but the instance is optional and
+// lenient; resolveLayout (lib/layout.ts) fills defaults from the instance's
+// type and drops a row whose instance no longer exists.
+export const layoutSectionSchema = z
   .object({
-    id: z.enum(LAYOUT_WIDGET_IDS),
-    // Multi-instance widgets (feed) carry the config instance they render;
-    // resolveLayoutWidgets validates it against the live instance ids and drops
-    // an orphan, so a bad/stale value here is caught downstream, not at parse.
-    instanceId: z.string().optional().catch(undefined),
+    widget: z.string().min(1),
     span: z.number().int().min(1).max(GRID_COLUMNS).optional().catch(undefined),
     hidden: z.boolean().optional().catch(undefined),
     cards: z
@@ -108,42 +79,18 @@ export const layoutWidgetSchema = z
       .catch(undefined),
     space: lenientSpaceSchema.optional().catch(undefined),
   })
-  .transform(
-    ({
-      id,
-      instanceId,
-      span,
-      hidden,
-      cards,
-      hideLabel,
-      height,
-      space,
-    }): {
-      id: LayoutWidgetId;
-      instanceId?: string;
-      span: number;
-      hidden?: boolean;
-      cards?: number;
-      hideLabel?: boolean;
-      height?: number;
-      space?: WidgetSpace;
-    } => {
-      const resolvedSpace = cleanSpace(space);
-      return {
-        id,
-        ...(instanceId === undefined ? {} : { instanceId }),
-        span: span ?? defaultSpanFor(id),
-        ...(hidden === undefined ? {} : { hidden }),
-        ...(cards === undefined ? {} : { cards }),
-        ...(hideLabel === undefined ? {} : { hideLabel }),
-        ...(height === undefined ? {} : { height }),
-        ...(resolvedSpace ? { space: resolvedSpace } : {}),
-      };
-    }
-  );
+  .transform(({ space, ...row }) => {
+    const resolvedSpace = cleanSpace(space);
+    const out = Object.fromEntries(
+      Object.entries(row).filter(([, v]) => v !== undefined)
+    ) as unknown as Omit<typeof row, "space"> & { space?: WidgetSpace };
+    if (resolvedSpace) out.space = resolvedSpace;
+    return out;
+  });
+export type LayoutSection = z.infer<typeof layoutSectionSchema>;
 
 export const layoutSchema = z.object({
-  sections: lenientArray(layoutWidgetSchema).default(DEFAULT_WIDGETS),
+  sections: lenientArray(layoutSectionSchema).default(DEFAULT_SECTIONS),
   // Which grid the stored spans are for. Always 24 today — the one-time shape
   // migration doubles 12-column spans and stamps this marker; keeping it
   // persisted is what tells that migration a file is already current.
@@ -178,10 +125,6 @@ export const layoutSchema = z.object({
 });
 export type LayoutConfig = z.infer<typeof layoutSchema>;
 
-// Admin input for the component flags, derived from the stored schema
-// (lib/schema/input.ts).
-export const componentsUpdateSchema = patchOf(componentsSchema);
-
 // The admin/editor sends the whole layout (every widget, fully resolved).
 // Hand-written rather than derived: the stored rows are deliberately partial
 // (each field optional, resolved against the widget defaults at read time),
@@ -190,13 +133,7 @@ export const componentsUpdateSchema = patchOf(componentsSchema);
 export const layoutUpdateSchema = z.object({
   sections: z.array(
     z.object({
-      id: z.enum(LAYOUT_WIDGET_IDS),
-      // Multi-instance widgets (feed) bind to their config instance by this id.
-      // It MUST round-trip through a save: without it the stored feed entry
-      // becomes id-less, and resolveLayoutWidgets then drops it and re-appends
-      // the card hidden — a placed RSS card silently vanishing after any
-      // settings save (the read schema, layoutWidgetSchema, keeps it too).
-      instanceId: z.string().optional(),
+      widget: z.string().min(1),
       span: z.number().int().min(1).max(GRID_COLUMNS),
       hidden: z.boolean(),
       cards: z.number().int().min(1).max(MAX_CARD_COLUMNS).optional(),

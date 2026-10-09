@@ -4,6 +4,7 @@ import { redactSecrets, secretFields } from "./meta";
 import { lenientItems } from "./shared";
 import { settingsSchema } from "./settings";
 import { appItemSchema } from "./apps-bookmarks";
+import { widgetInstanceSchema } from "./instances";
 
 // Schema-driven redaction (#287).
 
@@ -23,6 +24,9 @@ function fields(schema: z.ZodType, path: string[] = [], covered = false): { path
   const base = stack[stack.length - 1];
   const item = lenientItems.get(base) ?? (base instanceof z.ZodArray ? (base.element as z.ZodType) : undefined);
   if (item) return fields(item, [...path, "[]"], marked);
+  if (base instanceof z.ZodUnion) {
+    return (base.options as z.ZodType[]).flatMap((o) => fields(o, path, marked));
+  }
   if (base instanceof z.ZodObject) {
     return Object.entries(base.shape as Record<string, z.ZodType>).flatMap(([k, v]) =>
       fields(v, [...path, k], marked)
@@ -36,7 +40,11 @@ describe("secret marks", () => {
     // Any "…Key" (apiKey, userKey), but not a bare "key" like a search bang's.
     const credential = /(pass(word)?|token|\wkey|secret|username|user|chatid)$/i;
     // Every settings and app field named like a credential.
-    const uncovered = [...fields(settingsSchema), ...fields(appItemSchema, ["apps[]"])]
+    const uncovered = [
+      ...fields(settingsSchema),
+      ...fields(appItemSchema, ["apps[]"]),
+      ...fields(widgetInstanceSchema, ["widgets[]"]),
+    ]
       .filter((f) => credential.test(f.path.split(".").pop()!))
       .filter((f) => !f.covered)
       .map((f) => f.path);
@@ -45,11 +53,9 @@ describe("secret marks", () => {
 
   it("blank marked strings and neutralize marked sections", () => {
     const settings = settingsSchema.parse({
-      calendar: { url: "https://cal.test", username: "me", password: "pw" },
       integrations: { sonarr: { enabled: true, url: "http://10.0.0.5", apiKey: "k" } },
     });
     const out = redactSecrets(settingsSchema, settings);
-    expect(out.calendar).toMatchObject({ url: "https://cal.test", username: "", password: "" });
     expect(out.integrations.sonarr).toMatchObject({ enabled: false, url: "", apiKey: "" });
     // Into list entries too: an alert channel keeps its type, loses its keys.
     const alerts = settingsSchema.parse({
@@ -61,7 +67,23 @@ describe("secret marks", () => {
     }).alerts;
     const [ch] = redactSecrets(settingsSchema, { ...settings, alerts }).alerts.channels;
     expect(ch).toMatchObject({ type: "telegram", token: "", chatId: "", smtp: { pass: "", port: 25 } });
+    // A tagged union by its option (#297): a calendar widget loses its
+    // credentials, a notes widget keeps its content.
+    const calendar = widgetInstanceSchema.parse({
+      id: "c",
+      type: "calendar",
+      url: "https://cal.test",
+      username: "me",
+      password: "pw",
+    });
+    expect(redactSecrets(widgetInstanceSchema, calendar)).toMatchObject({
+      url: "https://cal.test",
+      username: "",
+      password: "",
+    });
+    const notes = widgetInstanceSchema.parse({ id: "n", type: "notes", content: "hi" });
+    expect(redactSecrets(widgetInstanceSchema, notes)).toEqual(notes);
     // The input is left alone.
-    expect(settings.calendar.password).toBe("pw");
+    expect(calendar.type === "calendar" && calendar.password).toBe("pw");
   });
 });

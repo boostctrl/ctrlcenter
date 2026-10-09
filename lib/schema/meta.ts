@@ -53,6 +53,12 @@ export function redactSecrets<T>(schema: z.ZodType, value: T): T {
     if (rule?.redact === "blank") return (typeof value === "string" ? "" : value) as T;
   }
   const base = stack[stack.length - 1];
+  // A union (the widget instances, #297): redact by the option the value
+  // actually is. Values reaching here were parsed by this schema, so one fits.
+  if (base instanceof z.ZodUnion) {
+    const option = (base.options as z.ZodType[]).find((o) => o.safeParse(value).success);
+    return option ? redactSecrets(option, value) : value;
+  }
   const item = lenientItems.get(base);
   if (item && Array.isArray(value)) {
     return value.map((v) => redactSecrets(item, v)) as T;

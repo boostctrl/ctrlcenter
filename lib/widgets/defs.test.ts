@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { WIDGET_DEFS, WIDGET_IDS, emptyReason, widgetsWith } from "./defs";
+import { WIDGET_DEFS, WIDGET_IDS, emptyReason } from "./defs";
+import { DEFAULT_INSTANCES, widgetInstanceSchema } from "../schema";
 import { GRID_COLUMNS } from "../layout";
 
 // The widget registry (#285).
@@ -18,15 +19,11 @@ describe("widget registry", () => {
     }
   });
 
-  it("keeps the legacy header list frozen", () => {
-    // These were the pre-grid fixed header; a saved layout missing them gets
-    // them prepended. New widgets must never join this list.
-    expect(widgetsWith("legacyHeader")).toEqual([
-      "greeting",
-      "headerCard",
-      "clock",
-      "weather",
-      "status",
-    ]);
+  it("has an instance schema for every widget type, and no other (#297)", () => {
+    expect(DEFAULT_INSTANCES.map((w) => w.type)).toEqual([...WIDGET_IDS]);
+    for (const type of WIDGET_IDS) {
+      expect(widgetInstanceSchema.safeParse({ id: "x", type }).success, type).toBe(true);
+    }
+    expect(widgetInstanceSchema.safeParse({ id: "x", type: "nope" }).success).toBe(false);
   });
 });

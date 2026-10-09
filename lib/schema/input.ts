@@ -60,6 +60,12 @@ function mapShape(
 function whole(schema: z.ZodType): z.ZodType {
   const s = peel(schema);
   if (s instanceof z.ZodOptional) return whole(s.unwrap() as z.ZodType).optional();
+  // A tagged union (the widget instances, #297): each option made whole, the
+  // tag kept, so input still picks its option by the tag.
+  if (s instanceof z.ZodDiscriminatedUnion) {
+    const options = (s.options as z.ZodType[]).map(whole) as [z.ZodObject, ...z.ZodObject[]];
+    return z.discriminatedUnion(s._zod.def.discriminator, options);
+  }
   const item = lenientItems.get(s);
   if (item) return z.array(whole(item));
   if (s instanceof z.ZodObject) return z.object(mapShape(s, whole));

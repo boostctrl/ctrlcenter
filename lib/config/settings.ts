@@ -1,11 +1,25 @@
 // Settings reads and the settings PUT (#290 split).
 import type { z } from "zod";
 import { GRID_COLUMNS } from "../layout";
-import { settingsSchema, mergeRules, type Settings, type SettingsInput } from "../schema";
+import {
+  settingsSchema,
+  mergeRules,
+  type Settings,
+  type SettingsInput,
+  type WidgetInstance,
+} from "../schema";
 import { mutate, readConfigInternal } from "./store";
 
 export async function getSettings(): Promise<Settings> {
   return (await readConfigInternal()).settings;
+}
+
+// The settings plus the widget instances, for server-rendered pages that
+// derive navigation from both (the calendar link follows the calendar
+// widgets, #297). Server-only: calendar credentials ride along.
+export async function getSiteConfig(): Promise<{ settings: Settings; widgets: WidgetInstance[] }> {
+  const { settings, widgets } = await readConfigInternal();
+  return { settings, widgets };
 }
 
 // Server-only accessor for the calendar Basic-auth credentials. readPublicConfig
@@ -14,12 +28,15 @@ export async function getSettings(): Promise<Settings> {
 // config it hands to client components, keeping them off any client-serializable
 // object (#157). The CTRLCENTER_CALDAV_PASS env override is applied downstream in
 // lib/calendar-fetch; this returns the stored values as-is.
-export async function getCalendarAuth(): Promise<{
+// Per calendar widget (#297); empty credentials for an id that isn't one.
+export async function getCalendarAuth(instanceId: string): Promise<{
   username: string;
   password: string;
 }> {
-  const { calendar } = (await readConfigInternal()).settings;
-  return { username: calendar.username, password: calendar.password };
+  const w = (await readConfigInternal()).widgets.find((i) => i.id === instanceId);
+  return w?.type === "calendar"
+    ? { username: w.username, password: w.password }
+    : { username: "", password: "" };
 }
 
 export async function updateSettings(

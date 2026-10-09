@@ -1,257 +1,75 @@
 import { describe, it, expect } from "vitest";
-import {
-  resolveLayoutWidgets,
-  fillSpan,
-  LAYOUT_WIDGET_IDS,
-  HEADER_WIDGET_IDS,
-  DEFAULT_WIDGETS,
-  type LayoutWidgetId,
-} from "./layout";
+import { resolveLayout, toSections, fillSpan, WIDGET_TYPES, DEFAULT_SECTIONS } from "./layout";
 import { settingsSchema, layoutSchema, layoutUpdateSchema } from "./schema";
 
-describe("resolveLayoutWidgets", () => {
-  it("defaults to the full catalog, in canonical order, for empty/undefined", () => {
-    expect(resolveLayoutWidgets(undefined)).toEqual(DEFAULT_WIDGETS);
-    expect(resolveLayoutWidgets([])).toEqual(DEFAULT_WIDGETS);
+// Instances named after their type, as a fresh config has.
+const STOCK = WIDGET_TYPES.map((type) => ({ id: type as string, type }));
+
+describe("resolveLayout (#297)", () => {
+  it("gives the stock arrangement for the stock rows and instances", () => {
+    const out = resolveLayout(DEFAULT_SECTIONS, STOCK);
+    expect(out.map((w) => w.id)).toEqual([...WIDGET_TYPES]);
+    expect(out.find((w) => w.id === "notes")).toEqual({ id: "notes", type: "notes", span: 8, hidden: true });
   });
 
-  it("keeps saved order/span/hidden and adds what's missing", () => {
-    const saved = [
-      { id: "bookmarks", span: 6, hidden: false },
-      { id: "apps", span: 6, hidden: true },
-    ];
-    const out = resolveLayoutWidgets(saved);
-    // Header widgets are prepended, then the saved order, then missing body
-    // widgets appended.
-    expect(out.slice(0, HEADER_WIDGET_IDS.length).map((w) => w.id)).toEqual([
-      ...HEADER_WIDGET_IDS,
-    ]);
-    const afterHeader = out.slice(HEADER_WIDGET_IDS.length);
-    expect(afterHeader.slice(0, 2)).toEqual(saved);
-    expect(afterHeader.slice(2).map((w) => w.id)).toEqual([
-      "search",
-      "calendar",
-      "notes",
-      "feed",
-      "countdown",
-      "worldClocks",
-      "systemStats",
-      "favorites",
-    ]);
-    // Every widget appears exactly once.
-    expect(out.map((w) => w.id).sort()).toEqual([...LAYOUT_WIDGET_IDS].sort());
-  });
-
-  it("renders a body-sections-only layout exactly like the old page", () => {
-    // A pre-widget config: only body sections saved (spans via the one-time
-    // shape migration), header fixed on top.
-    const out = resolveLayoutWidgets([
-      { id: "search", span: 24 },
-      { id: "calendar", span: 12 },
-      { id: "favorites", span: 24 },
-      { id: "apps", span: 24 },
-      { id: "bookmarks", span: 12 },
-    ]);
-    expect(out.map((w) => w.id)).toEqual([
-      "greeting",
-      "headerCard",
-      "clock",
-      "weather",
-      "status",
-      "search",
-      "calendar",
-      "favorites",
-      "apps",
-      "bookmarks",
-      "notes",
-      "feed",
-      "countdown",
-      "worldClocks",
-      "systemStats",
-    ]);
-    // Combined card visible, split widgets hidden — today's look.
-    expect(out.find((w) => w.id === "headerCard")?.hidden).toBe(false);
-    expect(out.find((w) => w.id === "clock")?.hidden).toBe(true);
-    expect(out.find((w) => w.id === "weather")?.hidden).toBe(true);
-    expect(out.find((w) => w.id === "status")?.hidden).toBe(true);
-  });
-
-  it("drops unknown ids and duplicates, and coerces a bad span to the default", () => {
-    const out = resolveLayoutWidgets([
-      { id: "apps", span: 6 },
-      { id: "apps", span: 12 }, // duplicate id — ignored (first wins)
-      { id: "nope" as LayoutWidgetId, span: 6 }, // unknown — dropped
-      { id: "search", span: 25 }, // out of range — default span
-      { id: "bookmarks", span: 2.5 }, // not an integer — default span
-    ]);
-    expect(out.find((w) => w.id === "apps")?.span).toBe(6);
-    expect(out.find((w) => w.id === "search")?.span).toBe(24);
-    expect(out.find((w) => w.id === "bookmarks")?.span).toBe(24);
-    expect(out.some((w) => (w.id as string) === "nope")).toBe(false);
-    expect(out).toHaveLength(LAYOUT_WIDGET_IDS.length);
-  });
-
-  it("keeps a valid cards override and drops an invalid one", () => {
-    const out = resolveLayoutWidgets([
-      { id: "apps", span: 24, cards: 4 },
-      { id: "bookmarks", span: 24, cards: 0 }, // out of range — dropped
-      { id: "favorites", span: 24, cards: 2.5 }, // not an integer — dropped
-    ]);
-    expect(out.find((w) => w.id === "apps")?.cards).toBe(4);
-    expect("cards" in out.find((w) => w.id === "bookmarks")!).toBe(false);
-    expect("cards" in out.find((w) => w.id === "favorites")!).toBe(false);
-  });
-
-  it("keeps a boolean hideLabel and ignores a non-boolean one", () => {
-    const out = resolveLayoutWidgets([
-      { id: "apps", span: 24, hideLabel: true },
-      { id: "bookmarks", span: 24, hideLabel: "yes" },
-      { id: "favorites", span: 24 }, // absent — stays off
-    ]);
-    expect(out.find((w) => w.id === "apps")?.hideLabel).toBe(true);
-    expect("hideLabel" in out.find((w) => w.id === "bookmarks")!).toBe(false);
-    expect("hideLabel" in out.find((w) => w.id === "favorites")!).toBe(false);
-  });
-
-  it("keeps an in-range integer height and drops an invalid one", () => {
-    const out = resolveLayoutWidgets([
-      { id: "apps", span: 24, height: 320 },
-      { id: "bookmarks", span: 24, height: 50 }, // below min — dropped
-      { id: "feed", span: 24, height: 300.5 }, // not an integer — dropped
-      { id: "notes", span: 24, height: 99999 }, // above max — dropped
-      { id: "favorites", span: 24 }, // absent — stays auto
-    ]);
-    expect(out.find((w) => w.id === "apps")?.height).toBe(320);
-    expect("height" in out.find((w) => w.id === "bookmarks")!).toBe(false);
-    expect("height" in out.find((w) => w.id === "feed")!).toBe(false);
-    expect("height" in out.find((w) => w.id === "notes")!).toBe(false);
-    expect("height" in out.find((w) => w.id === "favorites")!).toBe(false);
-  });
-
-  it("keeps valid per-side space values and drops invalid sides", () => {
-    const out = resolveLayoutWidgets([
-      { id: "apps", span: 24, space: { top: 24, bottom: 16 } },
-      // A bad side is dropped; a valid side on the same entry survives.
-      { id: "bookmarks", span: 24, space: { left: 8, right: 0, top: 99999 } },
-      { id: "feed", span: 24, space: { top: 12.5 } }, // non-integer — dropped
-      { id: "notes", span: 24 }, // absent — none
-    ]);
-    expect(out.find((w) => w.id === "apps")?.space).toEqual({ top: 24, bottom: 16 });
-    expect(out.find((w) => w.id === "bookmarks")?.space).toEqual({ left: 8 });
-    expect("space" in out.find((w) => w.id === "feed")!).toBe(false);
-    expect("space" in out.find((w) => w.id === "notes")!).toBe(false);
-  });
-
-  it("folds legacy components toggles into hidden for entries without one", () => {
-    const components = { greeting: false, apps: false, search: true };
-    const out = resolveLayoutWidgets(
+  it("binds each row to its instance and type, in saved order", () => {
+    const out = resolveLayout(
       [
-        { id: "search", span: 24 },
-        { id: "apps", span: 24 }, // no hidden — folds components.apps
+        { widget: "n2", span: 6, hidden: false },
+        { widget: "n1", span: 12, hidden: true },
       ],
-      components
+      [
+        { id: "n1", type: "notes" },
+        { id: "n2", type: "notes" },
+      ]
     );
-    // Saved entry without hidden folds the toggle…
-    expect(out.find((w) => w.id === "apps")?.hidden).toBe(true);
-    expect(out.find((w) => w.id === "search")?.hidden).toBe(false);
-    // …and so does a missing widget (greeting was never in the saved list).
-    expect(out.find((w) => w.id === "greeting")?.hidden).toBe(true);
-    // Toggles without an opinion leave the default.
-    expect(out.find((w) => w.id === "bookmarks")?.hidden).toBe(false);
+    expect(out).toEqual([
+      { id: "n2", type: "notes", span: 6, hidden: false },
+      { id: "n1", type: "notes", span: 12, hidden: true },
+    ]);
   });
 
-  it("prefers an explicit hidden over the legacy toggle", () => {
-    const out = resolveLayoutWidgets(
-      [{ id: "apps", span: 12, hidden: false }],
-      { apps: false }
-    );
-    expect(out.find((w) => w.id === "apps")?.hidden).toBe(false);
+  it("appends every instance no row places, hidden at its type's default span", () => {
+    const out = resolveLayout([{ widget: "apps", span: 24, hidden: false }], [
+      { id: "apps", type: "apps" },
+      { id: "notes-2", type: "notes" },
+    ]);
+    expect(out[1]).toEqual({ id: "notes-2", type: "notes", span: 8, hidden: true });
   });
 
-  it("appends widgets added in later versions, dormant, to an older layout", () => {
-    // The upgrade path: a full layout saved before notes/feed existed must
-    // render unchanged, with the new widgets appended hidden at their default
-    // spans.
-    const added: LayoutWidgetId[] = [
-      "notes",
-      "feed",
-      "countdown",
-      "worldClocks",
-      "systemStats",
+  it("skips rows for missing instances and repeats, and fixes bad values", () => {
+    const out = resolveLayout(
+      [
+        { widget: "gone", span: 6, hidden: false },
+        { widget: "apps", span: 25, hidden: "no" },
+        { widget: "apps", span: 6, hidden: false },
+        { span: 6 },
+      ],
+      [{ id: "apps", type: "apps" }]
+    );
+    expect(out).toEqual([{ id: "apps", type: "apps", span: 24, hidden: false }]);
+  });
+
+  it("keeps valid placement tweaks and drops invalid ones", () => {
+    const inst = [
+      { id: "a", type: "apps" as const },
+      { id: "b", type: "bookmarks" as const },
     ];
-    const older = LAYOUT_WIDGET_IDS.filter((id) => !added.includes(id)).map(
-      (id) => ({ id, span: 24, hidden: false })
+    const [a, b] = resolveLayout(
+      [
+        { widget: "a", span: 24, cards: 4, hideLabel: true, height: 320, space: { top: 24, bottom: 16 } },
+        { widget: "b", span: 24, cards: 0, hideLabel: "yes", height: 50, space: { left: 8, right: 0, top: 99999 } },
+      ],
+      inst
     );
-    const out = resolveLayoutWidgets(older);
-    expect(out.map((w) => w.id)).toEqual([...older.map((w) => w.id), ...added]);
-    for (const id of added) {
-      // The feed is multi-instance: its appended entry carries the stock
-      // instance id so the layout binds to the default feed card.
-      const expected =
-        id === "feed"
-          ? { id, instanceId: "feed", span: 8, hidden: true }
-          : { id, span: 8, hidden: true };
-      expect(out.find((w) => w.id === id)).toEqual(expected);
-    }
+    expect(a).toMatchObject({ cards: 4, hideLabel: true, height: 320, space: { top: 24, bottom: 16 } });
+    expect(b).toEqual({ id: "b", type: "bookmarks", span: 24, hidden: false, space: { left: 8 } });
   });
 
-  describe("multi-instance feed reconciliation (#167)", () => {
-    // A concrete non-feed entry keeps the resolver's other branches exercised.
-    const apps = { id: "apps", span: 24, hidden: false };
-
-    it("keeps every placed feed instance that is still configured", () => {
-      const out = resolveLayoutWidgets(
-        [
-          apps,
-          { id: "feed", instanceId: "a", span: 8, hidden: false },
-          { id: "feed", instanceId: "b", span: 12, hidden: false },
-        ],
-        undefined,
-        ["a", "b"]
-      );
-      const feeds = out.filter((w) => w.id === "feed");
-      expect(feeds.map((w) => w.instanceId)).toEqual(["a", "b"]);
-      expect(feeds.map((w) => w.span)).toEqual([8, 12]);
-    });
-
-    it("drops a feed entry whose instance was deleted (orphan)", () => {
-      const out = resolveLayoutWidgets(
-        [apps, { id: "feed", instanceId: "gone", span: 8, hidden: false }],
-        undefined,
-        ["a"]
-      );
-      // "gone" isn't configured → dropped; the configured "a" is appended hidden.
-      const feeds = out.filter((w) => w.id === "feed");
-      expect(feeds).toEqual([{ id: "feed", instanceId: "a", span: 8, hidden: true }]);
-    });
-
-    it("appends a configured instance that has no layout entry yet, hidden", () => {
-      const out = resolveLayoutWidgets(
-        [apps, { id: "feed", instanceId: "a", span: 8, hidden: false }],
-        undefined,
-        ["a", "b"]
-      );
-      const feeds = out.filter((w) => w.id === "feed");
-      expect(feeds.map((w) => [w.instanceId, w.hidden])).toEqual([
-        ["a", false],
-        ["b", true],
-      ]);
-    });
-
-    it("dedupes repeated instanceIds and drops a feed entry with none", () => {
-      const out = resolveLayoutWidgets(
-        [
-          { id: "feed", instanceId: "a", span: 8, hidden: false },
-          { id: "feed", instanceId: "a", span: 20, hidden: false },
-          { id: "feed", span: 8, hidden: false },
-        ],
-        undefined,
-        ["a"]
-      );
-      const feeds = out.filter((w) => w.id === "feed");
-      // First "a" wins (span 8); the duplicate and the id-less entry are dropped.
-      expect(feeds).toEqual([{ id: "feed", instanceId: "a", span: 8, hidden: false }]);
-    });
+  it("round-trips through toSections", () => {
+    const out = resolveLayout(DEFAULT_SECTIONS, STOCK);
+    expect(resolveLayout(toSections(out), STOCK)).toEqual(out);
+    expect(toSections(out)[0]).toEqual({ widget: "greeting", span: 16, hidden: false });
   });
 });
 
@@ -290,17 +108,17 @@ describe("fillSpan", () => {
 describe("layout schema", () => {
   it("settingsSchema defaults to the full widget catalog on the 24-column grid", () => {
     const layout = settingsSchema.parse({}).layout;
-    expect(layout.sections).toEqual(DEFAULT_WIDGETS);
+    expect(layout.sections).toEqual(DEFAULT_SECTIONS);
     expect(layout.columns).toBe(24);
     expect(layout.scale).toBe(100);
   });
 
   it("parses spans as-is and re-parses idempotently (pre-24 shapes are the migration's job)", () => {
     const once = layoutSchema.parse({
-      sections: [{ id: "apps", span: 7 }],
+      sections: [{ widget: "apps", span: 7 }],
       columns: 24,
     });
-    expect(once.sections).toEqual([{ id: "apps", span: 7 }]);
+    expect(once.sections).toEqual([{ widget: "apps", span: 7 }]);
     // Re-parsing the output (as writeConfig does) is a no-op.
     expect(layoutSchema.parse(once)).toEqual(once);
   });
@@ -314,36 +132,36 @@ describe("layout schema", () => {
   it("keeps a valid cards override and drops an invalid one", () => {
     const parsed = layoutSchema.parse({
       sections: [
-        { id: "apps", span: 24, cards: 3 },
-        { id: "bookmarks", span: 24, cards: 9 },
+        { widget: "apps", span: 24, cards: 3 },
+        { widget: "bookmarks", span: 24, cards: 9 },
       ],
       columns: 24,
     });
-    expect(parsed.sections[0]).toEqual({ id: "apps", span: 24, cards: 3 });
-    expect(parsed.sections[1]).toEqual({ id: "bookmarks", span: 24 });
+    expect(parsed.sections[0]).toEqual({ widget: "apps", span: 24, cards: 3 });
+    expect(parsed.sections[1]).toEqual({ widget: "bookmarks", span: 24 });
   });
 
   it("keeps a valid per-side space and drops one with no valid side", () => {
     const parsed = layoutSchema.parse({
       sections: [
-        { id: "apps", span: 24, space: { top: 24, bottom: 16 } },
-        { id: "feed", span: 24, space: { top: 0 } }, // no valid side — dropped
+        { widget: "apps", span: 24, space: { top: 24, bottom: 16 } },
+        { widget: "feed", span: 24, space: { top: 0 } }, // no valid side — dropped
       ],
       columns: 24,
     });
     expect(parsed.sections[0]).toEqual({
-      id: "apps",
+      widget: "apps",
       span: 24,
       space: { top: 24, bottom: 16 },
     });
-    expect(parsed.sections[1]).toEqual({ id: "feed", span: 24 });
+    expect(parsed.sections[1]).toEqual({ widget: "feed", span: 24 });
   });
 
   it("keeps hidden absent when a stored entry omits it, present when not", () => {
     const parsed = layoutSchema.parse({
       sections: [
-        { id: "apps", span: 6 },
-        { id: "search", span: 12, hidden: true },
+        { widget: "apps", span: 6 },
+        { widget: "search", span: 12, hidden: true },
       ],
     });
     expect("hidden" in parsed.sections[0]).toBe(false);
@@ -353,25 +171,23 @@ describe("layout schema", () => {
   it("drops only the malformed rows, keeping the good ones", () => {
     const parsed = layoutSchema.parse({
       sections: [
-        { id: "not-a-widget" },
-        { id: "apps", span: 6 },
+        { id: "apps" }, // the v2 shape: no `widget`
+        { widget: "apps", span: 6 },
         "garbage",
       ],
       columns: 24,
     });
-    expect(parsed.sections).toEqual([{ id: "apps", span: 6 }]);
-    // The resolver then rebuilds the rest around what survived.
-    const resolved = resolveLayoutWidgets(parsed.sections);
-    expect(resolved.map((w) => w.id).sort()).toEqual(
-      [...LAYOUT_WIDGET_IDS].sort()
-    );
+    expect(parsed.sections).toEqual([{ widget: "apps", span: 6 }]);
+    // The resolver then adds every unplaced instance around what survived.
+    const resolved = resolveLayout(parsed.sections, STOCK);
+    expect(resolved.map((w) => w.id).sort()).toEqual([...WIDGET_TYPES].sort());
   });
 
   it("layoutUpdateSchema requires a fully-resolved list and bounds span/cards/scale", () => {
     const good = {
       sections: [
         {
-          id: "apps",
+          widget: "apps",
           span: 13,
           hidden: false,
           cards: 4,
@@ -393,14 +209,14 @@ describe("layout schema", () => {
     expect(parsed.data?.columns).toBe(24);
     expect(parsed.data?.scale).toBe(100);
     for (const bad of [
-      { sections: [{ id: "apps", span: 0, hidden: false }] },
-      { sections: [{ id: "apps", span: 25, hidden: false }] },
-      { sections: [{ id: "apps", span: 6 }] }, // hidden required
-      { sections: [{ id: "apps", width: "half", hidden: false }] }, // legacy shape rejected
-      { sections: [{ id: "apps", span: 6, hidden: false, cards: 5 }] },
-      { sections: [{ id: "apps", span: 6, hidden: false, height: 40 }] }, // below min
-      { sections: [{ id: "apps", span: 6, hidden: false, space: { top: 0 } }] }, // side below min
-      { sections: [{ id: "apps", span: 6, hidden: false, space: { top: 99999 } }] }, // side above max
+      { sections: [{ widget: "apps", span: 0, hidden: false }] },
+      { sections: [{ widget: "apps", span: 25, hidden: false }] },
+      { sections: [{ widget: "apps", span: 6 }] }, // hidden required
+      { sections: [{ id: "apps", span: 6, hidden: false }] }, // v2 shape rejected
+      { sections: [{ widget: "apps", span: 6, hidden: false, cards: 5 }] },
+      { sections: [{ widget: "apps", span: 6, hidden: false, height: 40 }] }, // below min
+      { sections: [{ widget: "apps", span: 6, hidden: false, space: { top: 0 } }] }, // side below min
+      { sections: [{ widget: "apps", span: 6, hidden: false, space: { top: 99999 } }] }, // side above max
       { sections: [], scale: 500 },
       { sections: [], gap: 999 }, // gap out of range
     ]) {

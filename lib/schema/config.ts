@@ -5,17 +5,21 @@ import { settingsSchema } from "./settings";
 import { appItemSchema, bookmarkItemSchema } from "./apps-bookmarks";
 import { themePackSchema } from "./theme";
 import { authSchema } from "./auth";
+import { widgetInstancesSchema } from "./instances";
 
 // The on-disk config shape's version, written on every save. Files without it
 // predate the field (2.9 and earlier). lib/config-migrate.ts keys its
 // migration chain on this (#288): the frozen pre-2.x step still detects by
 // shape for files stamped ≤ 2, each later shape change bumps this with its own
 // step, and a file stamped higher than this build knows is refused.
-export const CONFIG_SCHEMA_VERSION = 2;
+export const CONFIG_SCHEMA_VERSION = 3;
 
 export const configSchema = z.object({
   schemaVersion: z.number().int().default(CONFIG_SCHEMA_VERSION),
   settings: settingsSchema.default(settingsSchema.parse({})),
+  // Every widget on the board, with its content (#297). Layout sections
+  // place them by id.
+  widgets: widgetInstancesSchema,
   apps: z.array(appItemSchema).default([]),
   bookmarks: z.array(bookmarkItemSchema).default([]),
   // Admin overrides of the built-in theme packs (edit-and-reset; see

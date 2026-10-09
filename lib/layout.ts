@@ -5,31 +5,13 @@ import { WIDGET_DEFS, WIDGET_IDS, widgetsWith, type WidgetDef } from "./widgets/
 // span (1–24) and a hidden flag; heights stay content-driven and rows pack
 // automatically — there is no pinned x/y placement.
 
-// The widget ids, labels, defaults and capability lists below are derived
+// The widget types, labels, defaults and capability lists below are derived
 // from the widget registry (lib/widgets/defs.ts, #285) — add a widget there.
-export const LAYOUT_WIDGET_IDS = WIDGET_IDS;
+// What's placed on the grid is an instance of a type (#297): the layout names
+// instances by id, and an instance's type decides how it renders.
+export const WIDGET_TYPES = WIDGET_IDS;
 
-export type LayoutWidgetId = (typeof LAYOUT_WIDGET_IDS)[number];
-
-// Widget types that can appear more than once on the board, each bound to its
-// own config instance. A multi-instance entry carries an `instanceId` (matching
-// a config instance's id); its identity for keys, reordering and per-widget
-// edits is that instanceId, not the type id. Single-instance widgets omit it
-// and are identified by their type id as before. Feed is the first (and today
-// only) instanceable type — the same machinery generalizes to notes/countdown.
-export const INSTANCEABLE_WIDGET_IDS: readonly LayoutWidgetId[] = widgetsWith("instanceable");
-
-// The default feed instance's id: the sole instance a fresh install ships and
-// the target the single→list migration folds a pre-2.1 feed into. Shared by the
-// layout default, the config schema, and lib/config-migrate.
-export const FEED_DEFAULT_ID = "feed";
-
-// A layout entry's stable identity: its instanceId for multi-instance widgets,
-// else its type id. Keys, reorder matching, and the per-widget edit callbacks
-// all go through this so two instances of the same type stay distinct.
-export function widgetKey(w: { id: LayoutWidgetId; instanceId?: string }): string {
-  return w.instanceId ?? w.id;
-}
+export type WidgetType = (typeof WIDGET_TYPES)[number];
 
 export const GRID_COLUMNS = 24;
 
@@ -37,19 +19,19 @@ export const GRID_COLUMNS = 24;
 // favorites). `cards` on a layout entry is an explicit override; absent means
 // "auto" — derived from the widget's span (see cardGridClass in Dashboard).
 export const MAX_CARD_COLUMNS = 4;
-export const CARD_WIDGET_IDS: readonly LayoutWidgetId[] = widgetsWith("cards");
+export const CARD_WIDGET_TYPES: readonly WidgetType[] = widgetsWith("cards");
 
 // Widgets that render a section heading (the shared SectionTitle) and so can
 // have it toggled off per-widget from the layout editor (see `hideLabel`). The
 // header widgets, search and the split clock/weather/status have no heading.
-export const TITLED_WIDGET_IDS: readonly LayoutWidgetId[] = widgetsWith("titled");
+export const TITLED_WIDGET_TYPES: readonly WidgetType[] = widgetsWith("titled");
 
 // The content/list widgets. When given an explicit `height` these scroll their
 // overflow; the others (header widgets, search) center their content in the
 // set height instead, so sizing the greeting/header card restores the classic
 // centered header. Any widget can take a height — this set only decides
 // scroll-vs-center behavior.
-export const SIZED_WIDGET_IDS: readonly LayoutWidgetId[] = widgetsWith("sized");
+export const SIZED_WIDGET_TYPES: readonly WidgetType[] = widgetsWith("sized");
 
 // Per-widget explicit height (px): the card is exactly this tall — taller than
 // its content (breathing room / a header band) or shorter (content scrolls or
@@ -101,55 +83,42 @@ export const MAX_UI_SCALE = 150;
 export const DEFAULT_UI_SCALE = 100;
 export const UI_SCALE_STEP = 5;
 
+// One placed widget, resolved: the instance (`id`) and its type, plus where
+// and how it sits on the grid.
 export type LayoutWidget = {
-  id: LayoutWidgetId;
-  // Present only on multi-instance widgets (INSTANCEABLE_WIDGET_IDS): the id of
-  // the config instance this entry renders. Its value is the entry's identity
-  // (see widgetKey). Absent on single-instance widgets.
-  instanceId?: string;
+  id: string;
+  type: WidgetType;
   span: number;
   hidden: boolean;
-  // Cards per row (1–4) for the card-grid widgets; absent = auto from span.
   cards?: number;
-  // Suppress the widget's section heading (the ALL-CAPS label above it) when
-  // true; absent/false shows it. Only meaningful for TITLED_WIDGET_IDS.
   hideLabel?: boolean;
-  // Explicit card height in px (the card is exactly this tall); absent = auto.
   height?: number;
-  // Extra space (px, beyond the grid gap) on any side of the card; absent sides
-  // and an absent object both mean none.
   space?: WidgetSpace;
 };
 
+// A layout row as stored and sent: the instance by id, and the placement.
+export type LayoutSectionRow = Omit<LayoutWidget, "id" | "type"> & { widget: string };
+
 export const WIDGET_LABELS = Object.fromEntries(
   WIDGET_DEFS.map((d) => [d.id, d.label])
-) as Record<LayoutWidgetId, string>;
+) as Record<WidgetType, string>;
 
-// The default arrangement reproduces the pre-widget-grid page exactly:
-// greeting beside the combined header card up top, the body sections
-// full-width below (registry order and defaults). An instanceable widget's
-// default entry is bound to the instance named after its type — for the feed,
-// FEED_DEFAULT_ID.
-export const DEFAULT_WIDGETS: LayoutWidget[] = WIDGET_DEFS.map((d: WidgetDef) => ({
-  id: d.id as LayoutWidgetId,
-  ...(d.instanceable ? { instanceId: d.id } : {}),
+const DEFAULT_BY_TYPE = Object.fromEntries(
+  WIDGET_DEFS.map((d: WidgetDef) => [d.id, d])
+) as Record<WidgetType, WidgetDef>;
+
+export function defaultSpanFor(type: WidgetType): number {
+  return DEFAULT_BY_TYPE[type].span;
+}
+
+// The stock arrangement, over the stock instances (one per type, each named
+// after its type): greeting beside the header card up top, the body widgets
+// full-width below, the optional ones hidden. Registry order and defaults.
+export const DEFAULT_SECTIONS: LayoutSectionRow[] = WIDGET_DEFS.map((d: WidgetDef) => ({
+  widget: d.id,
   span: d.span,
   hidden: d.hidden,
 }));
-
-// The widgets that used to live in the fixed header. When missing from a saved
-// layout they're PREPENDED in this order (body widgets are appended), so a
-// config saved before they were placeable renders with them on top — exactly
-// where the fixed header used to be.
-export const HEADER_WIDGET_IDS: readonly LayoutWidgetId[] = widgetsWith("legacyHeader");
-
-const DEFAULT_BY_ID = Object.fromEntries(
-  DEFAULT_WIDGETS.map((w) => [w.id, w])
-) as Record<LayoutWidgetId, LayoutWidget>;
-
-export function defaultSpanFor(id: LayoutWidgetId): number {
-  return DEFAULT_BY_ID[id].span;
-}
 
 // The span that makes the widget at `index` fill to the end of its row — its
 // current span plus any dead space trailing it. Walks the list in flow order
@@ -179,186 +148,59 @@ export function fillSpan(
   return clamp(widgets[index]?.span ?? columns);
 }
 
-// Widget visibility used to live in settings.components. Those flags fold into
-// `hidden` only for entries (or whole widgets) the new UI hasn't written yet —
-// once a layout entry carries an explicit `hidden`, the legacy flag is ignored.
-// Structural type on purpose: lib/schema imports from this file, so importing
-// its ComponentsConfig here would be a cycle.
-export type LegacyComponentToggles = {
-  greeting?: boolean;
-  search?: boolean;
-  apps?: boolean;
-  bookmarks?: boolean;
-  favorites?: boolean;
-};
+const isInt = (v: unknown, lo: number, hi: number): v is number =>
+  typeof v === "number" && Number.isInteger(v) && v >= lo && v <= hi;
 
-const LEGACY_TOGGLE_IDS = [
-  "greeting",
-  "search",
-  "apps",
-  "bookmarks",
-  "favorites",
-] as const;
-
-function isWidgetId(v: unknown): v is LayoutWidgetId {
-  return (
-    typeof v === "string" && (LAYOUT_WIDGET_IDS as readonly string[]).includes(v)
-  );
-}
-
-function isSpan(v: unknown): v is number {
-  return (
-    typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= GRID_COLUMNS
-  );
-}
-
-function isCards(v: unknown): v is number {
-  return (
-    typeof v === "number" &&
-    Number.isInteger(v) &&
-    v >= 1 &&
-    v <= MAX_CARD_COLUMNS
-  );
-}
-
-function isHeight(v: unknown): v is number {
-  return (
-    typeof v === "number" &&
-    Number.isInteger(v) &&
-    v >= MIN_WIDGET_HEIGHT &&
-    v <= MAX_WIDGET_HEIGHT
-  );
-}
-
-// One side's spacing value: a positive integer within the cap.
-function isSpaceValue(v: unknown): v is number {
-  return (
-    typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= MAX_WIDGET_SPACE
-  );
-}
-
-// A valid `space` object, keeping only the sides carrying an in-range value.
-// Returns undefined when nothing valid remains, so an entry with no spacing
-// stays clean (no empty object persisted).
 function coerceSpace(v: unknown): WidgetSpace | undefined {
   if (typeof v !== "object" || v === null) return undefined;
   const raw = v as Record<string, unknown>;
   const out: WidgetSpace = {};
   for (const side of SPACE_SIDES) {
-    if (isSpaceValue(raw[side])) out[side] = raw[side] as number;
+    if (isInt(raw[side], 1, MAX_WIDGET_SPACE)) out[side] = raw[side] as number;
   }
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
-function legacyHidden(
-  id: LayoutWidgetId,
-  components: LegacyComponentToggles | undefined
-): boolean | undefined {
-  if (!components) return undefined;
-  if (!(LEGACY_TOGGLE_IDS as readonly string[]).includes(id)) return undefined;
-  const flag = components[id as (typeof LEGACY_TOGGLE_IDS)[number]];
-  return flag === undefined ? undefined : !flag;
-}
-
-// Normalize a stored/partial layout into a concrete, complete widget list: keep
-// the saved order, drop unknown ids and duplicates, coerce a bad span to the
-// widget's default, keep a valid `cards` override, and resolve `hidden`
-// (explicit boolean > folded legacy components toggle > visible-when-listed).
-// Widgets the saved layout is missing are added — header widgets prepended,
-// body widgets appended — with their defaults (legacy toggles still folded), so
-// a config from any earlier version renders unchanged and a widget added in a
-// future version still shows. Spans are expected on the 24-column grid — the
-// one-time shape migration (lib/config-migrate.ts) rewrites pre-24 configs
-// before anything parses them. Mirrors applyOrder in lib/config/items.ts.
-export function resolveLayoutWidgets(
-  saved:
-    | readonly {
-        id?: unknown;
-        instanceId?: unknown;
-        span?: unknown;
-        hidden?: unknown;
-        cards?: unknown;
-        hideLabel?: unknown;
-        height?: unknown;
-        space?: unknown;
-      }[]
-    | undefined,
-  components?: LegacyComponentToggles,
-  // The feed config instance ids currently configured (settings.feeds). A saved
-  // feed entry survives only while its instanceId is still one of these (its
-  // config wasn't deleted); every configured instance not already placed is
-  // appended hidden, so a newly-added feed card shows up ready to place.
-  // Defaults to the single stock instance so callers that don't pass it (and
-  // the layout default) behave exactly as a fresh install.
-  feedInstanceIds: readonly string[] = [FEED_DEFAULT_ID]
+// The arrangement to render (#297): the saved rows in order, each bound to its
+// instance, then every instance no row places, appended hidden (the editor's
+// tray, where a widget added in Settings waits to be shown). A row naming an
+// instance that's gone, or one already placed, is skipped. Bad placement
+// values fall back to the type's defaults. Pure.
+export function resolveLayout(
+  sections: readonly Partial<Record<keyof LayoutSectionRow, unknown>>[] | undefined,
+  instances: readonly { id: string; type: WidgetType }[]
 ): LayoutWidget[] {
-  const knownFeedIds = new Set(feedInstanceIds);
-  const listed: LayoutWidget[] = [];
-  const seenSingles = new Set<LayoutWidgetId>();
-  const placedFeedIds = new Set<string>();
-  for (const item of saved ?? []) {
-    const id = item?.id;
-    if (!isWidgetId(id)) continue;
-    const instanceable = INSTANCEABLE_WIDGET_IDS.includes(id);
-    let instanceId: string | undefined;
-    if (instanceable) {
-      // A multi-instance entry is kept only when it names a still-configured
-      // instance and hasn't already been placed (drops orphans + duplicates).
-      instanceId = typeof item.instanceId === "string" ? item.instanceId : undefined;
-      if (!instanceId || !knownFeedIds.has(instanceId) || placedFeedIds.has(instanceId))
-        continue;
-      placedFeedIds.add(instanceId);
-    } else {
-      if (seenSingles.has(id)) continue;
-      seenSingles.add(id);
-    }
-    const span = isSpan(item.span) ? item.span : DEFAULT_BY_ID[id].span;
-    const hidden =
-      typeof item.hidden === "boolean"
-        ? item.hidden
-        : (legacyHidden(id, components) ?? false);
-    const space = coerceSpace(item.space);
-    listed.push({
+  const typeOf = new Map(instances.map((i) => [i.id, i.type]));
+  const placed = new Set<string>();
+  const out: LayoutWidget[] = [];
+  for (const row of sections ?? []) {
+    const id = row?.widget;
+    if (typeof id !== "string") continue;
+    const type = typeOf.get(id);
+    if (!type || placed.has(id)) continue;
+    placed.add(id);
+    const space = coerceSpace(row.space);
+    out.push({
       id,
-      ...(instanceId ? { instanceId } : {}),
-      span,
-      hidden,
-      ...(isCards(item.cards) ? { cards: item.cards } : {}),
-      ...(typeof item.hideLabel === "boolean"
-        ? { hideLabel: item.hideLabel }
-        : {}),
-      ...(isHeight(item.height) ? { height: item.height } : {}),
+      type,
+      span: isInt(row.span, 1, GRID_COLUMNS) ? row.span : defaultSpanFor(type),
+      hidden: typeof row.hidden === "boolean" ? row.hidden : false,
+      ...(isInt(row.cards, 1, MAX_CARD_COLUMNS) ? { cards: row.cards } : {}),
+      ...(typeof row.hideLabel === "boolean" ? { hideLabel: row.hideLabel } : {}),
+      ...(isInt(row.height, MIN_WIDGET_HEIGHT, MAX_WIDGET_HEIGHT) ? { height: row.height } : {}),
       ...(space ? { space } : {}),
     });
   }
-  const missingHeader = HEADER_WIDGET_IDS.filter((id) => !seenSingles.has(id)).map(
-    (id) => ({
-      ...DEFAULT_BY_ID[id],
-      hidden: legacyHidden(id, components) ?? DEFAULT_BY_ID[id].hidden,
-    })
-  );
-  // Append every body widget the saved layout is missing, walking the canonical
-  // order so the default arrangement reproduces exactly. At `feed`, emit one
-  // hidden entry per configured instance not already placed.
-  const appendedBody: LayoutWidget[] = [];
-  for (const id of LAYOUT_WIDGET_IDS) {
-    if (HEADER_WIDGET_IDS.includes(id)) continue;
-    if (INSTANCEABLE_WIDGET_IDS.includes(id)) {
-      for (const fid of feedInstanceIds) {
-        if (!placedFeedIds.has(fid))
-          appendedBody.push({
-            id,
-            instanceId: fid,
-            span: DEFAULT_BY_ID[id].span,
-            hidden: DEFAULT_BY_ID[id].hidden,
-          });
-      }
-    } else if (!seenSingles.has(id)) {
-      appendedBody.push({
-        ...DEFAULT_BY_ID[id],
-        hidden: legacyHidden(id, components) ?? DEFAULT_BY_ID[id].hidden,
-      });
-    }
+  for (const { id, type } of instances) {
+    if (!placed.has(id)) out.push({ id, type, span: defaultSpanFor(type), hidden: true });
   }
-  return [...missingHeader, ...listed, ...appendedBody];
+  return out;
+}
+
+// The rows to store for a resolved arrangement.
+export function toSections(widgets: readonly LayoutWidget[]): LayoutSectionRow[] {
+  return widgets.map(({ id, type: _type, ...rest }) => {
+    void _type;
+    return { widget: id, ...rest };
+  });
 }

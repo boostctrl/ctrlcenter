@@ -26,7 +26,6 @@ import {
   MAX_UI_SCALE,
   UI_SCALE_STEP,
   SPACE_SIDES,
-  widgetKey,
   type LayoutWidget,
   type SpaceSide,
 } from "@/lib/layout";
@@ -331,9 +330,9 @@ export function WidgetFrame({
   drop,
 }: {
   widget: LayoutWidget;
-  // Display name for this entry — the widget's label, or a feed instance's
-  // title, so multiple cards of one type stay distinguishable. The per-widget
-  // callbacks key on the entry's identity (widgetKey), not the type id.
+  // Display name for this entry — the instance's title, else its type's
+  // label, numbered when several share it. The per-widget callbacks key on
+  // the instance id, not the type.
   label: string;
   index: number;
   count: number;
@@ -363,7 +362,7 @@ export function WidgetFrame({
   dragging: boolean;
   drop: DropTarget | null;
 }) {
-  const key = widgetKey(widget);
+  const key = widget.id;
   const { frameRef, previewRef, drag, widthHandle, heightHandle } = useDragResize(
     {
       span: widget.span,

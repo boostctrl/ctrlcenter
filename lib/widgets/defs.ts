@@ -8,6 +8,8 @@
 // component, server data loader and admin editor sit beside its entry in the
 // other registries (see the new-widget skill).
 
+// Every type can be placed any number of times (#297): each placement is an
+// instance with its own content (lib/schema/instances.ts).
 export type WidgetDef = {
   id: string;
   // Shown in the layout editor's frame and tray.
@@ -27,13 +29,6 @@ export type WidgetDef = {
   sized?: true;
   // Extra classes for the widget's grid cell (vertical alignment).
   align?: string;
-  // Lived in the pre-grid fixed header: when missing from a saved layout it's
-  // prepended (in this table's order) rather than appended, so old configs
-  // render it where the header was. Frozen — never set on a new widget.
-  legacyHeader?: true;
-  // Can appear more than once, each entry bound to a config instance by
-  // `instanceId` (the default entry's instance id is the widget id).
-  instanceable?: true;
   // The edit-mode placeholder: why the cell is empty and where to fix it.
   empty: string | ((ctx: { statusEnabled: boolean }) => string);
 };
@@ -45,7 +40,6 @@ export const WIDGET_DEFS = [
     span: 16,
     hidden: false,
     align: "lg:self-center",
-    legacyHeader: true,
     // Always has content.
     empty: "Nothing to show yet.",
   },
@@ -55,7 +49,6 @@ export const WIDGET_DEFS = [
     span: 8,
     hidden: false,
     align: "lg:self-center",
-    legacyHeader: true,
     empty:
       "Everything this card shows is off — enable the clock, weather, or status checks. The separate Clock, Weather and Status widgets are an alternative to this combined card.",
   },
@@ -66,7 +59,6 @@ export const WIDGET_DEFS = [
     label: "Clock",
     span: 8,
     hidden: true,
-    legacyHeader: true,
     empty: "Date & clock is toggled off in the admin Layout settings.",
   },
   {
@@ -74,7 +66,6 @@ export const WIDGET_DEFS = [
     label: "Weather",
     span: 8,
     hidden: true,
-    legacyHeader: true,
     empty: "Weather is disabled in the admin Weather settings.",
   },
   {
@@ -82,7 +73,6 @@ export const WIDGET_DEFS = [
     label: "Status",
     span: 8,
     hidden: true,
-    legacyHeader: true,
     empty: ({ statusEnabled }) =>
       statusEnabled
         ? "Waiting for the first status check…"
@@ -102,7 +92,7 @@ export const WIDGET_DEFS = [
     hidden: false,
     titled: true,
     sized: true,
-    empty: "The calendar is disabled, or it has no upcoming events to show.",
+    empty: "No calendar URL yet — add it in admin Settings → Widgets → Calendars — or no upcoming events.",
   },
   // Ship dormant (hidden) so upgrades don't surprise existing dashboards; the
   // admin shows them from the layout editor or Settings → Layout.
@@ -122,9 +112,8 @@ export const WIDGET_DEFS = [
     hidden: true,
     titled: true,
     sized: true,
-    instanceable: true,
     empty:
-      "The RSS feed is off or has no feeds — set it up in admin Settings → Widgets → RSS feed.",
+      "No feed URLs yet — add them in admin Settings → Widgets → RSS feeds.",
   },
   {
     id: "countdown",
@@ -133,7 +122,7 @@ export const WIDGET_DEFS = [
     hidden: true,
     titled: true,
     sized: true,
-    empty: "No dates yet — add them in admin Settings → Widgets → Countdown.",
+    empty: "No dates yet — add them in admin Settings → Widgets → Countdowns.",
   },
   {
     id: "worldClocks",
@@ -202,7 +191,7 @@ export function widgetDef(id: WidgetId): WidgetDef {
 
 // The ids whose entry has `flag` set, in table order.
 export function widgetsWith(
-  flag: "cards" | "titled" | "sized" | "legacyHeader" | "instanceable"
+  flag: "cards" | "titled" | "sized"
 ): WidgetId[] {
   return WIDGET_DEFS.filter((d: WidgetDef) => d[flag]).map((d) => d.id);
 }

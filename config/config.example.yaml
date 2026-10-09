@@ -1,3 +1,4 @@
+schemaVersion: 3
 settings:
   title: Home
   timezone: America/Chicago
@@ -8,20 +9,28 @@ settings:
     units: imperial
   # The home-page widget grid (24 columns) — easiest edited visually: sign in
   # and pick "Edit layout" from the floating corner menu. Order = position;
-  # each widget spans 1–24 columns and rows pack automatically.
+  # each row places one widget (by its id in `widgets` below) across 1–24
+  # columns, and rows pack automatically.
   # layout:
   #   columns: 24
   #   sections:
-  #     - { id: greeting, span: 16 }
-  #     - { id: headerCard, span: 8 }             # clock/weather/status card
-  #     - { id: clock, span: 8, hidden: true }    # …or show these split
-  #     - { id: weather, span: 8, hidden: true }  #    widgets instead of the
-  #     - { id: status, span: 8, hidden: true }   #    combined card
-  #     - { id: search, span: 24 }
-  #     - { id: calendar, span: 24 }
-  #     - { id: favorites, span: 24 }
-  #     - { id: apps, span: 24 }
-  #     - { id: bookmarks, span: 24 }
+  #     - { widget: greeting, span: 16 }
+  #     - { widget: headerCard, span: 8 }           # clock/weather/status card
+  #     - { widget: clock, span: 8, hidden: true }  # …or show these split
+  #     - { widget: weather, span: 8, hidden: true } #   widgets instead of the
+  #     - { widget: status, span: 8, hidden: true }  #   combined card
+  #     - { widget: search, span: 24 }
+  #     - { widget: todo, span: 12 }
+  #     - { widget: favorites, span: 24 }
+  #     - { widget: apps, span: 24 }
+  #     - { widget: bookmarks, span: 24 }
+# Every widget is an instance with its own content, and a type can appear any
+# number of times. Leave this out for one of each; the admin portal's
+# Settings → Widgets edits them.
+# widgets:
+#   - { id: greeting, type: greeting }
+#   - { id: todo, type: notes, title: To do, content: "- renew certs" }
+#   - { id: news, type: feed, urls: ["https://example.com/feed.xml"] }
 apps:
   - id: 85b49535-e829-4356-8685-fef57bbeab56
     name: File Storage

@@ -10,6 +10,7 @@ import {
   bookmarkInputSchema,
   integrationsSchema,
   settingsInputSchema,
+  newInstance,
 } from "./schema";
 
 // config.ts captures CONFIG_PATH at module load, so the env var has to be set
@@ -37,6 +38,11 @@ beforeEach(async () => {
   await fs.rm(configPath, { force: true });
   await fs.rm(`${configPath}.bak`, { force: true });
 });
+
+
+// One v3 layout row by the instance it places.
+const rowOf = <T extends { widget: string }>(sections: readonly T[], widget: string) =>
+  sections.find((r) => r.widget === widget);
 
 describe("comment-preserving writes (#279)", () => {
   const comments = (text: string) =>
@@ -336,22 +342,22 @@ describe("updateSettings partial merge", () => {
       }),
       "utf8"
     );
-    // The migration folds the single feed into a one-instance feeds list…
+    // The migrations fold the single feed into a feed widget instance (#297)…
     const loaded = await config.readConfigInternal();
-    expect(loaded.settings.feeds[0].urls).toEqual(["https://old.example/rss"]);
-    // …and the admin then clears the row, saving the whole feeds list with an
+    const feed = loaded.widgets.find((w) => w.type === "feed")!;
+    expect(feed.type === "feed" && feed.urls).toEqual(["https://old.example/rss"]);
+    // …and the admin then clears the row, saving the whole widget list with an
     // empty url list. Nothing is left on disk to resurrect the feed from.
-    const settings = await config.updateSettings(settingsInput({
-      feeds: [
-        { id: "feed", enabled: true, urls: [], count: 6, title: "", summaries: false },
-      ],
-    }));
-    expect(settings.feeds[0].urls).toEqual([]);
+    await config.replaceWidgets(
+      loaded.widgets.map((w) => (w.type === "feed" ? { ...w, urls: [] } : w))
+    );
     const onDisk = YAML.load(await fs.readFile(configPath, "utf8")) as {
-      settings: { feed?: unknown; feeds: Record<string, unknown>[] };
+      settings: Record<string, unknown>;
+      widgets: Record<string, unknown>[];
     };
     expect("feed" in onDisk.settings).toBe(false);
-    expect(onDisk.settings.feeds[0].urls).toEqual([]);
+    expect("feeds" in onDisk.settings).toBe(false);
+    expect(onDisk.widgets.find((w) => w.type === "feed")?.urls).toEqual([]);
   });
 
   it("merges nested weather fields without dropping siblings", async () => {
@@ -401,20 +407,20 @@ describe("updateSettings partial merge", () => {
   it("replaces the layout wholesale", async () => {
     await config.updateSettings(settingsInput({
       layout: {
-        sections: [{ id: "apps", span: 12, hidden: false }],
+        sections: [{ widget: "apps", span: 12, hidden: false }],
         columns: 24,
         scale: 100,
       },
     }));
     const settings = await config.updateSettings(settingsInput({
       layout: {
-        sections: [{ id: "bookmarks", span: 24, hidden: true }],
+        sections: [{ widget: "bookmarks", span: 24, hidden: true }],
         columns: 24,
         scale: 110,
       },
     }));
     expect(settings.layout.sections).toEqual([
-      { id: "bookmarks", span: 24, hidden: true },
+      { widget: "bookmarks", span: 24, hidden: true },
     ]);
     expect(settings.layout.scale).toBe(110);
   });
@@ -428,13 +434,13 @@ describe("updateSettings partial merge", () => {
     };
     await fs.writeFile(configPath, YAML.dump(legacy), "utf8");
     const loaded = await config.readConfigInternal();
-    expect(loaded.settings.layout.sections).toEqual([{ id: "apps", span: 12 }]);
+    expect(rowOf(loaded.settings.layout.sections, "apps")).toEqual({ widget: "apps", span: 12, hidden: false });
 
     // The read itself persisted the span shape and the 24-column grid marker…
     const onDisk = YAML.load(await fs.readFile(configPath, "utf8")) as {
-      settings: { layout: { sections: unknown; columns: number } };
+      settings: { layout: { sections: { widget: string }[]; columns: number } };
     };
-    expect(onDisk.settings.layout.sections).toEqual([{ id: "apps", span: 12 }]);
+    expect(rowOf(onDisk.settings.layout.sections, "apps")).toEqual({ widget: "apps", span: 12, hidden: false });
     expect(onDisk.settings.layout.columns).toBe(24);
     // …after snapshotting the pre-migration file verbatim to the .bak.
     const bak = YAML.load(await fs.readFile(`${configPath}.bak`, "utf8"));
@@ -459,11 +465,12 @@ describe("updateSettings partial merge", () => {
     expect(await fs.readFile(`${configPath}.bak`, "utf8")).toBe(legacyText);
     // …and the live file is migrated (feed folded) with the mutation applied.
     const onDisk = YAML.load(await fs.readFile(configPath, "utf8")) as {
-      settings: { feed?: unknown; feeds: Record<string, unknown>[] };
+      settings: { feed?: unknown };
+      widgets: Record<string, unknown>[];
       apps: { name: string }[];
     };
     expect("feed" in onDisk.settings).toBe(false);
-    expect(onDisk.settings.feeds[0].urls).toEqual(["https://old.example/rss"]);
+    expect(onDisk.widgets.find((w) => w.type === "feed")?.urls).toEqual(["https://old.example/rss"]);
     expect(onDisk.apps.map((a) => a.name)).toEqual(["First"]);
   });
 
@@ -495,19 +502,15 @@ describe("updateSettings partial merge", () => {
       "utf8"
     );
     const loaded = await config.readConfigInternal();
-    expect(loaded.settings.layout.sections).toEqual([
-      { id: "apps", span: 12, hidden: false },
-      { id: "search", span: 24, hidden: false },
-    ]);
+    expect(rowOf(loaded.settings.layout.sections, "apps")?.span).toBe(12);
+    expect(rowOf(loaded.settings.layout.sections, "search")?.span).toBe(24);
 
     // The first read persisted the doubled spans + marker; later reads and
     // writes must not double them a second time.
     await config.updateSettings(settingsInput({ title: "Dash" }));
     const reloaded = await config.readConfigInternal();
-    expect(reloaded.settings.layout.sections).toEqual([
-      { id: "apps", span: 12, hidden: false },
-      { id: "search", span: 24, hidden: false },
-    ]);
+    expect(rowOf(reloaded.settings.layout.sections, "apps")?.span).toBe(12);
+    expect(rowOf(reloaded.settings.layout.sections, "search")?.span).toBe(24);
     expect(reloaded.settings.layout.columns).toBe(24);
   });
 
@@ -527,11 +530,15 @@ describe("updateSettings partial merge", () => {
       apps: [],
       bookmarks: [],
     });
-    expect(replaced.settings.feeds[0].urls).toEqual(["https://old.example/rss"]);
-    expect(replaced.settings.layout.sections).toEqual([
-      { id: "apps", span: 12, hidden: false },
-      { id: "bookmarks", span: 12, space: { bottom: 40 } },
-    ]);
+    const feed = replaced.widgets.find((w) => w.type === "feed");
+    expect(feed?.type === "feed" && feed.urls).toEqual(["https://old.example/rss"]);
+    expect(rowOf(replaced.settings.layout.sections, "apps")).toEqual({ widget: "apps", span: 12, hidden: false });
+    expect(rowOf(replaced.settings.layout.sections, "bookmarks")).toEqual({
+      widget: "bookmarks",
+      span: 12,
+      hidden: false,
+      space: { bottom: 40 },
+    });
     expect(replaced.settings.layout.columns).toBe(24);
   });
 });
@@ -899,16 +906,14 @@ describe("readConfigInternal stays off public surfaces", () => {
 // safe to serialize, while the server-only getCalendarAuth still yields the real
 // values for the home-page fetch.
 describe("settings-secret redaction", () => {
+  // The calendar is a widget instance since 3.0 (#297).
+  const calendar = {
+    ...newInstance("calendar", "calendar"),
+    url: "https://cal.example.com/private.ics",
+    username: "alice",
+    password: "cal-secret",
+  };
   const withSecrets = {
-    calendar: {
-      enabled: true,
-      url: "https://cal.example.com/private.ics",
-      count: 5,
-      homeView: "agenda" as const,
-      hideWhenEmpty: false,
-      username: "alice",
-      password: "cal-secret",
-    },
     alerts: {
       enabled: true,
       type: "generic" as const,
@@ -956,11 +961,12 @@ describe("settings-secret redaction", () => {
 
   it("stripSecrets blanks every credential while keeping non-secret fields", async () => {
     await config.updateSettings(settingsInput(withSecrets));
+    await config.replaceWidgets([calendar]);
     const full = await config.readConfigInternal();
 
     const pub = config.stripSecrets(config.stripAuth(full));
-    expect(pub.settings.calendar.username).toBe("");
-    expect(pub.settings.calendar.password).toBe("");
+    const pubCal = pub.widgets.find((w) => w.id === "calendar")!;
+    expect(pubCal).toMatchObject({ username: "", password: "" });
     expect(pub.settings.alerts.webhookUrl).toBe("");
     expect(pub.settings.alerts.email.user).toBe("");
     expect(pub.settings.alerts.email.pass).toBe("");
@@ -984,23 +990,23 @@ describe("settings-secret redaction", () => {
     }
 
     // Non-secret fields survive so the widgets/nav still render and fetch.
-    expect(pub.settings.calendar.url).toBe(withSecrets.calendar.url);
-    expect(pub.settings.calendar.enabled).toBe(true);
+    expect(pubCal).toMatchObject({ url: calendar.url });
     expect(pub.settings.alerts.enabled).toBe(true);
     expect(pub.settings.alerts.email.port).toBe(587);
 
     // Redaction doesn't mutate the source config.
-    expect(full.settings.calendar.password).toBe("cal-secret");
+    expect(full.widgets.find((w) => w.id === "calendar")).toMatchObject({ password: "cal-secret" });
     expect(full.settings.alerts.email.pass).toBe("smtp-secret");
     expect(full.settings.integrations.qbittorrent.password).toBe("qbit-secret");
     expect(full.settings.integrations.sonarr.apiKey).toBe("sonarr-secret");
   });
 
   it("getCalendarAuth still returns the real credentials server-side", async () => {
-    await config.updateSettings(settingsInput(withSecrets));
-    expect(await config.getCalendarAuth()).toEqual({
+    await config.replaceWidgets([calendar]);
+    expect(await config.getCalendarAuth("calendar")).toEqual({
       username: "alice",
       password: "cal-secret",
     });
+    expect(await config.getCalendarAuth("nope")).toEqual({ username: "", password: "" });
   });
 });

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getSettings } from "@/lib/config";
+import { getSiteConfig } from "@/lib/config";
 import { requireAdminPage } from "@/lib/api-auth";
 import { getServiceDetail, isDetailService } from "@/lib/monitor-detail";
 import { SERVICE_LABELS } from "@/lib/services/ids";
@@ -31,14 +31,14 @@ export default async function MonitorDetailPage({ params }: Params) {
   // unconfigured one does below, so the route can't be used to probe which
   // services exist.
   if (!isDetailService(id)) notFound();
-  const settings = await getSettings();
+  const { settings, widgets } = await getSiteConfig();
   const result = await getServiceDetail(id, settings.integrations);
   if (!result) notFound();
 
   return (
     <>
-      <MonitorDetail initial={result} nav={navPages(settings)} />
-      <FloatingNav {...navPages(settings)} />
+      <MonitorDetail initial={result} nav={navPages(settings, widgets)} />
+      <FloatingNav {...navPages(settings, widgets)} />
     </>
   );
 }

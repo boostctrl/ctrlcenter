@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/lib/api-auth";
-import { probeCalendar } from "@/lib/calendar-fetch";
-import { getSettings } from "@/lib/config";
+import { ENV_CALENDAR_ID, probeCalendar } from "@/lib/calendar-fetch";
+import { getSiteConfig } from "@/lib/config";
 import { isSavedUrl, withoutEnvSecrets } from "@/lib/secrets";
 
 // Admin-only: fetch the given calendar URL fresh and report whether it's a
@@ -20,9 +20,11 @@ export async function POST(request: NextRequest) {
   if (!url.trim()) {
     return NextResponse.json({ ok: false, count: 0, error: "No URL set" });
   }
-  // CTRLCENTER_CALDAV_PASS only goes to the saved calendar URL; a probe of a
-  // newly typed URL uses just the credentials the form sent.
-  const saved = (await getSettings()).calendar.url;
+  // CTRLCENTER_CALDAV_PASS only goes to the saved URL of the calendar it
+  // belongs to (lib/calendar-fetch asCalendar); a probe of any other URL uses
+  // just the credentials the form sent.
+  const envCalendar = (await getSiteConfig()).widgets.find((w) => w.id === ENV_CALENDAR_ID);
+  const saved = envCalendar?.type === "calendar" ? envCalendar.url : "";
   const probe = () => probeCalendar(url, { username, password });
   const result = isSavedUrl(url, saved)
     ? await probe()

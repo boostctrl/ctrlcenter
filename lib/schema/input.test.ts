@@ -1,18 +1,18 @@
 import { describe, it, expect } from "vitest";
 import {
   announcementUpdateSchema,
-  calendarUpdateSchema,
-  feedUpdateSchema,
+  newInstance,
   settingsInputSchema,
   settingsSchema,
-  systemStatsUpdateSchema,
+  weatherUpdateSchema,
+  widgetInstancesUpdateSchema,
   alertsUpdateSchema,
 } from "../schema";
 
 // Admin input schemas derived from the stored ones (#287).
 describe("derived input schemas", () => {
   it("leave out what a patch doesn't send — no defaults filled in", () => {
-    expect(calendarUpdateSchema.parse({})).toEqual({});
+    expect(weatherUpdateSchema.parse({})).toEqual({});
     expect(alertsUpdateSchema.parse({ email: { host: "smtp.test" } })).toEqual({
       email: { host: "smtp.test" },
     });
@@ -23,18 +23,19 @@ describe("derived input schemas", () => {
     expect(announcementUpdateSchema.safeParse({ tone: "loud" }).success).toBe(false);
   });
 
-  it("require whole list items", () => {
-    const card = { id: "f1", enabled: true, urls: [], count: 6, title: "", summaries: false };
-    expect(feedUpdateSchema.safeParse(card).success).toBe(true);
+  it("require whole list items, a tagged union's included (#297)", () => {
+    const card = { ...newInstance("feed", "f1"), urls: [] };
+    expect(widgetInstancesUpdateSchema.safeParse([card]).success).toBe(true);
     const noId: Partial<typeof card> = { ...card };
     delete noId.id;
-    expect(feedUpdateSchema.safeParse(noId).success).toBe(false);
+    expect(widgetInstancesUpdateSchema.safeParse([noId]).success).toBe(false);
   });
 
   it("keep their input-only rules", () => {
-    expect(calendarUpdateSchema.safeParse({ url: "ftp://x" }).success).toBe(false);
+    expect(weatherUpdateSchema.safeParse({ latitude: 91 }).success).toBe(false);
     const disk = { label: "d", path: "/d" };
-    expect(systemStatsUpdateSchema.safeParse({ disks: Array(9).fill(disk) }).success).toBe(false);
+    const stats = { ...newInstance("systemStats", "s"), disks: Array(9).fill(disk) };
+    expect(widgetInstancesUpdateSchema.safeParse([stats]).success).toBe(false);
     const ch = settingsSchema.parse({ alerts: { channels: [{ id: "c", type: "gotify" }] } }).alerts
       .channels[0];
     expect(alertsUpdateSchema.safeParse({ channels: [{ ...ch, url: "https://g.test" }] }).success).toBe(true);

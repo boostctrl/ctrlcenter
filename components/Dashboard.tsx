@@ -16,14 +16,13 @@ import {
   DEFAULT_UI_SCALE,
   DEFAULT_GRID_GAP,
   DEFAULT_TOP_GAP,
-  CARD_WIDGET_IDS,
-  TITLED_WIDGET_IDS,
-  SIZED_WIDGET_IDS,
+  CARD_WIDGET_TYPES,
+  TITLED_WIDGET_TYPES,
+  SIZED_WIDGET_TYPES,
   WIDGET_LABELS,
   fillSpan,
-  widgetKey,
   type LayoutWidget,
-  type LayoutWidgetId,
+  type WidgetType,
 } from "@/lib/layout";
 import { useEditMode } from "./EditMode";
 import { ConfirmProvider } from "./admin/Confirm";
@@ -90,7 +89,7 @@ export default function Dashboard({
   // Everything the widgets render, built server-side (lib/widgets/load.tsx).
   data: HomeData;
 }) {
-  const { apps, bookmarks, search, categoryOrder, statusEnabled, feedLabels } = data;
+  const { apps, bookmarks, search, categoryOrder, statusEnabled, labels } = data;
   const [query, setQuery] = useState("");
   // The search widget renders through the registry and hands its <input>
   // back here (for the "/" hotkey); the state setter is the callback ref.
@@ -142,19 +141,13 @@ export default function Dashboard({
   useGridLayout(gridRef, layout.gap, gridSignature);
 
 
-  // Keyed by widgetKey so feed instances don't collide; apps/bookmarks are
-  // single-instance, so their key is just the type id.
-  const hiddenByKey = useMemo(
-    () => new Map(layout.sections.map((w) => [widgetKey(w), w.hidden])),
-    [layout.sections]
-  );
-  const showApps = !hiddenByKey.get("apps");
-  const showBookmarks = !hiddenByKey.get("bookmarks");
-  // A feed instance's label (title, else generic) for the editor frame/tray.
+  // Whether any apps / bookmarks widget is on show: search only covers what
+  // the board shows.
+  const showApps = layout.sections.some((w) => w.type === "apps" && !w.hidden);
+  const showBookmarks = layout.sections.some((w) => w.type === "bookmarks" && !w.hidden);
+  // An instance's label (its title, else the type's) for the editor frame/tray.
   const labelFor = (widget: LayoutWidget): string =>
-    widget.id === "feed"
-      ? (feedLabels[widgetKey(widget)] ?? WIDGET_LABELS.feed)
-      : WIDGET_LABELS[widget.id];
+    labels[widget.id] ?? WIDGET_LABELS[widget.type];
 
 
   // "/" focuses search; Escape clears and blurs it. Parked while editing so the
@@ -280,11 +273,11 @@ export default function Dashboard({
     topMatchId,
   };
   const blockFor = (widget: LayoutWidget): React.ReactNode =>
-    WIDGET_RENDERERS[widget.id](widget, renderContext);
+    WIDGET_RENDERERS[widget.type](widget, renderContext);
 
 
   // Why a widget's cell is empty right now — shown in its edit-mode placeholder.
-  const emptyReason = (id: LayoutWidgetId): string =>
+  const emptyReason = (id: WidgetType): string =>
     widgetEmptyReason(id, { statusEnabled });
 
   // Every widget with its rendered node. Only the visible cells — not hidden,
@@ -307,12 +300,12 @@ export default function Dashboard({
   // move is always a visible change, never a silent swap with a tray widget.
   function moveVisible(fromV: number, toV: number) {
     if (toV < 0 || toV >= liveCells.length) return;
-    const liveKeys = new Set(liveWidgets.map((w) => widgetKey(w)));
+    const liveKeys = new Set(liveWidgets.map((w) => w.id));
     const nextVisible = reorder(liveWidgets, fromV, toV);
     let vi = 0;
     mutateSections(
       layout.sections.map((w) =>
-        liveKeys.has(widgetKey(w)) ? nextVisible[vi++] : w
+        liveKeys.has(w.id) ? nextVisible[vi++] : w
       )
     );
   }
@@ -329,7 +322,7 @@ export default function Dashboard({
         className="grid grid-cols-1 gap-x-8 gap-y-8 lg:grid-cols-24 lg:items-start"
       >
         {liveCells.map(({ widget, node }, vIndex) => {
-          const cellClass = `${COL_SPAN[widget.span]} ${widgetDef(widget.id).align ?? ""}`;
+          const cellClass = `${COL_SPAN[widget.span]} ${widgetDef(widget.type).align ?? ""}`;
           // An explicit height sizes the cell exactly: content widgets scroll
           // their overflow, the others center their content (so a sized greeting
           // sits centered beside the header card, restoring the classic header).
@@ -338,7 +331,7 @@ export default function Dashboard({
           // stack full-width, contents grow taller (the header card's rows
           // stack), and a height tuned against the desktop row would silently
           // crop them (#105) — auto height is what a phone wants there.
-          const scrolls = SIZED_WIDGET_IDS.includes(widget.id);
+          const scrolls = SIZED_WIDGET_TYPES.includes(widget.type);
           const heightStyle = widget.height
             ? scrolls
               ? { height: widget.height }
@@ -354,7 +347,7 @@ export default function Dashboard({
           if (!editing) {
             return (
               <div
-                key={widgetKey(widget)}
+                key={widget.id}
                 className={`${cellClass} ${heightClass}`}
                 style={heightStyle}
                 data-space-top={widget.space?.top || undefined}
@@ -368,7 +361,7 @@ export default function Dashboard({
           }
           return (
             <WidgetFrame
-              key={widgetKey(widget)}
+              key={widget.id}
               widget={widget}
               label={labelFor(widget)}
               index={vIndex}
@@ -376,12 +369,12 @@ export default function Dashboard({
               cellClass={cellClass}
               node={node}
               effectiveCards={
-                CARD_WIDGET_IDS.includes(widget.id)
+                CARD_WIDGET_TYPES.includes(widget.type)
                   ? cardsFor(widget)
                   : undefined
               }
               fillTo={fillSpan(liveWidgets, vIndex)}
-              titled={TITLED_WIDGET_IDS.includes(widget.id)}
+              titled={TITLED_WIDGET_TYPES.includes(widget.type)}
               previewStyle={heightStyle}
               previewClass={heightClass}
               onMove={moveVisible}
@@ -419,8 +412,8 @@ export default function Dashboard({
           <div className="mt-3 flex flex-wrap gap-2">
             {trayCells.map(({ widget, node }) => (
               <div
-                key={widgetKey(widget)}
-                title={node === null ? emptyReason(widget.id) : undefined}
+                key={widget.id}
+                title={node === null ? emptyReason(widget.type) : undefined}
                 className="flex max-w-full min-w-0 items-center gap-2 rounded-lg border border-fg/10 bg-fg/5 px-2.5 py-1.5 text-xs text-ink-60"
               >
                 <span className="shrink-0 font-medium">{labelFor(widget)}</span>
@@ -430,7 +423,7 @@ export default function Dashboard({
                 {widget.hidden ? (
                   <button
                     type="button"
-                    onClick={() => toggleWidgetHidden(widgetKey(widget))}
+                    onClick={() => toggleWidgetHidden(widget.id)}
                     className="rounded-md border border-fg/10 px-2 py-0.5 text-ink-70 transition-colors hover:bg-fg/10 hover:text-fg"
                   >
                     Show
@@ -439,7 +432,7 @@ export default function Dashboard({
                   // min-w-0 so the reason truncates inside a phone-width
                   // chip instead of widening the page (#271).
                   <span className="max-w-72 min-w-0 truncate text-ink-55">
-                    {emptyReason(widget.id)}
+                    {emptyReason(widget.type)}
                   </span>
                 )}
               </div>

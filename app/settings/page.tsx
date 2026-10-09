@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
   const {
-    config: { settings, themes },
+    config: { settings, themes, widgets },
     isAdmin,
   } = await readPublicConfig();
   const packs = resolveThemePacks(themes);
@@ -22,7 +22,7 @@ export default async function SettingsPage() {
     <>
       <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 pt-12 pb-24 sm:px-10 lg:pt-16">
       <div>
-        <PageNav current="settings" {...navPages(settings)} />
+        <PageNav current="settings" {...navPages(settings, widgets)} />
         <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold">Settings</h1>
@@ -78,8 +78,8 @@ export default async function SettingsPage() {
         </div>
       </ConfirmProvider>
       </main>
-      {settings.components.settingsButton && (
-        <FloatingNav {...navPages(settings)} />
+      {settings.settingsButton && (
+        <FloatingNav {...navPages(settings, widgets)} />
       )}
     </>
   );

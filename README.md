@@ -168,9 +168,10 @@ manual `chown`.
 ## Configuration
 
 Edit through **/admin** (recommended) or by hand — changes are picked up on the
-next page load, no rebuild. The file has three sections:
+next page load, no rebuild. The main sections:
 
 ```yaml
+schemaVersion: 3            # written for you; older files migrate on first start
 settings:
   title: ctrlcenter         # browser tab title
   timezone: America/Chicago # IANA timezone, used for the date + greeting
@@ -226,36 +227,36 @@ settings:
     # Before 2.13 there was one webhook (type, webhookUrl) and one email
     # section; those keys still work and can be moved into the list from
     # Settings → Monitoring → Alerts.
-  calendar:                 # the Upcoming agenda card
-    enabled: false
-    url: ""                 # a published iCal (.ics) URL
-    count: 5                # how many upcoming events to show (1–20)
+  settingsButton: true      # the floating corner navigation menu
   # Further sections mirror the admin UI one-to-one and are easiest to edit
   # there: favicon, announcement (the site-wide banner), statusAnnouncements,
-  # notes, feed (the RSS card), countdown, worldClocks, systemStats,
   # integrations (the private Monitor page's service connections), and
   # bookmarkCategoryOrder.
-  components:
-    clock: true             # the date/time row inside the header card
-    settingsButton: true    # the floating corner navigation menu
-    # greeting/search/apps/bookmarks/favorites are legacy visibility flags —
-    # still honored for old configs, but layout `hidden` (below) is the source
-    # of truth once set.
   layout:                   # the home-page widget grid — best edited visually:
     columns: 24             # sign in and pick "Edit layout" from the corner menu
-    sections:
-      - { id: greeting, span: 16 }        # order = position; widgets flow row
-      - { id: headerCard, span: 8 }       #   by row across 24 columns
-      - { id: clock, span: 8, hidden: true }    # split clock/weather/status
-      - { id: weather, span: 8, hidden: true }  #   widgets — show them as an
-      - { id: status, span: 8, hidden: true }   #   alternative to headerCard
-      - { id: search, span: 24 }
-      - { id: calendar, span: 24 }
-      - { id: favorites, span: 24 }
-      - { id: apps, span: 24 }
-      - { id: bookmarks, span: 24 }
-    # Older configs (12-column spans, or pre-1.3 `width: full|twoThirds|…`)
-    # are still accepted and migrated to 24-column spans on the next save.
+    sections:               # order = position; widgets flow row by row
+      - { widget: greeting, span: 16 }    # `widget` names an instance below
+      - { widget: headerCard, span: 8 }
+      - { widget: clock, span: 8, hidden: true }    # split clock/weather/status
+      - { widget: weather, span: 8, hidden: true }  #   widgets — show them as an
+      - { widget: status, span: 8, hidden: true }   #   alternative to headerCard
+      - { widget: search, span: 24 }
+      - { widget: family, span: 12 }
+      - { widget: work, span: 12 }
+      - { widget: favorites, span: 24 }
+      - { widget: apps, span: 24 }
+      - { widget: bookmarks, span: 24 }
+
+widgets:                    # every widget, with its content; any type can
+                            # appear any number of times (one of each if left out)
+  - { id: greeting, type: greeting }
+  - { id: headerCard, type: headerCard, showClock: true }
+  - { id: family, type: calendar, url: "https://…/family.ics" }
+  - { id: work, type: calendar, url: "https://…/work.ics", homeView: month }
+  - { id: todo, type: notes, title: To do, content: "- renew certs" }
+  # …and the other types: clock, weather, status, search, feed, countdown,
+  # worldClocks, systemStats, favorites, apps, bookmarks. A widget without a
+  # layout row waits, hidden, in the layout editor's tray.
 
 apps:
   - id: <uuid>
@@ -300,7 +301,7 @@ for reuse. You can also paste a direct image URL or a `data:` URI.
 | `SESSION_SECRET` | no | Secret used to sign session cookies. If unset, a random one is generated on first start and kept in the config volume (`session-secret`); only if that volume isn't writable does it fall back to deriving one from `ADMIN_PASSWORD`. Set it yourself to manage the secret explicitly (e.g. `openssl rand -base64 32`). |
 | `CONFIG_PATH` | no | Path to the config file (default `./config/config.yaml`; the container sets `/config/config.yaml`). The uptime history (`status-history.db`, a SQLite database) and uploaded custom icons (`uploads/`) are written beside it. |
 | `CTRLCENTER_SMTP_PASS` | no | Overrides the email-alert SMTP password, so the secret can stay out of `config.yaml`. |
-| `CTRLCENTER_CALDAV_PASS` | no | Overrides the private-calendar (CalDAV/WebDAV) password, so that secret can stay out of `config.yaml` too. |
+| `CTRLCENTER_CALDAV_PASS` | no | Overrides the private-calendar (CalDAV/WebDAV) password of the calendar widget with id `calendar` (the one a 2.x config migrates to), so that secret can stay out of `config.yaml` too. Other calendar widgets use only their own stored credentials. |
 | `CTRLCENTER_QBITTORRENT_PASS` | no | Overrides the qBittorrent integration's password (leave the field blank in the admin), keeping that secret out of `config.yaml`. |
 | `CTRLCENTER_SONARR_KEY` | no | Overrides the Sonarr integration's API key, same convention. |
 | `CTRLCENTER_RADARR_KEY` | no | Overrides the Radarr integration's API key, same convention. |

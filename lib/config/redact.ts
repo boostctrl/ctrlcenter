@@ -3,10 +3,12 @@
 import {
   appItemSchema,
   settingsSchema,
+  widgetInstanceSchema,
   redactSecrets,
   type AppItem,
   type Config,
   type Settings,
+  type WidgetInstance,
 } from "../schema";
 
 // The config without the admin credential — what's safe to send over the API
@@ -24,7 +26,8 @@ export function stripAuth(config: Config): Omit<Config, "auth"> {
 // (secretFields in lib/schema/meta.ts, #287): the calendar Basic-auth
 // credentials, the alert webhook URL and SMTP details, and — neutralized
 // whole — the integrations (#189: URLs map internal topology) and inbound
-// webhook tokens — plus, per app, the push-check token (#294). stripAuth only
+// webhook tokens — plus, per app, the push-check token (#294), and per widget
+// instance, a calendar's credentials (#297). stripAuth only
 // removes the top-level admin credential; these secrets live inside
 // `settings` and the app rows, where they'd otherwise ride along in
 // anything serialized from a public surface. readPublicConfig
@@ -33,10 +36,15 @@ export function stripAuth(config: Config): Omit<Config, "auth"> {
 // values read them separately — the calendar fetcher via getCalendarAuth, the
 // alert poller and the monitor snapshot via readConfigInternal-backed
 // accessors.
-export function stripSecrets<T extends { settings: Settings; apps?: AppItem[] }>(config: T): T {
+export function stripSecrets<
+  T extends { settings: Settings; apps?: AppItem[]; widgets?: WidgetInstance[] },
+>(config: T): T {
   return {
     ...config,
     settings: redactSecrets(settingsSchema, config.settings),
     ...(config.apps ? { apps: config.apps.map((a) => redactSecrets(appItemSchema, a)) } : {}),
+    ...(config.widgets
+      ? { widgets: config.widgets.map((w) => redactSecrets(widgetInstanceSchema, w)) }
+      : {}),
   };
 }

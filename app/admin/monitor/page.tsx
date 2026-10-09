@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getSettings } from "@/lib/config";
+import { getSiteConfig } from "@/lib/config";
 import { requireAdminPage } from "@/lib/api-auth";
 import { getMonitorSnapshot } from "@/lib/monitor";
 import MonitorDashboard from "@/components/monitor/MonitorDashboard";
@@ -17,12 +17,12 @@ export const dynamic = "force-dynamic";
 // direct URL.
 export default async function MonitorPage() {
   await requireAdminPage("/admin/monitor");
-  const settings = await getSettings();
+  const { settings, widgets } = await getSiteConfig();
   const snapshot = await getMonitorSnapshot(settings.integrations);
   return (
     <>
-      <MonitorDashboard initial={snapshot} nav={navPages(settings)} />
-      <FloatingNav {...navPages(settings)} />
+      <MonitorDashboard initial={snapshot} nav={navPages(settings, widgets)} />
+      <FloatingNav {...navPages(settings, widgets)} />
     </>
   );
 }

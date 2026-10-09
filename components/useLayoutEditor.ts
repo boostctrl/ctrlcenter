@@ -11,9 +11,10 @@ import {
   DEFAULT_UI_SCALE,
   DEFAULT_GRID_GAP,
   DEFAULT_TOP_GAP,
-  DEFAULT_WIDGETS,
+  DEFAULT_SECTIONS,
+  resolveLayout,
   smallScreenTopGap,
-  widgetKey,
+  toSections,
   type LayoutWidget,
   type SpaceSide,
 } from "@/lib/layout";
@@ -47,10 +48,11 @@ function takeUndoSnapshot(timing: { lastPush: number }): boolean {
   return take;
 }
 
-// Persist the whole layout; the settings API replaces it wholesale.
+// Persist the whole layout; the settings API replaces it wholesale. Sections
+// are stored by instance id (#297).
 async function saveLayout(layout: EditableLayout, opts?: SaveOptions): Promise<void> {
   await saveSettingsPatch(
-    { layout },
+    { layout: { ...layout, sections: toSections(layout.sections) } },
     { fallback: "Failed to save layout", keepalive: opts?.keepalive }
   );
 }
@@ -147,8 +149,13 @@ export function useLayoutEditor({
   }
   function resetLayout() {
     undoTimingRef.current.lastPush = 0;
+    // The stock arrangement over the stock instances; any other instance
+    // (a second notes card, say) goes back to the tray.
     mutateLayout({
-      sections: DEFAULT_WIDGETS.map((w) => ({ ...w })),
+      sections: resolveLayout(
+        DEFAULT_SECTIONS,
+        layout.sections.map(({ id, type }) => ({ id, type }))
+      ),
       scale: DEFAULT_UI_SCALE,
       gap: DEFAULT_GRID_GAP,
       topGap: DEFAULT_TOP_GAP,
@@ -156,12 +163,12 @@ export function useLayoutEditor({
   }
   const mutateSections = (sections: LayoutWidget[]) =>
     mutateLayout({ ...layout, sections });
-  // Per-widget edits match on the entry's stable identity (widgetKey), so two
-  // feed instances stay independent — matching on the type id would move both.
+  // Per-widget edits match on the instance id, so two widgets of a type stay
+  // independent.
   const setWidgetSpan = (key: string, span: number) =>
     mutateSections(
       layout.sections.map((w) =>
-        widgetKey(w) === key
+        w.id === key
           ? { ...w, span: Math.min(GRID_COLUMNS, Math.max(1, span)) }
           : w
       )
@@ -171,7 +178,7 @@ export function useLayoutEditor({
   const setWidgetCards = (key: string, cards: number | undefined) =>
     mutateSections(
       layout.sections.map((w) => {
-        if (widgetKey(w) !== key) return w;
+        if (w.id !== key) return w;
         if (cards !== undefined) return { ...w, cards };
         const rest = { ...w };
         delete rest.cards;
@@ -183,7 +190,7 @@ export function useLayoutEditor({
   const setWidgetHeight = (key: string, height: number | undefined) =>
     mutateSections(
       layout.sections.map((w) => {
-        if (widgetKey(w) !== key) return w;
+        if (w.id !== key) return w;
         if (height !== undefined) return { ...w, height };
         const rest = { ...w };
         delete rest.height;
@@ -199,7 +206,7 @@ export function useLayoutEditor({
   ) =>
     mutateSections(
       layout.sections.map((w) => {
-        if (widgetKey(w) !== key) return w;
+        if (w.id !== key) return w;
         const nextSpace = { ...(w.space ?? {}) };
         if (value) nextSpace[side] = value;
         else delete nextSpace[side];
@@ -216,7 +223,7 @@ export function useLayoutEditor({
   const toggleWidgetHidden = (key: string) =>
     mutateSections(
       layout.sections.map((w) =>
-        widgetKey(w) === key ? { ...w, hidden: !w.hidden } : w
+        w.id === key ? { ...w, hidden: !w.hidden } : w
       )
     );
   // Toggle the section heading. Stored only when off (the key is dropped when
@@ -224,7 +231,7 @@ export function useLayoutEditor({
   const toggleWidgetLabel = (key: string) =>
     mutateSections(
       layout.sections.map((w) => {
-        if (widgetKey(w) !== key) return w;
+        if (w.id !== key) return w;
         if (w.hideLabel) {
           const rest = { ...w };
           delete rest.hideLabel;
