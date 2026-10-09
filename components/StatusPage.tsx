@@ -256,6 +256,9 @@ export default function StatusPage({
                       {dur ? `Down for ${dur}` : "Down"}
                     </p>
                   )}
+                  {s?.up && s.warning && (
+                    <p className="text-xs text-amber-200">{s.warning}</p>
+                  )}
                 </>
               );
               // One strip element for both layouts (like `figures` above), so
@@ -272,7 +275,11 @@ export default function StatusPage({
                 <div
                   key={app.id}
                   className={`glass-card relative px-5 py-4 transition-colors hover:bg-fg/[0.03] ${
-                    s && !s.up ? "ring-1 ring-red-400/30" : ""
+                    s && !s.up
+                      ? "ring-1 ring-red-400/30"
+                      : s?.warning
+                        ? "ring-1 ring-amber-400/30"
+                        : ""
                   }`}
                 >
                   <div className="flex items-center gap-4">

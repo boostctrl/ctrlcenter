@@ -92,10 +92,17 @@ export function uptimeColor(u: number | null): string {
 }
 
 export function StateDot({ status }: { status: AppStatus | undefined }) {
-  const cls = !status ? "bg-fg/25" : status.up ? "bg-emerald-400" : "bg-red-400";
+  const warn = Boolean(status?.up && status.warning);
+  const cls = !status
+    ? "bg-fg/25"
+    : warn
+      ? "bg-amber-400"
+      : status.up
+        ? "bg-emerald-400"
+        : "bg-red-400";
   return (
     <span className="relative flex h-2.5 w-2.5 shrink-0">
-      {status?.up && (
+      {status?.up && !warn && (
         <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-emerald-400/60" />
       )}
       <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${cls}`} />

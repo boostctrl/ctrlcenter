@@ -42,6 +42,8 @@ type FormState = {
   port: string;
   keyword: string;
   jsonQuery: string;
+  // Days before a TLS certificate's expiry to warn (#294); "" = default/off.
+  certWarnDays: string;
   // Whether the app gets status checks at all (#296).
   monitor: boolean;
   // Per-app check overrides (#292); "" = the global setting.
@@ -60,6 +62,7 @@ const emptyForm: FormState = {
   port: "",
   keyword: "",
   jsonQuery: "",
+  certWarnDays: "",
   monitor: true,
   interval: "",
   timeout: "",
@@ -86,6 +89,11 @@ function PushUrl({ token }: { token: string }) {
   );
 }
 
+// The HTTP-family checks can watch an https site's certificate alongside
+// (#294); the TLS check does nothing else.
+const watchesCert = (t: CheckType) => t === "http" || t === "keyword" || t === "json";
+const isHttps = (url: string) => /^https:\/\//i.test(withHttpScheme(url));
+
 // One-line description of what each check method does, shown under the picker.
 function checkTypeHint(t: CheckType): string {
   switch (t) {
@@ -101,6 +109,8 @@ function checkTypeHint(t: CheckType): string {
       return "Fetches the URL as JSON; up only if the query below holds.";
     case "push":
       return "Your job calls a secret URL each time it runs; up while those calls keep arriving.";
+    case "tls":
+      return "Reads the site's TLS certificate; warns before it expires and is down once it has.";
     case "http":
     default:
       return "Sends an HTTP request to the URL and checks the response code.";
@@ -155,6 +165,7 @@ export default function AppsManager({
       port: app.port != null ? String(app.port) : "",
       keyword: app.keyword ?? "",
       jsonQuery: app.jsonQuery ?? "",
+      certWarnDays: app.certWarnDays != null ? String(app.certWarnDays) : "",
       monitor: app.monitor !== false,
       interval: app.interval != null ? String(app.interval) : "",
       timeout: app.timeout != null ? String(app.timeout) : "",
@@ -194,6 +205,10 @@ export default function AppsManager({
         keyword: form.checkType === "keyword" ? form.keyword : "",
         jsonQuery: form.checkType === "json" ? form.jsonQuery : "",
         port: optionalNumber(form.port, form.checkType === "tcp" || form.checkType === "dns"),
+        certWarnDays: optionalNumber(
+          form.certWarnDays,
+          form.checkType === "tls" || (watchesCert(form.checkType) && isHttps(form.url))
+        ),
         interval: optionalNumber(form.interval),
         timeout: optionalNumber(form.timeout),
         retries: optionalNumber(form.retries),
@@ -464,6 +479,19 @@ export default function AppsManager({
                   />
                 )}
 
+                {form.checkType === "tls" && (
+                  <TextField
+                    label="Warn before expiry (days)"
+                    type="number"
+                    min={1}
+                    max={365}
+                    placeholder="14 (default)"
+                    value={form.certWarnDays}
+                    onChange={(e) => setForm({ ...form, certWarnDays: e.target.value })}
+                    hint="The app shows a warning this many days before its certificate expires. Uses the URL's port, or 443."
+                  />
+                )}
+
                 {form.checkType === "push" && (
                   <PushUrl token={apps.find((a) => a.id === editingId)?.pushToken ?? ""} />
                 )}
@@ -547,7 +575,12 @@ export default function AppsManager({
                     away: the defaults suit almost every app. */}
                 <details
                   className="rounded-lg border border-fg/10 px-3 py-2"
-                  open={Boolean(form.interval || form.timeout || form.retries)}
+                  open={Boolean(
+                    form.interval ||
+                      form.timeout ||
+                      form.retries ||
+                      (form.certWarnDays && form.checkType !== "tls")
+                  )}
                 >
                   <summary className="cursor-pointer text-sm text-ink-70 select-none">
                     Advanced check settings
@@ -586,6 +619,20 @@ export default function AppsManager({
                     many quick re-tries a failed check gets before it counts as down.
                     Leave blank to use the defaults.
                   </Hint>
+                  {watchesCert(form.checkType) && isHttps(form.url) && (
+                    <div className="mt-3">
+                      <TextField
+                        label="Certificate warning (days)"
+                        type="number"
+                        min={1}
+                        max={365}
+                        placeholder="Off"
+                        value={form.certWarnDays}
+                        onChange={(e) => setForm({ ...form, certWarnDays: e.target.value })}
+                        hint="Also watch this site's TLS certificate, and show a warning this many days before it expires."
+                      />
+                    </div>
+                  )}
                 </details>
               </>
             )}

@@ -490,6 +490,13 @@ export default async function HelpPage() {
               (<code>curl -fsS</code> is enough), and it counts as down when a
               run is missed. Set its interval to how often the job runs.
             </li>
+            <li>
+              <strong>TLS certificate.</strong> Reads the site&apos;s
+              certificate and shows an amber warning a set number of days
+              before it expires (14 by default), turning down once it has. An
+              HTTPS check can watch its certificate the same way: set{" "}
+              <strong>Certificate warning</strong> under Advanced.
+            </li>
           </ul>
           <P>
             A background poller records history on its own schedule, so uptime

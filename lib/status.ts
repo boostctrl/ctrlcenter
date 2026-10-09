@@ -7,7 +7,14 @@ import { formatInZone, formatRangeInZone } from "./datetime";
 // One app's reachability: `up` is false only on a network error or timeout (a
 // reachable host that answers 401/403/5xx still counts as up). `status` is the
 // HTTP code when reachable, `ms` the round-trip time.
-export type AppStatus = { up: boolean; status: number | null; ms: number };
+export type AppStatus = {
+  up: boolean;
+  status: number | null;
+  ms: number;
+  // Up, but with something to fix soon (#294) — today a TLS certificate near
+  // expiry. Counts as up for uptime and alerts; shown amber with this text.
+  warning?: string;
+};
 
 // A status keyed by the app id it belongs to.
 export type StatusResult = AppStatus & { id: string };
@@ -65,6 +72,7 @@ export const CHECK_TYPES = [
   { key: "icmp", label: "Ping (ICMP)" },
   { key: "json", label: "JSON query" },
   { key: "push", label: "Push (heartbeat)" },
+  { key: "tls", label: "TLS certificate" },
 ] as const;
 export type CheckType = (typeof CHECK_TYPES)[number]["key"];
 export const CHECK_TYPE_KEYS = CHECK_TYPES.map((c) => c.key) as [

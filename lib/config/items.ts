@@ -35,7 +35,7 @@ export async function createApp(
 }
 
 // The optional app fields an update can clear by sending null.
-type Clearable = "port" | "interval" | "timeout" | "retries";
+type Clearable = "port" | "interval" | "timeout" | "retries" | "certWarnDays";
 export type AppUpdate = Partial<Omit<AppItem, "id" | "pushToken" | Clearable>> & {
   [K in Clearable]?: AppItem[K] | null;
 };

@@ -36,11 +36,20 @@ here.
   as down and alerts fire like for any other outage. Set the app's interval to
   how often the job runs. The URL is shown in the app form and never on a
   public page. (#294)
+- **TLS certificate checks.** A new check method reads a site's certificate
+  and warns a set number of days before it expires (14 by default) — the
+  app's dot turns amber and the status page says how long is left — then
+  counts as down once it has expired. Any HTTPS check can watch its
+  certificate the same way, from *Certificate warning* under Advanced.
+  (#294)
 
 ### Fixed
 
 - Clearing an app's TCP or DNS port in the admin portal now actually removes
   it, rather than keeping the old one. (#292)
+- The home page's service-status link now presents its visible text to
+  screen readers and voice control, so "Uptime & outages" can be spoken to
+  open it. (#294)
 
 ## [2.12.0] - 2026-10-09
 

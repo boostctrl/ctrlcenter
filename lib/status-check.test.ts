@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import net from "node:net";
+import tls from "node:tls";
+import { EventEmitter } from "node:events";
 import dnsPromises from "node:dns/promises";
 import { checkApp } from "./status-check";
 
@@ -433,5 +435,68 @@ describe("checkApp · push (#294)", () => {
     const { resetPushState } = await import("./push");
     resetPushState(Date.now());
     expect((await checkApp(push(), { intervalMinutes: 5 })).up).toBe(true);
+  });
+});
+
+describe("checkApp · TLS certificate (#294)", () => {
+  const DAY = 86_400_000;
+  // A fake TLS socket whose peer certificate expires `days` from now (or a
+  // handshake that fails, for null).
+  function fakeCert(days: number | null) {
+    return vi.spyOn(tls, "connect").mockImplementation((() => {
+      const socket = Object.assign(new EventEmitter(), {
+        setTimeout: () => socket,
+        destroy: () => {},
+        getPeerCertificate: () => ({
+          valid_to: new Date(Date.now() + (days ?? 0) * DAY).toUTCString(),
+        }),
+      });
+      queueMicrotask(() =>
+        days === null ? socket.emit("error", new Error("handshake")) : socket.emit("secureConnect")
+      );
+      return socket;
+    }) as unknown as typeof tls.connect);
+  }
+  const tlsApp = (certWarnDays?: number) => ({
+    ...base,
+    url: "https://nas.example",
+    checkType: "tls" as const,
+    certWarnDays,
+  });
+
+  it("is up and quiet with plenty of time left", async () => {
+    fakeCert(60);
+    const r = await checkApp(tlsApp());
+    expect(r).toMatchObject({ up: true });
+    expect(r.warning).toBeUndefined();
+  });
+
+  it("warns inside the window (14 days by default, or the app's own)", async () => {
+    fakeCert(6.5);
+    expect((await checkApp(tlsApp())).warning).toBe("Certificate expires in 6 days");
+    fakeCert(20);
+    expect((await checkApp(tlsApp(30))).warning).toBe("Certificate expires in 19 days");
+  });
+
+  it("is down once expired, or when no certificate could be read", async () => {
+    fakeCert(-1);
+    expect(await checkApp(tlsApp())).toMatchObject({ up: false, warning: "Certificate expired" });
+    fakeCert(null);
+    expect((await checkApp(tlsApp())).up).toBe(false);
+  });
+
+  it("adds the watch to an https HTTP check when certWarnDays is set", async () => {
+    mockFetch(200);
+    fakeCert(3);
+    const r = await checkApp({ ...base, url: "https://nas.example", checkType: "http", certWarnDays: 7 });
+    expect(r).toMatchObject({ up: true, status: 200, warning: "Certificate expires in 2 days" });
+  });
+
+  it("leaves an HTTP check alone without certWarnDays", async () => {
+    mockFetch(200);
+    const spy = fakeCert(3);
+    const r = await checkApp({ ...base, url: "https://nas.example", checkType: "http" });
+    expect(r.warning).toBeUndefined();
+    expect(spy).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,5 @@
 import net from "node:net";
+import tls from "node:tls";
 import dns from "node:dns/promises";
 import { execFile } from "node:child_process";
 import { matchesStatus, type AppStatus } from "./status";
@@ -25,7 +26,7 @@ type CheckInput = Pick<
   AppItem,
   "url" | "expectStatus" | "checkType" | "port" | "keyword" | "timeout" | "retries" | "interval"
 > &
-  Partial<Pick<AppItem, "jsonQuery" | "id">>;
+  Partial<Pick<AppItem, "jsonQuery" | "id" | "certWarnDays">>;
 
 // What a check can't read off the app itself.
 export type CheckContext = {
@@ -48,6 +49,7 @@ export function checkSignature(app: CheckInput): string {
     app.port,
     app.keyword,
     app.jsonQuery,
+    app.certWarnDays,
   ]);
 }
 
@@ -73,7 +75,82 @@ export async function checkApp(app: CheckInput, ctx: CheckContext = {}): Promise
     await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
     result = await checkOnce(app);
   }
+  // The certificate watch alongside an https HTTP-family check (#294): only
+  // a warning — an expired certificate already fails the request itself.
+  if (
+    result.up &&
+    app.certWarnDays &&
+    (app.checkType === "http" || app.checkType === "keyword" || app.checkType === "json") &&
+    hostFromUrl(app.url).https
+  ) {
+    const cert = await certificateExpiry(app);
+    const warning = cert.expiresAt === null ? null : expiryWarning(cert.expiresAt, app.certWarnDays);
+    if (warning) result = { ...result, warning };
+  }
   return result;
+}
+
+// TLS certificate (#294): connect, read the peer certificate, and judge its
+// expiry — down once it has expired (or no certificate could be read), up
+// with a warning inside the warning window (certWarnDays, default 14). Trust
+// isn't judged here: a homelab's self-signed certificate is normal, and
+// expiry is what sneaks up on people.
+const DEFAULT_CERT_WARN_DAYS = 14;
+const DAY_MS = 86_400_000;
+
+async function checkTls(app: CheckInput): Promise<AppStatus> {
+  const { expiresAt, ms } = await certificateExpiry(app);
+  if (expiresAt === null || expiresAt <= Date.now()) {
+    return {
+      up: false,
+      status: null,
+      ms,
+      ...(expiresAt !== null ? { warning: "Certificate expired" } : {}),
+    };
+  }
+  const warning = expiryWarning(expiresAt, app.certWarnDays ?? DEFAULT_CERT_WARN_DAYS);
+  return { up: true, status: null, ms, ...(warning ? { warning } : {}) };
+}
+
+function expiryWarning(expiresAt: number, warnDays: number): string | null {
+  const left = expiresAt - Date.now();
+  if (left > warnDays * DAY_MS) return null;
+  if (left <= 0) return "Certificate expired";
+  const days = Math.floor(left / DAY_MS);
+  return days === 0
+    ? "Certificate expires today"
+    : `Certificate expires in ${days} day${days === 1 ? "" : "s"}`;
+}
+
+// The peer certificate's expiry (epoch ms), or null when the handshake or the
+// certificate couldn't be read. Port: the explicit `port`, else the URL's,
+// else 443.
+function certificateExpiry(app: CheckInput): Promise<{ expiresAt: number | null; ms: number }> {
+  const start = Date.now();
+  const { host, urlPort } = hostFromUrl(app.url);
+  const port = app.port ?? urlPort ?? 443;
+  return new Promise((resolve) => {
+    if (!host) return resolve({ expiresAt: null, ms: 0 });
+    const socket = tls.connect({
+      host,
+      port,
+      // SNI only takes a hostname, never an IP literal.
+      servername: net.isIP(host) ? undefined : host,
+      rejectUnauthorized: false,
+    });
+    const done = (expiresAt: number | null) => {
+      socket.destroy();
+      resolve({ expiresAt, ms: Date.now() - start });
+    };
+    socket.setTimeout(timeoutOf(app));
+    socket.once("secureConnect", () => {
+      const validTo = socket.getPeerCertificate()?.valid_to;
+      const at = validTo ? Date.parse(validTo) : NaN;
+      done(Number.isFinite(at) ? at : null);
+    });
+    socket.once("timeout", () => done(null));
+    socket.once("error", () => done(null));
+  });
 }
 
 // Push (#294): up while the last ping to the app's secret URL is within its
@@ -97,6 +174,8 @@ function checkOnce(app: CheckInput): Promise<AppStatus> {
       return checkHttp(app, (app.keyword ?? "").trim());
     case "json":
       return checkJson(app);
+    case "tls":
+      return checkTls(app);
     case "http":
     default:
       return checkHttp(app, "");

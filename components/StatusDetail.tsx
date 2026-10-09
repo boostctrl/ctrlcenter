@@ -295,7 +295,11 @@ export default function StatusDetail({
   const liveDetail = !live
     ? "Checking…"
     : live.up
-      ? `${live.status ? `HTTP ${live.status}` : "Reachable"} · ${live.ms}ms`
+      ? live.warning
+        ? live.warning
+        : check.type === "push"
+          ? "Pinging on schedule"
+          : `${live.status ? `HTTP ${live.status}` : "Reachable"} · ${live.ms}ms`
       : dur
         ? live.status
           ? `Down for ${dur} · HTTP ${live.status}`
@@ -312,7 +316,11 @@ export default function StatusDetail({
       {/* Live header: the same identity + state the row shows, full width. */}
       <div
         className={`glass-card flex items-center gap-4 px-5 py-4 ${
-          live && !live.up ? "ring-1 ring-red-400/30" : ""
+          live && !live.up
+            ? "ring-1 ring-red-400/30"
+            : live?.warning
+              ? "ring-1 ring-amber-400/30"
+              : ""
         }`}
       >
         <StateDot status={live} />
@@ -329,7 +337,9 @@ export default function StatusDetail({
                 ? `down since ${instantLabel(outageStart, timezone)}`
                 : undefined
             }
-            className={`text-sm ${live && !live.up ? "text-red-400" : "text-ink-70"}`}
+            className={`text-sm ${
+              live && !live.up ? "text-red-400" : live?.warning ? "text-amber-200" : "text-ink-70"
+            }`}
           >
             {liveDetail}
           </p>

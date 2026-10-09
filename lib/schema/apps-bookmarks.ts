@@ -32,6 +32,10 @@ export const appItemSchema = z.object({
   keyword: z.string().default(""),
   // The JSON query check's expression (#294), e.g. `$.status == "ok"`.
   jsonQuery: z.string().catch("").default(""),
+  // Warn this many days before the TLS certificate expires (#294). The TLS
+  // check always warns (default 14); on an https HTTP, keyword or JSON check,
+  // setting it adds the certificate watch alongside.
+  certWarnDays: z.number().int().min(1).max(365).optional().catch(undefined),
   // The push check's secret (#294): its URL is /api/push/<token>. Generated
   // server-side when the app is switched to push, never taken from input, and
   // redacted from public reads like any credential.
@@ -89,6 +93,7 @@ export const appInputSchema = z.object({
   port: z.number().int().min(1).max(65535).optional(),
   keyword: z.string().optional().default(""),
   jsonQuery: jsonQuery.optional().default(""),
+  certWarnDays: z.number().int().min(1).max(365).optional(),
   monitor: z.boolean().optional().default(true),
   interval: z.number().int().min(1).max(60).optional(),
   timeout: z.number().int().min(1).max(60).optional(),
@@ -116,6 +121,7 @@ export const appUpdateSchema = z.object({
   port: z.number().int().min(1).max(65535).nullable().optional(),
   keyword: z.string().optional(),
   jsonQuery: jsonQuery.optional(),
+  certWarnDays: z.number().int().min(1).max(365).nullable().optional(),
   monitor: z.boolean().optional(),
   interval: z.number().int().min(1).max(60).nullable().optional(),
   timeout: z.number().int().min(1).max(60).nullable().optional(),

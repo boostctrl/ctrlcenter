@@ -53,24 +53,28 @@ export function StatusDot({ id }: { id: string }) {
   if (!status) return null;
 
   const title = status.up
-    ? `Online${status.status ? ` · HTTP ${status.status}` : ""} · ${status.ms}ms`
+    ? status.warning
+      ? `Online · ${status.warning}`
+      : `Online${status.status ? ` · HTTP ${status.status}` : ""} · ${status.ms}ms`
     : `Offline${status.status ? ` · HTTP ${status.status}` : ""}`;
+  // Up with a warning (a certificate near expiry, #294) shows amber.
+  const warn = status.up && Boolean(status.warning);
 
   return (
     <span
       className="absolute top-3 right-3 flex h-2.5 w-2.5"
       title={title}
       role="img"
-      aria-label={status.up ? "Online" : "Offline"}
+      aria-label={status.up ? (warn ? `Online, ${status.warning}` : "Online") : "Offline"}
     >
-      {status.up && (
+      {status.up && !warn && (
         <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-emerald-400/60" />
       )}
       {/* Up is a solid dot, down a hollow ring, so the state reads by shape
           as well as color for color-blind visitors (#273). */}
       <span
         className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
-          status.up ? "bg-emerald-400" : "border-2 border-red-400"
+          warn ? "bg-amber-400" : status.up ? "bg-emerald-400" : "border-2 border-red-400"
         }`}
       />
     </span>
@@ -108,7 +112,9 @@ export function StatusSummary({
     <Link
       href="/status"
       title={message}
-      aria-label={`Service status: ${message}`}
+      // No aria-label: the visible text ("All systems operational · Uptime &
+      // outages") is the accessible name, so speech users can say what they
+      // see (WCAG 2.5.3).
       className={SUMMARY_VARIANTS[variant]}
     >
       <span className="relative flex h-2.5 w-2.5" aria-hidden>
