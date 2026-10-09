@@ -1,5 +1,6 @@
 // Connections to other self-hosted services (Monitor dashboard).
 import { z } from "zod";
+import { patchOf } from "./input";
 
 // --- Integrations (#189): connections to other self-hosted services, shown
 // only on the private Monitor dashboard (/admin/monitor). Read-only in the
@@ -61,9 +62,7 @@ export const integrationsSchema = z.object({
 });
 export type IntegrationsConfig = z.infer<typeof integrationsSchema>;
 
-// The admin sends the whole integrations object (the Settings tab autosaves
-// the complete settings), so updateSettings replaces it wholesale like the
-// theme.
+// Admin input, derived from the stored schema (lib/schema/input.ts).
 //
 // No URL-format refine here on purpose: because the entire Settings object is
 // one autosave PUT, a refine failure on a half-typed integration URL (e.g. a
@@ -74,31 +73,4 @@ export type IntegrationsConfig = z.infer<typeof integrationsSchema>;
 // URL with a clear message shown on the Monitor card and the Test-connection
 // button — and stored leniently, so a bad value stays inert rather than
 // wedging the admin form.
-export const userPassIntegrationUpdateSchema = z.object({
-  enabled: z.boolean(),
-  url: z.string(),
-  username: z.string(),
-  password: z.string(),
-  allowInsecureTls: z.boolean(),
-  allowActions: z.boolean(),
-});
-
-export const apiKeyIntegrationUpdateSchema = z.object({
-  enabled: z.boolean(),
-  url: z.string(),
-  apiKey: z.string(),
-  allowInsecureTls: z.boolean(),
-  allowActions: z.boolean(),
-});
-
-export const integrationsUpdateSchema = z.object({
-  qbittorrent: userPassIntegrationUpdateSchema,
-  sonarr: apiKeyIntegrationUpdateSchema,
-  radarr: apiKeyIntegrationUpdateSchema,
-  adguard: userPassIntegrationUpdateSchema,
-  tautulli: apiKeyIntegrationUpdateSchema,
-  seerr: apiKeyIntegrationUpdateSchema,
-  portainer: apiKeyIntegrationUpdateSchema,
-  truenas: apiKeyIntegrationUpdateSchema,
-  unifi: userPassIntegrationUpdateSchema,
-});
+export const integrationsUpdateSchema = patchOf(integrationsSchema);

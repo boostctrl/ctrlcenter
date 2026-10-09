@@ -5,12 +5,17 @@
 // "Stored" schemas (used to read config.yaml): every field has a default so
 // a hand-edited or partially-filled YAML file still parses successfully.
 //
-// "Update" schemas (PUT / partial merge): every field is plain-optional with
-// NO `.default()`. This matters — chaining `.partial()` off a schema whose
-// fields already carry `.default()` doesn't leave omitted fields untouched,
-// it immediately substitutes their defaults, which would silently blow away
-// existing values during a partial update. Keeping these schemas separate
-// and default-free is what makes "only send the fields you're changing" work.
+// "Update" schemas (admin input): derived from the stored ones by
+// lib/schema/input.ts (#287) — patchOf for sections the settings PUT
+// deep-merges (every field optional, NO defaults: in Zod 4 a default inside
+// an optional still fills in, which would blow away stored values on a
+// partial update), wholeOf for list items that replace. Input-only rules
+// (bounds, URL checks) are layered on per section. Layout and theme input
+// stay hand-written: their input shape isn't the stored shape minus
+// leniency (see lib/schema/layout.ts, theme.ts).
+//
+// Per-field rules that generic code reads — how a section merges, which
+// fields are secret — are marked on the schemas via lib/schema/meta.ts.
 
 export * from "./schema/theme";
 export * from "./schema/search";

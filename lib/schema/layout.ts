@@ -22,6 +22,7 @@ import {
   type WidgetSpace,
 } from "../layout";
 import { lenientArray } from "./shared";
+import { patchOf } from "./input";
 
 // Per-component visibility for the home page. Each flag defaults on, so existing
 // configs keep showing everything. Weather, the status row, and the calendar have
@@ -177,22 +178,15 @@ export const layoutSchema = z.object({
 });
 export type LayoutConfig = z.infer<typeof layoutSchema>;
 
-// The admin sends the whole components object (all flags), so updateSettings can
-// replace it wholesale.
-export const componentsUpdateSchema = z.object({
-  greeting: z.boolean(),
-  clock: z.boolean(),
-  search: z.boolean(),
-  apps: z.boolean(),
-  bookmarks: z.boolean(),
-  favorites: z.boolean(),
-  settingsButton: z.boolean(),
-});
+// Admin input for the component flags, derived from the stored schema
+// (lib/schema/input.ts).
+export const componentsUpdateSchema = patchOf(componentsSchema);
 
-// The admin/editor sends the whole layout (every widget, fully resolved), so
-// updateSettings replaces it wholesale (like theme/components). Spans are on
-// the 24-column grid; `columns` is stamped in so the stored layout never
-// re-triggers the 12→24 migration.
+// The admin/editor sends the whole layout (every widget, fully resolved).
+// Hand-written rather than derived: the stored rows are deliberately partial
+// (each field optional, resolved against the widget defaults at read time),
+// while input must be complete. Spans are on the 24-column grid; `columns` is
+// stamped in so the stored layout never re-triggers the 12→24 migration.
 export const layoutUpdateSchema = z.object({
   sections: z.array(
     z.object({

@@ -1,6 +1,7 @@
 // Outbound uptime alerts (webhook + email channels).
 import { z } from "zod";
 import { secretFields } from "./meta";
+import { patchOf } from "./input";
 
 // Redacted from public reads (stripSecrets): credentials, and the addresses
 // and endpoints that map where alerts go.
@@ -48,35 +49,13 @@ export const alertsSchema = z.object({
 });
 export type AlertConfig = z.infer<typeof alertsSchema>;
 
-// Admin sends the whole alerts object. A webhook URL is optional (alerts stay
-// inert until one is set), but when present it must be http(s).
-// Lenient like the webhook URL: an enabled-but-incomplete email channel just
-// stays inert (processAlerts gates sending on emailReady), so partially-filled
-// fields never block an autosave. The admin UI nudges to finish the config.
-// Optional in the parent so older clients can omit it.
-export const alertEmailUpdateSchema = z.object({
-  enabled: z.boolean(),
-  host: z.string(),
-  port: z.number().int().min(1).max(65535),
-  secure: z.boolean(),
-  subject: z.string(),
-  user: z.string(),
-  pass: z.string(),
-  from: z.string(),
-  to: z.string(),
-});
-
-export const alertsUpdateSchema = z
-  .object({
-    enabled: z.boolean(),
-    type: z.enum(ALERT_TYPES),
-    webhookUrl: z.string(),
-    webhookEnabled: z.boolean().optional(),
-    notifyOnRecovery: z.boolean(),
-    confirmations: z.number().int().min(1).max(10),
-    email: alertEmailUpdateSchema.optional(),
-  })
-  .refine(
-    (a) => a.webhookUrl.trim() === "" || /^https?:\/\//i.test(a.webhookUrl.trim()),
-    { message: "Webhook URL must start with http(s)", path: ["webhookUrl"] }
-  );
+// Admin input, derived from the stored schema (lib/schema/input.ts). A
+// webhook URL is optional (alerts stay inert until one is set), but when
+// present it must be http(s). The email channel is lenient: an
+// enabled-but-incomplete one just stays inert (processAlerts gates sending on
+// emailReady), so partially-filled fields never block an autosave.
+export const alertsUpdateSchema = patchOf(alertsSchema).refine(
+  (a) =>
+    a.webhookUrl === undefined || a.webhookUrl.trim() === "" || /^https?:\/\//i.test(a.webhookUrl.trim()),
+  { message: "Webhook URL must start with http(s)", path: ["webhookUrl"] }
+);

@@ -1,6 +1,7 @@
 // Search bar settings: engine, custom URL template, and `!key` bangs.
 import { z } from "zod";
 import { SEARCH_ENGINE_KEYS, isValidCustomUrl } from "../search";
+import { patchOf } from "./input";
 
 // Stored search config is lenient (so a hand-edited file always parses); the
 // custom URL is validated on the admin-input path and at use time instead.
@@ -17,17 +18,11 @@ export const searchSchema = z.object({
   bangs: z.array(bangSchema).default([]),
 });
 
-// Admin sends the full search object; reject a "custom" engine without a valid
-// http(s) `%s` template so a broken search bar can't be saved.
-export const searchUpdateSchema = z
-  .object({
-    engine: z.enum(SEARCH_ENGINE_KEYS),
-    customUrl: z.string(),
-    // Lenient on input so a half-typed bang row doesn't block autosave; bad rows
-    // are ignored at resolve time.
-    bangs: z.array(bangSchema).optional(),
-  })
-  .refine((s) => s.engine !== "custom" || isValidCustomUrl(s.customUrl), {
-    message: "Custom search URL must start with http(s) and contain %s",
-    path: ["customUrl"],
-  });
+// Admin input, derived from the stored schema (lib/schema/input.ts). Bang
+// rows stay lenient in content, so a half-typed one doesn't block autosave
+// (bad rows are ignored at resolve time). A "custom" engine needs a valid
+// http(s) `%s` template sent with it, so a broken search bar can't be saved.
+export const searchUpdateSchema = patchOf(searchSchema).refine(
+  (s) => s.engine !== "custom" || isValidCustomUrl(s.customUrl ?? ""),
+  { message: "Custom search URL must start with http(s) and contain %s", path: ["customUrl"] }
+);

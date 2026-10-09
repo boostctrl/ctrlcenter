@@ -27,6 +27,7 @@ import {
   announcementSchema,
   statusAnnouncementSchema,
   announcementUpdateSchema,
+  statusAnnouncementsUpdateSchema,
 } from "./announcements";
 import {
   componentsSchema,
@@ -107,7 +108,7 @@ export const settingsInputSchema = z.object({
   // The admin sends the whole list (each entry carries a client-minted id), so
   // updateSettings replaces it wholesale — it flows through `rest` like the
   // other plain settings arrays (e.g. bookmarkCategoryOrder).
-  statusAnnouncements: z.array(statusAnnouncementSchema).optional(),
+  statusAnnouncements: statusAnnouncementsUpdateSchema.optional(),
   // The whole feed-cards list, replaced wholesale like statusAnnouncements.
   feeds: feedsUpdateSchema.optional(),
   countdown: countdownUpdateSchema.optional(),

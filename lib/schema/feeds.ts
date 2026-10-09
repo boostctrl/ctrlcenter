@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { FEED_DEFAULT_ID } from "../layout";
 import { lenientArray } from "./shared";
+import { wholeOf } from "./input";
 
 // Cap on how many feed URLs one widget can fan out to. Each is a separate
 // server-side fetch per home-page render (the page is force-dynamic), so the
@@ -53,22 +54,17 @@ export function feedUrls(feed: Pick<FeedConfig, "urls">): string[] {
   return feed.urls.map((u) => u.trim()).filter((u) => u !== "");
 }
 
-// The admin sends the whole feed-cards list. Each card carries its instance
-// `id`. A card's URL list may be empty (it stays inert until set) and blank
-// rows are allowed (trimmed on read), but every non-empty entry must be
-// http(s). The list is capped at MAX_FEED_CARDS.
-export const feedUpdateSchema = z
-  .object({
-    id: z.string(),
-    enabled: z.boolean(),
-    urls: z.array(z.string()).max(MAX_FEED_URLS),
-    count: z.number().int().min(1).max(15),
-    title: z.string(),
-    summaries: z.boolean(),
-  })
-  .refine(
-    (f) => f.urls.every((u) => u.trim() === "" || /^https?:\/\//i.test(u.trim())),
-    { message: "Every feed URL must start with http(s)", path: ["urls"] }
-  );
+// Admin input, derived from the stored schema (lib/schema/input.ts). The
+// admin sends the whole feed-cards list, which replaces the stored one, so
+// each card is complete and carries its instance `id`. A card's URL list may
+// be empty (it stays inert until set) and blank rows are allowed (trimmed on
+// read), but every non-empty entry must be http(s). The URL list and the card
+// count are capped.
+export const feedUpdateSchema = wholeOf(feedSchema)
+  .extend({ urls: z.array(z.string()).max(MAX_FEED_URLS) })
+  .refine((f) => f.urls.every((u) => u.trim() === "" || /^https?:\/\//i.test(u.trim())), {
+    message: "Every feed URL must start with http(s)",
+    path: ["urls"],
+  });
 
 export const feedsUpdateSchema = z.array(feedUpdateSchema).max(MAX_FEED_CARDS);

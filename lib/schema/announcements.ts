@@ -1,5 +1,6 @@
 // Site-wide announcement banner, /status page notices, and outage notes.
 import { z } from "zod";
+import { patchOf, wholeOf } from "./input";
 
 // Site-wide announcement banner shown at the top of every page. The banner
 // renders only when `enabled` and `message` is non-empty (see
@@ -55,10 +56,8 @@ export const outageNoteSchema = z.object({
   note: z.string().max(500),
 });
 
-// The admin sends the whole announcement object.
-export const announcementUpdateSchema = z.object({
-  enabled: z.boolean(),
-  message: z.string(),
-  tone: z.enum(ANNOUNCEMENT_TONES),
-  dismissible: z.boolean(),
-});
+// Admin input, derived from the stored schemas (lib/schema/input.ts).
+export const announcementUpdateSchema = patchOf(announcementSchema);
+// The admin sends the whole notices list (each entry carries a client-minted
+// id); it replaces the stored one, so each entry must be complete.
+export const statusAnnouncementsUpdateSchema = z.array(wholeOf(statusAnnouncementSchema));

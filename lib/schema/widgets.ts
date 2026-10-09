@@ -2,6 +2,7 @@
 // world clocks, system stats, and notes.
 import { z } from "zod";
 import { secretFields } from "./meta";
+import { patchOf, wholeOf } from "./input";
 
 export const weatherSchema = z.object({
   enabled: z.boolean().default(true),
@@ -100,57 +101,30 @@ export const notesSchema = z.object({
 });
 export type NotesConfig = z.infer<typeof notesSchema>;
 
-export const weatherUpdateSchema = z.object({
-  enabled: z.boolean().optional(),
+// Admin input, derived from the stored schemas above (lib/schema/input.ts).
+// Each is a patch: the settings PUT deep-merges it, so only sent keys change.
+
+// Coordinates are bounded on input; the stored schema stays lenient.
+export const weatherUpdateSchema = patchOf(weatherSchema).extend({
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
-  units: z.enum(["imperial", "metric"]).optional(),
 });
 
-// Admin sends the whole calendar object. The URL is optional (the widget stays
-// off until set) but must be http(s) or webcal when present.
-export const calendarUpdateSchema = z
-  .object({
-    enabled: z.boolean(),
-    url: z.string(),
-    count: z.number().int().min(1).max(20),
-    homeView: z.enum(["agenda", "month"]),
-    hideWhenEmpty: z.boolean(),
-    username: z.string(),
-    password: z.string(),
-  })
-  .refine(
-    (c) =>
-      c.url.trim() === "" || /^(https?|webcal):\/\//i.test(c.url.trim()),
-    { message: "Calendar URL must start with http(s) or webcal", path: ["url"] }
-  );
+// The URL is optional (the widget stays off until set) but must be http(s) or
+// webcal when present.
+export const calendarUpdateSchema = patchOf(calendarSchema).refine(
+  (c) => c.url === undefined || c.url.trim() === "" || /^(https?|webcal):\/\//i.test(c.url.trim()),
+  { message: "Calendar URL must start with http(s) or webcal", path: ["url"] }
+);
 
-// The admin sends the whole notes object (title + content together).
-export const notesUpdateSchema = z.object({
-  title: z.string(),
-  content: z.string(),
-});
+export const notesUpdateSchema = patchOf(notesSchema);
 
-// The admin sends the whole countdown object. Rows stay lenient (a half-typed
-// date must not block autosave); invalid dates are simply not rendered.
-export const countdownUpdateSchema = z.object({
-  title: z.string(),
-  items: z.array(z.object({ label: z.string(), date: z.string() })),
-});
+// Rows stay lenient in content (a half-typed date or zone must not block
+// autosave; invalid ones simply aren't rendered).
+export const countdownUpdateSchema = patchOf(countdownSchema);
+export const worldClocksUpdateSchema = patchOf(worldClocksSchema);
 
-// The admin sends the whole worldClocks object. Rows stay lenient (a half-typed
-// zone must not block autosave); invalid zones are simply not rendered.
-export const worldClocksUpdateSchema = z.object({
-  title: z.string(),
-  items: z.array(z.object({ label: z.string(), timeZone: z.string() })),
-});
-
-// The admin sends the whole systemStats object. Rows stay lenient (a
-// half-typed path must not block autosave; an unmountable one is skipped at
-// collection time), but the row count is capped — each is a per-render statfs.
-export const systemStatsUpdateSchema = z.object({
-  title: z.string(),
-  disks: z
-    .array(z.object({ label: z.string(), path: z.string() }))
-    .max(MAX_STAT_DISKS),
+// Disk rows are capped on input — each is a per-render statfs.
+export const systemStatsUpdateSchema = patchOf(systemStatsSchema).extend({
+  disks: z.array(wholeOf(systemStatsDiskSchema)).max(MAX_STAT_DISKS).optional(),
 });

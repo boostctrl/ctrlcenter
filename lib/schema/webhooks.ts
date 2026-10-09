@@ -1,5 +1,6 @@
 // Inbound webhooks from Sonarr/Radarr/Seerr.
 import { z } from "zod";
+import { patchOf } from "./input";
 
 // Inbound webhooks (#204): Sonarr/Radarr/Overseerr(Seerr) POST an event to us
 // ("download complete", "request needs approval", "health issue") and we relay
@@ -31,16 +32,7 @@ export const webhooksSchema = z.object({
 });
 export type WebhooksConfig = z.infer<typeof webhooksSchema>;
 
-// The admin sends the whole webhooks object; updateSettings replaces it
-// wholesale. Tokens are stored leniently (the app generates them, so there's no
-// user input to validate).
-export const webhookServiceUpdateSchema = z.object({
-  enabled: z.boolean(),
-  token: z.string(),
-});
-export const webhooksUpdateSchema = z.object({
-  enabled: z.boolean(),
-  sonarr: webhookServiceUpdateSchema,
-  radarr: webhookServiceUpdateSchema,
-  seerr: webhookServiceUpdateSchema,
-});
+// Admin input, derived from the stored schema (lib/schema/input.ts). Tokens
+// are stored leniently (the app generates them; there's no user input to
+// validate).
+export const webhooksUpdateSchema = patchOf(webhooksSchema);
