@@ -4,9 +4,10 @@ import { z } from "zod";
 // --- Integrations (#189): connections to other self-hosted services, shown
 // only on the private Monitor dashboard (/admin/monitor). Read-only in the
 // 2.3.x–2.4.x arc. Stored leniently like every settings section. The
-// credentials are secrets — and the URLs are internal topology — so
-// stripSecrets (lib/config.ts) blanks both out of anything a public surface
-// serializes (#157); each credential can also come from a CTRLCENTER_* env
+// credentials are secrets — and the URLs are internal topology — so the
+// whole section is marked secret (settingsSchema) and stripSecrets
+// neutralizes it in anything a public surface serializes (#157); each
+// credential can also come from a CTRLCENTER_* env
 // var instead of the file (resolved at use time in lib/services/*).
 //
 // Two credential shapes cover every service: a WebUI login
@@ -21,8 +22,8 @@ import { z } from "zod";
 // configured integration stays read-only until the admin turns it on. Only the
 // action-capable services (qBittorrent, Seerr, Portainer) expose the toggle and
 // honor it; every service carries the field so both credential shapes share one
-// schema. redactIntegrations (lib/config.ts) forces every boolean off for
-// public surfaces, so this can't leak either.
+// schema. Public redaction forces every boolean off too, so this can't leak
+// either.
 export const userPassIntegrationSchema = z.object({
   enabled: z.boolean().default(false),
   url: z.string().default(""),

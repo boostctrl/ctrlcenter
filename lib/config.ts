@@ -13,6 +13,7 @@ import {
   configReadSchema,
   settingsSchema,
   mergeRules,
+  redactSecrets,
   totpAuthSchema,
   type Config,
   type AppItem,
@@ -274,82 +275,20 @@ export function stripAuth(config: Config): Omit<Config, "auth"> {
 }
 
 // Blank the secret-bearing settings fields so a signed-out visitor can never
-// receive them: the calendar Basic-auth credentials, the alert webhook URL /
-// SMTP credentials, and the integration connections (#189 — credentials AND
-// URLs: an integration URL maps internal topology, and nothing public renders
-// integrations at all). stripAuth only removes the top-level admin credential;
+// receive them. Which fields those are is marked on the schemas themselves
+// (secretFields in lib/schema/meta.ts, #287): the calendar Basic-auth
+// credentials, the alert webhook URL and SMTP details, and — neutralized
+// whole — the integrations (#189: URLs map internal topology) and inbound
+// webhook tokens. stripAuth only removes the top-level admin credential;
 // these secrets live inside `settings`, where they'd otherwise ride along in
-// anything serialized from a public surface. readPublicConfig (lib/api-auth.ts)
-// applies this so its result is genuinely safe to hand to a client component
-// (#157). The server-side consumers that need the real values read them
-// separately — the calendar fetcher via getCalendarAuth, the alert poller and
-// the monitor snapshot via readConfigInternal-backed accessors.
+// anything serialized from a public surface. readPublicConfig
+// (lib/api-auth.ts) applies this so its result is genuinely safe to hand to a
+// client component (#157). The server-side consumers that need the real
+// values read them separately — the calendar fetcher via getCalendarAuth, the
+// alert poller and the monitor snapshot via readConfigInternal-backed
+// accessors.
 export function stripSecrets<T extends { settings: Settings }>(config: T): T {
-  return {
-    ...config,
-    settings: {
-      ...config.settings,
-      calendar: { ...config.settings.calendar, username: "", password: "" },
-      alerts: {
-        ...config.settings.alerts,
-        webhookUrl: "",
-        email: {
-          ...config.settings.alerts.email,
-          user: "",
-          pass: "",
-          host: "",
-          from: "",
-          to: "",
-        },
-      },
-      integrations: redactIntegrations(config.settings.integrations),
-      // Inbound-webhook tokens are shared secrets — a public serialization must
-      // never reveal them (or which services are wired up), same class as the
-      // integration credentials above.
-      webhooks: redactWebhooks(config.settings.webhooks),
-    },
-  };
-}
-
-// Blank every inbound-webhook token and force every flag off for public
-// surfaces — mirrors redactIntegrations so a stray public serialization leaks
-// neither a token nor which services are connected.
-function redactWebhooks(
-  webhooks: Settings["webhooks"]
-): Settings["webhooks"] {
-  const out: Record<string, unknown> = { enabled: false };
-  for (const key of Object.keys(webhooks)) {
-    if (key === "enabled") continue;
-    out[key] = { enabled: false, token: "" };
-  }
-  return out as Settings["webhooks"];
-}
-
-// Fully neutralize every integration for any public surface: blank every
-// string field (the URL is internal topology, the rest are secrets) AND force
-// every boolean off, so a public serialization reveals neither an
-// integration's credentials/URL nor even which integrations are enabled.
-// Generic on purpose: a service later added to integrationsSchema is
-// neutralized by construction, so it can't leak to a public surface just
-// because someone forgot to extend a hand-written list here — the #157/#184
-// leak class closed structurally (fail-closed) rather than per-service.
-// Nothing public renders integrations at all (they live only on the
-// admin-only Monitor page, #207); this keeps that true even if a future public
-// page serializes the whole settings object by mistake (#199).
-function redactIntegrations(
-  integrations: Settings["integrations"]
-): Settings["integrations"] {
-  const out: Record<string, Record<string, unknown>> = {};
-  for (const [id, cfg] of Object.entries(integrations)) {
-    const redacted: Record<string, unknown> = { ...cfg };
-    for (const key of Object.keys(redacted)) {
-      const value = redacted[key];
-      if (typeof value === "string") redacted[key] = "";
-      else if (typeof value === "boolean") redacted[key] = false;
-    }
-    out[id] = redacted;
-  }
-  return out as Settings["integrations"];
+  return { ...config, settings: redactSecrets(settingsSchema, config.settings) };
 }
 
 // Validate and write a whole config, replacing what's on disk (used by import).

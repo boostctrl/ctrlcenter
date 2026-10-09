@@ -16,10 +16,15 @@ export const httpUrl = z
     message: "URL must start with http:// or https://",
   });
 
+// The item schema behind each lenientArray, for code that walks the schemas
+// (lib/schema/meta.ts, lib/schema/input.ts) — the array itself is a pipe
+// that only knows it holds `unknown`.
+export const lenientItems = new WeakMap<z.ZodType, z.ZodType>();
+
 // Parse an array, dropping only the items that fail validation instead of
 // failing the whole config. A non-array value falls back to an empty list.
 export function lenientArray<T extends z.ZodTypeAny>(item: T) {
-  return z
+  const schema = z
     .array(z.unknown())
     .catch([])
     .transform((arr) =>
@@ -28,4 +33,6 @@ export function lenientArray<T extends z.ZodTypeAny>(item: T) {
         return parsed.success ? [parsed.data as z.infer<T>] : [];
       })
     );
+  lenientItems.set(schema, item);
+  return schema;
 }

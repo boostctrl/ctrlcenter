@@ -1,6 +1,7 @@
 // Single-instance home-page widget settings: weather, calendar, countdown,
 // world clocks, system stats, and notes.
 import { z } from "zod";
+import { secretFields } from "./meta";
 
 export const weatherSchema = z.object({
   enabled: z.boolean().default(true),
@@ -25,8 +26,8 @@ export const calendarSchema = z.object({
   hideWhenEmpty: z.boolean().default(false),
   // Optional Basic-auth credentials for a private CalDAV/WebDAV calendar (e.g. a
   // Nextcloud DAV URL). The password can also come from CTRLCENTER_CALDAV_PASS.
-  username: z.string().default(""),
-  password: z.string().default(""),
+  username: z.string().default("").register(secretFields, { redact: "blank" }),
+  password: z.string().default("").register(secretFields, { redact: "blank" }),
 });
 export type CalendarConfig = z.infer<typeof calendarSchema>;
 

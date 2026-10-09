@@ -1,5 +1,10 @@
 // Outbound uptime alerts (webhook + email channels).
 import { z } from "zod";
+import { secretFields } from "./meta";
+
+// Redacted from public reads (stripSecrets): credentials, and the addresses
+// and endpoints that map where alerts go.
+const secret = () => z.string().default("").register(secretFields, { redact: "blank" });
 
 // Outbound uptime alerts. When status checks are on, the background poller can
 // POST to a webhook as apps transition down (or recover). Stored leniently so a
@@ -12,15 +17,15 @@ export type AlertType = (typeof ALERT_TYPES)[number];
 // can also come from the CTRLCENTER_SMTP_PASS env var to keep it out of the file.
 export const alertEmailSchema = z.object({
   enabled: z.boolean().default(false),
-  host: z.string().default(""),
+  host: secret(),
   port: z.number().int().min(1).max(65535).default(587),
   // Implicit TLS (port 465). Leave off for 587/STARTTLS, which nodemailer
   // upgrades automatically.
   secure: z.boolean().default(false),
-  user: z.string().default(""),
-  pass: z.string().default(""),
-  from: z.string().default(""),
-  to: z.string().default(""),
+  user: secret(),
+  pass: secret(),
+  from: secret(),
+  to: secret(),
   // Subject template; {service} and {status} are substituted. Empty = the
   // default "{service} is {status}".
   subject: z.string().default(""),
@@ -30,7 +35,7 @@ export type AlertEmailConfig = z.infer<typeof alertEmailSchema>;
 export const alertsSchema = z.object({
   enabled: z.boolean().default(false),
   type: z.enum(ALERT_TYPES).default("generic"),
-  webhookUrl: z.string().default(""),
+  webhookUrl: secret(),
   // Webhook channel on/off, independent of the email channel. Defaults true so an
   // existing config with a webhook URL keeps sending; the webhook fires only when
   // this is on AND a URL is set.

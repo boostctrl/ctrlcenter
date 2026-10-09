@@ -2,7 +2,7 @@
 import { z } from "zod";
 import { STATUS_RANGE_KEYS } from "../status";
 import { lenientArray } from "./shared";
-import { mergeRules } from "./meta";
+import { mergeRules, secretFields } from "./meta";
 import { themeSchema, themeInputSchema } from "./theme";
 import { searchSchema, searchUpdateSchema } from "./search";
 import { alertsSchema, alertsUpdateSchema } from "./alerts";
@@ -73,8 +73,15 @@ export const settingsSchema = z.object({
   countdown: countdownSchema.default(countdownSchema.parse({})),
   worldClocks: worldClocksSchema.default(worldClocksSchema.parse({})),
   systemStats: systemStatsSchema.default(systemStatsSchema.parse({})),
-  integrations: integrationsSchema.default(integrationsSchema.parse({})),
-  webhooks: webhooksSchema.default(webhooksSchema.parse({})),
+  // Private wholesale (#157, #189): URLs are internal topology, the rest
+  // credentials, and even which ones are switched on isn't a visitor's business.
+  integrations: integrationsSchema
+    .default(integrationsSchema.parse({}))
+    .register(secretFields, { redact: "all" }),
+  // Inbound-webhook tokens are shared secrets (#204); same treatment.
+  webhooks: webhooksSchema
+    .default(webhooksSchema.parse({}))
+    .register(secretFields, { redact: "all" }),
   components: componentsSchema.default(componentsSchema.parse({})),
   layout: layoutSchema.default(layoutSchema.parse({})),
 });
