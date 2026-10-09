@@ -100,6 +100,10 @@ describe("wantsAlert", () => {
     expect(wantsAlert(ch, "up", "a")).toBe(false);
     expect(wantsAlert(ch, "down", "b")).toBe(false);
     expect(wantsAlert(channel({}), "down", "anything")).toBe(true);
+    // A cleared warning needs both the warning and the recovery switch.
+    expect(wantsAlert(channel({}), "cleared", "a")).toBe(true);
+    expect(wantsAlert(channel({ onRecovery: false }), "cleared", "a")).toBe(false);
+    expect(wantsAlert(channel({ onWarning: false }), "warning", "a")).toBe(false);
   });
 });
 

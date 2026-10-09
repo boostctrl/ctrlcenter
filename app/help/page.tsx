@@ -580,8 +580,9 @@ export default async function HelpPage() {
             server, which forwards to dozens of other services.
           </P>
           <P>
-            Each channel chooses what it sends (downs, recoveries, inbound
-            webhook events) and for which apps, so the outage of something
+            Each channel chooses what it sends (downs, recoveries, warnings
+            such as a certificate near expiry, inbound webhook events) and for
+            which apps, so the outage of something
             critical can go to your phone while everything else goes to a chat
             room. <strong>Send test</strong> on a channel fires a sample alert
             through it straight away.

@@ -209,7 +209,7 @@ settings:
         type: telegram
         token: ""           # from @BotFather
         chatId: ""
-        onRecovery: false   # also onDown, onWebhooks (inbound events); all default true
+        onRecovery: false   # also onDown, onWarning, onWebhooks (inbound events); all default true
         apps: [plex]        # only these app ids; leave out for every app
       - id: mail
         type: email

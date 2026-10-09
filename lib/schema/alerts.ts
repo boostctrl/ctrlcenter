@@ -55,10 +55,12 @@ export const alertChannelSchema = z.object({
   // A label for the admin's own reference; empty shows the type's name.
   name: z.string().catch("").default(""),
   enabled: z.boolean().catch(true).default(true),
-  // Which events reach this channel: an app going down, coming back up, and
-  // the inbound webhook events relayed from Sonarr/Radarr/Seerr (#204).
+  // Which events reach this channel: an app going down, coming back up,
+  // starting to warn (a certificate near expiry, #310), and the inbound
+  // webhook events relayed from Sonarr/Radarr/Seerr (#204).
   onDown: z.boolean().catch(true).default(true),
   onRecovery: z.boolean().catch(true).default(true),
+  onWarning: z.boolean().catch(true).default(true),
   onWebhooks: z.boolean().catch(true).default(true),
   // Only alert for these app ids; empty means every monitored app.
   apps: z.array(z.string()).catch([]).default([]),

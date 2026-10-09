@@ -33,7 +33,12 @@ export function isLegacyChannel(id: string): boolean {
 // alert for every app, as they always did.
 export function legacyChannels(config: AlertConfig): AlertChannel[] {
   const out: AlertChannel[] = [];
-  const base = { onDown: true, onRecovery: config.notifyOnRecovery, onWebhooks: true };
+  const base = {
+    onDown: true,
+    onRecovery: config.notifyOnRecovery,
+    onWarning: true,
+    onWebhooks: true,
+  };
   if (config.webhookUrl.trim()) {
     out.push(
       alertChannelSchema.parse({
@@ -110,9 +115,20 @@ export function activeChannels(config: AlertConfig): AlertChannel[] {
   return alertChannels(config).filter((ch) => ch.enabled && channelReady(ch));
 }
 
-// Whether a channel takes an uptime event for this app.
-export function wantsAlert(ch: AlertChannel, type: "down" | "up", appId: string): boolean {
-  if (!(type === "down" ? ch.onDown : ch.onRecovery)) return false;
+// Whether a channel takes an uptime event for this app. A cleared warning is
+// a recovery from a warning, so it needs both switches.
+export function wantsAlert(
+  ch: AlertChannel,
+  type: "down" | "up" | "warning" | "cleared",
+  appId: string
+): boolean {
+  const wanted = {
+    down: ch.onDown,
+    up: ch.onRecovery,
+    warning: ch.onWarning,
+    cleared: ch.onWarning && ch.onRecovery,
+  }[type];
+  if (!wanted) return false;
   return ch.apps.length === 0 || ch.apps.includes(appId);
 }
 

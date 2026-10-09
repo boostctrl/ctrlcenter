@@ -16,8 +16,10 @@ import { fetchWithTimeout } from "./fetch-body";
 // and payload shaping are pure (unit-tested); only the delivery functions at
 // the bottom do IO.
 
-export type AlertEventType = "down" | "up";
-export type AlertEvent = { id: string; type: AlertEventType };
+// "warning" and "cleared" are an up app entering and leaving the warning
+// state (#310), e.g. a certificate near expiry; `detail` carries the text.
+export type AlertEventType = "down" | "up" | "warning" | "cleared";
+export type AlertEvent = { id: string; type: AlertEventType; detail?: string };
 
 // Per-app state carried between ticks. `confirmed` is the last state we've
 // committed to (and alerted on); `downStreak` counts consecutive failed polls so
@@ -59,8 +61,73 @@ export function evaluateTransitions(
   return { next, events };
 }
 
+// Warning state per app (#310): when the last warning alert went out, and
+// whether a failed check has come between.
+export type WarnState = { lastSent: number; failed?: boolean };
+
+// While an app stays in warning, remind once a day: a certificate a week from
+// lapsing deserves more than one notification, but not one per check.
+export const WARNING_REMIND_MS = 24 * 60 * 60 * 1000;
+
+// Pure warning step, alongside evaluateTransitions: alert when an up app starts
+// warning, remind every `remindMs` while it stays that way, and note when the
+// warning clears. A failed check keeps the state, so a blip doesn't re-announce
+// the warning; and an app coming back from a failure without its warning gets
+// no "cleared" note (its down/recovery alerts covered that stretch).
+export function evaluateWarnings(
+  prev: Map<string, WarnState>,
+  results: { id: string; up: boolean; warning?: string }[],
+  now: number,
+  remindMs = WARNING_REMIND_MS
+): { next: Map<string, WarnState>; events: AlertEvent[] } {
+  const next = new Map(prev);
+  const events: AlertEvent[] = [];
+  for (const r of results) {
+    const cur = next.get(r.id);
+    if (!r.up) {
+      if (cur) next.set(r.id, { ...cur, failed: true });
+    } else if (r.warning) {
+      if (!cur || now - cur.lastSent >= remindMs) {
+        events.push({ id: r.id, type: "warning", detail: r.warning });
+        next.set(r.id, { lastSent: now });
+      } else if (cur.failed) {
+        next.set(r.id, { lastSent: cur.lastSent });
+      }
+    } else if (cur) {
+      if (!cur.failed) events.push({ id: r.id, type: "cleared" });
+      next.delete(r.id);
+    }
+  }
+  return { next, events };
+}
+
 export type AlertApp = { name: string; url: string };
 export type AlertRequest = { url: string; init: RequestInit };
+
+// The words and look of one event, shared by every format. `status` is what
+// the email subject's {status} becomes.
+export function describeAlert(
+  event: AlertEvent,
+  app: AlertApp
+): { title: string; emoji: string; status: string; label: string; accent: string } {
+  switch (event.type) {
+    case "down":
+      return { title: `${app.name} is down`, emoji: "🔴", status: "down", label: "Service down", accent: "#dc2626" };
+    case "warning":
+      return {
+        title: `${app.name}: ${event.detail || "warning"}`,
+        emoji: "🟠",
+        status: "warning",
+        label: "Warning",
+        accent: "#d97706",
+      };
+    case "cleared":
+      return { title: `${app.name}: warning cleared`, emoji: "🟢", status: "up", label: "Cleared", accent: "#16a34a" };
+    case "up":
+    default:
+      return { title: `${app.name} recovered`, emoji: "🟢", status: "up", label: "Recovered", accent: "#16a34a" };
+  }
+}
 
 // Shape one alert event into a webhook request for the chosen channel. Discord,
 // Slack and ntfy each want a specific body/headers; "generic" posts a plain JSON
@@ -72,9 +139,8 @@ export function buildAlertRequest(
   app: AlertApp,
   at: number
 ): AlertRequest {
-  const down = event.type === "down";
-  const title = down ? `${app.name} is down` : `${app.name} recovered`;
-  const text = `${down ? "🔴" : "🟢"} ${title}`;
+  const { title, emoji } = describeAlert(event, app);
+  const text = `${emoji} ${title}`;
   switch (type) {
     case "discord":
       return jsonReq(webhookUrl, { content: app.url ? `${text}\n${app.url}` : text });
@@ -91,8 +157,13 @@ export function buildAlertRequest(
           method: "POST",
           headers: {
             ...(asciiTitle ? { Title: asciiTitle } : {}),
-            Priority: down ? "high" : "default",
-            Tags: down ? "red_circle" : "green_circle",
+            Priority: event.type === "down" ? "high" : "default",
+            Tags:
+              event.type === "down"
+                ? "red_circle"
+                : event.type === "warning"
+                  ? "warning"
+                  : "green_circle",
           },
           body: app.url ? `${text}\n${app.url}` : text,
         },
@@ -104,6 +175,7 @@ export function buildAlertRequest(
         service: app.name,
         url: app.url,
         status: event.type,
+        ...(event.detail ? { detail: event.detail } : {}),
         message: text,
         at: new Date(at).toISOString(),
       });
@@ -179,15 +251,15 @@ function linkRow(url: string, accent: string): string {
   return `<p style="margin:0 0 4px">${body}</p>`;
 }
 
-// Render the subject from its template, substituting {service}/{status}. CR/LF
+// Render the subject from its template, substituting {service}/{status}
+// (down, up or warning). CR/LF
 // are stripped (the service name is admin-controlled but flows into a header) and
 // the length is capped; an empty template falls back to the default.
 export function renderSubject(
   template: string,
   app: AlertApp,
-  down: boolean
+  status: string
 ): string {
-  const status = down ? "down" : "up";
   const out = (template.trim() || "{service} is {status}")
     .replace(/\{service\}/gi, app.name)
     .replace(/\{status\}/gi, status)
@@ -206,20 +278,19 @@ export function buildEmailMessage(
   at: number,
   subjectTemplate = ""
 ): { subject: string; text: string; html: string } {
-  const down = event.type === "down";
-  const title = down ? `${app.name} is down` : `${app.name} recovered`;
+  const { title, emoji, status, label, accent } = describeAlert(event, app);
   const when = new Date(at).toISOString();
-  const subject = renderSubject(subjectTemplate, app, down);
-  const text =
-    `${down ? "🔴" : "🟢"} ${title}` +
-    (app.url ? `\n${app.url}` : "") +
-    `\n\nAt ${when}`;
-  const accent = down ? "#dc2626" : "#16a34a";
+  // A warning's subject leads with its detail; a custom template still wins.
+  const subject =
+    event.type === "warning" || event.type === "cleared"
+      ? renderSubject(subjectTemplate || title, app, status)
+      : renderSubject(subjectTemplate, app, status);
+  const text = `${emoji} ${title}` + (app.url ? `\n${app.url}` : "") + `\n\nAt ${when}`;
   const urlRow = app.url ? linkRow(app.url, accent) : "";
   const html = `<!doctype html><html><body style="margin:0;background:#f4f4f5;padding:24px">
 <table role="presentation" cellpadding="0" cellspacing="0" style="max-width:480px;margin:0 auto;width:100%;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
 <tr><td style="background:#ffffff;border-radius:12px;border-left:4px solid ${accent};padding:20px 24px">
-<p style="margin:0 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:${accent};font-weight:600">${down ? "Service down" : "Recovered"}</p>
+<p style="margin:0 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:${accent};font-weight:600">${label}</p>
 <h1 style="margin:0 0 12px;font-size:18px;color:#18181b">${escapeHtml(title)}</h1>
 ${urlRow}
 <p style="margin:8px 0 0;font-size:12px;color:#71717a">At ${when}</p>
@@ -279,14 +350,14 @@ export type PlainMessage = {
   body: string;
   text: string;
   url?: string;
-  level: "down" | "up" | "info";
+  level: "down" | "warning" | "up" | "info";
 };
 
 export function plainAlert(event: AlertEvent, app: AlertApp): PlainMessage {
-  const down = event.type === "down";
-  const title = down ? `${app.name} is down` : `${app.name} recovered`;
-  const body = `${down ? "🔴" : "🟢"} ${title}`;
-  return { title, body, text: body, url: app.url.trim() || undefined, level: event.type };
+  const { title, emoji } = describeAlert(event, app);
+  const body = `${emoji} ${title}`;
+  const level = event.type === "down" || event.type === "warning" ? event.type : "up";
+  return { title, body, text: body, url: app.url.trim() || undefined, level };
 }
 
 export function plainNotification(c: NotificationContent): PlainMessage {
@@ -328,7 +399,7 @@ export function buildServiceRequest(
           body: JSON.stringify({
             title: m.title,
             message: withLink(m.body, m.url),
-            priority: m.level === "down" ? 8 : 5,
+            priority: m.level === "down" ? 8 : m.level === "warning" ? 6 : 5,
           }),
         },
       };
@@ -357,7 +428,7 @@ export function buildServiceRequest(
       return jsonReq(ch.url.trim(), {
         title: m.title,
         body: withLink(m.body, m.url),
-        type: m.level === "down" ? "failure" : m.level === "up" ? "success" : "info",
+        type: { down: "failure", warning: "warning", up: "success", info: "info" }[m.level],
       });
   }
 }
@@ -469,6 +540,7 @@ export function anyChannelReady(config: AlertConfig): boolean {
 // share one instance (same reason as the status history store).
 const g = globalThis as unknown as {
   __ctrlcenterAlertState?: Map<string, AppAlertState>;
+  __ctrlcenterWarnState?: Map<string, WarnState>;
 };
 
 function seedState(priorReadings: Map<string, boolean>): Map<string, AppAlertState> {
@@ -513,10 +585,10 @@ export async function sendTestAlert(
 // Called by the poller each tick. `priorReadings` is the last-known up/down per
 // app from BEFORE this tick (from history), used once to seed the in-memory
 // state so a restart doesn't re-alert an app that was already down. No-op when
-// alerts are off or no channel is active. Each transition goes to every
-// channel whose event and app filters take it.
+// alerts are off or no channel is active. Each transition (and warning) goes
+// to every channel whose event and app filters take it.
 export async function processAlerts(
-  results: { id: string; up: boolean }[],
+  results: { id: string; up: boolean; warning?: string }[],
   apps: { id: string; name: string; url: string }[],
   config: AlertConfig,
   priorReadings: Map<string, boolean>
@@ -531,6 +603,11 @@ export async function processAlerts(
     notifyOnRecovery: true,
   });
   g.__ctrlcenterAlertState = next;
+  // Warnings keep their own state (#310). Not persisted: after a restart an
+  // app still warning is announced once more.
+  const warned = evaluateWarnings(g.__ctrlcenterWarnState ?? new Map(), results, Date.now());
+  g.__ctrlcenterWarnState = warned.next;
+  events.push(...warned.events);
   if (events.length === 0) return;
   const byId = new Map(apps.map((a) => [a.id, a]));
   const at = Date.now();

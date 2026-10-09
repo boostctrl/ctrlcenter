@@ -10,6 +10,8 @@ import {
   plainNotification,
   processAlerts,
   sendNotification,
+  evaluateWarnings,
+  describeAlert,
   anyChannelReady,
   type AppAlertState,
   type AlertEvent,
@@ -104,6 +106,80 @@ describe("evaluateTransitions", () => {
     ]);
     const { events } = evaluateTransitions(seeded, [{ id: "a", up: false }], opts());
     expect(events).toEqual([]);
+  });
+});
+
+describe("evaluateWarnings", () => {
+  const warn = (id: string, warning?: string, up = true) => ({ id, up, warning });
+
+  it("alerts when an up app starts warning, then stays quiet", () => {
+    const first = evaluateWarnings(new Map(), [warn("a", "Certificate expires in 6 days")], 0);
+    expect(first.events).toEqual([{ id: "a", type: "warning", detail: "Certificate expires in 6 days" }]);
+    const again = evaluateWarnings(first.next, [warn("a", "Certificate expires in 6 days")], 60_000);
+    expect(again.events).toEqual([]);
+  });
+
+  it("reminds once the reminder interval has passed", () => {
+    const { next } = evaluateWarnings(new Map(), [warn("a", "x")], 0, 1000);
+    expect(evaluateWarnings(next, [warn("a", "y")], 999, 1000).events).toEqual([]);
+    expect(evaluateWarnings(next, [warn("a", "y")], 1000, 1000).events).toEqual([
+      { id: "a", type: "warning", detail: "y" },
+    ]);
+  });
+
+  it("notes when the warning clears", () => {
+    const { next } = evaluateWarnings(new Map(), [warn("a", "x")], 0);
+    const after = evaluateWarnings(next, [warn("a")], 1);
+    expect(after.events).toEqual([{ id: "a", type: "cleared" }]);
+    expect(after.next.size).toBe(0);
+  });
+
+  it("doesn't re-announce a warning after a failed check", () => {
+    const { next } = evaluateWarnings(new Map(), [warn("a", "x")], 0);
+    const blip = evaluateWarnings(next, [warn("a", undefined, false)], 1);
+    expect(blip.events).toEqual([]);
+    expect(evaluateWarnings(blip.next, [warn("a", "x")], 2).events).toEqual([]);
+  });
+
+  it("sends no cleared note when the app comes back from a failure without its warning", () => {
+    const { next } = evaluateWarnings(new Map(), [warn("a", "x")], 0);
+    const down = evaluateWarnings(next, [warn("a", undefined, false)], 1);
+    const back = evaluateWarnings(down.next, [warn("a")], 2);
+    expect(back.events).toEqual([]);
+    expect(back.next.size).toBe(0);
+  });
+
+  it("ignores apps that never warned", () => {
+    expect(evaluateWarnings(new Map(), [warn("a"), warn("b", undefined, false)], 0).events).toEqual([]);
+  });
+});
+
+describe("describeAlert", () => {
+  const app = { name: "Plex", url: "" };
+  it("words each event", () => {
+    expect(describeAlert({ id: "a", type: "down" }, app).title).toBe("Plex is down");
+    expect(describeAlert({ id: "a", type: "up" }, app).title).toBe("Plex recovered");
+    expect(describeAlert({ id: "a", type: "warning", detail: "Certificate expires in 3 days" }, app)).toMatchObject({
+      title: "Plex: Certificate expires in 3 days",
+      emoji: "🟠",
+      status: "warning",
+    });
+    expect(describeAlert({ id: "a", type: "cleared" }, app).title).toBe("Plex: warning cleared");
+  });
+
+  it("carries a warning into each format", () => {
+    const e = { id: "a", type: "warning" as const, detail: "Certificate expires in 3 days" };
+    const ntfy = buildAlertRequest("ntfy", "https://n.test", e, app, 0);
+    expect((ntfy.init.headers as Record<string, string>).Tags).toBe("warning");
+    const generic = JSON.parse(buildAlertRequest("generic", "https://g.test", e, app, 0).init.body as string);
+    expect(generic).toMatchObject({ status: "warning", detail: "Certificate expires in 3 days" });
+    expect(buildEmailMessage(e, app, 0).subject).toBe("Plex: Certificate expires in 3 days");
+    expect(buildEmailMessage(e, app, 0, "{service} is {status}").subject).toBe("Plex is warning");
+    const apprise = buildServiceRequest(
+      { type: "apprise", url: "http://a.test", token: "", chatId: "", userKey: "" },
+      plainAlert(e, app)
+    );
+    expect(JSON.parse(apprise.init.body as string).type).toBe("warning");
   });
 });
 
@@ -209,14 +285,14 @@ describe("renderSubject", () => {
     const out = renderSubject(
       "{service} is {status}\r\nBcc: evil@x",
       { name: "API", url: "" },
-      true
+      "down"
     );
     expect(out).toBe("API is down Bcc: evil@x"); // newlines collapsed to a space
     expect(out).not.toMatch(/[\r\n]/);
   });
 
   it("falls back to the default when the template is blank", () => {
-    expect(renderSubject("   ", { name: "API", url: "" }, false)).toBe("API is up");
+    expect(renderSubject("   ", { name: "API", url: "" }, "up")).toBe("API is up");
   });
 });
 
@@ -391,7 +467,9 @@ describe("processAlerts", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    delete (globalThis as { __ctrlcenterAlertState?: unknown }).__ctrlcenterAlertState;
+    const g = globalThis as { __ctrlcenterAlertState?: unknown; __ctrlcenterWarnState?: unknown };
+    delete g.__ctrlcenterAlertState;
+    delete g.__ctrlcenterWarnState;
     fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
   });
@@ -442,6 +520,24 @@ describe("processAlerts", () => {
     fetchMock.mockClear();
     await processAlerts([{ id: "a", up: true }], apps, config, prior);
     expect(hits()).toEqual(["https://new.test"]);
+  });
+
+  it("sends warnings to the channels that take them", async () => {
+    const config = alertsSchema.parse({
+      enabled: true,
+      confirmations: 1,
+      channels: [
+        channel({ id: "w", url: "https://w.test" }),
+        channel({ id: "nw", url: "https://nw.test", onWarning: false }),
+      ],
+    });
+    await processAlerts([{ id: "a", up: true, warning: "Certificate expires in 3 days" }], apps, config, prior);
+    expect(hits()).toEqual(["https://w.test"]);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).status).toBe("warning");
+    fetchMock.mockClear();
+    await processAlerts([{ id: "a", up: true }], apps, config, prior);
+    expect(hits()).toEqual(["https://w.test"]);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).status).toBe("cleared");
   });
 
   it("sends nothing while alerts are off", async () => {

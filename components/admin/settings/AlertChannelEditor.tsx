@@ -17,10 +17,11 @@ import {
 } from "../ui";
 import AlertTest from "../AlertTest";
 
-type Event = "onDown" | "onRecovery" | "onWebhooks";
+type Event = "onDown" | "onRecovery" | "onWarning" | "onWebhooks";
 const EVENTS: { value: Event; label: string }[] = [
   { value: "onDown", label: "Down" },
   { value: "onRecovery", label: "Recovered" },
+  { value: "onWarning", label: "Warnings" },
   { value: "onWebhooks", label: "Inbound webhooks" },
 ];
 

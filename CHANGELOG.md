@@ -50,6 +50,10 @@ here.
   button. Your existing webhook and email alerts keep working as they are;
   *Move into the channel list* in Settings turns them into channels you can
   filter. (#291)
+- **Warning alerts.** When an app starts warning, for instance a certificate
+  about to expire, its alert channels now hear about it, with a reminder once
+  a day while it lasts and a note when it clears. Each channel can switch
+  warnings off. (#310)
 
 ### Fixed
 
