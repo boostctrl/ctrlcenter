@@ -471,13 +471,22 @@ export function MoveButtons({
 
 // Row badge for items flagged "Only show when logged in". Shared by the app
 // and bookmark managers so the two lists can't drift apart.
+const CHIP_CLASS =
+  "shrink-0 rounded-full border border-fg/15 px-2 py-0.5 text-[10px] font-normal tracking-wide text-ink-45 uppercase";
+
 export function PrivateChip() {
   return (
-    <span
-      className="shrink-0 rounded-full border border-fg/15 px-2 py-0.5 text-[10px] font-normal tracking-wide text-ink-45 uppercase"
-      title="Only shown when logged in"
-    >
+    <span className={CHIP_CLASS} title="Only shown when logged in">
       Private
+    </span>
+  );
+}
+
+// Marks an app whose status checks are switched off (#296).
+export function UnmonitoredChip() {
+  return (
+    <span className={CHIP_CLASS} title="No status checks for this app">
+      Not monitored
     </span>
   );
 }

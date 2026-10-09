@@ -156,4 +156,17 @@ describe("GET /api/status", () => {
       await fs.writeFile(configPath, YAML.dump(raw), "utf8");
     }
   });
+
+  it("leaves out apps with monitoring off (#296)", async () => {
+    const configPath = process.env.CONFIG_PATH!;
+    const raw = YAML.load(await fs.readFile(configPath, "utf8")) as { apps: Record<string, unknown>[] };
+    raw.apps[1].monitor = false;
+    await fs.writeFile(configPath, YAML.dump(raw), "utf8");
+    try {
+      expect(await ids(await GET(request("/api/status", { session })))).toEqual(["public-app"]);
+    } finally {
+      delete raw.apps[1].monitor;
+      await fs.writeFile(configPath, YAML.dump(raw), "utf8");
+    }
+  });
 });

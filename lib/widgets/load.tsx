@@ -14,7 +14,7 @@ import { fetchWeather } from "../weather";
 import { collectSystemStats } from "../system-stats";
 import { greetingFor, hourIn, shortDate } from "../datetime";
 import { getCalendarAuth } from "../config";
-import { feedUrls, type AppItem, type BookmarkItem, type Settings } from "../schema";
+import { feedUrls, monitoredApps, type AppItem, type BookmarkItem, type Settings } from "../schema";
 import type { LayoutWidget, LayoutWidgetId } from "../layout";
 import type { HomeData } from "./data";
 
@@ -135,7 +135,7 @@ export async function loadHomeData(ctx: LoadContext): Promise<HomeData> {
     showClock: settings.components.clock,
     // One poller wraps both the status widgets and the per-app dots; only on
     // when status checks are on and there are apps to monitor.
-    statusEnabled: settings.statusChecks && apps.length > 0,
+    statusEnabled: settings.statusChecks && monitoredApps(apps).length > 0,
     notes: settings.notes,
     countdown: settings.countdown,
     worldClocks: settings.worldClocks,

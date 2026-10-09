@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { readConfigInternal } from "@/lib/config";
 import { isAdminRequest, visibleItems } from "@/lib/api-auth";
+import { monitoredApps } from "@/lib/schema";
 import { loadHistory, getHistory } from "@/lib/status-history";
 import { isValidTimeZone } from "@/lib/datetime";
 import type { StatusHistory } from "@/lib/status";
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
   // timeline (its own interval, else the global one, #292). History
   // is recorded for every app; only the caller's visible ids are read out.
   const visible = visibleItems(
-    apps,
+    monitoredApps(apps),
     await isAdminRequest(request, auth.passwordHash)
   );
   return NextResponse.json(

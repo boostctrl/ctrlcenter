@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 // record → prune → flush → alert steps. Every collaborator is mocked.
 const calls: string[] = [];
 let settings: { statusChecks: boolean; statusInterval?: number; alerts: object };
-let apps: { id: string; interval?: number }[];
+let apps: { id: string; interval?: number; monitor?: boolean }[];
 
 vi.mock("./config", () => ({
   readConfigInternal: vi.fn(async () => ({ settings, apps })),
@@ -88,6 +88,13 @@ describe("status poller tick", () => {
       at: Date.now(),
       signature: "sig:a",
     });
+  });
+
+  it("skips apps with monitoring off but keeps their history (#296)", async () => {
+    apps = [{ id: "a" }, { id: "b", monitor: false }];
+    await tick();
+    expect(calls.filter((c) => c.startsWith("check:"))).toEqual(["check:a"]);
+    expect(calls).toContain("prune:a,b");
   });
 
   it("checks each app on its own interval (#292)", async () => {

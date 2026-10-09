@@ -6,6 +6,7 @@ import StatusDetail from "@/components/StatusDetail";
 import PageNav from "@/components/PageNav";
 import FloatingNav from "@/components/FloatingNav";
 import { navPages } from "@/lib/nav";
+import { monitoredApps } from "@/lib/schema";
 
 // Per-service status detail (#150): a large uptime graph, latency analytics,
 // the windowed percentages for every range, the outage log, and the check's
@@ -32,7 +33,7 @@ export default async function StatusDetailRoute({ params }: Params) {
   // the session on every write.
   const { config, isAdmin } = await readPublicConfig();
   const { settings } = config;
-  const app = config.apps.find((a) => a.id === id);
+  const app = monitoredApps(config.apps).find((a) => a.id === id);
   if (!app) notFound();
 
   return (

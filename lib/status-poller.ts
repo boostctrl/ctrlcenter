@@ -9,6 +9,7 @@ import {
 } from "./status-history";
 import { mapLimit } from "./concurrency";
 import { publishChecks } from "./status-latest";
+import { monitoredApps } from "./schema";
 import { processAlerts } from "./alerts";
 import { log, errorReason } from "./log";
 import type { StatusResult } from "./status";
@@ -33,7 +34,10 @@ export async function tick(): Promise<void> {
     // Recording into a store that hasn't loaded yet would let the next flush
     // overwrite the persisted history, so every tick waits for the load.
     await loadHistory();
-    const { settings, apps } = await readConfigInternal();
+    const { settings, apps: allApps } = await readConfigInternal();
+    // Only monitored apps are checked (#296); every configured app keeps its
+    // history (see pruneHistory below), so switching one back on resumes it.
+    const apps = monitoredApps(allApps);
     if (!settings.statusChecks || apps.length === 0) return;
     const globalMinutes = settings.statusInterval ?? 5;
     const now = Date.now();
@@ -68,7 +72,7 @@ export async function tick(): Promise<void> {
     // buckets, outages and readings don't ride along forever.
     const ids = new Set(apps.map((a) => a.id));
     for (const id of lastChecked.keys()) if (!ids.has(id)) lastChecked.delete(id);
-    pruneHistory(apps.map((a) => a.id));
+    pruneHistory(allApps.map((a) => a.id));
     await flush();
     await processAlerts(results, apps, settings.alerts, prior);
   } catch (e) {

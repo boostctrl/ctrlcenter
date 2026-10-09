@@ -5,6 +5,7 @@ import { EditModeProvider } from "@/components/EditMode";
 import { resolveLayoutWidgets, smallScreenTopGap } from "@/lib/layout";
 import { readPublicConfig } from "@/lib/api-auth";
 import { navPages } from "@/lib/nav";
+import { monitoredApps } from "@/lib/schema";
 import { loadHomeData } from "@/lib/widgets/load";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ export default async function HomePage({
   const { config, isAdmin } = await readPublicConfig();
   const { settings, apps, bookmarks } = config;
 
-  const statusEnabled = settings.statusChecks && apps.length > 0;
+  const statusEnabled = settings.statusChecks && monitoredApps(apps).length > 0;
   // Resolved before the widget data loads: a loader can skip work for a widget
   // that's hidden (system stats on a guest render).
   const widgets = resolveLayoutWidgets(

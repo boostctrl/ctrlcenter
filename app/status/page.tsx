@@ -6,6 +6,7 @@ import StatusAnnouncements from "@/components/StatusAnnouncements";
 import PageNav from "@/components/PageNav";
 import FloatingNav from "@/components/FloatingNav";
 import { navPages } from "@/lib/nav";
+import { monitoredApps } from "@/lib/schema";
 
 export const metadata: Metadata = { title: "Status" };
 export const dynamic = "force-dynamic";
@@ -15,7 +16,8 @@ export default async function StatusRoute() {
   // list for guests — same visibility rule as the home page.
   const { config } = await readPublicConfig();
   const { settings } = config;
-  const items = config.apps.map((a) => ({
+  // Only the apps that get checks have a row (#296).
+  const items = monitoredApps(config.apps).map((a) => ({
     id: a.id,
     name: a.name,
     icon: a.icon,

@@ -15,6 +15,7 @@ import {
   MoveButtons,
   DragGrip,
   PrivateChip,
+  UnmonitoredChip,
   Hint,
   fieldLabelClasses,
   controlClasses,
@@ -25,7 +26,7 @@ import { useReorder, dropIndicatorClass } from "./useReorder";
 import { useToast } from "./Toast";
 import { useConfirm } from "./Confirm";
 import { useRevealForm } from "./useRevealForm";
-import { withHttpScheme } from "@/lib/urls";
+import { guessCheckType, withHttpScheme } from "@/lib/urls";
 import { apiErrorMessage } from "./apiError";
 
 type FormState = {
@@ -38,6 +39,8 @@ type FormState = {
   checkType: CheckType;
   port: string;
   keyword: string;
+  // Whether the app gets status checks at all (#296).
+  monitor: boolean;
   // Per-app check overrides (#292); "" = the global setting.
   interval: string;
   timeout: string;
@@ -53,6 +56,7 @@ const emptyForm: FormState = {
   checkType: "http",
   port: "",
   keyword: "",
+  monitor: true,
   interval: "",
   timeout: "",
   retries: "",
@@ -101,6 +105,9 @@ export default function AppsManager({
   const [form, setForm] = useState<FormState>(emptyForm);
   const [upMode, setUpMode] = useState<UpMode>("any");
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Whether the check method was chosen by hand. Until it is, a new app's
+  // method follows its URL (guessCheckType, #296).
+  const [methodChosen, setMethodChosen] = useState(false);
   const [saving, setSaving] = useState(false);
   const toast = useToast();
   const confirm = useConfirm();
@@ -108,6 +115,7 @@ export default function AppsManager({
 
   function startEdit(app: AppItem) {
     setEditingId(app.id);
+    setMethodChosen(true);
     setForm({
       name: app.name,
       subtitle: app.subtitle,
@@ -118,6 +126,7 @@ export default function AppsManager({
       checkType: app.checkType ?? "http",
       port: app.port != null ? String(app.port) : "",
       keyword: app.keyword ?? "",
+      monitor: app.monitor !== false,
       interval: app.interval != null ? String(app.interval) : "",
       timeout: app.timeout != null ? String(app.timeout) : "",
       retries: app.retries != null ? String(app.retries) : "",
@@ -128,6 +137,7 @@ export default function AppsManager({
 
   function resetForm() {
     setEditingId(null);
+    setMethodChosen(false);
     setForm(emptyForm);
     setUpMode("any");
   }
@@ -149,6 +159,7 @@ export default function AppsManager({
         url: withHttpScheme(form.url),
         icon: form.icon,
         private: form.private,
+        monitor: form.monitor,
         checkType: form.checkType,
         expectStatus: form.checkType === "http" ? form.expectStatus : "",
         keyword: form.checkType === "keyword" ? form.keyword : "",
@@ -289,6 +300,7 @@ export default function AppsManager({
                       truncate can't clip without it */}
                   <span className="min-w-0 truncate">{app.name}</span>
                   {app.private && <PrivateChip />}
+                  {statusChecksEnabled && app.monitor === false && <UnmonitoredChip />}
                 </p>
                 <p className="truncate text-xs text-ink-40">
                   {app.subtitle ? `${app.subtitle} · ${app.url}` : app.url}
@@ -340,8 +352,15 @@ export default function AppsManager({
               placeholder="https://"
               value={form.url}
               onChange={(e) => setForm({ ...form, url: e.target.value })}
-              // A bare host ("plex.local:32400") gets http:// (#277).
-              onBlur={(e) => setForm({ ...form, url: withHttpScheme(e.target.value) })}
+              // A bare host ("plex.local:32400") gets http:// (#277). The
+              // check method is guessed from what was typed, before that.
+              onBlur={(e) =>
+                setForm({
+                  ...form,
+                  url: withHttpScheme(e.target.value),
+                  checkType: methodChosen ? form.checkType : guessCheckType(e.target.value),
+                })
+              }
             />
             <IconField
               value={form.icon}
@@ -354,153 +373,164 @@ export default function AppsManager({
               checked={form.private}
               onChange={(v) => setForm({ ...form, private: v })}
             />
-            {/* The per-app check settings only matter once checks are on;
-                say so rather than let them look live (#277). */}
-            {!statusChecksEnabled && (
-              <p className="rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-xs text-ink-70">
-                Status checks are off, so these settings won&apos;t run yet. Turn
-                them on in the{" "}
-                <a
-                  href="/admin?tab=settings&section=monitoring"
-                  className="underline underline-offset-2 hover:text-fg"
-                >
-                  Monitoring settings
-                </a>
-                .
-              </p>
-            )}
-            <SelectField
-              label="Check method"
-              hint={checkTypeHint(form.checkType)}
-              value={form.checkType}
-              onChange={(e) =>
-                setForm({ ...form, checkType: e.target.value as CheckType })
-              }
-            >
-              {CHECK_TYPES.map((c) => (
-                <option key={c.key} value={c.key}>
-                  {c.label}
-                </option>
-              ))}
-            </SelectField>
-
-            {(form.checkType === "tcp" || form.checkType === "dns") && (
-              <TextField
-                label="Port"
-                type="number"
-                min={1}
-                max={65535}
-                placeholder={
-                  form.checkType === "dns"
-                    ? "53"
-                    : "Defaults to the URL's port (or 443/80)"
-                }
-                value={form.port}
-                onChange={(e) => setForm({ ...form, port: e.target.value })}
-              />
-            )}
-
-            {form.checkType === "keyword" && (
-              <TextField
-                label="Keyword in response"
-                placeholder="e.g. Welcome"
-                value={form.keyword}
-                onChange={(e) => setForm({ ...form, keyword: e.target.value })}
-              />
-            )}
-
-            {form.checkType === "http" && (
-              <div className="flex flex-col gap-2">
-                <span className={fieldLabelClasses}>Counts as up when</span>
-                <ChipGroup
-                  label="Counts as up when"
-                  equal
-                  options={
-                    [
-                      { value: "any", label: "Any response" },
-                      { value: "ok", label: "2xx & 3xx" },
-                      { value: "custom", label: "Custom" },
-                    ] as const
-                  }
-                  value={upMode}
-                  onChange={(key) => {
-                    setUpMode(key);
-                    if (key === "any") setForm({ ...form, expectStatus: "" });
-                    else if (key === "ok")
-                      setForm({ ...form, expectStatus: "200-399" });
-                    else
-                      setForm({
-                        ...form,
-                        expectStatus:
-                          modeFromExpect(form.expectStatus) === "custom"
-                            ? form.expectStatus
-                            : "200-299",
-                      });
+            <ToggleRow
+              label="Monitor this app"
+              hint="Check it with the status checks: a status dot, a row on the status page, and alerts. Off for things that don't need watching."
+              checked={form.monitor}
+              onChange={(v) => setForm({ ...form, monitor: v })}
+            />
+            {form.monitor && (
+              <>
+                {/* The per-app check settings only matter once checks are on;
+                    say so rather than let them look live (#277). */}
+                {!statusChecksEnabled && (
+                  <p className="rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-xs text-ink-70">
+                    Status checks are off, so these settings won&apos;t run yet. Turn
+                    them on in the{" "}
+                    <a
+                      href="/admin?tab=settings&section=monitoring"
+                      className="underline underline-offset-2 hover:text-fg"
+                    >
+                      Monitoring settings
+                    </a>
+                    .
+                  </p>
+                )}
+                <SelectField
+                  label="Check method"
+                  hint={checkTypeHint(form.checkType)}
+                  value={form.checkType}
+                  onChange={(e) => {
+                    setMethodChosen(true);
+                    setForm({ ...form, checkType: e.target.value as CheckType });
                   }}
-                />
-                {upMode === "custom" && (
-                  <input
-                    value={form.expectStatus}
-                    onChange={(e) =>
-                      setForm({ ...form, expectStatus: e.target.value })
+                >
+                  {CHECK_TYPES.map((c) => (
+                    <option key={c.key} value={c.key}>
+                      {c.label}
+                    </option>
+                  ))}
+                </SelectField>
+
+                {(form.checkType === "tcp" || form.checkType === "dns") && (
+                  <TextField
+                    label="Port"
+                    type="number"
+                    min={1}
+                    max={65535}
+                    placeholder={
+                      form.checkType === "dns"
+                        ? "53"
+                        : "Defaults to the URL's port (or 443/80)"
                     }
-                    placeholder="e.g. 200-299, 401"
-                    className={`${controlClasses} text-sm`}
+                    value={form.port}
+                    onChange={(e) => setForm({ ...form, port: e.target.value })}
                   />
                 )}
-                <Hint>
-                  {upMode === "any"
-                    ? "Any reachable host counts as up — even a 4xx/5xx response."
-                    : upMode === "ok"
-                      ? "Up only on a 2xx or 3xx response."
-                      : "Up only when the response code is in these codes/ranges — e.g. mark a 404 as down."}
-                </Hint>
-              </div>
+
+                {form.checkType === "keyword" && (
+                  <TextField
+                    label="Keyword in response"
+                    placeholder="e.g. Welcome"
+                    value={form.keyword}
+                    onChange={(e) => setForm({ ...form, keyword: e.target.value })}
+                  />
+                )}
+
+                {form.checkType === "http" && (
+                  <div className="flex flex-col gap-2">
+                    <span className={fieldLabelClasses}>Counts as up when</span>
+                    <ChipGroup
+                      label="Counts as up when"
+                      equal
+                      options={
+                        [
+                          { value: "any", label: "Any response" },
+                          { value: "ok", label: "2xx & 3xx" },
+                          { value: "custom", label: "Custom" },
+                        ] as const
+                      }
+                      value={upMode}
+                      onChange={(key) => {
+                        setUpMode(key);
+                        if (key === "any") setForm({ ...form, expectStatus: "" });
+                        else if (key === "ok")
+                          setForm({ ...form, expectStatus: "200-399" });
+                        else
+                          setForm({
+                            ...form,
+                            expectStatus:
+                              modeFromExpect(form.expectStatus) === "custom"
+                                ? form.expectStatus
+                                : "200-299",
+                          });
+                      }}
+                    />
+                    {upMode === "custom" && (
+                      <input
+                        value={form.expectStatus}
+                        onChange={(e) =>
+                          setForm({ ...form, expectStatus: e.target.value })
+                        }
+                        placeholder="e.g. 200-299, 401"
+                        className={`${controlClasses} text-sm`}
+                      />
+                    )}
+                    <Hint>
+                      {upMode === "any"
+                        ? "Any reachable host counts as up — even a 4xx/5xx response."
+                        : upMode === "ok"
+                          ? "Up only on a 2xx or 3xx response."
+                          : "Up only when the response code is in these codes/ranges — e.g. mark a 404 as down."}
+                    </Hint>
+                  </div>
+                )}
+                {/* Per-app overrides of the global check settings (#292), tucked
+                    away: the defaults suit almost every app. */}
+                <details
+                  className="rounded-lg border border-fg/10 px-3 py-2"
+                  open={Boolean(form.interval || form.timeout || form.retries)}
+                >
+                  <summary className="cursor-pointer text-sm text-ink-70 select-none">
+                    Advanced check settings
+                  </summary>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                    <TextField
+                      label="Interval (min)"
+                      type="number"
+                      min={1}
+                      max={60}
+                      placeholder={`${statusInterval} (default)`}
+                      value={form.interval}
+                      onChange={(e) => setForm({ ...form, interval: e.target.value })}
+                    />
+                    <TextField
+                      label="Timeout (s)"
+                      type="number"
+                      min={1}
+                      max={60}
+                      placeholder="5 (default)"
+                      value={form.timeout}
+                      onChange={(e) => setForm({ ...form, timeout: e.target.value })}
+                    />
+                    <TextField
+                      label="Retries"
+                      type="number"
+                      min={0}
+                      max={5}
+                      placeholder="0 (default)"
+                      value={form.retries}
+                      onChange={(e) => setForm({ ...form, retries: e.target.value })}
+                    />
+                  </div>
+                  <Hint>
+                    How often this app is checked, how long a check may take, and how
+                    many quick re-tries a failed check gets before it counts as down.
+                    Leave blank to use the defaults.
+                  </Hint>
+                </details>
+              </>
             )}
-            {/* Per-app overrides of the global check settings (#292), tucked
-                away: the defaults suit almost every app. */}
-            <details
-              className="rounded-lg border border-fg/10 px-3 py-2"
-              open={Boolean(form.interval || form.timeout || form.retries)}
-            >
-              <summary className="cursor-pointer text-sm text-ink-70 select-none">
-                Advanced check settings
-              </summary>
-              <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                <TextField
-                  label="Interval (min)"
-                  type="number"
-                  min={1}
-                  max={60}
-                  placeholder={`${statusInterval} (default)`}
-                  value={form.interval}
-                  onChange={(e) => setForm({ ...form, interval: e.target.value })}
-                />
-                <TextField
-                  label="Timeout (s)"
-                  type="number"
-                  min={1}
-                  max={60}
-                  placeholder="5 (default)"
-                  value={form.timeout}
-                  onChange={(e) => setForm({ ...form, timeout: e.target.value })}
-                />
-                <TextField
-                  label="Retries"
-                  type="number"
-                  min={0}
-                  max={5}
-                  placeholder="0 (default)"
-                  value={form.retries}
-                  onChange={(e) => setForm({ ...form, retries: e.target.value })}
-                />
-              </div>
-              <Hint>
-                How often this app is checked, how long a check may take, and how
-                many quick re-tries a failed check gets before it counts as down.
-                Leave blank to use the defaults.
-              </Hint>
-            </details>
             <div className="flex gap-2">
               <Button type="submit" disabled={saving}>
                 {editingId ? "Save changes" : "Add"}

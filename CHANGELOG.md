@@ -19,6 +19,13 @@ here.
   service (the default is still 5 seconds), and a few quick retries so a brief
   blip doesn't paint the timeline red or set off an alert. Leave them blank to
   use the defaults. (#292)
+- **Choose which apps are monitored.** A new *Monitor this app* switch in the
+  app form turns status checks off for things that don't need watching — no
+  status dot, no status-page row, no alerts — and back on without losing
+  their history. Every app stays monitored unless you switch it off. When you
+  add an app, its check method now follows the address you type: a bare
+  `host:22` gets a TCP check and port 53 a DNS check, until you pick one
+  yourself. (#296)
 
 ### Fixed
 

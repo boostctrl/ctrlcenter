@@ -6,6 +6,7 @@ import { mapLimit } from "@/lib/concurrency";
 import { latestCheck } from "@/lib/status-latest";
 import { swrCache } from "@/lib/swr-cache";
 import type { StatusResponse, StatusResult } from "@/lib/status";
+import { monitoredApps } from "@/lib/schema";
 
 // Public endpoint (not behind the admin proxy) the dashboard polls to render
 // online/offline dots. It only ever pings the admin-configured app URLs, never
@@ -36,7 +37,9 @@ const POLL_SLACK_MS = 60_000;
 const NO_SHARED_CACHE = { "cache-control": "private, no-store" };
 
 export async function GET(request: NextRequest) {
-  const { settings, apps, auth } = await readConfigInternal();
+  const config = await readConfigInternal();
+  const { settings, auth } = config;
+  const apps = monitoredApps(config.apps);
   if (!settings.statusChecks) {
     const empty: StatusResponse = { checkedAt: Date.now(), results: [] };
     return NextResponse.json(empty, { headers: NO_SHARED_CACHE });

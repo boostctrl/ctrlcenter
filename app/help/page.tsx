@@ -492,6 +492,9 @@ export default async function HelpPage() {
             <strong>Advanced check settings</strong> in an app&apos;s form you can
             give it its own interval, a longer timeout for a slow service, and a
             few quick retries so a brief blip doesn&apos;t count as an outage.
+            Switch off <strong>Monitor this app</strong> for anything that
+            doesn&apos;t need watching; its history is kept for when it&apos;s
+            back on.
           </P>
         </Card>
 

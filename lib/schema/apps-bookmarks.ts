@@ -22,6 +22,9 @@ export const appItemSchema = z.object({
   checkType: z.enum(CHECK_TYPE_KEYS).catch("http").default("http"),
   port: z.number().int().min(1).max(65535).optional(),
   keyword: z.string().default(""),
+  // Whether this app gets status checks at all (#296). Off = no dot, no
+  // status-page row, no alerts; its history is kept for when it's back on.
+  monitor: z.boolean().catch(true).default(true),
   // Per-app check overrides (#292); absent = the global setting. `interval`
   // (minutes) replaces the global status interval, `timeout` (seconds) the
   // 5-second default, and `retries` re-attempts a failed check that many times
@@ -47,6 +50,12 @@ export const bookmarkItemSchema = z.object({
 });
 
 export type AppItem = z.infer<typeof appItemSchema>;
+
+// The apps that get status checks (#296): every list a check, a status dot
+// or a status-page row comes from goes through this.
+export function monitoredApps<T extends { monitor?: boolean }>(apps: T[]): T[] {
+  return apps.filter((a) => a.monitor !== false);
+}
 export type BookmarkItem = z.infer<typeof bookmarkItemSchema>;
 
 // "Create" schemas (POST): required fields are required, everything else is
@@ -61,6 +70,7 @@ export const appInputSchema = z.object({
   checkType: z.enum(CHECK_TYPE_KEYS).optional().default("http"),
   port: z.number().int().min(1).max(65535).optional(),
   keyword: z.string().optional().default(""),
+  monitor: z.boolean().optional().default(true),
   interval: z.number().int().min(1).max(60).optional(),
   timeout: z.number().int().min(1).max(60).optional(),
   retries: z.number().int().min(0).max(5).optional(),
@@ -86,6 +96,7 @@ export const appUpdateSchema = z.object({
   // keeps the stored value, since updates merge).
   port: z.number().int().min(1).max(65535).nullable().optional(),
   keyword: z.string().optional(),
+  monitor: z.boolean().optional(),
   interval: z.number().int().min(1).max(60).nullable().optional(),
   timeout: z.number().int().min(1).max(60).nullable().optional(),
   retries: z.number().int().min(0).max(5).nullable().optional(),

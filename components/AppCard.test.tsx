@@ -23,6 +23,7 @@ const app: AppItem = {
   checkType: "http",
   keyword: "",
   private: false,
+  monitor: true,
 };
 
 beforeEach(() => {
