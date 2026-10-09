@@ -1,3 +1,7 @@
+// Config migrations, keyed on the file's `schemaVersion` (#288). migrateConfig
+// runs the ordered MIGRATIONS chain below; today it holds one frozen step, the
+// pre-2.0 shape migration (#152) described next, and 3.0 adds `v2 → v3`.
+//
 // One-time migration of pre-2.0 config shapes (#152). Everything the 1.x line
 // accepted but 2.0 no longer stores lives here, applied structurally to the
 // raw YAML object BEFORE zod parses it — the schemas themselves only know the
@@ -22,6 +26,7 @@
 // were removed from lib/status.ts outright with no migration to run.
 
 import { FEED_DEFAULT_ID, GRID_COLUMNS, MAX_WIDGET_SPACE } from "./layout";
+import { CONFIG_SCHEMA_VERSION } from "./schema/config";
 
 // The 1.3 grid was 12 columns; spans saved against it double onto today's 24.
 // A `columns` marker on the persisted layout says which grid the spans were
@@ -190,3 +195,77 @@ export function migrateConfigShape(raw: unknown): {
 
   return changed ? { value: { ...raw, settings }, changed } : { value: raw, changed };
 }
+
+// --- The versioned chain (#288) ---------------------------------------------
+
+// A file stamped with a newer schema than this build reads — typically after
+// rolling back from a later release. Reading it anyway would drop every key
+// the older schema doesn't know and re-stamp the file as the old version on the
+// next save, so it is refused with instructions instead.
+export class NewerConfigError extends Error {
+  constructor(readonly found: number) {
+    super(
+      `config.yaml was written by a newer CtrlCenter (config schema ${found}); ` +
+        `this version reads up to schema ${CONFIG_SCHEMA_VERSION}. Upgrade ` +
+        `CtrlCenter, or restore the backup the upgrade saved next to config.yaml.`
+    );
+    this.name = "NewerConfigError";
+  }
+}
+
+type MigrationResult = { value: unknown; changed: boolean };
+
+export type MigrationStep = {
+  // The schema version the step brings a file up to.
+  to: number;
+  // Whether it runs for a file stamped `version`.
+  appliesTo: (version: number) => boolean;
+  run: (raw: unknown) => MigrationResult;
+};
+
+// The ordered chain. Steps run in order on the raw (pre-zod) object, each
+// pure and idempotent like migrateConfigShape.
+export const MIGRATIONS: readonly MigrationStep[] = [
+  // Frozen: the 1.x/2.0 heuristics above. They detect by shape, not version,
+  // because 2.1 changed the feed shape (#167) after files were already being
+  // stamped 2 — so a v2 file can still carry a pre-2.1 shape, and the step runs
+  // for everything stamped 2 or lower. Files stamped 3+ never pay for it.
+  { to: 2, appliesTo: (v) => v <= 2, run: migrateConfigShape },
+];
+
+// The schema a raw config claims; unstamped files predate the field (≤ 2.9)
+// and are treated as version 1.
+export function configVersion(raw: unknown): number {
+  const v = isRecord(raw) ? raw.schemaVersion : undefined;
+  return typeof v === "number" && Number.isInteger(v) && v >= 1 ? v : 1;
+}
+
+// Bring a raw config up to CONFIG_SCHEMA_VERSION. Pure: the input isn't
+// mutated. `changed` means a step actually rewrote something — the file then
+// gets persisted (after a .bak snapshot) and stamped with the highest version
+// a changing step reached; merely being unstamped doesn't force a rewrite.
+// Throws NewerConfigError for a file from a newer release.
+export function migrateConfig(
+  raw: unknown,
+  steps: readonly MigrationStep[] = MIGRATIONS
+): MigrationResult {
+  if (!isRecord(raw)) return { value: raw, changed: false };
+  const version = configVersion(raw);
+  if (version > CONFIG_SCHEMA_VERSION) throw new NewerConfigError(version);
+  let value: unknown = raw;
+  let reached = 0;
+  for (const step of steps) {
+    if (!step.appliesTo(version)) continue;
+    const result = step.run(value);
+    if (result.changed) {
+      value = result.value;
+      reached = Math.max(reached, step.to);
+    }
+  }
+  if (reached === 0) return { value: raw, changed: false };
+  return {
+    value: { ...(value as Record<string, unknown>), schemaVersion: Math.max(version, reached) },
+    changed: true,
+  };
+}
+

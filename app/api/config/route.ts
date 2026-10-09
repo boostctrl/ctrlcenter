@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/lib/api-auth";
 import { readConfigInternal, replaceConfig, stripAuth } from "@/lib/config";
-import { migrateConfigShape } from "@/lib/config-migrate";
+import { migrateConfig, NewerConfigError } from "@/lib/config-migrate";
 import { configSchema } from "@/lib/schema";
 import {
   exportIcons,
@@ -49,7 +49,17 @@ export async function POST(request: NextRequest) {
   // know, so parsing the raw body first would silently launder the legacy
   // fields (single feed url, width/spaceBelow rows, 12-column spans) out of
   // the file instead of migrating them.
-  const parsed = configSchema.safeParse(migrateConfigShape(body).value);
+  let migrated: unknown;
+  try {
+    migrated = migrateConfig(body).value;
+  } catch (error) {
+    // A backup from a newer release (#288): say so rather than "invalid".
+    if (error instanceof NewerConfigError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    throw error;
+  }
+  const parsed = configSchema.safeParse(migrated);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "That doesn't look like a valid ctrlcenter config file." },

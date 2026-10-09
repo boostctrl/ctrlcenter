@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { migrateConfigShape } from "./config-migrate";
+import {
+  migrateConfigShape,
+  migrateConfig,
+  configVersion,
+  NewerConfigError,
+  MIGRATIONS,
+  type MigrationStep,
+} from "./config-migrate";
+import { CONFIG_SCHEMA_VERSION } from "./schema/config";
 
 describe("migrateConfigShape", () => {
   it("reports a current-shape config unchanged, value untouched", () => {
@@ -327,3 +335,57 @@ describe("migrateConfigShape", () => {
     expect(value.apps).toEqual([{ id: "broken", name: "" }]);
   });
 });
+
+describe("migrateConfig: the versioned chain (#288)", () => {
+  const legacyFeed = (schemaVersion?: number) => ({
+    ...(schemaVersion !== undefined && { schemaVersion }),
+    settings: { feed: { enabled: true, url: "https://a.example/rss" } },
+  });
+
+  it("reads an unstamped file as version 1", () => {
+    expect(configVersion({})).toBe(1);
+    expect(configVersion({ schemaVersion: "2" })).toBe(1);
+    expect(configVersion({ schemaVersion: 2 })).toBe(2);
+  });
+
+  it("runs the frozen legacy step for unstamped files and stamps the result", () => {
+    const { value, changed } = migrateConfig(legacyFeed());
+    expect(changed).toBe(true);
+    const v = value as { schemaVersion: number; settings: Record<string, unknown> };
+    expect(v.schemaVersion).toBe(2);
+    expect(v.settings.feed).toBeUndefined();
+    expect(v.settings.feeds).toBeDefined();
+  });
+
+  it("still runs it for a v2 file: 2.1 changed the feed shape without a bump", () => {
+    const { value, changed } = migrateConfig(legacyFeed(2));
+    expect(changed).toBe(true);
+    expect((value as { settings: Record<string, unknown> }).settings.feeds).toBeDefined();
+  });
+
+  it("leaves a current file alone, same reference, no stamp-only rewrite", () => {
+    const modern = { settings: { feeds: [] } };
+    const result = migrateConfig(modern);
+    expect(result.changed).toBe(false);
+    expect(result.value).toBe(modern);
+  });
+
+  it("refuses a file from a newer release instead of downgrading it", () => {
+    expect(() => migrateConfig({ schemaVersion: CONFIG_SCHEMA_VERSION + 1, settings: {} }))
+      .toThrow(NewerConfigError);
+  });
+
+  it("keys later steps on the version (a simulated v2 → v3)", () => {
+    const toV3: MigrationStep = {
+      to: 3,
+      appliesTo: (v) => v < 3,
+      run: (raw) => ({ value: { ...(raw as object), boards: [] }, changed: true }),
+    };
+    const steps = [...MIGRATIONS, toV3];
+    const fromV1 = migrateConfig(legacyFeed(), steps).value as Record<string, unknown>;
+    expect(fromV1.schemaVersion).toBe(3);
+    expect(fromV1.boards).toEqual([]);
+    expect((fromV1.settings as Record<string, unknown>).feeds).toBeDefined();
+  });
+});
+

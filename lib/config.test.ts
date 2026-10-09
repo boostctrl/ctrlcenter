@@ -92,6 +92,13 @@ describe("readConfigInternal", () => {
     expect(onDisk.schemaVersion).toBe(CONFIG_SCHEMA_VERSION);
   });
 
+  it("refuses a file written by a newer release, leaving it untouched (#288)", async () => {
+    const newer = YAML.dump({ schemaVersion: CONFIG_SCHEMA_VERSION + 1, settings: {}, boards: [] });
+    await fs.writeFile(configPath, newer, "utf8");
+    await expect(config.readConfigInternal()).rejects.toThrow(/newer CtrlCenter/);
+    expect(await fs.readFile(configPath, "utf8")).toBe(newer);
+  });
+
   it("rejects a file with more than one YAML document", () => {
     expect(() => config.parseConfigYaml("a: 1\n---\nb: 2\n")).toThrow(
       /single YAML document/

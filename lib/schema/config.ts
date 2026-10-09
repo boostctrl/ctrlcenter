@@ -7,9 +7,10 @@ import { themePackSchema } from "./theme";
 import { authSchema } from "./auth";
 
 // The on-disk config shape's version, written on every save. Files without it
-// predate the field (2.9 and earlier) and are in the 2.0 shape or older, which
-// lib/config-migrate.ts detects heuristically; a future shape change bumps
-// this, so its migration can key off the number instead of guessing.
+// predate the field (2.9 and earlier). lib/config-migrate.ts keys its
+// migration chain on this (#288): the frozen pre-2.x step still detects by
+// shape for files stamped ≤ 2, each later shape change bumps this with its own
+// step, and a file stamped higher than this build knows is refused.
 export const CONFIG_SCHEMA_VERSION = 2;
 
 export const configSchema = z.object({

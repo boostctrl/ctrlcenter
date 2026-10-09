@@ -2,7 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import * as YAML from "js-yaml";
 import { GRID_COLUMNS } from "./layout";
-import { migrateConfigShape } from "./config-migrate";
+import { migrateConfig } from "./config-migrate";
 import { log, errorReason } from "./log";
 import { globalSingleton } from "./singleton";
 import {
@@ -94,7 +94,7 @@ async function loadMigrated(): Promise<{
 }> {
   await ensureConfigExists();
   const raw = await fs.readFile(CONFIG_PATH, "utf8");
-  const { value, changed } = migrateConfigShape(parseConfigYaml(raw));
+  const { value, changed } = migrateConfig(parseConfigYaml(raw));
   // Lenient read: a single malformed row is dropped rather than 500-ing every
   // page on a hand-edited file (see configReadSchema). Writes/imports stay strict.
   return { config: configReadSchema.parse(value), changed, raw };
@@ -159,7 +159,7 @@ function persistShapeMigration(): Promise<void> {
       // Re-read inside the queue: a write that landed since detection has
       // already normalized the file, making this a no-op.
       const raw = await fs.readFile(CONFIG_PATH, "utf8");
-      const { value, changed } = migrateConfigShape(parseConfigYaml(raw));
+      const { value, changed } = migrateConfig(parseConfigYaml(raw));
       if (!changed) return;
       await writeFileAtomic(CONFIG_BAK, raw);
       await writeFileAtomic(CONFIG_PATH, YAML.dump(value, { lineWidth: 100 }));
@@ -331,7 +331,7 @@ function redactIntegrations(
 // with concurrent edits. The shape migration runs on the input first, so a
 // backup exported before 2.0.0 imports cleanly.
 export async function replaceConfig(input: unknown): Promise<Config> {
-  const validated = configSchema.parse(migrateConfigShape(input).value);
+  const validated = configSchema.parse(migrateConfig(input).value);
   const result = writes.queue.then(async () => {
     // Preserve the admin credential across an import. A backup file must not be
     // able to change or wipe the password: an older or hand-made config carries

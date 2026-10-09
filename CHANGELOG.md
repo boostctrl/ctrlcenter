@@ -12,6 +12,14 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **Safer rollbacks.** If you go back to an older version after an upgrade
+  has updated your config, CtrlCenter now refuses to load the newer file and
+  says why — restore the backup or upgrade again — instead of quietly dropping
+  the settings it doesn't understand. Importing a backup from a newer version
+  explains the same thing. (#288)
+
 ## [2.11.0] - 2026-10-09
 
 ### Added
