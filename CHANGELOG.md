@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [2.13.0] - 2026-10-09
+
 ### Added
 
 - **Check settings per app.** Under *Advanced check settings* in an app's
@@ -2793,7 +2795,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.12.0...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.13.0...HEAD
+[2.13.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.12.0...v2.13.0
 [2.12.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.11.0...v2.12.0
 [2.11.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.10.1...v2.11.0
 [2.10.1]: https://github.com/boostctrl/ctrlcenter/compare/v2.10.0...v2.10.1
