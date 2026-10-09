@@ -16,3 +16,16 @@ export function navPages(settings: Settings): {
     calendar: settings.calendar.enabled && settings.calendar.url.trim() !== "",
   };
 }
+
+// The anchor id a settings Card carries (components/admin/ui.tsx), derived
+// from its title. Links elsewhere — the Monitor's "Set up" buttons (#277) —
+// deep-link to one card via `#<id>`, which SettingsManager scrolls to on load.
+export function settingsCardId(title: string): string {
+  return (
+    "settings-card-" +
+    title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "")
+  );
+}

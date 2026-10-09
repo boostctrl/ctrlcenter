@@ -13,6 +13,7 @@ import {
   type ButtonSize,
   type ButtonVariant,
 } from "@/lib/buttons";
+import { settingsCardId } from "@/lib/nav";
 
 // The admin form chrome, in one place. The layout rules these primitives
 // encode (#180): labels sit ABOVE text/select controls (TextField,
@@ -346,15 +347,11 @@ export function Card({
 }: {
   title: string;
   intro?: ReactNode;
-  toggle?: { checked: boolean; onChange: (checked: boolean) => void };
+  // `label` names the switch for screen readers (default "<title> enabled").
+  toggle?: { checked: boolean; onChange: (checked: boolean) => void; label?: string };
   children?: ReactNode;
 }) {
-  const id =
-    "settings-card-" +
-    title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "");
+  const id = settingsCardId(title);
   return (
     <section id={id} className="glass-card flex flex-col gap-4 p-5">
       {/* The header underlines itself only when a body follows — a disabled
@@ -372,7 +369,7 @@ export function Card({
             <Switch
               checked={toggle.checked}
               onChange={toggle.onChange}
-              label={`${title} enabled`}
+              label={toggle.label ?? `${title} enabled`}
             />
           </label>
         )}

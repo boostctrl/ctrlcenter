@@ -327,7 +327,12 @@ export default function WidgetsSection({ d }: { d: SettingsDraft }) {
 
       <Card
         title="Notes"
-        intro="A free-form note card for the home page. Ships hidden — show it in the home-page layout editor (or the Home layout section) once there's something to say."
+        intro="A free-form note card for the home page. Switch it on to show it; arrange it in the home-page layout editor."
+        toggle={{
+          checked: d.isWidgetShown("notes"),
+          onChange: (v) => d.setWidgetShown("notes", v),
+          label: "Show Notes on the home page",
+        }}
       >
         <TextField
           label="Card title"
@@ -353,7 +358,12 @@ export default function WidgetsSection({ d }: { d: SettingsDraft }) {
 
       <Card
         title="Countdown"
-        intro="Labeled dates shown as “in N days” rows — renewals, birthdays, deadlines. Ships hidden — show the card in the home-page layout editor once dates are added."
+        intro="Labeled dates shown as “in N days” rows — renewals, birthdays, deadlines. Switch it on to show the card; arrange it in the home-page layout editor."
+        toggle={{
+          checked: d.isWidgetShown("countdown"),
+          onChange: (v) => d.setWidgetShown("countdown", v),
+          label: "Show Countdown on the home page",
+        }}
       >
         <TextField
           label="Card title"
@@ -404,7 +414,12 @@ export default function WidgetsSection({ d }: { d: SettingsDraft }) {
 
       <Card
         title="World clocks"
-        intro="Live clocks for the time zones you follow. Ships hidden — show the card in the home-page layout editor once zones are added."
+        intro="Live clocks for the time zones you follow. Switch it on to show the card; arrange it in the home-page layout editor."
+        toggle={{
+          checked: d.isWidgetShown("worldClocks"),
+          onChange: (v) => d.setWidgetShown("worldClocks", v),
+          label: "Show World clocks on the home page",
+        }}
       >
         <TextField
           label="Card title"
@@ -466,7 +481,12 @@ export default function WidgetsSection({ d }: { d: SettingsDraft }) {
 
       <Card
         title="System stats"
-        intro="CPU, memory and disk usage of whatever runs the app. Ships hidden — show the card in the home-page layout editor. The card itself says whether it's measuring this container or the host machine."
+        intro="CPU, memory and disk usage of whatever runs the app. Switch it on to show the card; arrange it in the home-page layout editor. The card itself says whether it's measuring this container or the host machine."
+        toggle={{
+          checked: d.isWidgetShown("systemStats"),
+          onChange: (v) => d.setWidgetShown("systemStats", v),
+          label: "Show System stats on the home page",
+        }}
       >
         <TextField
           label="Card title"

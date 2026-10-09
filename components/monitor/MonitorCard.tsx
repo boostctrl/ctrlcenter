@@ -5,6 +5,7 @@ import { createContext, useContext, type ReactNode } from "react";
 import type { ServiceStatus } from "@/lib/monitor";
 import { buttonClasses } from "@/lib/buttons";
 import { formatBytes } from "@/components/widgets/SystemStatsWidget";
+import { settingsCardId } from "@/lib/nav";
 
 // Set on a service's detail page (#208), where the page's own <h1> already names
 // the service. A card rendered under this context drops its dot+title header and
@@ -61,7 +62,11 @@ export const STATE_DOT: Record<ServiceState, string> = {
   unconfigured: "border border-dashed border-fg/30",
 };
 
-const SETTINGS_LINK = "/admin?tab=settings&section=integrations";
+// Deep link to this service's card in Admin → Settings → Integrations; card
+// titles are the service labels.
+function settingsLink(title: string): string {
+  return `/admin?tab=settings&section=integrations#${settingsCardId(title)}`;
+}
 
 // The three non-data bodies. Kept deliberately calm and centered so a cockpit
 // that is mostly unconfigured still reads as designed rather than broken.
@@ -82,7 +87,7 @@ function OfflineBody({ title, error }: { title: string; error: string | null }) 
   );
 }
 
-function DisabledBody() {
+function DisabledBody({ title }: { title: string }) {
   return (
     <Placeholder
       icon={
@@ -99,7 +104,7 @@ function DisabledBody() {
       tone="text-ink-25"
     >
       <p className="text-sm text-ink-45">Disabled</p>
-      <Link href={SETTINGS_LINK} className={buttonClasses("ghost", "sm")}>
+      <Link href={settingsLink(title)} className={buttonClasses("ghost", "sm")}>
         Enable in Settings
       </Link>
     </Placeholder>
@@ -122,7 +127,7 @@ function ConnectBody({ title }: { title: string }) {
       tone="text-[var(--accent-from)]/70"
     >
       <p className="text-sm text-ink-55">Connect {title}</p>
-      <Link href={SETTINGS_LINK} className={buttonClasses("ghost", "sm")}>
+      <Link href={settingsLink(title)} className={buttonClasses("ghost", "sm")}>
         Set up
       </Link>
     </Placeholder>
@@ -172,7 +177,7 @@ export default function MonitorCard({
   ) : state === "unreachable" ? (
     <OfflineBody title={title} error={status.error} />
   ) : state === "disabled" ? (
-    <DisabledBody />
+    <DisabledBody title={title} />
   ) : (
     <ConnectBody title={title} />
   );

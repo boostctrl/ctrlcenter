@@ -21,6 +21,7 @@ import { useReorder, dropIndicatorClass } from "./useReorder";
 import { useToast } from "./Toast";
 import { useConfirm } from "./Confirm";
 import { useRevealForm } from "./useRevealForm";
+import { withHttpScheme } from "@/lib/urls";
 import { apiErrorMessage } from "./apiError";
 import { saveSettingsPatch } from "./settingsApi";
 
@@ -81,7 +82,7 @@ export default function BookmarksManager({
       const res = await fetch(editingId ? `/api/bookmarks/${editingId}` : "/api/bookmarks", {
         method: editingId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, url: withHttpScheme(form.url) }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
@@ -334,10 +335,14 @@ export default function BookmarksManager({
             <TextField
               label="URL"
               required
-              type="url"
+              inputMode="url"
+              autoCapitalize="off"
+              spellCheck={false}
               placeholder="https://"
               value={form.url}
               onChange={(e) => setForm({ ...form, url: e.target.value })}
+              // A bare host ("plex.local:32400") gets http:// (#277).
+              onBlur={(e) => setForm({ ...form, url: withHttpScheme(e.target.value) })}
             />
             <IconField
               value={form.icon}

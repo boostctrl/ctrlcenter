@@ -181,7 +181,7 @@ function AdminBody({
   return (
     <main
       id="main-content"
-      className="mx-auto flex w-full max-w-8xl flex-col gap-8 px-6 py-12 sm:px-10"
+      className="mx-auto flex w-full max-w-8xl flex-col gap-8 px-6 pt-12 pb-24 sm:px-10"
     >
       <div>
         {/* The admin portal isn't one of the strip's listed pages (it's a
@@ -258,7 +258,12 @@ function AdminBody({
         ))}
       </div>
 
-      {tab === "apps" && <AppsManager initialApps={initialApps} />}
+      {tab === "apps" && (
+        <AppsManager
+          initialApps={initialApps}
+          statusChecksEnabled={initialSettings.statusChecks}
+        />
+      )}
       {tab === "bookmarks" && (
         <BookmarksManager
           initialBookmarks={initialBookmarks}

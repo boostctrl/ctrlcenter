@@ -56,6 +56,13 @@ here.
 - **Signing in successfully no longer counts toward the login limit.** Only
   wrong passwords and codes do, so signing in a few times in a row can't lock
   you out. (#277)
+- **Smoother admin setup.** Widget cards in Settings (Notes, Countdown, World
+  clocks, System stats) have their own "show on the home page" switch, so you
+  no longer have to visit the layout editor just to turn one on. App and
+  bookmark URLs accept a bare address like `plex.local:32400` and add the
+  `http://` for you. The app form says when status checks are switched off,
+  and the Monitor page's "Set up" buttons open that service's settings
+  directly. (#277)
 
 ## [2.10.1] - 2026-10-09
 

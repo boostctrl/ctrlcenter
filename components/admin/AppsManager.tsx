@@ -25,6 +25,7 @@ import { useReorder, dropIndicatorClass } from "./useReorder";
 import { useToast } from "./Toast";
 import { useConfirm } from "./Confirm";
 import { useRevealForm } from "./useRevealForm";
+import { withHttpScheme } from "@/lib/urls";
 import { apiErrorMessage } from "./apiError";
 
 type FormState = {
@@ -77,7 +78,15 @@ function modeFromExpect(v: string): UpMode {
   return "custom";
 }
 
-export default function AppsManager({ initialApps }: { initialApps: AppItem[] }) {
+export default function AppsManager({
+  initialApps,
+  statusChecksEnabled,
+}: {
+  initialApps: AppItem[];
+  // From the server-rendered settings; toggling checks this session updates on
+  // reload, like the nav flags.
+  statusChecksEnabled: boolean;
+}) {
   const [apps, setApps] = useState(initialApps);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [upMode, setUpMode] = useState<UpMode>("any");
@@ -121,7 +130,7 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
       const payload = {
         name: form.name,
         subtitle: form.subtitle,
-        url: form.url,
+        url: withHttpScheme(form.url),
         icon: form.icon,
         private: form.private,
         checkType: form.checkType,
@@ -283,10 +292,14 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
             <TextField
               label="URL"
               required
-              type="url"
+              inputMode="url"
+              autoCapitalize="off"
+              spellCheck={false}
               placeholder="https://"
               value={form.url}
               onChange={(e) => setForm({ ...form, url: e.target.value })}
+              // A bare host ("plex.local:32400") gets http:// (#277).
+              onBlur={(e) => setForm({ ...form, url: withHttpScheme(e.target.value) })}
             />
             <IconField
               value={form.icon}
@@ -299,6 +312,21 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
               checked={form.private}
               onChange={(v) => setForm({ ...form, private: v })}
             />
+            {/* The per-app check settings only matter once checks are on;
+                say so rather than let them look live (#277). */}
+            {!statusChecksEnabled && (
+              <p className="rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-xs text-ink-70">
+                Status checks are off, so these settings won&apos;t run yet. Turn
+                them on in the{" "}
+                <a
+                  href="/admin?tab=settings&section=monitoring"
+                  className="underline underline-offset-2 hover:text-fg"
+                >
+                  Monitoring settings
+                </a>
+                .
+              </p>
+            )}
             <SelectField
               label="Check method"
               hint={checkTypeHint(form.checkType)}
