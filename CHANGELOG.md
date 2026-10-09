@@ -12,6 +12,14 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **Pages load about five times lighter.** A first visit to the dashboard
+  downloaded around 1.8 MB, mostly an icon index and every selectable font.
+  It now fetches only the icon details it needs and only the font in use,
+  bringing a cold load to roughly 350 KB — noticeably faster on phones and
+  slow connections. (#276)
+
 ### Fixed
 
 - **The home page weather shows a moon at night.** The header card used the

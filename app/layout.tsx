@@ -28,34 +28,39 @@ import "./globals.css";
 // Every selectable font (see lib/fonts.ts) must be imported here: next/font is
 // analyzed at build time, so fonts can't be chosen dynamically by id. Each
 // exposes a CSS variable; the active one is selected by a `font-<id>` class on
-// <html> (app/globals.css). Only the rendered font's files are fetched by the
-// browser, so loading several is cheap at runtime.
+// <html> (app/globals.css). Only the default face is preloaded: next/font
+// preloads every font by default, which had each page download ~400 KB of
+// faces it never renders (#276). The others are fetched only when a visitor's
+// chosen font class makes the browser use them.
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
   variable: "--font-jakarta",
   weight: ["300", "400", "500", "600", "700", "800"],
 });
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", preload: false });
 const poppins = Poppins({
   subsets: ["latin"],
   variable: "--font-poppins",
   weight: ["400", "500", "600", "700"],
+  preload: false,
 });
-const nunito = Nunito({ subsets: ["latin"], variable: "--font-nunito" });
-const lora = Lora({ subsets: ["latin"], variable: "--font-lora" });
+const nunito = Nunito({ subsets: ["latin"], variable: "--font-nunito", preload: false });
+const lora = Lora({ subsets: ["latin"], variable: "--font-lora", preload: false });
 const jetbrains = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-jetbrains",
+  preload: false,
 });
-const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit" });
-const grotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-grotesk" });
-const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope" });
-const rubik = Rubik({ subsets: ["latin"], variable: "--font-rubik" });
+const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit", preload: false });
+const grotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-grotesk", preload: false });
+const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope", preload: false });
+const rubik = Rubik({ subsets: ["latin"], variable: "--font-rubik", preload: false });
 const playfair = Playfair_Display({
   subsets: ["latin"],
   variable: "--font-playfair",
+  preload: false,
 });
-const quicksand = Quicksand({ subsets: ["latin"], variable: "--font-quicksand" });
+const quicksand = Quicksand({ subsets: ["latin"], variable: "--font-quicksand", preload: false });
 
 const fontVariables = [
   jakarta.variable,

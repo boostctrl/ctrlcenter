@@ -375,3 +375,42 @@ export async function getCdnIconMetadata(): Promise<string | null> {
     return null;
   }
 }
+
+// The dashboard pages only need one thing from metadata.json: which slugs have
+// light/dark variants, and their names. The full index is ~1.2 MB (aliases,
+// categories, authors for ~3,400 icons) and was downloaded by every public
+// page that rendered an icon (#276); the variant-only subset is ~40 KB. Same
+// `{ slug: { colors } }` shape, so the client's lookup is unchanged.
+export function compactIconMetadata(text: string): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return "{}";
+  }
+  if (!parsed || typeof parsed !== "object") return "{}";
+  const out: Record<string, { colors: { light?: string; dark?: string } }> = {};
+  for (const [slug, entry] of Object.entries(parsed as Record<string, unknown>)) {
+    const colors = (entry as { colors?: { light?: unknown; dark?: unknown } } | null)
+      ?.colors;
+    if (!colors || typeof colors !== "object") continue;
+    const light = typeof colors.light === "string" ? colors.light : undefined;
+    const dark = typeof colors.dark === "string" ? colors.dark : undefined;
+    if (!light && !dark) continue;
+    out[slug] = { colors: { ...(light && { light }), ...(dark && { dark }) } };
+  }
+  return JSON.stringify(out);
+}
+
+// compactIconMetadata over the cached index, memoized on the source text so the
+// parse runs once per metadata refresh rather than per request.
+let compactMemo: { source: string; compact: string } | null = null;
+
+export async function getIconVariantIndex(): Promise<string | null> {
+  const text = await getCdnIconMetadata();
+  if (text === null) return null;
+  if (compactMemo?.source !== text) {
+    compactMemo = { source: text, compact: compactIconMetadata(text) };
+  }
+  return compactMemo.compact;
+}
