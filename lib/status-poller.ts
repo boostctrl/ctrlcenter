@@ -23,8 +23,8 @@ const TICK_MS = 60_000;
 const FIRST_DELAY_MS = 8_000;
 
 // Re-reads config every tick so changing the interval (or toggling status checks)
-// takes effect without restarting the timer.
-async function tick(): Promise<void> {
+// takes effect without restarting the timer. Exported for tests.
+export async function tick(): Promise<void> {
   try {
     // Recording into a store that hasn't loaded yet would let the next flush
     // overwrite the persisted history, so every tick waits for the load.
