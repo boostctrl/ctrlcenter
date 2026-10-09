@@ -1,6 +1,6 @@
 "use client";
 
-import { useVisitorPrefs } from "../PrefsProvider";
+import { useLookPrefs } from "../PrefsProvider";
 import { SCENE_REGISTRY } from "./index";
 
 // Renders the active scene's backdrop. Lives inside PrefsProvider so it follows
@@ -8,7 +8,7 @@ import { SCENE_REGISTRY } from "./index";
 // paint matches the server (canvas scenes just start animating after
 // hydration). Falls back to Aurora for any unknown stored value.
 export default function SceneLayer() {
-  const { scene, surfaceIsLight } = useVisitorPrefs();
+  const { scene, surfaceIsLight } = useLookPrefs();
   const Backdrop = SCENE_REGISTRY[scene] ?? SCENE_REGISTRY.aurora;
   return (
     <>

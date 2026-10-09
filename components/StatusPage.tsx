@@ -5,7 +5,7 @@ import Link from "next/link";
 import Icon from "./Icon";
 import StatusAnnouncements from "./StatusAnnouncements";
 import { ChipGroup } from "./ChipGroup";
-import { useVisitorPrefs } from "./PrefsProvider";
+import { useLocalePrefs } from "./PrefsProvider";
 import { usePolling } from "./usePolling";
 import { useNow } from "./useNow";
 import {
@@ -58,7 +58,7 @@ export default function StatusPage({
   const [range, setRange] = useState<StatusRangeKey>(defaultRange);
   // Render timeline times in the visitor's effective time zone, like the rest of
   // the app (the header clock, greeting), rather than UTC.
-  const { timezone } = useVisitorPrefs();
+  const { timezone } = useLocalePrefs();
 
   const load = useCallback(async (signal: AbortSignal) => {
     setLoading(true);

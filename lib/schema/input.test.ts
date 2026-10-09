@@ -26,7 +26,8 @@ describe("derived input schemas", () => {
   it("require whole list items", () => {
     const card = { id: "f1", enabled: true, urls: [], count: 6, title: "", summaries: false };
     expect(feedUpdateSchema.safeParse(card).success).toBe(true);
-    const { id: _id, ...noId } = card;
+    const noId: Partial<typeof card> = { ...card };
+    delete noId.id;
     expect(feedUpdateSchema.safeParse(noId).success).toBe(false);
   });
 

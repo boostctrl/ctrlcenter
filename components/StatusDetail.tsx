@@ -5,7 +5,7 @@ import Icon from "./Icon";
 import { ChipGroup } from "./ChipGroup";
 import { ConfirmProvider, useConfirm } from "./admin/Confirm";
 import { RenameButton, RenameField } from "./InlineRename";
-import { useVisitorPrefs } from "./PrefsProvider";
+import { useLocalePrefs } from "./PrefsProvider";
 import { usePolling } from "./usePolling";
 import { useNow } from "./useNow";
 import {
@@ -231,7 +231,7 @@ export default function StatusDetail({
   const [live, setLive] = useState<AppStatus | undefined>(undefined);
   const [checkedAt, setCheckedAt] = useState<number | null>(null);
   const [range, setRange] = useState<StatusRangeKey>(defaultRange);
-  const { timezone } = useVisitorPrefs();
+  const { timezone } = useLocalePrefs();
 
   const load = useCallback(async (signal: AbortSignal) => {
     try {

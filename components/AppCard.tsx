@@ -2,13 +2,13 @@
 
 import Icon from "./Icon";
 import { StatusDot } from "./StatusProvider";
-import { useVisitorPrefs } from "./PrefsProvider";
+import { useFavorites } from "./PrefsProvider";
 import type { AppItem } from "@/lib/schema";
 
 // `top` marks the search's top match — the card Enter opens — with the same
 // ring keyboard focus uses (#274).
 export default function AppCard({ app, top = false }: { app: AppItem; top?: boolean }) {
-  const { favorites, toggleFavorite } = useVisitorPrefs();
+  const { favorites, toggleFavorite } = useFavorites();
   const favorited = favorites.includes(app.id);
 
   return (

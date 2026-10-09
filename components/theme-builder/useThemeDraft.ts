@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
-import { useVisitorPrefs } from "../PrefsProvider";
+import { useLookPrefs } from "../PrefsProvider";
 import { useConfirm } from "../admin/Confirm";
 import type { ModeColors } from "@/lib/theme";
 import { parseThemesExport, siteThemeFromCustomTheme } from "@/lib/prefs";
@@ -41,7 +41,7 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     resetTheme,
     resolvedMode,
     setPreviewMode,
-  } = useVisitorPrefs();
+  } = useLookPrefs();
   const confirm = useConfirm();
 
   // Always edit the mode that's actually on screen, so what you tweak is what you

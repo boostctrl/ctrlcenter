@@ -38,7 +38,7 @@ import {
   type SearchConfig,
 } from "@/lib/search";
 import { orderCategories } from "@/lib/bookmarks";
-import { useVisitorPrefs } from "./PrefsProvider";
+import { useFavorites } from "./PrefsProvider";
 import SectionTitle from "./SectionTitle";
 import type { AppItem, BookmarkItem } from "@/lib/schema";
 import type { CurrentWeather } from "@/lib/weather";
@@ -274,7 +274,7 @@ export default function Dashboard({
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
-  const { favorites } = useVisitorPrefs();
+  const { favorites } = useFavorites();
   const { editing, setEditing } = useEditMode();
   const router = useRouter();
 

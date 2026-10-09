@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import { useVisitorPrefs } from "./PrefsProvider";
+import { useLocalePrefs } from "./PrefsProvider";
 import { buildMonthGrid, bucketByDay, type CalendarEvent } from "@/lib/calendar";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -25,7 +25,7 @@ export default function CalendarMonth({
   minOffset?: number;
   maxOffset?: number;
 }) {
-  const { timezone } = useVisitorPrefs();
+  const { timezone } = useLocalePrefs();
   const [offset, setOffset] = useState(0);
   const grid = useMemo(
     () => buildMonthGrid(now, timezone, offset),
@@ -148,7 +148,7 @@ export function MiniMonth({
   now: number;
   hint?: ReactNode;
 }) {
-  const { timezone } = useVisitorPrefs();
+  const { timezone } = useLocalePrefs();
   const grid = useMemo(() => buildMonthGrid(now, timezone, 0), [now, timezone]);
   const byDay = useMemo(() => bucketByDay(events, timezone), [events, timezone]);
 

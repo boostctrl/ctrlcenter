@@ -7,7 +7,8 @@ import type { AppItem } from "@/lib/schema";
 const toggleFavorite = vi.fn();
 let favorites: string[] = [];
 vi.mock("./PrefsProvider", () => ({
-  useVisitorPrefs: () => ({ favorites, toggleFavorite, surfaceIsLight: false }),
+  useFavorites: () => ({ favorites, toggleFavorite }),
+  useLookPrefs: () => ({ surfaceIsLight: false }),
 }));
 
 const { default: AppCard } = await import("./AppCard");

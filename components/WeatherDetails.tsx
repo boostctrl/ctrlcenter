@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { useVisitorPrefs } from "./PrefsProvider";
+import { useLocalePrefs, useLookPrefs } from "./PrefsProvider";
 import { useEdgeFade } from "./useEdgeFade";
 import { usePolling } from "./usePolling";
 import WeatherEffects from "./WeatherEffects";
@@ -163,7 +163,8 @@ export default function WeatherDetails({
 }: {
   initial: Forecast | null;
 }) {
-  const { location, units, surfaceIsLight } = useVisitorPrefs();
+  const { location, units } = useLocalePrefs();
+  const { surfaceIsLight } = useLookPrefs();
   const [fetched, setFetched] = useState<Forecast | null>(null);
   const [nowMin, setNowMin] = useState<number | null>(null);
 

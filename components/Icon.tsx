@@ -7,7 +7,7 @@ import {
   resolveThemedIconUrl,
   type IconMetadata,
 } from "@/lib/icons";
-import { useVisitorPrefs } from "./PrefsProvider";
+import { useLookPrefs } from "./PrefsProvider";
 
 type IconProps = {
   icon: string;
@@ -21,7 +21,7 @@ type IconProps = {
 let sharedMetadata: IconMetadata | null = null;
 
 export default function Icon({ icon, name, size = 28, className = "" }: IconProps) {
-  const { surfaceIsLight } = useVisitorPrefs();
+  const { surfaceIsLight } = useLookPrefs();
   const [metadata, setMetadata] = useState<IconMetadata | null>(sharedMetadata);
   // Track the URL that failed rather than a boolean, so when the icon changes
   // (e.g. editing the slug in the admin icon field) the new src is retried

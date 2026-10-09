@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import SectionTitle from "../SectionTitle";
-import { useVisitorPrefs } from "../PrefsProvider";
+import { useLocalePrefs } from "../PrefsProvider";
 
 // Admin-authored countdown card: labeled dates rendered as "in N days" rows in
 // the visitor's effective time zone. Day math happens after mount (the server
@@ -73,7 +73,7 @@ export default function CountdownWidget({
   // Show the section heading; the layout editor's label toggle turns it off.
   showTitle?: boolean;
 }) {
-  const { timezone } = useVisitorPrefs();
+  const { timezone } = useLocalePrefs();
   // Post-mount clock, refreshed each minute so an open tab rolls over midnight.
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => {

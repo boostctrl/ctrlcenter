@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useVisitorPrefs } from "./PrefsProvider";
+import { useLocalePrefs } from "./PrefsProvider";
 import { greetingFor, hourIn } from "@/lib/datetime";
 
 // The "Good evening, Name!" heading. Seeded with the server-computed greeting
@@ -12,7 +12,7 @@ export default function Greeting({
 }: {
   initialGreeting: string;
 }) {
-  const { timezone, greetingName } = useVisitorPrefs();
+  const { timezone, greetingName } = useLocalePrefs();
   const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {

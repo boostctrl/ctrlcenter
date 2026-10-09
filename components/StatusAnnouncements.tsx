@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { parseInline } from "@/lib/markdown";
-import { useVisitorPrefs } from "./PrefsProvider";
+import { useLocalePrefs } from "./PrefsProvider";
 import { useNow } from "./useNow";
 import InlineMarkdown from "./InlineMarkdown";
 import { ANNOUNCEMENT_TONE_STYLES } from "@/lib/announcement-tones";
@@ -25,7 +25,7 @@ export default function StatusAnnouncements({
 }: {
   announcements: StatusAnnouncement[];
 }) {
-  const { timezone } = useVisitorPrefs();
+  const { timezone } = useLocalePrefs();
   const now = useNow(30_000);
 
   const visible = useMemo(

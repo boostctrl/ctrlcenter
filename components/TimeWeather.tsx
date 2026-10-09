@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useVisitorPrefs } from "./PrefsProvider";
+import { useLocalePrefs } from "./PrefsProvider";
 import { usePolling } from "./usePolling";
 import { shortDate, timeString } from "@/lib/datetime";
 import {
@@ -26,7 +26,7 @@ export default function TimeWeather({
   showClock?: boolean;
   initial: CurrentWeather | null;
 }) {
-  const { timezone, location, units } = useVisitorPrefs();
+  const { timezone, location, units } = useLocalePrefs();
   const [now, setNow] = useState<Date | null>(null);
   const [fetched, setFetched] = useState<CurrentWeather | null>(null);
 

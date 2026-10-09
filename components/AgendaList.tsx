@@ -1,6 +1,6 @@
 "use client";
 
-import { useVisitorPrefs } from "./PrefsProvider";
+import { useLocalePrefs } from "./PrefsProvider";
 import { eventWhen, type CalendarEvent } from "@/lib/calendar";
 
 // The list of agenda rows, shared by the home "Upcoming" card and the /calendar
@@ -14,7 +14,7 @@ export default function AgendaList({
   events: CalendarEvent[];
   now: number;
 }) {
-  const { timezone } = useVisitorPrefs();
+  const { timezone } = useLocalePrefs();
   return (
     <ul className="flex flex-col gap-3">
       {events.map((e, i) => {
