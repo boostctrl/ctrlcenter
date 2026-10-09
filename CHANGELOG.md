@@ -12,6 +12,15 @@ here.
 
 ## [Unreleased]
 
+### Security
+
+- **The login limit works without a reverse proxy.** When CtrlCenter is
+  reached directly (`TRUSTED_PROXY_HOPS=0`), the Docker image now limits
+  sign-in attempts per visitor by their actual connection, instead of one
+  shared limit — so someone guessing passwords can no longer lock you out of
+  your own dashboard, and can't dodge the limit by faking their address.
+  (#257)
+
 ## [2.10.0] - 2026-10-07
 
 ### Added

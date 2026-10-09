@@ -34,6 +34,12 @@ for (const [from, to] of [
   fs.rmSync(to, { recursive: true, force: true });
   fs.cpSync(from, to, { recursive: true });
 }
+// And the image's entry point beside server.js, so the smoke run serves
+// through the same wrapper production does.
+fs.copyFileSync(
+  path.join(ROOT, "scripts", "server-entry.mjs"),
+  path.join(STANDALONE, "server-entry.mjs")
+);
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "ctrlcenter-smoke-"));
 const configPath = path.join(dataDir, "config.yaml");
@@ -51,7 +57,7 @@ const base = `http://127.0.0.1:${port}`;
 
 const logPath = path.join(dataDir, "server.log");
 const log = fs.openSync(logPath, "w");
-const server = spawn(process.execPath, [path.join(STANDALONE, "server.js")], {
+const server = spawn(process.execPath, [path.join(STANDALONE, "server-entry.mjs")], {
   env: {
     ...process.env,
     NODE_ENV: "production",

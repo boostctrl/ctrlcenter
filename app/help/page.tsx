@@ -746,14 +746,17 @@ export default async function HelpPage() {
             <P>
               ctrlcenter is meant to run <strong>behind a reverse proxy</strong>{" "}
               (for TLS and a stable address). Login attempts are rate-limited per
-              client IP, read from the <Code>X-Forwarded-For</Code> header.
+              client IP — the one your proxy reports in{" "}
+              <Code>X-Forwarded-For</Code>, or the connection&apos;s own address
+              when there&apos;s no proxy.
             </P>
             <P>
               Set <Code>TRUSTED_PROXY_HOPS</Code> to how many proxies sit in
               front of the app (default <Code>1</Code>). If you expose ctrlcenter{" "}
-              <strong>directly, with no proxy</strong>, set it to <Code>0</Code>.
-              Otherwise a visitor can spoof <Code>X-Forwarded-For</Code> to forge
-              a fresh IP on each request and slip past the per-IP login throttle.
+              <strong>directly, with no proxy</strong>, set it to <Code>0</Code>{" "}
+              so each visitor is limited by their actual connection. Otherwise a
+              visitor can spoof <Code>X-Forwarded-For</Code> to forge a fresh IP
+              on each request and slip past the per-IP login throttle.
             </P>
             <P>
               Installation, environment variables, and the full configuration

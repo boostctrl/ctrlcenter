@@ -58,3 +58,60 @@ describe("rateLimit", () => {
     expect(rateLimit(key, 1, 1000).allowed).toBe(true);
   });
 });
+
+describe("clientIp", () => {
+  // TRUSTED_PROXY_HOPS is read at module load, so each case imports fresh.
+  async function ipFor(
+    env: { hops?: string; entry?: boolean },
+    headers: Record<string, string>
+  ): Promise<string | null> {
+    vi.resetModules();
+    vi.stubEnv("TRUSTED_PROXY_HOPS", env.hops ?? "1");
+    vi.stubEnv("CTRLCENTER_PEER_HEADER", env.entry ? "1" : "");
+    const { clientIp } = await import("./rate-limit");
+    const { NextRequest } = await import("next/server");
+    return clientIp(new NextRequest("http://dash.lan/api/login", { headers }));
+  }
+  afterEach(() => vi.unstubAllEnvs());
+
+  describe("with the production entry (socket peer known)", () => {
+    it("uses the peer itself when exposed directly (hops=0), ignoring a forged header", async () => {
+      expect(
+        await ipFor({ hops: "0", entry: true }, {
+          "x-forwarded-for": "1.2.3.4",
+          "x-ctrlcenter-peer": "203.0.113.9",
+        })
+      ).toBe("203.0.113.9");
+    });
+
+    it("takes what the one trusted proxy saw (hops=1), whatever the client prepended", async () => {
+      expect(
+        await ipFor({ hops: "1", entry: true }, {
+          "x-forwarded-for": "6.6.6.6, 198.51.100.7",
+          "x-ctrlcenter-peer": "10.0.0.2",
+        })
+      ).toBe("198.51.100.7");
+    });
+
+    it("is null when there are fewer hops than configured", async () => {
+      expect(
+        await ipFor({ hops: "2", entry: true }, { "x-ctrlcenter-peer": "10.0.0.2" })
+      ).toBeNull();
+    });
+  });
+
+  describe("without the entry (next start)", () => {
+    it("ignores a client-sent peer header", async () => {
+      expect(
+        await ipFor({ hops: "0" }, { "x-ctrlcenter-peer": "203.0.113.9" })
+      ).toBeNull();
+    });
+
+    it("keeps the previous behavior: the last X-Forwarded-For entry at hops=1", async () => {
+      expect(
+        await ipFor({ hops: "1" }, { "x-forwarded-for": "6.6.6.6, 198.51.100.7" })
+      ).toBe("198.51.100.7");
+      expect(await ipFor({ hops: "0" }, { "x-forwarded-for": "198.51.100.7" })).toBeNull();
+    });
+  });
+});

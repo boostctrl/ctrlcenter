@@ -37,7 +37,8 @@ is the public entry point. A couple of settings matter for a safe deployment:
 - Set a strong `ADMIN_PASSWORD` (or configure a password in the admin portal).
 - Set `TRUSTED_PROXY_HOPS` to match your proxy chain — in particular, set it to
   `0` if you expose ctrlcenter directly with no proxy, so a client can't spoof
-  `X-Forwarded-For` to bypass the per-IP login throttle.
+  `X-Forwarded-For` to bypass the per-IP login throttle. With `0`, the Docker
+  image throttles each client by its real connection address.
 - Consider turning on **two-factor authentication** (Settings → Security),
   especially if the portal is reachable beyond a network you fully trust.
 
