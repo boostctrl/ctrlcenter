@@ -49,7 +49,7 @@ export type StatusAnnouncement = z.infer<typeof statusAnnouncementSchema>;
 // Body of PUT /api/status/history/[id]/note (#176): the incident note for one
 // recorded outage, anchored by the record's exact start instant. An empty
 // (post-trim) note clears the annotation. The cap keeps a note a caption, not
-// a post-mortem document — and bounds what lands in status-history.json.
+// a post-mortem document — and bounds what lands in the status history.
 export const outageNoteSchema = z.object({
   start: z.number().int().positive(),
   note: z.string().max(500),

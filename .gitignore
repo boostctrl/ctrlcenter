@@ -49,6 +49,7 @@ next-env.d.ts
 /config/config.yaml
 /config/config.yaml.bak
 /config/status-history.json
+/config/status-history.db*
 /config/uploads/
 /config/icons/
 /config/session-secret

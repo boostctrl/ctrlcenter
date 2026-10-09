@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "fs/promises";
 import os from "os";
 import path from "path";
@@ -23,6 +23,7 @@ import {
   type Bucket,
   type Reading,
 } from "./status-history";
+import { log } from "./log";
 
 const HOUR = 3_600_000;
 const MIN = 60_000;
@@ -59,6 +60,7 @@ const g = globalThis as unknown as {
     downSince: Map<string, unknown>;
     outages: Map<string, unknown>;
     missingSince: Map<string, number>;
+    dirty: unknown;
   };
 };
 function resetHistoryState() {
@@ -71,6 +73,13 @@ function resetHistoryState() {
     s.downSince = new Map();
     s.outages = new Map();
     s.missingSince = new Map();
+    s.dirty = {
+      buckets: new Set(),
+      readings: [],
+      downSince: new Set(),
+      outages: new Set(),
+      dropped: new Set(),
+    };
   }
 }
 
@@ -645,6 +654,85 @@ describe("loadHistory / flush persistence", () => {
     expect(getAppDetail("a", "UTC", 5).outages).toEqual([
       { startMs: now - 60 * MIN, endMs: now - 50 * MIN, downMs: 10 * MIN, exact: true, recorded: true },
     ]);
+  });
+});
+
+describe("history database (#278)", () => {
+  let dir: string;
+  const json = (data: unknown) =>
+    fs.writeFile(path.join(dir, "status-history.json"), JSON.stringify(data), "utf8");
+  const reload = async () => {
+    resetHistoryState();
+    await loadHistory();
+  };
+
+  beforeEach(async () => {
+    dir = await freshHistoryDir();
+  });
+
+  it("imports an older build's JSON once, and leaves the file in place", async () => {
+    const hour = hourOf(Date.now());
+    await json({ apps: { a: { [hour]: [3, 1] } } });
+    await loadHistory();
+    expect(getHistory(["a"]).apps[0].uptime.d1).toBeCloseTo(75, 6);
+    // A later edit to the JSON is ignored: the database is the record now.
+    await json({ apps: { a: { [hour]: [0, 4] } } });
+    await reload();
+    expect(getHistory(["a"]).apps[0].uptime.d1).toBeCloseTo(75, 6);
+    await expect(fs.access(path.join(dir, "status-history.json"))).resolves.toBeUndefined();
+  });
+
+  it("drops buckets past retention on import", async () => {
+    const now = Date.now();
+    await json({
+      apps: { a: { [hourOf(now) - 100 * 24]: [5, 5], [hourOf(now)]: [1, 0] } },
+    });
+    await loadHistory();
+    expect(getHistory(["a"]).apps[0].uptime.d90).toBe(100);
+  });
+
+  it("appends each flush's changes to what's already stored", async () => {
+    const t0 = Date.now() - 10 * MIN;
+    recordResults([{ id: "a", up: true, status: 200, ms: 100 }], t0);
+    await flush();
+    recordResults([{ id: "a", up: false, status: 503, ms: 5000 }], t0 + 5 * MIN);
+    await flush();
+    await reload();
+    const h = getHistory(["a"]).apps[0];
+    expect(h.uptime.h1).toBe(50);
+    expect(h.downSince).toBe(t0 + 5 * MIN);
+  });
+
+  it("deletes a pruned app's history from the database", async () => {
+    const now = Date.now();
+    recordResults([{ id: "gone", up: false, status: 503, ms: 5000 }], now);
+    await flush();
+    pruneHistory([], now);
+    pruneHistory([], now + PRUNE_GRACE_MS);
+    await flush();
+    await reload();
+    const s = g.__ctrlcenterStatusHistory!;
+    for (const map of [s.store, s.recent, s.downSince, s.outages]) {
+      expect(map.has("gone")).toBe(false);
+    }
+  });
+
+  it("sets a damaged database aside and starts a new one", async () => {
+    const warn = vi.spyOn(log, "warn").mockImplementation(() => {});
+    await fs.writeFile(path.join(dir, "status-history.db"), "not a database");
+    await loadHistory();
+    expect(warn).toHaveBeenCalledWith(
+      "status history was damaged; starting a new one",
+      expect.anything()
+    );
+    const files = await fs.readdir(dir);
+    expect(files.some((f) => f.startsWith("status-history.db.damaged-"))).toBe(true);
+    // …and the new one works.
+    recordResults([{ id: "a", up: true, status: 200, ms: 10 }], Date.now());
+    await flush();
+    await reload();
+    expect(getHistory(["a"]).apps[0].uptime.h1).toBe(100);
+    warn.mockRestore();
   });
 });
 

@@ -14,11 +14,22 @@ import type {
   OutageEntry,
 } from "./status";
 import { globalSingleton } from "./singleton";
+import {
+  openHistoryDb,
+  readHistoryRows,
+  readMeta,
+  writeHistoryChanges,
+  type DatabaseSync,
+  type HistoryChanges,
+  type HistoryRows,
+  type ReadingRow,
+} from "./status-history-db";
 
 // Persisted uptime history for the /status page. The background poller
 // (instrumentation.ts) records one up/down tally per app per hour; we keep 90
-// days of hourly buckets in memory and flush a compact JSON file alongside
-// config.yaml. Aggregation to uptime % / a daily timeline happens at read time.
+// days of hourly buckets in memory as the read model and persist each poll's
+// changes to a SQLite database beside config.yaml (lib/status-history-db.ts,
+// #278). Aggregation to uptime % / a daily timeline happens at read time.
 
 const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;
@@ -31,7 +42,9 @@ const RECENT_VIEW_MS = 60 * MIN_MS; // window the 1h view / h1 % actually show
 // every poll can't grow the file without bound. Oldest records fall off first,
 // and anything dropped degrades gracefully to the hour-bucket reconstruction.
 const MAX_OUTAGES = 500;
-const HISTORY_FILE = "status-history.json";
+const HISTORY_DB = "status-history.db";
+// What builds before #278 wrote; imported once into the database.
+const LEGACY_HISTORY_FILE = "status-history.json";
 
 // --- Pure aggregation helpers (unit-tested) ---
 
@@ -508,7 +521,27 @@ type HistoryState = {
   // The in-flight (or finished) load, shared by every caller — see loadHistory.
   loading?: Promise<void>;
   flushQueue: Promise<unknown>;
+  // What changed since the last flush — all flush() writes (#278).
+  dirty: Dirty;
+  // The open database, with the path it was opened for (CONFIG_PATH decides).
+  db?: { file: string; handle: DatabaseSync };
 };
+
+type Dirty = {
+  buckets: Set<string>; // bucketKey(id, hour)
+  readings: ReadingRow[];
+  downSince: Set<string>;
+  outages: Set<string>;
+  dropped: Set<string>;
+};
+const emptyDirty = (): Dirty => ({
+  buckets: new Set(),
+  readings: [],
+  downSince: new Set(),
+  outages: new Set(),
+  dropped: new Set(),
+});
+const bucketKey = (id: string, hour: number) => `${hour}\u0000${id}`;
 
 // Held on globalThis so the background poller (instrumentation.ts) and the API
 // route share ONE instance even if Next bundles them into separate module
@@ -522,114 +555,228 @@ const state = globalSingleton<HistoryState>("__ctrlcenterStatusHistory", () => (
   missingSince: new Map(),
   loaded: false,
   flushQueue: Promise.resolve(),
+  dirty: emptyDirty(),
 }));
 state.recent ??= new Map(); // tolerate a state created by an older build
 state.downSince ??= new Map(); // ditto — added after the recent ring
 state.outages ??= new Map(); // ditto — added with the recorded outages (#175)
 state.missingSince ??= new Map(); // ditto — added with the prune grace (#307)
+state.dirty ??= emptyDirty(); // ditto — added with the database (#278)
 
-function historyPath(): string {
+function historyDir(): string {
   // Untraced like CONFIG_PATH (lib/config.ts): a runtime path, not a build input.
   const configPath =
     process.env.CONFIG_PATH ||
     path.join(/* turbopackIgnore: true */ process.cwd(), "config", "config.yaml");
-  return path.join(path.dirname(configPath), HISTORY_FILE);
+  return path.dirname(configPath);
 }
 
-// Load the persisted history into memory once (idempotent). Stored shape:
+// The database for the current CONFIG_PATH, opened on first use. Throws when
+// it can't be opened (unwritable directory, a newer schema, a damaged file).
+function historyDb(): DatabaseSync {
+  const file = path.join(historyDir(), HISTORY_DB);
+  if (state.db?.file === file) return state.db.handle;
+  state.db?.handle.close();
+  state.db = undefined;
+  const handle = openHistoryDb(file);
+  state.db = { file, handle };
+  return handle;
+}
+
+// SQLite's "not a database" and "malformed" result codes.
+const isDamaged = (e: unknown) =>
+  typeof e === "object" && e !== null && [11, 26].includes((e as { errcode?: number }).errcode ?? 0);
+
+// Load the persisted history into memory once (idempotent).
+export function loadHistory(): Promise<void> {
+  // Every caller awaits the same load: a request (or the poller's first tick)
+  // arriving while the history is still being read must wait for it, not see
+  // an empty store.
+  state.loading ??= readHistory();
+  return state.loading;
+}
+
+async function readHistory(): Promise<void> {
+  if (state.loaded) return;
+  state.loaded = true;
+  // Memory is about to mirror the database; pending changes are moot.
+  state.dirty = emptyDirty();
+  applyRows({ buckets: [], readings: [], downSince: [], outages: [] });
+  await fs.mkdir(historyDir(), { recursive: true }).catch(() => undefined);
+  let db: DatabaseSync;
+  try {
+    db = historyDb();
+    await importLegacyOnce(db);
+  } catch (e) {
+    if (!isDamaged(e)) {
+      // Unwritable, or from a newer version: run on in memory, and say why
+      // (each flush will too) rather than touch a file we don't understand.
+      log.warn("status history unavailable", { reason: errorReason(e) });
+      return;
+    }
+    // A damaged file can't be read by anyone: set it aside, start afresh.
+    const file = path.join(historyDir(), HISTORY_DB);
+    state.db?.handle.close();
+    state.db = undefined;
+    const aside = `${file}.damaged-${Date.now()}`;
+    await fs.rename(file, aside).catch(() => undefined);
+    log.warn("status history was damaged; starting a new one", { savedAs: aside });
+    try {
+      db = historyDb();
+      await importLegacyOnce(db);
+    } catch (e2) {
+      log.warn("status history unavailable", { reason: errorReason(e2) });
+      return;
+    }
+  }
+  const now = Date.now();
+  applyRows(
+    readHistoryRows(db, {
+      minReadingT: now - RECENT_KEEP_MS,
+      minOutageEnd: now - RETENTION_HOURS * HOUR_MS,
+    })
+  );
+}
+
+// Replace the in-memory history with `rows`.
+function applyRows(rows: HistoryRows): void {
+  const store = new Map<string, AppBuckets>();
+  for (const b of rows.buckets) {
+    let m = store.get(b.app);
+    if (!m) store.set(b.app, (m = new Map()));
+    m.set(b.hour, {
+      up: b.up,
+      down: b.down,
+      msCount: b.msCount,
+      msSum: b.msSum,
+      msMax: b.msMax,
+    });
+  }
+  const recent = new Map<string, Reading[]>();
+  for (const r of rows.readings) {
+    const reading: Reading = { t: r.t, up: r.up };
+    if (r.ms != null) reading.ms = r.ms;
+    const list = recent.get(r.app);
+    if (list) list.push(reading);
+    else recent.set(r.app, [reading]);
+  }
+  const outages = new Map<string, RecordedOutage[]>();
+  for (const o of rows.outages) {
+    const rec: RecordedOutage = { start: o.start, end: o.end };
+    if (o.note) rec.note = o.note;
+    const list = outages.get(o.app);
+    if (list) list.push(rec);
+    else outages.set(o.app, [rec]);
+  }
+  state.store = store;
+  state.recent = recent;
+  state.downSince = new Map(rows.downSince.map((d) => [d.app, d.since]));
+  state.outages = outages;
+}
+
+// The first time a database is opened, carry over the JSON history an older
+// build wrote (if any), in the same transaction that marks the import done.
+// The JSON file is left in place, so going back to an older version still
+// finds its history (as of the upgrade).
+async function importLegacyOnce(db: DatabaseSync): Promise<void> {
+  if (readMeta(db, "legacyImport") !== undefined) return;
+  let rows: HistoryRows = { buckets: [], readings: [], downSince: [], outages: [] };
+  let found = false;
+  try {
+    const raw = await fs.readFile(path.join(historyDir(), LEGACY_HISTORY_FILE), "utf8");
+    rows = parseLegacyHistory(JSON.parse(raw), Date.now());
+    found = true;
+  } catch {
+    // No file, or one that doesn't parse — nothing to carry over.
+  }
+  const now = Date.now();
+  writeHistoryChanges(db, {
+    dropApps: [],
+    buckets: rows.buckets,
+    readings: rows.readings,
+    downSince: rows.downSince,
+    outages: groupOutages(rows.outages),
+    ...retentionCutoffs(now),
+    meta: { legacyImport: found ? `imported ${new Date(now).toISOString()}` : "none" },
+  });
+}
+
+function groupOutages(rows: HistoryRows["outages"]): HistoryChanges["outages"] {
+  const byApp = new Map<string, HistoryRows["outages"]>();
+  for (const o of rows) byApp.set(o.app, [...(byApp.get(o.app) ?? []), o]);
+  return [...byApp].map(([app, list]) => ({ app, list }));
+}
+
+function retentionCutoffs(now: number) {
+  return {
+    minHour: hourOf(now) - RETENTION_HOURS,
+    minReadingT: now - RECENT_KEEP_MS,
+    minOutageEnd: now - RETENTION_HOURS * HOUR_MS,
+  };
+}
+
+// Parse the JSON history file older builds wrote. Stored shape:
 // { apps:   { [id]: { [hour]: [up, down, msCount, msSum, msMax] } },
 //   recent: { [id]: [[t, up?1:0, ms?], …] },
 //   downSince: { [id]: ms },
 //   outages: { [id]: [[start, end, note?], …] } }.
 // The latency fields (msCount/msSum/msMax on a bucket, the third `ms` element on
 // a recent entry), the `downSince` map, and the `outages` records (#175) were
-// all added later, so the loader treats them as optional: a file written before
-// those features has 2-element bucket tuples, 2-element recent tuples, and no
+// all added later, so they're optional: a file written before those features
+// has 2-element bucket tuples, 2-element recent tuples, and no
 // `downSince`/`outages` keys, and simply loads with no latency data (zeros /
-// undefined), no outage marks, and no outage records. Same migration posture as
-// the rest of the config — old files must load without error. `downSince`
-// carries only apps that were down at the last recorded poll.
-export function loadHistory(): Promise<void> {
-  // Every caller awaits the same load: a request (or the poller's first tick)
-  // arriving while the file is still being read must wait for it, not see an
-  // empty store — the poller flushing that empty store would wipe the file.
-  state.loading ??= readHistoryFile();
-  return state.loading;
-}
-
-async function readHistoryFile(): Promise<void> {
-  if (state.loaded) return;
-  state.loaded = true;
-  try {
-    const raw = await fs.readFile(historyPath(), "utf8");
-    const data = JSON.parse(raw);
-    const next = new Map<string, AppBuckets>();
-    for (const [id, hours] of Object.entries(data?.apps ?? {})) {
-      const m: AppBuckets = new Map();
-      for (const [hk, v] of Object.entries(hours as Record<string, number[]>)) {
-        m.set(Number(hk), {
-          up: v?.[0] ?? 0,
-          down: v?.[1] ?? 0,
-          msCount: v?.[2] ?? 0,
-          msSum: v?.[3] ?? 0,
-          msMax: v?.[4] ?? 0,
-        });
-      }
-      next.set(id, m);
+// undefined), no outage marks, and no outage records. Readings and outages
+// past their retention are dropped on the way in.
+export function parseLegacyHistory(data: unknown, now: number): HistoryRows {
+  const d = (data ?? {}) as {
+    apps?: Record<string, Record<string, number[]>>;
+    recent?: Record<string, number[][]>;
+    downSince?: Record<string, unknown>;
+    outages?: Record<string, unknown[][]>;
+  };
+  const rows: HistoryRows = { buckets: [], readings: [], downSince: [], outages: [] };
+  for (const [app, hours] of Object.entries(d.apps ?? {})) {
+    for (const [hk, v] of Object.entries(hours ?? {})) {
+      rows.buckets.push({
+        app,
+        hour: Number(hk),
+        up: v?.[0] ?? 0,
+        down: v?.[1] ?? 0,
+        msCount: v?.[2] ?? 0,
+        msSum: v?.[3] ?? 0,
+        msMax: v?.[4] ?? 0,
+      });
     }
-    state.store = next;
-    const recent = new Map<string, Reading[]>();
-    const cutoff = Date.now() - RECENT_KEEP_MS;
-    for (const [id, rows] of Object.entries(data?.recent ?? {})) {
-      const list = (rows as number[][])
-        .filter((r) => r?.[0] >= cutoff)
-        .map((r) => {
-          const reading: Reading = { t: r[0], up: r[1] === 1 };
-          // Third element present only on up readings written by a new build;
-          // absent on old files and on down readings — those keep ms undefined.
-          if (r[2] != null) reading.ms = r[2];
-          return reading;
-        });
-      if (list.length) recent.set(id, list);
-    }
-    state.recent = recent;
-    // Current-outage marks. Absent on older files → an empty map (no app is
-    // considered mid-outage until the next down poll re-establishes it).
-    const downSince = new Map<string, number>();
-    for (const [id, ms] of Object.entries(data?.downSince ?? {}))
-      if (typeof ms === "number") downSince.set(id, ms);
-    state.downSince = downSince;
-    // Recorded outages (#175). Absent on older files → empty; those files'
-    // completed outages surface via the ring/bucket fallbacks instead. Prune
-    // to the retention window on the way in, same as the buckets.
-    const outages = new Map<string, RecordedOutage[]>();
-    const outageCutoff = Date.now() - RETENTION_HOURS * HOUR_MS;
-    for (const [id, rows] of Object.entries(data?.outages ?? {})) {
-      const list = (rows as unknown[][])
-        .filter(
-          (o) =>
-            typeof o?.[0] === "number" &&
-            typeof o?.[1] === "number" &&
-            (o[1] as number) >= outageCutoff
-        )
-        .map((o) => {
-          const rec: RecordedOutage = {
-            start: o[0] as number,
-            end: o[1] as number,
-          };
-          // Third element is the incident note (#176), present only when set.
-          if (typeof o[2] === "string" && o[2] !== "") rec.note = o[2];
-          return rec;
-        });
-      if (list.length) outages.set(id, list);
-    }
-    state.outages = outages;
-  } catch {
-    state.store = new Map();
-    state.recent = new Map();
-    state.downSince = new Map();
-    state.outages = new Map();
   }
+  const cutoff = now - RECENT_KEEP_MS;
+  for (const [app, list] of Object.entries(d.recent ?? {})) {
+    for (const r of list ?? []) {
+      if (!(r?.[0] >= cutoff)) continue;
+      // Third element present only on up readings written by a newer build;
+      // absent on old files and on down readings — those keep ms undefined.
+      const reading: ReadingRow = { app, t: r[0], up: r[1] === 1 };
+      if (r[2] != null) reading.ms = r[2];
+      rows.readings.push(reading);
+    }
+  }
+  // Current-outage marks. Absent on older files → no app is considered
+  // mid-outage until the next down poll re-establishes it.
+  for (const [app, since] of Object.entries(d.downSince ?? {}))
+    if (typeof since === "number") rows.downSince.push({ app, since });
+  // Recorded outages (#175). Absent on older files → those files' completed
+  // outages surface via the ring/bucket fallbacks instead.
+  const outageCutoff = now - RETENTION_HOURS * HOUR_MS;
+  for (const [app, list] of Object.entries(d.outages ?? {})) {
+    for (const o of list ?? []) {
+      if (typeof o?.[0] !== "number" || typeof o?.[1] !== "number") continue;
+      if (o[1] < outageCutoff) continue;
+      const row: HistoryRows["outages"][number] = { app, start: o[0], end: o[1] };
+      // Third element is the incident note (#176), present only when set.
+      if (typeof o[2] === "string" && o[2] !== "") row.note = o[2];
+      rows.outages.push(row);
+    }
+  }
+  return rows;
 }
 
 // The most recent raw reading (up/down) per id, for ids that have one in the
@@ -673,6 +820,7 @@ export function recordResults(results: StatusResult[], at: number): void {
       b.down++;
     }
     m.set(hour, b);
+    state.dirty.buckets.add(bucketKey(r.id, hour));
     for (const k of m.keys()) if (k < cutoff) m.delete(k);
 
     // Raw ring for the 1h view, pruned to the keep window. ms rides along on up
@@ -682,6 +830,7 @@ export function recordResults(results: StatusResult[], at: number): void {
     if (r.up) reading.ms = r.ms;
     const list = state.recent.get(r.id) ?? [];
     list.push(reading);
+    state.dirty.readings.push({ app: r.id, ...reading });
     state.recent.set(
       r.id,
       list.filter((x) => x.t >= recentCutoff)
@@ -712,8 +861,13 @@ export function recordResults(results: StatusResult[], at: number): void {
             .slice(-MAX_OUTAGES)
         );
         state.downSince.delete(r.id);
+        state.dirty.downSince.add(r.id);
+        state.dirty.outages.add(r.id);
       }
-    } else if (!state.downSince.has(r.id)) state.downSince.set(r.id, at);
+    } else if (!state.downSince.has(r.id)) {
+      state.downSince.set(r.id, at);
+      state.dirty.downSince.add(r.id);
+    }
   }
 }
 
@@ -725,8 +879,7 @@ export const PRUNE_GRACE_MS = 10 * 60 * 1000;
 // Forget every app not in `keepIds` once it has been missing for
 // PRUNE_GRACE_MS — its hourly buckets, recent readings, open-outage mark, and
 // recorded outages. Called by the poller with the configured app list, so a
-// deleted app's history stops being carried (and rewritten on every flush)
-// indefinitely. Returns how many apps were dropped.
+// deleted app's history isn't carried indefinitely. Returns how many apps were dropped.
 export function pruneHistory(keepIds: readonly string[], now = Date.now()): number {
   const keep = new Set(keepIds);
   for (const id of state.missingSince.keys()) {
@@ -745,56 +898,30 @@ export function pruneHistory(keepIds: readonly string[], now = Date.now()): numb
   for (const id of gone) {
     for (const map of maps) map.delete(id);
     state.missingSince.delete(id);
+    forgetDirty(state.dirty, id);
+    state.dirty.dropped.add(id);
   }
   return gone.size;
 }
 
-// Serialized, atomic write of the in-memory store to disk (temp file + rename so
-// a concurrent read never sees a torn JSON file).
+// Drop an app's pending changes (it's being deleted).
+function forgetDirty(d: Dirty, id: string): void {
+  for (const k of d.buckets) if (k.endsWith(`\u0000${id}`)) d.buckets.delete(k);
+  d.readings = d.readings.filter((r) => r.app !== id);
+  d.downSince.delete(id);
+  d.outages.delete(id);
+}
+
+// Write what changed since the last flush, serialized and in one transaction
+// (#278). On failure the changes are kept for the next flush to retry.
 export function flush(): Promise<void> {
-  state.flushQueue = state.flushQueue.then(async () => {
-    const apps: Record<string, Record<number, number[]>> = {};
-    for (const [id, m] of state.store) {
-      const hours: Record<number, number[]> = {};
-      for (const [hk, b] of m)
-        hours[hk] = [b.up, b.down, b.msCount, b.msSum, b.msMax];
-      apps[id] = hours;
-    }
-    const recent: Record<string, number[][]> = {};
-    for (const [id, list] of state.recent) {
-      // A 3-element tuple only when ms is present (up readings). Down/old
-      // readings stay 2-element rather than writing an `undefined`/null third
-      // slot, keeping the file compact; the loader keys off tuple length.
-      if (list.length)
-        recent[id] = list.map((r) =>
-          r.ms == null ? [r.t, r.up ? 1 : 0] : [r.t, r.up ? 1 : 0, r.ms]
-        );
-    }
-    // Current-outage marks. The map already holds only apps that are down (an up
-    // poll deletes the entry), so this writes just those; on reload they re-arm
-    // the "how long down?" duration without waiting for the next poll.
-    const downSince: Record<string, number> = {};
-    for (const [id, ms] of state.downSince) downSince[id] = ms;
-    // Recorded outages (#175) as compact [start, end] tuples; the incident
-    // note (#176) rides as a third element only where one is set, same
-    // omit-when-absent posture as the recent ring's ms.
-    const outages: Record<string, (number | string)[][]> = {};
-    for (const [id, list] of state.outages)
-      if (list.length)
-        outages[id] = list.map((o) =>
-          o.note == null ? [o.start, o.end] : [o.start, o.end, o.note]
-        );
-    const file = historyPath();
-    const tmp = `${file}.tmp`;
+  state.flushQueue = state.flushQueue.then(() => {
+    const dirty = state.dirty;
+    state.dirty = emptyDirty();
     try {
-      await fs.mkdir(path.dirname(file), { recursive: true });
-      await fs.writeFile(
-        tmp,
-        JSON.stringify({ apps, recent, downSince, outages }),
-        "utf8"
-      );
-      await fs.rename(tmp, file);
+      writeHistoryChanges(historyDb(), changesFrom(dirty, Date.now()));
     } catch (e) {
+      mergeDirty(dirty);
       // Best-effort — history is non-critical and the next flush retries —
       // but leave a trace, or a full disk or read-only volume would silently
       // stop the uptime history from persisting.
@@ -804,9 +931,49 @@ export function flush(): Promise<void> {
   return state.flushQueue as Promise<void>;
 }
 
+// The database writes for a set of changes, read from the in-memory model.
+function changesFrom(d: Dirty, now: number): HistoryChanges {
+  const buckets: HistoryChanges["buckets"] = [];
+  for (const key of d.buckets) {
+    const sep = key.indexOf("\u0000");
+    const hour = Number(key.slice(0, sep));
+    const app = key.slice(sep + 1);
+    // Gone from memory means retention dropped it; so will the DELETE.
+    const b = state.store.get(app)?.get(hour);
+    if (b) buckets.push({ app, hour, ...b });
+  }
+  return {
+    dropApps: [...d.dropped],
+    buckets,
+    readings: d.readings,
+    downSince: [...d.downSince].map((app) => ({
+      app,
+      since: state.downSince.get(app) ?? null,
+    })),
+    outages: [...d.outages].map((app) => ({
+      app,
+      list: (state.outages.get(app) ?? []).map((o) => ({ app, ...o })),
+    })),
+    ...retentionCutoffs(now),
+  };
+}
+
+// Put a failed flush's changes back in front of anything recorded since.
+function mergeDirty(failed: Dirty): void {
+  const now = state.dirty;
+  for (const id of now.dropped) forgetDirty(failed, id);
+  state.dirty = {
+    buckets: new Set([...failed.buckets, ...now.buckets]),
+    readings: [...failed.readings, ...now.readings],
+    downSince: new Set([...failed.downSince, ...now.downSince]),
+    outages: new Set([...failed.outages, ...now.outages]),
+    dropped: new Set([...failed.dropped, ...now.dropped]),
+  };
+}
+
 // Set, replace, or clear (empty string) the incident note on one recorded
 // outage (#176), anchored by the app id + the record's exact start instant.
-// Notes live with the outage records in status-history.json — server-recorded
+// Notes live with the outage records in the history database — server-recorded
 // state, not config — so they don't travel with config export/import, same as
 // the outage history they annotate. Returns false when no record of `id`
 // starts at `startMs` (unknown app, a legacy pre-#175 entry, or a record that
@@ -820,6 +987,7 @@ export function setOutageNote(
   if (!rec) return false;
   if (note === "") delete rec.note;
   else rec.note = note;
+  state.dirty.outages.add(id);
   return true;
 }
 

@@ -29,6 +29,14 @@ here.
   schedule. The "Uptime check interval" in Settings now sets how fresh the
   dots are too. An app you've just added or edited is checked straight away.
   (#278)
+- **Uptime history is stored in a database.** The history now lives in
+  `status-history.db` (SQLite, built into Node) beside your config, and each
+  check adds a few rows instead of rewriting 90 days of history to disk.
+  Your existing history is carried over automatically the first time the new
+  version starts. The old `status-history.json` is left untouched so you can
+  still go back to an earlier version, and you can delete it once you're
+  happy. If the history file is ever damaged, it's set aside and a fresh one
+  is started instead of the checks failing. (#278)
 
 ## [2.11.0] - 2026-10-09
 
