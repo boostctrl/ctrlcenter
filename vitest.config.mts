@@ -8,11 +8,30 @@ export default defineConfig({
     alias: { "@": path.resolve(import.meta.dirname, ".") },
   },
   test: {
-    environment: "node",
-    include: [
-      "lib/**/*.test.ts",
-      "app/**/*.test.ts",
-      "components/**/*.test.ts",
+    // Two projects, one `npm test` (#289): logic and route handlers run in
+    // plain Node; component tests (*.test.tsx) get a jsdom document.
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "node",
+          environment: "node",
+          include: [
+            "lib/**/*.test.ts",
+            "app/**/*.test.ts",
+            "components/**/*.test.ts",
+          ],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "dom",
+          environment: "jsdom",
+          include: ["components/**/*.test.tsx", "app/**/*.test.tsx"],
+          setupFiles: ["./vitest.setup.dom.ts"],
+        },
+      },
     ],
   },
 });
