@@ -17,6 +17,13 @@ here.
 - **Undo for deletes in the admin portal.** Deleting an app or bookmark shows
   an Undo button for a few seconds; it brings the item back exactly where it
   was, with its uptime history and favorites intact. (#307)
+- **Smoother admin setup.** Widget cards in Settings (Notes, Countdown, World
+  clocks, System stats) have their own "show on the home page" switch, so you
+  no longer have to visit the layout editor just to turn one on. App and
+  bookmark URLs accept a bare address like `plex.local:32400` and add the
+  `http://` for you. The app form says when status checks are switched off,
+  and the Monitor page's "Set up" buttons open that service's settings
+  directly. (#277)
 
 ### Changed
 
@@ -25,6 +32,20 @@ here.
   It now fetches only the icon details it needs and only the font in use,
   bringing a cold load to roughly 350 KB — noticeably faster on phones and
   slow connections. (#276)
+- **Better keyboard navigation.** Everything you can Tab to now shows a clear
+  focus ring, a "Skip to content" link comes first on every page, and each
+  app card is a single Tab stop — press **P** on a focused card to pin or
+  unpin it. While you search, the match that Enter will open is outlined, and
+  the search box shows its **/** shortcut. Screen readers get proper page
+  landmarks and heading order in the admin portal. (#274)
+- **Layout polish.** The corner menu button no longer covers the end of a page,
+  and its menu is opaque instead of see-through. The Settings page groups its
+  fields without gaps and keeps "Reset all settings" apart from them. A
+  service's status page shows the full address being checked. Bold scenes
+  like Horizon and Rays are softened in light mode so card text stays clear.
+  The Help page opens with a table of contents linking to every section, and
+  the menu labels the status page "Status", matching the rest of the site.
+  (#277)
 
 ### Fixed
 
@@ -53,31 +74,9 @@ here.
   all designs, in both light and dark mode, and Delete buttons no longer look
   disabled. A service that's down shows a hollow ring instead of a solid dot,
   so up and down are distinguishable without relying on color. (#273)
-- **Better keyboard navigation.** Everything you can Tab to now shows a clear
-  focus ring, a "Skip to content" link comes first on every page, and each
-  app card is a single Tab stop — press **P** on a focused card to pin or
-  unpin it. While you search, the match that Enter will open is outlined, and
-  the search box shows its **/** shortcut. Screen readers get proper page
-  landmarks and heading order in the admin portal. (#274)
 - **Signing in successfully no longer counts toward the login limit.** Only
   wrong passwords and codes do, so signing in a few times in a row can't lock
   you out. (#277)
-- **Smoother admin setup.** Widget cards in Settings (Notes, Countdown, World
-  clocks, System stats) have their own "show on the home page" switch, so you
-  no longer have to visit the layout editor just to turn one on. App and
-  bookmark URLs accept a bare address like `plex.local:32400` and add the
-  `http://` for you. The app form says when status checks are switched off,
-  and the Monitor page's "Set up" buttons open that service's settings
-  directly. (#277)
-- **Layout polish.** The corner menu button no longer covers the end of a page,
-  and its menu is opaque instead of see-through. The Settings page groups its
-  fields without gaps and keeps "Reset all settings" apart from them. A
-  service's status page shows the full address being checked. Bold scenes
-  like Horizon and Rays are softened in light mode so card text stays clear.
-  The Help page opens with a table of contents linking to every section, and
-  the menu labels the status page "Status", matching the rest of the site.
-  (#277)
-
 ## [2.10.1] - 2026-10-09
 
 ### Security
