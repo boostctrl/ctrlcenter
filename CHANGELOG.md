@@ -53,6 +53,9 @@ here.
   unpin it. While you search, the match that Enter will open is outlined, and
   the search box shows its **/** shortcut. Screen readers get proper page
   landmarks and heading order in the admin portal. (#274)
+- **Signing in successfully no longer counts toward the login limit.** Only
+  wrong passwords and codes do, so signing in a few times in a row can't lock
+  you out. (#277)
 
 ## [2.10.1] - 2026-10-09
 

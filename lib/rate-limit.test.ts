@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { rateLimit, pruneRateLimit } from "./rate-limit";
+import { rateLimit, refundRateLimit, pruneRateLimit } from "./rate-limit";
 
 describe("rateLimit", () => {
   beforeEach(() => {
@@ -23,6 +23,31 @@ describe("rateLimit", () => {
     const blocked = rateLimit(key, 3, 1000);
     expect(blocked.allowed).toBe(false);
     expect(blocked.retryAfterSeconds).toBeGreaterThan(0);
+  });
+
+  it("refunds one charge, so successes never accumulate into a lockout (#277)", () => {
+    const key = `k-${Math.random()}`;
+    for (let i = 0; i < 10; i++) {
+      expect(rateLimit(key, 3, 1000).allowed).toBe(true);
+      refundRateLimit(key);
+    }
+    // Refunds give back one charge each, not a reset: failures still count.
+    rateLimit(key, 3, 1000);
+    rateLimit(key, 3, 1000);
+    rateLimit(key, 3, 1000);
+    refundRateLimit(key);
+    expect(rateLimit(key, 3, 1000).allowed).toBe(true);
+    expect(rateLimit(key, 3, 1000).allowed).toBe(false);
+  });
+
+  it("ignores a refund for an unknown or expired window", () => {
+    const key = `k-${Math.random()}`;
+    refundRateLimit(key);
+    rateLimit(key, 1, 1000);
+    vi.advanceTimersByTime(1500);
+    refundRateLimit(key);
+    expect(rateLimit(key, 1, 1000).allowed).toBe(true);
+    expect(rateLimit(key, 1, 1000).allowed).toBe(false);
   });
 
   it("reports decreasing remaining count", () => {

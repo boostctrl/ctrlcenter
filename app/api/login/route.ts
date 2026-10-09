@@ -9,7 +9,12 @@ import {
   SESSION_COOKIE_NAME,
 } from "@/lib/auth";
 import { readConfigInternal, spendTotpRecoveryCode } from "@/lib/config";
-import { rateLimit, pruneRateLimit, clientKey } from "@/lib/rate-limit";
+import {
+  rateLimit,
+  refundRateLimit,
+  pruneRateLimit,
+  clientKey,
+} from "@/lib/rate-limit";
 import { verifyTotpOnce } from "@/lib/totp";
 import { verifyRecoveryCode } from "@/lib/recovery-codes";
 import { isSameOriginRequest } from "@/lib/api-auth";
@@ -36,7 +41,8 @@ export async function POST(request: NextRequest) {
   // reverse proxy the key is the real client IP (not the spoofable X-Forwarded-For
   // prefix). This is the gate that stops a single attacker; the global backstop
   // below only counts failures so it can't lock the real admin out.
-  const perClient = rateLimit(clientKey(request, "login"), MAX_ATTEMPTS, WINDOW_MS);
+  const throttleKey = clientKey(request, "login");
+  const perClient = rateLimit(throttleKey, MAX_ATTEMPTS, WINDOW_MS);
   if (!perClient.allowed) {
     return NextResponse.json(
       { error: "Too many attempts. Try again later." },
@@ -111,6 +117,10 @@ export async function POST(request: NextRequest) {
       }
     }
   }
+
+  // Fully signed in (password, and code when 2FA is on): refund this attempt's
+  // per-client charge, so only failures count toward the lockout.
+  refundRateLimit(throttleKey);
 
   // Bind the token to the current password hash so a later password change
   // revokes it (see proxy.ts / verifySessionToken).

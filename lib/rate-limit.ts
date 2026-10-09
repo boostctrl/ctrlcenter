@@ -45,6 +45,17 @@ export function rateLimit(
   };
 }
 
+// Give back one charge to `key` (no-op once its window has expired). Login
+// calls this when a session is actually issued, so signing in successfully a
+// few times in a row can't lock the admin out (#277). One charge, not a reset:
+// a success from a shared address mustn't wipe another client's failures.
+export function refundRateLimit(key: string): void {
+  const existing = windows.get(key);
+  if (existing && existing.count > 0 && Date.now() < existing.resetAt) {
+    existing.count -= 1;
+  }
+}
+
 // Opportunistically drop expired windows so the Map can't grow unbounded from
 // a stream of distinct keys (e.g. spoofed source IPs).
 export function pruneRateLimit(now = Date.now()): void {

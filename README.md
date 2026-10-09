@@ -224,19 +224,20 @@ settings:
     # still honored for old configs, but layout `hidden` (below) is the source
     # of truth once set.
   layout:                   # the home-page widget grid — best edited visually:
-    sections:               # sign in and pick "Edit layout" from the corner menu
-      - { id: greeting, span: 8 }         # order = position; widgets flow row
-      - { id: headerCard, span: 4 }       #   by row across 12 columns
-      - { id: clock, span: 4, hidden: true }    # split clock/weather/status
-      - { id: weather, span: 4, hidden: true }  #   widgets — show them as an
-      - { id: status, span: 4, hidden: true }   #   alternative to headerCard
-      - { id: search, span: 12 }
-      - { id: calendar, span: 12 }
-      - { id: favorites, span: 12 }
-      - { id: apps, span: 12 }
-      - { id: bookmarks, span: 12 }
-    # pre-1.3 configs used `width: full|twoThirds|half|third` — still accepted,
-    # auto-migrated to spans (12/8/6/4) on the next save.
+    columns: 24             # sign in and pick "Edit layout" from the corner menu
+    sections:
+      - { id: greeting, span: 16 }        # order = position; widgets flow row
+      - { id: headerCard, span: 8 }       #   by row across 24 columns
+      - { id: clock, span: 8, hidden: true }    # split clock/weather/status
+      - { id: weather, span: 8, hidden: true }  #   widgets — show them as an
+      - { id: status, span: 8, hidden: true }   #   alternative to headerCard
+      - { id: search, span: 24 }
+      - { id: calendar, span: 24 }
+      - { id: favorites, span: 24 }
+      - { id: apps, span: 24 }
+      - { id: bookmarks, span: 24 }
+    # Older configs (12-column spans, or pre-1.3 `width: full|twoThirds|…`)
+    # are still accepted and migrated to 24-column spans on the next save.
 
 apps:
   - id: <uuid>
