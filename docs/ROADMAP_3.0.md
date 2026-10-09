@@ -130,8 +130,8 @@ comments and a lighter status system.
 ## 2.13 — Status and alerts depth
 
 > **Status: released as 2.13.0** (2026-10-09).
-> All nine items are closed, plus two found along the way (#309, #310). What
-> users notice:
+> All six items are closed, plus three found along the way (#309, #310,
+> #311). What users notice:
 > - Each app can have its own check interval, timeout and retries, can be left
 >   unmonitored, and can use the new JSON query, push (heartbeat) and TLS
 >   certificate checks.
