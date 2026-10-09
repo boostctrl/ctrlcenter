@@ -99,7 +99,7 @@ Fixes everything the UX audit found. No config changes.
 
 ## 2.12 — Foundations
 
-> **Status: landed on `develop`** (2026-10-09), ready to release as 2.12.0.
+> **Status: released as 2.12.0** (2026-10-09).
 > All eight items are closed. What users notice:
 > - Admin saves keep `config.yaml` comments, and only changed keys are written.
 > - Each app is checked once per interval.
