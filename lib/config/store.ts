@@ -228,6 +228,14 @@ async function writeConfig(
 // Thrown by an item mutator when the target id/category isn't in the config, so
 // a route can answer 404 for that case alone and not mislabel a genuine write
 // failure (a full disk, a permissions problem, failed validation) the same way.
+// When config.yaml last changed (epoch ms): every write renames a fresh file
+// into place, and a hand edit bumps it too. The status feed dates undated
+// announcements by it (#295).
+export async function configMtime(): Promise<number> {
+  await ensureConfigExists();
+  return (await fs.stat(CONFIG_PATH)).mtimeMs;
+}
+
 export class NotFoundError extends Error {}
 
 export async function mutate<T>(fn: (config: Config) => T): Promise<T> {

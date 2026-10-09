@@ -43,6 +43,8 @@ const PUBLIC_ROUTES = [
   "app/api/status/route.ts",
   "app/api/status/history/route.ts",
   "app/api/status/history/[id]/route.ts",
+  // Status badges (#295): readPublicConfig decides visibility per caller.
+  "app/api/status/badge/[id]/route.ts",
 ];
 
 // The session checks a handler may use: the plain one, or the integration

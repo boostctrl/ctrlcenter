@@ -56,6 +56,12 @@ here.
   pages, with the time marked in blue on the timeline and left out of the
   uptime figures. An app still down when the window ends alerts as usual.
   (#293)
+- **Status badges and a status feed.** Every monitored app has a
+  shields-style SVG badge at `/api/status/badge/<id>.svg` showing whether
+  it's up, or with `?type=uptime` / `?type=response` its uptime or response
+  time over a range. The status page also has an Atom feed of outages, with
+  your incident notes, and announcements at `/status/feed.xml`. Private apps
+  stay out of both for signed-out visitors. (#295)
 - **Warning alerts.** When an app starts warning, for instance a certificate
   about to expire, its alert channels now hear about it, with a reminder once
   a day while it lasts and a note when it clears. Each channel can switch

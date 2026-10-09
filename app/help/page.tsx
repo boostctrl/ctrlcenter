@@ -630,6 +630,26 @@ export default async function HelpPage() {
           </P>
         </Card>
 
+        <Card title="Badges and the status feed">
+          <P>
+            Each monitored app has a shields-style badge for a README or wiki
+            at <code>/api/status/badge/&lt;id&gt;.svg</code> (the id is in
+            the app&apos;s status page address). It shows whether the app is up,
+            or with <code>?type=uptime</code> or <code>?type=response</code> its
+            uptime or average response time; add <code>&amp;range=</code>
+            <code>1h</code>, <code>24h</code>, <code>30d</code> (the default)
+            or <code>90d</code>, and <code>&amp;label=</code> to change the
+            left-hand text. A private app&apos;s badge only works while signed
+            in.
+          </P>
+          <P>
+            The <A href="/status/feed.xml">status feed</A> lists outages, with
+            their incident notes, and status announcements, so a feed reader
+            can tell you when something goes down. Like the status page, it
+            leaves private apps out.
+          </P>
+        </Card>
+
         <Card title="Status announcements">
           <P>
             Tell your household about maintenance and upcoming changes right on

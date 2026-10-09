@@ -7,6 +7,7 @@ export {
   parseConfigYaml,
   readConfigInternal,
   replaceConfig,
+  configMtime,
   NotFoundError,
 } from "./store";
 export * from "./redact";

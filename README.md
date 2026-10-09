@@ -41,7 +41,10 @@ Built with Next.js 16, React 19, and Tailwind v4.
   exact start and end times — where a signed-in admin can attach **incident
   notes** ("planned maintenance", "ISP fault") that visitors see beside the
   entry. **Status announcements** post maintenance windows and notices on the
-  status page itself, with optional scheduling. Each service picks a **check
+  status page itself, with optional scheduling, and can hold an app's alerts as
+  a **maintenance window**. The status page has an **Atom feed** of outages
+  and announcements (`/status/feed.xml`), and each app a shields-style **SVG
+  badge** (`/api/status/badge/<id>.svg`). Each service picks a **check
   method** — HTTP (choose which status codes count as up, so a `404` reads as
   **down**), **TCP port**, **keyword** in the response body, **DNS** resolution, or
   **ICMP ping** — so non-web services can be monitored too. **Alerts** fire when a

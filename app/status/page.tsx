@@ -8,7 +8,11 @@ import FloatingNav from "@/components/FloatingNav";
 import { navPages } from "@/lib/nav";
 import { monitoredApps } from "@/lib/schema";
 
-export const metadata: Metadata = { title: "Status" };
+export const metadata: Metadata = {
+  title: "Status",
+  // Lets feed readers find the incidents feed from the page URL (#295).
+  alternates: { types: { "application/atom+xml": "/status/feed.xml" } },
+};
 export const dynamic = "force-dynamic";
 
 export default async function StatusRoute() {
@@ -56,6 +60,14 @@ export default async function StatusRoute() {
             </p>
           </>
         )}
+
+        <p className="text-sm text-ink-50">
+          Get outages and announcements in a feed reader:{" "}
+          <a href="/status/feed.xml" className="underline hover:text-ink-80">
+            subscribe to the status feed
+          </a>
+          .
+        </p>
       </main>
       {settings.components.settingsButton && (
         <FloatingNav {...navPages(settings)} />
