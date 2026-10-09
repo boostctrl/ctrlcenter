@@ -25,3 +25,4 @@ export * from "./schema/apps-bookmarks";
 export * from "./schema/auth";
 export * from "./schema/settings";
 export * from "./schema/config";
+export * from "./schema/meta";

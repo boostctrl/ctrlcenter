@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { STATUS_RANGE_KEYS } from "../status";
 import { lenientArray } from "./shared";
+import { mergeRules } from "./meta";
 import { themeSchema, themeInputSchema } from "./theme";
 import { searchSchema, searchUpdateSchema } from "./search";
 import { alertsSchema, alertsUpdateSchema } from "./alerts";
@@ -38,7 +39,8 @@ export const settingsSchema = z.object({
   title: z.string().default("Home"),
   favicon: z.string().default(""),
   timezone: z.string().default("UTC"),
-  theme: themeSchema.default(themeSchema.parse({})),
+  // Replaced whole on save: omitting an optional custom color clears it.
+  theme: themeSchema.default(themeSchema.parse({})).register(mergeRules, { merge: "replace" }),
   // When on, the dashboard polls /api/status to show per-app online/offline
   // dots. Off by default since it makes the server ping every app URL.
   statusChecks: z.boolean().default(false),

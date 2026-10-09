@@ -252,6 +252,33 @@ describe("apps CRUD", () => {
   });
 });
 
+describe("updateSettings generic merge (#287)", () => {
+  it("deep-merges a nested section, keeping keys the patch leaves out", async () => {
+    await config.updateSettings(
+      settingsInput({ alerts: { enabled: true, type: "ntfy", webhookUrl: "https://ntfy.test/x", notifyOnRecovery: true, confirmations: 2, email: { enabled: true, host: "smtp.test", port: 587, secure: false, subject: "", user: "u", pass: "p", from: "a@test", to: "b@test" } } })
+    );
+    // A later patch touching one email field leaves the rest of the section.
+    await config.updateSettings({ alerts: { email: { host: "smtp2.test" } } } as never);
+    const alerts = (await config.getSettings()).alerts;
+    expect(alerts.email).toMatchObject({ host: "smtp2.test", user: "u", pass: "p", enabled: true });
+    expect(alerts.webhookUrl).toBe("https://ntfy.test/x");
+  });
+
+  it("replaces the theme whole, so an omitted custom color is cleared", async () => {
+    const base = (await config.getSettings()).theme;
+    await config.updateSettings(settingsInput({ theme: { ...base, background: "#101010" } }));
+    expect((await config.getSettings()).theme.background).toBe("#101010");
+    await config.updateSettings(settingsInput({ theme: { ...base } }));
+    expect((await config.getSettings()).theme.background).toBeUndefined();
+  });
+
+  it("replaces lists, so removing an entry persists", async () => {
+    await config.updateSettings(settingsInput({ bookmarkCategoryOrder: ["a", "b"] }));
+    await config.updateSettings(settingsInput({ bookmarkCategoryOrder: ["b"] }));
+    expect((await config.getSettings()).bookmarkCategoryOrder).toEqual(["b"]);
+  });
+});
+
 describe("updateSettings partial merge", () => {
   it("updates a top-level field without clobbering the others", async () => {
     await config.updateSettings(settingsInput({

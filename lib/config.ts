@@ -1,6 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 import * as YAML from "js-yaml";
+import type { z } from "zod";
 import { GRID_COLUMNS } from "./layout";
 import { migrateConfig } from "./config-migrate";
 import { updateYamlText } from "./config-yaml";
@@ -10,6 +11,8 @@ import {
   CONFIG_SCHEMA_VERSION,
   configSchema,
   configReadSchema,
+  settingsSchema,
+  mergeRules,
   totpAuthSchema,
   type Config,
   type AppItem,
@@ -470,86 +473,44 @@ export async function updateSettings(
   partial: SettingsInput
 ): Promise<Settings> {
   return mutate((config) => {
-    const {
-      weather: weatherPartial,
-      search: searchPartial,
-      alerts: alertsPartial,
-      calendar: calendarPartial,
-      notes: notesPartial,
-      announcement: announcementPartial,
-      feeds: feedsPartial,
-      countdown: countdownPartial,
-      worldClocks: worldClocksPartial,
-      systemStats: systemStatsPartial,
-      integrations: integrationsPartial,
-      components: componentsPartial,
-      theme: themePartial,
-      layout: layoutPartial,
-      ...rest
-    } = partial;
-    config.settings = {
-      ...config.settings,
-      ...withoutUndefined(rest),
-      weather: {
-        ...config.settings.weather,
-        ...withoutUndefined(weatherPartial ?? {}),
-      },
-      search: {
-        ...config.settings.search,
-        ...withoutUndefined(searchPartial ?? {}),
-      },
-      alerts: {
-        ...config.settings.alerts,
-        ...withoutUndefined(alertsPartial ?? {}),
-      },
-      calendar: {
-        ...config.settings.calendar,
-        ...withoutUndefined(calendarPartial ?? {}),
-      },
-      notes: {
-        ...config.settings.notes,
-        ...withoutUndefined(notesPartial ?? {}),
-      },
-      announcement: {
-        ...config.settings.announcement,
-        ...withoutUndefined(announcementPartial ?? {}),
-      },
-      // Feed cards are sent as the whole list (each carries its instance id),
-      // so replace wholesale — that's how removing a card persists; keep the
-      // existing list when the update doesn't touch feeds.
-      feeds: feedsPartial ?? config.settings.feeds,
-      countdown: {
-        ...config.settings.countdown,
-        ...withoutUndefined(countdownPartial ?? {}),
-      },
-      worldClocks: {
-        ...config.settings.worldClocks,
-        ...withoutUndefined(worldClocksPartial ?? {}),
-      },
-      systemStats: {
-        ...config.settings.systemStats,
-        ...withoutUndefined(systemStatsPartial ?? {}),
-      },
-      // Integrations are sent whole (every service, credentials included), so
-      // replace wholesale like the theme; keep the existing object when the
-      // update doesn't touch them.
-      integrations: integrationsPartial ?? config.settings.integrations,
-      components: {
-        ...config.settings.components,
-        ...withoutUndefined(componentsPartial ?? {}),
-      },
-      // Theme is sent whole, so replace it (this is how clearing the optional
-      // custom colors works); keep the existing one when not provided.
-      theme: themePartial ?? config.settings.theme,
-      // Layout is sent whole too (the ordered section list), so replace it.
-      // Re-stamp the grid marker: writeConfig re-parses on save, and a stored
-      // layout without `columns` would re-trigger the 12→24 span migration.
-      layout: layoutPartial
-        ? { ...layoutPartial, columns: GRID_COLUMNS }
-        : config.settings.layout,
-    };
+    config.settings = mergeSettings(config.settings, partial);
+    // Re-stamp the grid marker: writeConfig re-parses on save, and a stored
+    // layout without `columns` would re-trigger the 12→24 span migration.
+    if (partial.layout) {
+      config.settings.layout = { ...config.settings.layout, columns: GRID_COLUMNS };
+    }
     return config.settings;
   });
+}
+
+// Apply a settings PUT (#287): each section sent is deep-merged into the
+// stored one — plain objects key by key, arrays and scalars replaced,
+// undefined ignored — so only what the admin changed moves. Lists the admin
+// sends whole (feed cards, announcements, layout sections) replace, which is
+// how removing an entry persists. A section the schema marks
+// merge: "replace" (lib/schema/meta.ts) is swapped whole instead.
+function mergeSettings(current: Settings, patch: SettingsInput): Settings {
+  const next: Record<string, unknown> = { ...current };
+  const shape = settingsSchema.shape as Record<string, z.ZodType>;
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === undefined) continue;
+    const field = shape[key];
+    next[key] =
+      field && mergeRules.get(field)?.merge === "replace" ? value : deepMerge(next[key], value);
+  }
+  return next as Settings;
+}
+
+const isPlainObject = (v: unknown): v is Record<string, unknown> =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
+
+function deepMerge(base: unknown, patch: unknown): unknown {
+  if (!isPlainObject(base) || !isPlainObject(patch)) return patch;
+  const out: Record<string, unknown> = { ...base };
+  for (const [k, v] of Object.entries(patch)) {
+    if (v !== undefined) out[k] = deepMerge(base[k], v);
+  }
+  return out;
 }
 
 // Admin overrides of the built-in theme packs. Pair with resolveThemePacks()
