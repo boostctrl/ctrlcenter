@@ -12,6 +12,12 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Undo for deletes in the admin portal.** Deleting an app or bookmark shows
+  an Undo button for a few seconds; it brings the item back exactly where it
+  was, with its uptime history and favorites intact. (#307)
+
 ### Changed
 
 - **Pages load about five times lighter.** A first visit to the dashboard

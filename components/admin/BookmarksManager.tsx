@@ -104,7 +104,9 @@ export default function BookmarksManager({
   }
 
   async function handleDelete(id: string) {
-    const name = bookmarks.find((b) => b.id === id)?.name;
+    const index = bookmarks.findIndex((b) => b.id === id);
+    const removed = index >= 0 ? bookmarks[index] : undefined;
+    const name = removed?.name;
     const ok = await confirm({
       title: name ? `Delete “${name}”?` : "Delete this bookmark?",
       confirmLabel: "Delete",
@@ -124,7 +126,31 @@ export default function BookmarksManager({
     }
     setBookmarks((prev) => prev.filter((b) => b.id !== id));
     if (editingId === id) resetForm();
-    toast("Bookmark deleted");
+    if (!removed) {
+      toast("Bookmark deleted");
+      return;
+    }
+    // Undo restores the same row (same id, so history and favorites still
+    // match) at its old position (#307).
+    toast(`Deleted “${removed.name}”`, "success", {
+      label: "Undo",
+      onClick: () => void undoDelete(removed, index),
+    });
+  }
+
+  async function undoDelete(item: BookmarkItem, index: number) {
+    try {
+      const res = await fetch("/api/bookmarks/restore", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ item, index }),
+      });
+      if (!res.ok) throw new Error();
+      setBookmarks(await res.json());
+      toast(`Restored “${item.name}”`);
+    } catch {
+      toast("Couldn't undo the delete", "error");
+    }
   }
 
   async function persistOrder(next: BookmarkItem[]) {

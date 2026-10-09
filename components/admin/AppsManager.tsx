@@ -166,7 +166,9 @@ export default function AppsManager({
   }
 
   async function handleDelete(id: string) {
-    const name = apps.find((a) => a.id === id)?.name;
+    const index = apps.findIndex((a) => a.id === id);
+    const removed = index >= 0 ? apps[index] : undefined;
+    const name = removed?.name;
     const ok = await confirm({
       title: name ? `Delete “${name}”?` : "Delete this application?",
       message: "It's removed from the dashboard, search, and the status page.",
@@ -187,7 +189,31 @@ export default function AppsManager({
     }
     setApps((prev) => prev.filter((a) => a.id !== id));
     if (editingId === id) resetForm();
-    toast("Application deleted");
+    if (!removed) {
+      toast("Application deleted");
+      return;
+    }
+    // Undo restores the same row (same id, so history and favorites still
+    // match) at its old position (#307).
+    toast(`Deleted “${removed.name}”`, "success", {
+      label: "Undo",
+      onClick: () => void undoDelete(removed, index),
+    });
+  }
+
+  async function undoDelete(item: AppItem, index: number) {
+    try {
+      const res = await fetch("/api/apps/restore", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ item, index }),
+      });
+      if (!res.ok) throw new Error();
+      setApps(await res.json());
+      toast(`Restored “${item.name}”`);
+    } catch {
+      toast("Couldn't undo the delete", "error");
+    }
   }
 
   async function persistOrder(next: AppItem[]) {

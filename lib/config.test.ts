@@ -189,6 +189,23 @@ describe("apps CRUD", () => {
     await config.deleteApp(created.id);
     expect(await config.listApps()).toHaveLength(0);
   });
+
+  it("restores a deleted app with its id at its old position, once (#307)", async () => {
+    const make = (name: string) =>
+      config.createApp(appInput({ name, url: `https://${name}.example.com` }));
+    const a = await make("a");
+    const b = await make("b");
+    const c = await make("c");
+    await config.deleteApp(b.id);
+    await config.restoreApp(b, 1);
+    // A second Undo (double click) is a no-op, not a duplicate.
+    await config.restoreApp(b, 1);
+    expect((await config.listApps()).map((x) => x.id)).toEqual([a.id, b.id, c.id]);
+    // An index past the end clamps to append.
+    await config.deleteApp(a.id);
+    await config.restoreApp(a, 99);
+    expect((await config.listApps()).map((x) => x.name)).toEqual(["b", "c", "a"]);
+  });
 });
 
 describe("updateSettings partial merge", () => {
