@@ -153,8 +153,10 @@ export default function AppsManager({ initialApps }: { initialApps: AppItem[] })
   }
 
   async function handleDelete(id: string) {
+    const name = apps.find((a) => a.id === id)?.name;
     const ok = await confirm({
-      title: "Delete this application?",
+      title: name ? `Delete “${name}”?` : "Delete this application?",
+      message: "It's removed from the dashboard, search, and the status page.",
       confirmLabel: "Delete",
       danger: true,
     });

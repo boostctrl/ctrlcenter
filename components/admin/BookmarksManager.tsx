@@ -99,8 +99,9 @@ export default function BookmarksManager({
   }
 
   async function handleDelete(id: string) {
+    const name = bookmarks.find((b) => b.id === id)?.name;
     const ok = await confirm({
-      title: "Delete this bookmark?",
+      title: name ? `Delete “${name}”?` : "Delete this bookmark?",
       confirmLabel: "Delete",
       danger: true,
     });

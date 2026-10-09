@@ -21,6 +21,9 @@ here.
   `ADMIN_PASSWORD` used to show a normal sign-in form that rejected every
   password. The sign-in page now explains what to set, and the server log
   says so at startup. (#275)
+- **The delete confirmation is readable in light mode** and names what you're
+  deleting ("Delete “Plex”?"). For destructive actions it now starts on
+  Cancel, so a reflexive Enter backs out instead of deleting. (#269)
 
 ## [2.10.1] - 2026-10-09
 
