@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [2.12.0] - 2026-10-09
+
 ### Changed
 
 - **Safer rollbacks.** If you go back to an older version after an upgrade
@@ -2722,7 +2724,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.11.0...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.12.0...HEAD
+[2.12.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.11.0...v2.12.0
 [2.11.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.10.1...v2.11.0
 [2.10.1]: https://github.com/boostctrl/ctrlcenter/compare/v2.10.0...v2.10.1
 [2.10.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.9.0...v2.10.0
