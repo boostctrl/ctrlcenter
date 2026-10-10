@@ -219,43 +219,76 @@ try {
 // no-flash script — which also proves that script runs in the production
 // build: it marks <html data-theme-boot>, and a serialization slip in
 // lib/theme-paint.ts would otherwise die silently in its try/catch (#325).
+// A pack's wallpaper is seeded the way applying the pack stores it, so a
+// bundled background is fetched and audited (#348). Then every scene no pack
+// showcases is rendered once, and one look runs at full motion, since the
+// matrix stills everything and a canvas scene's animation loop would
+// otherwise never run in CI.
 // lib/theme.ts imports nothing, so Node loads it as-is (type stripping).
 async function themeMatrixPhase(run) {
-  const { THEME_PACKS, BASE_THEMES } = await import("../lib/theme.ts");
+  const { THEME_PACKS, BASE_THEMES, SCENES } = await import("../lib/theme.ts");
   const looks = [
     ...THEME_PACKS.map((p) => ({ ...p, kind: "theme" })),
     ...BASE_THEMES.map((p) => ({ ...p, design: "glass", scene: "aurora", kind: "palette" })),
   ];
-  for (const look of looks) {
-    for (const scheme of ["dark", "light"]) {
-      const ctx = await browser.newContext({
-        viewport: { width: 1280, height: 800 },
-        colorScheme: scheme,
-        reducedMotion: "reduce",
+  // One look on the home page, stored as a visitor's choice of it would be.
+  const render = async (look, scheme, shot, { motion = "reduce", before } = {}) => {
+    const ctx = await browser.newContext({
+      viewport: { width: 1280, height: 800 },
+      colorScheme: scheme,
+      reducedMotion: motion,
+    });
+    const entries = {
+      "ctrlcenter:theme": scheme,
+      "ctrlcenter:activeTheme": JSON.stringify({ dark: look.dark, light: look.light }),
+      "ctrlcenter:design": JSON.stringify({ dark: look.design, light: look.designLight ?? look.design }),
+      "ctrlcenter:scene": JSON.stringify({ dark: look.scene, light: look.sceneLight ?? look.scene }),
+    };
+    if (look.wallpaper || look.wallpaperLight) {
+      entries["ctrlcenter:wallpaper"] = JSON.stringify({
+        dark: look.wallpaper ?? null,
+        light: look.wallpaperLight ?? look.wallpaper ?? null,
       });
-      await ctx.addInitScript(
-        (entries) => {
-          for (const [k, v] of Object.entries(entries)) localStorage.setItem(k, v);
-        },
-        {
-          "ctrlcenter:theme": scheme,
-          "ctrlcenter:activeTheme": JSON.stringify({ dark: look.dark, light: look.light }),
-          "ctrlcenter:design": JSON.stringify({ dark: look.design, light: look.design }),
-          "ctrlcenter:scene": JSON.stringify({ dark: look.scene, light: look.scene }),
-        }
+    }
+    await ctx.addInitScript((entries) => {
+      for (const [k, v] of Object.entries(entries)) localStorage.setItem(k, v);
+    }, entries);
+    let booted = false;
+    await run(ctx, "/", shot, async (page) => {
+      if (before) await before(page);
+      booted = await page.evaluate(
+        () => document.documentElement.getAttribute("data-theme-boot") === "1"
       );
-      let booted = false;
-      const slug = look.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-      await run(ctx, "/", `${look.kind}-${slug}-${scheme}`, async (page) => {
-        booted = await page.evaluate(
-          () => document.documentElement.getAttribute("data-theme-boot") === "1"
-        );
-      });
-      if (!booted) failures.push(`/ (${look.name}, ${scheme}): the no-flash theme script didn't run`);
-      await ctx.close();
+    });
+    if (!booted) failures.push(`/ (${shot}): the no-flash theme script didn't run`);
+    await ctx.close();
+  };
+
+  for (const look of looks) {
+    const slug = look.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    for (const scheme of ["dark", "light"]) {
+      await render(look, scheme, `${look.kind}-${slug}-${scheme}`);
     }
   }
   console.log(`ok    ${looks.length} built-in looks audited in both schemes`);
+
+  // The scenes no theme showcases, once each on the stock look (dark), so a
+  // scene that throws in its effect or breaks the page is seen by CI.
+  const shown = new Set(THEME_PACKS.flatMap((p) => [p.scene, p.sceneLight ?? p.scene]));
+  const unshown = SCENES.filter((s) => !shown.has(s.id));
+  for (const s of unshown) {
+    await render({ ...THEME_PACKS[0], scene: s.id }, "dark", `scene-${s.id}-dark`);
+  }
+  console.log(`ok    ${unshown.length} scenes no theme uses rendered`);
+
+  // One canvas scene at full motion, left to draw for a moment, so a throw
+  // inside its requestAnimationFrame loop surfaces as a page error.
+  const moving = looks.find((l) => l.scene === "petals") ?? looks[0];
+  await render(moving, "dark", "motion-full-dark", {
+    motion: "no-preference",
+    before: (page) => page.waitForTimeout(400),
+  });
+  console.log(`ok    ${moving.name} rendered at full motion`);
 }
 
 // The first-run setup (#304): with a fresh install's config swapped in, /admin
