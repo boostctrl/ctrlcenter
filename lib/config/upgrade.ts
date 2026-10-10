@@ -60,11 +60,14 @@ export function summarizeUpgrade(before: unknown, after: unknown, at = new Date(
 
 // Called by the store just before it saves a migrated config, with the file
 // as it was (`raw`, parsed as `before`) and the migrated value. Does nothing
-// unless this is the step out of 2.x. Failing to keep the backup stops the
-// upgrade (better a 2.x file served in memory than one rewritten without its
-// rollback copy); the notice is best-effort.
+// unless this is the step out of 2.x, and not for an empty file (one created
+// ahead of the first start): that's a new install, with nothing to back up.
+// Failing to keep the backup stops the upgrade (better a 2.x file served in
+// memory than one rewritten without its rollback copy); the notice is
+// best-effort.
 export async function recordUpgrade(raw: string, before: unknown, after: unknown): Promise<void> {
   if (configVersion(before) >= 3 || configVersion(after) < 3) return;
+  if (typeof before === "object" && before !== null && Object.keys(before).length === 0) return;
   const dir = configDir();
   try {
     // "wx": only if there isn't one — the first upgrade's copy is the one

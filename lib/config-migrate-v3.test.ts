@@ -200,7 +200,7 @@ describe("migrateV2toV3: content", () => {
   });
 
   it("leaves a config with boards alone", () => {
-    const raw = { settings: {}, boards: [], widgets: [] };
+    const raw = { schemaVersion: 3, settings: {}, boards: [], widgets: [] };
     expect(migrateV2toV3(raw)).toEqual({ value: raw, changed: false });
   });
 });
@@ -435,6 +435,18 @@ describe("v2 → v3: alerts (#320)", () => {
       settings: { alerts: { webhookUrl: "", webhookEnabled: true, email: { enabled: false, host: "" } } },
     });
     expect((value as { settings: { alerts: unknown } }).settings.alerts).toEqual({ channels: [] });
+  });
+});
+
+describe("v2 → v3: first-run setup (#304)", () => {
+  it("marks an upgraded 2.x install as set up, but not a 3.0 file", () => {
+    const upgraded = migrateV2toV3({ schemaVersion: 2, settings: {} }).value as { settings: Record<string, unknown> };
+    expect(upgraded.settings.setupComplete).toBe(true);
+    const fresh = { schemaVersion: 3, settings: {}, boards: [], widgets: [] };
+    expect(migrateV2toV3(fresh)).toEqual({ value: fresh, changed: false });
+    // An empty config.yaml made before the first start is a new install too.
+    const blank = migrateV2toV3({}).value as { settings?: Record<string, unknown> };
+    expect(blank.settings?.setupComplete).toBeUndefined();
   });
 });
 

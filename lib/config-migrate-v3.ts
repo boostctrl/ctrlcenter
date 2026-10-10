@@ -163,7 +163,10 @@ export function migrateV2toV3(raw: unknown): { value: unknown; changed: boolean 
   if (!isRecord(raw)) return { value: raw, changed: false };
   let value = raw;
   let changed = false;
-  for (const step of [instancesStep, boardsStep, groupsStep, integrationsStep, themesStep, alertsStep]) {
+  // Read before the steps fill in their defaults: whether there was anything
+  // to upgrade at all.
+  const blank = isBlankFile(raw);
+  for (const step of [instancesStep, boardsStep, groupsStep, integrationsStep, themesStep, alertsStep, setupStep(blank)]) {
     const out = step(value);
     if (out.changed) {
       value = out.value;
@@ -374,6 +377,20 @@ const alertsStep: Step = (raw) => {
   for (const k of ALERT_KEYS) delete alerts[k];
   alerts.channels = [...moved, ...channels];
   return { value: { ...raw, settings: { ...raw.settings, alerts } }, changed: true };
+};
+
+// First-run setup (#304): an install coming from 2.x was set up long ago, so
+// it's marked done and never sees the setup. Only for files stamped below 3 —
+// a fresh 3.0 file is stamped 3 from the start — and not for a blank one (an
+// empty config.yaml created ahead of the first start), which is a new install.
+const isBlankFile = (raw: Record<string, unknown>): boolean =>
+  Object.keys(raw).every((k) => k === "schemaVersion");
+
+const setupStep = (blank: boolean): Step => (raw) => {
+  const version = typeof raw.schemaVersion === "number" ? raw.schemaVersion : 1;
+  const settings = isRecord(raw.settings) ? raw.settings : {};
+  if (blank || version >= 3 || "setupComplete" in settings) return { value: raw, changed: false };
+  return { value: { ...raw, settings: { ...settings, setupComplete: true } }, changed: true };
 };
 
 // Widgets become instances (#297) and the layout the home board (#298).

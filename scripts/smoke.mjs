@@ -187,6 +187,7 @@ try {
   }
 
   await statusPhase(run);
+  await setupPhase(run);
   await upgradePhase(run);
 } catch (e) {
   failures.push(`smoke run aborted: ${e instanceof Error ? e.message : e}`);
@@ -194,6 +195,32 @@ try {
   await browser?.close();
   server.kill();
   tlsServer?.close();
+}
+
+// The first-run setup (#304): with a fresh install's config swapped in, /admin
+// leads to the setup (audited), and skipping it lands on the admin page for
+// good. Signed in first, while the config still has apps.
+async function setupPhase(run) {
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  await signIn(ctx);
+  fs.writeFileSync(configPath, "schemaVersion: 3\n", "utf8");
+  await run(ctx, "/admin", "setup", async (page) => {
+    await page.getByRole("heading", { name: "Set up CtrlCenter" }).waitFor({ timeout: 10_000 });
+  });
+  const page = await ctx.newPage();
+  try {
+    await page.goto(`${base}/admin`);
+    await page.getByRole("button", { name: "Skip setup" }).click();
+    await page.waitForURL((u) => u.pathname === "/admin", { timeout: 10_000 });
+    await page.goto(`${base}/admin`);
+    if (new URL(page.url()).pathname !== "/admin") throw new Error("the setup showed again after Skip");
+    console.log("ok    a fresh install starts with the setup, and Skip ends it for good");
+  } catch (e) {
+    failures.push(`setup: ${e instanceof Error ? e.message.split("\n")[0] : e}`);
+  } finally {
+    await page.close();
+    await ctx.close();
+  }
 }
 
 // The 2.x → 3.0 upgrade (#306): swap a 2.13 config in under the running

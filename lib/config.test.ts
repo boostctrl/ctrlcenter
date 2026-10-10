@@ -877,6 +877,7 @@ describe("readConfigInternal stays off public surfaces", () => {
   const ALLOWED = [
     // Admin-only (proxy-gated) pages and routes.
     "app/admin/page.tsx",
+    "app/admin/setup/page.tsx",
     "app/api/alerts/test/route.ts",
     "app/api/config/route.ts",
     "app/api/password/route.ts",

@@ -1,4 +1,6 @@
+import { redirect } from "next/navigation";
 import { readConfigInternal, readUpgradeNotice } from "@/lib/config";
+import { needsSetup } from "@/lib/setup";
 import { requireAdminPage } from "@/lib/api-auth";
 import AdminDashboard from "@/components/admin/AdminDashboard";
 
@@ -16,6 +18,8 @@ export default async function AdminPage({
 }) {
   const config = await readConfigInternal();
   await requireAdminPage("/admin", config.auth.passwordHash);
+  // A fresh install starts with the first-run setup (#304).
+  if (needsSetup(config)) redirect("/admin/setup");
   const params = await searchParams;
   // The one-time "upgraded to 3.0" banner (#306), until dismissed.
   const upgradeNotice = await readUpgradeNotice();

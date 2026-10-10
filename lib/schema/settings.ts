@@ -47,6 +47,9 @@ export const settingsSchema = z.object({
   settingsButton: z.boolean().default(true),
   // The UI scale and grid spacing, shared by every board (#298).
   layout: layoutSchema.default(layoutSchema.parse({})),
+  // The first-run setup (#304) has been finished or skipped. A fresh install
+  // starts without it; an upgraded 2.x install had it set by the migration.
+  setupComplete: z.boolean().default(false),
 });
 
 export type Settings = z.infer<typeof settingsSchema>;
@@ -70,5 +73,6 @@ export const settingsInputSchema = z.object({
   webhooks: webhooksUpdateSchema.optional(),
   settingsButton: z.boolean().optional(),
   layout: layoutUpdateSchema.optional(),
+  setupComplete: z.boolean().optional(),
 });
 export type SettingsInput = z.infer<typeof settingsInputSchema>;

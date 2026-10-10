@@ -165,7 +165,9 @@ at your own risk**, and review the code yourself first.
    `ghcr.io/boostctrl/ctrlcenter:latest`. To build from source instead, comment
    out `image:`, uncomment `build: .`, and run `docker compose up -d --build`.
 3. Open **http://localhost:3000** for the dashboard and **/admin** to manage it
-   (sign in with `ADMIN_PASSWORD`).
+   (sign in with `ADMIN_PASSWORD`). A new install starts with a short guided
+   setup — location and time zone, your first apps, status checks and a
+   theme. Skip any step; it's all in Settings later.
 
 Your data lives in `./config/config.yaml`, bind-mounted into the container and
 created automatically on first run (see [`config/config.example.yaml`](config/config.example.yaml)

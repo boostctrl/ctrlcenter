@@ -201,4 +201,13 @@ describe("upgrading through the store", () => {
     expect(rec(YAML.load(saved)).schemaVersion).toBe(CONFIG_SCHEMA_VERSION);
     expect(await fs.readFile(path.join(path.dirname(configPath), "config.v2.bak.yaml"), "utf8")).toBe(text);
   });
+
+  it("treats an empty config.yaml as a new install: no backup, no banner, setup still to do", async () => {
+    await fs.writeFile(configPath, "", "utf8");
+    const cfg = await config.readConfigInternal();
+    expect(cfg.settings.setupComplete).toBe(false);
+    const dir = path.dirname(configPath);
+    await expect(fs.access(path.join(dir, "config.v2.bak.yaml"))).rejects.toThrow();
+    await expect(fs.access(path.join(dir, "upgrade-notice.json"))).rejects.toThrow();
+  });
 });

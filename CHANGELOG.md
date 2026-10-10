@@ -67,6 +67,14 @@ here.
   thresholds, and pick how often it refreshes. Widgets are yours alone unless
   you set one to Everyone, and then visitors see only the values you picked
   out — never the URL, headers or the rest of the response. (#302)
+- **First-run setup (3.0).** A new install now opens on a short guided
+  setup after you first sign in: where you are (search a city or use your
+  browser's location), your time zone and units; your first apps, pasted as a
+  list of addresses, with optional examples; status checks and an alert
+  webhook; and a theme. Skip any step, or the whole thing, and change it all
+  later in Settings. It appears only while the dashboard has no apps and no
+  bookmarks, and never again once finished or skipped — an upgraded install
+  goes straight to the admin page. (#304)
 
 ### Changed
 
