@@ -7,6 +7,7 @@ import PageNav from "@/components/PageNav";
 import FloatingNav from "@/components/FloatingNav";
 import { navPages } from "@/lib/nav";
 import { WIDGET_DEFS } from "@/lib/widgets/defs";
+import { SCENES } from "@/lib/theme";
 import { P } from "./ui";
 import { WIDGET_HELP } from "./widget-help";
 
@@ -303,7 +304,7 @@ export default async function HelpPage() {
             </li>
             <li>
               <strong>Scene.</strong> The animated backdrop: Aurora,
-              Starfield, Petals, Comets, and more (18 in all), or none. Set
+              Starfield, Petals, Comets, and more ({SCENES.length - 1} in all), or none. Set
               how strongly it shows and whether it moves at full speed, calmly
               or not at all; a <em>Reduced</em> motion preference stills every
               scene whatever the theme says. Put a photo behind it as a
