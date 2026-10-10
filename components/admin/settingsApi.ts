@@ -107,6 +107,20 @@ export async function saveWidget(widget: WidgetInstance, { keepalive }: { keepal
   await putJson(`/api/widgets/${encodeURIComponent(widget.id)}`, widget, "Failed to save the widget", keepalive);
 }
 
+// Delete a widget and its rows on every board (#318).
+export async function deleteWidget(id: string): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(`/api/widgets/${encodeURIComponent(id)}`, { method: "DELETE" });
+  } catch {
+    throw new Error("Couldn't remove the widget");
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(apiErrorMessage(data, "Couldn't remove the widget"));
+  }
+}
+
 // Add a widget of a type, with its defaults (the palette, #303).
 export async function createWidget(type: string): Promise<WidgetInstance> {
   let res: Response;

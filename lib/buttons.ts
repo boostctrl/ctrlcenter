@@ -27,7 +27,7 @@ export function buttonClasses(
     // text-red-300 deepens to red-700 in light mode (app/globals.css), so the
     // button reads as active there, not disabled (#277).
     danger:
-      "border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20",
+      "btn-danger border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20",
   };
   return `${base} ${variants[variant]}`;
 }

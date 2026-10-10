@@ -22,11 +22,14 @@ const get = (id: string, auth = true) =>
   route.GET(request(`/api/widgets/${id}`, { session: auth ? session : undefined }), params({ id }));
 const put = (id: string, body: unknown, auth = true) =>
   route.PUT(request(`/api/widgets/${id}`, { method: "PUT", body, session: auth ? session : undefined }), params({ id }));
+const del = (id: string, auth = true) =>
+  route.DELETE(request(`/api/widgets/${id}`, { method: "DELETE", session: auth ? session : undefined }), params({ id }));
 
 describe("/api/widgets/[id]", () => {
   it("requires a session", async () => {
     expect((await get("cal-1", false)).status).toBe(401);
     expect((await put("cal-1", calendar, false)).status).toBe(401);
+    expect((await del("cal-1", false)).status).toBe(401);
   });
 
   it("answers with the instance as stored, secrets included, and what its editor needs", async () => {
@@ -62,5 +65,25 @@ describe("/api/widgets/[id]", () => {
     const res = await put("cal-1", { ...calendar, url: "ftp://nope" });
     expect(res.status).toBe(400);
     expect((await res.json()).error).toMatch(/http/);
+  });
+
+  it("deletes an instance and its rows on every board, naming those boards first (#318)", async () => {
+    const { replaceWidgets, replaceBoards, readConfigInternal } = await import("@/lib/config");
+    const extra = { ...newInstance("notes", "notes-2"), content: "stays" };
+    await replaceWidgets([calendar, notes, extra]);
+    await replaceBoards([
+      { id: "home", name: "Home", visibility: "public", layout: { sections: [{ widget: "notes-1", span: 8, hidden: false }, { widget: "notes-2", span: 8, hidden: false }] } },
+      { id: "media", name: "Media", visibility: "public", layout: { sections: [{ widget: "notes-1", span: 8, hidden: false }] } },
+      { id: "infra", name: "Infra", visibility: "private", layout: { sections: [{ widget: "notes-1", span: 8, hidden: true }] } },
+    ]);
+    expect((await (await get("notes-1")).json()).boards).toEqual(["Home", "Media"]);
+
+    expect((await del("notes-1")).status).toBe(204);
+    const config = await readConfigInternal();
+    expect(config.widgets.map((w) => w.id)).toEqual(["cal-1", "notes-2"]);
+    for (const board of config.boards)
+      expect(board.layout.sections.map((r) => r.widget), board.id).not.toContain("notes-1");
+    expect(config.boards[0].layout.sections.map((r) => r.widget)).toEqual(["notes-2"]);
+    expect((await del("notes-1")).status).toBe(404);
   });
 });

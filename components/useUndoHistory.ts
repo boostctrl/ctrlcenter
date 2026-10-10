@@ -131,7 +131,33 @@ export function useUndoHistory<T>() {
     sync();
   }, [sync]);
 
-  return { record, undo, redo, beginGesture, endGesture, group, clear, canUndo, canRedo };
+  // Apply `fn` to every step on both stacks: a change no undo may take back
+  // (a widget deleted for good, #318) leaves the history without it. A step
+  // the rewrite makes identical to its neighbour toward `current` is dropped,
+  // so no Undo or Redo press does nothing.
+  const rewrite = useCallback(
+    (fn: (value: T) => T, current: T) => {
+      const squash = (stack: T[]) => {
+        const out: T[] = [];
+        let next = JSON.stringify(current);
+        // From the step nearest `current` outward.
+        for (let i = stack.length - 1; i >= 0; i--) {
+          const value = fn(stack[i]);
+          const key = JSON.stringify(value);
+          if (key === next) continue;
+          out.unshift(value);
+          next = key;
+        }
+        return out;
+      };
+      undoRef.current = squash(undoRef.current);
+      redoRef.current = squash(redoRef.current);
+      sync();
+    },
+    [sync]
+  );
+
+  return { record, undo, redo, beginGesture, endGesture, group, clear, rewrite, canUndo, canRedo };
 }
 
 // How a control deep in the editor brackets a pointer gesture so it lands as

@@ -8,12 +8,15 @@
 // It loads the widget as stored (GET /api/widgets/[id]: the board page only
 // has the redacted copy, and saving that would wipe its secrets), autosaves
 // just that widget (PUT /api/widgets/[id]), and after each save asks the page
-// to refresh its data so the card shows the change.
+// to refresh its data so the card shows the change. Remove deletes it for
+// good, off every board (DELETE /api/widgets/[id], #318).
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { WidgetInstance } from "@/lib/schema";
 import type { WidgetEditContext } from "@/lib/config/widgets";
-import { fetchWidgetForEditing, saveWidget } from "./admin/settingsApi";
+import { deleteWidget, fetchWidgetForEditing, saveWidget } from "./admin/settingsApi";
+import { buttonClasses } from "@/lib/buttons";
+import { useConfirm } from "./admin/Confirm";
 import { useAutosave, SaveStatus } from "./admin/useAutosave";
 import { useFeedHealth } from "./admin/FeedHealth";
 import { INSTANCE_GROUPS } from "./admin/settings/widgets";
@@ -35,12 +38,15 @@ export default function WidgetPanel({
   label,
   onClose,
   onSaved,
+  onRemoved,
 }: {
   id: string;
   label: string;
   onClose: () => void;
   // A save landed: refresh the page's data.
   onSaved: () => void;
+  // The widget was deleted: drop it from the editor and close.
+  onRemoved: () => void;
 }) {
   const [context, setContext] = useState<WidgetEditContext | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -75,7 +81,11 @@ export default function WidgetPanel({
   // Escape closes it, wherever focus is — unless a menu inside it is open.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || document.querySelector("[data-widget-panel] details[open]")) return;
+      if (
+        e.key !== "Escape" ||
+        document.querySelector("[data-widget-panel] details[open], [role='alertdialog']")
+      )
+        return;
       onClose();
     };
     document.addEventListener("keydown", onKey);
@@ -113,7 +123,10 @@ export default function WidgetPanel({
         ) : !context ? (
           <p className="text-sm text-ink-55">Loading…</p>
         ) : (
-          <WidgetEditor key={context.widget.id} context={context} label={label} onSaved={onSaved} />
+          <>
+            <WidgetEditor key={context.widget.id} context={context} label={label} onSaved={onSaved} />
+            <RemoveWidget id={id} label={label} boards={context.boards} onRemoved={onRemoved} />
+          </>
         )}
       </div>
     </div>
@@ -171,6 +184,62 @@ function WidgetEditor({
       <div className="text-xs">
         <SaveStatus status={status} error={error} />
       </div>
+    </div>
+  );
+}
+
+// Delete the widget for good: its content, and its place on every board.
+// Undo can't bring it back, so the confirmation says so and names the boards
+// it comes off.
+function RemoveWidget({
+  id,
+  label,
+  boards,
+  onRemoved,
+}: {
+  id: string;
+  label: string;
+  boards: string[];
+  onRemoved: () => void;
+}) {
+  const confirm = useConfirm();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const where =
+    boards.length === 0
+      ? "It isn't on any board right now."
+      : `It comes off ${boards.length === 1 ? "the" : "these boards:"} ${boards.join(", ")}${boards.length === 1 ? " board" : ""}.`;
+  async function remove() {
+    const ok = await confirm({
+      title: `Remove ${label}?`,
+      message: `${where} Its settings and content go with it, and Undo can't bring it back.`,
+      confirmLabel: "Remove widget",
+      danger: true,
+    });
+    if (!ok) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteWidget(id);
+      onRemoved();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't remove the widget");
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="mt-6 flex flex-col items-start gap-2 border-t border-fg/10 pt-4">
+      <button type="button" disabled={busy} onClick={remove} className={buttonClasses("danger", "sm")}>
+        Remove widget
+      </button>
+      <p className="text-xs text-ink-55">
+        Deletes it from every board. To take it off this board only, use Hide.
+      </p>
+      {error && (
+        <p role="alert" className="text-xs text-red-400">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

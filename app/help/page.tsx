@@ -770,12 +770,15 @@ export default async function HelpPage() {
               <strong>Configure a widget.</strong> <strong>Configure</strong>{" "}
               in a selected card&apos;s toolbar, or on its chip in the tray,
               opens the same settings for a widget that&apos;s already there.
+              <strong> Remove widget</strong> at their foot deletes it for
+              good, from every board; to take it off just this board, hide it
+              instead.
             </li>
             <li>
               <strong>Boards.</strong> The <strong>Board</strong> menu in the
-              editor bar switches to another board&apos;s editor, renames or
-              reorders this one, and starts a new board. Who can see a board,
-              and removing one, stay in Settings → Layout.
+              editor bar switches to another board&apos;s editor; renames,
+              reorders or deletes this one, or sets who can open it; and
+              starts a new board. Deleting a board keeps its widgets.
             </li>
             <li>
               <strong>Hide or place from the tray.</strong> Drag a card onto

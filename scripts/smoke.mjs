@@ -179,6 +179,19 @@ try {
       await page.getByRole("button", { name: "Add widget" }).click();
       await page.getByRole("dialog", { name: "Add a widget" }).waitFor({ timeout: 5_000 });
     });
+    // Removing a widget and changing or deleting a board from the editor
+    // (#318): the panel's Remove confirmation and the open board menu, left
+    // unconfirmed.
+    await run(ctx, "/?edit=1&configure=apps", `editor-remove-${scheme}`, async (page) => {
+      await page.locator("[data-widget-panel]").getByRole("button", { name: "Remove widget" }).click();
+      await page.getByRole("alertdialog").waitFor({ timeout: 5_000 });
+    });
+    await run(ctx, "/?edit=1", `editor-boards-${scheme}`, async (page) => {
+      await page.getByRole("button", { name: /^Board:/ }).click();
+      const menu = page.getByRole("dialog", { name: "Boards" });
+      await menu.getByLabel("Who can open this board").waitFor({ timeout: 5_000 });
+      await menu.getByRole("button", { name: "Delete this board" }).waitFor({ timeout: 5_000 });
+    });
     if (scheme === "light") {
       await apiWidgetTest(ctx);
       await editorTray(ctx);

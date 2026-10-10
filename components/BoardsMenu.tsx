@@ -1,8 +1,8 @@
 "use client";
 
-// The layout editor's board menu (#303): switch to another board's editor,
-// rename or reorder this one, or start a new board — without a trip to
-// Settings → Layout, which keeps visibility and removal. Saves the board list
+// The layout editor's board menu (#303): switch to another board's editor;
+// rename, reorder, set who can open, or delete this one (#318); or start a
+// new board — without a trip to Settings → Layout. Saves the board list
 // (PUT /api/boards; layouts aren't sent, so they're kept as stored).
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -10,6 +10,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { slugId } from "@/lib/slug";
 import { saveBoards } from "./admin/settingsApi";
+import { useConfirm } from "./admin/Confirm";
+import { buttonClasses } from "@/lib/buttons";
 
 export type EditorBoard = {
   id: string;
@@ -33,6 +35,7 @@ export default function BoardsMenu({
   currentId: string;
 }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -51,12 +54,15 @@ export default function BoardsMenu({
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+      // A confirmation open over the menu closes first.
+      if (e.key !== "Escape" || document.querySelector("[role='alertdialog']")) return;
       setOpen(false);
       buttonRef.current?.focus();
     };
     const onDown = (e: PointerEvent) => {
       const t = e.target as Node;
+      // A confirmation opened from the menu is part of it.
+      if ((t as Element).closest?.("[role='alertdialog']")) return;
       if (!ref.current?.contains(t) && !popRef.current?.contains(t))
         setOpen(false);
     };
@@ -94,6 +100,29 @@ export default function BoardsMenu({
     save(next, () =>
       router.replace(editorHref(next, currentId), { scroll: false }),
     );
+  }
+
+  function setVisibility(visibility: EditorBoard["visibility"]) {
+    save(boards.map((b) => (b.id === currentId ? { ...b, visibility } : b)));
+  }
+
+  // Delete this board, then edit the home board. Its widgets stay: on other
+  // boards, and in Settings → Widgets.
+  async function remove() {
+    const next = boards.filter((b) => b.id !== currentId);
+    const ok = await confirm({
+      title: `Delete the ${nameOf(current)} board?`,
+      message:
+        "Its arrangement goes; its widgets stay, on any other boards they're on and in Settings → Widgets." +
+        (index === 0 ? ` ${nameOf(next[0])} becomes the home page.` : ""),
+      confirmLabel: "Delete board",
+      danger: true,
+    });
+    if (!ok) return;
+    save(next, () => {
+      setOpen(false);
+      router.push(editorHref(next, next[0].id));
+    });
   }
 
   function create() {
@@ -229,6 +258,32 @@ export default function BoardsMenu({
                 </button>
               </div>
             </form>
+            <div className="flex flex-col gap-1.5 border-t border-fg/10 pt-3">
+              <label
+                htmlFor="editor-board-visibility"
+                className="text-xs text-ink-60"
+              >
+                Who can open this board
+              </label>
+              <select
+                id="editor-board-visibility"
+                value={current.visibility}
+                disabled={busy}
+                onChange={(e) =>
+                  setVisibility(e.target.value === "private" ? "private" : "public")
+                }
+                className={field}
+              >
+                <option value="public">Everyone</option>
+                <option value="private">Only me</option>
+              </select>
+              {current.visibility === "private" && index === 0 && boards.length > 1 && (
+                <p className="text-xs text-ink-55">
+                  Visitors who aren&apos;t signed in get the first board open to
+                  everyone instead.
+                </p>
+              )}
+            </div>
             {boards.length < MAX_BOARDS && (
               <form
                 className="flex flex-col gap-1.5 border-t border-fg/10 pt-3"
@@ -262,13 +317,25 @@ export default function BoardsMenu({
                 </div>
               </form>
             )}
+            {boards.length > 1 && (
+              <div className="border-t border-fg/10 pt-3">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={remove}
+                  className={buttonClasses("danger", "sm")}
+                >
+                  Delete this board
+                </button>
+              </div>
+            )}
             {error && (
               <p role="alert" className="text-xs text-red-400">
                 {error}
               </p>
             )}
             <p className="text-xs text-ink-55">
-              Who can see a board, and removing one, are in{" "}
+              All boards are also in{" "}
               <Link
                 href="/admin?tab=settings&section=layout"
                 className="underline hover:text-ink-80"

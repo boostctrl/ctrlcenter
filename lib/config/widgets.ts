@@ -1,7 +1,7 @@
 // Widget instances (#297): the admin edits the whole list at once in
 // Settings → Widgets, or one instance in place from the layout editor (#303).
 import { randomUUID } from "node:crypto";
-import { newInstance, widgetInstancesUpdateSchema, type Group, type WidgetInstance } from "../schema";
+import { boardName, newInstance, widgetInstancesUpdateSchema, type Group, type WidgetInstance } from "../schema";
 import type { WidgetType } from "../layout";
 import { allTags } from "../groups";
 import { integrationLabels } from "../services/ids";
@@ -25,6 +25,9 @@ export type WidgetEditContext = {
   groups: Group[];
   tags: string[];
   integrations: { id: string; label: string }[];
+  // The boards showing it (a row that isn't hidden), by name, for the
+  // Remove step's confirmation (#318).
+  boards: string[];
 };
 export async function widgetForEditing(id: string): Promise<WidgetEditContext | null> {
   const config = await readConfigInternal();
@@ -36,6 +39,9 @@ export async function widgetForEditing(id: string): Promise<WidgetEditContext | 
     groups: config.groups,
     tags: allTags(config.apps),
     integrations: config.integrations.map((i) => ({ id: i.id, label: labels[i.id] })),
+    boards: config.boards
+      .filter((b) => b.layout.sections.some((r) => r.widget === id && !r.hidden))
+      .map(boardName),
   };
 }
 
@@ -72,5 +78,17 @@ export async function addWidget(type: WidgetType): Promise<WidgetInstance> {
     if (!parsed.success) throw new InvalidWidgetsError(parsed.error.issues[0]?.message ?? "Can't add that widget");
     config.widgets.push(widget);
     return widget;
+  });
+}
+
+// Delete one instance and its rows on every board (#318), so no board keeps
+// a row naming it. False when there's no such widget.
+export async function removeWidget(id: string): Promise<boolean> {
+  return mutate((config) => {
+    if (!config.widgets.some((w) => w.id === id)) return false;
+    config.widgets = config.widgets.filter((w) => w.id !== id);
+    for (const board of config.boards)
+      board.layout = { ...board.layout, sections: board.layout.sections.filter((r) => r.widget !== id) };
+    return true;
   });
 }

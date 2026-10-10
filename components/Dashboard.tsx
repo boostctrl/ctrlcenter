@@ -140,6 +140,7 @@ export default function Dashboard({
     setTopGap,
     toggleWidgetHidden,
     toggleWidgetLabel,
+    forgetWidget,
     saveStatus,
     saveError,
   } = useLayoutEditor({
@@ -488,6 +489,26 @@ export default function Dashboard({
     return null;
   }
 
+  // A widget deleted from its settings panel (#318): off the page and out of
+  // the undo history, with focus on the card that took its place (or the
+  // editor bar's Add widget when there's none).
+  function removed(widget: LayoutWidget) {
+    // The cards after it, then those before it, nearest first.
+    const at = layout.sections.findIndex((w) => w.id === widget.id);
+    const near = [...layout.sections.slice(at + 1), ...layout.sections.slice(0, Math.max(at, 0)).reverse()];
+    setPanelId(null);
+    forgetWidget(widget.id);
+    announce(`${labelFor(widget)} removed`);
+    router.refresh();
+    requestAnimationFrame(() => {
+      // The nearest one still in the grid (an empty one sits in the tray).
+      const card = near
+        .map((w) => gridRef.current?.querySelector<HTMLElement>(`[data-widget-id="${CSS.escape(w.id)}"]`))
+        .find(Boolean);
+      (card ?? document.querySelector<HTMLElement>("[data-widget-palette-button]"))?.focus({ preventScroll: true });
+    });
+  }
+
   // The editor's live region (#313): moves, resizes and selection, said out
   // loud. A repeat of the same words still re-announces (the key changes).
   const [announcement, setAnnouncement] = useState({ text: "", n: 0 });
@@ -704,20 +725,23 @@ export default function Dashboard({
       )}
 
       {editing && panelWidget && (
-        <WidgetPanel
-          // A fresh panel per widget, so another widget's editor never shows
-          // under this one's name while it loads.
-          key={panelWidget.id}
-          id={panelWidget.id}
-          label={labelFor(panelWidget)}
-          onClose={() => {
-            setPanelId(null);
-            gridRef.current
-              ?.querySelector<HTMLElement>(`[data-widget-id="${CSS.escape(panelWidget.id)}"]`)
-              ?.focus({ preventScroll: true });
-          }}
-          onSaved={() => router.refresh()}
-        />
+        <ConfirmProvider>
+          <WidgetPanel
+            // A fresh panel per widget, so another widget's editor never shows
+            // under this one's name while it loads.
+            key={panelWidget.id}
+            id={panelWidget.id}
+            label={labelFor(panelWidget)}
+            onClose={() => {
+              setPanelId(null);
+              gridRef.current
+                ?.querySelector<HTMLElement>(`[data-widget-id="${CSS.escape(panelWidget.id)}"]`)
+                ?.focus({ preventScroll: true });
+            }}
+            onSaved={() => router.refresh()}
+            onRemoved={() => removed(panelWidget)}
+          />
+        </ConfirmProvider>
       )}
 
       {cardDrag && draggedCell && (

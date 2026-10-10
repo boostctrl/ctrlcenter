@@ -617,6 +617,12 @@ select optgroup {
   .accent-focus:focus {
     border-color: var(--accent-to);
   }
+  /* The danger button's red tint over a translucent surface (a confirmation
+     over a tinted page) can leave red-700 text just under 4.5:1, so on the
+     light theme its text goes one shade deeper. */
+  .theme-light .btn-danger {
+    color: var(--color-red-800);
+  }
   /* A glow on top of the border tint: the 1px border change alone was barely
      visible, and links using this class have no border at all (#274). */
   .accent-focus:focus-visible {

@@ -247,6 +247,24 @@ export function useLayoutEditor({
     selectedRef.current = selectedId;
   }, [selectedId]);
 
+  // A widget deleted for good (#318): gone from the arrangement, from every
+  // undo and redo step and from what Revert restores, so nothing can put back
+  // a row naming it. Not an undo step itself, and not a change to save: the
+  // delete already took its rows off every board.
+  const { rewrite } = history;
+  const forgetWidget = useCallback(
+    (id: string) => {
+      const without = (l: EditableLayout) => ({ ...l, sections: l.sections.filter((w) => w.id !== id) });
+      const next = without(latestRef.current);
+      latestRef.current = next;
+      entryRef.current = without(entryRef.current);
+      rewrite(without, next);
+      setLayout(next);
+      setSelectedId((s) => (s === id ? null : s));
+    },
+    [rewrite]
+  );
+
   const doneEditing = useCallback(() => {
     setEditing(false);
     setSelectedId(null);
@@ -325,6 +343,7 @@ export function useLayoutEditor({
     setTopGap,
     toggleWidgetHidden,
     toggleWidgetLabel,
+    forgetWidget,
     saveStatus,
     saveError,
   };

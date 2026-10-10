@@ -63,6 +63,8 @@ export default function WidgetPalette({
         ref={buttonRef}
         type="button"
         aria-expanded={open}
+        // Where focus goes when a removed widget leaves no card behind (#318).
+        data-widget-palette-button
         onClick={(e) => {
           const r = e.currentTarget.getBoundingClientRect();
           setPos({

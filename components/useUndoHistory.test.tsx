@@ -135,4 +135,26 @@ describe("useUndoHistory", () => {
     expect(h.result.current.canUndo).toBe(false);
     expect(h.result.current.canRedo).toBe(false);
   });
+
+  it("rewrites both stacks, dropping steps the rewrite leaves doing nothing (#318)", () => {
+    const h = setup();
+    // 0 → 1 → 2 → 3 → 4, then back to 2: undo holds 0, 1; redo holds 4, 3.
+    for (const n of [1, 2, 3, 4]) h.change(n);
+    h.undo();
+    h.undo();
+    expect(h.value).toBe(2);
+    // Odd values become their even neighbour: 1 → 0 and 3 → 2. The undo
+    // stack [0, 1] becomes [0], since 1's step now matches 0; the redo stack
+    // [4, 3] becomes [4], since 3's step now matches the current 2.
+    act(() => h.result.current.rewrite((v) => v - (v % 2), h.value));
+    h.undo();
+    expect(h.value).toBe(0);
+    expect(h.result.current.canUndo).toBe(false);
+    h.redo();
+    expect(h.value).toBe(2);
+    h.redo();
+    expect(h.value).toBe(4);
+    expect(h.result.current.canRedo).toBe(false);
+  });
 });
+

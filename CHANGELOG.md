@@ -54,9 +54,11 @@ here.
   notes card or feed is one step instead of a trip to Settings and back.
   *Configure* on a selected card, or on its chip in the tray, opens the same
   settings for a widget already there, and Settings → Widgets gains an *Edit
-  in place* link for each one. A *Board* menu in the editor switches between
-  boards' editors, renames or reorders the current board, and starts a new
-  one. (#303)
+  in place* link for each one. *Remove widget* at the foot of those
+  settings deletes a widget for good, off every board, after a confirmation
+  that names the boards it's on. A *Board* menu in the editor switches between
+  boards' editors, renames or reorders the current board, sets who can open
+  it, deletes it, and starts a new one. (#303, #318)
 - **API widgets (3.0).** Show values from any JSON endpoint — a NAS, a
   router, a home-automation hub, your own script — as a single stat, a gauge,
   label/value rows or a list (Settings → Widgets → API widgets). Point each
