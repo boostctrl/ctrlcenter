@@ -297,6 +297,11 @@ sub-issue per item. T1–T8 are the polish core and land first; T9–T16 are
 the depth items, each independent of the others. Every item is additive to
 the v3 config.
 
+**Landed (2026-10-10): all sixteen, on `develop` through PR #323**, one
+commit per item, each with its changelog entry, tests and a Chromium
+render. Follow-ups filed along the way: #338 (a CDN flake in the smoke
+run) and #339 (no way to delete an uploaded wallpaper from the admin UI).
+
 **Principles.**
 - Nothing here changes an existing visitor's or admin's look. New knobs
   default to the current behavior.
