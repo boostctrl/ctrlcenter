@@ -316,6 +316,30 @@ export function wallpaperEqual(a: Wallpaper | null | undefined, b: Wallpaper | n
   return a.src === b.src && a.blur === b.blur && a.dim === b.dim && a.fit === b.fit;
 }
 
+// The bundled backgrounds (#348): small SVG patterns shipped under
+// public/backgrounds/, offered as a "Bundled" row wherever a wallpaper is
+// chosen. Each is a plain same-origin path, so it passes isWallpaperSrc and
+// goes through the resolver, themes, share codes and config like any other
+// wallpaper; `fit` is how the pattern was drawn to be shown. The paths are
+// API: a visitor's theme or a config may name one, so retiring a file needs
+// a migration step, not a delete. Neutral grey at low opacity, so each reads
+// on both light and dark surfaces.
+export type BundledBackground = {
+  id: string;
+  name: string;
+  description: string;
+  src: string;
+  fit: WallpaperFit;
+};
+
+export const BUNDLED_BACKGROUNDS: BundledBackground[] = [
+  { id: "linen", name: "Linen", description: "Fine woven threads", src: "/backgrounds/linen.svg", fit: "tile" },
+  { id: "hatch", name: "Hatch", description: "Fine diagonal hairlines", src: "/backgrounds/hatch.svg", fit: "tile" },
+  { id: "honeycomb", name: "Honeycomb", description: "A hex lattice", src: "/backgrounds/honeycomb.svg", fit: "tile" },
+  { id: "grain", name: "Grain", description: "Soft film grain", src: "/backgrounds/grain.svg", fit: "tile" },
+  { id: "vignette", name: "Vignette", description: "Corners darken softly", src: "/backgrounds/vignette.svg", fit: "cover" },
+];
+
 // Semantic colors (#331): up, down, warning and info, as a theme's own per
 // mode. Absent, the stylesheet's defaults apply (pale on dark, deep on light).
 export type SemanticKey = "up" | "down" | "warning" | "info";

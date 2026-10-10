@@ -69,8 +69,9 @@ Built with Next.js 16, React 19, and Tailwind v4.
     `horizon`, `orbit`, `peaks`, `rain`, `fireflies`, `blueprint`, `prisms`,
     `petals`, `comets`, `topography`, `snow`, `embers`, `bokeh`, `beams`,
     `bubbles`, `glyphs`, with intensity and motion controls (and a
-    Reduce-motion switch that stills them all). A **wallpaper** can sit behind the scene,
-    blurred and dimmed.
+    Reduce-motion switch that stills them all). A **wallpaper** can sit behind
+    the scene, blurred and dimmed: one of five bundled patterns (linen, hatch,
+    honeycomb, grain, vignette), a web address, or an upload.
   - **Colors & type** — a palette plus an accent gradient, or your own colors,
     including the status colors (up, down, warning, info); or pick one accent
     and let the builder derive a whole palette with contrast guaranteed. A body
@@ -250,6 +251,7 @@ settings:
     # headingFont: lora           # titles in their own face; density: compact | comfortable | spacious
     # status: { up: '#22c55e', down: '#ef4444', warning: '#f59e0b', info: '#38bdf8' }
     # wallpaper: { src: "https://…/photo.jpg", blur: 8, dim: 40, fit: cover }  # fit: cover | contain | tile
+    #   or a bundled pattern: { src: /backgrounds/linen.svg, fit: tile }   # linen hatch honeycomb grain vignette
   visitorTheming: all       # what visitors may change: all | packs (the gallery
                             # and light/dark only) | none (kiosks); admins always may
   themeSchedule:            # a day and a night theme by time of day

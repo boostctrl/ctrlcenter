@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 import {
+  BUNDLED_BACKGROUNDS,
   resolveThemePacks,
   sanitizeTune,
   isDefaultTune,
@@ -41,6 +44,38 @@ describe("catalog sizes", () => {
     for (const p of THEME_PACKS) expect(ids).toContain(p.scene);
     for (const retired of ["glow", "vortex", "mesh"]) {
       expect(ids).not.toContain(retired);
+    }
+  });
+});
+
+describe("bundled backgrounds (#348)", () => {
+  it("ships five, each a shipped file at a same-origin path every wallpaper check accepts", () => {
+    expect(BUNDLED_BACKGROUNDS.map((b) => b.id)).toEqual(["linen", "hatch", "honeycomb", "grain", "vignette"]);
+    for (const b of BUNDLED_BACKGROUNDS) {
+      expect(b.src).toBe(`/backgrounds/${b.id}.svg`);
+      expect(isWallpaperSrc(b.src)).toBe(true);
+      const wp = { src: b.src, blur: 0, dim: 0, fit: b.fit };
+      expect(sanitizeWallpaper(wp)).toEqual(wp);
+      // The path is API (a theme or config may name it), so the file must
+      // exist in public/, which the image and the smoke run both ship.
+      const file = path.join(process.cwd(), "public", b.src);
+      expect(fs.existsSync(file), `${b.src} is missing under public/`).toBe(true);
+      // Small enough to inline-fetch without thought: the five together
+      // stay under 3 KB.
+      expect(fs.statSync(file).size).toBeLessThan(1024);
+      // proxy.ts skips paths with a file extension, so the file is served
+      // straight from public/ with no session check in the way.
+      expect(b.src).toMatch(/\.\w+$/);
+    }
+  });
+
+  it("a pack's bundled wallpaper names a shipped background", () => {
+    for (const p of THEME_PACKS) {
+      for (const wp of [p.wallpaper, p.wallpaperLight]) {
+        if (wp && wp.src.startsWith("/backgrounds/")) {
+          expect(BUNDLED_BACKGROUNDS.some((b) => b.src === wp.src)).toBe(true);
+        }
+      }
     }
   });
 });

@@ -2,20 +2,23 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  BUNDLED_BACKGROUNDS,
   MAX_WALLPAPER_BLUR,
   WALLPAPER_FITS,
   isWallpaperSrc,
+  type BundledBackground,
   type Wallpaper,
   type WallpaperFit,
 } from "@/lib/theme";
 import { buttonClasses } from "@/lib/buttons";
 import { ChipGroup } from "../ChipGroup";
+import { OptionCard } from "./OptionCard";
 
 // The wallpaper controls (#333), shared by the theme builder's Scene tab, the
 // admin pack editor and Settings → General: an image address (typed, or for
-// an admin, uploaded), blur, dim and fit. `value` null means no wallpaper. The
-// address commits on blur or Enter, not per keystroke, so the page doesn't
-// fetch every partial URL.
+// an admin, uploaded), a row of the bundled backgrounds (#348), blur, dim and
+// fit. `value` null means no wallpaper. The address commits on blur or Enter,
+// not per keystroke, so the page doesn't fetch every partial URL.
 export function WallpaperFields({
   value,
   onChange,
@@ -63,6 +66,13 @@ export function WallpaperFields({
   const patch = (p: Partial<Wallpaper>) => {
     if (!value) return;
     onChange({ ...value, ...p });
+  };
+  // A bundled background keeps the blur and dim and takes the fit it was
+  // drawn for; the address box follows it like an upload.
+  const pickBundled = (b: BundledBackground) => {
+    setSrc(b.src);
+    setSrcError(null);
+    if (b.src !== value?.src) onChange({ ...wp, src: b.src, fit: b.fit });
   };
 
   async function handleUpload(file: File) {
@@ -148,10 +158,38 @@ export function WallpaperFields({
         ) : (
           !compact && (
             <p id={`${srcId}-desc`} className="text-[10px] text-ink-40">
-              A photo behind the scene{canUpload ? ": a web address, or upload a PNG, JPEG or WebP up to 4 MB" : ", by its web address"}.
+              An image behind the scene: a web address{canUpload ? ", a PNG, JPEG or WebP upload up to 4 MB" : ""}, or one of the bundled patterns below.
             </p>
           )
         )}
+      </div>
+      {/* The bundled backgrounds (#348): patterns shipped with the app, so a
+          wallpaper needs no address or upload. */}
+      <div className={compact ? "space-y-1" : "space-y-1 sm:col-span-2"}>
+        <span className={`block ${labelClass}`}>Bundled</span>
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+          {BUNDLED_BACKGROUNDS.map((b) => (
+            <OptionCard
+              key={b.id}
+              selected={value?.src === b.src}
+              onClick={() => pickBundled(b)}
+              name={b.name}
+              desc={compact ? undefined : b.description}
+              title={b.description}
+            >
+              <span
+                className={`block w-full overflow-hidden rounded-md ring-1 ring-fg/10 ${compact ? "h-6" : "h-10"}`}
+                style={{
+                  backgroundColor: "var(--background)",
+                  backgroundImage: `url("${b.src}")`,
+                  backgroundSize: b.fit === "tile" ? "auto" : "cover",
+                  backgroundRepeat: b.fit === "tile" ? "repeat" : "no-repeat",
+                }}
+                aria-hidden
+              />
+            </OptionCard>
+          ))}
+        </div>
       </div>
       {value && (
         <>

@@ -23,6 +23,13 @@ here.
   your palette and follows the intensity and motion controls, and the
   scenes that never move (Peaks, Blueprint, Topography) now say *Still* in
   the picker. (#348)
+- **Bundled backgrounds.** Five patterns ship with the app and sit in a
+  *Bundled* row wherever a wallpaper is chosen (the builder's Scene tab,
+  Settings → General and the Themes tab): Linen, Hatch, Honeycomb, Grain
+  and a Vignette that darkens the corners. Pick one and it is there, with
+  no address or upload needed; blur, dim and fit still apply, and it is
+  saved in themes and share codes like any wallpaper. They are not uploads,
+  so *Uploaded wallpapers* does not list them. (#348)
 
 ## [3.0.0-rc.1] - 2026-10-10
 
