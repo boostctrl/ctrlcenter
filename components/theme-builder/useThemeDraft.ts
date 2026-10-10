@@ -7,7 +7,7 @@ import type { Mode } from "../prefs/themeApply";
 import { useConfirm } from "../admin/Confirm";
 import { colorSetsEqual, sceneFxEqual, tunesEqual } from "@/lib/theme";
 import type { ModeColors, ThemePack } from "@/lib/theme";
-import { parseThemesExport, siteThemeFromCustomTheme } from "@/lib/prefs";
+import { decodeThemeCode, encodeThemeCode, newThemeId, parseThemesExport, siteThemeFromCustomTheme } from "@/lib/prefs";
 import type { CustomTheme, ThemeColors } from "@/lib/prefs";
 import { saveSettingsPatch } from "../admin/settingsApi";
 import { downloadJson } from "@/lib/download";
@@ -42,12 +42,15 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     setAccentOverride,
     saveNamedTheme,
     applyNamedTheme,
+    captureTheme,
+    adoptTheme,
     renameNamedTheme,
     deleteNamedTheme,
     importNamedThemes,
     resetTheme,
     resolvedMode,
     setPreviewMode,
+    hydrated,
   } = useLookPrefs();
   const confirm = useConfirm();
 
@@ -166,6 +169,67 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
       accentTo: activeAccent.to,
     });
   }, [activeLook, editMode, activeAccent]);
+
+  // Sharing as text (#329): the current look as a code on the clipboard, a
+  // pasted code (or link) adopted into the saved list and applied, and a
+  // /settings#theme=<code> link handled once on arrival. Status lines sit in
+  // the Your-themes section like the file import's.
+  const [codeStatus, setCodeStatus] = useState<string | null>(null);
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState("");
+  async function copyCode() {
+    const theme = captureTheme(name.trim() || "Shared look", newThemeId());
+    const code = encodeThemeCode(theme);
+    try {
+      await navigator.clipboard.writeText(code);
+      setCodeStatus("Copied this look as a code — paste it into another browser's theme builder.");
+    } catch {
+      // No clipboard (plain HTTP, denied): show the code to copy by hand.
+      setPasteText(code);
+      setPasteOpen(true);
+      setCodeStatus("Couldn't reach the clipboard — the code is in the box below, ready to copy.");
+    }
+  }
+  function takeCode(text: string): boolean {
+    const theme = decodeThemeCode(text);
+    if (!theme) {
+      setCodeStatus("That isn't a theme code.");
+      return false;
+    }
+    const adopted = adoptTheme(theme);
+    setCodeStatus(
+      adopted
+        ? `Applied “${adopted.name}”${adopted.id === theme.id ? " and saved it to your themes" : ""}.`
+        : "Couldn't save the theme — your browser is blocking local storage (private mode or full storage)."
+    );
+    return !!adopted;
+  }
+  function pasteCode() {
+    if (takeCode(pasteText)) {
+      setPasteText("");
+      setPasteOpen(false);
+    }
+  }
+  // The link form: taken once the stored look has hydrated (this hook's own
+  // mount effect runs before PrefsProvider's, when the saved list is still
+  // the empty SSR state and would be clobbered), through a latest-value ref
+  // so the adopt sees the loaded list; then cleared from the address bar so
+  // a reload doesn't re-import it.
+  const takeCodeRef = useRef(takeCode);
+  useEffect(() => {
+    takeCodeRef.current = takeCode;
+  });
+  const linkTaken = useRef(false);
+  useEffect(() => {
+    if (!hydrated || linkTaken.current) return;
+    const hash = window.location.hash;
+    if (!hash.startsWith("#theme=")) return;
+    linkTaken.current = true;
+    // The URL is the external system here; the status it sets is the
+    // outcome of reading it, once.
+    takeCodeRef.current(hash);
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+  }, [hydrated]);
 
   // A palette or saved theme can bring in a two-color accent the Solid editor
   // can't represent — flip back to the gradient editor when that happens.
@@ -351,6 +415,13 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     importStatus,
     promoteStatus,
     promoting,
+    codeStatus,
+    pasteOpen,
+    setPasteOpen,
+    pasteText,
+    setPasteText,
+    copyCode,
+    pasteCode,
     fileInputRef,
     accentStyle,
     updateBase,

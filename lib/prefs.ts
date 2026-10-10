@@ -376,6 +376,54 @@ export function saveThemes(themes: CustomTheme[]): boolean {
   }
 }
 
+// A theme as a short text code (#329): "ctc1." plus the base64url of the
+// theme's JSON without its id, so it can be pasted into another browser or
+// carried in a link (/settings#theme=<code>). Decoding runs the same forgiving
+// sanitizer as a file import, so a code from a newer version with fields this
+// build doesn't know still lands; the id is minted fresh.
+const CODE_PREFIX = "ctc1.";
+
+function bytesToBase64Url(bytes: Uint8Array): string {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function base64UrlToBytes(text: string): Uint8Array | null {
+  const b64 = text.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (text.length % 4)) % 4);
+  try {
+    const bin = atob(b64);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+export function encodeThemeCode(theme: CustomTheme): string {
+  const { id: _id, ...rest } = theme;
+  void _id;
+  return CODE_PREFIX + bytesToBase64Url(new TextEncoder().encode(JSON.stringify(rest)));
+}
+
+// The theme in a code (whitespace around it is ignored), or null when it
+// isn't one. Accepts the bare code or a full /settings#theme=<code> link.
+export function decodeThemeCode(input: string): CustomTheme | null {
+  let text = input.trim();
+  const hash = text.indexOf("#theme=");
+  if (hash >= 0) text = text.slice(hash + "#theme=".length);
+  if (!text.startsWith(CODE_PREFIX)) return null;
+  const bytes = base64UrlToBytes(text.slice(CODE_PREFIX.length));
+  if (!bytes) return null;
+  try {
+    const theme = sanitizeCustomTheme(JSON.parse(new TextDecoder().decode(bytes)));
+    return theme ? { ...theme, id: newThemeId() } : null;
+  } catch {
+    return null;
+  }
+}
+
 // Mint an id for a saved theme. crypto.randomUUID() only exists in secure
 // contexts (HTTPS/localhost), and this app is routinely self-hosted over plain
 // HTTP on a LAN — so fall back to getRandomValues, which is available

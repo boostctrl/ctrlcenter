@@ -29,6 +29,13 @@ export default function ThemesTab({
     importStatus,
     promoteStatus,
     promoting,
+    codeStatus,
+    pasteOpen,
+    setPasteOpen,
+    pasteText,
+    setPasteText,
+    copyCode,
+    pasteCode,
     fileInputRef,
     commitRename,
     hasDuplicateNames,
@@ -70,8 +77,20 @@ export default function ThemesTab({
             Your themes
           </span>
           {/* Import always (so an empty list can still receive a file);
-              export only once there's something to export. */}
-          <div className="flex items-center gap-2">
+              export only once there's something to export. A code carries one
+              look as text (#329): copy the current one, or paste one in. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={copyCode} className={buttonClasses("ghost")}>
+              Copy as code
+            </button>
+            <button
+              type="button"
+              onClick={() => setPasteOpen(!pasteOpen)}
+              aria-expanded={pasteOpen}
+              className={buttonClasses("ghost")}
+            >
+              Paste a code
+            </button>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
@@ -98,9 +117,35 @@ export default function ThemesTab({
             />
           </div>
         </div>
+        {pasteOpen && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              pasteCode();
+            }}
+            className="flex flex-wrap items-center gap-2"
+          >
+            <input
+              value={pasteText}
+              onChange={(e) => setPasteText(e.target.value)}
+              placeholder="Paste a theme code or link"
+              aria-label="Theme code"
+              spellCheck={false}
+              className="accent-focus min-w-0 flex-1 basis-56 rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 font-mono text-xs text-fg outline-none transition-colors"
+            />
+            <button type="submit" disabled={!pasteText.trim()} className={buttonClasses("primary")}>
+              Apply
+            </button>
+          </form>
+        )}
+        {codeStatus && (
+          <p role="status" className="text-xs text-ink-50">
+            {codeStatus}
+          </p>
+        )}
         {customThemes.length === 0 && (
           <p className="text-xs text-ink-40">
-            Import a themes file exported from another browser.
+            Import a themes file exported from another browser, or paste a code.
           </p>
         )}
         {importStatus && (

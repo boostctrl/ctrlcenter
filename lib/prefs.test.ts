@@ -5,6 +5,8 @@ import {
   sanitizeModeColors,
   sanitizeCustomTheme,
   siteThemeFromCustomTheme,
+  encodeThemeCode,
+  decodeThemeCode,
   type CustomTheme,
 } from "./prefs";
 import { themeInputSchema } from "./schema";
@@ -205,5 +207,39 @@ describe("sanitizeCustomTheme scene effects (#327)", () => {
     expect(site.sceneMotion).toBe("calm");
     expect(site.sceneIntensityLight).toBe(30);
     expect(sanitizeCustomTheme({ ...base, sceneFx: { motion: "nope" } })?.sceneFx).toBeUndefined();
+  });
+});
+
+describe("theme codes (#329)", () => {
+  const theme = sanitizeCustomTheme({
+    name: "Rosé nuit",
+    dark: valid,
+    light: { ...valid, background: "#eceef3", foreground: "#181b24" },
+    design: "cyber",
+    scene: "grid",
+    font: "inter",
+    tune: { glow: 50 },
+    sceneFx: { motion: "calm" },
+  })!;
+
+  it("round-trips a theme through a code, minting a new id", () => {
+    const code = encodeThemeCode(theme);
+    expect(code.startsWith("ctc1.")).toBe(true);
+    expect(code).not.toMatch(/[+/=]/);
+    const back = decodeThemeCode(code)!;
+    expect(back.id).not.toBe(theme.id);
+    const { id: _a, ...a } = theme;
+    const { id: _b, ...b } = back;
+    void _a;
+    void _b;
+    expect(b).toEqual(a);
+  });
+
+  it("accepts a link and surrounding whitespace, and rejects anything else", () => {
+    const code = encodeThemeCode(theme);
+    expect(decodeThemeCode(`  https://home.lan/settings#theme=${code}\n`)?.name).toBe("Rosé nuit");
+    expect(decodeThemeCode("ctc1.not base64!!")).toBeNull();
+    expect(decodeThemeCode("hello")).toBeNull();
+    expect(decodeThemeCode("ctc1." + Buffer.from("{\"name\":1}").toString("base64url"))).toBeNull();
   });
 });

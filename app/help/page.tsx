@@ -320,7 +320,11 @@ export default async function HelpPage() {
           <P>
             Light and dark can carry wholly independent looks. Like the rest of
             your preferences, everything stays on your device, so each visitor
-            gets their own. Signed-in admins get one extra control here: the
+            gets their own. To carry a look elsewhere, <em>Copy as code</em>{" "}
+            puts it on the clipboard as a short code; <em>Paste a code</em> in
+            another browser&apos;s builder applies and saves it, and a link of
+            the form <Code>/settings#theme=&lt;code&gt;</Code> does the same on
+            arrival. Export and Import move your whole list as a file. Signed-in admins get one extra control here: the
             globe on a saved theme makes that look the site-wide default every
             visitor starts from — a copy, so editing the saved theme later
             doesn&apos;t change the site.

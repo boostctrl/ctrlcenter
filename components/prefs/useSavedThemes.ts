@@ -11,7 +11,10 @@ import {
   saveDesign,
   saveScene,
   saveFont,
+  saveTune,
+  saveSceneFx,
   newThemeId,
+  NO_ACCENT_OVERRIDES,
   type CustomTheme,
   type AccentOverrides,
   type ModePair,
@@ -19,6 +22,7 @@ import {
 import type { ColorSet, DesignId, ModeColors, SceneFx, SceneId, Tune } from "@/lib/theme";
 import type { FontId } from "@/lib/fonts";
 import {
+  applyAll as paintAll,
   applyDesign,
   applyFont,
   applyScene,
@@ -29,6 +33,28 @@ import {
   type Mode,
   type Theme,
 } from "./themeApply";
+
+// A theme's content, id excluded — field by field, not JSON of the whole
+// object, so the key can't silently start depending on key insertion order
+// across the places themes are built. Imports de-dupe on it.
+function themeKey(t: CustomTheme): string {
+  const colorKey = (c: ColorSet) => [c.background, c.foreground, c.accentFrom, c.accentTo];
+  return JSON.stringify([
+    t.name,
+    t.design,
+    t.scene,
+    t.font,
+    t.designLight,
+    t.sceneLight,
+    t.fontLight,
+    colorKey(t.dark),
+    colorKey(t.light),
+    t.tune ?? null,
+    t.tuneLight ?? null,
+    t.sceneFx ?? null,
+    t.sceneFxLight ?? null,
+  ]);
+}
 
 // The visitor's saved (named) themes: the list itself and its CRUD — save the
 // current look, restore one, rename, delete, import. The live look these read
@@ -43,14 +69,17 @@ export function useSavedThemes({
   resolveScene,
   resolveFont,
   resolveTune,
-  setTune,
+  defTune,
   resolveSceneFx,
-  setSceneFx,
+  defSceneFx,
   applyThemeColors,
   displayTheme,
   setDesigns,
   setScenes,
   setFonts,
+  setTunes,
+  setSceneFxs,
+  reduceMotion,
 }: {
   activeLook: ModeColors | null;
   seedColorSet: (dark: boolean) => ColorSet;
@@ -60,14 +89,17 @@ export function useSavedThemes({
   resolveScene: (dark: boolean) => SceneId;
   resolveFont: (dark: boolean) => FontId;
   resolveTune: (dark: boolean) => Tune | null;
-  setTune: (tune: Tune | null, mode: Mode) => void;
+  defTune: (dark: boolean) => Tune | null;
   resolveSceneFx: (dark: boolean) => SceneFx | null;
-  setSceneFx: (fx: SceneFx | null, mode: Mode) => void;
+  defSceneFx: (dark: boolean) => SceneFx | null;
   applyThemeColors: (colors: ModeColors, mode?: Mode) => void;
   displayTheme: Theme;
   setDesigns: Dispatch<SetStateAction<ModePair<DesignId | null>>>;
   setScenes: Dispatch<SetStateAction<ModePair<SceneId | null>>>;
   setFonts: Dispatch<SetStateAction<ModePair<FontId | null>>>;
+  setTunes: Dispatch<SetStateAction<ModePair<Tune | null>>>;
+  setSceneFxs: Dispatch<SetStateAction<ModePair<SceneFx | null>>>;
+  reduceMotion: boolean;
 }) {
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([]);
 
@@ -80,26 +112,20 @@ export function useSavedThemes({
     return true;
   }, []);
 
-  // Capture the current full look — both modes' design/scene/font and colors —
-  // as a saved theme, baking each mode's effective accent into its colorset so it
-  // restores exactly as shown.
-  const saveNamedTheme = useCallback(
-    (name: string, overwriteId?: string) => {
+  // Capture the current full look — both modes' design/scene/font, colors,
+  // tune and scene effects — as a theme object, baking each mode's effective
+  // accent into its colorset so it restores exactly as shown. Saving stores
+  // it; "Copy as code" (#329) encodes it without storing.
+  const captureTheme = useCallback(
+    (name: string, id: string): CustomTheme => {
       const look =
         activeLook ?? { dark: seedColorSet(true), light: seedColorSet(false) };
-      // Bake each mode's own effective accent into its colorset.
       const withAccent = (cs: ColorSet, dark: boolean): ColorSet => {
         const a = resolveAccent(overrideFor(accentOverride, dark), cs, defaultAccent);
         return { ...cs, accentFrom: a.from, accentTo: a.to };
       };
-      // Overwriting keeps the target's id (and its slot in the list); everything
-      // else — name and both modes' design/scene/font/colors — is recaptured
-      // fresh, exactly as a new save would.
-      const existing = overwriteId
-        ? customThemes.find((t) => t.id === overwriteId)
-        : undefined;
       const entry: CustomTheme = {
-        id: existing ? existing.id : newThemeId(),
+        id,
         name: name.trim().slice(0, 40) || "Custom",
         design: resolveDesign(true),
         scene: resolveScene(true),
@@ -110,25 +136,17 @@ export function useSavedThemes({
         dark: withAccent(look.dark, true),
         light: withAccent(look.light, false),
       };
-      // The fine-tune over each mode's design, when there is one (#326).
       const tune = resolveTune(true);
       const tuneLight = resolveTune(false);
       if (tune) entry.tune = tune;
       if (tuneLight) entry.tuneLight = tuneLight;
-      // And each mode's scene effects (#327).
       const fx = resolveSceneFx(true);
       const fxLight = resolveSceneFx(false);
       if (fx) entry.sceneFx = fx;
       if (fxLight) entry.sceneFxLight = fxLight;
-      return commitThemes(
-        existing
-          ? customThemes.map((t) => (t.id === existing.id ? entry : t))
-          : [...customThemes, entry]
-      );
+      return entry;
     },
     [
-      customThemes,
-      commitThemes,
       activeLook,
       seedColorSet,
       accentOverride,
@@ -141,15 +159,31 @@ export function useSavedThemes({
     ]
   );
 
+  const saveNamedTheme = useCallback(
+    (name: string, overwriteId?: string) => {
+      // Overwriting keeps the target's id (and its slot in the list); everything
+      // else — name and both modes' parts — is recaptured fresh, exactly as a
+      // new save would.
+      const existing = overwriteId
+        ? customThemes.find((t) => t.id === overwriteId)
+        : undefined;
+      const entry = captureTheme(name, existing ? existing.id : newThemeId());
+      return commitThemes(
+        existing
+          ? customThemes.map((t) => (t.id === existing.id ? entry : t))
+          : [...customThemes, entry]
+      );
+    },
+    [customThemes, commitThemes, captureTheme]
+  );
+
   // Restore a saved theme: both modes' design/scene/font and colors, then apply
   // the chrome for whichever mode is displayed now — from the theme's own parts,
   // not applyChrome, which would resolve from this render's designs/scenes/fonts
   // state (the values from before the setState calls above commit) and re-apply
   // the old chrome until a mode toggle or reload (#120).
-  const applyNamedTheme = useCallback(
-    (id: string) => {
-      const t = customThemes.find((x) => x.id === id);
-      if (!t) return;
+  const applyTheme = useCallback(
+    (t: CustomTheme) => {
       const nextDesigns = { dark: t.design, light: t.designLight };
       const nextScenes = { dark: t.scene, light: t.sceneLight };
       const nextFonts = { dark: t.font, light: t.fontLight };
@@ -159,21 +193,53 @@ export function useSavedThemes({
       saveScene(nextScenes);
       setFonts(nextFonts);
       saveFont(nextFonts);
-      // Each mode's tune (null = the design untouched); setTune paints the
-      // displayed mode's one itself.
-      setTune(t.tune ?? null, "dark");
-      setTune(t.tuneLight ?? null, "light");
-      setSceneFx(t.sceneFx ?? null, "dark");
-      setSceneFx(t.sceneFxLight ?? null, "light");
+      const nextTunes = { dark: t.tune ?? null, light: t.tuneLight ?? null };
+      setTunes(nextTunes);
+      saveTune(nextTunes);
+      const nextFx = { dark: t.sceneFx ?? null, light: t.sceneFxLight ?? null };
+      setSceneFxs(nextFx);
+      saveSceneFx(nextFx);
       applyThemeColors({ dark: t.dark, light: t.light });
       const dark = resolveDark(displayTheme);
+      // applyThemeColors painted with this render's tune and effects (the
+      // state above hasn't committed); paint once more with the theme's own,
+      // so a restored tune isn't wiped until the next repaint (#329).
+      paintAll({
+        theme: displayTheme,
+        look: { dark: t.dark, light: t.light },
+        accentOverride: NO_ACCENT_OVERRIDES,
+        defaultAccent,
+        tune: (dark ? t.tune : t.tuneLight) ?? defTune(dark),
+        sceneFx: (dark ? t.sceneFx : t.sceneFxLight) ?? defSceneFx(dark),
+        reduceMotion,
+      });
       applyDesign(dark ? t.design : t.designLight);
       applyScene(dark ? t.scene : t.sceneLight);
       applyFont(dark ? t.font : t.fontLight);
     },
     // The setters are PrefsProvider's useState setters — stable, listed only
     // because they arrive as arguments here.
-    [customThemes, applyThemeColors, displayTheme, setDesigns, setScenes, setFonts, setTune, setSceneFx]
+    [
+      applyThemeColors,
+      displayTheme,
+      defaultAccent,
+      defTune,
+      defSceneFx,
+      reduceMotion,
+      setDesigns,
+      setScenes,
+      setFonts,
+      setTunes,
+      setSceneFxs,
+    ]
+  );
+
+  const applyNamedTheme = useCallback(
+    (id: string) => {
+      const t = customThemes.find((x) => x.id === id);
+      if (t) applyTheme(t);
+    },
+    [customThemes, applyTheme]
   );
 
   const deleteNamedTheme = useCallback((id: string) => {
@@ -203,32 +269,10 @@ export function useSavedThemes({
   // start depending on key insertion order across the places themes are built.
   const importNamedThemes = useCallback(
     (themes: CustomTheme[]) => {
-      const colorKey = (c: ColorSet) => [
-        c.background,
-        c.foreground,
-        c.accentFrom,
-        c.accentTo,
-      ];
-      const keyOf = (t: CustomTheme) =>
-        JSON.stringify([
-          t.name,
-          t.design,
-          t.scene,
-          t.font,
-          t.designLight,
-          t.sceneLight,
-          t.fontLight,
-          colorKey(t.dark),
-          colorKey(t.light),
-          t.tune ?? null,
-          t.tuneLight ?? null,
-          t.sceneFx ?? null,
-          t.sceneFxLight ?? null,
-        ]);
-      const seen = new Set(customThemes.map(keyOf));
+      const seen = new Set(customThemes.map(themeKey));
       const added: CustomTheme[] = [];
       for (const t of themes) {
-        const key = keyOf(t);
+        const key = themeKey(t);
         if (seen.has(key)) continue;
         seen.add(key);
         added.push(t);
@@ -241,11 +285,29 @@ export function useSavedThemes({
     [customThemes, commitThemes]
   );
 
+  // Take in a theme from a code or link (#329): save it unless an identical
+  // one is already saved, then apply it. Returns the theme now in the list,
+  // or null when it couldn't be stored.
+  const adoptTheme = useCallback(
+    (t: CustomTheme): CustomTheme | null => {
+      const key = themeKey(t);
+      const existing = customThemes.find((x) => themeKey(x) === key);
+      const theme = existing ?? t;
+      if (!existing && !commitThemes([...customThemes, t])) return null;
+      applyTheme(theme);
+      return theme;
+    },
+    [customThemes, commitThemes, applyTheme]
+  );
+
   return {
     customThemes,
     setCustomThemes,
+    captureTheme,
     saveNamedTheme,
+    applyTheme,
     applyNamedTheme,
+    adoptTheme,
     renameNamedTheme,
     deleteNamedTheme,
     importNamedThemes,

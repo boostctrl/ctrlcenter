@@ -112,6 +112,10 @@ export type LookValue = {
   // at now: "off" when the switch is on, else the displayed mode's effects.
   reduceMotion: boolean;
   motion: MotionLevel;
+  // True once the stored look (saved themes included) has been read on
+  // mount, so a consumer that writes the saved list from a link (#329) can
+  // wait for it rather than clobber it with the empty SSR state.
+  hydrated: boolean;
   // Whether the effective background reads as light (for theme-aware icons).
   surfaceIsLight: boolean;
   customThemes: CustomTheme[];
@@ -148,6 +152,12 @@ export type LookValue = {
   // position) instead of appending a second copy.
   saveNamedTheme: (name: string, overwriteId?: string) => boolean;
   applyNamedTheme: (id: string) => void;
+  // The current look as a theme object under `name`, without saving it — for
+  // "Copy as code" (#329).
+  captureTheme: (name: string, id: string) => CustomTheme;
+  // Save (unless already saved) and apply a theme from a code or link; null
+  // when it couldn't be stored.
+  adoptTheme: (theme: CustomTheme) => CustomTheme | null;
   // Rename a saved theme in place. Returns false for an empty name, an unknown
   // id, or a failed write.
   renameNamedTheme: (id: string, name: string) => boolean;
@@ -226,6 +236,7 @@ export function useLook(defaultTheme: DefaultTheme): {
     light: null,
   });
   const [reduceMotion, setReduceMotionState] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
   const [activeLook, setActiveLook] = useState<ModeColors | null>(null);
   const [accentOverride, setAccentOverrideState] =
     useState<AccentOverrides>(NO_ACCENT_OVERRIDES);
@@ -601,8 +612,10 @@ export function useLook(defaultTheme: DefaultTheme): {
   const {
     customThemes,
     setCustomThemes,
+    captureTheme,
     saveNamedTheme,
     applyNamedTheme,
+    adoptTheme,
     renameNamedTheme,
     deleteNamedTheme,
     importNamedThemes,
@@ -615,14 +628,17 @@ export function useLook(defaultTheme: DefaultTheme): {
     resolveScene,
     resolveFont,
     resolveTune,
-    setTune,
+    defTune,
     resolveSceneFx,
-    setSceneFx,
+    defSceneFx,
     applyThemeColors,
     displayTheme,
     setDesigns,
     setScenes,
     setFonts,
+    setTunes,
+    setSceneFxs,
+    reduceMotion,
   });
 
 
@@ -765,6 +781,7 @@ export function useLook(defaultTheme: DefaultTheme): {
     setSystemDark(
       window.matchMedia("(prefers-color-scheme: dark)").matches
     );
+    setHydrated(true);
     /* eslint-enable react-hooks/set-state-in-effect */
     // The inline script already applied these; re-apply for consistency.
     const initial = chromeFor(resolveDark(stored));
@@ -854,6 +871,7 @@ export function useLook(defaultTheme: DefaultTheme): {
       },
       reduceMotion,
       motion: reduceMotion ? "off" : (resolveSceneFx(displayDark)?.motion ?? "normal"),
+      hydrated,
       surfaceIsLight,
       customThemes,
       activeLook,
@@ -878,6 +896,8 @@ export function useLook(defaultTheme: DefaultTheme): {
       setAccentOverride,
       saveNamedTheme,
       applyNamedTheme,
+      captureTheme,
+      adoptTheme,
       renameNamedTheme,
       deleteNamedTheme,
       importNamedThemes,
@@ -895,6 +915,7 @@ export function useLook(defaultTheme: DefaultTheme): {
     resolveTune,
     resolveSceneFx,
     reduceMotion,
+    hydrated,
     seedColorSet,
     systemDark,
     customThemes,
@@ -914,6 +935,8 @@ export function useLook(defaultTheme: DefaultTheme): {
     setAccentOverride,
     saveNamedTheme,
     applyNamedTheme,
+    captureTheme,
+    adoptTheme,
     renameNamedTheme,
     deleteNamedTheme,
     importNamedThemes,

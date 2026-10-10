@@ -14,6 +14,12 @@ here.
 
 ### Added
 
+- **Share a theme as a code (3.0).** *Copy as code* in the theme builder
+  puts the current look on the clipboard as a short text code; *Paste a
+  code* in another browser applies it and saves it to that browser's
+  themes. A link of the form `/settings#theme=<code>` does the same when
+  opened. Codes carry both modes, the fine-tune and the scene effects, and
+  a code from a newer version still lands. (#329)
 - **A theme builder that shows its work (3.0).** A live miniature of the
   dashboard (greeting, an app card, buttons and text at every level) sits
   beside the builder's tabs, and above them on a phone, where the real page
