@@ -36,6 +36,7 @@ import type { LayoutWidget, WidgetType } from "@/lib/layout";
 import type { AppItem, InstanceOf } from "@/lib/schema";
 import type { HomeData } from "@/lib/widgets/data";
 import Complication from "@/components/monitor/Complication";
+import ApiWidget from "./ApiWidget";
 
 // What a renderer can read: the server-built data, plus Dashboard's live
 // state (edit mode, the search box and what it currently matches).
@@ -223,6 +224,15 @@ export const WIDGET_RENDERERS: Record<WidgetType, Renderer> = {
     if (!tile) return null;
     const { label, ...content } = tile;
     return <Complication label={label} fill {...content} />;
+  },
+
+  // The generic API widget (#302): the server-mapped view.
+  api: (widget, { data }) => {
+    const w = instanceOf("api", widget, data);
+    const result = data.apiViews[widget.id];
+    return w && result ? (
+      <ApiWidget title={w.title.trim() || "API"} result={result} showTitle={!widget.hideLabel} />
+    ) : null;
   },
 
   favorites: (widget, { q, editing, favoriteApps }) =>

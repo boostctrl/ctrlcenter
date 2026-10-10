@@ -43,14 +43,15 @@ export default async function BoardPage({
   // placed only on a private board, say), never reach the page.
   const resolved = resolveLayout(board.layout.sections, config.widgets);
   // Never for a guest: an apps widget showing only private apps (#299) has
-  // nothing for them, and an integration tile is admin-only unless set to
-  // "Everyone" (#301).
+  // nothing for them, and an integration tile (#301) or API widget (#302) is
+  // admin-only unless set to "Everyone".
   const adminOnly = new Set(
     config.widgets
       .filter(
         (w) =>
           (w.type === "apps" && w.filter.private === "only") ||
-          (w.type === "integration" && !shownToGuests(w))
+          (w.type === "integration" && !shownToGuests(w)) ||
+          (w.type === "api" && w.visibility !== "public")
       )
       .map((w) => w.id)
   );

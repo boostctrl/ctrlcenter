@@ -91,7 +91,9 @@ Built with Next.js 16, React 19, and Tailwind v4.
   **Countdown** card ("in N days" to labeled dates), **World clocks** (live
   times and dates for the zones you follow), **System stats** (CPU, memory, and
   disk fill — container-aware, with an opt-in host mode), and an **RSS/Atom
-  feed** card — each optional and placed from the layout editor. Plus a
+  feed** card, and **API widgets** that show a stat, gauge, rows or a list
+  picked out of any JSON endpoint — each optional and placed from the layout
+  editor. Plus a
   site-wide **announcement banner** for notices or maintenance windows, with a
   tone and an optional visitor dismiss.
 
@@ -280,8 +282,12 @@ widgets:                    # every widget, with its content; any type can
   - { id: media-apps, type: apps, title: Media, filter: { group: media } }
   - { id: private-apps, type: apps, title: Private, filter: { private: only } }
   - { id: bookmarks, type: bookmarks }  # filter: { group: … } for one group
+  - { id: nas, type: api, title: NAS, url: "http://nas.lan/api/pool",
+      headers: [{ name: Authorization, value: "Bearer ${NAS_TOKEN}" }],
+      display: gauge, fields: [{ label: Used, path: $.used_pct, unit: "%" }],
+      thresholds: { warn: 80, critical: 95 } }   # visibility: public to share
   # …and the other types: clock, weather, status, search, feed, countdown,
-  # worldClocks, systemStats, favorites, apps, bookmarks. A widget without a
+  # worldClocks, systemStats, favorites, integration. A widget without a
   # row on a board waits, hidden, in that board's layout editor tray.
 
 integrations:               # the private Monitor page's connections, any number

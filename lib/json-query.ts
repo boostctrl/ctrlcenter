@@ -63,7 +63,8 @@ export function parseJsonQuery(source: string): JsonQuery | { error: string } {
   return { path, op, value };
 }
 
-function select(data: unknown, path: (string | number)[]): { found: boolean; value?: unknown } {
+// The value at a path, and whether it's there at all.
+export function selectPath(data: unknown, path: (string | number)[]): { found: boolean; value?: unknown } {
   let cur: unknown = data;
   for (const seg of path) {
     if (cur === null || typeof cur !== "object") return { found: false };
@@ -81,7 +82,7 @@ const asNumber = (v: unknown): number | null => {
 };
 
 export function evaluateJsonQuery(query: JsonQuery, data: unknown): boolean {
-  const { found, value } = select(data, query.path);
+  const { found, value } = selectPath(data, query.path);
   if (!found) return false;
   if (query.op === null) {
     return value !== null && value !== false && value !== 0 && value !== "";
@@ -105,3 +106,13 @@ export function evaluateJsonQuery(query: JsonQuery, data: unknown): boolean {
       return a >= b;
   }
 }
+
+// A bare path (no comparison), for mapping a JSON field to a value: the
+// generic API widget (#302). `$` alone is the whole document.
+export function parseJsonPath(source: string): (string | number)[] | { error: string } {
+  const parsed = parseJsonQuery(source);
+  if ("error" in parsed) return parsed;
+  if (parsed.op !== null) return { error: "Just the path here, without a comparison" };
+  return parsed.path;
+}
+

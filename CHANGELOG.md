@@ -47,6 +47,17 @@ here.
   unless you set one to Everyone, and then visitors see only counts and
   states — never names, titles, hosts, users or error messages. (#301)
 
+- **API widgets (3.0).** Show values from any JSON endpoint — a NAS, a
+  router, a home-automation hub, your own script — as a single stat, a gauge,
+  label/value rows or a list (Settings → Widgets → API widgets). Point each
+  value at its place in the response with a JSONPath such as
+  `$.pool.used_pct`; *Test* shows the raw response beside what the widget
+  would show. Add headers or a POST body, keep tokens in the environment with
+  `${NAME}` references, tint a stat or gauge with warning and critical
+  thresholds, and pick how often it refreshes. Widgets are yours alone unless
+  you set one to Everyone, and then visitors see only the values you picked
+  out — never the URL, headers or the rest of the response. (#302)
+
 ### Changed
 
 - **Every widget can appear any number of times (3.0).** Each widget on the

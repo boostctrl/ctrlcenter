@@ -24,6 +24,7 @@ import SystemStatsSettings from "./SystemStatsSettings";
 import AppsSettings from "./AppsSettings";
 import BookmarksSettings from "./BookmarksSettings";
 import IntegrationTileSettings from "./IntegrationTileSettings";
+import ApiSettings from "./ApiSettings";
 
 export const SITE_SETTINGS: ComponentType<{ d: SettingsDraft }>[] = [SearchSettings, WeatherSettings];
 
@@ -93,6 +94,14 @@ export const INSTANCE_GROUPS: InstanceGroup[] = [
       "A service from Settings → Integrations as a tile on a board — the same one the Monitor shows. Only you see it unless you set it to everyone, who get counts and states only.",
     add: "+ Add integration tile",
     Editor: IntegrationTileSettings,
+  }),
+  group({
+    type: "api",
+    title: "API widgets",
+    intro:
+      "Any JSON endpoint as a number, a gauge, rows or a list: point it at a URL, pick fields with JSONPath, and check them with Test. Fetched on the server; only the values you pick reach the page.",
+    add: "+ Add API widget",
+    Editor: ApiSettings,
   }),
   group({
     type: "notes",

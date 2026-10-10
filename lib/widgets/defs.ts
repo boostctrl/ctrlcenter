@@ -157,6 +157,18 @@ export const WIDGET_DEFS = [
     empty:
       "No integration picked, or it's off — choose one in admin Settings → Widgets → Integrations, and set it up under Settings → Integrations.",
   },
+  // Any JSON endpoint as a stat, gauge, rows or a list (#302). No stock
+  // instance: it needs a URL first.
+  {
+    id: "api",
+    label: "API",
+    span: 8,
+    hidden: true,
+    titled: true,
+    noStock: true,
+    empty:
+      "No data yet — set its URL and fields in admin Settings → Widgets → API widgets, and check them with Test.",
+  },
   {
     id: "favorites",
     label: "Favorites",

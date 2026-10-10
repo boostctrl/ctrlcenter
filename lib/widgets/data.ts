@@ -8,6 +8,7 @@ import type { SearchConfig } from "../search";
 import type { CurrentWeather } from "../weather";
 import type { SystemStats } from "../system-stats";
 import type { IntegrationTile } from "./integration-tiles";
+import type { ApiResult } from "../api-widget";
 
 export type HomeData = {
   apps: AppItem[];
@@ -40,4 +41,7 @@ export type HomeData = {
   // Integration tiles by instance id (#301), built on the server: only the
   // tile's content, never the service's snapshot. Missing = nothing to show.
   integrationTiles: Record<string, IntegrationTile>;
+  // API widgets' views by instance id (#302): the mapped values only, never
+  // the raw response.
+  apiViews: Record<string, ApiResult>;
 };

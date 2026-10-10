@@ -6,6 +6,7 @@
 // shape of each type's content.
 import { z } from "zod";
 import { lenientArray } from "./shared";
+import { secretFields } from "./meta";
 import { WIDGET_DEFS, type WidgetDef } from "../widgets/defs";
 import { wholeOf } from "./input";
 import {
@@ -65,6 +66,69 @@ const integrationContent = {
   visibility: z.enum(INTEGRATION_WIDGET_VISIBILITIES).catch("admin").default("admin"),
 };
 
+// The generic API widget (#302): fetch a JSON endpoint on the server, map
+// fields out of it with JSONPath (lib/json-query.ts), and show them as a
+// stat, a gauge, key/value rows or a list. Header values may hold `${ENV}`
+// references and are secret (blanked off every public surface); only the
+// mapped values ever reach the page.
+export const API_DISPLAYS = ["stat", "gauge", "kv", "list"] as const;
+export const API_METHODS = ["GET", "POST"] as const;
+export const MAX_API_FIELDS = 8;
+export const MAX_API_HEADERS = 8;
+export const MIN_API_REFRESH = 15;
+export const MAX_API_REFRESH = 3600;
+const apiField = z.object({
+  label: z.string().max(40).catch("").default(""),
+  path: z.string().max(200).catch("").default(""),
+  unit: z.string().max(12).catch("").default(""),
+});
+const apiContent = {
+  title: z.string().max(60).catch("").default(""),
+  url: z.string().max(2000).catch("").default(""),
+  method: z.enum(API_METHODS).catch("GET").default("GET"),
+  headers: z
+    .array(
+      z.object({
+        name: z.string().max(100).catch("").default(""),
+        value: z.string().max(2000).catch("").default("").register(secretFields, { redact: "blank" }),
+      })
+    )
+    .max(MAX_API_HEADERS)
+    .catch([])
+    .default([]),
+  // A POST body (JSON text), sent as is.
+  body: z.string().max(10_000).catch("").default(""),
+  display: z.enum(API_DISPLAYS).catch("stat").default("stat"),
+  // stat: the first field; gauge: the first field over `max`; kv: every
+  // field as a row.
+  fields: z.array(apiField).max(MAX_API_FIELDS).catch([]).default([]),
+  // gauge: the value that fills the ring.
+  max: z.number().positive().catch(100).default(100),
+  // list: the array, and each item's label and value paths (relative to the
+  // item, so `$.name`).
+  list: z
+    .object({
+      path: z.string().max(200).catch("").default(""),
+      label: z.string().max(200).catch("").default(""),
+      value: z.string().max(200).catch("").default(""),
+    })
+    .catch({ path: "", label: "", value: "" })
+    .default({ path: "", label: "", value: "" }),
+  // Seconds between fetches (the shared cache's TTL for this widget).
+  refresh: z.number().int().min(MIN_API_REFRESH).max(MAX_API_REFRESH).catch(60).default(60),
+  visibility: z.enum(INTEGRATION_WIDGET_VISIBILITIES).catch("admin").default("admin"),
+  // Tint the headline number (stat, gauge) amber past `warn`, red past
+  // `critical`, counting up ("above") or down ("below"). Feeds alerts in 3.1.
+  thresholds: z
+    .object({
+      warn: z.number().nullable().catch(null).default(null),
+      critical: z.number().nullable().catch(null).default(null),
+      direction: z.enum(["above", "below"]).catch("above").default("above"),
+    })
+    .catch({ warn: null, critical: null, direction: "above" })
+    .default({ warn: null, critical: null, direction: "above" }),
+};
+
 // The header card's own switch for its date/time row (was the site-wide
 // `settings.components.clock` before 3.0).
 const headerCardContent = { showClock: z.boolean().catch(true).default(true) };
@@ -83,6 +147,7 @@ export const widgetInstanceSchema = z.discriminatedUnion("type", [
   z.object({ ...base, type: z.literal("worldClocks"), ...worldClocksSchema.shape }),
   z.object({ ...base, type: z.literal("systemStats"), ...systemStatsSchema.shape }),
   z.object({ ...base, type: z.literal("integration"), ...integrationContent }),
+  z.object({ ...base, type: z.literal("api"), ...apiContent }),
   z.object({ ...base, type: z.literal("favorites") }),
   z.object({ ...base, type: z.literal("apps"), ...appsContent }),
   z.object({ ...base, type: z.literal("bookmarks"), ...bookmarksContent }),
@@ -108,8 +173,10 @@ export const DEFAULT_INSTANCES: WidgetInstance[] = (WIDGET_DEFS as readonly Widg
 export const widgetInstancesSchema = lenientArray(widgetInstanceSchema).default(DEFAULT_INSTANCES);
 
 // How many instances a config can hold, and how many feed cards: each feed is
-// MAX_FEED_URLS fetches per render, so the fan-out stays bounded.
+// MAX_FEED_URLS fetches per render, so the fan-out stays bounded. API widgets
+// are each a fetch per refresh window, so they're capped too (#302).
 export const MAX_WIDGET_INSTANCES = 64;
+export const MAX_API_WIDGETS = 20;
 
 const httpOrBlank = (u: string) => u.trim() === "" || /^https?:\/\//i.test(u.trim());
 
@@ -138,6 +205,12 @@ export const widgetInstancesUpdateSchema = z
     });
     if (feeds > MAX_FEED_CARDS)
       ctx.addIssue({ code: "custom", message: `At most ${MAX_FEED_CARDS} RSS feed cards` });
+    if (list.filter((w) => w.type === "api").length > MAX_API_WIDGETS)
+      ctx.addIssue({ code: "custom", message: `At most ${MAX_API_WIDGETS} API widgets` });
+    list.forEach((w, i) => {
+      if (w.type === "api" && !httpOrBlank(w.url))
+        ctx.addIssue({ code: "custom", message: "An API widget's URL must start with http(s)", path: [i, "url"] });
+    });
   });
 
 // Re-exported for the editors that build rows.

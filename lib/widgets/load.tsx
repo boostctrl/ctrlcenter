@@ -16,6 +16,7 @@ import { collectSystemStats, type SystemStats } from "../system-stats";
 import { greetingFor, hourIn, shortDate } from "../datetime";
 import { getCalendarAuth, getSiteConfig } from "../config";
 import { integrationTiles } from "./integration-tiles";
+import { getApiView, publicApiInstance, type ApiResult } from "../api-widget";
 import {
   feedUrls,
   monitoredApps,
@@ -137,6 +138,25 @@ const LOADERS: Loader[] = [
     return { systemStats };
   },
 
+  // API widgets (#302): admin-only ones only for the admin, and a visitor
+  // never sees why one failed (the message could name a host).
+  async (ctx) => {
+    const widgets = shownOf(ctx, "api").filter((w) => ctx.isAdmin || w.visibility === "public");
+    if (widgets.length === 0) return {};
+    // The page's instances have their header values blanked (secret); the
+    // fetch needs the stored ones.
+    const stored = new Map((await getSiteConfig()).widgets.map((w) => [w.id, w]));
+    const apiViews: Record<string, ApiResult> = {};
+    await Promise.all(
+      widgets.map(async (w) => {
+        const full = stored.get(w.id);
+        const result = await getApiView(full?.type === "api" ? full : w);
+        apiViews[w.id] = ctx.isAdmin ? result : { view: result.view, error: result.view ? null : "Unavailable" };
+      })
+    );
+    return { apiViews };
+  },
+
   // Integration tiles (#301): admin-only ones only for the admin. The
   // integrations' credentials come from the server-side config; the public
   // config the page renders from carries none.
@@ -171,11 +191,15 @@ export async function loadHomeData(ctx: LoadContext): Promise<HomeData> {
     // One poller wraps both the status widgets and the per-app dots; only on
     // when status checks are on and there are apps to monitor.
     statusEnabled: settings.statusChecks && monitoredApps(apps).length > 0,
-    instances: Object.fromEntries(instances.map((i) => [i.id, i])),
+    // A visitor's page never carries an API widget's request (#302).
+    instances: Object.fromEntries(
+      instances.map((i) => [i.id, i.type === "api" && !ctx.isAdmin ? publicApiInstance(i) : i])
+    ),
     labels: instanceLabels(instances),
     nodes: {},
     systemStats: {},
     integrationTiles: {},
+    apiViews: {},
   };
   const parts = await Promise.all(LOADERS.map((load) => load(ctx)));
   // Merge, combining the per-instance maps rather than letting one loader's

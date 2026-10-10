@@ -95,6 +95,37 @@ export const WIDGET_HELP: Partial<Record<WidgetType, { title: string; body: Reac
       </>
     ),
   },
+  api: {
+    title: "API widgets",
+    body: (
+      <>
+        <P>
+          Show a number or a few values from any JSON endpoint — a NAS, a
+          router, a home-automation hub, your own script. Add one in{" "}
+          <strong>Settings → Widgets → API widgets</strong>: give it the URL
+          (and any headers or a POST body it needs), pick how to show it — a
+          single stat, a gauge, label/value rows, or a list — and point each
+          value at its place in the response with a JSONPath like{" "}
+          <code>$.pool.used_pct</code>. <strong>Test</strong> fetches the
+          endpoint right away and shows the raw response beside what the
+          widget would show, so you can get the paths right before saving.
+        </P>
+        <P>
+          The server does the fetching, every refresh interval (60 seconds by
+          default), so the endpoint only has to be reachable from CtrlCenter.
+          A header value can name an environment variable — write{" "}
+          <code>Bearer ${"{"}API_TOKEN{"}"}</code> — to keep a token out of the
+          config file; it&apos;s only sent to the widget&apos;s saved URL.
+          Warning and critical thresholds tint a stat or gauge amber or red.
+        </P>
+        <P>
+          A widget is yours alone by default. Set it to{" "}
+          <strong>Everyone</strong> and visitors see the values you picked out
+          — never the URL, the headers, or the rest of the response.
+        </P>
+      </>
+    ),
+  },
   systemStats: {
     title: "System stats card",
     body: (

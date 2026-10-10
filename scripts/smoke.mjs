@@ -126,6 +126,9 @@ try {
       if (integrationUrl && media.includes(integrationUrl.replace("http://", "")))
         failures.push("/b/media: an integration URL reached a signed-out page");
       else console.log("ok    /b/media shows the public tile and no integration URL");
+      if (!media.includes("App health")) failures.push("/b/media: the public API widget is missing");
+      else if (media.includes("/api/health")) failures.push("/b/media: an API widget URL reached a signed-out page");
+      else console.log("ok    /b/media shows the public API widget and not its URL");
       const res = await fetch(`${base}/b/infra`);
       if (res.status !== 404) failures.push(`/b/infra: signed-out visitor got HTTP ${res.status}, not 404`);
       else console.log("ok    /b/infra is a 404 signed out");
@@ -159,6 +162,7 @@ try {
     ]) {
       await run(ctx, p, `${shot}-${scheme}`);
     }
+    if (scheme === "light") await apiWidgetTest(ctx);
     await ctx.close();
   }
 
@@ -310,15 +314,53 @@ async function addBoards() {
   const config = await (await ctx.request.get(`${base}/api/config`)).json();
   const widgets = await ctx.request.put(`${base}/api/widgets`, {
     headers: { Origin: base },
-    data: [...config.widgets, { id: "sonarr-tile", type: "integration", integration: "sonarr-4k", view: "glance", visibility: "public" }],
+    data: [
+      ...config.widgets,
+      { id: "sonarr-tile", type: "integration", integration: "sonarr-4k", view: "glance", visibility: "public" },
+      // A public API widget (#302) reading the app's own health endpoint.
+      {
+        id: "health-api",
+        type: "api",
+        title: "App health",
+        url: `${base}/api/health`,
+        method: "GET",
+        headers: [],
+        body: "",
+        display: "kv",
+        fields: [{ label: "Status", path: "$.status", unit: "" }],
+        max: 100,
+        list: { path: "", label: "", value: "" },
+        refresh: 60,
+        visibility: "public",
+        thresholds: { warn: null, critical: null, direction: "above" },
+      },
+    ],
   });
-  if (!widgets.ok()) throw new Error(`adding the integration tile failed: HTTP ${widgets.status()}`);
+  if (!widgets.ok()) throw new Error(`adding the board widgets failed: HTTP ${widgets.status()} ${await widgets.text()}`);
   const media = await ctx.request.put(`${base}/api/boards/media/layout`, {
     headers: { Origin: base },
-    data: { sections: [{ widget: "search" }, { widget: "sonarr-tile", span: 8 }, { widget: "bookmarks" }] },
+    data: { sections: [{ widget: "search" }, { widget: "sonarr-tile", span: 8 }, { widget: "health-api", span: 8 }, { widget: "bookmarks" }] },
   });
   if (!media.ok()) throw new Error(`placing the integration tile failed: HTTP ${media.status()}`);
   await ctx.close();
+}
+
+// An API widget's Test (#302) fetches with the form's values and shows what
+// the widget would.
+async function apiWidgetTest(ctx) {
+  const page = await ctx.newPage();
+  try {
+    await page.goto(`${base}/admin?tab=settings&section=widgets`);
+    await page.getByRole("button", { name: "Test", exact: true }).click();
+    const shows = page.getByText("What the widget shows").locator("..");
+    await shows.getByText("ok", { exact: true }).waitFor({ timeout: 15_000 });
+    await shows.locator("..").screenshot({ path: path.join(OUT, "api-widget-test-light.png") });
+    console.log("ok    the API widget's Test shows the mapped value");
+  } catch (e) {
+    failures.push(`API widget Test: ${e instanceof Error ? e.message.split("\n")[0] : e}`);
+  } finally {
+    await page.close();
+  }
 }
 
 async function signIn(ctx) {
