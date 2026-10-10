@@ -57,23 +57,33 @@ Built with Next.js 16, React 19, and Tailwind v4.
   or an **Apprise** API server. Each channel picks its events and apps, and
   flap-dampening confirmations keep a single blip quiet.
 
-- **Theming.** Combine three independent axes and save the result:
+- **Theming.** A builder with a live preview, built on independent axes you
+  combine and save:
   - **Designs** (18) — the card surface: `glass`, `aero`, `flat`, `soft`,
     `minimal`, `bold`, `cyber`, `clay`, `frost`, `outline`, `paper`, `gradient`,
-    `aura`, `emboss`, `carve`, `stripe`, `sketch`, `console`.
-  - **Scenes** (18) — an animated backdrop: `aurora`, `abyss`, `nebula`, `grid`,
-    `starfield`, `waves`, `rays`, `traces`, `dots`, `horizon`, `orbit`, `peaks`,
-    `rain`, `fireflies`, `blueprint`, `prisms`, `petals`, `comets` (motion
-    respects `prefers-reduced-motion`).
-  - **Colors & font** — a palette plus an accent gradient (or your own colors),
-    and one of 12 UI fonts (`jakarta`, `inter`, `poppins`, `nunito`, `lora`,
-    `jetbrains`, `outfit`, `grotesk`, `manrope`, `rubik`, `playfair`,
-    `quicksand`).
+    `aura`, `emboss`, `carve`, `stripe`, `sketch`, `console` — each with a
+    **Tune** tab of sliders over it (corner radius, border, blur, shadow, fill,
+    glow).
+  - **Scenes** (18, or none) — an animated backdrop: `aurora`, `abyss`,
+    `nebula`, `grid`, `starfield`, `waves`, `rays`, `traces`, `dots`,
+    `horizon`, `orbit`, `peaks`, `rain`, `fireflies`, `blueprint`, `prisms`,
+    `petals`, `comets`, with intensity and motion controls (and a Reduce-motion
+    switch that stills them all). A **wallpaper** can sit behind the scene,
+    blurred and dimmed.
+  - **Colors & type** — a palette plus an accent gradient, or your own colors,
+    including the status colors (up, down, warning, info); or pick one accent
+    and let the builder derive a whole palette with contrast guaranteed. A body
+    font and a heading font from 12 faces (`jakarta`, `inter`, `poppins`,
+    `nunito`, `lora`, `jetbrains`, `outfit`, `grotesk`, `manrope`, `rubik`,
+    `playfair`, `quicksand`), and a density step.
 
-  Each look carries its own light and dark variant, and one-tap **Themes**
-  (Default, Mariana, Outrun, Observatory, Tide, …) bundle a palette, design, and
-  scene together. The admin sets a site-wide default; each visitor can override
-  any of it in their own browser.
+  Each look carries its own light and dark variant. One-tap **Themes** bundle
+  it all; the admin curates that gallery (edit the built-ins, add their own,
+  hide and reorder), sets a site-wide default, can schedule a day and a night
+  theme by sunrise and sunset or fixed times, pin a theme on a board, and
+  decides how much visitors may change: everything, the gallery only, or
+  nothing. Visitors save their own themes, share one as a short code or link,
+  and every built-in look clears WCAG AA contrast in both modes.
 
 - **Weather.** A header widget with the current conditions, plus a full
   **/weather** page: a hero with feels-like, an hourly forecast, a 7-day outlook
@@ -222,7 +232,7 @@ settings:
   theme:                    # site-wide default (visitors can override in /settings)
     mode: system            # system | light | dark
     design: glass           # glass aero flat soft minimal bold cyber clay frost outline paper gradient aura emboss carve stripe sketch console
-    scene: aurora           # aurora abyss nebula grid starfield waves rays traces dots horizon orbit peaks rain fireflies blueprint prisms petals comets
+    scene: aurora           # aurora abyss nebula grid starfield waves rays traces dots horizon orbit peaks rain fireflies blueprint prisms petals comets none
     font: jakarta           # jakarta inter poppins nunito lora jetbrains outfit grotesk manrope rubik playfair quicksand
     accentFrom: '#a78bfa'   # accent gradient start (#rrggbb)
     accentTo: '#22d3ee'     # accent gradient end (same as start = solid)
@@ -231,6 +241,24 @@ settings:
     # foreground: '#f4f4f6'
     # backgroundLight: '#eceef3'  # light surface / ink
     # foregroundLight: '#181b24'
+    # Optional, each also with a *Light twin for light mode (best set in the
+    # theme builder, then "set as site theme", or in Settings → General):
+    # designLight / sceneLight / fontLight   # a different look for light mode
+    # tune: { radius: 100, border: 100, blur: 100, shadow: 100, fill: 100, glow: 100 }  # percent of the design's own
+    # sceneIntensity: 100         # 0–100; sceneMotion: normal | calm | off
+    # headingFont: lora           # titles in their own face; density: compact | comfortable | spacious
+    # status: { up: '#22c55e', down: '#ef4444', warning: '#f59e0b', info: '#38bdf8' }
+    # wallpaper: { src: "https://…/photo.jpg", blur: 8, dim: 40, fit: cover }  # fit: cover | contain | tile
+  visitorTheming: all       # what visitors may change: all | packs (the gallery
+                            # and light/dark only) | none (kiosks); admins always may
+  themeSchedule:            # a day and a night theme by time of day
+    enabled: false
+    mode: sun               # sun (sunrise/sunset at the weather location) | fixed
+    day: Daybreak           # gallery theme names; "" = the theme above
+    night: Observatory
+    dayStart: "07:00"       # for fixed mode, in the site's time zone
+    nightStart: "19:00"
+    # dayMode: light        # an appearance mode per phase; nightMode: dark
   statusChecks: false       # ping app URLs, show online/offline dots + /status
   statusInterval: 5         # minutes between background uptime checks (1–60)
   statusDefaultRange: d1    # range /status opens on: h1 | d1 | d30 | d90 (= 1h/24h/30d/90d)
@@ -279,6 +307,18 @@ settings:
     gap: 32                 # space between cards (px)
     topGap: 64              # space above the first row (px)
 
+themes:                     # the theme gallery visitors pick from, in this order
+                            # (Settings → Themes). Empty = the built-ins as shipped.
+  - { key: Tide, builtin: Tide, name: Surf }        # a built-in, renamed
+  - { key: Outrun, builtin: Outrun, hidden: true }  # a built-in hidden from visitors
+  - key: custom-1a2b3c4d    # a theme of your own: name and both colorsets at
+    name: Lab               # least; design, scene (and designLight/sceneLight),
+    design: console         # tune, font, headingFont, status/statusLight and
+    scene: grid             # wallpaper/wallpaperLight as under theme: above
+    dark: { background: '#06070d', foreground: '#f4f4f6', accentFrom: '#22c55e', accentTo: '#22d3ee' }
+    light: { background: '#eceef3', foreground: '#181b24', accentFrom: '#15803d', accentTo: '#0e7490' }
+  # Built-ins left out stay as shipped, after the ones listed.
+
 boards:                     # the dashboards; the first is the home page, the
                             # others live at /b/<id>. Best edited visually: sign
                             # in and pick "Edit layout" from the corner menu
@@ -303,6 +343,7 @@ boards:                     # the dashboards; the first is the home page, the
     visibility: private
     icon: proxmox           # optional, beside its name in the menus: a slug,
                             # an image URL or an uploaded icon, like an app's
+    theme: Lab              # optional: a gallery theme pinned on this board
     layout:
       sections:
         - { widget: todo, span: 12 }
@@ -432,6 +473,9 @@ changelog, issue hygiene — live in [CLAUDE.md](CLAUDE.md).
 - `components/scenes/` are the animated backdrops; the theme builder lives in
   [`components/ThemeBuilder.tsx`](components/ThemeBuilder.tsx) and persists
   per-visitor prefs via [`components/PrefsProvider.tsx`](components/PrefsProvider.tsx).
+  [`lib/theme-paint.ts`](lib/theme-paint.ts) is the one theme resolver: the
+  no-flash inline script in the root layout is its source run in the browser,
+  and the hydrated paint uses the same instance, so the two can't drift.
 - [`instrumentation.ts`](instrumentation.ts) starts the background uptime poller
   ([`lib/status-poller.ts`](lib/status-poller.ts) → [`lib/status-history/`](lib/status-history/)),
   which also drives down/recovery [`alerts`](lib/alerts.ts).
