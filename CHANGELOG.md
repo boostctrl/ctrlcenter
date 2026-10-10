@@ -75,6 +75,13 @@ here.
   `CTRLCENTER_CALDAV_PASS` variable keeps applying to your existing
   calendar, and only to it. (#297)
 
+### Fixed
+
+- **Layout editor undo.** Ctrl+Z now takes back one action at a time: a
+  resize drag or a held − / + button is one step however long it takes, and
+  showing a widget and then resizing it are two. **Redo** is new: the Redo
+  button, Ctrl+Shift+Z or Ctrl+Y. (#314)
+
 ## [2.13.0] - 2026-10-09
 
 ### Added

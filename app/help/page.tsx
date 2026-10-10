@@ -778,7 +778,10 @@ export default async function HelpPage() {
             </li>
             <li>
               <strong>Undo any misstep.</strong> <strong>Undo</strong> (
-              <Kbd>Ctrl</Kbd>+<Kbd>Z</Kbd>) takes back the last change,{" "}
+              <Kbd>Ctrl</Kbd>+<Kbd>Z</Kbd>) takes back the last change — a
+              whole drag counts as one — and <strong>Redo</strong> (
+              <Kbd>Ctrl</Kbd>+<Kbd>Shift</Kbd>+<Kbd>Z</Kbd> or{" "}
+              <Kbd>Ctrl</Kbd>+<Kbd>Y</Kbd>) puts it back,{" "}
               <strong>Revert</strong> restores the layout you started the
               session with, and <strong>Reset</strong> returns the whole
               arrangement to its out-of-the-box defaults (on a board other

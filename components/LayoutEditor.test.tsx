@@ -17,6 +17,8 @@ function setup(overrides: Partial<Parameters<typeof EditToolbar>[0]> = {}) {
     onTopGap: vi.fn(),
     canUndo: false,
     onUndo: vi.fn(),
+    canRedo: false,
+    onRedo: vi.fn(),
     onRevert: vi.fn(),
     onReset: vi.fn(),
     resetsToEmpty: false,
@@ -35,8 +37,16 @@ describe("EditToolbar", () => {
   it("offers Done, and Undo only when there is something to undo", () => {
     const { props, toolbar } = setup();
     expect(within(toolbar).getByRole("button", { name: "Undo" })).toHaveProperty("disabled", true);
+    expect(within(toolbar).getByRole("button", { name: "Redo" })).toHaveProperty("disabled", true);
     fireEvent.click(within(toolbar).getByRole("button", { name: "Done" }));
     expect(props.onDone).toHaveBeenCalledOnce();
+  });
+
+  it("offers Redo only when there is something to redo (#314)", () => {
+    const onRedo = vi.fn();
+    const { toolbar } = setup({ canRedo: true, onRedo });
+    fireEvent.click(within(toolbar).getByRole("button", { name: "Redo" }));
+    expect(onRedo).toHaveBeenCalledOnce();
   });
 
   it("steps the UI scale up from the current value", () => {

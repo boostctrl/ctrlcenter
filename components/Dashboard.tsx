@@ -30,6 +30,7 @@ import { reorder } from "./admin/useReorder";
 import { WidgetFrame, EditToolbar, useFlowReorder } from "./LayoutEditor";
 import { useGridLayout } from "./useGridLayout";
 import { useLayoutEditor } from "./useLayoutEditor";
+import { UndoGestureContext } from "./useUndoHistory";
 import { emptyReason as widgetEmptyReason, widgetDef } from "@/lib/widgets/defs";
 import type { HomeData } from "@/lib/widgets/data";
 import { WIDGET_RENDERERS, cardsFor, type WidgetRenderContext } from "./widgets/registry";
@@ -105,7 +106,10 @@ export default function Dashboard({
   const {
     layout,
     canUndo,
+    canRedo,
     undoLast,
+    redoLast,
+    gesture,
     doneEditing,
     revertLayout,
     resetLayout,
@@ -339,7 +343,7 @@ export default function Dashboard({
   }
 
   return (
-    <>
+    <UndoGestureContext.Provider value={gesture}>
       {/* Vertical layout (row-gap, per-cell row-span and margins) is driven by
           useGridLayout, not this class — the gap-y here is only a pre-hydration
           fallback. Sparse (non-dense) flow keeps cards in the order they're
@@ -532,6 +536,8 @@ export default function Dashboard({
             onTopGap={setTopGap}
             canUndo={canUndo}
             onUndo={undoLast}
+            canRedo={canRedo}
+            onRedo={redoLast}
             onRevert={revertLayout}
             onReset={resetLayout}
             resetsToEmpty={!isHome}
@@ -539,6 +545,6 @@ export default function Dashboard({
           />
         </ConfirmProvider>
       )}
-    </>
+    </UndoGestureContext.Provider>
   );
 }

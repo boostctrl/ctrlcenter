@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useUndoGesture } from "./useUndoHistory";
 import {
   GRID_COLUMNS,
   MIN_WIDGET_HEIGHT,
@@ -13,7 +14,8 @@ import {
 // Pointer-based (mouse/pen/touch); the steppers remain the keyboard/precise path,
 // the same split as useFlowReorder ↔ MoveButtons. Start values are captured on
 // pointerdown and the move/up listeners live on the window, so a re-render
-// mid-drag (each onSpan/onHeight fires one) never drops the gesture.
+// mid-drag (each onSpan/onHeight fires one) never drops the gesture. One drag
+// is one undo step (#314).
 
 export type ResizeDrag = { kind: "width" | "height"; value: number } | null;
 
@@ -35,6 +37,7 @@ export function useDragResize({
   const frameRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<ResizeDrag>(null);
+  const gesture = useUndoGesture();
 
   function beginWidth(e: React.PointerEvent) {
     const grid = frameRef.current?.parentElement;
@@ -63,10 +66,14 @@ export function useDragResize({
     const up = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
       setDrag(null);
+      gesture.end();
     };
+    gesture.begin();
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
   }
 
   function beginHeight(e: React.PointerEvent) {
@@ -97,10 +104,14 @@ export function useDragResize({
     const up = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
       setDrag(null);
+      gesture.end();
     };
+    gesture.begin();
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
   }
 
   return {

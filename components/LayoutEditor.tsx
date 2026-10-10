@@ -33,6 +33,7 @@ import { MoveButtons } from "./admin/ui";
 import { useConfirm } from "./admin/Confirm";
 import { SaveStatus, type SaveState } from "./admin/useAutosave";
 import { useDragResize } from "./useDragResize";
+import { useUndoGesture } from "./useUndoHistory";
 
 // Which edge of the hovered cell a drop would insert on, in flow order, and
 // which axis that edge sits on ("x" = beside the cell, "y" = above/below it).
@@ -139,11 +140,13 @@ const HOLD_DELAY_MS = 400;
 const HOLD_REPEAT_MS = 60;
 
 function useHoldRepeat(action: () => void, canRun: boolean) {
+  // A hold is one undo step (#314), however many repeats it fires.
+  const gesture = useUndoGesture();
   const live = useRef({ action, canRun });
   useEffect(() => {
     live.current = { action, canRun };
   });
-  const timers = useRef<{ delay?: number; interval?: number; fired: boolean }>(
+  const timers = useRef<{ delay?: number; interval?: number; fired: boolean; holding?: boolean }>(
     { fired: false }
   );
 
@@ -151,11 +154,18 @@ function useHoldRepeat(action: () => void, canRun: boolean) {
     window.clearTimeout(timers.current.delay);
     window.clearInterval(timers.current.interval);
     timers.current.delay = timers.current.interval = undefined;
-  }, []);
+    // Only the gesture this hold opened: a stepper unmounting mid-drag (the
+    // height stepper moves into More as a resize narrows the card) mustn't
+    // close a resize gesture.
+    if (timers.current.holding) gesture.end();
+    timers.current.holding = false;
+  }, [gesture]);
   useEffect(() => stop, [stop]);
 
   const start = useCallback(() => {
     stop();
+    gesture.begin();
+    timers.current.holding = true;
     timers.current.fired = false;
     timers.current.delay = window.setTimeout(() => {
       timers.current.interval = window.setInterval(() => {
@@ -167,7 +177,7 @@ function useHoldRepeat(action: () => void, canRun: boolean) {
         live.current.action();
       }, HOLD_REPEAT_MS);
     }, HOLD_DELAY_MS);
-  }, [stop]);
+  }, [stop, gesture]);
 
   return {
     // Capture the pointer for the duration of the hold: each step can move
@@ -228,6 +238,7 @@ function StepGroup({
         type="button"
         aria-label={decLabel}
         disabled={!canDec}
+        data-undo-merge
         {...holdDec}
         className={stepBtn}
       >
@@ -238,6 +249,7 @@ function StepGroup({
         type="button"
         aria-label={incLabel}
         disabled={!canInc}
+        data-undo-merge
         {...holdInc}
         className={stepBtn}
       >
@@ -599,6 +611,7 @@ export function WidgetFrame({
           and Delete returns the height to automatic. */}
       <span
         {...widthHandle}
+        data-undo-merge
         role="slider"
         tabIndex={0}
         aria-label={`${label} width`}
@@ -625,6 +638,7 @@ export function WidgetFrame({
       />
       <span
         {...heightHandle}
+        data-undo-merge
         role="slider"
         tabIndex={0}
         aria-label={`${label} height`}
@@ -722,6 +736,7 @@ function ToolbarStepper({
         type="button"
         aria-label={decLabel}
         disabled={!canDec}
+        data-undo-merge
         {...holdDec}
         className={btn}
       >
@@ -732,6 +747,7 @@ function ToolbarStepper({
         type="button"
         aria-label={incLabel}
         disabled={!canInc}
+        data-undo-merge
         {...holdInc}
         className={btn}
       >
@@ -742,7 +758,7 @@ function ToolbarStepper({
 }
 
 // The edit toolbar: the page-level steppers (UI scale, card gap, top gap),
-// autosave state, undo, revert to how the layout looked when edit mode was
+// autosave state, undo and redo, revert to how the layout looked when edit mode was
 // entered, reset to the stock arrangement, and done.
 //
 // Large screens get one floating pill. Small screens get a full-width bar
@@ -767,6 +783,8 @@ export function EditToolbar({
   onTopGap,
   canUndo,
   onUndo,
+  canRedo,
+  onRedo,
   onRevert,
   onReset,
   resetsToEmpty,
@@ -782,6 +800,8 @@ export function EditToolbar({
   onTopGap: (topGap: number) => void;
   canUndo: boolean;
   onUndo: () => void;
+  canRedo: boolean;
+  onRedo: () => void;
   onRevert: () => void;
   onReset: () => void;
   // A board other than the home board resets to empty, not the stock set.
@@ -798,7 +818,7 @@ export function EditToolbar({
       className="fixed inset-x-0 bottom-0 z-[45] flex flex-col gap-2 border-t border-fg/10 bg-[var(--background)]/90 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-lg backdrop-blur-xl lg:inset-x-auto lg:bottom-5 lg:left-1/2 lg:w-max lg:max-w-[calc(100vw-2rem)] lg:-translate-x-1/2 lg:flex-row lg:flex-wrap lg:items-center lg:justify-center lg:gap-x-3 lg:gap-y-1 lg:rounded-full lg:border lg:py-2 lg:pr-2 lg:pl-4"
     >
       <div className="flex items-center gap-2 lg:contents">
-        <span className="text-sm font-medium text-ink-80">Editing layout</span>
+        <span className="text-sm font-medium whitespace-nowrap text-ink-80">Editing layout</span>
         <span className="lg:order-5">
           <SaveStatus status={status} error={error} />
         </span>
@@ -810,7 +830,22 @@ export function EditToolbar({
           title="Undo the last change (Ctrl+Z)"
           className={`${ghostBtn} lg:order-6`}
         >
-          Undo
+          <span aria-hidden className="lg:hidden">
+            ↶
+          </span>
+          <span className="max-lg:sr-only">Undo</span>
+        </button>
+        <button
+          type="button"
+          disabled={!canRedo}
+          onClick={onRedo}
+          title="Redo what you undid (Ctrl+Shift+Z)"
+          className={`${ghostBtn} lg:order-6`}
+        >
+          <span aria-hidden className="lg:hidden">
+            ↷
+          </span>
+          <span className="max-lg:sr-only">Redo</span>
         </button>
         <button
           type="button"
