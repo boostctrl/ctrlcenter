@@ -71,6 +71,24 @@ describe("boardsUpdateSchema", () => {
   });
 });
 
+describe("a board's theme (#337)", () => {
+  const board = { id: "home", name: "Home", visibility: "public" as const };
+
+  it("stores a pinned pack name, trimmed, and drops an empty or overlong one", () => {
+    expect(boardsSchema.parse([{ ...board, theme: " Circuit " }])[0].theme).toBe("Circuit");
+    expect(boardsSchema.parse([{ ...board, theme: "" }])[0].theme).toBeUndefined();
+    expect(boardsSchema.parse([{ ...board, theme: "x".repeat(41) }])[0].theme).toBeUndefined();
+    expect(boardsSchema.parse([board])[0]).not.toHaveProperty("theme");
+  });
+
+  it("takes a theme on the admin update, or \"\" to clear it", () => {
+    expect(boardsUpdateSchema.parse([{ ...board, theme: "Circuit" }])[0].theme).toBe("Circuit");
+    expect(boardsUpdateSchema.parse([{ ...board, theme: "" }])[0].theme).toBe("");
+    expect(boardsUpdateSchema.parse([board])[0]).not.toHaveProperty("theme");
+    expect(boardsUpdateSchema.safeParse([{ ...board, theme: "x".repeat(41) }]).success).toBe(false);
+  });
+});
+
 describe("newBoardId", () => {
   it("makes the name URL-safe", () => {
     expect(newBoardId("Media & TV", [])).toBe("media-tv");

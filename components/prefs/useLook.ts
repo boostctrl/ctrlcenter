@@ -1177,10 +1177,13 @@ export function useLook(
   // The site default can change under an open page — a day/night schedule
   // switch (#336) hands in a new one. Repaint what the visitor hasn't
   // customized from it; the mount effect above is deliberately mount-only.
-  const paintedDefault = useRef(defaultTheme);
+  // Compared by content: a board page hands in the theme the layout already
+  // painted (#337), and that shouldn't repaint.
+  const defaultKey = JSON.stringify(defaultTheme);
+  const paintedDefault = useRef(defaultKey);
   useEffect(() => {
-    if (paintedDefault.current === defaultTheme) return;
-    paintedDefault.current = defaultTheme;
+    if (paintedDefault.current === defaultKey) return;
+    paintedDefault.current = defaultKey;
     // The mode too, unless the visitor chose one (a phase can bring its
     // own, as the site's own mode does for an un-customized visitor).
     let stored: string | null = null;
@@ -1204,7 +1207,7 @@ export function useLook(
     applyChrome(dark);
     // Only a new default should repaint; the callbacks are this render's.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defaultTheme]);
+  }, [defaultKey]);
 
   const look = useMemo<LookValue>(() => {
     // Resolve the displayed mode (saved `theme`, or a live builder preview) to a

@@ -32,6 +32,7 @@ import {
 import type { Settings } from "@/lib/schema";
 import { inlineThemeScript } from "@/lib/theme-paint";
 import { scheduleState, themeWithPack } from "@/lib/theme-schedule";
+import { boardDefaultTheme, boardForPath } from "@/lib/board-theme";
 import type { ScheduleProps } from "@/components/prefs/useScheduledTheme";
 import { FONT_IDS } from "@/lib/fonts";
 import { PrefsProvider } from "@/components/PrefsProvider";
@@ -143,17 +144,22 @@ export default async function RootLayout({
   const packs = resolveThemePacks(config.themes);
   // The day/night schedule (#336): the site theme for each phase and the
   // phase now, so the first paint is right; PrefsProvider flips it live.
-  // The schedule may name a pack hidden from visitors (a kiosk's night
-  // look), so it resolves against the whole gallery.
-  const schedule = resolveSchedule(
-    settings,
-    resolveThemeGallery(config.themes).map((r) => r.pack)
-  );
-  const defaultTheme = schedule ? (schedule.phase === "day" ? schedule.day : schedule.night) : settings.theme;
   // Per-request CSP nonce from the proxy, so our inline theme script is allowed
   // without script-src 'unsafe-inline'. Reading headers() also opts pages into
   // dynamic rendering, which is required for a per-request nonce to match.
-  const nonce = (await headers()).get("x-nonce") ?? undefined;
+  const requestHeaders = await headers();
+  const nonce = requestHeaders.get("x-nonce") ?? undefined;
+  // A board's own theme (#337), when the request shows a board that pins
+  // one: it stands in for the site theme on that page, schedule included
+  // (the pin is the board's whole look). The proxy passes the path along;
+  // BoardPage hands the same theme to PrefsProvider for client-side moves.
+  const gallery = resolveThemeGallery(config.themes).map((r) => r.pack);
+  const board = boardForPath(requestHeaders.get("x-pathname"), config.boards, isAdmin);
+  const pinned = board?.theme ? boardDefaultTheme(settings.theme, board, gallery) : null;
+  // The schedule may name a pack hidden from visitors (a kiosk's night
+  // look), so it resolves against the whole gallery.
+  const schedule = pinned ? null : resolveSchedule(settings, gallery);
+  const defaultTheme = pinned ?? (schedule ? (schedule.phase === "day" ? schedule.day : schedule.night) : settings.theme);
 
   // Apply the effective theme before first paint — imperatively, so React never
   // controls the <html> color variables (which would otherwise clobber it on

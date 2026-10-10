@@ -732,8 +732,10 @@ export default async function HelpPage() {
             <strong>Settings → Layout → Boards</strong> (a Media board, an
             Infra board…), and each gets its own address, /b/ and the
             board&apos;s id. Rename and reorder them there, give one an icon
-            to show beside its name in the menus, and{" "}
-            <strong>Arrange</strong> opens one in the layout editor.
+            to show beside its name in the menus, pin one of the site&apos;s
+            themes on it (an Infra board in Circuit while the home board
+            stays as it is; visitors&apos; own choices still apply over it),
+            and <strong>Arrange</strong> opens one in the layout editor.
           </P>
           <P>
             Set a board to <strong>Only me</strong> and it&apos;s private:
@@ -805,8 +807,9 @@ export default async function HelpPage() {
             <li>
               <strong>Boards.</strong> The <strong>Board</strong> menu in the
               editor bar switches to another board&apos;s editor; renames,
-              reorders or deletes this one, or sets who can open it; and
-              starts a new board. Deleting a board keeps its widgets.
+              reorders or deletes this one, sets who can open it or pins a
+              theme on it; and starts a new board. Deleting a board keeps its
+              widgets.
             </li>
             <li>
               <strong>Hide or place from the tray.</strong> Drag a card onto

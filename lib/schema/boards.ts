@@ -31,6 +31,9 @@ export const boardSchema = z.object({
   // Shown before its name in the navigation (#316). Optional, so a board
   // without one stores nothing.
   icon: z.string().trim().min(1).max(MAX_ICON_LENGTH).optional().catch(undefined),
+  // A gallery pack pinned as this board's theme (#337), by name; absent =
+  // the site theme. Resolved by lib/board-theme.ts.
+  theme: z.string().trim().min(1).max(40).optional().catch(undefined),
   layout: boardLayoutSchema.default(boardLayoutSchema.parse({})),
 });
 export type Board = z.infer<typeof boardSchema>;
@@ -75,7 +78,8 @@ export const newBoardId = (name: string, taken: readonly string[]): string =>
 // Admin input (PUT /api/boards): the whole list, in order. A board sent
 // without `layout` keeps its stored rows (a new one starts empty), so this
 // form can't overwrite an arrangement the editor saved meanwhile. `icon`
-// works the same way: left out, the stored one stays; "" clears it.
+// works the same way: left out, the stored one stays; "" clears it. So does
+// `theme` (#337).
 export const boardsUpdateSchema = z
   .array(
     z.object({
@@ -83,6 +87,7 @@ export const boardsUpdateSchema = z
       name: z.string().max(MAX_BOARD_NAME),
       visibility: boardVisibilitySchema,
       icon: z.string().trim().max(MAX_ICON_LENGTH).optional(),
+      theme: z.string().trim().max(40).optional(),
       layout: z.object({ sections: z.array(layoutRowInputSchema).max(MAX_BOARD_ROWS) }).optional(),
     })
   )

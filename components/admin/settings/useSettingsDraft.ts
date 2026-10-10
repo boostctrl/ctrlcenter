@@ -76,12 +76,13 @@ export function useSettingsDraft(
   const boardsSave = useAutosave(boards, async (next, opts) => {
     const before = new Map(savedBoards.current.map((b) => [b.id, b.layout]));
     await saveBoards(
-      next.map(({ id, name, visibility, icon, layout }) => ({
+      next.map(({ id, name, visibility, icon, theme, layout }) => ({
         id,
         name,
         visibility,
         // Sent every time ("" for none), so clearing one here sticks.
         icon: icon ?? "",
+        theme: theme ?? "",
         ...(JSON.stringify(before.get(id)) === JSON.stringify(layout)
           ? {}
           : { layout: { sections: layout.sections } }),
@@ -221,12 +222,16 @@ export function useSettingsDraft(
     ]);
   };
   // An icon of "" clears it (#316).
-  const updateBoard = (id: string, patch: { name?: string; visibility?: BoardVisibility; icon?: string }) =>
+  const updateBoard = (
+    id: string,
+    patch: { name?: string; visibility?: BoardVisibility; icon?: string; theme?: string }
+  ) =>
     setBoards((bs) =>
       bs.map((b) => {
         if (b.id !== id) return b;
         const next = { ...b, ...patch };
         if (!next.icon) delete next.icon;
+        if (!next.theme) delete next.theme;
         return next;
       })
     );

@@ -156,6 +156,7 @@ export default function SettingsManager({
             d={draft}
             groupsState={groupsState}
             items={items}
+            themePacks={themePacks}
           />
         )}
         {section === "widgets" && (

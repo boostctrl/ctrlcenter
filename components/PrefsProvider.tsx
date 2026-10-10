@@ -25,6 +25,11 @@ import { useLook, type DefaultTheme, type LookValue } from "./prefs/useLook";
 import type { ThemePack, VisitorTheming } from "@/lib/theme";
 import { useScheduledTheme, type ScheduleProps, type ThemeScheduleValue } from "./prefs/useScheduledTheme";
 
+// The open board's own theme (#337), set by BoardTheme while it's mounted.
+const BoardThemeContext = createContext<((theme: DefaultTheme | null) => void) | null>(null);
+export const useSetBoardTheme = (): ((theme: DefaultTheme | null) => void) =>
+  useRequired(BoardThemeContext, "useSetBoardTheme");
+
 // Per-visitor preferences, client-only (localStorage), in three contexts so a
 // change re-renders only what reads it (#290): the locale (time zone, units,
 // weather location, greeting name), the look (./prefs/useLook — mode,
@@ -136,9 +141,14 @@ export function PrefsProvider({
   // Pinned app IDs (starts empty to match SSR; hydrated from localStorage on mount).
   const [favorites, setFavorites] = useState<string[]>([]);
   // Under a schedule the site default is the current phase's theme, flipped
-  // live at each switch; the visitor's own choices still win over it.
+  // live at each switch; the visitor's own choices still win over it. A
+  // board's own theme (#337) comes first, for as long as that board is open.
   const scheduled = useScheduledTheme(schedule ?? null);
-  const { look, resetLook } = useLook(scheduled.theme ?? defaultTheme, { policy: visitorTheming, packs });
+  const [boardTheme, setBoardTheme] = useState<DefaultTheme | null>(null);
+  const { look, resetLook } = useLook(boardTheme ?? scheduled.theme ?? defaultTheme, {
+    policy: visitorTheming,
+    packs,
+  });
 
   const persist = useCallback((next: VisitorPrefs) => {
     setPrefs(next);
@@ -257,9 +267,11 @@ export function PrefsProvider({
 
   return (
     <LocaleContext.Provider value={locale}>
+      <BoardThemeContext.Provider value={setBoardTheme}>
       <LookContext.Provider value={lookValue}>
         <FavoritesContext.Provider value={favoritesValue}>{children}</FavoritesContext.Provider>
       </LookContext.Provider>
+      </BoardThemeContext.Provider>
     </LocaleContext.Provider>
   );
 }

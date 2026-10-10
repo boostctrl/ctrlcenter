@@ -14,6 +14,11 @@ here.
 
 ### Added
 
+- **A theme per board (3.0).** Pin one of the site's themes on a board, in
+  Settings → Layout → Boards or from the editor's Board menu, so an Infra
+  board can be Circuit while the home board stays as it is. It paints from
+  the first byte and follows you between boards; visitors' own choices
+  still apply over it. (#337)
 - **A day theme and a night theme (3.0).** *Day & night schedule* in
   Settings → General switches the site between two gallery themes by time
   of day: at sunrise and sunset, worked out for the weather location with

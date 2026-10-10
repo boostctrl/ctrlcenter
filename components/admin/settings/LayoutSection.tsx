@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { buttonClasses } from "@/lib/buttons";
+import type { ThemePack } from "@/lib/theme";
 import { boardName, GROUP_COLORS, MAX_BOARD_NAME, MAX_BOARDS, MAX_GROUP_NAME, type GroupColor } from "@/lib/schema";
 import IconChooser from "../IconChooser";
 import { findGroupByName, groupUsage } from "@/lib/groups";
@@ -16,7 +17,7 @@ import type { SettingsDraft } from "./useSettingsDraft";
 // The boards (#298): one row each, in navigation order. The first is the
 // home page. A board's id is its URL, set from its name when it's created
 // and kept through renames so links to it keep working.
-function BoardsCard({ d }: { d: SettingsDraft }) {
+function BoardsCard({ d, themePacks }: { d: SettingsDraft; themePacks: ThemePack[] }) {
   const { boards, savedBoardIds, addBoard, updateBoard, moveBoard, removeBoard } = d;
   const [draftName, setDraftName] = useState("");
   const add = () => {
@@ -63,6 +64,20 @@ function BoardsCard({ d }: { d: SettingsDraft }) {
                 >
                   <option value="public">Everyone</option>
                   <option value="private">Only me</option>
+                </select>
+                {/* A gallery theme pinned on the board (#337). */}
+                <select
+                  value={b.theme && themePacks.some((p) => p.name === b.theme) ? b.theme : ""}
+                  onChange={(e) => updateBoard(b.id, { theme: e.target.value })}
+                  aria-label={`Theme for the ${label} board`}
+                  className={controlClasses}
+                >
+                  <option value="">Site theme</option>
+                  {themePacks.map((p) => (
+                    <option key={p.name} value={p.name}>
+                      {p.name}
+                    </option>
+                  ))}
                 </select>
                 {savedBoardIds.has(b.id) ? (
                   <Link href={`${href}?edit=1`} className={buttonClasses("ghost", "sm")}>
@@ -267,17 +282,20 @@ export default function LayoutSection({
   d,
   groupsState,
   items,
+  themePacks,
 }: {
   d: SettingsDraft;
   groupsState: GroupsState;
   items: ItemsState;
+  // The gallery, to pin a theme on a board (#337).
+  themePacks: ThemePack[];
 }) {
   const { settings, setSettings, isWidgetShown, setWidgetShown, widgetToggles, instancesOf, updateWidget, widgetLabels } =
     d;
   const headerCards = instancesOf("headerCard");
   return (
     <>
-      <BoardsCard d={d} />
+      <BoardsCard d={d} themePacks={themePacks} />
       <GroupsCard groupsState={groupsState} items={items} />
       <Card
         title="Visible widgets"
