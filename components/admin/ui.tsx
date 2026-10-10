@@ -412,12 +412,15 @@ export function MoveButtons({
   label,
   onMove,
   flow = false,
+  row = false,
 }: {
   index: number;
   count: number;
   label: string;
   onMove: (from: number, to: number) => void;
   flow?: boolean;
+  // Side by side at every size (a toolbar row), not stacked below lg.
+  row?: boolean;
 }) {
   // On coarse pointers these are the ONLY reorder path (HTML5 drag needs a
   // mouse), so they grow toward the touch-target guideline there (#102).
@@ -427,7 +430,7 @@ export function MoveButtons({
   const nextLabel = flow ? `Move ${label} later` : `Move ${label} down`;
   return (
     <div
-      className={`flex shrink-0 flex-col gap-0.5 ${flow ? "lg:flex-row" : ""}`}
+      className={`flex shrink-0 gap-0.5 ${row ? "flex-row" : flow ? "flex-col lg:flex-row" : "flex-col"}`}
     >
       <button
         type="button"

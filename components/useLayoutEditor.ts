@@ -240,11 +240,24 @@ export function useLayoutEditor({
         return { ...w, hideLabel: true };
       })
     );
-  const { beginGesture, endGesture } = history;
-  const gesture = useMemo(() => ({ begin: beginGesture, end: endGesture }), [beginGesture, endGesture]);
+  const { beginGesture, endGesture, group } = history;
+  const gesture = useMemo(
+    () => ({ begin: beginGesture, end: endGesture, group }),
+    [beginGesture, endGesture, group]
+  );
   const clearHistory = history.clear;
+
+  // The selected card (#313): only it shows its controls. Cleared on leaving
+  // edit mode.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selectedRef = useRef(selectedId);
+  useEffect(() => {
+    selectedRef.current = selectedId;
+  }, [selectedId]);
+
   const doneEditing = useCallback(() => {
     setEditing(false);
+    setSelectedId(null);
     clearHistory();
     // Drop a stale ?edit=1 (the deep link from admin Settings) so a reload
     // doesn't reopen the editor.
@@ -254,9 +267,10 @@ export function useLayoutEditor({
 
   // Editing hotkeys: Ctrl/Cmd+Z undoes the last layout change, and
   // Ctrl/Cmd+Shift+Z or Ctrl+Y redoes it — except in a text field, which
-  // keeps its own undo. Escape exits
-  // edit mode like Done — unless a layered surface should eat it first (an
-  // open More popover, the reset confirm dialog), whose own handlers close it.
+  // keeps its own undo. Escape deselects the selected card, and with none
+  // selected exits edit mode like Done — unless a layered surface should eat
+  // it first (an open More popover, the reset confirm dialog), whose own
+  // handlers close it.
   // Capture phase, so the open-popover check runs before those document-level
   // handlers have closed anything.
   useEffect(() => {
@@ -270,8 +284,18 @@ export function useLayoutEditor({
         return;
       }
       if (e.key === "Escape") {
-        if (gridRef.current?.querySelector("details[open]")) return;
+        if (document.querySelector("details[data-editor-more][open]")) return;
         if (document.querySelector('[role="alertdialog"]')) return;
+        const selected = selectedRef.current;
+        if (selected) {
+          e.preventDefault();
+          setSelectedId(null);
+          // Back to the card, from its toolbar (which goes away).
+          gridRef.current
+            ?.querySelector<HTMLElement>(`[data-widget-id="${CSS.escape(selected)}"]`)
+            ?.focus({ preventScroll: true });
+          return;
+        }
         doneEditing();
       }
     }
@@ -286,6 +310,8 @@ export function useLayoutEditor({
     undoLast,
     redoLast,
     gesture,
+    selectedId,
+    select: setSelectedId,
     doneEditing,
     revertLayout,
     resetLayout,

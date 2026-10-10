@@ -79,6 +79,23 @@ describe("useUndoHistory", () => {
     expect(h.value).toBe(5);
   });
 
+  it("folds only changes of the kind a multi-purpose control names", () => {
+    const h = setup();
+    control(false); // a selected card: arrows move it, Shift+arrows resize it
+    act(() => h.result.current.group("resize"));
+    h.change(1);
+    act(() => h.result.current.group("resize"));
+    h.change(2);
+    h.change(3); // an arrow: a move, its own step
+    h.change(4); // another move
+    h.undo();
+    expect(h.value).toBe(3);
+    h.undo();
+    expect(h.value).toBe(2);
+    h.undo();
+    expect(h.value).toBe(0);
+  });
+
   it("redoes what was undone, until a new change", () => {
     const h = setup();
     h.change(1);

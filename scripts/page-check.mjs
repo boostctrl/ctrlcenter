@@ -62,8 +62,9 @@ async function settle(page, origin, { quietMs = 500, timeoutMs = 15000 } = {}) {
 
 // Check one page. `context` is a Playwright BrowserContext (so callers control
 // cookies and color scheme); `screenshot` is an optional output path; `axe`
-// adds the accessibility audit.
-export async function checkPage(context, url, { screenshot, axe = false } = {}) {
+// adds the accessibility audit; `before(page)` puts the page in a state worth
+// checking (opens a menu, selects a card) after it has loaded.
+export async function checkPage(context, url, { screenshot, axe = false, before } = {}) {
   const origin = new URL(url).origin;
   const ours = (u) => u.startsWith(origin);
   const failures = [];
@@ -86,6 +87,7 @@ export async function checkPage(context, url, { screenshot, axe = false } = {}) 
 
   await page.goto(url, { waitUntil: "load" });
   await settle(page, origin);
+  if (before) await before(page);
 
   const styled = await page.evaluate(() => document.styleSheets.length > 0);
   if (!styled)

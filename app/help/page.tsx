@@ -747,13 +747,21 @@ export default async function HelpPage() {
           </P>
           <ul className={LIST_CLASS}>
             <li>
-              <strong>Reorder.</strong> Drag a card by its{" "}
-              <strong>⠿</strong> grip, or use the move arrows.
+              <strong>Select a card.</strong> The editor shows the page just
+              as visitors see it, each card outlined with its name. Click a
+              card (or Tab to it and press <Kbd>Enter</Kbd>) and its
+              controls appear in a small toolbar above it — on a phone, in
+              the bar at the bottom. <Kbd>Esc</Kbd> deselects it.
+            </li>
+            <li>
+              <strong>Reorder.</strong> Drag a card by its name tag, use the
+              move arrows, or press the arrow keys on a selected card.
             </li>
             <li>
               <strong>Resize.</strong> Drag a card&apos;s right edge to set its{" "}
               <strong>width</strong> in columns, or its bottom edge to set its{" "}
-              <strong>height</strong>; the steppers do the same in exact steps.
+              <strong>height</strong>; the steppers do the same in exact steps,
+              and so do <Kbd>Shift</Kbd>+arrow keys on a selected card.
               A <strong>Fill</strong> button widens a card to close the gap
               when it doesn&apos;t reach the end of its row.
             </li>
@@ -764,7 +772,7 @@ export default async function HelpPage() {
               scrolls a long list inside.
             </li>
             <li>
-              <strong>The More menu</strong> on each card adds{" "}
+              <strong>The More menu</strong> in a card&apos;s toolbar adds{" "}
               <strong>space on any side</strong> (above, below, or beside a
               card sharing its row), sets <strong>cards per row</strong> for
               the app and bookmark grids, and hides a section&apos;s heading.

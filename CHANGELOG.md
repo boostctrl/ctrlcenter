@@ -60,6 +60,13 @@ here.
 
 ### Changed
 
+- **A calmer layout editor (3.0).** The editor now shows the page exactly as
+  visitors see it, each card outlined with its name, instead of a strip of
+  controls on every card that changed their heights. Click a card to select
+  it: its controls appear in one small toolbar above it (on a phone, in the
+  bar at the bottom). With the keyboard, Tab to a card, press Enter, then use
+  the arrow keys to move it and Shift with the arrow keys to resize it; Esc
+  deselects. (#313)
 - **Every widget can appear any number of times (3.0).** Each widget on the
   home page is now its own item with its own content: two notes cards, a
   calendar per person, a feed per topic. In Settings → Widgets each kind

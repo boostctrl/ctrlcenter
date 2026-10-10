@@ -3,10 +3,13 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   GRID_COLUMNS,
   MAX_CARD_COLUMNS,
@@ -273,7 +276,7 @@ const SIDE_META: Record<SpaceSide, { arrow: string; name: string }> = {
 // click and Escape. Without them the menu only closes by re-clicking its own
 // summary, so several can pile up and an open one overlaps the card beside it
 // (#100).
-function MoreMenu({ children }: { children: ReactNode }) {
+function MoreMenu({ children, up = false }: { children: ReactNode; up?: boolean }) {
   const ref = useRef<HTMLDetailsElement>(null);
   const [open, setOpen] = useState(false);
   useEffect(() => {
@@ -297,26 +300,57 @@ function MoreMenu({ children }: { children: ReactNode }) {
   return (
     <details
       ref={ref}
-      className="relative"
+      data-editor-more
+      className="relative shrink-0"
       onToggle={(e) => setOpen(e.currentTarget.open)}
     >
       <summary className="flex cursor-pointer list-none items-center rounded-lg border border-fg/10 px-2 py-1 text-ink-60 transition-colors hover:bg-fg/10 hover:text-fg [&::-webkit-details-marker]:hidden">
         More
       </summary>
-      <div className="absolute top-full right-0 z-10 mt-1 flex w-56 flex-col gap-3 rounded-xl border border-fg/10 bg-[var(--background)] p-3 shadow-lg">
+      <div
+        className={`absolute right-0 z-10 flex w-56 flex-col gap-3 rounded-xl border border-fg/10 bg-[var(--background)] p-3 shadow-lg ${
+          up ? "bottom-full mb-1" : "top-full mt-1"
+        }`}
+      >
         {children}
       </div>
     </details>
   );
 }
 
-// Edit-mode chrome around one widget cell: a dashed frame with the widget's
-// label, a title-row drag zone that reorders, MoveButtons, the common size
-// controls (span + Fill, height), a "More" popover with per-side spacing /
-// cards-per-row / label toggle, and a Hide button. Right- and bottom-edge
-// handles resize the width and height by dragging. Only widgets the live page
-// renders get a frame — hidden and empty ones live in the Dashboard's tray —
-// so the edit grid packs exactly like the live page (#98).
+// Whether the large-screen layout is in effect (lg+: spans apply and cells sit
+// side by side). Server and first paint assume large; the editor only mounts
+// after an admin opens it.
+const LARGE_QUERY = "(min-width: 1024px)";
+export function useIsLarge(): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      const mq = window.matchMedia(LARGE_QUERY);
+      mq.addEventListener("change", onChange);
+      return () => mq.removeEventListener("change", onChange);
+    },
+    () => window.matchMedia(LARGE_QUERY).matches,
+    () => true
+  );
+}
+
+// Where a selected card's toolbar docks on small screens: a slot in the
+// bottom editor bar (EditToolbar renders it).
+export const SELECTION_SLOT_ID = "layout-selection-slot";
+
+// One widget cell in the editor (#313). Unselected it is the live card plus a
+// thin outline and a small name tag floating over its top-right corner —
+// nothing in the flow changes, so the editor packs exactly like the live
+// page. The cell is a focusable group: Tab moves between cards, a click or
+// Enter/Space selects one, and then
+// - one compact toolbar (move, width and Fill, height, More, Hide) floats
+//   over the page above or below the card, or docks into the bottom editor
+//   bar on small screens;
+// - the resize handles on its edges take a drag or arrow keys;
+// - arrow keys move the card one place, Shift+arrows resize it (left/right
+//   width, up/down height), and Escape deselects (useLayoutEditor).
+// The content is inert: links and fields in it can't take focus or clicks.
+// Hidden and empty widgets live in the Dashboard's tray instead.
 export function WidgetFrame({
   widget,
   label,
@@ -329,6 +363,9 @@ export function WidgetFrame({
   titled,
   previewStyle,
   previewClass,
+  selected,
+  onSelect,
+  onAnnounce,
   onMove,
   onSpan,
   onCards,
@@ -360,9 +397,13 @@ export function WidgetFrame({
   fillTo: number;
   // Whether the widget has a section heading that can be toggled off.
   titled: boolean;
-  // Applied to the live preview so the set height shows while editing.
+  // The live cell's height style and classes, on the content box.
   previewStyle?: React.CSSProperties;
   previewClass: string;
+  selected: boolean;
+  onSelect: (key: string) => void;
+  // Say something through the editor's live region.
+  onAnnounce: (message: string) => void;
   onMove: (from: number, to: number) => void;
   onSpan: (key: string, span: number) => void;
   onCards: (key: string, cards: number | undefined) => void;
@@ -374,11 +415,12 @@ export function WidgetFrame({
   dropHandlers: React.HTMLAttributes<HTMLDivElement>;
   dragging: boolean;
   drop: DropTarget | null;
-  // Just shown from the tray (#315): outlined for a moment, and focusable so
-  // focus can land here.
+  // Just shown from the tray (#315): outlined for a moment.
   landed?: boolean;
 }) {
   const key = widget.id;
+  const isLarge = useIsLarge();
+  const gesture = useUndoGesture();
   const { frameRef, previewRef, drag, widthHandle, heightHandle } = useDragResize(
     {
       span: widget.span,
@@ -387,13 +429,64 @@ export function WidgetFrame({
       onHeight: (height) => onHeight(key, height),
     }
   );
+  // A keyboard move re-inserts the cell in the DOM, which drops its focus;
+  // take it back once the move has rendered.
+  const refocus = useRef(false);
+  useEffect(() => {
+    if (!refocus.current) return;
+    refocus.current = false;
+    frameRef.current?.focus({ preventScroll: true });
+    frameRef.current?.scrollIntoView({ block: "nearest" });
+  });
+
+  const clampSpan = (n: number) => Math.min(GRID_COLUMNS, Math.max(1, n));
+  const clampHeight = (n: number) => Math.min(MAX_WIDGET_HEIGHT, Math.max(MIN_WIDGET_HEIGHT, n));
+  // A height step from "Auto" starts at what's on screen, snapped to the step.
+  const currentHeight = () =>
+    widget.height ??
+    clampHeight(
+      Math.round((previewRef.current?.getBoundingClientRect().height ?? DEFAULT_WIDGET_HEIGHT) / WIDGET_HEIGHT_STEP) *
+        WIDGET_HEIGHT_STEP
+    );
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    // Only keys aimed at the card itself — not its toolbar or handles.
+    if (e.target !== e.currentTarget) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onSelect(key);
+      return;
+    }
+    if (!selected || e.altKey || e.ctrlKey || e.metaKey) return;
+    const dir =
+      e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : 0;
+    if (dir === 0) return;
+    e.preventDefault();
+    if (!e.shiftKey) {
+      const to = index + dir;
+      if (to < 0 || to >= count) return;
+      refocus.current = true;
+      onMove(index, to);
+      return;
+    }
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      // Widths only apply on large screens.
+      if (!isLarge) return;
+      const next = clampSpan(widget.span + dir);
+      if (next === widget.span) return;
+      gesture.group(`span:${key}`);
+      onSpan(key, next);
+      onAnnounce(`${label} width ${next} of ${GRID_COLUMNS} columns`);
+    } else {
+      // Up is taller, as on the height handle.
+      const next = clampHeight(currentHeight() - dir * WIDGET_HEIGHT_STEP);
+      gesture.group(`height:${key}`);
+      onHeight(key, next);
+      onAnnounce(`${label} height ${next} pixels`);
+    }
+  }
+
   const space = widget.space ?? {};
-  // Narrow cells can't fit the whole control strip beside the label without
-  // wrapping over the preview, so the height stepper moves into More there.
-  // Below lg every widget stacks full-width, so the width stepper and Fill
-  // (which only matter on large screens) leave the strip entirely and height
-  // moves into More too — one row of move / More / Hide on a phone (#271).
-  const narrow = widget.span < 8;
   const heightStepper = (className = "") => (
     <StepGroup
       className={className}
@@ -401,22 +494,8 @@ export function WidgetFrame({
       display={widget.height !== undefined ? `${widget.height}px` : "Auto"}
       decLabel={`Shorter ${label}`}
       incLabel={`Taller ${label}`}
-      onDec={() =>
-        onHeight(
-          key,
-          widget.height === undefined
-            ? DEFAULT_WIDGET_HEIGHT
-            : Math.max(MIN_WIDGET_HEIGHT, widget.height - WIDGET_HEIGHT_STEP)
-        )
-      }
-      onInc={() =>
-        onHeight(
-          key,
-          widget.height === undefined
-            ? DEFAULT_WIDGET_HEIGHT
-            : Math.min(MAX_WIDGET_HEIGHT, widget.height + WIDGET_HEIGHT_STEP)
-        )
-      }
+      onDec={() => onHeight(key, clampHeight(currentHeight() - WIDGET_HEIGHT_STEP))}
+      onInc={() => onHeight(key, clampHeight(currentHeight() + WIDGET_HEIGHT_STEP))}
       canDec={widget.height === undefined || widget.height > MIN_WIDGET_HEIGHT}
       canInc={widget.height === undefined || widget.height < MAX_WIDGET_HEIGHT}
       extra={
@@ -433,266 +512,233 @@ export function WidgetFrame({
       }
     />
   );
+
+  const controls = (
+    <FrameToolbar label={label} docked={!isLarge} frameRef={frameRef}>
+      <MoveButtons index={index} count={count} label={label} onMove={onMove} flow row />
+      {isLarge && (
+        <StepGroup
+          title={`Column width: ${widget.span} of ${GRID_COLUMNS} columns — drag the right edge to resize. Widths apply on large screens.`}
+          display={`${widget.span}/${GRID_COLUMNS}`}
+          decLabel={`Narrow ${label}`}
+          incLabel={`Widen ${label}`}
+          onDec={() => onSpan(key, widget.span - 1)}
+          onInc={() => onSpan(key, widget.span + 1)}
+          canDec={widget.span > 1}
+          canInc={widget.span < GRID_COLUMNS}
+        />
+      )}
+      {/* Parked during a resize drag: the span changes every step, so the
+          button popping in/out would shift the toolbar mid-gesture. */}
+      {isLarge && !drag && fillTo > widget.span && (
+        <button
+          type="button"
+          onClick={() => onSpan(key, fillTo)}
+          title={`Widen ${label} to fill the empty space in its row`}
+          className={toolBtn}
+        >
+          Fill
+        </button>
+      )}
+      {heightStepper()}
+      <MoreMenu up={!isLarge}>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[10px] tracking-wide text-ink-60 uppercase">Space around card</span>
+          <div className="grid grid-cols-2 gap-1.5">
+            {SPACE_SIDES.map((side) => (
+              <StepGroup
+                key={side}
+                title={`Space ${SIDE_META[side].name} ${label}`}
+                display={
+                  <span className="flex items-center gap-1">
+                    <span aria-hidden>{SIDE_META[side].arrow}</span>
+                    {space[side] ?? 0}
+                  </span>
+                }
+                decLabel={`Less space ${SIDE_META[side].name} ${label}`}
+                incLabel={`More space ${SIDE_META[side].name} ${label}`}
+                onDec={() => {
+                  const cur = space[side] ?? 0;
+                  onSpace(key, side, cur > WIDGET_SPACE_STEP ? cur - WIDGET_SPACE_STEP : undefined);
+                }}
+                onInc={() => onSpace(key, side, Math.min(MAX_WIDGET_SPACE, (space[side] ?? 0) + WIDGET_SPACE_STEP))}
+                canDec={!!space[side]}
+                canInc={(space[side] ?? 0) < MAX_WIDGET_SPACE}
+              />
+            ))}
+          </div>
+        </div>
+        {effectiveCards !== undefined && (
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] tracking-wide text-ink-60 uppercase">Cards / row</span>
+            <StepGroup
+              display={widget.cards !== undefined ? `${widget.cards}×` : "Auto"}
+              decLabel={`Fewer cards per row in ${label}`}
+              incLabel={`More cards per row in ${label}`}
+              onDec={() => onCards(key, effectiveCards - 1)}
+              onInc={() => onCards(key, effectiveCards + 1)}
+              canDec={effectiveCards > 1}
+              canInc={effectiveCards < MAX_CARD_COLUMNS}
+              extra={
+                widget.cards !== undefined && (
+                  <button
+                    type="button"
+                    aria-label={`Automatic cards per row in ${label}`}
+                    onClick={() => onCards(key, undefined)}
+                    className={`${stepBtn} border-l border-fg/10 text-[10px] tracking-wide uppercase`}
+                  >
+                    Auto
+                  </button>
+                )
+              }
+            />
+          </div>
+        )}
+        {titled && (
+          <button type="button" aria-pressed={!widget.hideLabel} onClick={() => onToggleLabel(key)} className={toolBtn}>
+            {widget.hideLabel ? "Show heading" : "Hide heading"}
+          </button>
+        )}
+      </MoreMenu>
+      <button
+        type="button"
+        onClick={() => onToggleHidden(key)}
+        title={`Hide ${label} from the page (it moves to the tray below)`}
+        className={toolBtn}
+      >
+        Hide
+      </button>
+    </FrameToolbar>
+  );
+
+  const handleClass = `absolute z-20 touch-none rounded-full bg-violet-400/80 outline-none transition-opacity focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-400 ${
+    selected || drag ? "opacity-100" : "opacity-0 group-hover/frame:opacity-100"
+  }`;
+
   return (
     <div
       ref={frameRef}
       {...dropHandlers}
       data-widget-id={key}
-      tabIndex={-1}
+      data-selected={selected || undefined}
+      role="group"
+      aria-label={label}
+      aria-roledescription="widget"
+      aria-describedby={selected ? "layout-selected-help" : "layout-card-help"}
+      tabIndex={0}
+      onKeyDown={onKeyDown}
+      onClick={(e) => {
+        // Clicks in the toolbar or on a handle don't (re)select.
+        if ((e.target as HTMLElement).closest("[data-frame-chrome]")) return;
+        onSelect(key);
+      }}
       data-space-top={space.top || undefined}
       data-space-right={space.right || undefined}
       data-space-bottom={space.bottom || undefined}
       data-space-left={space.left || undefined}
-      className={`relative flex flex-col gap-2 rounded-2xl p-2 outline-2 transition-[opacity,outline-color] select-none ${
-        landed ? "outline-solid outline-violet-400" : "outline-dashed outline-fg/15"
+      className={`group/frame relative cursor-pointer rounded-2xl outline-offset-4 transition-[opacity,outline-color] select-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-violet-400 ${
+        selected || landed
+          ? "outline-2 outline-solid outline-violet-400"
+          : "outline-1 outline-dashed outline-fg/25 hover:outline-fg/50"
       } ${dragging ? "opacity-40" : ""} ${cellClass}`}
     >
-      {drop && (
-        <span className={DROP_BAR[`${drop.side}:${drop.axis}`]} aria-hidden />
-      )}
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-60">
-        {/* The whole label strip — grip, label, and the empty run before the
-            controls — is the drag source, not just the 16px grip: grabbing the
-            card's title is the natural first gesture, and the resize handles
-            live on the cell edges so a wide top drag zone can't collide with
-            them (#99). The frame is select-none so a drag that starts anywhere
-            on the card can't smear a text selection instead. */}
-        <span
-          {...gripHandlers}
-          className="flex min-w-0 flex-1 cursor-grab items-center gap-x-2 active:cursor-grabbing"
-          title="Drag to move"
-        >
-          <span className="hidden text-ink-50 sm:inline" aria-hidden>
-            ⠿
-          </span>
-          <span className="font-medium">{label}</span>
-        </span>
-        {/* min-w-0 + wrap (not shrink-0): the coarse-pointer sizes make this
-            row wider than a phone-width frame, so it must be able to break
-            into rows instead of overflowing the card's edge. */}
-        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
-          <MoveButtons
-            index={index}
-            count={count}
-            label={label}
-            onMove={onMove}
-            flow
-          />
-          <StepGroup
-            title={`Column width: ${widget.span} of ${GRID_COLUMNS} columns — drag the right edge to resize. Widths apply on large screens.`}
-            display={`${widget.span}/${GRID_COLUMNS}`}
-            decLabel={`Narrow ${label}`}
-            incLabel={`Widen ${label}`}
-            onDec={() => onSpan(key, widget.span - 1)}
-            onInc={() => onSpan(key, widget.span + 1)}
-            canDec={widget.span > 1}
-            canInc={widget.span < GRID_COLUMNS}
-            className="max-lg:hidden"
-          />
-          {/* Parked during a resize drag: the span changes every step, so the
-              button popping in/out would reflow the strip mid-gesture. */}
-          {!drag && fillTo > widget.span && (
-            <button
-              type="button"
-              onClick={() => onSpan(key, fillTo)}
-              title={`Widen ${label} to fill the empty space in its row`}
-              className="rounded-lg border border-fg/10 px-2 py-1 text-ink-60 transition-colors hover:bg-fg/10 hover:text-fg max-lg:hidden"
-            >
-              Fill
-            </button>
-          )}
-          {!narrow && heightStepper("max-lg:hidden")}
-          <MoreMenu>
-              <div
-                className={`flex items-center justify-between gap-2 ${narrow ? "" : "lg:hidden"}`}
-              >
-                <span className="text-[10px] tracking-wide text-ink-60 uppercase">
-                  Height
-                </span>
-                {heightStepper()}
-              </div>
-            <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] tracking-wide text-ink-60 uppercase">
-                  Space around card
-                </span>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {SPACE_SIDES.map((side) => (
-                    <StepGroup
-                      key={side}
-                      title={`Space ${SIDE_META[side].name} ${label}`}
-                      display={
-                        <span className="flex items-center gap-1">
-                          <span aria-hidden>{SIDE_META[side].arrow}</span>
-                          {space[side] ?? 0}
-                        </span>
-                      }
-                      decLabel={`Less space ${SIDE_META[side].name} ${label}`}
-                      incLabel={`More space ${SIDE_META[side].name} ${label}`}
-                      onDec={() => {
-                        const cur = space[side] ?? 0;
-                        onSpace(
-                          key,
-                          side,
-                          cur > WIDGET_SPACE_STEP ? cur - WIDGET_SPACE_STEP : undefined
-                        );
-                      }}
-                      onInc={() =>
-                        onSpace(
-                          key,
-                          side,
-                          Math.min(
-                            MAX_WIDGET_SPACE,
-                            (space[side] ?? 0) + WIDGET_SPACE_STEP
-                          )
-                        )
-                      }
-                      canDec={!!space[side]}
-                      canInc={(space[side] ?? 0) < MAX_WIDGET_SPACE}
-                    />
-                  ))}
-                </div>
-              </div>
-              {effectiveCards !== undefined && (
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] tracking-wide text-ink-60 uppercase">
-                    Cards / row
-                  </span>
-                  <StepGroup
-                    display={widget.cards !== undefined ? `${widget.cards}×` : "Auto"}
-                    decLabel={`Fewer cards per row in ${label}`}
-                    incLabel={`More cards per row in ${label}`}
-                    onDec={() => onCards(key, effectiveCards - 1)}
-                    onInc={() => onCards(key, effectiveCards + 1)}
-                    canDec={effectiveCards > 1}
-                    canInc={effectiveCards < MAX_CARD_COLUMNS}
-                    extra={
-                      widget.cards !== undefined && (
-                        <button
-                          type="button"
-                          aria-label={`Automatic cards per row in ${label}`}
-                          onClick={() => onCards(key, undefined)}
-                          className={`${stepBtn} border-l border-fg/10 text-[10px] tracking-wide uppercase`}
-                        >
-                          Auto
-                        </button>
-                      )
-                    }
-                  />
-                </div>
-              )}
-              {titled && (
-                <button
-                  type="button"
-                  aria-pressed={!widget.hideLabel}
-                  onClick={() => onToggleLabel(key)}
-                  className="rounded-lg border border-fg/10 px-2 py-1 text-ink-60 transition-colors hover:bg-fg/10 hover:text-fg"
-                >
-                  {widget.hideLabel ? "Show heading" : "Hide heading"}
-                </button>
-              )}
-          </MoreMenu>
-          <button
-            type="button"
-            onClick={() => onToggleHidden(key)}
-            title={`Hide ${label} from the page (it moves to the tray below)`}
-            className="rounded-lg border border-fg/10 px-2 py-1 text-ink-60 transition-colors hover:bg-fg/10 hover:text-fg"
-          >
-            Hide
-          </button>
-        </div>
-      </div>
-      {/* Inert while editing so a drag can't trigger the widget's links; the
-          preview carries the set height so sizing shows live. */}
-      <div
-        ref={previewRef}
-        className={`pointer-events-none ${previewClass}`}
-        style={previewStyle}
-      >
+      {drop && <span className={DROP_BAR[`${drop.side}:${drop.axis}`]} aria-hidden />}
+      {/* The live card, as visitors get it. Inert: the editor owns every
+          click and Tab stop here. */}
+      <div ref={previewRef} inert className={previewClass} style={previewStyle}>
         {node}
       </div>
+      {/* The name tag, over the card's top-right corner (section headings
+          start at the top left); it's also the drag source for reordering by
+          mouse. The group's own label already names the card, so the tag is
+          hidden from assistive tech. */}
+      <span
+        {...gripHandlers}
+        data-frame-chrome
+        aria-hidden
+        title="Drag to move"
+        className={`absolute -top-2.5 right-3 z-20 flex max-w-[calc(100%-1.5rem)] cursor-grab items-center gap-1 rounded-full border px-2 py-px text-[10px] leading-4 font-medium whitespace-nowrap shadow-sm active:cursor-grabbing ${
+          selected
+            ? "border-violet-500 bg-violet-600 text-white"
+            : "border-fg/15 bg-[var(--background)] text-ink-70"
+        }`}
+      >
+        <span aria-hidden>⠿</span>
+        <span className="truncate">{label}</span>
+      </span>
+      {selected && controls}
       {/* Drag-to-resize edges: right = width (lg+, where spans apply), bottom =
-          height. A live badge shows the value while dragging. They carry
-          role="slider", so they're focusable and arrow-key operable (#102):
+          height. Shown on hover and on the selected card; focusable (as
+          sliders) only on the selected one, so Tab still walks card to card.
           Up/Right increases per the ARIA convention, Home/End jump the range,
           and Delete returns the height to automatic. */}
-      <span
-        {...widthHandle}
-        data-undo-merge
-        role="slider"
-        tabIndex={0}
-        aria-label={`${label} width`}
-        aria-valuenow={widget.span}
-        aria-valuemin={1}
-        aria-valuemax={GRID_COLUMNS}
-        aria-valuetext={`${widget.span} of ${GRID_COLUMNS} columns`}
-        onKeyDown={(e) => {
-          if (e.key === "ArrowRight" || e.key === "ArrowUp") {
+      {isLarge && (
+        <span
+          {...widthHandle}
+          data-frame-chrome
+          data-undo-merge
+          role="slider"
+          tabIndex={selected ? 0 : -1}
+          aria-label={`${label} width`}
+          aria-valuenow={widget.span}
+          aria-valuemin={1}
+          aria-valuemax={GRID_COLUMNS}
+          aria-valuetext={`${widget.span} of ${GRID_COLUMNS} columns`}
+          onKeyDown={(e) => {
+            const next =
+              e.key === "ArrowRight" || e.key === "ArrowUp"
+                ? widget.span + 1
+                : e.key === "ArrowLeft" || e.key === "ArrowDown"
+                  ? widget.span - 1
+                  : e.key === "Home"
+                    ? 1
+                    : e.key === "End"
+                      ? GRID_COLUMNS
+                      : null;
+            if (next === null) return;
             e.preventDefault();
-            onSpan(key, widget.span + 1);
-          } else if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
-            e.preventDefault();
-            onSpan(key, widget.span - 1);
-          } else if (e.key === "Home") {
-            e.preventDefault();
-            onSpan(key, 1);
-          } else if (e.key === "End") {
-            e.preventDefault();
-            onSpan(key, GRID_COLUMNS);
-          }
-        }}
-        className="absolute top-1/2 right-0 hidden h-12 w-2 -translate-y-1/2 cursor-col-resize touch-none rounded-full bg-fg/10 transition-colors outline-none hover:bg-violet-400/70 focus-visible:bg-violet-400/70 focus-visible:outline-2 focus-visible:outline-violet-400 lg:block pointer-coarse:h-16 pointer-coarse:w-4"
-      />
+            onSpan(key, next);
+          }}
+          className={`${handleClass} top-1/2 right-0 h-12 w-2 translate-x-1/2 -translate-y-1/2 cursor-col-resize pointer-coarse:h-16 pointer-coarse:w-4`}
+        />
+      )}
       <span
         {...heightHandle}
+        data-frame-chrome
         data-undo-merge
         role="slider"
-        tabIndex={0}
+        tabIndex={selected ? 0 : -1}
         aria-label={`${label} height`}
         aria-valuenow={widget.height ?? DEFAULT_WIDGET_HEIGHT}
         aria-valuemin={MIN_WIDGET_HEIGHT}
         aria-valuemax={MAX_WIDGET_HEIGHT}
-        aria-valuetext={
-          widget.height !== undefined ? `${widget.height} pixels` : "Automatic"
-        }
+        aria-valuetext={widget.height !== undefined ? `${widget.height} pixels` : "Automatic"}
         onKeyDown={(e) => {
-          const clampH = (h: number) =>
-            Math.min(MAX_WIDGET_HEIGHT, Math.max(MIN_WIDGET_HEIGHT, h));
-          const seeded = widget.height ?? DEFAULT_WIDGET_HEIGHT;
-          if (e.key === "ArrowUp" || e.key === "ArrowRight") {
-            e.preventDefault();
-            onHeight(
-              key,
-              widget.height === undefined
-                ? DEFAULT_WIDGET_HEIGHT
-                : clampH(seeded + WIDGET_HEIGHT_STEP)
-            );
-          } else if (e.key === "ArrowDown" || e.key === "ArrowLeft") {
-            e.preventDefault();
-            onHeight(
-              key,
-              widget.height === undefined
-                ? DEFAULT_WIDGET_HEIGHT
-                : clampH(seeded - WIDGET_HEIGHT_STEP)
-            );
-          } else if (e.key === "Home") {
-            e.preventDefault();
-            onHeight(key, MIN_WIDGET_HEIGHT);
-          } else if (e.key === "End") {
-            e.preventDefault();
-            onHeight(key, MAX_WIDGET_HEIGHT);
-          } else if (e.key === "Delete" || e.key === "Backspace") {
+          if (e.key === "Delete" || e.key === "Backspace") {
             e.preventDefault();
             onHeight(key, undefined);
+            return;
           }
+          const next =
+            e.key === "ArrowUp" || e.key === "ArrowRight"
+              ? clampHeight(currentHeight() + WIDGET_HEIGHT_STEP)
+              : e.key === "ArrowDown" || e.key === "ArrowLeft"
+                ? clampHeight(currentHeight() - WIDGET_HEIGHT_STEP)
+                : e.key === "Home"
+                  ? MIN_WIDGET_HEIGHT
+                  : e.key === "End"
+                    ? MAX_WIDGET_HEIGHT
+                    : null;
+          if (next === null) return;
+          e.preventDefault();
+          onHeight(key, next);
         }}
-        className="absolute bottom-0 left-1/2 h-2 w-12 -translate-x-1/2 cursor-row-resize touch-none rounded-full bg-fg/10 transition-colors outline-none hover:bg-violet-400/70 focus-visible:bg-violet-400/70 focus-visible:outline-2 focus-visible:outline-violet-400 pointer-coarse:h-4 pointer-coarse:w-16"
+        className={`${handleClass} bottom-0 left-1/2 h-2 w-12 -translate-x-1/2 translate-y-1/2 cursor-row-resize pointer-coarse:h-4 pointer-coarse:w-16`}
       />
       {drag && (
         <span
-          className={`pointer-events-none absolute z-20 rounded-md bg-violet-500 px-1.5 py-0.5 text-[10px] font-medium text-white tabular-nums ${
-            drag.kind === "width"
-              ? "top-1/2 right-3 -translate-y-1/2"
-              : "bottom-3 left-1/2 -translate-x-1/2"
+          className={`pointer-events-none absolute z-30 rounded-md bg-violet-500 px-1.5 py-0.5 text-[10px] font-medium text-white tabular-nums ${
+            drag.kind === "width" ? "top-1/2 right-3 -translate-y-1/2" : "bottom-3 left-1/2 -translate-x-1/2"
           }`}
         >
           {drag.kind === "width" ? `${drag.value}/${GRID_COLUMNS}` : `${drag.value}px`}
@@ -700,6 +746,59 @@ export function WidgetFrame({
       )}
     </div>
   );
+}
+
+const toolBtn =
+  "shrink-0 rounded-lg border border-fg/10 px-2 py-1 text-ink-60 transition-colors hover:bg-fg/10 hover:text-fg pointer-coarse:py-2";
+
+// The selected card's toolbar. On large screens it floats over the page just
+// above the card — below it when there's no room above — and lines up with
+// the card's right edge when it would run off the screen. On small screens it
+// docks into the bottom editor bar instead.
+function FrameToolbar({
+  label,
+  docked,
+  frameRef,
+  children,
+}: {
+  label: string;
+  docked: boolean;
+  frameRef: React.RefObject<HTMLDivElement | null>;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  // The slot is rendered by the editor bar, which is on screen whenever a
+  // card can be selected (the toolbar only renders for a selection, on the
+  // client).
+  const slot = docked && typeof document !== "undefined" ? document.getElementById(SELECTION_SLOT_ID) : null;
+  // Place it after every render: the card moves and resizes under it.
+  useLayoutEffect(() => {
+    const bar = ref.current;
+    const frame = frameRef.current;
+    if (!bar || !frame || docked) return;
+    const f = frame.getBoundingClientRect();
+    const b = bar.getBoundingClientRect();
+    bar.dataset.below = f.top - b.height - 12 < 0 ? "true" : "false";
+    bar.dataset.right = f.left + b.width > window.innerWidth - 8 ? "true" : "false";
+  });
+  const bar = (
+    <div
+      ref={ref}
+      data-frame-chrome
+      role="toolbar"
+      aria-label={`${label} controls`}
+      className={
+        docked
+          ? "flex items-center gap-1.5 overflow-x-auto pb-0.5 text-xs text-ink-60"
+          : "absolute bottom-full left-0 z-30 mb-3 flex w-max items-center gap-1.5 rounded-xl border border-fg/10 bg-[var(--background)] p-1.5 text-xs text-ink-60 shadow-lg data-[below=true]:top-full data-[below=true]:bottom-auto data-[below=true]:mt-3 data-[below=true]:mb-0 data-[right=true]:right-0 data-[right=true]:left-auto"
+      }
+    >
+      {docked && <span className="shrink-0 pr-1 font-medium text-ink-80">{label}</span>}
+      {children}
+    </div>
+  );
+  if (docked) return slot ? createPortal(bar, slot) : null;
+  return bar;
 }
 
 // One labeled −/value/+ group in the edit toolbar. The tiny always-visible
@@ -821,8 +920,11 @@ export function EditToolbar({
     <div
       role="toolbar"
       aria-label="Layout editor"
+      data-editor-keep
       className="fixed inset-x-0 bottom-0 z-[45] flex flex-col gap-2 border-t border-fg/10 bg-[var(--background)]/90 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-lg backdrop-blur-xl lg:inset-x-auto lg:bottom-5 lg:left-1/2 lg:w-max lg:max-w-[calc(100vw-2rem)] lg:-translate-x-1/2 lg:flex-row lg:flex-wrap lg:items-center lg:justify-center lg:gap-x-3 lg:gap-y-1 lg:rounded-full lg:border lg:py-2 lg:pr-2 lg:pl-4"
     >
+      {/* Where the selected card's controls dock on small screens (#313). */}
+      <div id={SELECTION_SLOT_ID} className="empty:hidden lg:hidden" />
       <div className="flex items-center gap-2 lg:contents">
         <span className="text-sm font-medium whitespace-nowrap text-ink-80">Editing layout</span>
         <span className="lg:order-5">

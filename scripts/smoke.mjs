@@ -95,10 +95,11 @@ try {
   }
 
   browser = await launchBrowser();
-  const run = async (context, pathname, shot) => {
+  const run = async (context, pathname, shot, before) => {
     const result = await checkPage(context, base + pathname, {
       screenshot: path.join(OUT, `${shot}.png`),
       axe: true,
+      before,
     });
     for (const w of result.warnings) console.log(`WARN  ${pathname}: ${w}`);
     for (const f of result.failures) failures.push(`${pathname}: ${f}`);
@@ -163,6 +164,12 @@ try {
     ]) {
       await run(ctx, p, `${shot}-${scheme}`);
     }
+    // The editor with a card selected (#313): its floating toolbar and
+    // handles, audited too.
+    await run(ctx, "/?edit=1", `editor-selected-${scheme}`, async (page) => {
+      await page.locator("[data-widget-id]").nth(1).click();
+      await page.getByRole("toolbar", { name: /controls$/ }).waitFor({ timeout: 5_000 });
+    });
     if (scheme === "light") {
       await apiWidgetTest(ctx);
       await editorTray(ctx);

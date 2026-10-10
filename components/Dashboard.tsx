@@ -110,6 +110,8 @@ export default function Dashboard({
     undoLast,
     redoLast,
     gesture,
+    selectedId,
+    select,
     doneEditing,
     revertLayout,
     resetLayout,
@@ -332,6 +334,7 @@ export default function Dashboard({
   // move is always a visible change, never a silent swap with a tray widget.
   function moveVisible(fromV: number, toV: number) {
     if (toV < 0 || toV >= liveCells.length) return;
+    announce(`${labelFor(liveWidgets[fromV])} moved to position ${toV + 1} of ${liveCells.length}`);
     const liveKeys = new Set(liveWidgets.map((w) => w.id));
     const nextVisible = reorder(liveWidgets, fromV, toV);
     let vi = 0;
@@ -341,6 +344,26 @@ export default function Dashboard({
       )
     );
   }
+
+  // The editor's live region (#313): moves, resizes and selection, said out
+  // loud. A repeat of the same words still re-announces (the key changes).
+  const [announcement, setAnnouncement] = useState({ text: "", n: 0 });
+  const announce = (text: string) => setAnnouncement((a) => ({ text, n: a.n + 1 }));
+  function selectCard(id: string) {
+    if (id !== selectedId) announce(`${labelFor(layout.sections.find((w) => w.id === id)!)} selected`);
+    select(id);
+  }
+  // A click anywhere but a card, the editor bar or a dialog deselects.
+  useEffect(() => {
+    if (!editing || !selectedId) return;
+    const onDown = (e: PointerEvent) => {
+      const target = e.target as Element | null;
+      if (target?.closest("[data-widget-id], [data-editor-keep], [role='alertdialog']")) return;
+      select(null);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [editing, selectedId, select]);
 
   // Show and Hide move a widget somewhere else on the page (#315): a shown
   // one goes back to its place in the grid, often far above the tray, and a
@@ -352,6 +375,10 @@ export default function Dashboard({
   const landingSeq = useRef(0);
   const [landed, setLanded] = useState<{ id: string; seq: number } | null>(null);
   function showOrHide(id: string) {
+    // A shown widget comes back selected, ready to place; a hidden one
+    // leaves the selection.
+    const wasHidden = layout.sections.find((w) => w.id === id)?.hidden;
+    select(wasHidden ? id : null);
     toggleWidgetHidden(id);
     landingSeq.current += 1;
     setLanded({ id, seq: landingSeq.current });
@@ -373,6 +400,9 @@ export default function Dashboard({
 
   return (
     <UndoGestureContext.Provider value={gesture}>
+      {/* The cards' content is inert while editing (#313), the greeting's
+          heading with it, so the editor names the page itself. */}
+      {editing && <h1 className="sr-only">Editing the layout</h1>}
       {/* Vertical layout (row-gap, per-cell row-span and margins) is driven by
           useGridLayout, not this class — the gap-y here is only a pre-hydration
           fallback. Sparse (non-dense) flow keeps cards in the order they're
@@ -446,6 +476,9 @@ export default function Dashboard({
               onToggleHidden={showOrHide}
               onToggleLabel={toggleWidgetLabel}
               landed={landed?.id === widget.id}
+              selected={selectedId === widget.id}
+              onSelect={selectCard}
+              onAnnounce={announce}
               gripHandlers={gripHandlers(vIndex)}
               dropHandlers={dropHandlers(vIndex)}
               dragging={dragIndex === vIndex}
@@ -559,6 +592,20 @@ export default function Dashboard({
           so the tray always clears the pill. Taller on small screens, where the
           pill wraps to more rows. */}
       {editing && <div aria-hidden className="h-40 sm:h-28" />}
+
+      {/* What the cards' descriptions point at, and the live region (#313). */}
+      {editing && (
+        <div className="sr-only">
+          <p id="layout-card-help">Press Enter to select this widget.</p>
+          <p id="layout-selected-help">
+            Selected. Arrow keys move it, Shift with the arrow keys resizes it,
+            and Escape deselects it. Its controls follow.
+          </p>
+          <p aria-live="polite" key={announcement.n}>
+            {announcement.text}
+          </p>
+        </div>
+      )}
 
       {editing && (
         <ConfirmProvider>
