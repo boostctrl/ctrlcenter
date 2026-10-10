@@ -14,6 +14,9 @@ here.
 
 ### Added
 
+- **Manage uploaded wallpapers.** Settings → General lists every wallpaper
+  uploaded to the site, says which theme uses it, and deletes the ones you
+  no longer need. (#339)
 - **A theme per board (3.0).** Pin one of the site's themes on a board, in
   Settings → Layout → Boards or from the editor's Board menu, so an Infra
   board can be Circuit while the home board stays as it is. It paints from
