@@ -7,7 +7,7 @@ competition (Homepage, Homarr, Dashy, Glance, Heimdall, Homer, Organizr,
 Flame, Uptime Kuma). Every confirmed defect is filed (#269–#279), and each
 release has a tracker issue with one sub-issue per item: 2.11 #280, 2.12 #281,
 2.13 #282, 3.0 #283, and the post-3.0 backlog #284. The theming project
-was added 2026-10-10 (see "3.0 — Theming depth")._
+was added 2026-10-10 (see "3.0 — Theming depth", tracker #324)._
 
 ## Where things stand
 
@@ -215,7 +215,8 @@ integrations:                 # an array: as many of each type as you run
 **Beta plan**
 - **beta.1:** A–D. The new config model, with the UI at parity.
 - **beta.2:** E–G. The new capabilities.
-- **rc:** H–J, plus docs and help.
+- **rc:** H–J, the theming project (see "3.0 — Theming depth", #324),
+  plus docs and help.
 - **3.0.0:** after a quiet rc.
 
 ---
@@ -276,24 +277,25 @@ Admin overrides of the built-in packs survive renames (3.0 migration).
 |---|---|---|---|
 | T1 | **Accent ink by contrast.** Pick `--accent-fg` by WCAG contrast against the stop that is painted, in `applyAccent` and the inline script; deepen `gradient-text` on light surfaces the way scenes already are. | S | #321 |
 | T2 | **Ink lift per theme, and a theme-matrix smoke pass.** Derive `--ink-lift` from the applied foreground/background contrast so `text-ink-*` holds 4.5:1 on every palette. Extend `npm run smoke` to render the home page under every built-in pack in both modes with the axe audit. | S | #322 |
-| T3 | **One theme resolver.** Generate the no-flash script's logic from the same module `themeApply.ts` and `scenes/color.ts` use (a pure function serialized at build time), so the three copies can't drift. | S | — |
+| T3 | **One theme resolver.** Generate the no-flash script's logic from the same module `themeApply.ts` and `scenes/color.ts` use (a pure function serialized at build time), so the three copies can't drift. | S | #325 |
 | T4 | **Light-mode signature traits** for Console, Sketch, Minimal and Outline. | S | #308 |
-| T5 | **Fine-tune tab.** Sliders layered over the chosen design: corner radius, border weight, blur, shadow depth, card opacity, glow intensity. Stored per mode with the theme, exported with it, and resettable to the design's own values. The design stays the recipe; the tune is a delta. | M | — |
-| T6 | **Scene controls.** A *None* scene; per-scene intensity (opacity) and motion (off, calm, normal) that also honor a per-visitor reduce-motion switch independent of the OS. | S | — |
-| T7 | **Builder that shows its work.** A live preview card pinned beside the tabs (greeting, an app card, a button, status dots, text at every ink level) for the mode being edited; the active theme, palette, design, scene and font highlighted; theme tiles that render their design and scene, not a gradient bar; a *Modified* state with one-tap revert to the last applied theme. | M | — |
-| T8 | **Share a theme as text.** Copy a theme as a short code or link and paste one in, alongside the file export. | S | — |
-| T9 | **Typography.** A heading face separate from the body face, a size/density step (compact, comfortable, spacious), tabular numerals for clocks and stats, and packs that can carry a font. | M | — |
-| T10 | **Semantic colors as tokens.** Status (up, down, warning, info) and group colors become theme tokens with light and dark pairs, derived from the palette by default so existing looks don't change, editable in the builder. Replaces the hard-coded Tailwind shades. | M | — |
-| T11 | **Palette from one color.** Pick an accent and derive background, ink, secondary stop and the semantic set for both modes in OKLCH with contrast guaranteed; an *Auto-pair* action next to the custom pickers. | M | — |
-| T12 | **Wallpaper.** An uploaded or linked image behind the scene, with blur and dim controls, per mode. Uploads and the `img-src https:` CSP already allow it. | M | — |
-| T13 | **Admin theme gallery.** `themes:` holds whole packs, not only overrides: add, duplicate, hide and reorder packs, and preview them live in the Themes tab. Additive config; existing overrides migrate to entries that reference their built-in. | M | — |
-| T14 | **Visitor theming policy.** Admin chooses what visitors may change: everything, packs only, or nothing (kiosks, shared screens). | S | — |
-| T15 | **Scheduled themes.** Switch between two site themes by time of day, with sunrise and sunset from the weather location. Pulls the schedule half of the 3.1 kiosk item forward; weather-reactive scenes stay in 3.1. | M | — |
-| T16 | **Per-board theme.** A board can pin its own theme on top of the site default. Builds on 3.0 boards. | M | — |
+| T5 | **Fine-tune tab.** Sliders layered over the chosen design: corner radius, border weight, blur, shadow depth, card opacity, glow intensity. Stored per mode with the theme, exported with it, and resettable to the design's own values. The design stays the recipe; the tune is a delta. | M | #326 |
+| T6 | **Scene controls.** A *None* scene; per-scene intensity (opacity) and motion (off, calm, normal) that also honor a per-visitor reduce-motion switch independent of the OS. | S | #327 |
+| T7 | **Builder that shows its work.** A live preview card pinned beside the tabs (greeting, an app card, a button, status dots, text at every ink level) for the mode being edited; the active theme, palette, design, scene and font highlighted; theme tiles that render their design and scene, not a gradient bar; a *Modified* state with one-tap revert to the last applied theme. | M | #328 |
+| T8 | **Share a theme as text.** Copy a theme as a short code or link and paste one in, alongside the file export. | S | #329 |
+| T9 | **Typography.** A heading face separate from the body face, a size/density step (compact, comfortable, spacious), tabular numerals for clocks and stats, and packs that can carry a font. | M | #330 |
+| T10 | **Semantic colors as tokens.** Status (up, down, warning, info) and group colors become theme tokens with light and dark pairs, derived from the palette by default so existing looks don't change, editable in the builder. Replaces the hard-coded Tailwind shades. | M | #331 |
+| T11 | **Palette from one color.** Pick an accent and derive background, ink, secondary stop and the semantic set for both modes in OKLCH with contrast guaranteed; an *Auto-pair* action next to the custom pickers. | M | #332 |
+| T12 | **Wallpaper.** An uploaded or linked image behind the scene, with blur and dim controls, per mode. Uploads and the `img-src https:` CSP already allow it. | M | #333 |
+| T13 | **Admin theme gallery.** `themes:` holds whole packs, not only overrides: add, duplicate, hide and reorder packs, and preview them live in the Themes tab. Additive config; existing overrides migrate to entries that reference their built-in. | M | #334 |
+| T14 | **Visitor theming policy.** Admin chooses what visitors may change: everything, packs only, or nothing (kiosks, shared screens). | S | #335 |
+| T15 | **Scheduled themes.** Switch between two site themes by time of day, with sunrise and sunset from the weather location. Pulls the schedule half of the 3.1 kiosk item forward; weather-reactive scenes stay in 3.1. | M | #336 |
+| T16 | **Per-board theme.** A board can pin its own theme on top of the site default. Builds on 3.0 boards. | M | #337 |
 
-**Suggested cut.** T1–T8 are the polish core and fit the 3.0 rc; T9–T16 are
-the depth items, each independent, to pick from for 3.0 or carry into 3.1.
-Every item is additive to the v3 config.
+**Decided (2026-10-10): all sixteen items ship in 3.0.** Tracker #324, one
+sub-issue per item. T1–T8 are the polish core and land first; T9–T16 are
+the depth items, each independent of the others. Every item is additive to
+the v3 config.
 
 **Principles.**
 - Nothing here changes an existing visitor's or admin's look. New knobs
