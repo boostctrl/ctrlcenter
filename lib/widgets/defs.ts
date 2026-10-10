@@ -14,6 +14,8 @@ export type WidgetDef = {
   id: string;
   // Shown in the layout editor's frame and tray.
   label: string;
+  // One line on what it shows, for the layout editor's add-widget palette.
+  blurb: string;
   // The default layout entry: column span on the 24-column grid, and whether
   // it ships hidden. `hidden` is the upgrade-path decision — a widget missing
   // from a saved layout is added with these defaults, so `hidden: false` would
@@ -40,6 +42,7 @@ export const WIDGET_DEFS = [
   {
     id: "greeting",
     label: "Greeting",
+    blurb: "A good-morning headline, with the visitor’s name.",
     span: 16,
     hidden: false,
     align: "lg:self-center",
@@ -49,6 +52,7 @@ export const WIDGET_DEFS = [
   {
     id: "headerCard",
     label: "Header card",
+    blurb: "Clock, weather and status together in one card.",
     span: 8,
     hidden: false,
     align: "lg:self-center",
@@ -60,6 +64,7 @@ export const WIDGET_DEFS = [
   {
     id: "clock",
     label: "Clock",
+    blurb: "The time and date.",
     span: 8,
     hidden: true,
     empty: "Date & clock is toggled off in the admin Layout settings.",
@@ -67,6 +72,7 @@ export const WIDGET_DEFS = [
   {
     id: "weather",
     label: "Weather",
+    blurb: "Current conditions, in °C or °F.",
     span: 8,
     hidden: true,
     empty: "Weather is disabled in the admin Weather settings.",
@@ -74,6 +80,7 @@ export const WIDGET_DEFS = [
   {
     id: "status",
     label: "Status",
+    blurb: "How many of your monitored apps are up.",
     span: 8,
     hidden: true,
     empty: ({ statusEnabled }) =>
@@ -84,6 +91,7 @@ export const WIDGET_DEFS = [
   {
     id: "search",
     label: "Search",
+    blurb: "Search your apps and bookmarks, or the web.",
     span: 24,
     hidden: false,
     empty: "The search bar appears once there are apps or bookmarks to search.",
@@ -91,6 +99,7 @@ export const WIDGET_DEFS = [
   {
     id: "calendar",
     label: "Calendar",
+    blurb: "Upcoming events from an iCal or CalDAV calendar.",
     span: 24,
     hidden: false,
     titled: true,
@@ -102,6 +111,7 @@ export const WIDGET_DEFS = [
   {
     id: "notes",
     label: "Notes",
+    blurb: "A card of notes, written in markdown.",
     span: 8,
     hidden: true,
     titled: true,
@@ -111,6 +121,7 @@ export const WIDGET_DEFS = [
   {
     id: "feed",
     label: "RSS feed",
+    blurb: "Latest headlines from RSS, Atom or JSON feeds.",
     span: 8,
     hidden: true,
     titled: true,
@@ -121,6 +132,7 @@ export const WIDGET_DEFS = [
   {
     id: "countdown",
     label: "Countdown",
+    blurb: "Days to go until the dates you choose.",
     span: 8,
     hidden: true,
     titled: true,
@@ -130,6 +142,7 @@ export const WIDGET_DEFS = [
   {
     id: "worldClocks",
     label: "World clocks",
+    blurb: "The time in the other zones you follow.",
     span: 8,
     hidden: true,
     titled: true,
@@ -139,6 +152,7 @@ export const WIDGET_DEFS = [
   {
     id: "systemStats",
     label: "System stats",
+    blurb: "CPU, memory and disk use of this server.",
     span: 8,
     hidden: true,
     titled: true,
@@ -151,6 +165,7 @@ export const WIDGET_DEFS = [
   {
     id: "integration",
     label: "Integration",
+    blurb: "A live tile for one of your integrations.",
     span: 8,
     hidden: true,
     noStock: true,
@@ -162,6 +177,7 @@ export const WIDGET_DEFS = [
   {
     id: "api",
     label: "API",
+    blurb: "A stat, gauge or list from any JSON endpoint.",
     span: 8,
     hidden: true,
     titled: true,
@@ -172,6 +188,7 @@ export const WIDGET_DEFS = [
   {
     id: "favorites",
     label: "Favorites",
+    blurb: "The apps each visitor has pinned.",
     span: 24,
     hidden: false,
     cards: true,
@@ -182,6 +199,7 @@ export const WIDGET_DEFS = [
   {
     id: "apps",
     label: "Applications",
+    blurb: "Your application tiles, all or one group.",
     span: 24,
     hidden: false,
     cards: true,
@@ -192,6 +210,7 @@ export const WIDGET_DEFS = [
   {
     id: "bookmarks",
     label: "Bookmarks",
+    blurb: "Your bookmarks, grouped.",
     span: 24,
     hidden: false,
     cards: true,

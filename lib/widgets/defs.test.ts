@@ -10,9 +10,10 @@ describe("widget registry", () => {
     expect([...WIDGET_IDS]).toEqual(WIDGET_DEFS.map((d) => d.id));
   });
 
-  it("gives every widget a label, an in-grid default span and an empty reason", () => {
+  it("gives every widget a label, a palette blurb, an in-grid default span and an empty reason", () => {
     for (const d of WIDGET_DEFS) {
       expect(d.label.trim(), d.id).not.toBe("");
+      expect(d.blurb.trim(), d.id).not.toBe("");
       expect(d.span, d.id).toBeGreaterThanOrEqual(1);
       expect(d.span, d.id).toBeLessThanOrEqual(GRID_COLUMNS);
       expect(emptyReason(d.id, { statusEnabled: false }).trim(), d.id).not.toBe("");
