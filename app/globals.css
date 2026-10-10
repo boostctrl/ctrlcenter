@@ -13,11 +13,10 @@
   --fg: #ffffff;
   --accent-from: #a78bfa;
   --accent-to: #22d3ee;
-  /* Legible ink for text/icons sitting on the accent gradient (e.g. .btn-accent).
-     Chosen from the accent's perceived luminance — near-black on bright accents,
-     white on dark ones — so accent buttons stay readable with any accent, in
-     either mode. Set imperatively on <html> by the no-flash script and
-     applyAccent(); this is the default-accent fallback pre-hydration. */
+  /* Legible ink for text/icons sitting on the accent (e.g. .btn-accent): black
+     or white, whichever contrasts more with the painted accent stop (#321).
+     Set imperatively on <html> by the no-flash script and applyAll(); this is
+     the default-accent fallback pre-hydration. */
   --accent-fg: #000000;
   /* Scene backdrops paint translucent accent over the page background. A bright
      accent reads as a vivid burst over the dark surface but washes out over the
@@ -430,7 +429,8 @@
 
 /* Emboss's light-source highlight must be a true white in light mode — the
    --fg-based one would invert into a dark smudge on the pale surface. */
-.theme-light.design-emboss {
+.theme-light.design-emboss,
+.theme-light .design-emboss {
   --surface-shadow: -6px -6px 14px rgba(255, 255, 255, 0.85),
     6px 6px 14px rgba(var(--shadow-tint), 0.18);
   --surface-shadow-hover: -8px -8px 18px rgba(255, 255, 255, 0.95),
@@ -439,11 +439,70 @@
 
 /* Aero's glossy top highlight is a light inset line — keep it light-on-light in
    light mode (the --fg-based one would invert to a dark smudge). */
-.theme-light.design-aero {
+.theme-light.design-aero,
+.theme-light .design-aero {
   --surface-shadow: 0 8px 24px rgba(var(--shadow-tint), 0.16),
     inset 0 1px 0 rgba(255, 255, 255, 0.7);
   --surface-shadow-hover: 0 10px 28px rgba(var(--shadow-tint), 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+/* Light-mode signature traits (#308). Console, Sketch, Minimal and Outline
+   told apart on dark by hairlines, dashes and glows that all but vanish on the
+   pale surface, so each gets one trait that survives it. Dark is untouched.
+   Each rule also matches the class on a wrapper (the theme builder's design
+   tiles), so the tiles preview the light variant too. */
+.theme-light.design-minimal,
+.theme-light .design-minimal {
+  /* No border at all: a flat, faintly darker slab, and spacing does the work. */
+  --surface-border-width: 0px;
+  --surface-border: transparent;
+  --surface-border-hover: transparent;
+  --surface-bg: color-mix(in srgb, var(--fg) 5%, var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 8%, var(--background));
+}
+.theme-light.design-outline,
+.theme-light .design-outline {
+  /* A heavier outline in the deepened accent (the --scene-* tone the light
+     surface already uses for backdrops and the focus ring), still no fill. */
+  --surface-border-width: 2px;
+  --surface-border: color-mix(in srgb, var(--scene-from) 75%, transparent);
+  --surface-border-hover: var(--scene-to);
+  --surface-bg-hover: color-mix(in srgb, var(--scene-from) 6%, transparent);
+  --surface-shadow-hover: none;
+}
+.theme-light.design-sketch,
+.theme-light .design-sketch {
+  /* Heavier pencil, a second offset stroke like a hand-drawn double line, and a
+     paper-white wash under it. */
+  --surface-border-width: 2px;
+  --surface-border: color-mix(in srgb, var(--fg) 62%, transparent);
+  --surface-border-hover: color-mix(in srgb, var(--fg) 80%, transparent);
+  --surface-bg: rgba(255, 255, 255, 0.45);
+  --surface-bg-hover: rgba(255, 255, 255, 0.65);
+  --surface-shadow: 3px 3px 0 0 color-mix(in srgb, var(--fg) 22%, transparent);
+  --surface-shadow-hover: 4px 4px 0 0 color-mix(in srgb, var(--fg) 30%, transparent);
+}
+.design-sketch {
+  /* Uneven corners, the hand-drawn rectangle: the browser scales the oversized
+     radii to fit, so every card comes out a little off-square. Both modes —
+     it's the design's signature. */
+  --surface-radius: 255px 18px 225px 18px / 18px 225px 18px 255px;
+}
+.theme-light.design-console,
+.theme-light .design-console {
+  /* A visible scanline wash and a firmer frame around the accent rule. */
+  --surface-border: color-mix(in srgb, var(--fg) 22%, transparent);
+  --surface-bg: color-mix(in srgb, var(--fg) 6%, var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 9%, var(--background));
+  --surface-bg-image: repeating-linear-gradient(
+    0deg,
+    color-mix(in srgb, var(--fg) 7%, transparent) 0 1px,
+    transparent 1px 4px
+  );
+  --surface-shadow: inset 4px 0 0 0 var(--scene-from);
+  --surface-shadow-hover: inset 4px 0 0 0 var(--scene-to),
+    0 0 16px color-mix(in srgb, var(--scene-from) 15%, transparent);
 }
 
 /* Weather emoji: white glyphs (☁️, 🌫️, ❄️) vanish on the pale light surface, so
@@ -461,7 +520,10 @@
    use `text-ink-*` for any text whose opacity is below 100. */
 :root {
   /* A small lift in dark mode too: white at /40–/45 lands just under 4.5:1 on
-     the near-black surfaces (3.8–4.49 measured). */
+     the near-black surfaces (3.8–4.49 measured). These are the per-mode FLOORS,
+     tuned for the default colors; whenever a look (a palette, theme or custom
+     colors) is applied, the theme resolver sets --ink-lift on <html> to the
+     smallest value at which that look's /40 ink clears 4.5:1 (#322). */
   --ink-lift: 0.15;
 }
 .theme-light {
@@ -579,8 +641,12 @@ select optgroup {
     background-color: var(--surface-bg-hover);
     box-shadow: var(--surface-shadow-hover);
   }
+  /* Drawn from the scene colors rather than the raw accent: on the light
+     surface those are the accent deepened and saturated (lib/theme-paint.ts),
+     so the greeting's mark keeps reading instead of washing to 1.6:1 (#321);
+     on dark they ARE the accent. */
   .gradient-text {
-    background-image: linear-gradient(135deg, var(--accent-from), var(--accent-to));
+    background-image: linear-gradient(135deg, var(--scene-from), var(--scene-to));
     background-clip: text;
     -webkit-background-clip: text;
     color: transparent;

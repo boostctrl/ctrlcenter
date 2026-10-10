@@ -186,7 +186,9 @@ export const BASE_THEMES: PresetTheme[] = [
   {
     name: "Everforest",
     dark: { background: "#2d353b", foreground: "#d3c6aa", accentFrom: "#a7c080", accentTo: "#83c092" },
-    light: { background: "#f3ead3", foreground: "#5c6a72", accentFrom: "#8da101", accentTo: "#35a77c" },
+    // The light ink is a step deeper than Everforest's own #5c6a72, which sat
+    // at 4.1:1 on a card's fill (#322).
+    light: { background: "#f3ead3", foreground: "#4a575e", accentFrom: "#8da101", accentTo: "#35a77c" },
   },
   {
     name: "Monokai",

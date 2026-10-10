@@ -88,6 +88,14 @@ here.
 
 ### Changed
 
+- **Four designs now look like themselves in light mode.** Console, Sketch,
+  Minimal and Outline were told apart on the dark surface by hairlines,
+  dashes and glows that all but vanished on the pale one. In light mode,
+  Minimal is now a borderless flat slab, Outline draws a heavier outline in
+  the accent, Sketch gets a firmer pencil line with a second offset stroke
+  on a paper-white wash, and Console shows its scanlines and a firmer frame
+  around its accent rule. Sketch's corners are now a little uneven in both
+  modes, like a hand-drawn rectangle. (#308)
 - **Upgrading from 2.x (3.0).** Your `config.yaml` is converted to the 3.0
   shape on first start, keeping your comments (but those on the settings
   that move, which stay in the backup): the home page layout becomes the
@@ -161,6 +169,21 @@ here.
   the widget lands far up the page. A widget that's empty can be hidden again
   from the tray (it used to have no button), says it will appear once it has
   content, and its hint about what to add is no longer cut off. (#315)
+- **Accent buttons stay readable with any accent.** The text on an accent
+  button (Save theme, the selected option's tick, today in the calendar) is
+  now black or white by measured contrast against the colour it sits on.
+  Before, a bright start colour with a darker end colour got white text:
+  on the Forest, Monokai and Mariana looks it fell to under 2:1. The
+  greeting's accent mark also deepens on the light surface like the scenes
+  do, instead of washing out. (#321)
+- **Secondary text keeps its contrast on every palette.** The dimmer text
+  (hints, descriptions, timestamps) was tuned to pass 4.5:1 only on the
+  default colours; on Everforest, Tokyo, Nord, Catppuccin and others it fell
+  under. Each look now sets its own lift so the dimmest common step reads at
+  4.5:1 on that look's cards. Everforest's light-mode ink is a step deeper
+  for the same reason. The smoke check in CI renders the home page under
+  every built-in theme and palette, in both modes, so a new look can't ship
+  under the line. (#322)
 
 ## [2.13.0] - 2026-10-09
 

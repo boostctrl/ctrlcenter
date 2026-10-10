@@ -141,6 +141,8 @@ try {
     await ctx.close();
   }
 
+  await themeMatrixPhase(run);
+
   // Sign in through the real form, then render the admin pages — in both
   // schemes, since contrast regressions tend to be scheme-specific.
   for (const scheme of ["light", "dark"]) {
@@ -208,6 +210,52 @@ try {
   await browser?.close();
   server.kill();
   tlsServer?.close();
+}
+
+// Every built-in theme and palette, in both schemes, on the home page (#322):
+// the axe audit otherwise only ever sees the default colors, so a look whose
+// secondary text or accent button fell under 4.5:1 shipped unseen. Each look
+// is applied the way a visitor's choice is — through localStorage, read by the
+// no-flash script — which also proves that script runs in the production
+// build: it marks <html data-theme-boot>, and a serialization slip in
+// lib/theme-paint.ts would otherwise die silently in its try/catch (#325).
+// lib/theme.ts imports nothing, so Node loads it as-is (type stripping).
+async function themeMatrixPhase(run) {
+  const { THEME_PACKS, BASE_THEMES } = await import("../lib/theme.ts");
+  const looks = [
+    ...THEME_PACKS.map((p) => ({ ...p, kind: "theme" })),
+    ...BASE_THEMES.map((p) => ({ ...p, design: "glass", scene: "aurora", kind: "palette" })),
+  ];
+  for (const look of looks) {
+    for (const scheme of ["dark", "light"]) {
+      const ctx = await browser.newContext({
+        viewport: { width: 1280, height: 800 },
+        colorScheme: scheme,
+        reducedMotion: "reduce",
+      });
+      await ctx.addInitScript(
+        (entries) => {
+          for (const [k, v] of Object.entries(entries)) localStorage.setItem(k, v);
+        },
+        {
+          "ctrlcenter:theme": scheme,
+          "ctrlcenter:activeTheme": JSON.stringify({ dark: look.dark, light: look.light }),
+          "ctrlcenter:design": JSON.stringify({ dark: look.design, light: look.design }),
+          "ctrlcenter:scene": JSON.stringify({ dark: look.scene, light: look.scene }),
+        }
+      );
+      let booted = false;
+      const slug = look.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      await run(ctx, "/", `${look.kind}-${slug}-${scheme}`, async (page) => {
+        booted = await page.evaluate(
+          () => document.documentElement.getAttribute("data-theme-boot") === "1"
+        );
+      });
+      if (!booted) failures.push(`/ (${look.name}, ${scheme}): the no-flash theme script didn't run`);
+      await ctx.close();
+    }
+  }
+  console.log(`ok    ${looks.length} built-in looks audited in both schemes`);
 }
 
 // The first-run setup (#304): with a fresh install's config swapped in, /admin

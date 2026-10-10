@@ -1,0 +1,283 @@
+import { describe, it, expect } from "vitest";
+import {
+  inlineThemeScript,
+  makeThemePaint,
+  themePaint,
+  type PaintDefaults,
+  type PaintIds,
+} from "./theme-paint";
+import { BASE_THEMES, DESIGN_IDS, SCENE_IDS, THEME_PACKS } from "./theme";
+import { FONT_IDS } from "./fonts";
+import { serializeForScript } from "./serialize";
+
+const IDS: PaintIds = { design: DESIGN_IDS, scene: SCENE_IDS, font: FONT_IDS };
+
+const DT: PaintDefaults = {
+  mode: "system",
+  design: "glass",
+  scene: "aurora",
+  font: "jakarta",
+  accentFrom: "#a78bfa",
+  accentTo: "#22d3ee",
+};
+
+// A localStorage stand-in.
+function storage(entries: Record<string, unknown>) {
+  const map = new Map(
+    Object.entries(entries).map(([k, v]) => [k, typeof v === "string" ? v : JSON.stringify(v)])
+  );
+  return { getItem: (k: string) => map.get(k) ?? null };
+}
+
+// Every built-in look, per mode.
+const LOOKS = [...BASE_THEMES, ...THEME_PACKS].flatMap((t) => [
+  { name: `${t.name} dark`, dark: true, ...t.dark },
+  { name: `${t.name} light`, dark: false, ...t.light },
+]);
+
+describe("makeThemePaint is self-contained", () => {
+  it("evaluates from its own source with no outer references", () => {
+    // The inline no-flash script embeds this source (#325): a reference to
+    // anything outside the factory body would throw here, long before it
+    // could fail silently inside the browser's try/catch.
+    const isolated = new Function(`return (${makeThemePaint.toString()})();`)() as ReturnType<
+      typeof makeThemePaint
+    >;
+    for (const look of LOOKS) {
+      const input = {
+        dark: look.dark,
+        background: look.background,
+        foreground: look.foreground,
+        accentFrom: look.accentFrom,
+        accentTo: look.accentTo,
+        design: "cyber",
+        scene: "grid",
+        font: "inter",
+      };
+      expect(isolated.computePaint(input)).toEqual(themePaint.computePaint(input));
+    }
+  });
+
+  it("builds an inline script that is one statement, escaped for HTML", () => {
+    const script = inlineThemeScript(
+      serializeForScript({ ...DT, preset: "</script><b>x" }),
+      IDS
+    );
+    expect(script.startsWith("(function(){try{")).toBe(true);
+    expect(script.endsWith("}catch(e){}})();")).toBe(true);
+    expect(script).not.toContain("</script>");
+    expect(script).toContain("data-theme-boot");
+  });
+});
+
+describe("accentInk (#321)", () => {
+  it("picks whichever of black or white contrasts more with the painted stop", () => {
+    expect(themePaint.accentInk("#34d399")).toBe("#000000"); // Forest's bright green
+    expect(themePaint.accentInk("#a1a1aa")).toBe("#000000"); // Mono's zinc
+    expect(themePaint.accentInk("#7c3aed")).toBe("#ffffff"); // a deep violet
+    expect(themePaint.accentInk("#a78bfa")).toBe("#000000"); // the default accent
+  });
+
+  it("gives every built-in look at least 4.5:1 ink on its accent button", () => {
+    const under = LOOKS.filter(
+      (l) => themePaint.contrast(themePaint.accentInk(l.accentFrom), l.accentFrom) < 4.5
+    ).map((l) => l.name);
+    expect(under).toEqual([]);
+  });
+});
+
+const blend = (bg: string, fg: string, alpha: number) => {
+  const a = themePaint.hexToRgb(bg)!;
+  const b = themePaint.hexToRgb(fg)!;
+  return (
+    "#" +
+    [0, 1, 2]
+      .map((i) => Math.round(a[i] * (1 - alpha) + b[i] * alpha).toString(16).padStart(2, "0"))
+      .join("")
+  );
+};
+
+describe("built-in inks", () => {
+  it("clear 4.5:1 at full opacity on a 10% card fill, every look, both modes", () => {
+    // The lift can't help full-opacity text; the palette itself has to. The
+    // smoke run's theme matrix found Everforest light at 4.1:1 this way.
+    const under = LOOKS.filter(
+      (l) => themePaint.contrast(blend(l.background, l.foreground, 0.1), l.foreground) < 4.5
+    ).map((l) => l.name);
+    expect(under).toEqual([]);
+  });
+});
+
+describe("inkLift (#322)", () => {
+  // The CSS: text-ink-40 = ink at (100 - 60 * (1 - lift))% opacity, here over
+  // the 10% card fill the lift is measured against. Mirror it to check the
+  // guarantee the lift is meant to give.
+  const ink40 = (bg: string, fg: string, lift: number) => {
+    const surface = blend(bg, fg, 0.1);
+    const alpha = 1 - 0.6 * (1 - lift);
+    return themePaint.contrast(surface, blend(surface, fg, alpha));
+  };
+
+  it("never drops below the per-mode floor the stylesheet ships", () => {
+    expect(themePaint.inkLift("#06070d", "#f4f4f6", true)).toBeGreaterThanOrEqual(0.15);
+    expect(themePaint.inkLift("#eceef3", "#181b24", false)).toBeGreaterThanOrEqual(0.4);
+  });
+
+  it("lifts every built-in look's /40 ink to 4.5:1", () => {
+    const under = LOOKS.filter((l) => {
+      const lift = themePaint.inkLift(l.background, l.foreground, l.dark);
+      return ink40(l.background, l.foreground, lift) < 4.5;
+    }).map((l) => l.name);
+    expect(under).toEqual([]);
+  });
+
+  it("raises Everforest light, which the floor left under 3:1", () => {
+    const lift = themePaint.inkLift("#f3ead3", "#4a575e", false);
+    expect(lift).toBeGreaterThan(0.4);
+    expect(ink40("#f3ead3", "#4a575e", 0.4)).toBeLessThan(4.5);
+    expect(ink40("#f3ead3", "#4a575e", lift)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("goes all the way up for a pair that can't reach 4.5:1 at all", () => {
+    expect(themePaint.inkLift("#888888", "#999999", true)).toBe(1);
+  });
+});
+
+describe("computePaint", () => {
+  it("removes the surface vars and the lift when no look applies", () => {
+    const paint = themePaint.computePaint({
+      dark: true,
+      background: null,
+      foreground: null,
+      accentFrom: "#a78bfa",
+      accentTo: "#22d3ee",
+    });
+    expect(paint.vars["--background"]).toBeNull();
+    expect(paint.vars["--fg"]).toBeNull();
+    expect(paint.vars["--ink-lift"]).toBeNull();
+    expect(paint.vars["--accent-from"]).toBe("#a78bfa");
+    expect(paint.vars["--accent-fg"]).toBe("#000000");
+    // Dark: the scene colors are the raw accent.
+    expect(paint.vars["--scene-from"]).toBe("#a78bfa");
+    expect(paint.design).toBeUndefined();
+  });
+
+  it("deepens the scene colors on light and sets the lift for a look", () => {
+    const paint = themePaint.computePaint({
+      dark: false,
+      background: "#eceef3",
+      foreground: "#181b24",
+      accentFrom: "#a78bfa",
+      accentTo: "#22d3ee",
+    });
+    expect(paint.vars["--scene-from"]).toBe(`rgb(${themePaint.deepenForLight("#a78bfa")})`);
+    expect(paint.vars["--fg"]).toBe("#181b24");
+    expect(Number(paint.vars["--ink-lift"])).toBeGreaterThanOrEqual(0.4);
+  });
+});
+
+describe("readStored (the no-flash path)", () => {
+  it("falls back to the site default with nothing stored", () => {
+    const input = themePaint.readStored(storage({}), DT, IDS, true);
+    expect(input).toEqual({
+      dark: true,
+      background: null,
+      foreground: null,
+      accentFrom: "#a78bfa",
+      accentTo: "#22d3ee",
+      design: "glass",
+      scene: "aurora",
+      font: "jakarta",
+    });
+  });
+
+  it("follows the stored mode, and the OS for system", () => {
+    expect(themePaint.readStored(storage({ "ctrlcenter:theme": "light" }), DT, IDS, true).dark).toBe(false);
+    expect(themePaint.readStored(storage({ "ctrlcenter:theme": "dark" }), DT, IDS, false).dark).toBe(true);
+    expect(themePaint.readStored(storage({}), { ...DT, mode: "light" }, IDS, true).dark).toBe(false);
+    expect(themePaint.readStored(storage({}), DT, IDS, false).dark).toBe(false);
+  });
+
+  it("uses the active look's variant for the mode, with its own accent", () => {
+    const look = { dark: THEME_PACKS[1].dark, light: THEME_PACKS[1].light };
+    const input = themePaint.readStored(
+      storage({ "ctrlcenter:activeTheme": look, "ctrlcenter:theme": "light" }),
+      DT,
+      IDS,
+      true
+    );
+    expect(input.background).toBe(look.light.background);
+    expect(input.accentFrom).toBe(look.light.accentFrom);
+  });
+
+  it("reads a flat pre-mode look as both modes", () => {
+    const flat = THEME_PACKS[2].dark;
+    const input = themePaint.readStored(
+      storage({ "ctrlcenter:activeTheme": flat, "ctrlcenter:theme": "light" }),
+      DT,
+      IDS,
+      true
+    );
+    expect(input.background).toBe(flat.background);
+  });
+
+  it("seeds the admin custom default colors when the visitor has none", () => {
+    const dt: PaintDefaults = {
+      ...DT,
+      background: "#000000",
+      foreground: "#ffffff",
+      backgroundLight: "#ffffff",
+      foregroundLight: "#000000",
+      accentFromLight: "#111111",
+      accentToLight: "#222222",
+    };
+    expect(themePaint.readStored(storage({}), dt, IDS, true)).toMatchObject({
+      background: "#000000",
+      accentFrom: "#a78bfa",
+    });
+    expect(themePaint.readStored(storage({}), dt, IDS, false)).toMatchObject({
+      background: "#ffffff",
+      accentFrom: "#111111",
+    });
+  });
+
+  it("layers a per-mode accent override, and a flat one for both modes", () => {
+    const perMode = { dark: { from: "#111111", to: "#222222" }, light: null };
+    expect(
+      themePaint.readStored(storage({ "ctrlcenter:accent": perMode }), DT, IDS, true).accentFrom
+    ).toBe("#111111");
+    expect(
+      themePaint.readStored(storage({ "ctrlcenter:accent": perMode, "ctrlcenter:theme": "light" }), DT, IDS, true)
+        .accentFrom
+    ).toBe("#a78bfa");
+    const flat = { from: "#333333", to: "#444444" };
+    expect(
+      themePaint.readStored(storage({ "ctrlcenter:accent": flat, "ctrlcenter:theme": "light" }), DT, IDS, true)
+        .accentTo
+    ).toBe("#444444");
+  });
+
+  it("picks the stored per-mode design/scene/font, validated, else the mode's default", () => {
+    const dt: PaintDefaults = { ...DT, design: "bold", designLight: "paper", scene: "grid" };
+    const s = storage({
+      "ctrlcenter:design": { dark: "cyber", light: "nope" },
+      "ctrlcenter:font": { dark: null, light: "inter" },
+    });
+    expect(themePaint.readStored(s, dt, IDS, true)).toMatchObject({
+      design: "cyber",
+      scene: "grid",
+      font: "jakarta",
+    });
+    expect(themePaint.readStored(s, { ...dt, mode: "light" }, IDS, true)).toMatchObject({
+      design: "paper", // "nope" is not a design this build knows
+      scene: "grid", // no sceneLight: the dark default
+      font: "inter",
+    });
+  });
+
+  it("ignores unparsable storage", () => {
+    const s = storage({ "ctrlcenter:activeTheme": "{not json", "ctrlcenter:design": "[1" });
+    expect(themePaint.readStored(s, DT, IDS, true).background).toBeNull();
+    expect(themePaint.readStored(s, DT, IDS, true).design).toBe("glass");
+  });
+});
