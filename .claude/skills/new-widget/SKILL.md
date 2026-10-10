@@ -12,9 +12,13 @@ server-only. Work through them in order. The renderer registry is typed over
 every widget type, so `npm run typecheck` fails until the new type has one.
 
 Since 3.0 (#297) what sits on the board is an **instance** of a type: an entry
-in the top-level `widgets` list (`{ id, type, ...content }`), placed by a
-layout row `{ widget: <id>, span, … }`. A type can appear any number of times,
-and its content lives on the instance, never in `settings`.
+in the top-level `widgets` list (`{ id, type, ...content }`), placed on a
+board by a layout row `{ widget: <id>, span, … }` in `boards[].layout.sections`
+(#298). A type can appear any number of times, on any number of boards, and
+its content lives on the instance, never in `settings`. Loaders only see the
+board being rendered, and a guest only receives the instances that board
+shows, so a widget's data must come through its loader and instance, never a
+site-wide lookup.
 
 ## 1. Metadata: `lib/widgets/defs.ts` (the source of truth)
 

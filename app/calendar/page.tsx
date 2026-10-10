@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { viewerIsAdmin } from "@/lib/api-auth";
 import { getSiteConfig } from "@/lib/config";
 import { asCalendar, fetchCalendar, fetchCalendarRange } from "@/lib/calendar-fetch";
 import CalendarView from "@/components/CalendarView";
@@ -24,8 +25,10 @@ const AGENDA_COUNT = 20;
 // grid (the home widget defaults to the agenda) with an Agenda toggle. Every
 // calendar widget with a feed contributes (#297), merged by start time.
 export default async function CalendarPage() {
-  const { settings, widgets } = await getSiteConfig();
-  const calendars = activeCalendars(settings, widgets);
+  // The full config: each calendar's credentials go into its fetch.
+  const [site, isAdmin] = await Promise.all([getSiteConfig(), viewerIsAdmin()]);
+  const { settings } = site;
+  const calendars = activeCalendars(site, isAdmin);
   const enabled = calendars.length > 0;
   const now = new Date().getTime();
   const perCalendar = await Promise.all(
@@ -50,7 +53,7 @@ export default async function CalendarPage() {
     <>
       <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 pt-12 pb-24 sm:px-10 lg:pt-16">
         <div>
-          <PageNav current="calendar" {...navPages(settings, widgets)} />
+          <PageNav current="calendar" {...navPages(site, isAdmin)} />
           <h1 className="mt-3 text-3xl font-bold">Calendar</h1>
         </div>
 
@@ -72,7 +75,7 @@ export default async function CalendarPage() {
           />
         )}
       </main>
-      {settings.settingsButton && <FloatingNav {...navPages(settings, widgets)} />}
+      {settings.settingsButton && <FloatingNav {...navPages(site, isAdmin)} />}
     </>
   );
 }

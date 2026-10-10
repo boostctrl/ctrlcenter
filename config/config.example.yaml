@@ -7,26 +7,39 @@ settings:
     latitude: 38.9072
     longitude: -77.0369
     units: imperial
-  # The home-page widget grid (24 columns) — easiest edited visually: sign in
-  # and pick "Edit layout" from the floating corner menu. Order = position;
-  # each row places one widget (by its id in `widgets` below) across 1–24
-  # columns, and rows pack automatically.
-  # layout:
-  #   columns: 24
-  #   sections:
-  #     - { widget: greeting, span: 16 }
-  #     - { widget: headerCard, span: 8 }           # clock/weather/status card
-  #     - { widget: clock, span: 8, hidden: true }  # …or show these split
-  #     - { widget: weather, span: 8, hidden: true } #   widgets instead of the
-  #     - { widget: status, span: 8, hidden: true }  #   combined card
-  #     - { widget: search, span: 24 }
-  #     - { widget: todo, span: 12 }
-  #     - { widget: favorites, span: 24 }
-  #     - { widget: apps, span: 24 }
-  #     - { widget: bookmarks, span: 24 }
+# The dashboards (boards), easiest edited visually: sign in and pick "Edit
+# layout" from the floating corner menu, and manage the list in the admin
+# portal's Settings → Layout. The first board is the home page; the others
+# live at /b/<id>. A private board is only there for the signed-in admin.
+# Each board's layout places widgets (by their id in `widgets` below) on a
+# 24-column grid: order = position, each row spans 1–24 columns, and rows
+# pack automatically. Leave this out for one home board with the stock
+# arrangement.
+# boards:
+#   - id: home
+#     name: Home
+#     layout:
+#       columns: 24
+#       sections:
+#         - { widget: greeting, span: 16 }
+#         - { widget: headerCard, span: 8 }           # clock/weather/status card
+#         - { widget: clock, span: 8, hidden: true }  # …or show these split
+#         - { widget: weather, span: 8, hidden: true } #   widgets instead of the
+#         - { widget: status, span: 8, hidden: true }  #   combined card
+#         - { widget: search, span: 24 }
+#         - { widget: todo, span: 12 }
+#         - { widget: favorites, span: 24 }
+#         - { widget: apps, span: 24 }
+#         - { widget: bookmarks, span: 24 }
+#   - id: infra
+#     name: Infra
+#     visibility: private
+#     layout:
+#       sections:
+#         - { widget: apps }
 # Every widget is an instance with its own content, and a type can appear any
-# number of times. Leave this out for one of each; the admin portal's
-# Settings → Widgets edits them.
+# number of times, and on any number of boards. Leave this out for one of
+# each; the admin portal's Settings → Widgets edits them.
 # widgets:
 #   - { id: greeting, type: greeting }
 #   - { id: todo, type: notes, title: To do, content: "- renew certs" }

@@ -12,6 +12,18 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Boards: more than one dashboard (3.0).** Add boards in Settings →
+  Layout (a Media board, an Infra board…), each with its own arrangement of
+  widgets and its own address, `/b/<name>`. The first board is still the
+  home page. Rename, reorder and delete them there, and *Arrange* opens one
+  in the layout editor. A board set to *Only me* is private: signed-out
+  visitors get a "not found" page and never see it in their menu. Switch
+  boards from the floating corner menu, or with the `1`–`9`, `[` and `]`
+  keys. Widgets are shared, so one notes card can sit on two boards. Your
+  current layout becomes the home board on upgrade. (#298)
+
 ### Changed
 
 - **Every widget can appear any number of times (3.0).** Each widget on the
@@ -25,7 +37,7 @@ here.
 - Feed cards and calendars no longer have a separate on/off switch: whether
   one shows is the same *On the home page* switch (or the layout editor) as
   every other widget, and one you had switched off comes through hidden.
-  The calendar page shows every calendar on the home page, merged. The
+  The calendar page shows every calendar on a board you can open, merged. The
   `CTRLCENTER_CALDAV_PASS` variable keeps applying to your existing
   calendar, and only to it. (#297)
 

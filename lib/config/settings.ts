@@ -1,10 +1,10 @@
 // Settings reads and the settings PUT (#290 split).
 import type { z } from "zod";
-import { GRID_COLUMNS } from "../layout";
 import {
   settingsSchema,
   mergeRules,
   type Settings,
+  type Board,
   type SettingsInput,
   type WidgetInstance,
 } from "../schema";
@@ -14,12 +14,13 @@ export async function getSettings(): Promise<Settings> {
   return (await readConfigInternal()).settings;
 }
 
-// The settings plus the widget instances, for server-rendered pages that
-// derive navigation from both (the calendar link follows the calendar
-// widgets, #297). Server-only: calendar credentials ride along.
-export async function getSiteConfig(): Promise<{ settings: Settings; widgets: WidgetInstance[] }> {
-  const { settings, widgets } = await readConfigInternal();
-  return { settings, widgets };
+// What server-rendered pages derive navigation from: the settings, the boards
+// (the board links, #298) and the widget instances (the calendar link follows
+// the calendar widgets, #297). Server-only: calendar credentials ride along.
+export type SiteConfig = { settings: Settings; boards: Board[]; widgets: WidgetInstance[] };
+export async function getSiteConfig(): Promise<SiteConfig> {
+  const { settings, boards, widgets } = await readConfigInternal();
+  return { settings, boards, widgets };
 }
 
 // Server-only accessor for the calendar Basic-auth credentials. readPublicConfig
@@ -44,11 +45,6 @@ export async function updateSettings(
 ): Promise<Settings> {
   return mutate((config) => {
     config.settings = mergeSettings(config.settings, partial);
-    // Re-stamp the grid marker: writeConfig re-parses on save, and a stored
-    // layout without `columns` would re-trigger the 12→24 span migration.
-    if (partial.layout) {
-      config.settings.layout = { ...config.settings.layout, columns: GRID_COLUMNS };
-    }
     return config.settings;
   });
 }

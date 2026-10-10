@@ -31,14 +31,15 @@ export default async function MonitorDetailPage({ params }: Params) {
   // unconfigured one does below, so the route can't be used to probe which
   // services exist.
   if (!isDetailService(id)) notFound();
-  const { settings, widgets } = await getSiteConfig();
-  const result = await getServiceDetail(id, settings.integrations);
+  // Admin-only (the proxy gates /admin), so every board is listed.
+  const site = await getSiteConfig();
+  const result = await getServiceDetail(id, site.settings.integrations);
   if (!result) notFound();
 
   return (
     <>
-      <MonitorDetail initial={result} nav={navPages(settings, widgets)} />
-      <FloatingNav {...navPages(settings, widgets)} />
+      <MonitorDetail initial={result} nav={navPages(site, true)} />
+      <FloatingNav {...navPages(site, true)} />
     </>
   );
 }

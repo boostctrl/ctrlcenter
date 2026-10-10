@@ -1,5 +1,6 @@
 "use client";
 
+import type { NavPages } from "@/lib/nav";
 import { useCallback, useEffect, useState } from "react";
 import type { MonitorSnapshot } from "@/lib/monitor";
 import { SERVICE_LABELS, type ServiceId } from "@/lib/services/ids";
@@ -91,7 +92,7 @@ export default function MonitorDashboard({
   nav,
 }: {
   initial: MonitorSnapshot;
-  nav: { weather: boolean; status: boolean; calendar: boolean };
+  nav: NavPages;
 }) {
   const [snapshot, setSnapshot] = useState(initial);
   // When the shown snapshot last came back, for the header's freshness read —

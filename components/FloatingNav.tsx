@@ -4,22 +4,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useEditMode } from "./EditMode";
+import type { NavPages } from "@/lib/nav";
 
 // The floating corner control — the old settings gear, evolved into a small menu
 // that links to every enabled page so navigation is reachable from anywhere
 // without touching the header. Which admin-gated pages appear is decided
 // server-side (see navPages); Help, Settings and the Admin portal always appear,
-// Dashboard is added here, and the current page is omitted. Closes on outside
+// and the current page is omitted. With more than one board (#298) the menu
+// opens with the board switcher: every board the visitor can open, the
+// current one marked; with one, a plain Dashboard link. Closes on outside
 // click or Escape.
-export default function FloatingNav({
-  weather,
-  status,
-  calendar,
-}: {
-  weather: boolean;
-  status: boolean;
-  calendar: boolean;
-}) {
+export default function FloatingNav({ boards, weather, status, calendar }: NavPages) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
@@ -43,9 +38,10 @@ export default function FloatingNav({
     };
   }, [open]);
 
+  const switcher = boards.length > 1;
   const links = (
     [
-      { href: "/", label: "Dashboard" },
+      switcher ? null : { href: "/", label: "Dashboard" },
       weather ? { href: "/weather", label: "Weather" } : null,
       status ? { href: "/status", label: "Status" } : null,
       calendar ? { href: "/calendar", label: "Calendar" } : null,
@@ -61,7 +57,31 @@ export default function FloatingNav({
   return (
     <div ref={ref} className="fixed right-5 bottom-5 z-40 flex flex-col items-end">
       {open && (
-        <nav className="mb-2 flex min-w-44 flex-col overflow-hidden rounded-2xl border border-fg/10 bg-[var(--background)]/90 py-1 shadow-lg backdrop-blur-xl">
+        <nav className="mb-2 flex max-h-[calc(100vh-6rem)] min-w-44 flex-col overflow-y-auto rounded-2xl border border-fg/10 bg-[var(--background)]/90 py-1 shadow-lg backdrop-blur-xl">
+          {switcher && (
+            <div className="flex flex-col border-b border-fg/10 pb-1" aria-label="Boards" role="group">
+              {boards.map((b) =>
+                b.href === pathname ? (
+                  <span
+                    key={b.id}
+                    aria-current="page"
+                    className="px-4 py-2 text-sm font-medium text-ink-90"
+                  >
+                    {b.name}
+                  </span>
+                ) : (
+                  <Link
+                    key={b.id}
+                    href={b.href}
+                    onClick={() => setOpen(false)}
+                    className="px-4 py-2 text-sm text-ink-70 transition-colors hover:bg-fg/10 hover:text-fg"
+                  >
+                    {b.name}
+                  </Link>
+                )
+              )}
+            </div>
+          )}
           {links.map((l) => (
             <Link
               key={l.href}

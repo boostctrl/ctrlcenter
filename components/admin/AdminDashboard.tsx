@@ -6,6 +6,7 @@ import type {
   AppItem,
   BookmarkItem,
   Settings,
+  Board,
   ThemePackConfig,
   WidgetInstance,
 } from "@/lib/schema";
@@ -40,6 +41,7 @@ type Props = {
   initialBookmarks: BookmarkItem[];
   initialSettings: Settings;
   initialWidgets: WidgetInstance[];
+  initialBoards: Board[];
   initialThemes: ThemePackConfig[];
   initialTwoFactorEnabled: boolean;
   // The ?tab / ?section deep-link params, read server-side by the page (NOT
@@ -67,6 +69,7 @@ function AdminBody({
   initialBookmarks,
   initialSettings,
   initialWidgets,
+  initialBoards,
   initialThemes,
   initialTwoFactorEnabled,
   initialTab,
@@ -196,7 +199,10 @@ function AdminBody({
             gated portal, reachable from the floating menu and /settings), so
             nothing is current here. Flags come from the server-rendered
             settings; a feature toggled this session updates on reload. */}
-        <PageNav current={null} {...navPages(initialSettings, initialWidgets)} />
+        <PageNav current={null} {...navPages(
+            { settings: initialSettings, boards: initialBoards, widgets: initialWidgets },
+            true
+          )} />
         <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-3xl font-bold">Manage your dashboard</h1>
           {/* A 2×2 grid on phones rather than a wrap that strands "Log out"
@@ -284,6 +290,7 @@ function AdminBody({
         <SettingsManager
           initialSettings={initialSettings}
           initialWidgets={initialWidgets}
+          initialBoards={initialBoards}
           apps={monitoredApps(initialApps).map(({ id, name }) => ({ id, name }))}
           themePacks={resolveThemePacks(initialThemes)}
           initialSection={initialSection}

@@ -17,12 +17,13 @@ export const dynamic = "force-dynamic";
 // direct URL.
 export default async function MonitorPage() {
   await requireAdminPage("/admin/monitor");
-  const { settings, widgets } = await getSiteConfig();
-  const snapshot = await getMonitorSnapshot(settings.integrations);
+  // Admin-only (the proxy gates /admin), so every board is listed.
+  const site = await getSiteConfig();
+  const snapshot = await getMonitorSnapshot(site.settings.integrations);
   return (
     <>
-      <MonitorDashboard initial={snapshot} nav={navPages(settings, widgets)} />
-      <FloatingNav {...navPages(settings, widgets)} />
+      <MonitorDashboard initial={snapshot} nav={navPages(site, true)} />
+      <FloatingNav {...navPages(site, true)} />
     </>
   );
 }

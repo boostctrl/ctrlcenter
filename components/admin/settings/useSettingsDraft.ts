@@ -1,60 +1,44 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import type { Settings, SettingsInput, WidgetInstance } from "@/lib/schema";
+import type { Board, BoardVisibility, Settings, SettingsInput, WidgetInstance } from "@/lib/schema";
 import {
   type WebhookService,
   alertChannelSchema,
   feedUrls,
   newInstance,
   MAX_FEED_CARDS,
+  MAX_BOARDS,
+  newBoardId,
 } from "@/lib/schema";
 import { moveLegacyIntoChannels } from "@/lib/alert-channels";
 import type { ThemePack } from "@/lib/theme";
 import { newThemeId } from "@/lib/prefs";
-import {
-  defaultSpanFor,
-  resolveLayout,
-  toSections,
-  type LayoutWidget,
-  type WidgetType,
-} from "@/lib/layout";
+import { defaultSpanFor, resolveLayout, type WidgetType } from "@/lib/layout";
 import { instanceLabels } from "@/lib/widgets/labels";
 import { useConfirm } from "../Confirm";
 import { useAutosave, type SaveOptions, type SaveState } from "../useAutosave";
 import { settingsPatch } from "../settingsPatch";
-import { saveSettingsPatch, saveWidgets } from "../settingsApi";
+import { saveBoards, saveSettingsPatch, saveWidgets } from "../settingsApi";
+import { reorder } from "../useReorder";
 import { useKeyedRows } from "./useKeyedRows";
 
 // The settings form's state: the draft settings object, the autosave that
 // persists it, and the per-section updaters every section component edits
 // it through. One hook so the sections share a single draft and autosave.
-// The settings as the form holds them: the layout resolved against the widget
-// instances (each row bound to its instance and type), stored back by id.
-export type DraftSettings = Omit<Settings, "layout"> & {
-  layout: Omit<Settings["layout"], "sections"> & { sections: LayoutWidget[] };
-};
 
 // A fresh instance id: the type, then a short random suffix.
 const newInstanceId = (type: WidgetType) => `${type}-${newThemeId().slice(0, 8)}`;
 
+type Row = Board["layout"]["sections"][number];
+
 export function useSettingsDraft(
   initialSettings: Settings,
   initialWidgets: WidgetInstance[],
+  initialBoards: Board[],
   themePacks: ThemePack[]
 ) {
-  // Resolve the layout up front: this form saves the layout as one whole
-  // object whenever it changes, and the strict layout update schema requires
-  // every row complete.
-  const [settings, setSettings] = useState<DraftSettings>(() => ({
-    ...initialSettings,
-    layout: {
-      // Keep columns/scale — this form autosaves the whole layout object, so
-      // dropping them here would reset them on the next save.
-      ...initialSettings.layout,
-      sections: resolveLayout(initialSettings.layout.sections, initialWidgets),
-    },
-  }));
+  const [settings, setSettings] = useState<Settings>(initialSettings);
   // The widget instances (#297), with their own autosave to /api/widgets. A
   // feed card's blank URL rows are trimmed up front (the resolved list, like
   // the home page uses), so a half-typed row saved earlier doesn't linger.
@@ -66,30 +50,53 @@ export function useSettingsDraft(
   // so this tab can't revert what another surface saved meanwhile. `saved`
   // starts as the initial state; useAutosave serializes saves, and a failed
   // save leaves it unchanged so its keys go out again with the next one.
-  const saved = useRef<DraftSettings>(settings);
-  const save = useCallback(async (next: DraftSettings, opts?: SaveOptions) => {
+  const saved = useRef<Settings>(settings);
+  const save = useCallback(async (next: Settings, opts?: SaveOptions) => {
     const patch = settingsPatch(saved.current, next);
     if (Object.keys(patch).length === 0) return;
-    const body = patch.layout
-      ? { ...patch, layout: { ...patch.layout, sections: toSections(patch.layout.sections) } }
-      : patch;
-    await saveSettingsPatch(body as SettingsInput, { keepalive: opts?.keepalive });
+    await saveSettingsPatch(patch as SettingsInput, { keepalive: opts?.keepalive });
     saved.current = next;
   }, []);
   const settingsSave = useAutosave(settings, save);
   const widgetsSave = useAutosave(widgets, async (next, opts) => {
     await saveWidgets(next, { keepalive: opts?.keepalive });
   });
-  // One status for the header: saving while either is, else the latest error.
-  const status: SaveState =
-    settingsSave.status === "saving" || widgetsSave.status === "saving"
-      ? "saving"
-      : settingsSave.status === "error" || widgetsSave.status === "error"
-        ? "error"
-        : settingsSave.status === "saved" || widgetsSave.status === "saved"
-          ? "saved"
-          : "idle";
-  const error = settingsSave.error ?? widgetsSave.error;
+  // The boards (#298), with their own autosave to /api/boards. A board's rows
+  // go out only when this form changed them since the last save, so it can't
+  // overwrite an arrangement the on-page editor saved meanwhile.
+  const [boards, setBoards] = useState<Board[]>(initialBoards);
+  const savedBoards = useRef<Board[]>(initialBoards);
+  // Which boards exist on the server yet: a new board's page 404s until its
+  // first save lands, so its Arrange link waits for this.
+  const [savedBoardIds, setSavedBoardIds] = useState<ReadonlySet<string>>(
+    () => new Set(initialBoards.map((b) => b.id))
+  );
+  const boardsSave = useAutosave(boards, async (next, opts) => {
+    const before = new Map(savedBoards.current.map((b) => [b.id, b.layout]));
+    await saveBoards(
+      next.map(({ id, name, visibility, layout }) => ({
+        id,
+        name,
+        visibility,
+        ...(JSON.stringify(before.get(id)) === JSON.stringify(layout)
+          ? {}
+          : { layout: { sections: layout.sections } }),
+      })),
+      { keepalive: opts?.keepalive }
+    );
+    savedBoards.current = next;
+    setSavedBoardIds(new Set(next.map((b) => b.id)));
+  });
+  // One status for the header: saving while any is, else the latest error.
+  const saves = [settingsSave, widgetsSave, boardsSave];
+  const status: SaveState = saves.some((x) => x.status === "saving")
+    ? "saving"
+    : saves.some((x) => x.status === "error")
+      ? "error"
+      : saves.some((x) => x.status === "saved")
+        ? "saved"
+        : "idle";
+  const error = settingsSave.error ?? widgetsSave.error ?? boardsSave.error;
   const confirm = useConfirm();
 
   const theme = settings.theme;
@@ -162,18 +169,55 @@ export function useSettingsDraft(
         : { enabled }
     );
 
-  // Widget visibility lives on the layout rows (the on-page editor owns the
-  // arrangement; these switches are the same `hidden` flags), by instance id.
-  const layoutWidgets = settings.layout.sections;
-  const isWidgetShown = (id: string) => !layoutWidgets.find((w) => w.id === id)?.hidden;
-  const setWidgetShown = (id: string, shown: boolean) =>
-    setSettings((s) => ({
-      ...s,
-      layout: {
-        ...s.layout,
-        sections: s.layout.sections.map((w) => (w.id === id ? { ...w, hidden: !shown } : w)),
+  // Widget visibility lives on the home board's layout rows (the on-page
+  // editor owns the arrangement; these switches are the same `hidden` flags),
+  // by instance id. An instance the board has no row for is hidden there;
+  // showing it adds the row at the end.
+  const homeWidgets = resolveLayout(boards[0]?.layout.sections, widgets);
+  const isWidgetShown = (id: string) => homeWidgets.find((w) => w.id === id)?.hidden === false;
+  const updateHomeRows = (update: (rows: Row[]) => Row[]) =>
+    setBoards((bs) =>
+      bs.map((b, i) => (i === 0 ? { ...b, layout: { ...b.layout, sections: update(b.layout.sections) } } : b))
+    );
+  const setWidgetShown = (id: string, shown: boolean) => {
+    const type = widgets.find((w) => w.id === id)?.type;
+    if (!type) return;
+    updateHomeRows((rows) =>
+      rows.some((r) => r.widget === id)
+        ? rows.map((r) => (r.widget === id ? { ...r, hidden: !shown } : r))
+        : [...rows, { widget: id, span: defaultSpanFor(type), hidden: !shown }]
+    );
+  };
+
+  // Board management (#298): add, rename, reorder, set visibility, delete.
+  // Deleting a board takes only its arrangement; the widget instances it
+  // placed stay (they're shared, and may sit on other boards).
+  const addBoard = (name: string) => {
+    if (boards.length >= MAX_BOARDS) return;
+    setBoards((bs) => [
+      ...bs,
+      {
+        id: newBoardId(name, bs.map((b) => b.id)),
+        name: name.trim(),
+        visibility: "public",
+        layout: { columns: 24, sections: [] },
       },
-    }));
+    ]);
+  };
+  const updateBoard = (id: string, patch: { name?: string; visibility?: BoardVisibility }) =>
+    setBoards((bs) => bs.map((b) => (b.id === id ? { ...b, ...patch } : b)));
+  const moveBoard = (from: number, to: number) => setBoards((bs) => reorder(bs, from, to));
+  const removeBoard = async (id: string, label: string) => {
+    if (boards.length <= 1) return;
+    const ok = await confirm({
+      title: `Delete the ${label} board?`,
+      message: "Its arrangement goes with it. The widgets on it stay, ready to place on another board.",
+      confirmLabel: "Delete board",
+      danger: true,
+    });
+    if (!ok) return;
+    setBoards((bs) => bs.filter((b) => b.id !== id));
+  };
 
   // The widget instances (#297).
   const widgetLabels = instanceLabels(widgets);
@@ -188,14 +232,8 @@ export function useSettingsDraft(
     if (type === "feed" && instancesOf("feed").length >= MAX_FEED_CARDS) return;
     const id = newInstanceId(type);
     const fresh = newInstance(type, id);
-    setWidgets((ws) => [...ws, type === "feed" ? { ...fresh, enabled: true, urls: [""] } : fresh]);
-    setSettings((s) => ({
-      ...s,
-      layout: {
-        ...s.layout,
-        sections: [...s.layout.sections, { id, type, span: defaultSpanFor(type), hidden: false }],
-      },
-    }));
+    setWidgets((ws) => [...ws, type === "feed" ? { ...fresh, urls: [""] } : fresh]);
+    updateHomeRows((rows) => [...rows, { widget: id, span: defaultSpanFor(type), hidden: false }]);
   };
   const removeWidget = async (id: string) => {
     const ok = await confirm({
@@ -206,10 +244,13 @@ export function useSettingsDraft(
     });
     if (!ok) return;
     setWidgets((ws) => ws.filter((w) => w.id !== id));
-    setSettings((s) => ({
-      ...s,
-      layout: { ...s.layout, sections: s.layout.sections.filter((w) => w.id !== id) },
-    }));
+    // Off every board it was placed on.
+    setBoards((bs) =>
+      bs.map((b) => ({
+        ...b,
+        layout: { ...b.layout, sections: b.layout.sections.filter((r) => r.widget !== id) },
+      }))
+    );
   };
   // The widgets with no settings of their own, switched on and off here; the
   // content widgets have their switch beside their editor (Widgets tab).
@@ -363,7 +404,12 @@ export function useSettingsDraft(
     updateWebhookService,
     genWebhookToken,
     toggleWebhookService,
-    layoutWidgets,
+    boards,
+    savedBoardIds,
+    addBoard,
+    updateBoard,
+    moveBoard,
+    removeBoard,
     isWidgetShown,
     setWidgetShown,
     widgetToggles,

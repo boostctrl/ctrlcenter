@@ -367,7 +367,7 @@ describe("migrateConfig: the versioned chain (#288)", () => {
   });
 
   it("leaves a current file alone, same reference, no stamp-only rewrite", () => {
-    const modern = { schemaVersion: CONFIG_SCHEMA_VERSION, settings: {}, widgets: [] };
+    const modern = { schemaVersion: CONFIG_SCHEMA_VERSION, settings: {}, boards: [], widgets: [] };
     const result = migrateConfig(modern);
     expect(result.changed).toBe(false);
     expect(result.value).toBe(modern);

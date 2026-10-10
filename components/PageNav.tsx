@@ -1,5 +1,6 @@
 import Link from "next/link";
 import BackHome from "./BackHome";
+import type { NavPages } from "@/lib/nav";
 
 // The shared subpage navigation strip (#164): one identical row at the top of
 // every page outside the home dashboard — the back-home link plus the site's
@@ -9,7 +10,9 @@ import BackHome from "./BackHome";
 // Which feature pages appear comes from lib/nav.ts navPages — the same source
 // as the floating menu, so the two surfaces can't drift. The admin portal
 // renders the strip with no current page: it's a gated portal, not a sibling
-// page, so it isn't listed here (it stays in the floating menu).
+// page, so it isn't listed here (it stays in the floating menu). With more
+// than one board (#298), the boards after the home board follow the back-home
+// link, which stands for the home board.
 
 export type PageNavCurrent =
   | "weather"
@@ -21,17 +24,14 @@ export type PageNavCurrent =
 
 export default function PageNav({
   current,
+  boards,
   weather,
   status,
   calendar,
-}: {
-  current: PageNavCurrent;
-  weather: boolean;
-  status: boolean;
-  calendar: boolean;
-}) {
+}: NavPages & { current: PageNavCurrent }) {
   const pages = (
     [
+      ...boards.slice(1).map((b) => ({ key: `board:${b.id}`, href: b.href, label: b.name })),
       weather ? { key: "weather", href: "/weather", label: "Weather" } : null,
       status ? { key: "status", href: "/status", label: "Status" } : null,
       calendar ? { key: "calendar", href: "/calendar", label: "Calendar" } : null,
@@ -48,7 +48,7 @@ export default function PageNav({
       aria-label="Site pages"
       className="-my-1 flex items-center gap-x-3 overflow-x-auto py-1 whitespace-nowrap sm:gap-x-4"
     >
-      <BackHome label="Dashboard" compact />
+      <BackHome label={boards.length > 1 ? boards[0].name : "Dashboard"} compact />
       <span aria-hidden className="h-3.5 w-px shrink-0 bg-fg/15" />
       {pages.map((p) =>
         p.key === current ? (

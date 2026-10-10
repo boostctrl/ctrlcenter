@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { resolveLayout, toSections, fillSpan, WIDGET_TYPES, DEFAULT_SECTIONS } from "./layout";
-import { settingsSchema, layoutSchema, layoutUpdateSchema } from "./schema";
+import {
+  settingsSchema,
+  configSchema,
+  layoutSchema,
+  boardLayoutSchema,
+  boardLayoutUpdateSchema,
+} from "./schema";
 
 // Instances named after their type, as a fresh config has.
 const STOCK = WIDGET_TYPES.map((type) => ({ id: type as string, type }));
@@ -106,31 +112,33 @@ describe("fillSpan", () => {
 });
 
 describe("layout schema", () => {
-  it("settingsSchema defaults to the full widget catalog on the 24-column grid", () => {
-    const layout = settingsSchema.parse({}).layout;
-    expect(layout.sections).toEqual(DEFAULT_SECTIONS);
-    expect(layout.columns).toBe(24);
-    expect(layout.scale).toBe(100);
+  it("a fresh config has one public home board with the full widget catalog", () => {
+    const config = configSchema.parse({});
+    expect(config.boards).toHaveLength(1);
+    expect(config.boards[0]).toMatchObject({ id: "home", name: "Home", visibility: "public" });
+    expect(config.boards[0].layout.sections).toEqual(DEFAULT_SECTIONS);
+    expect(config.boards[0].layout.columns).toBe(24);
+    expect(settingsSchema.parse({}).layout).toEqual({ scale: 100, gap: 32, topGap: 64 });
   });
 
   it("parses spans as-is and re-parses idempotently (pre-24 shapes are the migration's job)", () => {
-    const once = layoutSchema.parse({
+    const once = boardLayoutSchema.parse({
       sections: [{ widget: "apps", span: 7 }],
       columns: 24,
     });
     expect(once.sections).toEqual([{ widget: "apps", span: 7 }]);
     // Re-parsing the output (as writeConfig does) is a no-op.
-    expect(layoutSchema.parse(once)).toEqual(once);
+    expect(boardLayoutSchema.parse(once)).toEqual(once);
   });
 
   it("keeps a valid scale and coerces an out-of-range one to the default", () => {
-    expect(layoutSchema.parse({ scale: 120, columns: 24 }).scale).toBe(120);
-    expect(layoutSchema.parse({ scale: 500, columns: 24 }).scale).toBe(100);
-    expect(layoutSchema.parse({ scale: "big", columns: 24 }).scale).toBe(100);
+    expect(layoutSchema.parse({ scale: 120 }).scale).toBe(120);
+    expect(layoutSchema.parse({ scale: 500 }).scale).toBe(100);
+    expect(layoutSchema.parse({ scale: "big" }).scale).toBe(100);
   });
 
   it("keeps a valid cards override and drops an invalid one", () => {
-    const parsed = layoutSchema.parse({
+    const parsed = boardLayoutSchema.parse({
       sections: [
         { widget: "apps", span: 24, cards: 3 },
         { widget: "bookmarks", span: 24, cards: 9 },
@@ -142,7 +150,7 @@ describe("layout schema", () => {
   });
 
   it("keeps a valid per-side space and drops one with no valid side", () => {
-    const parsed = layoutSchema.parse({
+    const parsed = boardLayoutSchema.parse({
       sections: [
         { widget: "apps", span: 24, space: { top: 24, bottom: 16 } },
         { widget: "feed", span: 24, space: { top: 0 } }, // no valid side — dropped
@@ -158,7 +166,7 @@ describe("layout schema", () => {
   });
 
   it("keeps hidden absent when a stored entry omits it, present when not", () => {
-    const parsed = layoutSchema.parse({
+    const parsed = boardLayoutSchema.parse({
       sections: [
         { widget: "apps", span: 6 },
         { widget: "search", span: 12, hidden: true },
@@ -169,7 +177,7 @@ describe("layout schema", () => {
   });
 
   it("drops only the malformed rows, keeping the good ones", () => {
-    const parsed = layoutSchema.parse({
+    const parsed = boardLayoutSchema.parse({
       sections: [
         { id: "apps" }, // the v2 shape: no `widget`
         { widget: "apps", span: 6 },
@@ -183,7 +191,7 @@ describe("layout schema", () => {
     expect(resolved.map((w) => w.id).sort()).toEqual([...WIDGET_TYPES].sort());
   });
 
-  it("layoutUpdateSchema requires a fully-resolved list and bounds span/cards/scale", () => {
+  it("boardLayoutUpdateSchema bounds every row value and the page-level ones", () => {
     const good = {
       sections: [
         {
@@ -198,20 +206,17 @@ describe("layout schema", () => {
       ],
       gap: 48,
     };
-    const parsed = layoutUpdateSchema.safeParse(good);
+    const parsed = boardLayoutUpdateSchema.safeParse(good);
     expect(parsed.success).toBe(true);
     expect(parsed.data?.sections[0].hideLabel).toBe(true);
     expect(parsed.data?.sections[0].height).toBe(320);
     expect(parsed.data?.sections[0].space).toEqual({ top: 24, bottom: 40 });
     expect(parsed.data?.gap).toBe(48);
-    // The grid marker and scale are stamped in so a stored layout can never
-    // re-trigger the 12→24 migration.
-    expect(parsed.data?.columns).toBe(24);
-    expect(parsed.data?.scale).toBe(100);
+    // Left out, the scale stays as stored.
+    expect(parsed.data?.scale).toBeUndefined();
     for (const bad of [
       { sections: [{ widget: "apps", span: 0, hidden: false }] },
       { sections: [{ widget: "apps", span: 25, hidden: false }] },
-      { sections: [{ widget: "apps", span: 6 }] }, // hidden required
       { sections: [{ id: "apps", span: 6, hidden: false }] }, // v2 shape rejected
       { sections: [{ widget: "apps", span: 6, hidden: false, cards: 5 }] },
       { sections: [{ widget: "apps", span: 6, hidden: false, height: 40 }] }, // below min
@@ -220,7 +225,7 @@ describe("layout schema", () => {
       { sections: [], scale: 500 },
       { sections: [], gap: 999 }, // gap out of range
     ]) {
-      expect(layoutUpdateSchema.safeParse(bad).success).toBe(false);
+      expect(boardLayoutUpdateSchema.safeParse(bad).success).toBe(false);
     }
   });
 });

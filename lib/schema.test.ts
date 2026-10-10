@@ -359,17 +359,10 @@ describe("settingsInputSchema partial merge semantics", () => {
     expect("statusChecks" in parsed).toBe(false);
   });
 
-  it("keeps each layout row's instance through a save (#187, #297)", () => {
-    const parsed = settingsInputSchema.parse({
-      layout: {
-        sections: [
-          { widget: "greeting", span: 24, hidden: false },
-          { widget: "feed-second", span: 12, hidden: false },
-        ],
-        columns: 24,
-      },
-    });
-    expect(parsed.layout!.sections.map((r) => r.widget)).toEqual(["greeting", "feed-second"]);
+  it("takes the page-level layout values partially, with no rows (#298)", () => {
+    const parsed = settingsInputSchema.parse({ layout: { gap: 24 } });
+    expect(parsed.layout).toEqual({ gap: 24 });
+    expect(settingsInputSchema.safeParse({ layout: { gap: 999 } }).success).toBe(false);
   });
 
   it("accepts a valid theme and rejects an invalid one", () => {

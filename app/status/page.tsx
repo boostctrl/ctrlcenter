@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 export default async function StatusRoute() {
   // readPublicConfig already filtered private apps out of the server-rendered
   // list for guests — same visibility rule as the home page.
-  const { config } = await readPublicConfig();
+  const { config, isAdmin } = await readPublicConfig();
   const { settings } = config;
   // Only the apps that get checks have a row (#296).
   const items = monitoredApps(config.apps).map((a) => ({
@@ -33,7 +33,7 @@ export default async function StatusRoute() {
     <>
       <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 pt-12 pb-24 sm:px-10 lg:pt-16">
         <div>
-          <PageNav current="status" {...navPages(settings, config.widgets)} />
+          <PageNav current="status" {...navPages(config, isAdmin)} />
           <h1 className="mt-3 text-3xl font-bold">Status</h1>
         </div>
 
@@ -70,7 +70,7 @@ export default async function StatusRoute() {
         </p>
       </main>
       {settings.settingsButton && (
-        <FloatingNav {...navPages(settings, config.widgets)} />
+        <FloatingNav {...navPages(config, isAdmin)} />
       )}
     </>
   );

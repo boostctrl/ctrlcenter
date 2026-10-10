@@ -1,7 +1,7 @@
-// The widget-grid layout: placed widget instances and the grid's spacing.
+// The widget-grid layout: placed widget instances (per board) and the grid's
+// spacing (site-wide).
 import { z } from "zod";
 import {
-  DEFAULT_SECTIONS,
   GRID_COLUMNS,
   MAX_CARD_COLUMNS,
   MIN_WIDGET_HEIGHT,
@@ -20,7 +20,7 @@ import {
 } from "../layout";
 import { lenientArray } from "./shared";
 
-// Home-page widget arrangement: an ordered list of placed widget instances
+// A board's widget arrangement: an ordered list of placed widget instances
 // (#297), each with a column span on the 24-column grid, a hidden flag, and
 // optional per-placement tweaks. Shapes from before 3.0 are rewritten by the
 // migration chain (lib/config-migrate.ts) before this schema sees them.
@@ -89,12 +89,9 @@ export const layoutSectionSchema = z
   });
 export type LayoutSection = z.infer<typeof layoutSectionSchema>;
 
+// The page-level layout settings, shared by every board: the UI scale and the
+// grid's spacing. What each board places lives on the board (boardLayoutSchema).
 export const layoutSchema = z.object({
-  sections: lenientArray(layoutSectionSchema).default(DEFAULT_SECTIONS),
-  // Which grid the stored spans are for. Always 24 today — the one-time shape
-  // migration doubles 12-column spans and stamps this marker; keeping it
-  // persisted is what tells that migration a file is already current.
-  columns: z.literal(GRID_COLUMNS).catch(GRID_COLUMNS).default(GRID_COLUMNS),
   // Site-wide UI scale (percent). Rendered as font-size on <html>, so the
   // whole rem-based UI scales uniformly.
   scale: z
@@ -125,45 +122,42 @@ export const layoutSchema = z.object({
 });
 export type LayoutConfig = z.infer<typeof layoutSchema>;
 
-// The admin/editor sends the whole layout (every widget, fully resolved).
-// Hand-written rather than derived: the stored rows are deliberately partial
-// (each field optional, resolved against the widget defaults at read time),
-// while input must be complete. Spans are on the 24-column grid; `columns` is
-// stamped in so the stored layout never re-triggers the 12→24 migration.
+// What one board places (#298): its rows, in order. A board stored without
+// rows is empty (every instance waits in the editor's tray).
+export const boardLayoutSchema = z.object({
+  // Which grid the stored spans are for. Always 24; kept so a future grid
+  // change can tell which spans it has to convert.
+  columns: z.literal(GRID_COLUMNS).catch(GRID_COLUMNS).default(GRID_COLUMNS),
+  sections: lenientArray(layoutSectionSchema).default([]),
+});
+export type BoardLayout = z.infer<typeof boardLayoutSchema>;
+
+// The page-level values as the settings PUT takes them. The settings PUT
+// deep-merges, so each is optional.
 export const layoutUpdateSchema = z.object({
-  sections: z.array(
-    z.object({
-      widget: z.string().min(1),
-      span: z.number().int().min(1).max(GRID_COLUMNS),
-      hidden: z.boolean(),
-      cards: z.number().int().min(1).max(MAX_CARD_COLUMNS).optional(),
-      hideLabel: z.boolean().optional(),
-      height: z
-        .number()
-        .int()
-        .min(MIN_WIDGET_HEIGHT)
-        .max(MAX_WIDGET_HEIGHT)
-        .optional(),
-      space: widgetSpaceSchema.optional(),
-    })
-  ),
-  columns: z.literal(GRID_COLUMNS).default(GRID_COLUMNS),
-  scale: z
-    .number()
-    .int()
-    .min(MIN_UI_SCALE)
-    .max(MAX_UI_SCALE)
-    .default(DEFAULT_UI_SCALE),
-  gap: z
-    .number()
-    .int()
-    .min(MIN_GRID_GAP)
-    .max(MAX_GRID_GAP)
-    .default(DEFAULT_GRID_GAP),
-  topGap: z
-    .number()
-    .int()
-    .min(MIN_TOP_GAP)
-    .max(MAX_TOP_GAP)
-    .default(DEFAULT_TOP_GAP),
+  scale: z.number().int().min(MIN_UI_SCALE).max(MAX_UI_SCALE).optional(),
+  gap: z.number().int().min(MIN_GRID_GAP).max(MAX_GRID_GAP).optional(),
+  topGap: z.number().int().min(MIN_TOP_GAP).max(MAX_TOP_GAP).optional(),
+});
+
+// One layout row as admin input: the instance, and any placement values,
+// each strictly bounded (the stored read is lenient instead). Hand-written
+// rather than derived, since the stored row is a transform.
+export const layoutRowInputSchema = z.object({
+  widget: z.string().min(1).max(64),
+  span: z.number().int().min(1).max(GRID_COLUMNS).optional(),
+  hidden: z.boolean().optional(),
+  cards: z.number().int().min(1).max(MAX_CARD_COLUMNS).optional(),
+  hideLabel: z.boolean().optional(),
+  height: z.number().int().min(MIN_WIDGET_HEIGHT).max(MAX_WIDGET_HEIGHT).optional(),
+  space: widgetSpaceSchema.optional(),
+});
+
+// How many rows one board can hold: every instance once, with room to spare.
+export const MAX_BOARD_ROWS = 128;
+
+// The layout editor's save (PUT /api/boards/<id>/layout): the board's rows,
+// and the page-level values the editor's toolbar tunes alongside them.
+export const boardLayoutUpdateSchema = layoutUpdateSchema.extend({
+  sections: z.array(layoutRowInputSchema).max(MAX_BOARD_ROWS),
 });

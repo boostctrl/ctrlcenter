@@ -16,3 +16,4 @@ export * from "./items";
 export * from "./auth";
 export * from "./themes";
 export * from "./widgets";
+export * from "./boards";

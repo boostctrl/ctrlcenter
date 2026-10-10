@@ -232,20 +232,38 @@ settings:
   # there: favicon, announcement (the site-wide banner), statusAnnouncements,
   # integrations (the private Monitor page's service connections), and
   # bookmarkCategoryOrder.
-  layout:                   # the home-page widget grid — best edited visually:
-    columns: 24             # sign in and pick "Edit layout" from the corner menu
-    sections:               # order = position; widgets flow row by row
-      - { widget: greeting, span: 16 }    # `widget` names an instance below
-      - { widget: headerCard, span: 8 }
-      - { widget: clock, span: 8, hidden: true }    # split clock/weather/status
-      - { widget: weather, span: 8, hidden: true }  #   widgets — show them as an
-      - { widget: status, span: 8, hidden: true }   #   alternative to headerCard
-      - { widget: search, span: 24 }
-      - { widget: family, span: 12 }
-      - { widget: work, span: 12 }
-      - { widget: favorites, span: 24 }
-      - { widget: apps, span: 24 }
-      - { widget: bookmarks, span: 24 }
+  layout:                   # shared by every board:
+    scale: 100              # UI scale, percent
+    gap: 32                 # space between cards (px)
+    topGap: 64              # space above the first row (px)
+
+boards:                     # the dashboards; the first is the home page, the
+                            # others live at /b/<id>. Best edited visually: sign
+                            # in and pick "Edit layout" from the corner menu
+  - id: home
+    name: Home
+    visibility: public      # public | private (only the signed-in admin)
+    layout:
+      columns: 24
+      sections:             # order = position; widgets flow row by row
+        - { widget: greeting, span: 16 }    # `widget` names an instance below
+        - { widget: headerCard, span: 8 }
+        - { widget: clock, span: 8, hidden: true }    # split clock/weather/status
+        - { widget: weather, span: 8, hidden: true }  #   widgets — show them as an
+        - { widget: status, span: 8, hidden: true }   #   alternative to headerCard
+        - { widget: search, span: 24 }
+        - { widget: family, span: 12 }
+        - { widget: work, span: 12 }
+        - { widget: favorites, span: 24 }
+        - { widget: apps, span: 24 }
+        - { widget: bookmarks, span: 24 }
+  - id: infra
+    name: Infra
+    visibility: private
+    layout:
+      sections:
+        - { widget: todo, span: 12 }
+        - { widget: apps, span: 24 }        # a widget can sit on several boards
 
 widgets:                    # every widget, with its content; any type can
                             # appear any number of times (one of each if left out)
@@ -256,7 +274,7 @@ widgets:                    # every widget, with its content; any type can
   - { id: todo, type: notes, title: To do, content: "- renew certs" }
   # …and the other types: clock, weather, status, search, feed, countdown,
   # worldClocks, systemStats, favorites, apps, bookmarks. A widget without a
-  # layout row waits, hidden, in the layout editor's tray.
+  # row on a board waits, hidden, in that board's layout editor tray.
 
 apps:
   - id: <uuid>

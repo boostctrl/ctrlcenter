@@ -103,18 +103,24 @@ try {
     return result;
   };
 
+  await addBoards();
+
   // Public pages, signed out.
   for (const scheme of ["light", "dark"]) {
     const ctx = await browser.newContext({
       viewport: { width: 1440, height: 900 },
       colorScheme: scheme,
     });
-    const pages = ["/", "/status", "/weather", "/calendar", "/help", "/settings", "/admin/login"];
+    const pages = ["/", "/b/media", "/status", "/weather", "/calendar", "/help", "/settings", "/admin/login"];
     for (const p of pages) {
       await run(ctx, p, `${p === "/" ? "home" : p.slice(1).replace(/\//g, "-")}-${scheme}`);
     }
-    // Admin pages bounce a signed-out visitor to the login form.
+    // Admin pages bounce a signed-out visitor to the login form, and a
+    // private board is a plain 404 (#298).
     if (scheme === "light") {
+      const res = await fetch(`${base}/b/infra`);
+      if (res.status !== 404) failures.push(`/b/infra: signed-out visitor got HTTP ${res.status}, not 404`);
+      else console.log("ok    /b/infra is a 404 signed out");
       const r = await run(ctx, "/admin", "admin-signed-out");
       if (!new URL(r.finalUrl).pathname.startsWith("/admin/login")) {
         failures.push(`/admin: signed-out visitor landed on ${r.finalUrl}, not the login page`);
@@ -137,6 +143,8 @@ try {
       ["/admin?tab=bookmarks", "admin-bookmarks"],
       ["/admin?tab=settings", "admin-settings"],
       ["/admin?tab=settings&section=widgets", "admin-widgets"],
+      ["/admin?tab=settings&section=layout", "admin-layout"],
+      ["/b/infra", "board-private"],
       ["/admin/monitor", "admin-monitor"],
     ]) {
       await run(ctx, p, `${shot}-${scheme}`);
@@ -253,6 +261,29 @@ async function statusPhase(run) {
     await run(ctx, "/admin?tab=settings&section=monitoring", `admin-monitoring-${scheme}`);
     await ctx.close();
   }
+}
+
+// Two boards beside the example's home board (#298): a public one, and a
+// private one only the admin can open. Saved through the admin API, the way
+// Settings → Layout saves them; the home board keeps its stored rows.
+async function addBoards() {
+  const ctx = await browser.newContext();
+  await signIn(ctx);
+  const res = await ctx.request.put(`${base}/api/boards`, {
+    headers: { Origin: base },
+    data: [
+      { id: "home", name: "Home", visibility: "public" },
+      {
+        id: "media",
+        name: "Media",
+        visibility: "public",
+        layout: { sections: [{ widget: "search" }, { widget: "bookmarks" }] },
+      },
+      { id: "infra", name: "Infra", visibility: "private", layout: { sections: [{ widget: "apps" }] } },
+    ],
+  });
+  if (!res.ok()) throw new Error(`adding boards failed: HTTP ${res.status()}`);
+  await ctx.close();
 }
 
 async function signIn(ctx) {

@@ -235,8 +235,10 @@ export const MIGRATIONS: readonly MigrationStep[] = [
   // stamped 2 — so a v2 file can still carry a pre-2.1 shape, and the step runs
   // for everything stamped 2 or lower. Files stamped 3+ never pay for it.
   { to: 2, appliesTo: (v) => v <= 2, run: migrateConfigShape },
-  // 3.0: widget instances (#297).
-  { to: 3, appliesTo: (v) => v <= 2, run: migrateV2toV3 },
+  // 3.0: widget instances (#297) and boards (#298). Also offered to files
+  // stamped 3, for configs written by 3.0 pre-release builds before boards;
+  // it's a no-op on any file that already has them.
+  { to: 3, appliesTo: (v) => v <= 3, run: migrateV2toV3 },
 ];
 
 // The schema a raw config claims; unstamped files predate the field (≤ 2.9)

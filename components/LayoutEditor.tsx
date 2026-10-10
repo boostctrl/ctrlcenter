@@ -769,6 +769,7 @@ export function EditToolbar({
   onUndo,
   onRevert,
   onReset,
+  resetsToEmpty,
   onDone,
 }: {
   status: SaveState;
@@ -783,6 +784,8 @@ export function EditToolbar({
   onUndo: () => void;
   onRevert: () => void;
   onReset: () => void;
+  // A board other than the home board resets to empty, not the stock set.
+  resetsToEmpty: boolean;
   onDone: () => void;
 }) {
   const confirm = useConfirm();
@@ -868,15 +871,16 @@ export function EditToolbar({
           type="button"
           onClick={async () => {
             const ok = await confirm({
-              title: "Reset the layout to its defaults?",
-              message:
-                "Every widget returns to its stock position, size and visibility, and the UI scale and card spacing go back to their defaults. Ctrl+Z can still undo this while you're editing.",
-              confirmLabel: "Reset layout",
+              title: resetsToEmpty ? "Clear this board?" : "Reset the layout to its defaults?",
+              message: resetsToEmpty
+                ? "Every widget leaves this board for the tray below, and the UI scale and card spacing go back to their defaults. Ctrl+Z can still undo this while you're editing."
+                : "Every widget returns to its stock position, size and visibility, and the UI scale and card spacing go back to their defaults. Ctrl+Z can still undo this while you're editing.",
+              confirmLabel: resetsToEmpty ? "Clear board" : "Reset layout",
               danger: true,
             });
             if (ok) onReset();
           }}
-          title="Restore the stock arrangement"
+          title={resetsToEmpty ? "Move every widget to the tray" : "Restore the stock arrangement"}
           className={`${ghostBtn} lg:order-8`}
         >
           Reset

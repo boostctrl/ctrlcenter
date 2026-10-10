@@ -27,6 +27,7 @@ export * from "./schema/instances";
 export * from "./schema/integrations";
 export * from "./schema/announcements";
 export * from "./schema/layout";
+export * from "./schema/boards";
 export * from "./schema/apps-bookmarks";
 export * from "./schema/auth";
 export * from "./schema/settings";

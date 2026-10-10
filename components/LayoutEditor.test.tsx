@@ -19,6 +19,7 @@ function setup(overrides: Partial<Parameters<typeof EditToolbar>[0]> = {}) {
     onUndo: vi.fn(),
     onRevert: vi.fn(),
     onReset: vi.fn(),
+    resetsToEmpty: false,
     onDone: vi.fn(),
     ...overrides,
   };
@@ -60,6 +61,16 @@ describe("EditToolbar", () => {
     await user.click(
       within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Reset layout" })
     );
+    expect(props.onReset).toHaveBeenCalledOnce();
+  });
+
+  it("words Reset as clearing on a board other than the home board", async () => {
+    const user = userEvent.setup();
+    const { props } = setup({ resetsToEmpty: true });
+    await user.click(screen.getByRole("button", { name: "Reset" }));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(within(dialog).getByText("Clear this board?")).toBeTruthy();
+    await user.click(within(dialog).getByRole("button", { name: "Clear board" }));
     expect(props.onReset).toHaveBeenCalledOnce();
   });
 });

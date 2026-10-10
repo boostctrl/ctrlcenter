@@ -9,15 +9,14 @@ import { resolveLayout } from "./layout";
 // resolveLayoutWidgets tests).
 
 type Out = {
-  settings: Record<string, unknown> & {
-    layout: { sections: { widget: string; span: number; hidden: boolean } & Record<string, unknown>[] };
-  };
+  settings: Record<string, unknown> & { layout: Record<string, unknown> };
+  boards: { id: string; name: string; visibility: string; layout: { columns: number; sections: unknown[] } }[];
   widgets: ({ id: string; type: string } & Record<string, unknown>)[];
 };
 const migrate = (settings: Record<string, unknown>) =>
   migrateV2toV3({ settings }).value as unknown as Out;
 const rows = (out: Out) =>
-  out.settings.layout.sections as unknown as ({ widget: string; span: number; hidden: boolean } & Record<
+  out.boards[0].layout.sections as unknown as ({ widget: string; span: number; hidden: boolean } & Record<
     string,
     unknown
   >)[];
@@ -200,9 +199,45 @@ describe("migrateV2toV3: content", () => {
     expect(row(out, "my-news")).toMatchObject({ span: 12, hidden: false });
   });
 
-  it("leaves a v3 config alone", () => {
-    const raw = { settings: {}, widgets: [] };
+  it("leaves a config with boards alone", () => {
+    const raw = { settings: {}, boards: [], widgets: [] };
     expect(migrateV2toV3(raw)).toEqual({ value: raw, changed: false });
+  });
+});
+
+describe("migrateV2toV3: boards (#298)", () => {
+  it("makes the v2 layout the public home board, leaving scale and spacing in settings", () => {
+    const out = migrate({
+      layout: { columns: 24, scale: 110, gap: 24, topGap: 40, sections: [{ id: "apps", span: 12 }] },
+    });
+    expect(out.boards).toHaveLength(1);
+    expect(out.boards[0]).toMatchObject({ id: "home", name: "Home", visibility: "public" });
+    expect(out.boards[0].layout.columns).toBe(24);
+    expect(row(out, "apps")).toMatchObject({ span: 12 });
+    expect(out.settings.layout).toEqual({ scale: 110, gap: 24, topGap: 40 });
+  });
+
+  it("moves a 3.0 pre-release file's rows into a board, and only that", () => {
+    const sections = [{ widget: "notes", span: 12, hidden: false }];
+    const raw = {
+      schemaVersion: 3,
+      settings: { title: "Mine", layout: { columns: 24, gap: 16, sections } },
+      widgets: [{ id: "notes", type: "notes" }],
+    };
+    const { value, changed } = migrateV2toV3(raw);
+    const out = value as Out;
+    expect(changed).toBe(true);
+    expect(out.widgets).toBe(raw.widgets);
+    expect(out.settings).toEqual({ title: "Mine", layout: { gap: 16 } });
+    expect(out.boards[0].layout.sections).toEqual(sections);
+  });
+
+  it("leaves a v3 file with no saved rows alone: the default home board is stock", () => {
+    const raw = { schemaVersion: 3, settings: { title: "Mine", layout: { gap: 16 } } };
+    expect(migrateV2toV3(raw)).toEqual({ value: raw, changed: false });
+    const config = configReadSchema.parse(raw);
+    expect(config.boards.map((b) => b.id)).toEqual(["home"]);
+    expect(resolveLayout(config.boards[0].layout.sections, config.widgets).map((w) => w.id)).toEqual(ALL);
   });
 });
 
@@ -219,7 +254,7 @@ describe("the v2 → v3 chain", () => {
     expect(changed).toBe(true);
     const config = configReadSchema.parse(value);
     expect(config.schemaVersion).toBe(3);
-    const board = resolveLayout(config.settings.layout.sections, config.widgets);
+    const board = resolveLayout(config.boards[0].layout.sections, config.widgets);
     expect(board.find((w) => w.id === "notes")).toMatchObject({ type: "notes", span: 12, hidden: false });
     expect(config.widgets.find((w) => w.id === "notes")).toMatchObject({ content: "milk" });
   });
@@ -236,7 +271,9 @@ describe("the v2 → v3 chain", () => {
       id: "feed",
       urls: ["https://x.test/rss"],
     });
-    const feedRow = resolveLayout(config.settings.layout.sections, config.widgets).find((w) => w.type === "feed");
+    const feedRow = resolveLayout(config.boards[0].layout.sections, config.widgets).find(
+      (w) => w.type === "feed"
+    );
     expect(feedRow).toMatchObject({ span: 12, hidden: false });
   });
 });

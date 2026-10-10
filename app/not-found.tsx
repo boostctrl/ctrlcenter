@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getSiteConfig } from "@/lib/config";
+import { readPublicConfig } from "@/lib/api-auth";
 import { buttonClasses } from "@/lib/buttons";
 import { navPages } from "@/lib/nav";
 import PageNav from "@/components/PageNav";
@@ -12,11 +12,11 @@ export const metadata: Metadata = { title: "Page not found" };
 // a mistyped link lands somewhere that looks like this site and leads back,
 // instead of Next's bare default.
 export default async function NotFound() {
-  const { settings, widgets } = await getSiteConfig();
+  const { config: site, isAdmin } = await readPublicConfig();
   return (
     <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 pt-12 pb-24 sm:px-10 lg:pt-16">
       <div>
-        <PageNav current={null} {...navPages(settings, widgets)} />
+        <PageNav current={null} {...navPages(site, isAdmin)} />
         <h1 className="mt-3 text-3xl font-bold">Page not found</h1>
       </div>
       <p className="text-ink-50">

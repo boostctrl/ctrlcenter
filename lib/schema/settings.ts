@@ -43,8 +43,8 @@ export const settingsSchema = z.object({
   weather: weatherSchema.default(weatherSchema.parse({})),
   alerts: alertsSchema.default(alertsSchema.parse({})),
   announcement: announcementSchema.default(announcementSchema.parse({})),
-  // Maintenance/upcoming-change notices for the /status page. Lenient like the
-  // layout `sections` list (used directly in this shared schema): one malformed
+  // Maintenance/upcoming-change notices for the /status page. Lenient like a
+  // board's layout rows (used directly in this shared schema): one malformed
   // hand-edited row is dropped rather than failing the whole settings parse.
   statusAnnouncements: lenientArray(statusAnnouncementSchema).default([]),
   // Private wholesale (#157, #189): URLs are internal topology, the rest
@@ -59,6 +59,7 @@ export const settingsSchema = z.object({
   // The floating corner menu (Weather, Status, Help, Settings…). Was
   // `components.settingsButton` before 3.0.
   settingsButton: z.boolean().default(true),
+  // The UI scale and grid spacing, shared by every board (#298).
   layout: layoutSchema.default(layoutSchema.parse({})),
 });
 

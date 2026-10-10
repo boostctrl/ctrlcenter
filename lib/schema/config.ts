@@ -6,6 +6,7 @@ import { appItemSchema, bookmarkItemSchema } from "./apps-bookmarks";
 import { themePackSchema } from "./theme";
 import { authSchema } from "./auth";
 import { widgetInstancesSchema } from "./instances";
+import { boardsSchema } from "./boards";
 
 // The on-disk config shape's version, written on every save. Files without it
 // predate the field (2.9 and earlier). lib/config-migrate.ts keys its
@@ -17,8 +18,10 @@ export const CONFIG_SCHEMA_VERSION = 3;
 export const configSchema = z.object({
   schemaVersion: z.number().int().default(CONFIG_SCHEMA_VERSION),
   settings: settingsSchema.default(settingsSchema.parse({})),
-  // Every widget on the board, with its content (#297). Layout sections
-  // place them by id.
+  // The dashboards (#298), in order: the first is the home page. Each places
+  // widget instances by id.
+  boards: boardsSchema,
+  // Every widget instance, with its content (#297). Shared by the boards.
   widgets: widgetInstancesSchema,
   apps: z.array(appItemSchema).default([]),
   bookmarks: z.array(bookmarkItemSchema).default([]),

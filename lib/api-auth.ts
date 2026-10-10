@@ -118,6 +118,12 @@ export function visibleItems<T extends { private: boolean }>(
 // or the real secrets — the poller, alerts, the calendar fetch (getCalendarAuth),
 // admin routes — use readConfigInternal, and a test pins which files under app/
 // may do so.
+// Whether this request comes from the signed-in admin, for server pages that
+// read the full config themselves (the calendar page needs its credentials).
+export async function viewerIsAdmin(): Promise<boolean> {
+  return isAdminSession((await readConfigInternal()).auth.passwordHash);
+}
+
 export async function readPublicConfig(request?: NextRequest): Promise<{
   config: Omit<Config, "auth">;
   isAdmin: boolean;

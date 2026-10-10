@@ -19,12 +19,11 @@ import {
   type SpaceSide,
 } from "@/lib/layout";
 import { useAutosave, type SaveOptions } from "./admin/useAutosave";
-import { saveSettingsPatch } from "./admin/settingsApi";
+import { saveBoardLayout } from "./admin/settingsApi";
 
-// What the layout editor edits and autosaves as one unit: the widget list plus
-// the site-wide UI scale, the grid's vertical gap, and the page's top gap.
-// Saved together because the settings API replaces the stored layout wholesale
-// — a sections-only save would reset the page-level values.
+// What the layout editor edits and autosaves as one unit: the board's widget
+// list plus the site-wide UI scale, the grid's vertical gap, and the page's
+// top gap (one undo stack and one save for everything its toolbar touches).
 export type EditableLayout = {
   sections: LayoutWidget[];
   scale: number;
@@ -48,21 +47,28 @@ function takeUndoSnapshot(timing: { lastPush: number }): boolean {
   return take;
 }
 
-// Persist the whole layout; the settings API replaces it wholesale. Sections
-// are stored by instance id (#297).
-async function saveLayout(layout: EditableLayout, opts?: SaveOptions): Promise<void> {
-  await saveSettingsPatch(
-    { layout: { ...layout, sections: toSections(layout.sections) } },
-    { fallback: "Failed to save layout", keepalive: opts?.keepalive }
+// Persist the board's rows (stored by instance id, #297) and the page-level
+// values to the board's layout endpoint (#298).
+async function saveLayout(boardId: string, layout: EditableLayout, opts?: SaveOptions): Promise<void> {
+  await saveBoardLayout(
+    boardId,
+    { ...layout, sections: toSections(layout.sections) },
+    { keepalive: opts?.keepalive }
   );
 }
 
 export function useLayoutEditor({
+  boardId,
+  isHome,
   initial,
   editing,
   setEditing,
   gridRef,
 }: {
+  // The board being edited (#298), and whether it's the first board, which
+  // Reset returns to the stock arrangement (any other board resets to empty).
+  boardId: string;
+  isHome: boolean;
   initial: EditableLayout;
   editing: boolean;
   setEditing: (editing: boolean) => void;
@@ -99,7 +105,7 @@ export function useLayoutEditor({
     layout,
     async (value, opts) => {
       if (!dirtyRef.current) return;
-      await saveLayout(value, opts);
+      await saveLayout(boardId, value, opts);
     }
   );
 
@@ -149,11 +155,12 @@ export function useLayoutEditor({
   }
   function resetLayout() {
     undoTimingRef.current.lastPush = 0;
-    // The stock arrangement over the stock instances; any other instance
-    // (a second notes card, say) goes back to the tray.
+    // The home board: the stock arrangement over the stock instances, with
+    // any other instance (a second notes card, say) back in the tray. Any
+    // other board: empty, everything in the tray.
     mutateLayout({
       sections: resolveLayout(
-        DEFAULT_SECTIONS,
+        isHome ? DEFAULT_SECTIONS : [],
         layout.sections.map(({ id, type }) => ({ id, type }))
       ),
       scale: DEFAULT_UI_SCALE,
@@ -248,7 +255,7 @@ export function useLayoutEditor({
     // Drop a stale ?edit=1 (the deep link from admin Settings) so a reload
     // doesn't reopen the editor.
     if (window.location.search.includes("edit="))
-      router.replace("/", { scroll: false });
+      router.replace(window.location.pathname, { scroll: false });
   }, [setEditing, router]);
 
   // Editing hotkeys: Ctrl/Cmd+Z undoes the last layout change; Escape exits

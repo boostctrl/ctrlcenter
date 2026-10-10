@@ -1,7 +1,7 @@
 import React from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getSiteConfig } from "@/lib/config";
+import { readPublicConfig } from "@/lib/api-auth";
 import { BUILTIN_BANGS } from "@/lib/search";
 import PageNav from "@/components/PageNav";
 import FloatingNav from "@/components/FloatingNav";
@@ -143,7 +143,8 @@ function tableOfContents(content: React.ReactElement<{ children?: React.ReactNod
 // runtime reads are the built-in bang list and the settings flag that gates
 // the floating navigation menu.
 export default async function HelpPage() {
-  const { settings, widgets } = await getSiteConfig();
+  const { config: site, isAdmin } = await readPublicConfig();
+  const { settings } = site;
   const builtins = Object.entries(BUILTIN_BANGS);
 
   // Every section, kept as one tree so the table of contents can be read off
@@ -683,6 +684,36 @@ export default async function HelpPage() {
         title="For admins: the home page"
         note="Arranging the dashboard and the cards that can live on it."
       >
+        <Card title="Boards">
+          <P>
+            A board is one dashboard: its own arrangement of widgets. The
+            first board is the home page; add more in{" "}
+            <strong>Settings → Layout → Boards</strong> (a Media board, an
+            Infra board…), and each gets its own address, /b/ and the
+            board&apos;s id. Rename and reorder them there, and{" "}
+            <strong>Arrange</strong> opens one in the layout editor.
+          </P>
+          <P>
+            Set a board to <strong>Only me</strong> and it&apos;s private:
+            visitors who aren&apos;t signed in get a &ldquo;not found&rdquo;
+            page, and it never shows up in their menu. If the first board is
+            private, signed-out visitors land on the first board open to
+            everyone instead.
+          </P>
+          <P>
+            With more than one board, the floating corner menu lists them, and
+            the keyboard switches between them: <Kbd>1</Kbd>–<Kbd>9</Kbd> open
+            a board by its place in the list, and <Kbd>[</Kbd> and{" "}
+            <Kbd>]</Kbd> step to the previous and next one.
+          </P>
+          <P>
+            Widgets are shared between boards: the same notes card can sit on
+            two of them, and editing it changes both. A new board starts
+            empty, with every widget waiting in the editor&apos;s tray;
+            deleting a board keeps its widgets.
+          </P>
+        </Card>
+
         <Card title="Home-page components">
           <P>
             The dashboard is a grid of widgets you arrange in place. Toggle
@@ -695,7 +726,7 @@ export default async function HelpPage() {
             a notes card for the household and another for the homelab, a
             calendar per person, a feed per topic. In{" "}
             <strong>Settings → Widgets</strong>, <strong>Add</strong> puts
-            another of a kind on the board, each one has its own{" "}
+            another of a kind on the home board, each one has its own{" "}
             <strong>On the home page</strong> switch, and{" "}
             <strong>Remove</strong> takes it away with its content.
           </P>
@@ -728,14 +759,15 @@ export default async function HelpPage() {
               <strong>card gap</strong> between all cards, the{" "}
               <strong>top gap</strong> above the first row, and the{" "}
               <strong>UI scale</strong> that sizes the whole dashboard up or
-              down.
+              down. These apply to every board.
             </li>
             <li>
               <strong>Undo any misstep.</strong> <strong>Undo</strong> (
               <Kbd>Ctrl</Kbd>+<Kbd>Z</Kbd>) takes back the last change,{" "}
               <strong>Revert</strong> restores the layout you started the
               session with, and <strong>Reset</strong> returns the whole
-              arrangement to its out-of-the-box defaults.
+              arrangement to its out-of-the-box defaults (on a board other
+              than the home board, it clears the board instead).
             </li>
           </ul>
           <P>
@@ -832,7 +864,7 @@ export default async function HelpPage() {
     <>
       <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 pt-12 pb-24 sm:px-10 lg:pt-16">
         <div>
-          <PageNav current="help" {...navPages(settings, widgets)} />
+          <PageNav current="help" {...navPages(site, isAdmin)} />
           <h1 className="mt-3 text-3xl font-bold">Help</h1>
           <p className="mt-1 text-sm text-ink-50">
             Everything ctrlcenter can do, plus setup notes for admins. Some
@@ -871,7 +903,7 @@ export default async function HelpPage() {
         </nav>
         {content}
       </main>
-      {settings.settingsButton && <FloatingNav {...navPages(settings, widgets)} />}
+      {settings.settingsButton && <FloatingNav {...navPages(site, isAdmin)} />}
     </>
   );
 }

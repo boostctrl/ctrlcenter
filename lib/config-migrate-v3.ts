@@ -1,11 +1,14 @@
-// The v2 → v3 config migration (#297, 3.0): widgets become instances.
+// The v2 → v3 config migration (3.0): widgets become instances (#297) and the
+// layout becomes the first board (#298).
 //
 // v2 kept each widget's content in a fixed settings key (settings.notes,
 // .countdown, .worldClocks, .systemStats, .calendar, the .feeds list) and
 // placed widgets by type in settings.layout.sections, with legacy rules filling
 // gaps: the pre-grid `components` visibility toggles, header widgets prepended
 // when missing, one entry per feed instance. v3 has a top-level `widgets` list
-// of instances, and layout sections that name one by id.
+// of instances, and a `boards` list whose layouts name them by id. The v2
+// layout becomes the single `home` board; the UI scale and grid spacing stay
+// in settings.layout, shared by every board.
 //
 // Each v2 widget becomes one instance whose id is its type name ("notes",
 // "calendar"…), and each feed card keeps its own id, so links and anything
@@ -135,8 +138,32 @@ function safeId(raw: string, taken: Set<string>): string {
   return id;
 }
 
+// The layout's rows become the home board; scale and spacing stay behind. A
+// layout that was never saved had the stock arrangement.
+function layoutToBoards(settings: Record<string, unknown>): Record<string, unknown>[] {
+  const layout = isRecord(settings.layout) ? settings.layout : {};
+  const { sections, columns: _columns, ...page } = layout;
+  void _columns;
+  settings.layout = page;
+  const rows = Array.isArray(sections)
+    ? sections
+    : V2_WIDGETS.map((w) => ({ widget: w.id, span: w.span, hidden: w.hidden }));
+  return [{ id: "home", name: "Home", visibility: "public", layout: { columns: 24, sections: rows } }];
+}
+
 export function migrateV2toV3(raw: unknown): { value: unknown; changed: boolean } {
-  if (!isRecord(raw) || Array.isArray(raw.widgets)) return { value: raw, changed: false };
+  if (!isRecord(raw) || Array.isArray(raw.boards)) return { value: raw, changed: false };
+  // A file from a 3.0 pre-release build already has instances, but may have
+  // kept saved rows in settings.layout: only the board step is left. With
+  // none saved there's nothing to move; the stock home board is the default.
+  if (Array.isArray(raw.widgets) || raw.schemaVersion === 3) {
+    const settings: Record<string, unknown> = isRecord(raw.settings) ? { ...raw.settings } : {};
+    if (!isRecord(settings.layout) || !Array.isArray(settings.layout.sections)) {
+      return { value: raw, changed: false };
+    }
+    const boards = layoutToBoards(settings);
+    return { value: { ...raw, settings, boards }, changed: true };
+  }
   const settings: Record<string, unknown> = isRecord(raw.settings) ? { ...raw.settings } : {};
   const components = isRecord(settings.components) ? settings.components : {};
 
@@ -187,10 +214,11 @@ export function migrateV2toV3(raw: unknown): { value: unknown; changed: boolean 
     return { widget, span: r.span, hidden: r.hidden || switchedOff(r, widget), ...r.extra };
   });
   settings.layout = layout;
+  const boards = layoutToBoards(settings);
 
   if (typeof components.settingsButton === "boolean") settings.settingsButton = components.settingsButton;
   for (const key of ["notes", "countdown", "worldClocks", "systemStats", "calendar", "feeds", "components"]) {
     delete settings[key];
   }
-  return { value: { ...raw, settings, widgets: instances }, changed: true };
+  return { value: { ...raw, settings, boards, widgets: instances }, changed: true };
 }

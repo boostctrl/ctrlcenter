@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import type { Settings, WidgetInstance } from "@/lib/schema";
+import type { Board, Settings, WidgetInstance } from "@/lib/schema";
 import type { ThemePack } from "@/lib/theme";
 import { replaceUrlParams } from "./urlState";
 import { SaveStatus } from "./useAutosave";
@@ -27,6 +27,7 @@ import SecuritySection from "./settings/SecuritySection";
 export default function SettingsManager({
   initialSettings,
   initialWidgets,
+  initialBoards,
   apps,
   themePacks,
   initialSection,
@@ -35,6 +36,8 @@ export default function SettingsManager({
   initialSettings: Settings;
   // The widget instances (#297), edited in the Widgets section.
   initialWidgets: WidgetInstance[];
+  // The boards (#298), managed in the Layout section.
+  initialBoards: Board[];
   // The monitored apps, for the alert channels' app filter and maintenance
   // windows.
   apps: { id: string; name: string }[];
@@ -44,7 +47,7 @@ export default function SettingsManager({
   initialSection?: string;
   initialTwoFactorEnabled: boolean;
 }) {
-  const draft = useSettingsDraft(initialSettings, initialWidgets, themePacks);
+  const draft = useSettingsDraft(initialSettings, initialWidgets, initialBoards, themePacks);
   const { status, error } = draft;
   // The URL seeds the active section (?tab=settings&section=widgets is a
   // shareable deep link that survives refresh); rail clicks mirror it back

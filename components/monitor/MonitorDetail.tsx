@@ -1,5 +1,6 @@
 "use client";
 
+import type { NavPages } from "@/lib/nav";
 import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import type { DetailResult } from "@/lib/monitor-detail";
@@ -120,7 +121,7 @@ export default function MonitorDetail({
   nav,
 }: {
   initial: DetailResult;
-  nav: { weather: boolean; status: boolean; calendar: boolean };
+  nav: NavPages;
 }) {
   const [result, setResult] = useState(initial);
   const id = initial.service;

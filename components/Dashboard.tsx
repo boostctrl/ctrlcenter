@@ -69,14 +69,18 @@ const COL_SPAN: Record<number, string> = {
 
 
 export default function Dashboard({
+  boardId,
+  isHome,
   widgets,
   scale = DEFAULT_UI_SCALE,
   gap = DEFAULT_GRID_GAP,
   topGap = DEFAULT_TOP_GAP,
   data,
 }: {
-  // The resolved widget arrangement (order + span + hidden), server-resolved so
-  // legacy configs render unchanged.
+  // The board shown (#298), and whether it's the first board (Reset's target).
+  boardId: string;
+  isHome: boolean;
+  // The board's resolved widget arrangement (order + span + hidden).
   widgets: LayoutWidget[];
   // The saved UI scale (percent); SSR already renders it on <html>, this seeds
   // the editor's stepper.
@@ -118,6 +122,8 @@ export default function Dashboard({
     saveStatus,
     saveError,
   } = useLayoutEditor({
+    boardId,
+    isHome,
     initial: { sections: widgets, scale, gap, topGap },
     editing,
     setEditing,
@@ -506,6 +512,7 @@ export default function Dashboard({
             onUndo={undoLast}
             onRevert={revertLayout}
             onReset={resetLayout}
+            resetsToEmpty={!isHome}
             onDone={doneEditing}
           />
         </ConfirmProvider>

@@ -404,25 +404,10 @@ describe("updateSettings partial merge", () => {
     expect(settings.theme.foreground).toBeUndefined();
   });
 
-  it("replaces the layout wholesale", async () => {
-    await config.updateSettings(settingsInput({
-      layout: {
-        sections: [{ widget: "apps", span: 12, hidden: false }],
-        columns: 24,
-        scale: 100,
-      },
-    }));
-    const settings = await config.updateSettings(settingsInput({
-      layout: {
-        sections: [{ widget: "bookmarks", span: 24, hidden: true }],
-        columns: 24,
-        scale: 110,
-      },
-    }));
-    expect(settings.layout.sections).toEqual([
-      { widget: "bookmarks", span: 24, hidden: true },
-    ]);
-    expect(settings.layout.scale).toBe(110);
+  it("merges the page-level layout values key by key", async () => {
+    await config.updateSettings(settingsInput({ layout: { scale: 110, gap: 16 } }));
+    const settings = await config.updateSettings(settingsInput({ layout: { gap: 24 } }));
+    expect(settings.layout).toMatchObject({ scale: 110, gap: 24 });
   });
 
   it("rewrites a legacy width layout to spans on the first read, with a .bak", async () => {
@@ -434,14 +419,14 @@ describe("updateSettings partial merge", () => {
     };
     await fs.writeFile(configPath, YAML.dump(legacy), "utf8");
     const loaded = await config.readConfigInternal();
-    expect(rowOf(loaded.settings.layout.sections, "apps")).toEqual({ widget: "apps", span: 12, hidden: false });
+    expect(rowOf(loaded.boards[0].layout.sections, "apps")).toEqual({ widget: "apps", span: 12, hidden: false });
 
-    // The read itself persisted the span shape and the 24-column grid marker…
+    // The read itself persisted the span shape, on the home board (#298)…
     const onDisk = YAML.load(await fs.readFile(configPath, "utf8")) as {
-      settings: { layout: { sections: { widget: string }[]; columns: number } };
+      boards: { layout: { sections: { widget: string }[]; columns: number } }[];
     };
-    expect(rowOf(onDisk.settings.layout.sections, "apps")).toEqual({ widget: "apps", span: 12, hidden: false });
-    expect(onDisk.settings.layout.columns).toBe(24);
+    expect(rowOf(onDisk.boards[0].layout.sections, "apps")).toEqual({ widget: "apps", span: 12, hidden: false });
+    expect(onDisk.boards[0].layout.columns).toBe(24);
     // …after snapshotting the pre-migration file verbatim to the .bak.
     const bak = YAML.load(await fs.readFile(`${configPath}.bak`, "utf8"));
     expect(bak).toEqual(legacy);
@@ -502,16 +487,16 @@ describe("updateSettings partial merge", () => {
       "utf8"
     );
     const loaded = await config.readConfigInternal();
-    expect(rowOf(loaded.settings.layout.sections, "apps")?.span).toBe(12);
-    expect(rowOf(loaded.settings.layout.sections, "search")?.span).toBe(24);
+    expect(rowOf(loaded.boards[0].layout.sections, "apps")?.span).toBe(12);
+    expect(rowOf(loaded.boards[0].layout.sections, "search")?.span).toBe(24);
 
     // The first read persisted the doubled spans + marker; later reads and
     // writes must not double them a second time.
     await config.updateSettings(settingsInput({ title: "Dash" }));
     const reloaded = await config.readConfigInternal();
-    expect(rowOf(reloaded.settings.layout.sections, "apps")?.span).toBe(12);
-    expect(rowOf(reloaded.settings.layout.sections, "search")?.span).toBe(24);
-    expect(reloaded.settings.layout.columns).toBe(24);
+    expect(rowOf(reloaded.boards[0].layout.sections, "apps")?.span).toBe(12);
+    expect(rowOf(reloaded.boards[0].layout.sections, "search")?.span).toBe(24);
+    expect(reloaded.boards[0].layout.columns).toBe(24);
   });
 
   it("migrates a pre-2.0 backup file on import", async () => {
@@ -532,14 +517,14 @@ describe("updateSettings partial merge", () => {
     });
     const feed = replaced.widgets.find((w) => w.type === "feed");
     expect(feed?.type === "feed" && feed.urls).toEqual(["https://old.example/rss"]);
-    expect(rowOf(replaced.settings.layout.sections, "apps")).toEqual({ widget: "apps", span: 12, hidden: false });
-    expect(rowOf(replaced.settings.layout.sections, "bookmarks")).toEqual({
+    expect(rowOf(replaced.boards[0].layout.sections, "apps")).toEqual({ widget: "apps", span: 12, hidden: false });
+    expect(rowOf(replaced.boards[0].layout.sections, "bookmarks")).toEqual({
       widget: "bookmarks",
       span: 12,
       hidden: false,
       space: { bottom: 40 },
     });
-    expect(replaced.settings.layout.columns).toBe(24);
+    expect(replaced.boards[0].layout.columns).toBe(24);
   });
 });
 
