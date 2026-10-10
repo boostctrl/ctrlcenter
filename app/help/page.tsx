@@ -651,7 +651,10 @@ export default async function HelpPage() {
             grab, an import, a request awaiting approval, a health issue —
             relayed straight out through the alert channels above. An
             Overseerr or Jellyseerr install from before they merged into
-            Seerr sends the same events.
+            Seerr sends the same events. An email channel gets the event as
+            a short report — subject <code>[App] Event: Title</code>, with
+            the poster, the key facts and a link back into the app; every
+            other channel gets a one-line summary.
           </P>
           <P>
             Turn on <strong>Settings → Alerts → Inbound webhooks</strong>,

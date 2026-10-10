@@ -17,6 +17,7 @@ import {
   type AlertEvent,
 } from "./alerts";
 import { alertChannelSchema, alertsSchema } from "./schema";
+import { parseArrWebhook } from "./webhooks";
 
 // Stub nodemailer's transport so the email path is exercised without SMTP.
 // sendMail is reconfigured per test (resolve = delivered, reject = failure).
@@ -528,7 +529,10 @@ describe("processAlerts", () => {
 });
 
 describe("sendNotification", () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    sendMailMock.mockReset();
+  });
 
   it("relays to the active channels that take inbound webhooks", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
@@ -548,5 +552,23 @@ describe("sendNotification", () => {
   it("reports no channel when none takes inbound webhooks", () => {
     const config = alertsSchema.parse({ channels: [channel({ onWebhooks: false })] });
     expect(anyChannelReady(config)).toBe(false);
+  });
+
+  it("emails the event as a report with its [App] Event subject (#345)", async () => {
+    sendMailMock.mockResolvedValue({});
+    const config = alertsSchema.parse({
+      channels: [channel({ type: "email", smtp: { host: "smtp.example.com", from: "a@x", to: "b@y" } })],
+    });
+    const n = parseArrWebhook("sonarr", {
+      eventType: "Grab",
+      series: { title: "The Bear" },
+      episodes: [{ seasonNumber: 4, episodeNumber: 3 }],
+    });
+    await sendNotification(config, n!, { at: 0, timeZone: "UTC", siteTitle: "Home" });
+    expect(sendMailMock).toHaveBeenCalledTimes(1);
+    const mail = sendMailMock.mock.calls[0][0];
+    expect(mail).toMatchObject({ from: "a@x", to: "b@y", subject: "[Sonarr] Grabbed: The Bear S04E03" });
+    expect(mail.html).toContain("CtrlCenter</span> · Home");
+    expect(mail.text).toContain("SONARR · GRABBED");
   });
 });

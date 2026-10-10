@@ -15,9 +15,10 @@ import { log } from "@/lib/log";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// A webhook body is small (an event JSON); cap it so a bad/hostile caller can't
-// stream an unbounded body into memory.
-const MAX_BYTES = 64 * 1024;
+// A webhook body is one event's JSON — a season pack's import lists every
+// file, with artwork and genres — so cap it generously, but cap it, so a
+// bad/hostile caller can't stream an unbounded body into memory.
+const MAX_BYTES = 256 * 1024;
 // Generous per-source rate limit — a normal app fires a handful of events, but
 // one misbehaving source shouldn't be able to hammer the relay.
 const MAX_PER_WINDOW = 60;
@@ -108,7 +109,11 @@ export async function POST(
     return NextResponse.json({ ok: true, delivered: false });
   }
 
-  await sendNotification(settings.alerts, notification);
+  await sendNotification(settings.alerts, notification, {
+    at: Date.now(),
+    timeZone: settings.timezone,
+    siteTitle: settings.title,
+  });
   log.info("webhook relayed", { service });
   return NextResponse.json({ ok: true, delivered: true });
 }

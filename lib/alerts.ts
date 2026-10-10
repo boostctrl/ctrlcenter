@@ -8,6 +8,8 @@ import {
 import { log, hostOf, errorReason } from "./log";
 import { resolveSecret } from "./secrets";
 import { fetchWithTimeout } from "./fetch-body";
+import type { NotificationContext, WebhookNotification } from "./webhooks";
+import { buildNotificationEmail, escapeHtml } from "./webhook-email";
 
 // Outbound uptime alerting. The background poller (lib/status-poller.ts) feeds
 // each tick's results through here; we detect down/recovery transitions and
@@ -182,8 +184,11 @@ export function buildAlertRequest(
 }
 
 // A free-form notification (an inbound webhook event, #204) rather than an
-// up/down transition: a headline plus optional detail and a link.
-export type NotificationContent = { title: string; body?: string; url?: string };
+// up/down transition: a headline plus optional detail and a link, and the
+// structured report the email renders (#345, lib/webhook-email.ts). The
+// email builder lives there; it is re-exported so callers keep one import.
+export type NotificationContent = WebhookNotification;
+export { buildNotificationEmail };
 
 // Shape a notification into a request for the chosen channel — the counterpart
 // to buildAlertRequest for events that aren't uptime transitions. Reuses each
@@ -228,14 +233,6 @@ export function buildNotificationRequest(
         at: new Date().toISOString(),
       });
   }
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 // The link line of an alert email. Only http(s) URLs become a link: the URL
@@ -292,34 +289,6 @@ export function buildEmailMessage(
 <p style="margin:0 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:${accent};font-weight:600">${label}</p>
 <h1 style="margin:0 0 12px;font-size:18px;color:#18181b">${escapeHtml(title)}</h1>
 ${urlRow}
-<p style="margin:8px 0 0;font-size:12px;color:#71717a">At ${when}</p>
-</td></tr>
-</table>
-</body></html>`;
-  return { subject, text, html };
-}
-
-// Email content for a free-form notification (#204): the title becomes the
-// subject and lead, the body and link fill the card. Pure, unit-tested.
-export function buildNotificationEmail(
-  c: NotificationContent
-): { subject: string; text: string; html: string } {
-  const when = new Date().toISOString();
-  const subject =
-    c.title.replace(/[\r\n]+/g, " ").trim().slice(0, 200) || "Notification";
-  const text =
-    [c.title, c.body?.trim(), c.url?.trim()].filter(Boolean).join("\n") +
-    `\n\nAt ${when}`;
-  const accent = "#2563eb";
-  const bodyRow = c.body?.trim()
-    ? `<p style="margin:0 0 8px;font-size:14px;color:#3f3f46;white-space:pre-line">${escapeHtml(c.body.trim())}</p>`
-    : "";
-  const urlRow = c.url?.trim() ? linkRow(c.url.trim(), accent) : "";
-  const html = `<!doctype html><html><body style="margin:0;background:#f4f4f5;padding:24px">
-<table role="presentation" cellpadding="0" cellspacing="0" style="max-width:480px;margin:0 auto;width:100%;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
-<tr><td style="background:#ffffff;border-radius:12px;border-left:4px solid ${accent};padding:20px 24px">
-<h1 style="margin:0 0 12px;font-size:18px;color:#18181b">${escapeHtml(c.title)}</h1>
-${bodyRow}${urlRow}
 <p style="margin:8px 0 0;font-size:12px;color:#71717a">At ${when}</p>
 </td></tr>
 </table>
@@ -435,7 +404,7 @@ export function buildServiceRequest(
 // One thing to deliver: an uptime transition, or a relayed notification.
 type Outgoing =
   | { kind: "alert"; event: AlertEvent; app: AlertApp; at: number }
-  | { kind: "notification"; content: NotificationContent };
+  | { kind: "notification"; content: NotificationContent; ctx: NotificationContext };
 
 // The HTTP request for one channel and one message (every type but email).
 function requestFor(ch: AlertChannel, out: Outgoing): AlertRequest {
@@ -491,7 +460,7 @@ async function runEmail(cfg: SmtpConfig, out: Outgoing): Promise<ChannelResult> 
     const { subject, text, html } =
       out.kind === "alert"
         ? buildEmailMessage(out.event, out.app, out.at, cfg.subject)
-        : buildNotificationEmail(out.content);
+        : buildNotificationEmail(out.content, out.ctx);
     await transport.sendMail({ from: cfg.from, to: cfg.to, subject, text, html });
     return { ok: true, detail: "sent" };
   } catch (e) {
@@ -520,13 +489,17 @@ async function deliverLogged(ch: AlertChannel, out: Outgoing): Promise<void> {
 
 // Relay one free-form notification (#204) out to every active channel that
 // takes inbound webhook events. A no-op when there's none; the caller checks
-// anyChannelReady first to answer clearly.
+// anyChannelReady first to answer clearly. `ctx` dates the email and names the
+// site in its footer; the webhook route passes the site's own settings.
 export async function sendNotification(
   config: AlertConfig,
-  c: NotificationContent
+  c: NotificationContent,
+  ctx: NotificationContext = { at: Date.now(), timeZone: "UTC", siteTitle: "CtrlCenter" }
 ): Promise<void> {
   const channels = activeChannels(config).filter((ch) => ch.onWebhooks);
-  await Promise.all(channels.map((ch) => deliverLogged(ch, { kind: "notification", content: c })));
+  await Promise.all(
+    channels.map((ch) => deliverLogged(ch, { kind: "notification", content: c, ctx }))
+  );
 }
 
 // Whether any channel would receive a relayed notification: the webhook route

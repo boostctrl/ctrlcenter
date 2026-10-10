@@ -25,8 +25,9 @@ const smtpShape = {
   pass: secret(),
   from: secret(),
   to: secret(),
-  // Subject template; {service} and {status} are substituted. Empty = the
-  // default "{service} is {status}".
+  // Subject template for uptime alerts; {service} and {status} are
+  // substituted. Empty = the default "{service} is {status}". A relayed
+  // webhook event has its own "[App] Event: Title" subject (#345).
   subject: z.string().default(""),
 };
 export const smtpSchema = z.object(smtpShape);

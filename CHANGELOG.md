@@ -24,6 +24,12 @@ here.
   the inbound-webhook settings, the help page and the example config now
   call it that. An Overseerr or Jellyseerr install from before the merge
   keeps working with the same webhook URL. (#342)
+- **Webhook emails are now a report.** An event relayed from Sonarr, Radarr
+  or Seerr arrives with a short subject — `[Sonarr] Imported: The Bear
+  S04E03–E04` — and a body that shows the title, the poster, the facts
+  (quality, size, release group, indexer, requester…), the message and a
+  button back into the app, in light and dark mode. Other alert channels
+  keep their one-line summary. (#345)
 
 ### Fixed
 
