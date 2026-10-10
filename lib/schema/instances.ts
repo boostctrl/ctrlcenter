@@ -180,6 +180,10 @@ export const MAX_API_WIDGETS = 20;
 
 const httpOrBlank = (u: string) => u.trim() === "" || /^https?:\/\//i.test(u.trim());
 
+// Admin input for one instance edited in place (PUT /api/widgets/[id], #303):
+// complete, like each entry of the list below.
+export const widgetInstanceUpdateSchema = wholeOf(widgetInstanceSchema);
+
 // Admin input (PUT /api/widgets): the whole list, each instance complete, with
 // the input-only rules the stored shape can't state.
 export const widgetInstancesUpdateSchema = z

@@ -39,3 +39,27 @@ describe("PUT /api/widgets", () => {
     expect((await readConfigInternal()).widgets.map((w) => w.id)).toEqual(["n1", "n2"]);
   });
 });
+
+describe("POST /api/widgets", () => {
+  const post = (body: unknown, auth = true) =>
+    route.POST(request("/api/widgets", { method: "POST", body, session: auth ? session : undefined }));
+
+  it("requires a session and a known type", async () => {
+    expect((await post({ type: "notes" }, false)).status).toBe(401);
+    expect((await post({ type: "nope" })).status).toBe(400);
+  });
+
+  it("adds a widget with its defaults and a fresh id, keeping the rest", async () => {
+    const { readConfigInternal } = await import("@/lib/config");
+    const before = (await readConfigInternal()).widgets.length;
+    const res = await post({ type: "feed" });
+    expect(res.status).toBe(201);
+    const created = await res.json();
+    expect(created).toMatchObject({ type: "feed", urls: [""] });
+    expect(created.id).toMatch(/^feed-[0-9a-f]{8}$/);
+    const after = (await readConfigInternal()).widgets;
+    expect(after).toHaveLength(before + 1);
+    expect(after.at(-1)?.id).toBe(created.id);
+  });
+});
+

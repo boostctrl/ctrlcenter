@@ -47,6 +47,16 @@ here.
   unless you set one to Everyone, and then visitors see only counts and
   states — never names, titles, hosts, users or error messages. (#301)
 
+- **Add and set up widgets right on the page (3.0).** The layout editor's
+  *Add widget* lists every kind of widget with a line on what it shows; pick
+  one and it lands after the selected card with its settings open beside the
+  page (a sheet from the bottom on a phone), saved as you type, so a new
+  notes card or feed is one step instead of a trip to Settings and back.
+  *Configure* on a selected card, or on its chip in the tray, opens the same
+  settings for a widget already there, and Settings → Widgets gains an *Edit
+  in place* link for each one. A *Board* menu in the editor switches between
+  boards' editors, renames or reorders the current board, and starts a new
+  one. (#303)
 - **API widgets (3.0).** Show values from any JSON endpoint — a NAS, a
   router, a home-automation hub, your own script — as a single stat, a gauge,
   label/value rows or a list (Settings → Widgets → API widgets). Point each

@@ -170,6 +170,15 @@ try {
       await page.locator("[data-widget-id]").nth(1).click();
       await page.getByRole("toolbar", { name: /controls$/ }).waitFor({ timeout: 5_000 });
     });
+    // A widget's settings open beside the page (#303), straight from the
+    // Settings → Widgets "Edit in place" link; and the add-widget palette.
+    await run(ctx, "/?edit=1&configure=apps", `editor-panel-${scheme}`, async (page) => {
+      await page.locator("[data-widget-panel]").getByText("Card title").waitFor({ timeout: 10_000 });
+    });
+    await run(ctx, "/?edit=1", `editor-palette-${scheme}`, async (page) => {
+      await page.getByRole("button", { name: "Add widget" }).click();
+      await page.getByRole("dialog", { name: "Add a widget" }).waitFor({ timeout: 5_000 });
+    });
     if (scheme === "light") {
       await apiWidgetTest(ctx);
       await editorTray(ctx);

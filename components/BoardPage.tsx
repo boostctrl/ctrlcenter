@@ -101,6 +101,8 @@ export default async function BoardPage({
             gap={gap}
             topGap={topGap}
             data={data}
+            // The editor's board menu (#303); only the admin edits.
+            boards={isAdmin ? config.boards.map(({ id, name, visibility }) => ({ id, name, visibility })) : []}
           />
           <BoardKeys boards={nav.boards} />
           {settings.settingsButton && <FloatingNav {...nav} />}

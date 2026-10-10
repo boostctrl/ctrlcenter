@@ -4,6 +4,8 @@ import type {
   boardsUpdateSchema,
   settingsInputSchema,
 } from "@/lib/schema";
+import type { WidgetInstance } from "@/lib/schema";
+import type { WidgetEditContext } from "@/lib/config/widgets";
 import { apiErrorMessage } from "./apiError";
 
 // Save a partial settings update. /api/settings merges it key by key, so a
@@ -84,4 +86,40 @@ export async function saveIntegrations(
   { keepalive }: { keepalive?: boolean } = {}
 ): Promise<void> {
   await putJson("/api/integrations", integrations, "Failed to save integrations", keepalive);
+}
+
+// One widget edited in place from the layout editor (#303): the instance as
+// stored (secrets included) with what its editor offers to pick from.
+export async function fetchWidgetForEditing(id: string): Promise<WidgetEditContext> {
+  let res: Response;
+  try {
+    res = await fetch(`/api/widgets/${encodeURIComponent(id)}`);
+  } catch {
+    throw new Error("Couldn't load the widget");
+  }
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(apiErrorMessage(data, "Couldn't load the widget"));
+  return data as WidgetEditContext;
+}
+
+// Save that one widget; the others stay exactly as stored.
+export async function saveWidget(widget: WidgetInstance, { keepalive }: { keepalive?: boolean } = {}): Promise<void> {
+  await putJson(`/api/widgets/${encodeURIComponent(widget.id)}`, widget, "Failed to save the widget", keepalive);
+}
+
+// Add a widget of a type, with its defaults (the palette, #303).
+export async function createWidget(type: string): Promise<WidgetInstance> {
+  let res: Response;
+  try {
+    res = await fetch("/api/widgets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type }),
+    });
+  } catch {
+    throw new Error("Couldn't add the widget");
+  }
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(apiErrorMessage(data, "Couldn't add the widget"));
+  return data as WidgetInstance;
 }

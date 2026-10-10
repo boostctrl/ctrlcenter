@@ -761,6 +761,24 @@ export default async function HelpPage() {
               selected card do the same one step at a time.
             </li>
             <li>
+              <strong>Add a widget.</strong> <strong>Add widget</strong> in the
+              editor bar lists every kind with what it shows. Pick one and it
+              goes after the selected card, with its settings open beside the
+              page (a sheet from the bottom on a phone) — the same settings as
+              in Settings → Widgets, saved as you type.
+            </li>
+            <li>
+              <strong>Configure a widget.</strong> <strong>Configure</strong>{" "}
+              in a selected card&apos;s toolbar, or on its chip in the tray,
+              opens the same settings for a widget that&apos;s already there.
+            </li>
+            <li>
+              <strong>Boards.</strong> The <strong>Board</strong> menu in the
+              editor bar switches to another board&apos;s editor, renames or
+              reorders this one, and starts a new board. Who can see a board,
+              and removing one, stay in Settings → Layout.
+            </li>
+            <li>
               <strong>Hide or place from the tray.</strong> Drag a card onto
               the tray below the page to hide it, or a hidden widget from the
               tray to exactly where you want it.

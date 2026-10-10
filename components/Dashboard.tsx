@@ -2,6 +2,8 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import {
   buildSearchUrl,
   engineLabel,
@@ -29,6 +31,13 @@ import { ConfirmProvider } from "./admin/Confirm";
 import { reorder } from "./admin/useReorder";
 import { WidgetFrame, EditToolbar, DragGhost } from "./LayoutEditor";
 import { usePointerReorder } from "./usePointerReorder";
+import WidgetPalette from "./WidgetPalette";
+import BoardsMenu, { type EditorBoard } from "./BoardsMenu";
+import { createWidget } from "./admin/settingsApi";
+
+// The widget settings panel (#303) loads only when the admin opens it, so
+// visitors never download the editors.
+const WidgetPanel = dynamic(() => import("./WidgetPanel"), { ssr: false });
 import { useGridLayout } from "./useGridLayout";
 import { useLayoutEditor } from "./useLayoutEditor";
 import { UndoGestureContext } from "./useUndoHistory";
@@ -73,6 +82,7 @@ const COL_SPAN: Record<number, string> = {
 export default function Dashboard({
   boardId,
   isHome,
+  boards = [],
   widgets,
   scale = DEFAULT_UI_SCALE,
   gap = DEFAULT_GRID_GAP,
@@ -82,6 +92,8 @@ export default function Dashboard({
   // The board shown (#298), and whether it's the first board (Reset's target).
   boardId: string;
   isHome: boolean;
+  // Every board, for the editor's board menu (#303); empty for visitors.
+  boards?: EditorBoard[];
   // The board's resolved widget arrangement (order + span + hidden).
   widgets: LayoutWidget[];
   // The saved UI scale (percent); SSR already renders it on <html>, this seeds
@@ -434,6 +446,48 @@ export default function Dashboard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flipKey]);
 
+  // The widget settings panel (#303): which widget's content is open beside
+  // the page. A save refreshes the page's data so the card shows it.
+  const router = useRouter();
+  const [panelId, setPanelId] = useState<string | null>(null);
+  const configure = (id: string) => {
+    setPanelId(id);
+    select(id);
+  };
+  // Settings → Widgets links here with ?configure=<id> (edit in place).
+  useEffect(() => {
+    if (!editing) return;
+    const id = new URLSearchParams(window.location.search).get("configure");
+    // A one-time read of the address on entering edit mode.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (id && layout.sections.some((w) => w.id === id)) setPanelId(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing]);
+
+  const panelWidget = panelId ? layout.sections.find((w) => w.id === panelId) : undefined;
+
+  // The add-widget palette (#303): create the widget, place it after the
+  // selected card (or at the end), select it and open its settings.
+  async function addWidget(type: WidgetType): Promise<string | null> {
+    let created;
+    try {
+      created = await createWidget(type);
+    } catch (e) {
+      return e instanceof Error ? e.message : "Couldn't add the widget";
+    }
+    const row: LayoutWidget = { id: created.id, type, span: widgetDef(type).span, hidden: false };
+    mutateSections((sections) => {
+      const after = selectedId ? sections.findIndex((w) => w.id === selectedId) : -1;
+      const next = [...sections];
+      next.splice(after >= 0 ? after + 1 : next.length, 0, row);
+      return next;
+    });
+    announce(`${widgetDef(type).label} added`);
+    configure(created.id);
+    router.refresh();
+    return null;
+  }
+
   // The editor's live region (#313): moves, resizes and selection, said out
   // loud. A repeat of the same words still re-announces (the key changes).
   const [announcement, setAnnouncement] = useState({ text: "", n: 0 });
@@ -563,6 +617,7 @@ export default function Dashboard({
               onSpace={setWidgetSpace}
               onToggleHidden={showOrHide}
               onToggleLabel={toggleWidgetLabel}
+              onConfigure={configure}
               landed={landed?.id === widget.id}
               selected={selectedId === widget.id}
               onSelect={selectCard}
@@ -615,14 +670,24 @@ export default function Dashboard({
                   <span className="rounded bg-fg/10 px-1.5 py-0.5 text-[10px] tracking-wide text-ink-60 uppercase">
                     {widget.hidden ? "Hidden" : "Empty"}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => showOrHide(widget.id)}
-                    aria-label={`${widget.hidden ? "Show" : "Hide"} ${label}`}
-                    className="ml-auto rounded-md border border-fg/10 px-2 py-0.5 text-ink-70 transition-colors hover:bg-fg/10 hover:text-fg"
-                  >
-                    {widget.hidden ? "Show" : "Hide"}
-                  </button>
+                  <span className="ml-auto flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => configure(widget.id)}
+                      aria-label={`Configure ${label}`}
+                      className="rounded-md border border-fg/10 px-2 py-0.5 text-ink-70 transition-colors hover:bg-fg/10 hover:text-fg"
+                    >
+                      Configure
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => showOrHide(widget.id)}
+                      aria-label={`${widget.hidden ? "Show" : "Hide"} ${label}`}
+                      className="rounded-md border border-fg/10 px-2 py-0.5 text-ink-70 transition-colors hover:bg-fg/10 hover:text-fg"
+                    >
+                      {widget.hidden ? "Show" : "Hide"}
+                    </button>
+                  </span>
                   {/* An empty widget that's set to show appears once it has
                       content; say so, and what would give it some. Wraps
                       rather than truncating, so the hint stays readable. */}
@@ -636,6 +701,23 @@ export default function Dashboard({
             })}
           </div>
         </div>
+      )}
+
+      {editing && panelWidget && (
+        <WidgetPanel
+          // A fresh panel per widget, so another widget's editor never shows
+          // under this one's name while it loads.
+          key={panelWidget.id}
+          id={panelWidget.id}
+          label={labelFor(panelWidget)}
+          onClose={() => {
+            setPanelId(null);
+            gridRef.current
+              ?.querySelector<HTMLElement>(`[data-widget-id="${CSS.escape(panelWidget.id)}"]`)
+              ?.focus({ preventScroll: true });
+          }}
+          onSaved={() => router.refresh()}
+        />
       )}
 
       {cardDrag && draggedCell && (
@@ -725,6 +807,12 @@ export default function Dashboard({
             onReset={resetLayout}
             resetsToEmpty={!isHome}
             onDone={doneEditing}
+            leading={
+              <>
+                {boards.length > 0 && <BoardsMenu boards={boards} currentId={boardId} />}
+                <WidgetPalette onAdd={addWidget} className="shrink-0" />
+              </>
+            }
           />
         </ConfirmProvider>
       )}

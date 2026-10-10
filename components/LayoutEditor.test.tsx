@@ -115,6 +115,7 @@ function frame(overrides: Partial<Parameters<typeof WidgetFrame>[0]> = {}) {
     onSpace: vi.fn(),
     onToggleHidden: vi.fn(),
     onToggleLabel: vi.fn(),
+    onConfigure: vi.fn(),
     onGrab: vi.fn(),
     clickEndsDrag: () => false,
     ...overrides,
@@ -142,6 +143,8 @@ describe("WidgetFrame", () => {
   it("gives a selected card its toolbar, and moves and resizes it from the keyboard", () => {
     const { props, card } = frame({ selected: true });
     const toolbar = screen.getByRole("toolbar", { name: "Notes controls" });
+    fireEvent.click(within(toolbar).getByRole("button", { name: "Configure" }));
+    expect(props.onConfigure).toHaveBeenCalledWith("notes-1");
     fireEvent.click(within(toolbar).getByRole("button", { name: "Hide" }));
     expect(props.onToggleHidden).toHaveBeenCalledWith("notes-1");
     expect(props.onSelect).not.toHaveBeenCalled();

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { MAX_FEED_CARDS, type Group } from "@/lib/schema";
 import { useFeedHealth } from "../FeedHealth";
 import { AddButton, Card, Hint, RemoveButton, Switch, fieldLabelClasses, subCardClasses } from "../ui";
@@ -9,8 +10,9 @@ import type { SettingsDraft } from "./useSettingsDraft";
 
 // The Widgets tab (#285): the site settings some widgets read, then every
 // content widget type with its instances (#297). Each instance has its own
-// editor, a switch for whether it shows on the home page, and Remove; Add puts
-// another of the type on the board.
+// editor, a switch for whether it shows on the home page, Remove, and a link
+// to edit it in place beside the home page (#303); Add puts another of the
+// type on the board.
 export default function WidgetsSection({
   d,
   groups,
@@ -46,6 +48,14 @@ export default function WidgetsSection({
                     <div className="flex items-center justify-between gap-2">
                       <span className={`${fieldLabelClasses} truncate`}>{label}</span>
                       <div className="flex shrink-0 items-center gap-2">
+                        {/* The same editor beside the page, in the home
+                            board's layout editor (#303). */}
+                        <Link
+                          href={`/?edit=1&configure=${encodeURIComponent(w.id)}`}
+                          className="text-xs text-ink-60 underline hover:text-ink-90"
+                        >
+                          Edit in place<span className="sr-only">: {label}</span>
+                        </Link>
                         <label className="flex cursor-pointer items-center gap-2 text-xs text-ink-60">
                           On the home page
                           <Switch

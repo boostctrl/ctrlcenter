@@ -276,7 +276,15 @@ export function useLayoutEditor({
         return;
       }
       if (e.key === "Escape") {
-        if (document.querySelector("details[data-editor-more][open]")) return;
+        // A layered surface closes first, on its own Escape: a card's More
+        // menu, the widget settings panel, the add-widget palette, the boards
+        // menu (#303).
+        if (
+          document.querySelector(
+            "details[data-editor-more][open], [data-widget-panel], [data-widget-palette], [data-boards-menu]"
+          )
+        )
+          return;
         if (document.querySelector('[role="alertdialog"]')) return;
         const selected = selectedRef.current;
         if (selected) {

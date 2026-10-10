@@ -283,6 +283,7 @@ export function WidgetFrame({
   onSpace,
   onToggleHidden,
   onToggleLabel,
+  onConfigure,
   onGrab,
   clickEndsDrag,
   placeholder = false,
@@ -321,6 +322,8 @@ export function WidgetFrame({
   onSpace: (key: string, side: SpaceSide, value: number | undefined) => void;
   onToggleHidden: (key: string) => void;
   onToggleLabel: (key: string) => void;
+  // Open the widget's settings beside the page (#303).
+  onConfigure: (key: string) => void;
   // A press on the card, which becomes a move drag past the slop or after a
   // long press (usePointerReorder, #312).
   onGrab: (e: React.PointerEvent<HTMLDivElement>) => void;
@@ -516,6 +519,14 @@ export function WidgetFrame({
           </button>
         )}
       </MoreMenu>
+      <button
+        type="button"
+        onClick={() => onConfigure(key)}
+        title={`Edit what ${label} shows`}
+        className={toolBtn}
+      >
+        Configure
+      </button>
       <button
         type="button"
         onClick={() => onToggleHidden(key)}
@@ -908,6 +919,7 @@ export function EditToolbar({
   onReset,
   resetsToEmpty,
   onDone,
+  leading,
 }: {
   status: SaveState;
   error: string | null;
@@ -926,6 +938,9 @@ export function EditToolbar({
   // A board other than the home board resets to empty, not the stock set.
   resetsToEmpty: boolean;
   onDone: () => void;
+  // The board menu and the add-widget palette (#303): first after the title
+  // on large screens, first in the scrolling row on small ones.
+  leading?: ReactNode;
 }) {
   const confirm = useConfirm();
   const ghostBtn =
@@ -935,7 +950,7 @@ export function EditToolbar({
       role="toolbar"
       aria-label="Layout editor"
       data-editor-keep
-      className="fixed inset-x-0 bottom-0 z-[45] flex flex-col gap-2 border-t border-fg/10 bg-[var(--background)]/90 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-lg backdrop-blur-xl lg:inset-x-auto lg:bottom-5 lg:left-1/2 lg:w-max lg:max-w-[calc(100vw-2rem)] lg:-translate-x-1/2 lg:flex-row lg:flex-wrap lg:items-center lg:justify-center lg:gap-x-3 lg:gap-y-1 lg:rounded-full lg:border lg:py-2 lg:pr-2 lg:pl-4"
+      className="fixed inset-x-0 bottom-0 z-[45] flex flex-col gap-2 border-t border-fg/10 bg-[var(--background)]/90 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-lg backdrop-blur-xl lg:inset-x-auto lg:bottom-5 lg:left-[calc(50%-var(--editor-panel,0px)/2)] lg:w-max lg:max-w-[calc(100vw-2rem-var(--editor-panel,0px))] lg:-translate-x-1/2 lg:flex-row lg:flex-wrap lg:items-center lg:justify-center lg:gap-x-3 lg:gap-y-1 lg:rounded-full lg:border lg:py-2 lg:pr-2 lg:pl-4"
     >
       {/* Where the selected card's controls dock on small screens (#313). */}
       <div id={SELECTION_SLOT_ID} className="empty:hidden lg:hidden" />
@@ -978,6 +993,7 @@ export function EditToolbar({
         </button>
       </div>
       <div className="-mx-3 flex items-center gap-2 overflow-x-auto px-3 pb-0.5 lg:contents">
+        {leading}
         <span className="shrink-0 text-xs text-ink-60 lg:hidden">
           Widths apply on large screens
         </span>
