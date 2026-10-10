@@ -5,7 +5,7 @@
 // the DOM application of all of it. PrefsProvider exposes the result as its
 // own context (useLookPrefs), so a color change doesn't re-render consumers
 // that only read the location or favorites.
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   loadActiveTheme,
   saveActiveTheme,
@@ -1173,6 +1173,38 @@ export function useLook(
     // re-running this on a new prop identity would clobber live theme state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // The site default can change under an open page — a day/night schedule
+  // switch (#336) hands in a new one. Repaint what the visitor hasn't
+  // customized from it; the mount effect above is deliberately mount-only.
+  const paintedDefault = useRef(defaultTheme);
+  useEffect(() => {
+    if (paintedDefault.current === defaultTheme) return;
+    paintedDefault.current = defaultTheme;
+    // The mode too, unless the visitor chose one (a phase can bring its
+    // own, as the site's own mode does for an un-customized visitor).
+    let stored: string | null = null;
+    if (policy !== "none") {
+      try {
+        stored = window.localStorage.getItem(THEME_KEY);
+      } catch {
+        // ignore
+      }
+    }
+    const ownMode = stored === "light" || stored === "dark" || stored === "system";
+    const theme = ownMode || previewMode ? displayTheme : defaultTheme.mode;
+    if (!ownMode && !previewMode) setThemeState(defaultTheme.mode);
+    const dark = resolveDark(theme);
+    applyAll({
+      theme,
+      look: resolveLook(activeLook),
+      accentOverride,
+      defaultAccent,
+    });
+    applyChrome(dark);
+    // Only a new default should repaint; the callbacks are this render's.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultTheme]);
 
   const look = useMemo<LookValue>(() => {
     // Resolve the displayed mode (saved `theme`, or a live builder preview) to a

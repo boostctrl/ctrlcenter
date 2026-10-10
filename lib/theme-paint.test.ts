@@ -365,6 +365,18 @@ describe("visitor theming policy (#335)", () => {
   });
 });
 
+describe("day/night schedule switch (#336)", () => {
+  const night = { ...DT, design: "paper", unscheduled: DT };
+  it("paints the phase's theme, or the usual one when the visitor turned the schedule off", () => {
+    expect(themePaint.readStored(storage({}), night, IDS, true).design).toBe("paper");
+    expect(themePaint.readStored(storage({ "ctrlcenter:schedule": "off" }), night, IDS, true).design).toBe("glass");
+    // The visitor's own choice still wins either way.
+    expect(themePaint.readStored(storage({ "ctrlcenter:design": { dark: "flat" } }), night, IDS, true).design).toBe("flat");
+    // Not under "none": the site decides.
+    expect(themePaint.readStored(storage({ "ctrlcenter:schedule": "off" }), { ...night, policy: "none" }, IDS, true).design).toBe("paper");
+  });
+});
+
 describe("readStored (the no-flash path)", () => {
   it("reads the stored scene effects and the Reduce motion key", () => {
     const s = storage({

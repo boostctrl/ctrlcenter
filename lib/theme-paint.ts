@@ -63,6 +63,10 @@ export type PaintDefaults = {
   // choice is then a pack's name, resolved here.
   policy?: string;
   packs?: PaintPack[];
+  // Under a day/night schedule (#336) the defaults above are the current
+  // phase's; this is the site's usual theme, for a visitor who turned the
+  // schedule off (a stored "off" under ctrlcenter:schedule).
+  unscheduled?: PaintDefaults;
 };
 
 export type PaintColorSet = { background: string; foreground: string; accentFrom: string; accentTo: string };
@@ -406,10 +410,26 @@ export function makeThemePaint() {
     // browser customized before the policy changed falls back at once.
     const policy = dt.policy === "packs" || dt.policy === "none" ? dt.policy : "all";
     const allowed =
-      policy === "all" ? null : policy === "packs" ? ["ctrlcenter:theme", "ctrlcenter:motion", "ctrlcenter:pack"] : ["ctrlcenter:motion"];
+      policy === "all"
+        ? null
+        : policy === "packs"
+          ? ["ctrlcenter:theme", "ctrlcenter:motion", "ctrlcenter:pack", "ctrlcenter:schedule"]
+          : ["ctrlcenter:motion"];
     const storage = allowed
       ? { getItem: (key: string) => (allowed.indexOf(key) >= 0 ? source.getItem(key) : null) }
       : source;
+    // The visitor's day/night schedule switch (#336): "off" means the
+    // site's usual theme instead of the phase's.
+    if (dt.unscheduled) {
+      let off = false;
+      try {
+        off = storage.getItem("ctrlcenter:schedule") === "off";
+      } catch {
+        // ignore
+      }
+      const base = dt.unscheduled;
+      if (off) dt = { ...base, policy: dt.policy, packs: dt.packs };
+    }
     const get = (key: string): unknown => {
       try {
         const raw = storage.getItem(key);

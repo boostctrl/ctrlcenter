@@ -167,6 +167,25 @@ export const themeEntrySchema = z
     }
   });
 
+// A day theme and a night theme by time of day (#336): gallery pack names
+// (empty = the site's usual theme for that phase), by sunrise and sunset at
+// the weather location or at fixed "HH:MM" times in the site's time zone,
+// each with an optional appearance mode. Replaced whole on save, so clearing
+// a mode sticks.
+const hhmm = z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Use HH:MM");
+export const themeScheduleSchema = z.object({
+  enabled: z.boolean().default(false),
+  mode: z.enum(["sun", "fixed"]).default("sun"),
+  day: z.string().max(40).default(""),
+  night: z.string().max(40).default(""),
+  dayStart: hhmm.catch("07:00").default("07:00"),
+  nightStart: hhmm.catch("19:00").default("19:00"),
+  dayMode: z.enum(["system", "light", "dark"]).optional(),
+  nightMode: z.enum(["system", "light", "dark"]).optional(),
+});
+
+export type ThemeScheduleConfig = z.infer<typeof themeScheduleSchema>;
+
 // Admin sends the whole gallery (PUT /api/themes); it replaces the stored
 // `themes` wholesale, so resetting a pack just omits its fields.
 export const themesInputSchema = z.array(themeEntrySchema).max(100);

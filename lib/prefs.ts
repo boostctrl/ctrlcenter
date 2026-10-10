@@ -800,6 +800,29 @@ export function saveDensity(pair: ModePair<Density | null> | null): void {
   saveModePair(DENSITY_KEY, pair);
 }
 
+// The visitor's day/night schedule switch (#336): "off" keeps the site's
+// usual theme under their own choices; anything else follows the schedule.
+export const SCHEDULE_KEY = "ctrlcenter:schedule";
+
+export function loadFollowSchedule(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    return window.localStorage.getItem(SCHEDULE_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}
+
+export function saveFollowSchedule(follow: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (follow) window.localStorage.removeItem(SCHEDULE_KEY);
+    else window.localStorage.setItem(SCHEDULE_KEY, "off");
+  } catch {
+    // ignore
+  }
+}
+
 // Under the "themes only" policy (#335), the visitor's choice is a pack's
 // name per mode; the no-flash script resolves it against the site's themes.
 export const PACK_KEY = "ctrlcenter:pack";

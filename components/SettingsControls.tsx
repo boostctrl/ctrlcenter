@@ -17,6 +17,7 @@ export default function SettingsControls() {
     reduceMotion,
     setReduceMotion,
     visitorTheming,
+    themeSchedule,
     timezone,
     units,
     location,
@@ -100,6 +101,29 @@ export default function SettingsControls() {
             whatever the theme says.
           </p>
         </div>
+
+        {/* The site's day/night schedule (#336): follow it, or keep the
+            site's usual theme under your own choices. */}
+        {themeSchedule && visitorTheming !== "none" && (
+          <div className="space-y-1.5">
+            <span className="text-ink-50">Day &amp; night theme</span>
+            <ChipGroup
+              label="Day and night theme"
+              size="md"
+              fit
+              options={[
+                { value: "follow", label: "Follow the site" },
+                { value: "off", label: "Off" },
+              ]}
+              value={themeSchedule.follow ? "follow" : "off"}
+              onChange={(v) => themeSchedule.setFollow(v === "follow")}
+            />
+            <p className="text-xs text-ink-40">
+              This site switches its theme by time of day; it&apos;s {themeSchedule.phase} now.
+              Off keeps the site&apos;s usual theme under your own choices.
+            </p>
+          </div>
+        )}
 
         <div className="space-y-1.5">
           <label htmlFor="greeting-name" className="text-ink-50">

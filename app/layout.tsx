@@ -19,8 +19,20 @@ import { readPublicConfig } from "@/lib/api-auth";
 import { DEFAULT_UI_SCALE } from "@/lib/layout";
 import { resolveIconUrl } from "@/lib/icons";
 import { serializeForScript } from "@/lib/serialize";
-import { DENSITY_IDS, DESIGN_IDS, SCENE_IDS, packFields, resolveThemePacks, type VisitorTheming } from "@/lib/theme";
+import {
+  DENSITY_IDS,
+  DESIGN_IDS,
+  SCENE_IDS,
+  packFields,
+  resolveThemeGallery,
+  resolveThemePacks,
+  type ThemePack,
+  type VisitorTheming,
+} from "@/lib/theme";
+import type { Settings } from "@/lib/schema";
 import { inlineThemeScript } from "@/lib/theme-paint";
+import { scheduleState, themeWithPack } from "@/lib/theme-schedule";
+import type { ScheduleProps } from "@/components/prefs/useScheduledTheme";
 import { FONT_IDS } from "@/lib/fonts";
 import { PrefsProvider } from "@/components/PrefsProvider";
 import SceneLayer from "@/components/scenes/SceneLayer";
@@ -96,6 +108,26 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+// The day/night schedule (#336) resolved for this request: the site theme
+// for each phase, and the phase at this moment (read here, outside the
+// component, which must stay pure).
+function resolveSchedule(settings: Settings, packs: ThemePack[]): ScheduleProps | null {
+  const sched = settings.themeSchedule;
+  if (!sched.enabled) return null;
+  const timeZone = settings.timezone || "UTC";
+  const location = { latitude: settings.weather.latitude, longitude: settings.weather.longitude };
+  const byName = (name: string) => packs.find((p) => p.name === name);
+  return {
+    config: sched,
+    base: settings.theme,
+    day: themeWithPack(settings.theme, byName(sched.day), sched.dayMode),
+    night: themeWithPack(settings.theme, byName(sched.night), sched.nightMode),
+    phase: scheduleState(sched, location, timeZone, Date.now()).phase,
+    location,
+    timeZone,
+  };
+}
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -107,9 +139,17 @@ export default async function RootLayout({
   const { config, isAdmin } = await readPublicConfig();
   const settings = config.settings;
   const weather = settings.weather;
-  const defaultTheme = settings.theme;
   const visitorTheming: VisitorTheming = isAdmin ? "all" : settings.visitorTheming;
   const packs = resolveThemePacks(config.themes);
+  // The day/night schedule (#336): the site theme for each phase and the
+  // phase now, so the first paint is right; PrefsProvider flips it live.
+  // The schedule may name a pack hidden from visitors (a kiosk's night
+  // look), so it resolves against the whole gallery.
+  const schedule = resolveSchedule(
+    settings,
+    resolveThemeGallery(config.themes).map((r) => r.pack)
+  );
+  const defaultTheme = schedule ? (schedule.phase === "day" ? schedule.day : schedule.night) : settings.theme;
   // Per-request CSP nonce from the proxy, so our inline theme script is allowed
   // without script-src 'unsafe-inline'. Reading headers() also opts pages into
   // dynamic rendering, which is required for a per-request nonce to match.
@@ -133,6 +173,7 @@ export default async function RootLayout({
       ...defaultTheme,
       policy: visitorTheming,
       ...(visitorTheming === "packs" ? { packs: packs.map(packFields) } : {}),
+      ...(schedule ? { unscheduled: schedule.base } : {}),
     }),
     {
     design: DESIGN_IDS,
@@ -175,6 +216,7 @@ export default async function RootLayout({
           defaultTheme={defaultTheme}
           visitorTheming={visitorTheming}
           packs={packs}
+          schedule={schedule}
           defaults={{
             timezone: settings.timezone || "UTC",
             latitude: weather.latitude,

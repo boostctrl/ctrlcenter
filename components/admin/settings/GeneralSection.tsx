@@ -3,7 +3,7 @@
 import type { ThemePack } from "@/lib/theme";
 import { FONTS, fontVar, type FontId } from "@/lib/fonts";
 import { DENSITIES, VISITOR_THEMING, type Density } from "@/lib/theme";
-import { Card, ControlRow, SelectField, TextField, controlClasses, fieldLabelClasses } from "../ui";
+import { Card, ControlRow, SelectField, TextField, ToggleRow, controlClasses, fieldLabelClasses } from "../ui";
 import { ChipGroup } from "@/components/ChipGroup";
 import IconField from "../IconField";
 import { WallpaperFields } from "@/components/theme-builder/WallpaperFields";
@@ -24,6 +24,10 @@ export default function GeneralSection({
     applyDefaultTheme,
     applyLightDefault,
   } = d;
+  const schedule = settings.themeSchedule;
+  const updateSchedule = (patch: Partial<typeof schedule>) =>
+    setSettings({ ...settings, themeSchedule: { ...schedule, ...patch } });
+  const modeOptions = (["system", "light", "dark"] as const).map((m) => ({ value: m, label: m }));
   return (
     <>
       <Card title="Site">
@@ -214,6 +218,114 @@ export default function GeneralSection({
               canUpload
               compact
             />
+          </div>
+        </details>
+
+        {/* A day theme and a night theme by time of day (#336). */}
+        <details className="text-xs" open={schedule.enabled}>
+          <summary className="cursor-pointer text-ink-50 transition-colors hover:text-ink-80">
+            Day &amp; night schedule{schedule.enabled ? " · on" : ""}
+          </summary>
+          <div className="mt-3 space-y-3">
+            <ToggleRow
+              label="Switch the site theme by time of day"
+              hint="A day theme and a night theme from the gallery. Visitors' own choices still win, and they can turn it off."
+              checked={schedule.enabled}
+              onChange={(enabled) => updateSchedule({ enabled })}
+            />
+            {schedule.enabled && (
+              <>
+                <ControlRow label="Switch at">
+                  <ChipGroup
+                    label="When the theme switches"
+                    shrink
+                    options={[
+                      { value: "sun", label: "Sunrise & sunset" },
+                      { value: "fixed", label: "Fixed times" },
+                    ]}
+                    value={schedule.mode}
+                    onChange={(mode) => updateSchedule({ mode })}
+                  />
+                </ControlRow>
+                {schedule.mode === "sun" ? (
+                  <p className="text-xs text-ink-40">
+                    At the weather location ({settings.weather.latitude.toFixed(2)},{" "}
+                    {settings.weather.longitude.toFixed(2)}), set under Widgets → Weather.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    <TextField
+                      label="Day from"
+                      type="time"
+                      value={schedule.dayStart}
+                      onChange={(e) => updateSchedule({ dayStart: e.target.value })}
+                    />
+                    <TextField
+                      label="Night from"
+                      type="time"
+                      value={schedule.nightStart}
+                      onChange={(e) => updateSchedule({ nightStart: e.target.value })}
+                    />
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                  <SelectField
+                    label="Day theme"
+                    value={schedule.day}
+                    onChange={(e) => updateSchedule({ day: e.target.value })}
+                  >
+                    <option value="">The default theme</option>
+                    {themePacks.map((p) => (
+                      <option key={p.name} value={p.name}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </SelectField>
+                  <SelectField
+                    label="Night theme"
+                    value={schedule.night}
+                    onChange={(e) => updateSchedule({ night: e.target.value })}
+                  >
+                    <option value="">The default theme</option>
+                    {themePacks.map((p) => (
+                      <option key={p.name} value={p.name}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </SelectField>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <SelectField
+                    label="Day mode"
+                    value={schedule.dayMode ?? ""}
+                    onChange={(e) =>
+                      updateSchedule({ dayMode: (e.target.value || undefined) as typeof schedule.dayMode })
+                    }
+                  >
+                    <option value="">The default mode</option>
+                    {modeOptions.map((m) => (
+                      <option key={m.value} value={m.value}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </SelectField>
+                  <SelectField
+                    label="Night mode"
+                    value={schedule.nightMode ?? ""}
+                    onChange={(e) =>
+                      updateSchedule({ nightMode: (e.target.value || undefined) as typeof schedule.nightMode })
+                    }
+                  >
+                    <option value="">The default mode</option>
+                    {modeOptions.map((m) => (
+                      <option key={m.value} value={m.value}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </SelectField>
+                </div>
+              </>
+            )}
           </div>
         </details>
 

@@ -23,6 +23,7 @@ import type { Mode, Theme } from "./prefs/themeApply";
 import { useLocationDetect } from "./prefs/useLocationDetect";
 import { useLook, type DefaultTheme, type LookValue } from "./prefs/useLook";
 import type { ThemePack, VisitorTheming } from "@/lib/theme";
+import { useScheduledTheme, type ScheduleProps, type ThemeScheduleValue } from "./prefs/useScheduledTheme";
 
 // Per-visitor preferences, client-only (localStorage), in three contexts so a
 // change re-renders only what reads it (#290): the locale (time zone, units,
@@ -69,15 +70,17 @@ export type FavoritesValue = {
   toggleFavorite: (id: string) => void;
 };
 
-export type PrefsValue = LocaleValue &
-  LookValue &
-  FavoritesValue & {
-    // Back to the site defaults: locale overrides and the whole look.
-    reset: () => void;
-  };
+// The look plus the global reset and, when the site runs a day/night
+// schedule (#336), the visitor's switch for it.
+export type LookPrefs = LookValue & {
+  reset: () => void;
+  themeSchedule: ThemeScheduleValue | null;
+};
+
+export type PrefsValue = LocaleValue & LookPrefs & FavoritesValue;
 
 const LocaleContext = createContext<LocaleValue | null>(null);
-const LookContext = createContext<(LookValue & { reset: () => void }) | null>(null);
+const LookContext = createContext<LookPrefs | null>(null);
 const FavoritesContext = createContext<FavoritesValue | null>(null);
 
 function useRequired<T>(ctx: Context<T | null>, name: string): T {
@@ -87,8 +90,7 @@ function useRequired<T>(ctx: Context<T | null>, name: string): T {
 }
 
 export const useLocalePrefs = (): LocaleValue => useRequired(LocaleContext, "useLocalePrefs");
-export const useLookPrefs = (): LookValue & { reset: () => void } =>
-  useRequired(LookContext, "useLookPrefs");
+export const useLookPrefs = (): LookPrefs => useRequired(LookContext, "useLookPrefs");
 export const useFavorites = (): FavoritesValue => useRequired(FavoritesContext, "useFavorites");
 
 // Everything at once — subscribes to all three contexts, so prefer the
@@ -113,6 +115,7 @@ export function PrefsProvider({
   defaultTheme,
   visitorTheming = "all",
   packs = [],
+  schedule = null,
   children,
 }: {
   defaults: Defaults;
@@ -122,6 +125,8 @@ export function PrefsProvider({
   // themes a "packs" choice resolves against.
   visitorTheming?: VisitorTheming;
   packs?: ThemePack[];
+  // The day/night schedule (#336), when the site runs one.
+  schedule?: ScheduleProps | null;
   children: ReactNode;
 }) {
   // Start empty so the first client render matches the server (which only knows
@@ -130,7 +135,10 @@ export function PrefsProvider({
   const [detectedTz, setDetectedTz] = useState<string | undefined>();
   // Pinned app IDs (starts empty to match SSR; hydrated from localStorage on mount).
   const [favorites, setFavorites] = useState<string[]>([]);
-  const { look, resetLook } = useLook(defaultTheme, { policy: visitorTheming, packs });
+  // Under a schedule the site default is the current phase's theme, flipped
+  // live at each switch; the visitor's own choices still win over it.
+  const scheduled = useScheduledTheme(schedule ?? null);
+  const { look, resetLook } = useLook(scheduled.theme ?? defaultTheme, { policy: visitorTheming, packs });
 
   const persist = useCallback((next: VisitorPrefs) => {
     setPrefs(next);
@@ -238,7 +246,10 @@ export function PrefsProvider({
     clearLocation,
   ]);
 
-  const lookValue = useMemo(() => ({ ...look, reset }), [look, reset]);
+  const lookValue = useMemo<LookPrefs>(
+    () => ({ ...look, reset, themeSchedule: scheduled.value }),
+    [look, reset, scheduled.value]
+  );
   const favoritesValue = useMemo<FavoritesValue>(
     () => ({ favorites, toggleFavorite }),
     [favorites, toggleFavorite]

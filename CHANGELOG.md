@@ -14,6 +14,14 @@ here.
 
 ### Added
 
+- **A day theme and a night theme (3.0).** *Day & night schedule* in
+  Settings → General switches the site between two gallery themes by time
+  of day: at sunrise and sunset, worked out for the weather location with
+  no network, or at fixed times in the site's time zone, each with its own
+  appearance mode if you like. The first paint is already right, and an
+  open page switches on time without a reload. Visitors' own choices still
+  win, and a *Day & night theme* switch in their Settings keeps the usual
+  theme instead. (#336)
 - **Decide how much visitors can theme (3.0).** *Visitors can change* in
   Settings → General: everything (as before), the site's themes and the
   light/dark mode only, or nothing — the site theme is final, for kiosks,

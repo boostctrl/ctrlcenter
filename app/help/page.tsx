@@ -327,7 +327,9 @@ export default async function HelpPage() {
             your preferences, everything stays on your device, so each visitor
             gets their own. A site&apos;s admin may limit this to picking one
             of the site&apos;s themes, or lock the theme altogether; the
-            Settings page says so when they have. To carry a look elsewhere, <em>Copy as code</em>{" "}
+            Settings page says so when they have. A site that switches its
+            theme by time of day shows a <em>Day &amp; night theme</em>
+            switch in Settings, to follow it or keep the usual theme. To carry a look elsewhere, <em>Copy as code</em>{" "}
             puts it on the clipboard as a short code; <em>Paste a code</em> in
             another browser&apos;s builder applies and saves it, and a link of
             the form <Code>/settings#theme=&lt;code&gt;</Code> does the same on
@@ -890,7 +892,13 @@ export default async function HelpPage() {
             change</em> in Settings → General decides how much of this
             visitors get: the whole builder, the gallery and the light/dark
             mode only, or nothing at all (for kiosks and shared screens);
-            signed-in admins are never limited.
+            signed-in admins are never limited. <em>Day &amp; night
+            schedule</em> there switches the site between two gallery themes
+            by time of day: at sunrise and sunset, worked out for the weather
+            location with no network, or at fixed times in the site&apos;s
+            time zone, each with its own appearance mode if you like. An open
+            page switches on time without a reload; visitors&apos; own
+            choices still win, and they can turn the schedule off.
           </P>
         </Card>
 
