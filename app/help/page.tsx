@@ -901,7 +901,9 @@ export default async function HelpPage() {
             location with no network, or at fixed times in the site&apos;s
             time zone, each with its own appearance mode if you like. An open
             page switches on time without a reload; visitors&apos; own
-            choices still win, and they can turn the schedule off.
+            choices still win, and they can turn the schedule off. <em>Uploaded
+            wallpapers</em> lists every wallpaper uploaded to the site, says
+            which theme uses it, and deletes the ones you no longer need.
           </P>
         </Card>
 

@@ -7,6 +7,7 @@ import { Card, ControlRow, SelectField, TextField, ToggleRow, controlClasses, fi
 import { ChipGroup } from "@/components/ChipGroup";
 import IconField from "../IconField";
 import { WallpaperFields } from "@/components/theme-builder/WallpaperFields";
+import { WallpaperLibrary } from "./WallpaperLibrary";
 import type { SettingsDraft } from "./useSettingsDraft";
 
 export default function GeneralSection({
@@ -217,6 +218,19 @@ export default function GeneralSection({
               idPrefix="site-wallpaper-light"
               canUpload
               compact
+            />
+          </div>
+        </details>
+
+        {/* Every wallpaper uploaded to the site, and what uses it (#339). */}
+        <details className="text-xs">
+          <summary className="cursor-pointer text-ink-50 transition-colors hover:text-ink-80">
+            Uploaded wallpapers
+          </summary>
+          <div className="mt-2">
+            <WallpaperLibrary
+              used={[theme.wallpaper?.src, theme.wallpaperLight?.src]}
+              themePacks={themePacks}
             />
           </div>
         </details>
