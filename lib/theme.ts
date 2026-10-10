@@ -666,6 +666,47 @@ export const THEME_PACKS: ThemePack[] = [
     light: { background: "#fdeee6", foreground: "#3a1d12", accentFrom: "#fb923c", accentTo: "#f43f5e" },
     dark: { background: "#160d0a", foreground: "#f5e7e0", accentFrom: "#fb923c", accentTo: "#fb7185" },
   },
+  // The 3.0 theming bundle's showcase packs (#348), appended so a gallery
+  // materialised before them keeps its order.
+  {
+    // Firelight: amber to ember over rising sparks, with the soft-raised
+    // Emboss surface.
+    name: "Hearth",
+    design: "emboss",
+    scene: "embers",
+    dark: { background: "#170d08", foreground: "#f6ebe2", accentFrom: "#f59e0b", accentTo: "#ea580c" },
+    light: { background: "#f8efe6", foreground: "#2b1a10", accentFrom: "#c2410c", accentTo: "#b45309" },
+  },
+  {
+    // Frost and pine under falling snow, pressed into the page by Carve.
+    name: "Alpine",
+    design: "carve",
+    scene: "snow",
+    dark: { background: "#07120f", foreground: "#e3efe9", accentFrom: "#a5f3fc", accentTo: "#4ade80" },
+    light: { background: "#eef5f1", foreground: "#10281f", accentFrom: "#0f766e", accentTo: "#166534" },
+  },
+  {
+    // A studio's paper and graphite with ochre and vermilion: hand-drawn
+    // Sketch outlines over still contour lines, on the bundled Linen
+    // background in both modes — the first built-in with a wallpaper.
+    name: "Atelier",
+    design: "sketch",
+    scene: "topography",
+    wallpaper: { src: "/backgrounds/linen.svg", blur: 0, dim: 0, fit: "tile" },
+    wallpaperLight: { src: "/backgrounds/linen.svg", blur: 0, dim: 0, fit: "tile" },
+    dark: { background: "#171512", foreground: "#ebe5d8", accentFrom: "#e8b04b", accentTo: "#d9674f" },
+    light: { background: "#f4efe4", foreground: "#2a2521", accentFrom: "#b7791f", accentTo: "#b4473a" },
+  },
+  {
+    // Green-on-black phosphor: the Console panel over glyph rain, set in
+    // JetBrains Mono.
+    name: "Terminal",
+    design: "console",
+    scene: "glyphs",
+    font: "jetbrains",
+    dark: { background: "#030805", foreground: "#c8f5d0", accentFrom: "#22c55e", accentTo: "#4ade80" },
+    light: { background: "#e9f5ec", foreground: "#0b2a16", accentFrom: "#15803d", accentTo: "#166534" },
+  },
 ];
 
 // The admin's theme gallery (#334): the `themes:` list in config.yaml. Each

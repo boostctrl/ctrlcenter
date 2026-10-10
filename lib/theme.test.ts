@@ -31,12 +31,13 @@ import {
 } from "./theme";
 
 describe("catalog sizes", () => {
-  it("ships 18 designs, 25 scenes plus None, 21 palettes, 12 themes", () => {
+  it("ships 18 designs, 25 scenes plus None, 21 palettes, 16 themes", () => {
     expect(DESIGNS).toHaveLength(18);
     expect(SCENES).toHaveLength(26);
     expect(SCENES[0].id).toBe("none");
     expect(BASE_THEMES).toHaveLength(21);
-    expect(THEME_PACKS).toHaveLength(12);
+    expect(THEME_PACKS).toHaveLength(16);
+    expect(THEME_PACKS[0].name).toBe("Default");
   });
 
   it("no pack references a retired scene id", () => {

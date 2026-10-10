@@ -30,6 +30,14 @@ here.
   no address or upload needed; blur, dim and fit still apply, and it is
   saved in themes and share codes like any wallpaper. They are not uploads,
   so *Uploaded wallpapers* does not list them. (#348)
+- **Four new themes.** *Hearth*, amber to ember over rising sparks on the
+  Emboss surface; *Alpine*, frost and pine under falling snow, pressed into
+  the page by Carve; *Atelier*, a studio's paper, graphite, ochre and
+  vermilion with hand-drawn Sketch outlines over still contour lines on the
+  bundled Linen background, the first built-in theme with a wallpaper; and
+  *Terminal*, green-on-black phosphor, the Console panel over glyph rain in
+  JetBrains Mono. Each reads in light and dark and clears the same contrast
+  checks as every other built-in. (#348)
 
 ## [3.0.0-rc.1] - 2026-10-10
 
