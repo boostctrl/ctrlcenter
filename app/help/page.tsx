@@ -311,7 +311,9 @@ export default async function HelpPage() {
             <li>
               <strong>Accent and colors.</strong> The accent gradient, custom
               surface colors, and the status colors: up, down, warning and
-              info for the dots, errors and notices.
+              info for the dots, errors and notices. Or pick one accent and
+              let <em>Build a palette</em> derive the rest for both modes,
+              with contrast checked.
             </li>
             <li>
               <strong>Font.</strong> Pick from twelve typefaces, from

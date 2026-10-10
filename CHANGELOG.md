@@ -14,6 +14,12 @@ here.
 
 ### Added
 
+- **A palette from one colour (3.0).** In the builder's Colors tab, *Build
+  a palette from this accent* derives everything else from the accent you
+  chose: surfaces tinted toward its hue, ink, a second accent stop (an
+  analogous hue, or a complementary one) and the four status colours, for
+  both light and dark, each fitted so text reads at 7:1, accents at 3:1 and
+  status colours at 4.5:1 on their surface. Then tweak anything. (#332)
 - **Status colors are part of the theme (3.0).** The green, red, amber and
   blue of status dots, errors, warnings, badges and notices are now theme
   tokens, so a theme can carry its own up, down, warning and info colours

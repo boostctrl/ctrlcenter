@@ -6,6 +6,7 @@ import { useLookPrefs } from "../PrefsProvider";
 import type { Mode } from "../prefs/themeApply";
 import { useConfirm } from "../admin/Confirm";
 import { colorSetsEqual, sceneFxEqual, semanticEqual, tunesEqual } from "@/lib/theme";
+import { derivePalette } from "@/lib/color";
 import type { ModeColors, ThemePack } from "@/lib/theme";
 import { decodeThemeCode, encodeThemeCode, newThemeId, parseThemesExport, siteThemeFromCustomTheme } from "@/lib/prefs";
 import type { CustomTheme, ThemeColors } from "@/lib/prefs";
@@ -181,6 +182,17 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
       accentTo: activeAccent.to,
     });
   }, [activeLook, editMode, activeAccent]);
+
+  // Auto-pair (#332): a whole palette from the accent being edited — surfaces
+  // tinted toward its hue, ink and the second stop fitted for contrast, and
+  // the status colors to match — for both modes at once, applied like a
+  // palette tile so it's one undoable step.
+  function autoPair(hueShift?: number) {
+    const derived = derivePalette(draft.accentFrom, hueShift === undefined ? {} : { hueShift });
+    applyThemeColors({ dark: derived.dark, light: derived.light });
+    setStatusColors(derived.status, "dark");
+    setStatusColors(derived.statusLight, "light");
+  }
 
   // Sharing as text (#329): the current look as a code on the clipboard, a
   // pasted code (or link) adopted into the saved list and applied, and a
@@ -440,6 +452,7 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     setPasteText,
     copyCode,
     pasteCode,
+    autoPair,
     fileInputRef,
     accentStyle,
     updateBase,

@@ -58,6 +58,7 @@ export default function ColorsTab({ d }: { d: ThemeDraft }) {
     paletteActive,
     statusFor,
     setStatusColors,
+    autoPair,
   } = d;
   const status = statusFor(editMode);
   const statusShown = status ?? DEFAULT_SEMANTIC[editMode];
@@ -218,6 +219,24 @@ export default function ColorsTab({ d }: { d: ThemeDraft }) {
             </div>
             <p className="text-xs text-ink-40">
               Colors buttons, highlights &amp; the scene glow.
+            </p>
+            {/* Auto-pair (#332): everything else from this one accent. */}
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <button type="button" onClick={() => autoPair()} className={buttonClasses("ghost", "sm")}>
+                Build a palette from this accent
+              </button>
+              <button
+                type="button"
+                onClick={() => autoPair(180)}
+                className={buttonClasses("ghost", "sm")}
+                title="The second accent stop on the opposite hue"
+              >
+                … with a complementary second stop
+              </button>
+            </div>
+            <p className="text-[10px] text-ink-40">
+              Surfaces, ink, the second stop and the status colors for both
+              modes, each checked for contrast.
             </p>
           </div>
         </div>
