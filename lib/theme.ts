@@ -247,12 +247,57 @@ export const BASE_THEMES: PresetTheme[] = [
   },
 ];
 
+// Fine-tuning over a design (#326): each knob scales one of the design's
+// surface tokens — radius, border weight, blur, shadow depth, fill (card
+// opacity) and the scene glow — as a percentage of the design's own value, so
+// 100 everywhere is the design untouched and any design stays the recipe. The
+// resolver paints them as `--tune-*` multipliers (lib/theme-paint.ts) that the
+// design tokens in app/globals.css multiply in. Chosen per mode, saved with a
+// theme, promotable to the site default, and a pack may ship one.
+export type TuneKey = "radius" | "border" | "blur" | "shadow" | "fill" | "glow";
+
+export type Tune = Record<TuneKey, number>;
+
+export const TUNE_FIELDS: { key: TuneKey; label: string; description: string; max: number }[] = [
+  { key: "radius", label: "Corner radius", description: "How rounded cards and buttons are", max: 200 },
+  { key: "border", label: "Border weight", description: "The card edge's thickness", max: 300 },
+  { key: "blur", label: "Blur", description: "How much the backdrop blurs through a card", max: 200 },
+  { key: "shadow", label: "Shadow depth", description: "The weight of card shadows and glows", max: 200 },
+  { key: "fill", label: "Card opacity", description: "How solid the card fill is", max: 300 },
+  { key: "glow", label: "Scene glow", description: "The backdrop's brightness behind the cards", max: 200 },
+];
+
+export const TUNE_KEYS = TUNE_FIELDS.map((f) => f.key) as [TuneKey, ...TuneKey[]];
+
+export const DEFAULT_TUNE: Tune = { radius: 100, border: 100, blur: 100, shadow: 100, fill: 100, glow: 100 };
+
+export function isDefaultTune(t: Tune | null | undefined): boolean {
+  return !t || TUNE_KEYS.every((k) => t[k] === 100);
+}
+
+// Validate a stored/imported tune: every knob a finite integer within its
+// range, or null. Tolerates a partial object by filling the rest with 100.
+export function sanitizeTune(input: unknown): Tune | null {
+  if (!input || typeof input !== "object") return null;
+  const raw = input as Record<string, unknown>;
+  const out = { ...DEFAULT_TUNE };
+  let any = false;
+  for (const f of TUNE_FIELDS) {
+    const v = raw[f.key];
+    if (typeof v !== "number" || !Number.isFinite(v)) continue;
+    out[f.key] = Math.min(f.max, Math.max(0, Math.round(v)));
+    any = true;
+  }
+  return any ? out : null;
+}
+
 // A "Theme" is a curated, art-directed look applied in one tap: a palette
 // bundled with the design (card surface) and scene (backdrop) composed to go
-// with it, tailored for both light and dark. Applying one sets all three at
-// once; the visitor can still tweak each part afterward. (Surfaced as "Themes"
+// with it, tailored for both light and dark, and optionally a tune over the
+// design. Applying one sets all of it at once (a pack without a tune resets
+// the tune); the visitor can still tweak each part afterward. (Surfaced as "Themes"
 // in the builder, alongside the visitor's saved CustomThemes.)
-export type ThemePack = { name: string; design: DesignId; scene: SceneId } & ModeColors;
+export type ThemePack = { name: string; design: DesignId; scene: SceneId; tune?: Tune } & ModeColors;
 
 // The built-in theme that mirrors the app's stock appearance (first in the list,
 // badged in the builder).

@@ -10,6 +10,7 @@ import { useThemeDraft } from "./theme-builder/useThemeDraft";
 import ThemesTab from "./theme-builder/ThemesTab";
 import ColorsTab from "./theme-builder/ColorsTab";
 import DesignTab from "./theme-builder/DesignTab";
+import TuneTab from "./theme-builder/TuneTab";
 import SceneTab from "./theme-builder/SceneTab";
 import FontTab from "./theme-builder/FontTab";
 
@@ -148,6 +149,7 @@ export default function ThemeBuilder({
       {tab === "themes" && <ThemesTab d={draft} packs={packs} promote={promote} />}
       {tab === "colors" && <ColorsTab d={draft} />}
       {tab === "design" && <DesignTab d={draft} />}
+      {tab === "tune" && <TuneTab d={draft} />}
       {tab === "scene" && <SceneTab d={draft} />}
       {tab === "font" && <FontTab d={draft} />}
 

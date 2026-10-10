@@ -373,6 +373,8 @@ export function useSettingsDraft(
       sceneLight: undefined,
       backgroundLight: pack.light.background,
       foregroundLight: pack.light.foreground,
+      tune: pack.tune,
+      tuneLight: undefined,
     });
   }
 
@@ -390,6 +392,7 @@ export function useSettingsDraft(
         accentToLight: undefined,
         backgroundLight: darkPack?.light.background,
         foregroundLight: darkPack?.light.foreground,
+        tuneLight: undefined,
       });
       return;
     }
@@ -403,6 +406,7 @@ export function useSettingsDraft(
       accentToLight: undefined,
       backgroundLight: pack.light.background,
       foregroundLight: pack.light.foreground,
+      tuneLight: pack.tune,
     });
   }
 

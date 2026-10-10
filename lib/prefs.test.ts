@@ -3,6 +3,7 @@ import {
   sanitizePrefs,
   sanitizeColors,
   sanitizeModeColors,
+  sanitizeCustomTheme,
   siteThemeFromCustomTheme,
   type CustomTheme,
 } from "./prefs";
@@ -164,5 +165,27 @@ describe("siteThemeFromCustomTheme", () => {
       .filter((k) => !omittedOnPurpose.includes(k))
       .sort();
     expect(mapped).toEqual(schemaKeys);
+  });
+});
+
+describe("sanitizeCustomTheme tune (#326)", () => {
+  const base = {
+    name: "Tuned",
+    dark: valid,
+    light: { ...valid, background: "#eceef3", foreground: "#181b24" },
+  };
+
+  it("keeps a valid tune per mode and drops an invalid one", () => {
+    const t = sanitizeCustomTheme({ ...base, tune: { radius: 50 }, tuneLight: "x" });
+    expect(t?.tune).toEqual({ radius: 50, border: 100, blur: 100, shadow: 100, fill: 100, glow: 100 });
+    expect(t?.tuneLight).toBeUndefined();
+  });
+
+  it("promotes the tune to the site theme", () => {
+    const t = sanitizeCustomTheme({ ...base, tune: { glow: 0 }, tuneLight: { blur: 50 } })!;
+    const site = siteThemeFromCustomTheme(t, "system");
+    expect(site.tune?.glow).toBe(0);
+    expect(site.tuneLight?.blur).toBe(50);
+    expect(themeInputSchema.parse(site).tuneLight?.blur).toBe(50);
   });
 });

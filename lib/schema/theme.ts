@@ -1,8 +1,19 @@
 // Site default theme, theme-pack overrides, and their admin inputs.
 import { z } from "zod";
-import { DESIGN_IDS, SCENE_IDS } from "../theme";
+import { DESIGN_IDS, SCENE_IDS, TUNE_FIELDS } from "../theme";
 import { FONT_IDS, DEFAULT_FONT } from "../fonts";
 import { hexColor } from "./shared";
+
+// A fine-tune over the design (#326): each knob a whole percentage of the
+// design's own value, 100 = untouched. Every knob is required so a stored
+// tune is always complete; lib/prefs.ts sanitizeTune fills a partial one.
+export const tuneSchema = z.object(
+  Object.fromEntries(
+    TUNE_FIELDS.map((f) => [f.key, z.number().int().min(0).max(f.max)])
+  ) as Record<(typeof TUNE_FIELDS)[number]["key"], z.ZodNumber>
+);
+
+export type TuneConfig = z.infer<typeof tuneSchema>;
 
 // The site-wide default theme. Visitors can override every part of this in
 // their own browser (the theme builder / settings page); these values are the
@@ -44,6 +55,10 @@ export const themeSchema = z.object({
   foreground: hexColor.optional(),
   backgroundLight: hexColor.optional(),
   foregroundLight: hexColor.optional(),
+  // Optional fine-tune over the design, per mode (light falls back to the
+  // dark tune). Absent = the design untouched.
+  tune: tuneSchema.optional(),
+  tuneLight: tuneSchema.optional(),
 });
 
 // A cohesive set of surface + accent colors (one mode of a theme).
@@ -69,6 +84,8 @@ export const themePackSchema = z.object({
   // failing the whole config read.
   design: z.enum(DESIGN_IDS).catch("glass"),
   scene: z.enum(SCENE_IDS).catch("aurora"),
+  // A pack may ship a tune over its design (#326).
+  tune: tuneSchema.optional(),
   dark: colorSetSchema,
   light: colorSetSchema,
 });
@@ -100,4 +117,6 @@ export const themeInputSchema = z.object({
   foreground: hexColor.optional(),
   backgroundLight: hexColor.optional(),
   foregroundLight: hexColor.optional(),
+  tune: tuneSchema.optional(),
+  tuneLight: tuneSchema.optional(),
 });

@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
   resolveThemePacks,
+  sanitizeTune,
+  isDefaultTune,
+  DEFAULT_TUNE,
   THEME_PACKS,
   DESIGNS,
   SCENES,
@@ -65,5 +68,32 @@ describe("resolveThemePacks", () => {
     expect(resolved[idx].name).toBe("Ocean");
     expect(resolved[idx].design).toBe("flat");
     expect(resolved[0]).toEqual(THEME_PACKS[0]); // others untouched
+  });
+});
+
+describe("sanitizeTune (#326)", () => {
+  it("clamps every knob to its range and rounds to whole percents", () => {
+    expect(sanitizeTune({ radius: 150.4, border: 999, blur: -5, shadow: 50, fill: 120, glow: 0 })).toEqual({
+      radius: 150,
+      border: 300,
+      blur: 0,
+      shadow: 50,
+      fill: 120,
+      glow: 0,
+    });
+  });
+
+  it("fills a partial tune with 100 and rejects junk", () => {
+    expect(sanitizeTune({ radius: 50 })).toEqual({ ...DEFAULT_TUNE, radius: 50 });
+    expect(sanitizeTune({ radius: "50" })).toBeNull();
+    expect(sanitizeTune(null)).toBeNull();
+    expect(sanitizeTune("x")).toBeNull();
+    expect(sanitizeTune({ nope: 1 })).toBeNull();
+  });
+
+  it("knows the untouched tune", () => {
+    expect(isDefaultTune(null)).toBe(true);
+    expect(isDefaultTune(DEFAULT_TUNE)).toBe(true);
+    expect(isDefaultTune({ ...DEFAULT_TUNE, glow: 80 })).toBe(false);
   });
 });

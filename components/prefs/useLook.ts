@@ -18,16 +18,18 @@ import {
   saveScene,
   loadFont,
   saveFont,
+  loadTune,
+  saveTune,
   NO_ACCENT_OVERRIDES,
   type CustomTheme,
   type AccentColors,
   type AccentOverrides,
   type ModePair,
 } from "@/lib/prefs";
-import type { ColorSet, DesignId, ModeColors, SceneId, ThemePack } from "@/lib/theme";
+import type { ColorSet, DesignId, ModeColors, SceneId, ThemePack, Tune } from "@/lib/theme";
 import type { FontId } from "@/lib/fonts";
 import {
-  applyAll,
+  applyAll as paintAll,
   applyDesign,
   applyFont,
   applyScene,
@@ -67,6 +69,9 @@ export type DefaultTheme = {
   foreground?: string;
   backgroundLight?: string;
   foregroundLight?: string;
+  // The site default's fine-tune over the design, per mode (#326).
+  tune?: Tune;
+  tuneLight?: Tune;
 };
 
 export type LookValue = {
@@ -84,6 +89,9 @@ export type LookValue = {
   designFor: (mode: Mode) => DesignId;
   sceneFor: (mode: Mode) => SceneId;
   fontFor: (mode: Mode) => FontId;
+  // The effective fine-tune for a mode (visitor's, else the admin default),
+  // or null when the design is untouched (#326).
+  tuneFor: (mode: Mode) => Tune | null;
   // Whether the effective background reads as light (for theme-aware icons).
   surfaceIsLight: boolean;
   customThemes: CustomTheme[];
@@ -102,6 +110,8 @@ export type LookValue = {
   setDesign: (design: DesignId, mode: Mode) => void;
   setScene: (scene: SceneId, mode: Mode) => void;
   setFont: (font: FontId, mode: Mode) => void;
+  // Set (or, with null, clear back to the admin default) a mode's fine-tune.
+  setTune: (tune: Tune | null, mode: Mode) => void;
   applyPack: (pack: ThemePack, mode: Mode) => void;
   applyThemeColors: (colors: ModeColors, mode?: Mode) => void;
   setBaseColors: (
@@ -185,6 +195,10 @@ export function useLook(defaultTheme: DefaultTheme): {
     dark: null,
     light: null,
   });
+  const [tunes, setTunes] = useState<ModePair<Tune | null>>({
+    dark: null,
+    light: null,
+  });
   const [activeLook, setActiveLook] = useState<ModeColors | null>(null);
   const [accentOverride, setAccentOverrideState] =
     useState<AccentOverrides>(NO_ACCENT_OVERRIDES);
@@ -227,6 +241,11 @@ export function useLook(defaultTheme: DefaultTheme): {
       dark ? defaultTheme.font : defaultTheme.fontLight ?? defaultTheme.font,
     [defaultTheme.font, defaultTheme.fontLight]
   );
+  const defTune = useCallback(
+    (dark: boolean): Tune | null =>
+      (dark ? defaultTheme.tune : defaultTheme.tuneLight ?? defaultTheme.tune) ?? null,
+    [defaultTheme.tune, defaultTheme.tuneLight]
+  );
 
   // The effective design/scene/font for a mode: the visitor's per-mode choice,
   // else the admin default for that mode.
@@ -241,6 +260,19 @@ export function useLook(defaultTheme: DefaultTheme): {
   const resolveFont = useCallback(
     (dark: boolean): FontId => (dark ? fonts.dark : fonts.light) ?? defFont(dark),
     [fonts, defFont]
+  );
+  const resolveTune = useCallback(
+    (dark: boolean): Tune | null => (dark ? tunes.dark : tunes.light) ?? defTune(dark),
+    [tunes, defTune]
+  );
+
+  // Paint the look state, with the fine-tune resolved for the mode it shows
+  // unless the caller passes one explicitly (a tune edit paints its new value
+  // before the state commits).
+  const applyAll = useCallback(
+    (opts: Parameters<typeof paintAll>[0]) =>
+      paintAll({ tune: resolveTune(resolveDark(opts.theme)), ...opts }),
+    [resolveTune]
   );
 
   // Apply the design/scene/font classes for whichever mode is displayed now.
@@ -294,7 +326,7 @@ export function useLook(defaultTheme: DefaultTheme): {
       });
       applyChrome(resolveDark(next));
     },
-    [activeLook, accentOverride, defaultAccent, resolveLook, applyChrome]
+    [activeLook, accentOverride, defaultAccent, resolveLook, applyChrome, applyAll]
   );
 
   // Preview a mode's appearance live (theme builder) without persisting it, or
@@ -313,7 +345,7 @@ export function useLook(defaultTheme: DefaultTheme): {
       });
       applyChrome(resolveDark(dt));
     },
-    [theme, activeLook, accentOverride, defaultAccent, resolveLook, applyChrome]
+    [theme, activeLook, accentOverride, defaultAccent, resolveLook, applyChrome, applyAll]
   );
 
   // Set one mode's design/scene/font. Persists the per-mode pair and applies the
@@ -374,18 +406,45 @@ export function useLook(defaultTheme: DefaultTheme): {
         defaultAccent,
       });
     },
-    [displayTheme, defaultAccent, activeLook, seedColorSet]
+    [displayTheme, defaultAccent, activeLook, seedColorSet, applyAll]
   );
 
-  // Apply a curated pack to one mode: its design + scene + that mode's colorset.
-  // (Font isn't part of a pack, so the mode's font is left as-is.)
+  // Set (or clear) one mode's fine-tune over its design. Persists the per-mode
+  // pair and repaints only when that mode is the one on screen, with the new
+  // value passed explicitly so the paint doesn't wait for the state to commit.
+  const setTune = useCallback(
+    (next: Tune | null, mode: Mode) => {
+      setTunes((prev) => {
+        const updated = { ...prev, [mode]: next };
+        saveTune(updated);
+        return updated;
+      });
+      const dark = resolveDark(displayTheme);
+      if ((mode === "dark") === dark) {
+        paintAll({
+          theme: displayTheme,
+          look: resolveLook(activeLook),
+          accentOverride,
+          defaultAccent,
+          tune: next ?? defTune(dark),
+        });
+      }
+    },
+    [displayTheme, resolveLook, activeLook, accentOverride, defaultAccent, defTune]
+  );
+
+  // Apply a curated pack to one mode: its design + scene + that mode's colorset,
+  // and its tune over the design (a pack without one resets the tune, so the
+  // curated look lands as designed). Font isn't part of a pack, so the mode's
+  // font is left as-is.
   const applyPack = useCallback(
     (pack: ThemePack, mode: Mode) => {
       setDesign(pack.design, mode);
       setScene(pack.scene, mode);
+      setTune(pack.tune ?? null, mode);
       applyThemeColors({ dark: pack.dark, light: pack.light }, mode);
     },
-    [setDesign, setScene, applyThemeColors]
+    [setDesign, setScene, setTune, applyThemeColors]
   );
 
   // Update only the background/foreground for the CURRENT mode's variant,
@@ -421,7 +480,7 @@ export function useLook(defaultTheme: DefaultTheme): {
       // preview), so editing the previewed mode shows immediately.
       applyAll({ theme: displayTheme, look: next, accentOverride, defaultAccent });
     },
-    [displayTheme, defaultAccent, accentOverride, activeLook, seedColorSet]
+    [displayTheme, defaultAccent, accentOverride, activeLook, seedColorSet, applyAll]
   );
 
   // Set or clear one mode's accent on its own, leaving the background/foreground
@@ -438,7 +497,7 @@ export function useLook(defaultTheme: DefaultTheme): {
         defaultAccent,
       });
     },
-    [accentOverride, displayTheme, defaultAccent, activeLook, resolveLook]
+    [accentOverride, displayTheme, defaultAccent, activeLook, resolveLook, applyAll]
   );
 
   const {
@@ -457,6 +516,8 @@ export function useLook(defaultTheme: DefaultTheme): {
     resolveDesign,
     resolveScene,
     resolveFont,
+    resolveTune,
+    setTune,
     applyThemeColors,
     displayTheme,
     setDesigns,
@@ -476,7 +537,7 @@ export function useLook(defaultTheme: DefaultTheme): {
       accentOverride: NO_ACCENT_OVERRIDES,
       defaultAccent,
     });
-  }, [defaultAccent, displayTheme, resolveLook]);
+  }, [defaultAccent, displayTheme, resolveLook, applyAll]);
 
   // Reset just the theme (colors, accent, design, scene, font — both modes) back
   // to the admin defaults, leaving mode/location/greeting alone — the theme
@@ -489,20 +550,23 @@ export function useLook(defaultTheme: DefaultTheme): {
     saveDesign(null);
     saveScene(null);
     saveFont(null);
+    saveTune(null);
     setDesigns({ dark: null, light: null });
     setScenes({ dark: null, light: null });
     setFonts({ dark: null, light: null });
-    applyAll({
+    setTunes({ dark: null, light: null });
+    const dark = resolveDark(displayTheme);
+    paintAll({
       theme: displayTheme,
       look: resolveLook(null),
       accentOverride: NO_ACCENT_OVERRIDES,
       defaultAccent,
+      tune: defTune(dark),
     });
-    const dark = resolveDark(displayTheme);
     applyDesign(defDesign(dark));
     applyScene(defScene(dark));
     applyFont(defFont(dark));
-  }, [defaultAccent, displayTheme, resolveLook, defDesign, defScene, defFont]);
+  }, [defaultAccent, displayTheme, resolveLook, defDesign, defScene, defFont, defTune]);
 
   const resetLook = useCallback(() => {
     // Drop all theme customizations so the visitor falls back to the admin
@@ -517,19 +581,22 @@ export function useLook(defaultTheme: DefaultTheme): {
     saveDesign(null);
     saveScene(null);
     saveFont(null);
+    saveTune(null);
     setActiveLook(null);
     setAccentOverrideState(NO_ACCENT_OVERRIDES);
     setThemeState(defaultTheme.mode);
     setDesigns({ dark: null, light: null });
     setScenes({ dark: null, light: null });
     setFonts({ dark: null, light: null });
-    applyAll({
+    setTunes({ dark: null, light: null });
+    const dark = resolveDark(defaultTheme.mode);
+    paintAll({
       theme: defaultTheme.mode,
       look: adminLook,
       accentOverride: NO_ACCENT_OVERRIDES,
       defaultAccent,
+      tune: defTune(dark),
     });
-    const dark = resolveDark(defaultTheme.mode);
     applyDesign(defDesign(dark));
     applyScene(defScene(dark));
     applyFont(defFont(dark));
@@ -538,6 +605,7 @@ export function useLook(defaultTheme: DefaultTheme): {
     defDesign,
     defScene,
     defFont,
+    defTune,
     adminLook,
     defaultAccent,
   ]);
@@ -560,18 +628,21 @@ export function useLook(defaultTheme: DefaultTheme): {
     const storedDesigns = loadDesign();
     const storedScenes = loadScene();
     const storedFonts = loadFont();
-    // Resolve a mode's design/scene/font from the loaded pairs + admin defaults
-    // (the state isn't committed yet, so resolve from the raw values here).
+    const storedTunes = loadTune();
+    // Resolve a mode's design/scene/font/tune from the loaded pairs + admin
+    // defaults (the state isn't committed yet, so resolve from the raw values).
     const chromeFor = (dark: boolean) => ({
       design: (dark ? storedDesigns.dark : storedDesigns.light) ?? defDesign(dark),
       scene: (dark ? storedScenes.dark : storedScenes.light) ?? defScene(dark),
       font: (dark ? storedFonts.dark : storedFonts.light) ?? defFont(dark),
+      tune: (dark ? storedTunes.dark : storedTunes.light) ?? defTune(dark),
     });
     /* eslint-disable react-hooks/set-state-in-effect */
     setThemeState(stored);
     setDesigns(storedDesigns);
     setScenes(storedScenes);
     setFonts(storedFonts);
+    setTunes(storedTunes);
     setActiveLook(active);
     setAccentOverrideState(overrideAccent);
     setCustomThemes(loadThemes());
@@ -580,13 +651,14 @@ export function useLook(defaultTheme: DefaultTheme): {
     );
     /* eslint-enable react-hooks/set-state-in-effect */
     // The inline script already applied these; re-apply for consistency.
-    applyAll({
+    const initial = chromeFor(resolveDark(stored));
+    paintAll({
       theme: stored,
       look: resolveLook(active),
       accentOverride: overrideAccent,
       defaultAccent,
+      tune: initial.tune,
     });
-    const initial = chromeFor(resolveDark(stored));
     applyDesign(initial.design);
     applyScene(initial.scene);
     applyFont(initial.font);
@@ -607,13 +679,14 @@ export function useLook(defaultTheme: DefaultTheme): {
       const mode: Theme = isMode ? (raw as Theme) : defaultTheme.mode;
       if (mode !== "system") return;
       const look = resolveLook(loadActiveTheme());
-      applyAll({
+      const next = chromeFor(mq.matches);
+      paintAll({
         theme: "system",
         look,
         accentOverride: loadAccentOverride(),
         defaultAccent,
+        tune: next.tune,
       });
-      const next = chromeFor(mq.matches);
       applyDesign(next.design);
       applyScene(next.scene);
       applyFont(next.font);
@@ -651,6 +724,7 @@ export function useLook(defaultTheme: DefaultTheme): {
       designFor: (mode: Mode) => resolveDesign(mode === "dark"),
       sceneFor: (mode: Mode) => resolveScene(mode === "dark"),
       fontFor: (mode: Mode) => resolveFont(mode === "dark"),
+      tuneFor: (mode: Mode) => resolveTune(mode === "dark"),
       surfaceIsLight,
       customThemes,
       activeLook,
@@ -666,6 +740,7 @@ export function useLook(defaultTheme: DefaultTheme): {
       setDesign,
       setScene,
       setFont,
+      setTune,
       applyPack,
       applyThemeColors,
       setBaseColors,
@@ -686,6 +761,7 @@ export function useLook(defaultTheme: DefaultTheme): {
     resolveDesign,
     resolveScene,
     resolveFont,
+    resolveTune,
     systemDark,
     customThemes,
     activeLook,
@@ -695,6 +771,7 @@ export function useLook(defaultTheme: DefaultTheme): {
     setDesign,
     setScene,
     setFont,
+    setTune,
     applyPack,
     applyThemeColors,
     setBaseColors,

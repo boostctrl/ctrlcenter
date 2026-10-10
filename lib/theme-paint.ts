@@ -21,6 +21,9 @@
 
 // The site default theme as the inline script receives it (the server's
 // settings.theme, already validated by the schema).
+// A tune (lib/theme.ts Tune): each knob a percentage of the design's value.
+export type PaintTune = Record<string, number>;
+
 export type PaintDefaults = {
   mode: "system" | "light" | "dark";
   design: string;
@@ -37,6 +40,8 @@ export type PaintDefaults = {
   foreground?: string;
   backgroundLight?: string;
   foregroundLight?: string;
+  tune?: PaintTune;
+  tuneLight?: PaintTune;
 };
 
 // The valid ids per part, so a stored value the current build doesn't know
@@ -53,6 +58,8 @@ export type PaintInput = {
   foreground: string | null;
   accentFrom: string;
   accentTo: string;
+  // The fine-tune over the design (null = the design untouched).
+  tune?: PaintTune | null;
   design?: string;
   scene?: string;
   font?: string;
@@ -77,6 +84,8 @@ export function makeThemePaint() {
   const HEX = /^#?([0-9a-fA-F]{6})$/;
   // The heaviest common card fill (ink over the page), see inkLift.
   const CARD_FILL = 0.1;
+  // The tune knobs, each painted as --tune-<key> (a multiplier; 100% = 1).
+  const TUNE = ["radius", "border", "blur", "shadow", "fill", "glow"];
 
   function hexToRgb(hex: string): [number, number, number] | null {
     const m = HEX.exec((hex || "").trim());
@@ -227,6 +236,11 @@ export function makeThemePaint() {
     vars["--accent-fg"] = accentInk(input.accentFrom);
     vars["--scene-from"] = sceneColor(input.accentFrom, input.dark);
     vars["--scene-to"] = sceneColor(input.accentTo, input.dark);
+    for (let i = 0; i < TUNE.length; i++) {
+      const k = TUNE[i];
+      const v = input.tune ? input.tune[k] : undefined;
+      vars["--tune-" + k] = typeof v === "number" && isFinite(v) && v !== 100 ? String(v / 100) : null;
+    }
     const paint: Paint = { dark: input.dark, vars: vars };
     if (input.design !== undefined) paint.design = input.design;
     if (input.scene !== undefined) paint.scene = input.scene;
@@ -338,6 +352,25 @@ export function makeThemePaint() {
       accentTo = override.to;
     }
 
+    // The tune: the stored per-mode pair, else the admin default for the mode
+    // (light falls back to the dark tune). Knobs are clamped like the app's
+    // sanitizeTune; a value that isn't a finite number is left at 100.
+    const tuneOf = (o: unknown): PaintTune | null => {
+      if (!isObj(o)) return null;
+      const out: PaintTune = {};
+      let any = false;
+      for (let i = 0; i < TUNE.length; i++) {
+        const v = o[TUNE[i]];
+        if (typeof v !== "number" || !isFinite(v)) continue;
+        out[TUNE[i]] = Math.min(300, Math.max(0, Math.round(v)));
+        any = true;
+      }
+      return any ? out : null;
+    };
+    const storedTune = get("ctrlcenter:tune");
+    let tune = isObj(storedTune) ? tuneOf(dark ? storedTune.dark : storedTune.light) : null;
+    if (!tune) tune = tuneOf(dark ? dt.tune : dt.tuneLight || dt.tune);
+
     // Design / scene / font: the stored per-mode pair, validated against the
     // ids this build knows, else the admin default for the mode.
     const pick = (key: string, valid: readonly string[], dd: string, dl: string | undefined): string => {
@@ -353,6 +386,7 @@ export function makeThemePaint() {
       foreground: cs ? cs.foreground : null,
       accentFrom: accentFrom,
       accentTo: accentTo,
+      tune: tune,
       design: pick("ctrlcenter:design", ids.design, dt.design, dt.designLight),
       scene: pick("ctrlcenter:scene", ids.scene, dt.scene, dt.sceneLight),
       font: pick("ctrlcenter:font", ids.font, dt.font, dt.fontLight),

@@ -294,6 +294,11 @@ export default async function HelpPage() {
               Frost to Cyber, Emboss, and Sketch (18 in all).
             </li>
             <li>
+              <strong>Tune.</strong> Sliders over the chosen design: corner
+              radius, border weight, blur, shadow depth, card opacity and the
+              scene glow, each as a percentage of the design&apos;s own value.
+            </li>
+            <li>
               <strong>Scene.</strong> The animated backdrop: Aurora,
               Starfield, Petals, Comets, and more (18 in all).
             </li>

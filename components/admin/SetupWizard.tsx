@@ -400,6 +400,8 @@ function ThemeStep({ settings, onSave, packs }: StepProps & { packs: ThemePack[]
                 sceneLight: undefined,
                 backgroundLight: pack.light.background,
                 foregroundLight: pack.light.foreground,
+                tune: pack.tune,
+                tuneLight: undefined,
               },
             },
             { fallback: "Couldn't save the theme" }

@@ -32,6 +32,7 @@ export const TABS = [
   { id: "themes", name: "Themes" },
   { id: "colors", name: "Colors" },
   { id: "design", name: "Design" },
+  { id: "tune", name: "Tune" },
   { id: "scene", name: "Scene" },
   { id: "font", name: "Font" },
 ] as const;

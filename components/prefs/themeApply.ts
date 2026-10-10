@@ -12,6 +12,7 @@ import {
   type DesignId,
   type ModeColors,
   type SceneId,
+  type Tune,
 } from "@/lib/theme";
 import { FONT_IDS, type FontId } from "@/lib/fonts";
 import { themePaint, type PaintIds } from "@/lib/theme-paint";
@@ -99,12 +100,14 @@ export function variantFor(look: ModeColors | null, dark: boolean): ColorSet | n
 // custom or admin default) contributes the surface colors for that mode;
 // without one, the CSS defaults (`:root` dark / `.theme-light` light) apply. The
 // accent is layered on last, so an accent-only override leaves the rest as-is.
+// `tune` is the fine-tune for the resolved mode (null = the design untouched).
 // The design/scene/font classes are left to applyDesign/applyScene/applyFont.
 export function applyAll(opts: {
   theme: Theme;
   look: ModeColors | null;
   accentOverride: AccentOverrides;
   defaultAccent: Accent;
+  tune?: Tune | null;
 }): void {
   if (typeof document === "undefined") return;
   const dark = resolveDark(opts.theme);
@@ -118,6 +121,7 @@ export function applyAll(opts: {
       foreground: cs ? cs.foreground : null,
       accentFrom: accent.from,
       accentTo: accent.to,
+      tune: opts.tune ?? null,
     }),
     IDS
   );

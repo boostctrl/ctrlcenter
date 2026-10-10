@@ -14,6 +14,14 @@ here.
 
 ### Added
 
+- **Fine-tune any design (3.0).** The theme builder's new *Tune* tab puts
+  six sliders over the design you chose: corner radius, border weight,
+  blur, shadow depth, card opacity and the scene glow, each as a percentage
+  of the design's own value, so 100% everywhere is the design as drawn and
+  any design stays the recipe underneath. Tuned per light and dark theme,
+  saved with your themes, carried by export and import, and promoted with
+  a saved theme to the site default. Admins can also give a built-in theme
+  its own tune in the Themes tab. (#326)
 - **Boards: more than one dashboard (3.0).** Add boards in Settings →
   Layout (a Media board, an Infra board…), each with its own arrangement of
   widgets and its own address, `/b/<name>`. The first board is still the

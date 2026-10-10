@@ -17,6 +17,7 @@ import { ChipGroup } from "@/components/ChipGroup";
 import { SelectField } from "./ui";
 import { apiErrorMessage } from "./apiError";
 import { useConfirm } from "./Confirm";
+import { TuneFields } from "@/components/theme-builder/TuneFields";
 import { useAutosave, SaveStatus, type SaveOptions } from "./useAutosave";
 
 async function saveThemes(
@@ -246,6 +247,21 @@ function PackEditor({
         }}
         aria-hidden
       />
+
+      {/* The pack's fine-tune over its design (#326), both modes. */}
+      <details className="text-xs">
+        <summary className="cursor-pointer text-ink-50 transition-colors hover:text-ink-80">
+          Fine-tune the design{pack.tune ? " · adjusted" : ""}
+        </summary>
+        <div className="mt-2">
+          <TuneFields
+            value={pack.tune ?? null}
+            onChange={(tune) => onField({ tune: tune ?? undefined })}
+            idPrefix={`pack-${pack.name.replace(/\W+/g, "-")}`}
+            compact
+          />
+        </div>
+      </details>
     </div>
   );
 }

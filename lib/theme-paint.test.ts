@@ -176,7 +176,40 @@ describe("computePaint", () => {
   });
 });
 
+describe("computePaint tune (#326)", () => {
+  const base = { dark: true, background: null, foreground: null, accentFrom: "#a78bfa", accentTo: "#22d3ee" };
+
+  it("paints each knob as a multiplier, skipping the untouched ones", () => {
+    const paint = themePaint.computePaint({
+      ...base,
+      tune: { radius: 50, border: 200, blur: 100, shadow: 0, fill: 150, glow: 100 },
+    });
+    expect(paint.vars["--tune-radius"]).toBe("0.5");
+    expect(paint.vars["--tune-border"]).toBe("2");
+    expect(paint.vars["--tune-blur"]).toBeNull();
+    expect(paint.vars["--tune-shadow"]).toBe("0");
+    expect(paint.vars["--tune-fill"]).toBe("1.5");
+    expect(paint.vars["--tune-glow"]).toBeNull();
+  });
+
+  it("removes every multiplier without a tune", () => {
+    const paint = themePaint.computePaint({ ...base, tune: null });
+    for (const k of ["radius", "border", "blur", "shadow", "fill", "glow"]) {
+      expect(paint.vars["--tune-" + k]).toBeNull();
+    }
+  });
+});
+
 describe("readStored (the no-flash path)", () => {
+  it("reads the stored per-mode tune, else the default's, clamped", () => {
+    const s = storage({ "ctrlcenter:tune": { dark: { radius: 50, glow: 400 }, light: null } });
+    expect(themePaint.readStored(s, DT, IDS, true).tune).toEqual({ radius: 50, glow: 300 });
+    const dt: PaintDefaults = { ...DT, tune: { radius: 120 } as never, tuneLight: { blur: 0 } as never };
+    expect(themePaint.readStored(s, { ...dt, mode: "light" }, IDS, true).tune).toEqual({ blur: 0 });
+    expect(themePaint.readStored(storage({}), dt, IDS, true).tune).toEqual({ radius: 120 });
+    expect(themePaint.readStored(storage({}), DT, IDS, true).tune).toBeNull();
+  });
+
   it("falls back to the site default with nothing stored", () => {
     const input = themePaint.readStored(storage({}), DT, IDS, true);
     expect(input).toEqual({
@@ -185,6 +218,7 @@ describe("readStored (the no-flash path)", () => {
       foreground: null,
       accentFrom: "#a78bfa",
       accentTo: "#22d3ee",
+      tune: null,
       design: "glass",
       scene: "aurora",
       font: "jakarta",

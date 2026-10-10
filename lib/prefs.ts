@@ -7,10 +7,12 @@ import {
   DEFAULT_SCENE,
   isDesignId,
   isSceneId,
+  sanitizeTune,
   type ColorSet,
   type DesignId,
   type ModeColors,
   type SceneId,
+  type Tune,
 } from "./theme";
 import { DEFAULT_FONT, isFontId, type FontId } from "./fonts";
 import { isValidTimeZone } from "./datetime";
@@ -184,6 +186,9 @@ export type CustomTheme = ModeColors & {
   designLight: DesignId;
   sceneLight: SceneId;
   fontLight: FontId;
+  // The fine-tune over each mode's design (#326); absent = design untouched.
+  tune?: Tune;
+  tuneLight?: Tune;
 };
 
 // The active custom look's light+dark colors (the resolved mode selects which
@@ -272,6 +277,8 @@ export function siteThemeFromCustomTheme(
     foreground: theme.dark.foreground,
     backgroundLight: theme.light.background,
     foregroundLight: theme.light.foreground,
+    tune: theme.tune,
+    tuneLight: theme.tuneLight,
   };
 }
 
@@ -291,6 +298,8 @@ export function sanitizeCustomTheme(input: unknown): CustomTheme | null {
   const designLight = isDesignId(t.designLight) ? t.designLight : design;
   const sceneLight = isSceneId(t.sceneLight) ? t.sceneLight : scene;
   const fontLight = isFontId(t.fontLight) ? t.fontLight : font;
+  const tune = sanitizeTune(t.tune);
+  const tuneLight = sanitizeTune(t.tuneLight);
   return {
     id: typeof t.id === "string" ? t.id : newThemeId(),
     name: t.name.slice(0, 40),
@@ -300,6 +309,8 @@ export function sanitizeCustomTheme(input: unknown): CustomTheme | null {
     designLight,
     sceneLight,
     fontLight,
+    ...(tune ? { tune } : {}),
+    ...(tuneLight ? { tuneLight } : {}),
     ...colors,
   };
 }
@@ -493,6 +504,33 @@ export function loadScene(): ModePair<SceneId | null> {
 
 export function saveScene(scene: ModePair<SceneId | null> | null): void {
   saveModePair(SCENE_KEY, scene);
+}
+
+// The fine-tune over the design (#326), per mode: a Tune or null (= the
+// design untouched / the admin default). Stored as a `{dark,light}` pair.
+export const TUNE_KEY = "ctrlcenter:tune";
+
+const isTune = (v: unknown): v is Tune => sanitizeTune(v) !== null;
+
+export function loadTune(): ModePair<Tune | null> {
+  const pair = loadModePair(TUNE_KEY, isTune);
+  return {
+    dark: pair.dark ? sanitizeTune(pair.dark) : null,
+    light: pair.light ? sanitizeTune(pair.light) : null,
+  };
+}
+
+export function saveTune(tune: ModePair<Tune | null> | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (tune && (tune.dark || tune.light)) {
+      window.localStorage.setItem(TUNE_KEY, JSON.stringify({ dark: tune.dark, light: tune.light }));
+    } else {
+      window.localStorage.removeItem(TUNE_KEY);
+    }
+  } catch {
+    // ignore
+  }
 }
 
 // The UI typeface (Plus Jakarta Sans, Inter, …), per mode. Applied as a
