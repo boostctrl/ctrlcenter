@@ -44,6 +44,13 @@ settings:
 #   - { id: greeting, type: greeting }
 #   - { id: todo, type: notes, title: To do, content: "- renew certs" }
 #   - { id: news, type: feed, urls: ["https://example.com/feed.xml"] }
+# The groups apps and bookmarks belong to, in display order. A bookmark names
+# its group by id; an app may (`group: media`), and can carry `tags`. An
+# Applications widget can show one group or tag (Settings → Widgets).
+groups:
+  - { id: shopping, name: Shopping }
+  - { id: social-media, name: Social Media }
+  - { id: utilities, name: Utilities }
 apps:
   - id: 85b49535-e829-4356-8685-fef57bbeab56
     name: File Storage
@@ -87,32 +94,32 @@ apps:
     icon: searxng
 bookmarks:
   - id: edbe5a4d-d2ca-432b-884f-36594d426452
-    category: Shopping
+    group: shopping
     name: Amazon
     url: https://amazon.com
     icon: amazon
   - id: 4b0b809b-66ce-4565-b498-59a71372bdcf
-    category: Shopping
+    group: shopping
     name: eBay
     url: https://ebay.com
     icon: ebay
   - id: 1468e9d1-0ced-40e6-9317-021fe0022b96
-    category: Social Media
+    group: social-media
     name: Youtube
     url: https://youtube.com
     icon: youtube
   - id: 1eae279f-70a2-4f5c-8534-175e7c5042f6
-    category: Social Media
+    group: social-media
     name: Twitch
     url: https://twitch.tv
     icon: twitch
   - id: 6c1b6f0a-2e4b-4f3d-9a1a-8c2d6f0e9b3a
-    category: Utilities
+    group: utilities
     name: ChatGPT
     url: https://chatgpt.com
     icon: chatgpt
   - id: 7d2c7a1b-3f5c-4e4e-8b2b-9d3e7f1a0c4b
-    category: Utilities
+    group: utilities
     name: Proton
     url: https://proton.me
     icon: proton

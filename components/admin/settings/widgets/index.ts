@@ -10,7 +10,7 @@
 // Widgets without settings (greeting, favorites, …) have no entry.
 import type { ComponentType } from "react";
 import type { WidgetType } from "@/lib/layout";
-import type { InstanceOf } from "@/lib/schema";
+import type { Group, InstanceOf } from "@/lib/schema";
 import type { FeedHealth } from "@/lib/feed";
 import type { SettingsDraft } from "../useSettingsDraft";
 import SearchSettings from "./SearchSettings";
@@ -21,6 +21,8 @@ import NotesSettings from "./NotesSettings";
 import CountdownSettings from "./CountdownSettings";
 import WorldClocksSettings from "./WorldClocksSettings";
 import SystemStatsSettings from "./SystemStatsSettings";
+import AppsSettings from "./AppsSettings";
+import BookmarksSettings from "./BookmarksSettings";
 
 export const SITE_SETTINGS: ComponentType<{ d: SettingsDraft }>[] = [SearchSettings, WeatherSettings];
 
@@ -31,6 +33,9 @@ export type InstanceEditorProps<T extends WidgetType> = {
   onChange: (patch: Partial<InstanceOf<T>>) => void;
   // Fetch health for the RSS feeds' URLs (read by the feed editor only).
   feedHealth?: Record<string, FeedHealth> | null;
+  // The groups and app tags, for the apps and bookmarks filters (#299).
+  groups: Group[];
+  tags: string[];
 };
 
 export type InstanceGroup = {
@@ -47,6 +52,21 @@ const group = <T extends WidgetType>(
 ): InstanceGroup => g as unknown as InstanceGroup;
 
 export const INSTANCE_GROUPS: InstanceGroup[] = [
+  group({
+    type: "apps",
+    title: "Applications",
+    intro:
+      "Grids of your apps. Each one can show a single group or tag, and leave out (or show only) the private apps — two of them make separate Media and Infra cards.",
+    add: "+ Add applications card",
+    Editor: AppsSettings,
+  }),
+  group({
+    type: "bookmarks",
+    title: "Bookmarks",
+    intro: "Your bookmarks under their groups: every group, or just one per card.",
+    add: "+ Add bookmarks card",
+    Editor: BookmarksSettings,
+  }),
   group({
     type: "calendar",
     title: "Calendars",

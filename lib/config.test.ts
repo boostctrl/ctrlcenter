@@ -305,9 +305,10 @@ describe("updateSettings generic merge (#287)", () => {
   });
 
   it("replaces lists, so removing an entry persists", async () => {
-    await config.updateSettings(settingsInput({ bookmarkCategoryOrder: ["a", "b"] }));
-    await config.updateSettings(settingsInput({ bookmarkCategoryOrder: ["b"] }));
-    expect((await config.getSettings()).bookmarkCategoryOrder).toEqual(["b"]);
+    const bang = (key: string) => ({ key, url: `https://${key}.example.com/?q=%s` });
+    await config.updateSettings(settingsInput({ search: { bangs: [bang("a"), bang("b")] } }));
+    await config.updateSettings(settingsInput({ search: { bangs: [bang("b")] } }));
+    expect((await config.getSettings()).search.bangs.map((b) => b.key)).toEqual(["b"]);
   });
 });
 
@@ -551,89 +552,84 @@ describe("reorderApps", () => {
   });
 });
 
-describe("renameBookmarkCategory", () => {
-  async function seed() {
-    await config.createBookmark(bookmarkInput({
-      category: "Media",
-      name: "Plex",
-      url: "https://plex.example.com",
-      icon: "",
-    }));
-    await config.createBookmark(bookmarkInput({
-      category: "Media",
-      name: "Jellyfin",
-      url: "https://jelly.example.com",
-      icon: "",
-    }));
-    await config.createBookmark(bookmarkInput({
-      category: "Dev",
-      name: "GitHub",
-      url: "https://github.com",
-      icon: "",
-    }));
-    await config.updateSettings(settingsInput({ bookmarkCategoryOrder: ["Dev", "Media"] }));
-  }
+describe("groups (#299)", () => {
+  const bm = (groupName: string, name: string) =>
+    config.createBookmark(bookmarkInput({ groupName, name, url: `https://${name.toLowerCase()}.example.com` }));
 
-  it("retags every bookmark in the category and updates the order in place", async () => {
-    await seed();
-    const result = await config.renameBookmarkCategory("Media", "Streaming");
-    // Only the Media rows change category; Dev is untouched.
-    expect(
-      result.bookmarks
-        .filter((b) => b.category === "Streaming")
-        .map((b) => b.name)
-    ).toEqual(["Plex", "Jellyfin"]);
-    expect(result.bookmarks.some((b) => b.category === "Media")).toBe(false);
-    // The renamed category keeps its slot in the order array rather than
-    // dropping to first-seen order.
-    expect(result.bookmarkCategoryOrder).toEqual(["Dev", "Streaming"]);
+  it("creates a group the first time a form names it, and reuses it by name in any case", async () => {
+    const a = await bm("Media", "Plex");
+    const b = await bm("  media ", "Jellyfin");
+    expect(a.group).toBe("media");
+    expect(b.group).toBe("media");
+    const app = await config.createApp(appInput({ name: "Sonarr", url: "https://sonarr.example.com", groupName: "Media" }));
+    expect(app.group).toBe("media");
+    const none = await config.createApp(appInput({ name: "Solo", url: "https://solo.example.com" }));
+    expect(none.group).toBe("");
+    expect((await config.readConfigInternal()).groups).toEqual([{ id: "media", name: "Media" }]);
+  });
 
-    // Persisted to disk.
-    const reread = await config.readConfigInternal();
-    expect(reread.settings.bookmarkCategoryOrder).toEqual(["Dev", "Streaming"]);
-    expect(reread.bookmarks.filter((b) => b.category === "Streaming")).toHaveLength(
-      2
+  it("keeps a new name's id unique", async () => {
+    await bm("Media", "Plex");
+    await config.replaceGroups([{ id: "media", name: "Films" }]);
+    const b = await bm("Media", "Jellyfin");
+    expect(b.group).toBe("media-2");
+  });
+
+  it("renames and reorders without touching the items", async () => {
+    await bm("Dev", "GitHub");
+    await bm("Media", "Plex");
+    const result = await config.replaceGroups([
+      { id: "media", name: "Streaming" },
+      { id: "dev", name: "Dev" },
+    ]);
+    expect(result.groups).toEqual([
+      { id: "media", name: "Streaming" },
+      { id: "dev", name: "Dev" },
+    ]);
+    expect(result.bookmarks.map((b) => b.group)).toEqual(["dev", "media"]);
+  });
+
+  it("merges a group renamed onto another's name into the earlier one, filters included", async () => {
+    await bm("Dev", "GitHub");
+    await bm("Media", "Plex");
+    await config.updateApp(
+      (await config.createApp(appInput({ name: "Gitea", url: "https://gitea.example.com", groupName: "Media" }))).id,
+      {}
     );
+    await config.replaceWidgets([
+      newInstance("greeting", "greeting"),
+      { ...newInstance("apps", "media-apps"), filter: { group: "media", tag: "", private: "any" } },
+    ]);
+    const result = await config.replaceGroups([
+      { id: "dev", name: "Dev" },
+      { id: "media", name: "dev" },
+    ]);
+    expect(result.groups).toEqual([{ id: "dev", name: "Dev" }]);
+    expect(result.bookmarks.every((b) => b.group === "dev")).toBe(true);
+    expect(result.apps[0].group).toBe("dev");
+    const stored = await config.readConfigInternal();
+    const media = stored.widgets.find((w) => w.id === "media-apps");
+    expect(media?.type === "apps" && media.filter.group).toBe("dev");
   });
 
-  it("merges into an existing category, keeping the earlier position", async () => {
-    await config.createBookmark(bookmarkInput({
-      category: "Dev",
-      name: "GitHub",
-      url: "https://github.com",
-      icon: "",
-    }));
-    await config.createBookmark(bookmarkInput({
-      category: "Media",
-      name: "Plex",
-      url: "https://plex.example.com",
-      icon: "",
-    }));
-    await config.createBookmark(bookmarkInput({
-      category: "Docs",
-      name: "Wiki",
-      url: "https://wiki.example.com",
-      icon: "",
-    }));
-    await config.updateSettings(settingsInput({
-      bookmarkCategoryOrder: ["Dev", "Media", "Docs"],
-    }));
-
-    // Dev (index 0) is earlier than Media (index 1), so merging Dev into Media
-    // collapses to a single "Media" at index 0 and drops the duplicate.
-    const result = await config.renameBookmarkCategory("Dev", "Media");
-    expect(result.bookmarkCategoryOrder).toEqual(["Media", "Docs"]);
-    expect(
-      result.bookmarks.filter((b) => b.category === "Media")
-    ).toHaveLength(2);
-    expect(result.bookmarks.some((b) => b.category === "Dev")).toBe(false);
+  it("deletes only an unused group", async () => {
+    await bm("Dev", "GitHub");
+    await expect(config.replaceGroups([])).rejects.toBeInstanceOf(config.GroupInUseError);
+    await config.replaceGroups([{ id: "dev", name: "Dev" }, { id: "spare", name: "Spare" }]);
+    const result = await config.replaceGroups([{ id: "dev", name: "Dev" }]);
+    expect(result.groups.map((g) => g.id)).toEqual(["dev"]);
   });
 
-  it("throws NotFoundError when no bookmark carries the source category", async () => {
-    await seed();
-    await expect(
-      config.renameBookmarkCategory("Nope", "Whatever")
-    ).rejects.toBeInstanceOf(config.NotFoundError);
+  it("bulk-moves and tags apps", async () => {
+    const a = await config.createApp(appInput({ name: "A", url: "https://a.example.com", tags: ["x"] }));
+    const b = await config.createApp(appInput({ name: "B", url: "https://b.example.com" }));
+    const moved = await config.bulkUpdateApps({ ids: [a.id, b.id, "gone"], groupName: "Infra" });
+    expect(moved.apps.map((x) => x.group)).toEqual(["infra", "infra"]);
+    expect(moved.groups).toEqual([{ id: "infra", name: "Infra" }]);
+    const tagged = await config.bulkUpdateApps({ ids: [a.id], addTags: ["X", "y"] });
+    expect(tagged.apps[0].tags).toEqual(["x", "y"]);
+    const out = await config.bulkUpdateApps({ ids: [b.id], groupName: "" });
+    expect(out.apps[1].group).toBe("");
   });
 });
 

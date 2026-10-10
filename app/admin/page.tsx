@@ -25,6 +25,7 @@ export default async function AdminPage({
       initialSettings={config.settings}
       initialWidgets={config.widgets}
       initialBoards={config.boards}
+      initialGroups={config.groups}
       initialThemes={config.themes}
       // Only the boolean crosses to the client — never the TOTP secret (#198).
       initialTwoFactorEnabled={config.auth.totp.enabled}

@@ -19,6 +19,8 @@
 // Like the earlier steps it works on the raw YAML object, leaving everything
 // it doesn't migrate untouched.
 
+import { slugId } from "./slug";
+
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
 
@@ -151,18 +153,121 @@ function layoutToBoards(settings: Record<string, unknown>): Record<string, unkno
   return [{ id: "home", name: "Home", visibility: "public", layout: { columns: 24, sections: rows } }];
 }
 
+type Step = (raw: Record<string, unknown>) => { value: Record<string, unknown>; changed: boolean };
+
+// The v2 → v3 step is three parts, each a no-op on a file that already has
+// what it adds, so a file written by a 3.0 pre-release build (which may have
+// instances but no boards, or boards but no groups) gets just the parts it's
+// missing.
 export function migrateV2toV3(raw: unknown): { value: unknown; changed: boolean } {
-  if (!isRecord(raw) || Array.isArray(raw.boards)) return { value: raw, changed: false };
-  // A file from a 3.0 pre-release build already has instances, but may have
-  // kept saved rows in settings.layout: only the board step is left. With
-  // none saved there's nothing to move; the stock home board is the default.
-  if (Array.isArray(raw.widgets) || raw.schemaVersion === 3) {
-    const settings: Record<string, unknown> = isRecord(raw.settings) ? { ...raw.settings } : {};
-    if (!isRecord(settings.layout) || !Array.isArray(settings.layout.sections)) {
-      return { value: raw, changed: false };
+  if (!isRecord(raw)) return { value: raw, changed: false };
+  let value = raw;
+  let changed = false;
+  for (const step of [instancesStep, boardsStep, groupsStep]) {
+    const out = step(value);
+    if (out.changed) {
+      value = out.value;
+      changed = true;
     }
-    const boards = layoutToBoards(settings);
-    return { value: { ...raw, settings, boards }, changed: true };
+  }
+  return { value, changed };
+}
+
+// A pre-release file with instances may have kept saved rows in
+// settings.layout. With none saved there's nothing to move: the stock home
+// board is the default.
+const boardsStep: Step = (raw) => {
+  if (Array.isArray(raw.boards)) return { value: raw, changed: false };
+  const settings: Record<string, unknown> = isRecord(raw.settings) ? { ...raw.settings } : {};
+  if (!isRecord(settings.layout) || !Array.isArray(settings.layout.sections)) {
+    return { value: raw, changed: false };
+  }
+  const boards = layoutToBoards(settings);
+  return { value: { ...raw, settings, boards }, changed: true };
+};
+
+// Groups (#299): each bookmark category becomes a group, in the saved
+// category order and then first-seen order, and each bookmark names its
+// group by id. `groupPrivateApps` (the apps widget splitting private apps
+// into their own block) becomes a second apps widget: the existing ones hide
+// private apps, and a "Private Applications" one beside each shows only them.
+const groupsStep: Step = (raw) => {
+  const settings: Record<string, unknown> = isRecord(raw.settings) ? { ...raw.settings } : {};
+  const bookmarks = Array.isArray(raw.bookmarks) ? raw.bookmarks : [];
+  const legacy =
+    "bookmarkCategoryOrder" in settings ||
+    "groupPrivateApps" in settings ||
+    bookmarks.some((b) => isRecord(b) && "category" in b);
+  if (Array.isArray(raw.groups) || !legacy) return { value: raw, changed: false };
+
+  const present: string[] = [];
+  for (const b of bookmarks) {
+    if (isRecord(b) && typeof b.category === "string" && !present.includes(b.category)) present.push(b.category);
+  }
+  const order = Array.isArray(settings.bookmarkCategoryOrder) ? settings.bookmarkCategoryOrder : [];
+  const categories = [
+    ...order.filter((c): c is string => typeof c === "string" && present.includes(c)),
+    ...present,
+  ].filter((c, i, all) => all.indexOf(c) === i);
+  const idOf = new Map<string, string>();
+  const groups = categories.map((name) => {
+    const id = slugId(name, idOf.values(), "group");
+    idOf.set(name, id);
+    // A category that's only spaces still needs a name.
+    return { id, name: name.trim() || id };
+  });
+  const nextBookmarks = bookmarks.map((b) => {
+    if (!isRecord(b) || !("category" in b)) return b;
+    const { category, ...rest } = b;
+    return { ...rest, group: typeof category === "string" ? (idOf.get(category) ?? "") : "" };
+  });
+
+  let widgets = raw.widgets;
+  let boards = raw.boards;
+  if (settings.groupPrivateApps === true && Array.isArray(raw.widgets)) {
+    const appsIds = raw.widgets
+      .filter((w) => isRecord(w) && w.type === "apps" && typeof w.id === "string")
+      .map((w) => (w as { id: string }).id);
+    const taken = new Set(raw.widgets.filter(isRecord).map((w) => w.id));
+    const privateId = (base: string) => {
+      let id = `${base}-private`;
+      for (let n = 2; taken.has(id); n++) id = `${base}-private-${n}`;
+      taken.add(id);
+      return id;
+    };
+    const twin = new Map(appsIds.map((id) => [id, privateId(id)]));
+    widgets = raw.widgets.flatMap((w) => {
+      if (!isRecord(w) || w.type !== "apps" || typeof w.id !== "string") return [w];
+      const filter = isRecord(w.filter) ? w.filter : {};
+      return [
+        { ...w, filter: { ...filter, private: "hide" } },
+        { id: twin.get(w.id), type: "apps", title: "Private Applications", filter: { private: "only" } },
+      ];
+    });
+    if (Array.isArray(raw.boards)) {
+      boards = raw.boards.map((board) => {
+        if (!isRecord(board) || !isRecord(board.layout) || !Array.isArray(board.layout.sections)) return board;
+        const sections = board.layout.sections.flatMap((row) => {
+          if (!isRecord(row) || typeof row.widget !== "string" || !twin.has(row.widget)) return [row];
+          const { span, hidden, cards } = row;
+          return [row, { widget: twin.get(row.widget), span, hidden, ...(cards !== undefined ? { cards } : {}) }];
+        });
+        return { ...board, layout: { ...board.layout, sections } };
+      });
+    }
+  }
+  delete settings.bookmarkCategoryOrder;
+  delete settings.groupPrivateApps;
+  return {
+    value: { ...raw, settings, groups, bookmarks: nextBookmarks, widgets, boards },
+    changed: true,
+  };
+};
+
+// Widgets become instances (#297) and the layout the home board (#298).
+const instancesStep: Step = (raw) => {
+  if (Array.isArray(raw.widgets) || Array.isArray(raw.boards) || raw.schemaVersion === 3) {
+    return { value: raw, changed: false };
   }
   const settings: Record<string, unknown> = isRecord(raw.settings) ? { ...raw.settings } : {};
   const components = isRecord(settings.components) ? settings.components : {};
@@ -221,4 +326,4 @@ export function migrateV2toV3(raw: unknown): { value: unknown; changed: boolean 
     delete settings[key];
   }
   return { value: { ...raw, settings, boards, widgets: instances }, changed: true };
-}
+};

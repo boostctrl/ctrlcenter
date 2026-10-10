@@ -7,6 +7,7 @@ import type {
   BookmarkItem,
   Settings,
   Board,
+  Group,
   ThemePackConfig,
   WidgetInstance,
 } from "@/lib/schema";
@@ -19,6 +20,7 @@ import PageNav from "@/components/PageNav";
 import { useEdgeFade } from "@/components/useEdgeFade";
 import { resolveThemePacks } from "@/lib/theme";
 import { navPages } from "@/lib/nav";
+import { useGroups } from "./useGroups";
 import { downloadJson } from "@/lib/download";
 import { buttonClasses } from "@/lib/buttons";
 import { Button } from "./ui";
@@ -42,6 +44,7 @@ type Props = {
   initialSettings: Settings;
   initialWidgets: WidgetInstance[];
   initialBoards: Board[];
+  initialGroups: Group[];
   initialThemes: ThemePackConfig[];
   initialTwoFactorEnabled: boolean;
   // The ?tab / ?section deep-link params, read server-side by the page (NOT
@@ -70,11 +73,15 @@ function AdminBody({
   initialSettings,
   initialWidgets,
   initialBoards,
+  initialGroups,
   initialThemes,
   initialTwoFactorEnabled,
   initialTab,
   initialSection,
 }: Props) {
+  // The groups (#299), shared by the Applications, Bookmarks and Settings
+  // tabs, which remount on every switch.
+  const groupsState = useGroups(initialGroups);
   // The URL is the initial source of truth (?tab=settings deep-links and
   // survives refresh); an unknown value falls back to the first tab.
   const [tab, setTab] = useState<Tab>(() =>
@@ -275,6 +282,7 @@ function AdminBody({
       {tab === "apps" && (
         <AppsManager
           initialApps={initialApps}
+          groupsState={groupsState}
           statusChecksEnabled={initialSettings.statusChecks}
           statusInterval={initialSettings.statusInterval}
         />
@@ -282,7 +290,7 @@ function AdminBody({
       {tab === "bookmarks" && (
         <BookmarksManager
           initialBookmarks={initialBookmarks}
-          initialCategoryOrder={initialSettings.bookmarkCategoryOrder}
+          groupsState={groupsState}
         />
       )}
       {tab === "themes" && <ThemesManager initialOverrides={initialThemes} />}
@@ -291,6 +299,9 @@ function AdminBody({
           initialSettings={initialSettings}
           initialWidgets={initialWidgets}
           initialBoards={initialBoards}
+          groupsState={groupsState}
+          initialApps={initialApps}
+          initialBookmarks={initialBookmarks}
           apps={monitoredApps(initialApps).map(({ id, name }) => ({ id, name }))}
           themePacks={resolveThemePacks(initialThemes)}
           initialSection={initialSection}

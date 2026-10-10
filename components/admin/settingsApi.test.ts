@@ -7,12 +7,12 @@ describe("saveSettingsPatch", () => {
   it("PUTs just the patch to /api/settings", async () => {
     const fetchMock = vi.fn<typeof fetch>(async () => new Response("{}"));
     vi.stubGlobal("fetch", fetchMock);
-    await saveSettingsPatch({ bookmarkCategoryOrder: ["a", "b"] }, { keepalive: true });
+    await saveSettingsPatch({ title: "Dash" }, { keepalive: true });
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("/api/settings");
     expect(init?.method).toBe("PUT");
     expect(init?.keepalive).toBe(true);
-    expect(JSON.parse(String(init?.body))).toEqual({ bookmarkCategoryOrder: ["a", "b"] });
+    expect(JSON.parse(String(init?.body))).toEqual({ title: "Dash" });
   });
 
   it("throws the API's error message when it sends one", async () => {

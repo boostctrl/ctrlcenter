@@ -9,9 +9,9 @@ import {
   appBangMap,
   parseBang,
 } from "@/lib/search";
-import { groupBookmarks } from "@/lib/bookmarks";
+import { appMatches, groupBookmarks, groupName } from "@/lib/groups";
 import { useFavorites } from "./PrefsProvider";
-import type { AppItem } from "@/lib/schema";
+import type { AppItem, InstanceOf } from "@/lib/schema";
 import {
   DEFAULT_UI_SCALE,
   DEFAULT_GRID_GAP,
@@ -93,7 +93,7 @@ export default function Dashboard({
   // Everything the widgets render, built server-side (lib/widgets/load.tsx).
   data: HomeData;
 }) {
-  const { apps, bookmarks, search, categoryOrder, statusEnabled, labels } = data;
+  const { apps, bookmarks, search, groups, statusEnabled, labels } = data;
   const [query, setQuery] = useState("");
   // The search widget renders through the registry and hands its <input>
   // back here (for the "/" hotkey); the state setter is the callback ref.
@@ -147,10 +147,35 @@ export default function Dashboard({
   useGridLayout(gridRef, layout.gap, gridSignature);
 
 
-  // Whether any apps / bookmarks widget is on show: search only covers what
-  // the board shows.
-  const showApps = layout.sections.some((w) => w.type === "apps" && !w.hidden);
-  const showBookmarks = layout.sections.some((w) => w.type === "bookmarks" && !w.hidden);
+  // The apps and bookmarks the visible apps / bookmarks widgets show,
+  // through each one's filter (#299): search only covers what the board
+  // shows.
+  const appsFilters = layout.sections
+    .filter((w) => w.type === "apps" && !w.hidden)
+    .flatMap((w) => {
+      const inst = data.instances[w.id] as InstanceOf<"apps"> | undefined;
+      return inst ? [inst.filter] : [];
+    });
+  const bookmarkFilters = layout.sections
+    .filter((w) => w.type === "bookmarks" && !w.hidden)
+    .flatMap((w) => {
+      const inst = data.instances[w.id] as InstanceOf<"bookmarks"> | undefined;
+      return inst ? [inst.filter] : [];
+    });
+  const filterKey = JSON.stringify([appsFilters, bookmarkFilters]);
+  const shownApps = useMemo(
+    () => apps.filter((a) => appsFilters.some((f) => appMatches(a, f))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [apps, filterKey]
+  );
+  const shownBookmarks = useMemo(
+    () =>
+      bookmarkFilters.some((f) => !f.group)
+        ? bookmarks
+        : bookmarks.filter((b) => bookmarkFilters.some((f) => f.group === b.group)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [bookmarks, filterKey]
+  );
   // An instance's label (its title, else the type's) for the editor frame/tray.
   const labelFor = (widget: LayoutWidget): string =>
     labels[widget.id] ?? WIDGET_LABELS[widget.type];
@@ -197,28 +222,26 @@ export default function Dashboard({
   );
 
   const filteredApps = useMemo(() => {
-    if (!showApps) return [];
-    if (!q) return apps;
-    return apps.filter((a) =>
-      [a.name, a.subtitle, a.url].some((f) => f.toLowerCase().includes(q))
+    if (!q) return shownApps;
+    return shownApps.filter((a) =>
+      [a.name, a.subtitle, a.url, ...a.tags].some((f) => f.toLowerCase().includes(q))
     );
-  }, [apps, q, showApps]);
+  }, [shownApps, q]);
 
   const filteredGroups = useMemo(() => {
-    if (!showBookmarks) return [];
     const matches = !q
-      ? bookmarks
-      : bookmarks.filter((b) =>
-          [b.name, b.category, b.url].some((f) => f.toLowerCase().includes(q))
+      ? shownBookmarks
+      : shownBookmarks.filter((b) =>
+          [b.name, groupName(groups, b.group), b.url].some((f) => f.toLowerCase().includes(q))
         );
-    return groupBookmarks(matches, categoryOrder);
-  }, [bookmarks, q, categoryOrder, showBookmarks]);
+    return groupBookmarks(matches, groups);
+  }, [shownBookmarks, q, groups]);
 
   // What Enter opens while searching (see topResultUrl), highlighted so the
   // keyboard shortcut isn't a guess (#274). A matching bang takes precedence.
   const topMatchId =
     q && !editing && !bangHit
-      ? (filteredApps[0]?.id ?? filteredGroups[0]?.[1][0]?.id ?? null)
+      ? (filteredApps[0]?.id ?? filteredGroups[0]?.items[0]?.id ?? null)
       : null;
 
   // Pinned apps, in pin order, dropping any that no longer exist. Shown only when
@@ -233,14 +256,13 @@ export default function Dashboard({
   // Whether there's anything configured at all (drives the empty-state) vs.
   // anything the admin's left visible to search (drives the search bar/messages).
   const hasAnyContent = apps.length > 0 || bookmarks.length > 0;
-  const hasVisibleContent =
-    (showApps && apps.length > 0) || (showBookmarks && bookmarks.length > 0);
+  const hasVisibleContent = shownApps.length > 0 || shownBookmarks.length > 0;
   const hasResults = filteredApps.length > 0 || filteredGroups.length > 0;
 
   function topResultUrl(): string | null {
     if (filteredApps.length > 0) return filteredApps[0].url;
     const firstGroup = filteredGroups[0];
-    return firstGroup?.[1][0]?.url ?? null;
+    return firstGroup?.items[0]?.url ?? null;
   }
 
   function webSearch() {

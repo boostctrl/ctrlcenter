@@ -23,8 +23,8 @@ export default async function BoardPage({
   edit: boolean;
 }) {
   // readPublicConfig already dropped private apps/bookmarks for guests, and
-  // everything derived from the lists (search matches, per-app bangs, category
-  // grouping) follows from the filtered arrays for free. `isAdmin` also
+  // everything derived from the lists (search matches, per-app bangs, group
+  // headings) follows from the filtered arrays for free. `isAdmin` also
   // unlocks the layout-editor UI (saves go through the gated API).
   const { config, isAdmin } = await readPublicConfig();
   const { settings, apps, bookmarks } = config;
@@ -41,13 +41,18 @@ export default async function BoardPage({
   // on show: the hidden rows, and the instances behind them (a notes card
   // placed only on a private board, say), never reach the page.
   const resolved = resolveLayout(board.layout.sections, config.widgets);
-  const widgets = isAdmin ? resolved : resolved.filter((w) => !w.hidden);
+  // An apps widget showing only private apps (#299) has nothing for a guest.
+  const privateOnly = new Set(
+    config.widgets.filter((w) => w.type === "apps" && w.filter.private === "only").map((w) => w.id)
+  );
+  const widgets = isAdmin ? resolved : resolved.filter((w) => !w.hidden && !privateOnly.has(w.id));
   const onShow = new Set(widgets.map((w) => w.id));
   const data = await loadHomeData({
     settings,
     instances: isAdmin ? config.widgets : config.widgets.filter((w) => onShow.has(w.id)),
     apps,
     bookmarks,
+    groups: config.groups,
     widgets,
     isAdmin,
     now: new Date(),

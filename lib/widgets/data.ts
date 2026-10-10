@@ -3,7 +3,7 @@
 // (components/widgets/registry.tsx), in place of a prop per widget. Widget
 // content is per instance since 3.0 (#297), keyed by instance id.
 import type { ReactNode } from "react";
-import type { AppItem, BookmarkItem, WidgetInstance } from "../schema";
+import type { AppItem, BookmarkItem, Group, WidgetInstance } from "../schema";
 import type { SearchConfig } from "../search";
 import type { CurrentWeather } from "../weather";
 import type { SystemStats } from "../system-stats";
@@ -12,11 +12,8 @@ export type HomeData = {
   apps: AppItem[];
   bookmarks: BookmarkItem[];
   search: SearchConfig;
-  categoryOrder: string[];
-  // When on, the Apps widget splits private apps into their own labeled
-  // "Private Applications" group. Only affects the admin — guests never
-  // receive private apps, so the group is always empty for them.
-  groupPrivateApps: boolean;
+  // The groups apps and bookmarks belong to (#299), in display order.
+  groups: Group[];
   // Server-computed seeds for the header widgets (admin default tz /
   // location), updated client-side to the visitor's effective prefs after
   // mount.

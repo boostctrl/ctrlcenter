@@ -4,6 +4,7 @@
 // the top-level `widgets` list by id, so one notes card can sit on two boards.
 import { z } from "zod";
 import { DEFAULT_SECTIONS } from "../layout";
+import { slugId } from "../slug";
 import { boardLayoutSchema, layoutRowInputSchema, MAX_BOARD_ROWS } from "./layout";
 
 // Board ids are the URL slug (/b/<id>), so the same rules as instance ids.
@@ -62,18 +63,8 @@ export const boardName = (board: Pick<Board, "id" | "name">): string =>
   board.name.trim() || board.id;
 
 // A new board's id (its URL, /b/<id>): the name made URL-safe, kept unique.
-export function newBoardId(name: string, taken: readonly string[]): string {
-  const stem =
-    name
-      .toLowerCase()
-      .normalize("NFKD")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 56) || "board";
-  let id = stem;
-  for (let n = 2; taken.includes(id); n++) id = `${stem}-${n}`;
-  return id;
-}
+export const newBoardId = (name: string, taken: readonly string[]): string =>
+  slugId(name, taken, "board");
 
 // Admin input (PUT /api/boards): the whole list, in order. A board sent
 // without `layout` keeps its stored rows (a new one starts empty), so this

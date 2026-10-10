@@ -173,7 +173,7 @@ export default async function HelpPage() {
         <Card title="Search">
           <P>
             Start typing to filter your apps and bookmarks at once. It matches
-            on name, subtitle, URL, and a bookmark&apos;s category, and opening
+            on name, subtitle, URL, an app&apos;s tags and a bookmark&apos;s group, and opening
             anything launches it in a new tab.
           </P>
           <ul className="flex flex-col gap-2 text-sm text-ink-70">
@@ -398,18 +398,31 @@ export default async function HelpPage() {
               icon. Mark one <strong>Only show when logged in</strong> to keep
               an internal service off the dashboard and status page for
               signed-out visitors — it&apos;s still monitored and alerted on.
-              Turn on <strong>Group private apps separately</strong> under
-              Settings → Layout to collect those apps into their own{" "}
-              <strong>Private Applications</strong> section, shown only to you.
             </li>
             <li>
-              <strong>Bookmarks</strong> group under categories you name. Both
-              the bookmarks and the category order are drag-sortable, and a
-              category can be renamed from its heading — every bookmark in it
-              moves across at once. Bookmarks take the same{" "}
-              <strong>Only show when logged in</strong> flag as apps; a
-              category whose bookmarks are all private disappears for
-              signed-out visitors too.
+              <strong>Groups and tags.</strong> An app can belong to a{" "}
+              <strong>group</strong> and carry <strong>tags</strong>; type a
+              new group name in the form to start one. Tick several apps to
+              move them to a group or tag them at once. In{" "}
+              <strong>Settings → Widgets → Applications</strong>, each
+              Applications card shows one group, one tag, or everything, and
+              can leave out the private apps or show only them, so a board can
+              have separate Media and Infra cards, or a{" "}
+              <strong>Private Applications</strong> card only you see.
+            </li>
+            <li>
+              <strong>Bookmarks</strong> are listed under their groups. The
+              bookmarks and the groups are drag-sortable, and a group can be
+              renamed from its heading; renaming one onto another&apos;s name
+              merges the two. A Bookmarks card shows every group or just one.
+              Bookmarks take the same <strong>Only show when logged in</strong>{" "}
+              flag as apps; a group whose bookmarks are all private disappears
+              for signed-out visitors too.
+            </li>
+            <li>
+              <strong>Settings → Layout → Groups</strong> lists every group
+              with what&apos;s in it: rename and reorder them there, and
+              delete one once nothing uses it.
             </li>
             <li>
               <strong>Icons</strong> are matched by name against the

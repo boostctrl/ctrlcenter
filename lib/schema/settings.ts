@@ -31,14 +31,6 @@ export const settingsSchema = z.object({
   statusInterval: z.number().int().min(1).max(60).default(5),
   // Which time range the /status page opens on (1h / 24h / 30d / 90d).
   statusDefaultRange: z.enum(STATUS_RANGE_KEYS).default("d1"),
-  // Explicit display order for bookmark categories; categories not listed fall
-  // back to first-seen order. Stale names are ignored at render time.
-  bookmarkCategoryOrder: z.array(z.string()).default([]),
-  // When on, the Apps widget splits private apps into their own labeled
-  // "Private Applications" group below the public ones. Off by default so
-  // existing dashboards keep their interspersed order. Only ever affects the
-  // admin's view — guests never receive private apps (readPublicConfig).
-  groupPrivateApps: z.boolean().default(false),
   search: searchSchema.default(searchSchema.parse({})),
   weather: weatherSchema.default(weatherSchema.parse({})),
   alerts: alertsSchema.default(alertsSchema.parse({})),
@@ -73,15 +65,13 @@ export const settingsInputSchema = z.object({
   statusChecks: z.boolean().optional(),
   statusInterval: z.number().int().min(1).max(60).optional(),
   statusDefaultRange: z.enum(STATUS_RANGE_KEYS).optional(),
-  bookmarkCategoryOrder: z.array(z.string()).optional(),
-  groupPrivateApps: z.boolean().optional(),
   search: searchUpdateSchema.optional(),
   weather: weatherUpdateSchema.optional(),
   alerts: alertsUpdateSchema.optional(),
   announcement: announcementUpdateSchema.optional(),
   // The admin sends the whole list (each entry carries a client-minted id), so
   // updateSettings replaces it wholesale — it flows through `rest` like the
-  // other plain settings arrays (e.g. bookmarkCategoryOrder).
+  // other plain settings arrays.
   statusAnnouncements: statusAnnouncementsUpdateSchema.optional(),
   integrations: integrationsUpdateSchema.optional(),
   webhooks: webhooksUpdateSchema.optional(),

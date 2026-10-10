@@ -30,10 +30,16 @@ import { guessCheckType, withHttpScheme } from "@/lib/urls";
 import { parseJsonQuery } from "@/lib/json-query";
 import { CopyUrlField, useOrigin } from "./CopyUrlField";
 import { apiErrorMessage } from "./apiError";
+import { allTags, groupName } from "@/lib/groups";
+import type { GroupsState } from "./useGroups";
 
 type FormState = {
   name: string;
   subtitle: string;
+  // The group's name (#299): an existing group, a new one, or "" for none.
+  groupName: string;
+  // Comma-separated tags.
+  tags: string;
   url: string;
   icon: string;
   private: boolean;
@@ -54,6 +60,8 @@ type FormState = {
 const emptyForm: FormState = {
   name: "",
   subtitle: "",
+  groupName: "",
+  tags: "",
   url: "",
   icon: "",
   private: false,
@@ -129,10 +137,13 @@ function modeFromExpect(v: string): UpMode {
 
 export default function AppsManager({
   initialApps,
+  groupsState,
   statusChecksEnabled,
   statusInterval,
 }: {
   initialApps: AppItem[];
+  // The shared group list (#299).
+  groupsState: GroupsState;
   // From the server-rendered settings; toggling checks this session updates on
   // reload, like the nav flags.
   statusChecksEnabled: boolean;
@@ -147,6 +158,9 @@ export default function AppsManager({
   // method follows its URL (guessCheckType, #296).
   const [methodChosen, setMethodChosen] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Apps ticked for a bulk group/tag change (#299).
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const { groups, setGroups, refresh: refreshGroups } = groupsState;
   const toast = useToast();
   const confirm = useConfirm();
   const { ref: formRef, reveal: revealForm } = useRevealForm<HTMLDivElement>();
@@ -157,6 +171,8 @@ export default function AppsManager({
     setForm({
       name: app.name,
       subtitle: app.subtitle,
+      groupName: app.group ? groupName(groups, app.group) : "",
+      tags: app.tags.join(", "),
       url: app.url,
       icon: app.icon,
       private: app.private,
@@ -196,6 +212,8 @@ export default function AppsManager({
       const payload = {
         name: form.name,
         subtitle: form.subtitle,
+        groupName: form.groupName,
+        tags: form.tags.split(","),
         url: withHttpScheme(form.url),
         icon: form.icon,
         private: form.private,
@@ -224,6 +242,8 @@ export default function AppsManager({
         return;
       }
       const saved: AppItem = await res.json();
+      // Naming a group that didn't exist created it server-side.
+      if (saved.group && !groups.some((g) => g.id === saved.group)) void refreshGroups();
       const wasEditing = editingId;
       setApps((prev) =>
         wasEditing ? prev.map((a) => (a.id === wasEditing ? saved : a)) : [...prev, saved]
@@ -313,6 +333,46 @@ export default function AppsManager({
     persistOrder
   );
 
+  const toggleSelected = (id: string) =>
+    setSelected((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  // Ticked apps that still exist (one may have been deleted meanwhile).
+  const selectedIds = apps.filter((a) => selected.has(a.id)).map((a) => a.id);
+
+  // Bulk-assign (#299): move the ticked apps to a group, or tag them.
+  async function bulkUpdate(change: { groupName?: string; addTags?: string[] }) {
+    try {
+      const res = await fetch("/api/apps/bulk", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: selectedIds, ...change }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast(apiErrorMessage(data, "Couldn't update the apps"), "error");
+        return;
+      }
+      setApps(data.apps);
+      setGroups(data.groups);
+      const n = selectedIds.length;
+      const what = n === 1 ? "1 app" : `${n} apps`;
+      toast(
+        change.groupName !== undefined
+          ? change.groupName.trim()
+            ? `Moved ${what} to ${change.groupName.trim()}`
+            : `Took ${what} out of their groups`
+          : `Tagged ${what}`
+      );
+      setSelected(new Set());
+    } catch {
+      toast("Couldn't update the apps", "error");
+    }
+  }
+
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(320px,380px)] xl:grid-cols-[minmax(0,1fr)_minmax(360px,440px)]">
       <div className="space-y-3">
@@ -332,6 +392,14 @@ export default function AppsManager({
         {apps.length === 0 && (
           <p className="text-sm text-ink-40">No applications yet. Add your first one.</p>
         )}
+        {selectedIds.length > 0 && (
+          <BulkBar
+            count={selectedIds.length}
+            onMove={(name) => void bulkUpdate({ groupName: name })}
+            onTag={(tag) => void bulkUpdate({ addTags: [tag] })}
+            onClear={() => setSelected(new Set())}
+          />
+        )}
         {apps.map((app, index) => (
           <div
             key={app.id}
@@ -342,6 +410,13 @@ export default function AppsManager({
             )} ${dragIndex === index ? "opacity-50" : ""}`}
           >
             <div className="flex min-w-0 items-center gap-3">
+              <input
+                type="checkbox"
+                checked={selected.has(app.id)}
+                onChange={() => toggleSelected(app.id)}
+                aria-label={`Select ${app.name}`}
+                className="h-4 w-4 shrink-0 accent-[var(--accent-from)] pointer-coarse:h-5 pointer-coarse:w-5"
+              />
               <MoveButtons index={index} count={apps.length} label={app.name} onMove={move} />
               <DragGrip {...grip(index)} />
               <Icon icon={app.icon} name={app.name} size={24} />
@@ -356,6 +431,20 @@ export default function AppsManager({
                 <p className="truncate text-xs text-ink-40">
                   {app.subtitle ? `${app.subtitle} · ${app.url}` : app.url}
                 </p>
+                {(app.group || app.tags.length > 0) && (
+                  <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-ink-55">
+                    {app.group && (
+                      <span className="rounded-full border border-fg/15 px-2 py-0.5">
+                        {groupName(groups, app.group)}
+                      </span>
+                    )}
+                    {app.tags.map((t) => (
+                      <span key={t} className="rounded-full bg-fg/[0.06] px-2 py-0.5">
+                        #{t}
+                      </span>
+                    ))}
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex shrink-0 gap-2">
@@ -418,6 +507,34 @@ export default function AppsManager({
               onChange={(v) => setForm({ ...form, icon: v })}
               name={form.name}
             />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <TextField
+                label="Group"
+                list="app-groups"
+                placeholder="None"
+                hint="An apps widget can show one group."
+                value={form.groupName}
+                onChange={(e) => setForm({ ...form, groupName: e.target.value })}
+              />
+              <TextField
+                label="Tags"
+                list="app-tags"
+                placeholder="e.g. video, admin"
+                hint="Comma-separated."
+                value={form.tags}
+                onChange={(e) => setForm({ ...form, tags: e.target.value })}
+              />
+            </div>
+            <datalist id="app-groups">
+              {groups.map((g) => (
+                <option key={g.id} value={g.name} />
+              ))}
+            </datalist>
+            <datalist id="app-tags">
+              {allTags(apps).map((t) => (
+                <option key={t} value={t} />
+              ))}
+            </datalist>
             <ToggleRow
               label="Only show when logged in"
               hint="Hides this app from signed-out visitors everywhere, including the status page. It's still monitored and alerted on."
@@ -649,6 +766,79 @@ export default function AppsManager({
           </form>
         </Card>
       </div>
+    </div>
+  );
+}
+
+// The bar over the app list while apps are ticked (#299): move them all to a
+// group (typed: an existing one, or a new name; empty takes them out of
+// their groups), or add a tag to each.
+function BulkBar({
+  count,
+  onMove,
+  onTag,
+  onClear,
+}: {
+  count: number;
+  onMove: (groupName: string) => void;
+  onTag: (tag: string) => void;
+  onClear: () => void;
+}) {
+  const [group, setGroup] = useState("");
+  const [tag, setTag] = useState("");
+  return (
+    <div
+      role="region"
+      aria-label="Change the selected apps"
+      className={`${subCardClasses} flex flex-wrap items-end gap-3 px-4 py-3 text-sm`}
+    >
+      <span className="self-center font-medium text-ink-80">
+        {count === 1 ? "1 app selected" : `${count} apps selected`}
+      </span>
+      <form
+        className="flex items-end gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          onMove(group);
+          setGroup("");
+        }}
+      >
+        <input
+          value={group}
+          onChange={(e) => setGroup(e.target.value)}
+          list="app-groups"
+          placeholder="Group (empty for none)"
+          aria-label="Group to move the selected apps to"
+          className={`${controlClasses} w-48 py-1.5 text-sm`}
+        />
+        <Button type="submit" variant="ghost" size="sm">
+          Move
+        </Button>
+      </form>
+      <form
+        className="flex items-end gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!tag.trim()) return;
+          onTag(tag);
+          setTag("");
+        }}
+      >
+        <input
+          value={tag}
+          onChange={(e) => setTag(e.target.value)}
+          list="app-tags"
+          placeholder="Tag"
+          aria-label="Tag to add to the selected apps"
+          className={`${controlClasses} w-32 py-1.5 text-sm`}
+        />
+        <Button type="submit" variant="ghost" size="sm" disabled={!tag.trim()}>
+          Add tag
+        </Button>
+      </form>
+      <Button type="button" variant="ghost" size="sm" onClick={onClear} className="ml-auto">
+        Clear selection
+      </Button>
     </div>
   );
 }

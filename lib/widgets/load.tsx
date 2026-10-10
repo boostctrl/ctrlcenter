@@ -22,6 +22,7 @@ import {
   type BookmarkItem,
   type InstanceOf,
   type Settings,
+  type Group,
   type WidgetInstance,
 } from "../schema";
 import type { LayoutWidget } from "../layout";
@@ -36,6 +37,8 @@ type LoadContext = {
   instances: WidgetInstance[];
   apps: AppItem[];
   bookmarks: BookmarkItem[];
+  // The groups apps and bookmarks belong to (#299).
+  groups: Group[];
   // The resolved arrangement, so a loader can skip work for a hidden widget.
   widgets: LayoutWidget[];
   // The admin previews every widget in the editor, hidden ones included.
@@ -143,8 +146,7 @@ export async function loadHomeData(ctx: LoadContext): Promise<HomeData> {
     apps,
     bookmarks,
     search: settings.search,
-    categoryOrder: settings.bookmarkCategoryOrder,
-    groupPrivateApps: settings.groupPrivateApps,
+    groups: ctx.groups,
     initialDate: shortDate(now, timeZone),
     initialGreeting: greetingFor(hourIn(now, timeZone)),
     initialWeather: null,

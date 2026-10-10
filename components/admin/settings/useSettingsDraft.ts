@@ -255,7 +255,7 @@ export function useSettingsDraft(
   // The widgets with no settings of their own, switched on and off here; the
   // content widgets have their switch beside their editor (Widgets tab).
   // Order mirrors roughly top-to-bottom on the page.
-  const PLAIN_TYPES: WidgetType[] = ["greeting", "headerCard", "search", "apps", "bookmarks", "favorites"];
+  const PLAIN_TYPES: WidgetType[] = ["greeting", "headerCard", "search", "favorites"];
   const widgetToggles = PLAIN_TYPES.flatMap((type) =>
     instancesOf(type).map((w) => ({ id: w.id, label: widgetLabels[w.id] }))
   );

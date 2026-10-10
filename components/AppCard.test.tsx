@@ -26,6 +26,8 @@ const app: AppItem = {
   monitor: true,
   jsonQuery: "",
   pushToken: "",
+  group: "",
+  tags: [],
 };
 
 beforeEach(() => {

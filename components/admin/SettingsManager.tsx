@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import type { Board, Settings, WidgetInstance } from "@/lib/schema";
+import type { AppItem, Board, BookmarkItem, Settings, WidgetInstance } from "@/lib/schema";
+import { allTags } from "@/lib/groups";
+import type { GroupsState } from "./useGroups";
 import type { ThemePack } from "@/lib/theme";
 import { replaceUrlParams } from "./urlState";
 import { SaveStatus } from "./useAutosave";
@@ -28,6 +30,9 @@ export default function SettingsManager({
   initialSettings,
   initialWidgets,
   initialBoards,
+  groupsState,
+  initialApps,
+  initialBookmarks,
   apps,
   themePacks,
   initialSection,
@@ -38,6 +43,11 @@ export default function SettingsManager({
   initialWidgets: WidgetInstance[];
   // The boards (#298), managed in the Layout section.
   initialBoards: Board[];
+  // The groups (#299), shared with the other tabs; and the items, for the
+  // groups' usage counts and the tags the apps filter offers.
+  groupsState: GroupsState;
+  initialApps: AppItem[];
+  initialBookmarks: BookmarkItem[];
   // The monitored apps, for the alert channels' app filter and maintenance
   // windows.
   apps: { id: string; name: string }[];
@@ -138,8 +148,17 @@ export default function SettingsManager({
         <div className="@container">
         <div className="grid grid-cols-1 gap-4 @5xl:grid-cols-2">
         {section === "general" && <GeneralSection d={draft} themePacks={themePacks} />}
-        {section === "layout" && <LayoutSection d={draft} />}
-        {section === "widgets" && <WidgetsSection d={draft} />}
+        {section === "layout" && (
+          <LayoutSection
+            d={draft}
+            groupsState={groupsState}
+            initialApps={initialApps}
+            initialBookmarks={initialBookmarks}
+          />
+        )}
+        {section === "widgets" && (
+          <WidgetsSection d={draft} groups={groupsState.groups} tags={allTags(initialApps)} />
+        )}
         {section === "monitoring" && <MonitoringSection d={draft} apps={apps} />}
         {section === "integrations" && <IntegrationsSection d={draft} />}
         {section === "announcements" && <AnnouncementsSection d={draft} apps={apps} />}

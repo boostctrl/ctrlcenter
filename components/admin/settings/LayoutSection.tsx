@@ -3,7 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { buttonClasses } from "@/lib/buttons";
-import { boardName, MAX_BOARD_NAME, MAX_BOARDS } from "@/lib/schema";
+import { boardName, MAX_BOARD_NAME, MAX_BOARDS, MAX_GROUP_NAME, type AppItem, type BookmarkItem } from "@/lib/schema";
+import { findGroupByName, groupUsage } from "@/lib/groups";
+import { useConfirm } from "../Confirm";
+import { useToast } from "../Toast";
+import type { GroupsState } from "../useGroups";
 import { Button, Card, Hint, ListPanel, MoveButtons, RemoveButton, ToggleRow, controlClasses } from "../ui";
 import type { SettingsDraft } from "./useSettingsDraft";
 
@@ -107,13 +111,135 @@ function BoardsCard({ d }: { d: SettingsDraft }) {
   );
 }
 
-export default function LayoutSection({ d }: { d: SettingsDraft }) {
+// The groups apps and bookmarks belong to (#299): rename (onto another
+// group's name merges the two), reorder (the bookmarks widgets' order), and
+// delete once nothing uses a group. Groups are made by naming one in an app
+// or bookmark form.
+function GroupsCard({
+  groupsState,
+  initialApps,
+  initialBookmarks,
+}: {
+  groupsState: GroupsState;
+  initialApps: Pick<AppItem, "group">[];
+  initialBookmarks: Pick<BookmarkItem, "group">[];
+}) {
+  const { groups, save } = groupsState;
+  // The items' groups, for the usage counts; a merge moves some.
+  const [items, setItems] = useState({ apps: initialApps, bookmarks: initialBookmarks });
+  // Names being typed, by group id, until committed on blur or Enter.
+  const [names, setNames] = useState<Record<string, string>>({});
+  const dropName = (id: string) =>
+    setNames((n) => Object.fromEntries(Object.entries(n).filter(([k]) => k !== id)));
+  const confirm = useConfirm();
+  const toast = useToast();
+  const usage = groupUsage(items.apps, items.bookmarks);
+  const persist = async (next: typeof groups, done: string) => {
+    try {
+      const moved = await save(next);
+      setItems(moved);
+      toast(done);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Couldn't save the groups", "error");
+    }
+  };
+  const commitName = async (id: string) => {
+    const typed = names[id];
+    dropName(id);
+    const current = groups.find((g) => g.id === id);
+    const to = typed?.trim();
+    if (!current || !to || to === current.name) return;
+    const other = findGroupByName(groups, to);
+    if (other && other.id !== id) {
+      const ok = await confirm({
+        title: `Merge “${current.name}” into “${other.name}”?`,
+        message: `Every app and bookmark in “${current.name}” moves into “${other.name}”.`,
+        confirmLabel: "Merge",
+      });
+      if (!ok) return;
+    }
+    await persist(
+      groups.map((g) => (g.id === id ? { ...g, name: other && other.id !== id ? other.name : to } : g)),
+      other && other.id !== id ? "Groups merged" : "Group renamed"
+    );
+  };
+  return (
+    <Card
+      title="Groups"
+      intro="The groups apps and bookmarks belong to. Bookmarks widgets list them in this order, and an Applications widget can show one. Start a group by naming it in an app or bookmark form."
+    >
+      {groups.length === 0 ? (
+        <Hint>No groups yet.</Hint>
+      ) : (
+        <ListPanel>
+          {groups.map((g, i) => {
+            const u = usage.get(g.id);
+            const count = u
+              ? [u.apps && `${u.apps} app${u.apps === 1 ? "" : "s"}`, u.bookmarks && `${u.bookmarks} bookmark${u.bookmarks === 1 ? "" : "s"}`]
+                  .filter(Boolean)
+                  .join(" · ")
+              : "Unused";
+            return (
+              <div key={g.id} className="flex flex-wrap items-center gap-2">
+                {groups.length > 1 && (
+                  <MoveButtons
+                    index={i}
+                    count={groups.length}
+                    label={`group ${g.name}`}
+                    onMove={(from, to) => {
+                      const next = [...groups];
+                      const [moved] = next.splice(from, 1);
+                      next.splice(to, 0, moved);
+                      void persist(next, "Group order saved");
+                    }}
+                  />
+                )}
+                <input
+                  value={names[g.id] ?? g.name}
+                  maxLength={MAX_GROUP_NAME}
+                  onChange={(e) => setNames((n) => ({ ...n, [g.id]: e.target.value }))}
+                  onBlur={() => void commitName(g.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.currentTarget.blur();
+                    if (e.key === "Escape") dropName(g.id);
+                  }}
+                  aria-label={`Name of the ${g.name} group`}
+                  className={`${controlClasses} min-w-0 flex-1 basis-40`}
+                />
+                <span className="w-32 shrink-0 text-right text-xs text-ink-55">{count}</span>
+                {!u && (
+                  <RemoveButton
+                    label={`Delete the ${g.name} group`}
+                    onClick={() => void persist(groups.filter((x) => x.id !== g.id), "Group deleted")}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </ListPanel>
+      )}
+    </Card>
+  );
+}
+
+export default function LayoutSection({
+  d,
+  groupsState,
+  initialApps,
+  initialBookmarks,
+}: {
+  d: SettingsDraft;
+  groupsState: GroupsState;
+  initialApps: Pick<AppItem, "group">[];
+  initialBookmarks: Pick<BookmarkItem, "group">[];
+}) {
   const { settings, setSettings, isWidgetShown, setWidgetShown, widgetToggles, instancesOf, updateWidget, widgetLabels } =
     d;
   const headerCards = instancesOf("headerCard");
   return (
     <>
       <BoardsCard d={d} />
+      <GroupsCard groupsState={groupsState} initialApps={initialApps} initialBookmarks={initialBookmarks} />
       <Card
         title="Visible widgets"
         intro="Show or hide widgets on the home page (the first board). The content widgets (calendars, feeds, notes…) each have their own switch under Widgets; the split clock/weather/status widgets are managed in the home-page editor."
@@ -144,18 +270,7 @@ export default function LayoutSection({ d }: { d: SettingsDraft }) {
             checked={settings.settingsButton}
             onChange={(settingsButton) => setSettings({ ...settings, settingsButton })}
           />
-          <ToggleRow
-            label="Group private apps separately"
-            checked={settings.groupPrivateApps}
-            onChange={(groupPrivateApps) =>
-              setSettings({ ...settings, groupPrivateApps })
-            }
-          />
         </div>
-        <Hint>
-          Private apps only appear when you&apos;re signed in, so this
-          &ldquo;Private Applications&rdquo; group is only ever visible to you.
-        </Hint>
         {!settings.settingsButton && (
           <Hint>
             With the floating navigation menu off, reach this page directly at

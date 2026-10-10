@@ -5,7 +5,7 @@ import { useRef } from "react";
 // The pencil that swaps a label for an inline rename field. Callers position it
 // (absolute over a card, inline beside a heading) via `className`; sharing the
 // icon and aria wiring keeps the theme-builder saved-theme cards and the
-// bookmark category headings from drifting apart (#144).
+// bookmark group headings from drifting apart (#144).
 export function RenameButton({
   label,
   onClick,
@@ -44,7 +44,7 @@ export function RenameButton({
 // cancels, leaving the name untouched. It owns the cancel bookkeeping — the
 // blur that follows an Escape-driven unmount must not fire a commit — so callers
 // only say what commit and cancel do. No preventDefault dance is needed even
-// when a commit opens a confirm dialog (a category merge): the dialog ignores
+// when a commit opens a confirm dialog (a group merge): the dialog ignores
 // the keystroke that opened it (#146).
 export function RenameField({
   initialValue,

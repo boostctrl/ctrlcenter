@@ -1,6 +1,6 @@
 "use client";
 
-import { MAX_FEED_CARDS } from "@/lib/schema";
+import { MAX_FEED_CARDS, type Group } from "@/lib/schema";
 import { useFeedHealth } from "../FeedHealth";
 import { AddButton, Card, Hint, RemoveButton, Switch, fieldLabelClasses, subCardClasses } from "../ui";
 import { INSTANCE_GROUPS, SITE_SETTINGS } from "./widgets";
@@ -10,7 +10,16 @@ import type { SettingsDraft } from "./useSettingsDraft";
 // content widget type with its instances (#297). Each instance has its own
 // editor, a switch for whether it shows on the home page, and Remove; Add puts
 // another of the type on the board.
-export default function WidgetsSection({ d }: { d: SettingsDraft }) {
+export default function WidgetsSection({
+  d,
+  groups,
+  tags,
+}: {
+  d: SettingsDraft;
+  // For the apps and bookmarks filters (#299).
+  groups: Group[];
+  tags: string[];
+}) {
   const { instancesOf, widgetLabels, updateWidget, addWidget, removeWidget, isWidgetShown, setWidgetShown } = d;
   // Health covers every URL the home page has fetched; each feed reads its own
   // rows out of it. Polls while any feed card exists.
@@ -50,6 +59,8 @@ export default function WidgetsSection({ d }: { d: SettingsDraft }) {
                       label={label}
                       onChange={(patch) => updateWidget(w.id, patch)}
                       feedHealth={feedHealth}
+                      groups={groups}
+                      tags={tags}
                     />
                   </div>
                 );

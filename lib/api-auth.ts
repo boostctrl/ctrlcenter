@@ -133,11 +133,17 @@ export async function readPublicConfig(request?: NextRequest): Promise<{
     ? await isAdminRequest(request, config.auth.passwordHash)
     : await isAdminSession(config.auth.passwordHash);
   const safe = stripSecrets(stripAuth(config));
+  const apps = visibleItems(safe.apps, isAdmin);
+  const bookmarks = visibleItems(safe.bookmarks, isAdmin);
+  // A guest gets only the groups their apps and bookmarks belong to (#299),
+  // so a group holding only private items doesn't give its name away.
+  const used = new Set([...apps, ...bookmarks].map((i) => i.group));
   return {
     config: {
       ...safe,
-      apps: visibleItems(safe.apps, isAdmin),
-      bookmarks: visibleItems(safe.bookmarks, isAdmin),
+      apps,
+      bookmarks,
+      groups: isAdmin ? safe.groups : safe.groups.filter((g) => used.has(g.id)),
     },
     isAdmin,
   };

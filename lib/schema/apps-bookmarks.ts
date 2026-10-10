@@ -1,10 +1,12 @@
-// Apps and bookmarks: stored rows, create/update inputs, category rename, and
-// reorder.
+// Apps and bookmarks: stored rows, create/update inputs, and reorder. Both
+// belong to groups (#299, lib/schema/groups.ts) by id; forms name a group by
+// its name (groupName), and the server resolves or creates it.
 import { z } from "zod";
 import { CHECK_TYPE_KEYS } from "../status";
 import { httpUrl } from "./shared";
 import { parseJsonQuery } from "../json-query";
 import { secretFields } from "./meta";
+import { cleanTags, groupNameInput, tagsInput } from "./groups";
 
 // A JSON query must parse (#294); an empty one is allowed while editing, and
 // fails the check until it's filled in.
@@ -59,11 +61,17 @@ export const appItemSchema = z.object({
   // filters flagged items out of every public surface. Monitoring and alerts
   // ignore the flag.
   private: z.boolean().catch(false).default(false),
+  // The group it belongs to (#299), by id; "" for none.
+  group: z.string().catch("").default(""),
+  // Free-text labels an apps widget can filter on (#299).
+  tags: z.array(z.unknown()).catch([]).default([]).transform(cleanTags),
 });
 
 export const bookmarkItemSchema = z.object({
   id: z.string(),
-  category: z.string().min(1),
+  // The group it's listed under (#299), by id. Was the free-text `category`
+  // before 3.0 (the migration turns categories into groups).
+  group: z.string().catch("").default(""),
   name: z.string().min(1),
   url: httpUrl,
   icon: z.string().default(""),
@@ -99,10 +107,12 @@ export const appInputSchema = z.object({
   timeout: z.number().int().min(1).max(60).optional(),
   retries: z.number().int().min(0).max(5).optional(),
   private: z.boolean().optional().default(false),
+  groupName: groupNameInput.optional().default(""),
+  tags: tagsInput.optional().default([]),
 });
 
 export const bookmarkInputSchema = z.object({
-  category: z.string().min(1),
+  groupName: groupNameInput.min(1),
   name: z.string().min(1),
   url: httpUrl,
   icon: z.string().optional().default(""),
@@ -127,10 +137,12 @@ export const appUpdateSchema = z.object({
   timeout: z.number().int().min(1).max(60).nullable().optional(),
   retries: z.number().int().min(0).max(5).nullable().optional(),
   private: z.boolean().optional(),
+  groupName: groupNameInput.optional(),
+  tags: tagsInput.optional(),
 });
 
 export const bookmarkUpdateSchema = z.object({
-  category: z.string().min(1).optional(),
+  groupName: groupNameInput.min(1).optional(),
   name: z.string().min(1).optional(),
   url: httpUrl.optional(),
   icon: z.string().optional(),
@@ -150,22 +162,16 @@ export const bookmarkRestoreSchema = z.object({
   index: z.number().int().min(0),
 });
 
-// Rename a bookmark category across its bookmarks (PATCH /api/bookmarks/category).
-// `from` is NOT trimmed — it must match the stored category verbatim, and stored
-// names can carry stray whitespace (bookmark input doesn't trim); trimming here
-// would make such a category permanently unrenameable. `to` is trimmed and must
-// be non-empty after trimming (trim BEFORE the min check, so "   " is rejected
-// rather than passing on its untrimmed length). A no-op rename (from === to) is
-// rejected as a 400 — the client cancels it before ever calling here, so this
-// only guards a direct request.
-export const bookmarkCategoryRenameSchema = z
+// Bulk-assign apps (#299): move the listed apps to a group ("" for none)
+// and/or add tags to each.
+export const appsBulkSchema = z
   .object({
-    from: z.string().min(1),
-    to: z.string().trim().min(1),
+    ids: z.array(z.string()).min(1).max(500),
+    groupName: groupNameInput.optional(),
+    addTags: tagsInput.optional(),
   })
-  .refine((v) => v.from !== v.to, {
-    message: "New category name must differ from the old one",
-    path: ["to"],
+  .refine((v) => v.groupName !== undefined || (v.addTags?.length ?? 0) > 0, {
+    message: "Nothing to change",
   });
 
 // Reorder (PATCH): an ordered list of existing ids.

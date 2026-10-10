@@ -3,18 +3,19 @@ import type { BookmarkItem } from "@/lib/schema";
 
 // `topId` marks the search's top match (the link Enter opens), #274.
 export default function BookmarkGroup({
-  category,
+  name,
   items,
   topId = null,
 }: {
-  category: string;
+  // The group's name (#299).
+  name: string;
   items: BookmarkItem[];
   topId?: string | null;
 }) {
   return (
     <div className="glass-card px-5 py-4">
       <h3 className="accent-label mb-3 text-xs font-semibold tracking-[0.18em] uppercase">
-        {category}
+        {name}
       </h3>
       <ul className="space-y-1">
         {items.map((b) => (

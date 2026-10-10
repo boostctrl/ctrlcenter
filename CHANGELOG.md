@@ -23,6 +23,16 @@ here.
   boards from the floating corner menu, or with the `1`–`9`, `[` and `]`
   keys. Widgets are shared, so one notes card can sit on two boards. Your
   current layout becomes the home board on upgrade. (#298)
+- **Groups and tags for apps and bookmarks (3.0).** Apps can belong to a
+  group and carry tags, and an Applications widget can show one group or
+  tag, or leave out (or show only) your private apps, so a board can have
+  separate "Media" and "Infra" cards. Bookmark categories are now groups too,
+  shared with apps: rename and reorder them from the Bookmarks tab or
+  Settings → Layout → Groups, and a Bookmarks widget can show one group.
+  Tick several apps to move them to a group or tag them at once. Search also
+  matches app tags. On upgrade your categories become groups in the same
+  order, and "Group private apps separately" becomes a second Applications
+  widget showing only private apps. (#299)
 
 ### Changed
 

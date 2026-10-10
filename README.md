@@ -13,7 +13,7 @@ Built with Next.js 16, React 19, and Tailwind v4.
 ## Features
 
 - **Apps & bookmarks.** A grid of the services you run — each a card with an
-  icon, name, and subtitle, one click from launch — with category-grouped
+  icon, name, and subtitle, one click from launch — with group-sorted
   bookmarks in the same view. To find things quickly:
   - **Search** — press `/` to focus, filter apps *and* bookmarks as you
     type, `Enter` opens the top match, `Esc` clears.
@@ -26,7 +26,10 @@ Built with Next.js 16, React 19, and Tailwind v4.
   - **Rich icons** — a [dashboard-icons](https://github.com/homarr-labs/dashboard-icons)
     slug, any direct image URL, or your own upload (PNG/JPEG/WebP/GIF/SVG/ICO);
     light/dark variants auto-pick the legible one for the active surface.
-  - **Drag-to-reorder** apps and bookmark categories from the admin UI
+  - **Groups and tags** — sort apps and bookmarks into groups, tag apps,
+    and give each group its own card: an Applications widget shows one group
+    or tag, a Bookmarks widget one group or all of them.
+  - **Drag-to-reorder** apps, bookmarks and groups from the admin UI
     (keyboard- and touch-friendly, not just mouse drag).
   - **Private items** — mark an app or bookmark **Only show when logged in**
     and it disappears for signed-out visitors (from the dashboard, search, and
@@ -230,8 +233,7 @@ settings:
   settingsButton: true      # the floating corner navigation menu
   # Further sections mirror the admin UI one-to-one and are easiest to edit
   # there: favicon, announcement (the site-wide banner), statusAnnouncements,
-  # integrations (the private Monitor page's service connections), and
-  # bookmarkCategoryOrder.
+  # and integrations (the private Monitor page's service connections).
   layout:                   # shared by every board:
     scale: 100              # UI scale, percent
     gap: 32                 # space between cards (px)
@@ -272,9 +274,16 @@ widgets:                    # every widget, with its content; any type can
   - { id: family, type: calendar, url: "https://…/family.ics" }
   - { id: work, type: calendar, url: "https://…/work.ics", homeView: month }
   - { id: todo, type: notes, title: To do, content: "- renew certs" }
+  - { id: media-apps, type: apps, title: Media, filter: { group: media } }
+  - { id: private-apps, type: apps, title: Private, filter: { private: only } }
+  - { id: bookmarks, type: bookmarks }  # filter: { group: … } for one group
   # …and the other types: clock, weather, status, search, feed, countdown,
   # worldClocks, systemStats, favorites, apps, bookmarks. A widget without a
   # row on a board waits, hidden, in that board's layout editor tray.
+
+groups:                     # what apps and bookmarks are sorted into, in order
+  - { id: media, name: Media }
+  - { id: shopping, name: Shopping }
 
 apps:
   - id: <uuid>
@@ -282,6 +291,8 @@ apps:
     subtitle: Nextcloud
     url: "https://cloud.example.com"
     icon: nextcloud          # slug, full image URL, or uploaded icon
+    group: media             # optional: a group id
+    tags: [files, backup]    # optional: an apps widget can show one tag
     checkType: http          # http | tcp | keyword | dns | icmp
     expectStatus: ""         # http: codes/ranges that count as up, e.g. "200-299, 401"
                              # (blank = any reachable host is up)
@@ -290,7 +301,7 @@ apps:
 
 bookmarks:
   - id: <uuid>
-    category: Shopping       # bookmarks are grouped by category
+    group: shopping          # the group it's listed under
     name: Amazon
     url: "https://amazon.com"
     icon: amazon

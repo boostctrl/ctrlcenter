@@ -31,9 +31,9 @@ import CountdownWidget, { isValidCountdownDate } from "./CountdownWidget";
 import SystemStatsWidget from "./SystemStatsWidget";
 import WorldClocksWidget from "./WorldClocksWidget";
 import { isValidTimeZone } from "@/lib/datetime";
-import { groupBookmarks } from "@/lib/bookmarks";
+import { appMatches, groupBookmarks, type BookmarkGroupView } from "@/lib/groups";
 import type { LayoutWidget, WidgetType } from "@/lib/layout";
-import type { AppItem, BookmarkItem, InstanceOf } from "@/lib/schema";
+import type { AppItem, InstanceOf } from "@/lib/schema";
 import type { HomeData } from "@/lib/widgets/data";
 
 // What a renderer can read: the server-built data, plus Dashboard's live
@@ -54,7 +54,7 @@ export type WidgetRenderContext = {
   hasVisibleContent: boolean;
   favoriteApps: AppItem[];
   filteredApps: AppItem[];
-  filteredGroups: [string, BookmarkItem[]][];
+  filteredGroups: BookmarkGroupView[];
   // What Enter opens while searching, highlighted (#274).
   topMatchId: string | null;
 };
@@ -225,55 +225,37 @@ export const WIDGET_RENDERERS: Record<WidgetType, Renderer> = {
       </section>
     ) : null,
 
+  // Each apps widget shows the apps its filter takes (#299): a group, a tag,
+  // the private apps alone or without them. Its title, else "Applications".
   apps: (widget, { data, editing, filteredApps, topMatchId }) => {
-    const list = editing ? data.apps : filteredApps;
+    const w = instanceOf("apps", widget, data);
+    if (!w) return null;
+    const list = (editing ? data.apps : filteredApps).filter((a) => appMatches(a, w.filter));
     if (list.length === 0) return null;
-    // With grouping on, private apps get their own labeled block below the
-    // public ones. The private slice is empty for guests (readPublicConfig
-    // filters private apps out upstream), so the second group only ever
-    // appears for the admin. Both slices keep the single ordered list's
-    // relative order.
-    const publicApps = data.groupPrivateApps ? list.filter((a) => !a.private) : list;
-    const privateApps = data.groupPrivateApps ? list.filter((a) => a.private) : [];
     return (
       <section className="@container">
-        {publicApps.length > 0 && (
-          <>
-            {!widget.hideLabel && <SectionTitle>Applications</SectionTitle>}
-            <div className={cardGridClass(widget, "gap-4")}>
-              {publicApps.map((app) => (
-                <AppCard key={app.id} app={app} top={app.id === topMatchId} />
-              ))}
-            </div>
-          </>
-        )}
-        {privateApps.length > 0 && (
-          // Space the private group off the public grid above it; the
-          // SectionTitle only carries a bottom margin. No top gap when it's
-          // the only group (every app is private).
-          <div className={publicApps.length > 0 ? "mt-8" : undefined}>
-            <SectionTitle>Private Applications</SectionTitle>
-            <div className={cardGridClass(widget, "gap-4")}>
-              {privateApps.map((app) => (
-                <AppCard key={app.id} app={app} top={app.id === topMatchId} />
-              ))}
-            </div>
-          </div>
-        )}
+        {!widget.hideLabel && <SectionTitle>{w.title.trim() || "Applications"}</SectionTitle>}
+        <div className={cardGridClass(widget, "gap-4")}>
+          {list.map((app) => (
+            <AppCard key={app.id} app={app} top={app.id === topMatchId} />
+          ))}
+        </div>
       </section>
     );
   },
 
+  // A bookmarks widget shows every group, or the one its filter names (#299).
   bookmarks: (widget, { data, editing, filteredGroups, topMatchId }) => {
-    const groups = editing
-      ? groupBookmarks(data.bookmarks, data.categoryOrder)
-      : filteredGroups;
+    const w = instanceOf("bookmarks", widget, data);
+    if (!w) return null;
+    const all = editing ? groupBookmarks(data.bookmarks, data.groups) : filteredGroups;
+    const groups = w.filter.group ? all.filter((g) => g.id === w.filter.group) : all;
     return groups.length > 0 ? (
       <section className="@container">
-        {!widget.hideLabel && <SectionTitle>Bookmarks</SectionTitle>}
+        {!widget.hideLabel && <SectionTitle>{w.title.trim() || "Bookmarks"}</SectionTitle>}
         <div className={cardGridClass(widget, "gap-6")}>
-          {groups.map(([category, items]) => (
-            <BookmarkGroup key={category} category={category} items={items} topId={topMatchId} />
+          {groups.map((g) => (
+            <BookmarkGroup key={g.id} name={g.name} items={g.items} topId={topMatchId} />
           ))}
         </div>
       </section>

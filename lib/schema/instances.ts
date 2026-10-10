@@ -28,6 +28,31 @@ const instanceId = z
 
 const base = { id: instanceId };
 
+// Which apps an apps widget shows (#299): one group or any, one tag or any,
+// and the private apps shown, hidden, or alone (what `groupPrivateApps` did
+// before 3.0, as a second widget). Guests never receive private apps, so
+// "only" shows them nothing.
+export const APPS_PRIVATE_FILTERS = ["any", "hide", "only"] as const;
+const appsContent = {
+  title: z.string().max(60).catch("").default(""),
+  filter: z
+    .object({
+      group: z.string().catch("").default(""),
+      tag: z.string().catch("").default(""),
+      private: z.enum(APPS_PRIVATE_FILTERS).catch("any").default("any"),
+    })
+    .catch({ group: "", tag: "", private: "any" })
+    .default({ group: "", tag: "", private: "any" }),
+};
+// A bookmarks widget shows every group, or one.
+const bookmarksContent = {
+  title: z.string().max(60).catch("").default(""),
+  filter: z
+    .object({ group: z.string().catch("").default("") })
+    .catch({ group: "" })
+    .default({ group: "" }),
+};
+
 // The header card's own switch for its date/time row (was the site-wide
 // `settings.components.clock` before 3.0).
 const headerCardContent = { showClock: z.boolean().catch(true).default(true) };
@@ -46,8 +71,8 @@ export const widgetInstanceSchema = z.discriminatedUnion("type", [
   z.object({ ...base, type: z.literal("worldClocks"), ...worldClocksSchema.shape }),
   z.object({ ...base, type: z.literal("systemStats"), ...systemStatsSchema.shape }),
   z.object({ ...base, type: z.literal("favorites") }),
-  z.object({ ...base, type: z.literal("apps") }),
-  z.object({ ...base, type: z.literal("bookmarks") }),
+  z.object({ ...base, type: z.literal("apps"), ...appsContent }),
+  z.object({ ...base, type: z.literal("bookmarks"), ...bookmarksContent }),
 ]);
 export type WidgetInstance = z.infer<typeof widgetInstanceSchema>;
 export type WidgetInstanceType = WidgetInstance["type"];

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import type { BookmarkItem } from "@/lib/schema";
-import { orderCategories } from "@/lib/bookmarks";
+import type { BookmarkItem, Group } from "@/lib/schema";
+import { findGroupByName, groupBookmarks, groupName } from "@/lib/groups";
 import Icon from "@/components/Icon";
 import { RenameButton, RenameField } from "@/components/InlineRename";
 import {
@@ -23,18 +23,19 @@ import { useConfirm } from "./Confirm";
 import { useRevealForm } from "./useRevealForm";
 import { withHttpScheme } from "@/lib/urls";
 import { apiErrorMessage } from "./apiError";
-import { saveSettingsPatch } from "./settingsApi";
+import type { GroupsState } from "./useGroups";
 
 type FormState = {
   name: string;
-  category: string;
+  // The group's name (#299): an existing group, or a new one to create.
+  groupName: string;
   url: string;
   icon: string;
   private: boolean;
 };
 const emptyForm: FormState = {
   name: "",
-  category: "",
+  groupName: "",
   url: "",
   icon: "",
   private: false,
@@ -42,18 +43,20 @@ const emptyForm: FormState = {
 
 export default function BookmarksManager({
   initialBookmarks,
-  initialCategoryOrder,
+  groupsState,
 }: {
   initialBookmarks: BookmarkItem[];
-  initialCategoryOrder: string[];
+  // The shared group list (#299): bookmarks are listed under their groups,
+  // in its order.
+  groupsState: GroupsState;
 }) {
   const [bookmarks, setBookmarks] = useState(initialBookmarks);
-  const [categoryOrder, setCategoryOrder] = useState(initialCategoryOrder);
+  const { groups, refresh: refreshGroups, save: saveGroups } = groupsState;
   const [form, setForm] = useState<FormState>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  // Which category heading is showing its inline rename field (null = none).
-  const [renamingCategory, setRenamingCategory] = useState<string | null>(null);
+  // Which group heading is showing its inline rename field, by id.
+  const [renamingGroup, setRenamingGroup] = useState<string | null>(null);
   const toast = useToast();
   const confirm = useConfirm();
   const { ref: formRef, reveal: revealForm } = useRevealForm<HTMLDivElement>();
@@ -62,7 +65,7 @@ export default function BookmarksManager({
     setEditingId(bookmark.id);
     setForm({
       name: bookmark.name,
-      category: bookmark.category,
+      groupName: bookmark.group ? groupName(groups, bookmark.group) : "",
       url: bookmark.url,
       icon: bookmark.icon,
       private: bookmark.private,
@@ -90,6 +93,8 @@ export default function BookmarksManager({
         return;
       }
       const saved: BookmarkItem = await res.json();
+      // Naming a group that didn't exist created it server-side.
+      if (!groups.some((g) => g.id === saved.group)) void refreshGroups();
       const wasEditing = editingId;
       setBookmarks((prev) =>
         wasEditing ? prev.map((b) => (b.id === wasEditing ? saved : b)) : [...prev, saved]
@@ -167,103 +172,86 @@ export default function BookmarksManager({
     }
   }
 
-  // Commit a category's newly ordered items, rebuilding the flat list while
-  // leaving other categories' positions untouched. Shared by drag-and-drop and
-  // the up/down buttons (both go through a per-category `useReorder`).
-  function commitGroup(category: string, reordered: BookmarkItem[]) {
+  // Commit a group's newly ordered bookmarks, rebuilding the flat list while
+  // leaving other groups' positions untouched. Shared by drag-and-drop and
+  // the up/down buttons (both go through a per-group `useReorder`).
+  function commitGroup(groupId: string, reordered: BookmarkItem[]) {
     let gi = 0;
-    persistOrder(
-      bookmarks.map((b) => (b.category === category ? reordered[gi++] : b))
-    );
+    persistOrder(bookmarks.map((b) => (b.group === groupId ? reordered[gi++] : b)));
   }
 
-  async function persistCategoryOrder(next: string[]) {
-    const previous = categoryOrder;
-    setCategoryOrder(next); // optimistic
+  async function persistGroups(next: Group[], done: string) {
     try {
-      await saveSettingsPatch({ bookmarkCategoryOrder: next });
-    } catch {
-      setCategoryOrder(previous);
-      toast("Couldn't save the category order", "error");
+      const moved = await saveGroups(next);
+      setBookmarks(moved.bookmarks);
+      toast(done);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Couldn't save the groups", "error");
     }
   }
 
-  // Commit an inline category rename. An empty/unchanged field leaves everything
-  // untouched. Renaming onto an existing category merges the two, gated behind a
-  // confirm; the server rewrites every affected bookmark and the category order
-  // in one action. RenameField suppresses the commit on an Escape cancel, so
-  // this only runs on a real commit — and the confirm dialog ignores the Enter
-  // that opened it (#146), so no local keystroke guard is needed here.
-  async function commitRename(from: string, value: string) {
+  // The group headings shown here are the groups with bookmarks; reordering
+  // them moves them within the full list (apps' groups keep their places).
+  async function persistGroupOrder(orderedIds: string[]) {
+    const shown = new Set(orderedIds);
+    let i = 0;
+    const next = groups.map((g) => (shown.has(g.id) ? groups.find((x) => x.id === orderedIds[i++])! : g));
+    await persistGroups(next, "Group order saved");
+  }
+
+  // Commit an inline group rename. An empty/unchanged field leaves everything
+  // untouched. Renaming onto another group's name merges the two, gated
+  // behind a confirm; the server moves every affected app and bookmark in one
+  // write. RenameField suppresses the commit on an Escape cancel, so this only
+  // runs on a real commit — and the confirm dialog ignores the Enter that
+  // opened it (#146), so no local keystroke guard is needed here.
+  async function commitRename(id: string, value: string) {
     const to = value.trim();
-    if (!to || to === from) {
-      setRenamingCategory(null);
+    const current = groups.find((g) => g.id === id);
+    if (!current || !to || to === current.name) {
+      setRenamingGroup(null);
       return;
     }
-    if (present.includes(to)) {
+    const other = findGroupByName(groups, to);
+    if (other && other.id !== id) {
       const ok = await confirm({
-        title: `Merge “${from}” into “${to}”?`,
-        message: `Every bookmark in “${from}” moves into “${to}”.`,
+        title: `Merge “${current.name}” into “${other.name}”?`,
+        message: `Every app and bookmark in “${current.name}” moves into “${other.name}”.`,
         confirmLabel: "Merge",
       });
       if (!ok) {
-        setRenamingCategory(null);
+        setRenamingGroup(null);
         return;
       }
     }
-    try {
-      const res = await fetch("/api/bookmarks/category", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ from, to }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        toast(apiErrorMessage(data, "Failed to rename"), "error");
-        return;
-      }
-      const data: { bookmarks: BookmarkItem[]; bookmarkCategoryOrder: string[] } =
-        await res.json();
-      setBookmarks(data.bookmarks);
-      setCategoryOrder(data.bookmarkCategoryOrder);
-      toast("Category renamed");
-    } catch {
-      toast("Failed to rename", "error");
-    } finally {
-      // Only close OUR rename field: the fetch yielded, and the user may have
-      // already opened a rename on another category in the meantime.
-      setRenamingCategory((cur) => (cur === from ? null : cur));
-    }
+    await persistGroups(
+      groups.map((g) => (g.id === id ? { ...g, name: other && other.id !== id ? other.name : to } : g)),
+      other && other.id !== id ? "Groups merged" : "Group renamed"
+    );
+    // Only close OUR rename field: the save yielded, and the user may have
+    // already opened a rename on another group in the meantime.
+    setRenamingGroup((cur) => (cur === id ? null : cur));
   }
 
-  // First-seen categories, then ordered by the saved order.
-  const present: string[] = [];
-  const seenCat = new Set<string>();
-  for (const b of bookmarks) {
-    if (!seenCat.has(b.category)) {
-      present.push(b.category);
-      seenCat.add(b.category);
-    }
-  }
-  const orderedCategories = orderCategories(present, categoryOrder);
-  const groups: [string, BookmarkItem[]][] = orderedCategories.map((c) => [
-    c,
-    bookmarks.filter((b) => b.category === c),
-  ]);
-  const categories = [...present].sort();
+  // Bookmarks under their groups, in the group list's order. A bookmark whose
+  // group the list doesn't carry (a hand edit) shows under its id, or
+  // "Other", and can't be renamed or reordered from here.
+  const views = groupBookmarks(bookmarks, groups);
+  const known = new Set(groups.map((g) => g.id));
+  const orderedGroupIds = views.filter((v) => known.has(v.id)).map((v) => v.id);
 
-  // Drag-and-drop for the category headings themselves. The per-category bookmark
-  // rows use their own `useReorder` inside `CategoryGroup` (hooks can't run in a
-  // loop). The heading is its own drop zone, so a row drag never bleeds into the
-  // category order.
+  // Drag-and-drop for the group headings themselves. The per-group bookmark
+  // rows use their own `useReorder` inside `GroupRows` (hooks can't run in a
+  // loop). The heading is its own drop zone, so a row drag never bleeds into
+  // the group order.
   const {
     handlers: catHandlers,
     grip: catGrip,
     dragIndex: catDragIndex,
     overIndex: catOverIndex,
     dropEdge: catDropEdge,
-    move: moveCategory,
-  } = useReorder(orderedCategories, persistCategoryOrder);
+    move: moveGroup,
+  } = useReorder(orderedGroupIds, persistGroupOrder);
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(320px,380px)] xl:grid-cols-[minmax(0,1fr)_minmax(360px,440px)]">
@@ -284,56 +272,61 @@ export default function BookmarksManager({
         {bookmarks.length === 0 && (
           <p className="text-sm text-ink-40">No bookmarks yet. Add your first one.</p>
         )}
-        {groups.map(([category, items], catIndex) => (
-          <div key={category} className="space-y-2">
-            <div
-              {...catHandlers(catIndex)}
-              className={`flex items-center gap-2 transition-colors ${dropIndicatorClass(
-                catIndex,
-                {
+        {views.map(({ id, name, items }) => {
+          const catIndex = orderedGroupIds.indexOf(id);
+          const movable = catIndex !== -1;
+          return (
+          <div key={id || "ungrouped"} className="space-y-2">
+            {movable ? (
+              <div
+                {...catHandlers(catIndex)}
+                className={`flex items-center gap-2 transition-colors ${dropIndicatorClass(catIndex, {
                   dragIndex: catDragIndex,
                   overIndex: catOverIndex,
                   dropEdge: catDropEdge,
-                }
-              )} ${catDragIndex === catIndex ? "opacity-50" : ""}`}
-            >
-              <MoveButtons
-                index={catIndex}
-                count={groups.length}
-                label={`category ${category}`}
-                onMove={moveCategory}
-              />
-              <DragGrip {...catGrip(catIndex)} />
-              {renamingCategory === category ? (
-                <RenameField
-                  initialValue={category}
-                  label={`Rename category ${category}`}
-                  onCommit={(v) => commitRename(category, v)}
-                  onCancel={() => setRenamingCategory(null)}
-                  className="accent-focus min-w-0 rounded-md border border-fg/15 bg-fg/5 px-1.5 py-0.5 text-xs font-semibold tracking-[0.18em] text-fg uppercase outline-none"
+                })} ${catDragIndex === catIndex ? "opacity-50" : ""}`}
+              >
+                <MoveButtons
+                  index={catIndex}
+                  count={orderedGroupIds.length}
+                  label={`group ${name}`}
+                  onMove={moveGroup}
                 />
-              ) : (
-                <>
-                  <h3 className="text-xs font-semibold tracking-[0.18em] text-ink-50 uppercase">
-                    {category}
-                  </h3>
-                  <RenameButton
-                    label={`Rename category ${category}`}
-                    onClick={() => setRenamingCategory(category)}
-                    className="shrink-0 rounded-md p-1 text-ink-40 transition-colors hover:bg-fg/10 hover:text-ink-80"
+                <DragGrip {...catGrip(catIndex)} />
+                {renamingGroup === id ? (
+                  <RenameField
+                    initialValue={name}
+                    label={`Rename group ${name}`}
+                    onCommit={(v) => commitRename(id, v)}
+                    onCancel={() => setRenamingGroup(null)}
+                    className="accent-focus min-w-0 rounded-md border border-fg/15 bg-fg/5 px-1.5 py-0.5 text-xs font-semibold tracking-[0.18em] text-fg uppercase outline-none"
                   />
-                </>
-              )}
-            </div>
-            <CategoryGroup
-              category={category}
+                ) : (
+                  <>
+                    <h3 className="text-xs font-semibold tracking-[0.18em] text-ink-50 uppercase">
+                      {name}
+                    </h3>
+                    <RenameButton
+                      label={`Rename group ${name}`}
+                      onClick={() => setRenamingGroup(id)}
+                      className="shrink-0 rounded-md p-1 text-ink-40 transition-colors hover:bg-fg/10 hover:text-ink-80"
+                    />
+                  </>
+                )}
+              </div>
+            ) : (
+              <h3 className="text-xs font-semibold tracking-[0.18em] text-ink-50 uppercase">{name}</h3>
+            )}
+            <GroupRows
+              groupId={id}
               items={items}
               onReorder={commitGroup}
               onEdit={startEdit}
               onDelete={handleDelete}
             />
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <div ref={formRef} className="h-fit scroll-mt-6">
@@ -346,16 +339,17 @@ export default function BookmarksManager({
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
             <TextField
-              label="Category"
+              label="Group"
               required
-              list="bookmark-categories"
+              list="bookmark-groups"
               placeholder="e.g. Shopping"
-              value={form.category}
-              onChange={(e) => setForm({ ...form, category: e.target.value })}
+              hint="An existing group, or a new name to start one."
+              value={form.groupName}
+              onChange={(e) => setForm({ ...form, groupName: e.target.value })}
             />
-            <datalist id="bookmark-categories">
-              {categories.map((c) => (
-                <option key={c} value={c} />
+            <datalist id="bookmark-groups">
+              {groups.map((g) => (
+                <option key={g.id} value={g.name} />
               ))}
             </datalist>
             <TextField
@@ -377,7 +371,7 @@ export default function BookmarksManager({
             />
             <ToggleRow
               label="Only show when logged in"
-              hint="Hides this bookmark from signed-out visitors. A category whose bookmarks are all private disappears with them."
+              hint="Hides this bookmark from signed-out visitors. A group whose bookmarks are all private disappears with them."
               checked={form.private}
               onChange={(v) => setForm({ ...form, private: v })}
             />
@@ -398,27 +392,27 @@ export default function BookmarksManager({
   );
 }
 
-// One category's bookmark rows, with drag-reorder scoped to this category (the
-// edit form handles moving a bookmark to a different category). Extracted so it
-// can own a `useReorder` — hooks can't be called per-iteration in the parent's
-// group loop. `onReorder` hands the category's newly ordered items back to the
+// One group's bookmark rows, with drag-reorder scoped to this group (the edit
+// form handles moving a bookmark to a different group). Extracted so it can
+// own a `useReorder` — hooks can't be called per-iteration in the parent's
+// group loop. `onReorder` hands the group's newly ordered items back to the
 // parent, which rebuilds the flat bookmark list.
-function CategoryGroup({
-  category,
+function GroupRows({
+  groupId,
   items,
   onReorder,
   onEdit,
   onDelete,
 }: {
-  category: string;
+  groupId: string;
   items: BookmarkItem[];
-  onReorder: (category: string, next: BookmarkItem[]) => void;
+  onReorder: (groupId: string, next: BookmarkItem[]) => void;
   onEdit: (bookmark: BookmarkItem) => void;
   onDelete: (id: string) => void;
 }) {
   const { handlers, grip, dragIndex, overIndex, dropEdge, move } = useReorder(
     items,
-    (next) => onReorder(category, next)
+    (next) => onReorder(groupId, next)
   );
 
   return (

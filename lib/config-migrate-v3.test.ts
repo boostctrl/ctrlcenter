@@ -277,3 +277,81 @@ describe("the v2 → v3 chain", () => {
     expect(feedRow).toMatchObject({ span: 12, hidden: false });
   });
 });
+
+describe("migrateV2toV3: groups (#299)", () => {
+  type G = { groups: { id: string; name: string }[]; bookmarks: Record<string, unknown>[]; settings: Record<string, unknown> };
+  const run = (raw: Record<string, unknown>) => migrateV2toV3(raw).value as unknown as Out & G;
+
+  it("turns bookmark categories into groups in the saved order, then first-seen", () => {
+    const out = run({
+      settings: { bookmarkCategoryOrder: ["Media", "Gone", "Dev"] },
+      bookmarks: [
+        { id: "1", category: "Dev", name: "GitHub", url: "https://github.com" },
+        { id: "2", category: "Shopping", name: "Amazon", url: "https://amazon.com" },
+        { id: "3", category: "Media", name: "Plex", url: "https://plex.tv" },
+        { id: "4", category: "Media & TV", name: "Jelly", url: "https://jelly.tv" },
+      ],
+    });
+    expect(out.groups).toEqual([
+      { id: "media", name: "Media" },
+      { id: "dev", name: "Dev" },
+      { id: "shopping", name: "Shopping" },
+      { id: "media-tv", name: "Media & TV" },
+    ]);
+    expect(out.bookmarks.map((b) => b.group)).toEqual(["dev", "shopping", "media", "media-tv"]);
+    expect(out.bookmarks.every((b) => !("category" in b))).toBe(true);
+    expect(out.settings).not.toHaveProperty("bookmarkCategoryOrder");
+    const config = configReadSchema.parse(migrateConfig({ schemaVersion: 2, settings: {}, bookmarks: out.bookmarks }).value);
+    expect(config.bookmarks).toHaveLength(4);
+  });
+
+  it("keeps two categories whose names make the same id apart", () => {
+    const out = run({
+      bookmarks: [
+        { id: "1", category: "Media", name: "A", url: "https://a.com" },
+        { id: "2", category: "media", name: "B", url: "https://b.com" },
+      ],
+    });
+    expect(out.groups.map((g) => g.id)).toEqual(["media", "media-2"]);
+  });
+
+  it("makes groupPrivateApps a second apps widget beside each apps row", () => {
+    const out = run({
+      settings: {
+        groupPrivateApps: true,
+        layout: { columns: 24, sections: [{ id: "apps", span: 12, cards: 3 }] },
+      },
+    });
+    const apps = out.widgets.filter((w) => w.type === "apps");
+    expect(apps).toEqual([
+      expect.objectContaining({ id: "apps", filter: { private: "hide" } }),
+      expect.objectContaining({ id: "apps-private", title: "Private Applications", filter: { private: "only" } }),
+    ]);
+    const ids = rows(out).map((r) => r.widget);
+    expect(ids.indexOf("apps-private")).toBe(ids.indexOf("apps") + 1);
+    expect(row(out, "apps-private")).toMatchObject({ span: 12, cards: 3, hidden: false });
+    expect(out.settings).not.toHaveProperty("groupPrivateApps");
+  });
+
+  it("drops a groupPrivateApps that was off without adding a widget", () => {
+    const out = run({ settings: { groupPrivateApps: false } });
+    expect(out.widgets.filter((w) => w.type === "apps").map((w) => w.id)).toEqual(["apps"]);
+    expect(out.settings).not.toHaveProperty("groupPrivateApps");
+  });
+
+  it("gives a pre-release file with boards just the groups part, and leaves a current one alone", () => {
+    const pre = {
+      schemaVersion: 3,
+      settings: {},
+      boards: [{ id: "home" }],
+      widgets: [],
+      bookmarks: [{ id: "1", category: "Dev", name: "GitHub", url: "https://github.com" }],
+    };
+    const out = migrateV2toV3(pre);
+    expect(out.changed).toBe(true);
+    expect((out.value as G).groups).toEqual([{ id: "dev", name: "Dev" }]);
+    const current = { ...pre, groups: [], bookmarks: [] };
+    expect(migrateV2toV3(current)).toEqual({ value: current, changed: false });
+  });
+});
+

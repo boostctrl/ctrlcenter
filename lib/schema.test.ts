@@ -9,7 +9,10 @@ import {
   weatherUpdateSchema,
   themesInputSchema,
   layoutSchema,
-  bookmarkCategoryRenameSchema,
+  appItemSchema,
+  appsBulkSchema,
+  groupsSchema,
+  groupsUpdateSchema,
   feedUrls,
   widgetInstancesUpdateSchema,
   newInstance,
@@ -112,7 +115,7 @@ describe("configSchema defaults", () => {
     expect(config.settings.theme.scene).toBe("aurora");
     expect(config.settings.theme.accentFrom).toBe("#a78bfa");
     expect(config.settings.statusChecks).toBe(false);
-    expect(config.settings.groupPrivateApps).toBe(false);
+    expect(config.groups).toEqual([]);
     expect(config.settings.statusInterval).toBe(5);
     expect(config.settings.statusDefaultRange).toBe("d1");
     expect(config.settings.statusAnnouncements).toEqual([]);
@@ -185,21 +188,12 @@ describe("settingsSchema", () => {
     });
   });
 
-  it("defaults groupPrivateApps off and keeps a stored value", () => {
-    expect(settingsSchema.parse({}).groupPrivateApps).toBe(false);
-    expect(settingsSchema.parse({ groupPrivateApps: true }).groupPrivateApps).toBe(
-      true
-    );
-  });
 });
 
 describe("settingsInputSchema", () => {
-  it("accepts groupPrivateApps as an optional partial update", () => {
-    expect(settingsInputSchema.parse({ groupPrivateApps: true })).toEqual({
-      groupPrivateApps: true,
-    });
-    // Omitted stays absent, so updateSettings' partial merge leaves it untouched.
-    expect(settingsInputSchema.parse({}).groupPrivateApps).toBeUndefined();
+  it("leaves an omitted field absent, so the partial merge keeps it", () => {
+    expect(settingsInputSchema.parse({ statusChecks: true })).toEqual({ statusChecks: true });
+    expect(settingsInputSchema.parse({}).statusChecks).toBeUndefined();
   });
 });
 
@@ -258,47 +252,47 @@ describe("appInputSchema", () => {
 });
 
 describe("bookmarkInputSchema", () => {
-  it("requires category, name and url", () => {
+  it("requires a group name, a name and a URL", () => {
+    expect(bookmarkInputSchema.safeParse({ name: "A", url: "https://a.com" }).success).toBe(false);
+    expect(bookmarkInputSchema.safeParse({ groupName: "  ", name: "A", url: "https://a.com" }).success).toBe(false);
     expect(
-      bookmarkInputSchema.safeParse({ name: "A", url: "https://a.com" }).success
-    ).toBe(false);
-    expect(
-      bookmarkInputSchema.safeParse({
-        category: "Shopping",
-        name: "A",
-        url: "https://a.com",
-      }).success
-    ).toBe(true);
+      bookmarkInputSchema.parse({ groupName: " Shopping ", name: "A", url: "https://a.com" }).groupName
+    ).toBe("Shopping");
   });
 });
 
-describe("bookmarkCategoryRenameSchema", () => {
-  it("keeps `from` verbatim (stored names may carry whitespace) and trims `to`", () => {
-    const parsed = bookmarkCategoryRenameSchema.parse({
-      from: "  Media ",
-      to: " Streaming ",
-    });
-    expect(parsed).toEqual({ from: "  Media ", to: "Streaming" });
+describe("app groups and tags (#299)", () => {
+  it("defaults to no group and no tags, and cleans stored tags", () => {
+    const app = appItemSchema.parse({ id: "a", name: "A", url: "https://a.com" });
+    expect(app.group).toBe("");
+    expect(app.tags).toEqual([]);
+    expect(appItemSchema.parse({ id: "a", name: "A", url: "https://a.com", tags: [" x ", "X", "", 3, "y"] }).tags).toEqual([
+      "x",
+      "y",
+    ]);
   });
 
-  it("requires `to` non-empty after trimming (trim runs BEFORE the min check)", () => {
-    expect(
-      bookmarkCategoryRenameSchema.safeParse({ from: "X", to: "   " }).success
-    ).toBe(false);
+  it("cleans tag input and caps it", () => {
+    expect(appInputSchema.parse({ name: "A", url: "https://a.com", tags: ["a", " a ", "b"] }).tags).toEqual(["a", "b"]);
+    expect(appInputSchema.safeParse({ name: "A", url: "https://a.com", tags: Array(13).fill("t") }).success).toBe(false);
   });
 
-  it("rejects a no-op rename (from === trimmed to)", () => {
-    expect(
-      bookmarkCategoryRenameSchema.safeParse({ from: "Media", to: "Media" })
-        .success
-    ).toBe(false);
-    // A whitespace-cleanup rename (" Media " → "Media") is a real rename.
-    expect(
-      bookmarkCategoryRenameSchema.safeParse({ from: " Media ", to: "Media" })
-        .success
-    ).toBe(true);
+  it("validates a bulk change", () => {
+    expect(appsBulkSchema.safeParse({ ids: ["a"] }).success).toBe(false);
+    expect(appsBulkSchema.safeParse({ ids: [], groupName: "X" }).success).toBe(false);
+    expect(appsBulkSchema.safeParse({ ids: ["a"], groupName: "" }).success).toBe(true);
+    expect(appsBulkSchema.safeParse({ ids: ["a"], addTags: ["t"] }).success).toBe(true);
+  });
+
+  it("keeps groups lenient on read and strict on input", () => {
+    expect(groupsSchema.parse([{ id: "a", name: "A" }, { id: "a", name: "Again" }, { id: "b c", name: "B" }, { id: "d", name: " " }])).toEqual([
+      { id: "a", name: "A" },
+    ]);
+    expect(groupsUpdateSchema.safeParse([{ id: "a", name: "A" }, { id: "a", name: "B" }]).success).toBe(false);
+    expect(groupsUpdateSchema.safeParse([{ id: "a", name: "A" }, { id: "b", name: "a" }]).success).toBe(true);
   });
 });
+
 
 describe("weatherUpdateSchema range validation", () => {
   it("accepts in-range coordinates", () => {
@@ -321,7 +315,7 @@ describe("weatherUpdateSchema range validation", () => {
 });
 
 describe("URL scheme validation", () => {
-  const valid = { name: "X", category: "C", url: "https://ok.example.com" };
+  const valid = { name: "X", groupName: "C", url: "https://ok.example.com" };
 
   it("accepts http and https URLs", () => {
     expect(
