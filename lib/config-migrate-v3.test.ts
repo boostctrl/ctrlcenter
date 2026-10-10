@@ -405,3 +405,36 @@ describe("v2 → v3: themes (#305)", () => {
   });
 });
 
+describe("v2 → v3: alerts (#320)", () => {
+  it("moves the original webhook and email into the channel list, as they sent", () => {
+    const { value } = migrateV2toV3({
+      settings: {
+        alerts: {
+          enabled: true,
+          type: "discord",
+          webhookUrl: " https://discord.test/hook ",
+          notifyOnRecovery: false,
+          email: { host: "smtp.test", from: "a@x", to: "b@y", pass: "p" },
+          channels: [{ id: "tg", type: "telegram", token: "t", chatId: "1" }],
+        },
+      },
+    });
+    const alerts = (value as { settings: { alerts: Record<string, unknown> } }).settings.alerts;
+    expect(Object.keys(alerts).sort()).toEqual(["channels", "enabled"]);
+    expect(alerts.channels).toEqual([
+      { id: "webhook", type: "webhook", enabled: true, onDown: true, onRecovery: false, onWarning: true, onWebhooks: true, format: "discord", url: "https://discord.test/hook" },
+      // 2.x's email switch defaulted to off.
+      { id: "email", type: "email", enabled: false, onDown: true, onRecovery: false, onWarning: true, onWebhooks: true, smtp: { host: "smtp.test", from: "a@x", to: "b@y", pass: "p" } },
+      { id: "tg", type: "telegram", token: "t", chatId: "1" },
+    ]);
+    expect(migrateV2toV3(value).changed).toBe(false);
+  });
+
+  it("drops the keys without adding channels when nothing was set up", () => {
+    const { value } = migrateV2toV3({
+      settings: { alerts: { webhookUrl: "", webhookEnabled: true, email: { enabled: false, host: "" } } },
+    });
+    expect((value as { settings: { alerts: unknown } }).settings.alerts).toEqual({ channels: [] });
+  });
+});
+

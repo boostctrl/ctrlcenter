@@ -268,13 +268,10 @@ async function statusPhase(run) {
     },
   ];
   // Alerts with every part of their settings card on show (#291), none able
-  // to send: the original webhook and one channel are switched off, the
-  // other channel is missing its chat ID.
+  // to send: one channel is switched off, the other is missing its chat ID.
   config.settings.alerts = {
     ...config.settings.alerts,
     enabled: true,
-    webhookUrl: `http://127.0.0.1:${closedPort}/`,
-    webhookEnabled: false,
     channels: [
       { id: "smoke-webhook", type: "webhook", enabled: false, url: `http://127.0.0.1:${closedPort}/` },
       { id: "smoke-telegram", type: "telegram", name: "Phone", token: "smoke", apps: ["smoke-down"] },

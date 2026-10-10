@@ -1,78 +1,9 @@
 import { describe, it, expect } from "vitest";
-import {
-  alertChannels,
-  channelReady,
-  legacyChannels,
-  missingFields,
-  moveLegacyIntoChannels,
-  wantsAlert,
-} from "./alert-channels";
+import { channelReady, missingFields, wantsAlert } from "./alert-channels";
 import { alertChannelSchema, alertsSchema } from "./schema";
 
 const channel = (over: Record<string, unknown>) =>
   alertChannelSchema.parse({ id: "c", type: "webhook", ...over });
-
-describe("legacyChannels", () => {
-  it("is empty for a fresh config", () => {
-    expect(legacyChannels(alertsSchema.parse({}))).toEqual([]);
-  });
-
-  it("turns the original webhook and email keys into entries", () => {
-    const config = alertsSchema.parse({
-      type: "ntfy",
-      webhookUrl: "https://ntfy.test/x",
-      webhookEnabled: false,
-      notifyOnRecovery: false,
-      email: { enabled: true, host: "smtp.test", from: "a@x", to: "b@y", subject: "S" },
-    });
-    const [webhook, email] = legacyChannels(config);
-    expect(webhook).toMatchObject({
-      id: "legacy-webhook",
-      type: "webhook",
-      enabled: false,
-      format: "ntfy",
-      url: "https://ntfy.test/x",
-      onRecovery: false,
-      apps: [],
-    });
-    expect(email).toMatchObject({
-      id: "legacy-email",
-      type: "email",
-      enabled: true,
-      smtp: { host: "smtp.test", from: "a@x", to: "b@y", subject: "S", port: 587 },
-    });
-  });
-
-  it("lists them ahead of the channel list", () => {
-    const config = alertsSchema.parse({
-      webhookUrl: "https://x.test",
-      channels: [channel({ id: "n", url: "https://n.test" })],
-    });
-    expect(alertChannels(config).map((c) => c.id)).toEqual(["legacy-webhook", "n"]);
-  });
-});
-
-describe("moveLegacyIntoChannels", () => {
-  it("moves the original keys into the list and resets them", () => {
-    const config = alertsSchema.parse({
-      webhookUrl: "https://x.test",
-      type: "slack",
-      email: { enabled: true, host: "smtp.test", from: "a@x", to: "b@y" },
-      channels: [channel({ id: "n" })],
-    });
-    let n = 0;
-    const patch = moveLegacyIntoChannels(config, () => `new-${++n}`);
-    expect(patch.channels.map((c) => [c.id, c.type])).toEqual([
-      ["new-1", "webhook"],
-      ["new-2", "email"],
-      ["n", "webhook"],
-    ]);
-    expect(patch.channels[0]).toMatchObject({ format: "slack", url: "https://x.test" });
-    const after = alertsSchema.parse({ ...config, ...patch });
-    expect(legacyChannels(after)).toEqual([]);
-    expect(alertChannels(after)).toHaveLength(3);
-  });
-});
 
 describe("missingFields / channelReady", () => {
   it("names what each type still needs", () => {

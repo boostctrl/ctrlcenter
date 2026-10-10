@@ -1,7 +1,6 @@
 import type { AlertChannel, AlertConfig, AlertType, SmtpConfig } from "./schema";
 import {
   activeChannels,
-  alertChannels,
   channelLabel,
   channelReady,
   wantsAlert,
@@ -566,7 +565,7 @@ export async function sendTestAlert(
   const channels =
     channelId === undefined
       ? activeChannels(config)
-      : alertChannels(config).filter((ch) => ch.id === channelId && channelReady(ch));
+      : config.channels.filter((ch) => ch.id === channelId && channelReady(ch));
   // A distinctly-named app so the notification reads "🔴 CtrlCenter test alert
   // is down": unmistakably a test, yet the real down-path formatting (ntfy
   // priority/tags, the email subject template, etc.).

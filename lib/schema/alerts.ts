@@ -1,4 +1,4 @@
-// Outbound uptime alerts (webhook + email channels).
+// Outbound uptime alerts: a list of channels (#291).
 import { z } from "zod";
 import { secretFields } from "./meta";
 import { patchOf } from "./input";
@@ -8,14 +8,11 @@ import { lenientArray } from "./shared";
 // and endpoints that map where alerts go.
 const secret = () => z.string().default("").register(secretFields, { redact: "blank" });
 
-// Outbound uptime alerts. When status checks are on, the background poller can
-// POST to a webhook as apps transition down (or recover). Stored leniently so a
-// hand-edited file always parses; the URL is validated on the admin-input path.
+// The payload formats a webhook channel can send.
 export const ALERT_TYPES = ["generic", "discord", "slack", "ntfy"] as const;
 export type AlertType = (typeof ALERT_TYPES)[number];
 
-// SMTP settings, shared by the original email channel and email entries in
-// the channel list. Stored leniently; required fields are enforced where a
+// An email channel's SMTP settings. Stored leniently; required fields are enforced where a
 // channel is checked for readiness. The password can also come from the
 // CTRLCENTER_SMTP_PASS env var to keep it out of the file.
 const smtpShape = {
@@ -34,13 +31,6 @@ const smtpShape = {
 };
 export const smtpSchema = z.object(smtpShape);
 export type SmtpConfig = z.infer<typeof smtpSchema>;
-
-// The original email (SMTP) alert channel, dispatched alongside the webhook.
-export const alertEmailSchema = z.object({
-  enabled: z.boolean().default(false),
-  ...smtpShape,
-});
-export type AlertEmailConfig = z.infer<typeof alertEmailSchema>;
 
 // One entry in the channel list (#291). Flat: each type reads the fields it
 // needs and ignores the rest, so switching a channel's type in the form keeps
@@ -78,22 +68,14 @@ export const alertChannelSchema = z.object({
 });
 export type AlertChannel = z.infer<typeof alertChannelSchema>;
 
+// When status checks are on, the background poller sends to each channel as
+// apps go down, recover or start warning.
 export const alertsSchema = z.object({
   enabled: z.boolean().default(false),
-  type: z.enum(ALERT_TYPES).default("generic"),
-  webhookUrl: secret(),
-  // Webhook channel on/off, independent of the email channel. Defaults true so an
-  // existing config with a webhook URL keeps sending; the webhook fires only when
-  // this is on AND a URL is set.
-  webhookEnabled: z.boolean().default(true),
-  // Also notify when a down app comes back up. Applies to the original
-  // webhook/email keys; list entries have their own onRecovery.
-  notifyOnRecovery: z.boolean().default(true),
   // Consecutive failed polls before an app is declared down (flap dampening).
   confirmations: z.number().int().min(1).max(10).default(2),
-  email: alertEmailSchema.default(alertEmailSchema.parse({})),
-  // Any number of channels (#291). The single webhook/email keys above keep
-  // working through 2.x; 3.0 moves them into this list.
+  // Any number of channels (#291). The single webhook and email keys 2.x kept
+  // beside this list were folded into it by the 3.0 migration (#320).
   channels: lenientArray(alertChannelSchema).default([]),
 });
 export type AlertConfig = z.infer<typeof alertsSchema>;
@@ -102,15 +84,11 @@ const httpOrBlank = (url: string | undefined) =>
   url === undefined || url.trim() === "" || /^https?:\/\//i.test(url.trim());
 
 // Admin input, derived from the stored schema (lib/schema/input.ts). A
-// webhook URL is optional (alerts stay inert until one is set), but when
-// present it must be http(s); so must a channel's URL. The email channel is lenient: an
-// enabled-but-incomplete one just stays inert (processAlerts gates sending on
-// emailReady), so partially-filled fields never block an autosave.
+// channel's URL is optional (it stays inert until one is set), but when
+// present it must be http(s). An enabled-but-incomplete channel just stays
+// inert (activeChannels skips it), so partially-filled fields never block an
+// autosave.
 export const alertsUpdateSchema = patchOf(alertsSchema)
-  .refine((a) => httpOrBlank(a.webhookUrl), {
-    message: "Webhook URL must start with http(s)",
-    path: ["webhookUrl"],
-  })
   .refine((a) => (a.channels ?? []).every((c) => httpOrBlank(c.url)), {
     message: "Channel URLs must start with http(s)",
     path: ["channels"],

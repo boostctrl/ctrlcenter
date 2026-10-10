@@ -13,9 +13,7 @@ import {
 describe("derived input schemas", () => {
   it("leave out what a patch doesn't send — no defaults filled in", () => {
     expect(weatherUpdateSchema.parse({})).toEqual({});
-    expect(alertsUpdateSchema.parse({ email: { host: "smtp.test" } })).toEqual({
-      email: { host: "smtp.test" },
-    });
+    expect(alertsUpdateSchema.parse({ confirmations: 3 })).toEqual({ confirmations: 3 });
   });
 
   it("are strict where the stored schema is lenient", () => {

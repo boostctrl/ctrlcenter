@@ -610,10 +610,9 @@ export default async function HelpPage() {
             through it straight away.
           </P>
           <P>
-            A webhook or email set up before channels existed keeps working,
-            and shows under <em>Set up in an earlier version</em>.{" "}
-            <strong>Move into the channel list</strong> turns it into a regular
-            channel you can edit and filter.
+            A webhook or email set up before channels existed (2.12 and
+            earlier) became a regular channel in the list when you upgraded
+            to 3.0, sending as before.
           </P>
         </Card>
 

@@ -163,7 +163,7 @@ export function migrateV2toV3(raw: unknown): { value: unknown; changed: boolean 
   if (!isRecord(raw)) return { value: raw, changed: false };
   let value = raw;
   let changed = false;
-  for (const step of [instancesStep, boardsStep, groupsStep, integrationsStep, themesStep]) {
+  for (const step of [instancesStep, boardsStep, groupsStep, integrationsStep, themesStep, alertsStep]) {
     const out = step(value);
     if (out.changed) {
       value = out.value;
@@ -330,6 +330,50 @@ const themesStep: Step = (raw) => {
       })
     : raw.themes;
   return changed ? { value: { ...raw, settings, themes }, changed } : { value: raw, changed: false };
+};
+
+// Alerts (#320): the single webhook and email keys that predate the channel
+// list (#291) become its first entries, sending where and when they did —
+// their on/off switch, format, and the global recovery setting they alone
+// read — and the keys go. 2.x defaulted the webhook's switch to on and the
+// email's to off. Ids are fixed, so a run over a file that already has them
+// adds nothing.
+const ALERT_KEYS = ["webhookUrl", "webhookEnabled", "type", "email", "notifyOnRecovery"];
+const alertsStep: Step = (raw) => {
+  if (!isRecord(raw.settings) || !isRecord(raw.settings.alerts)) return { value: raw, changed: false };
+  const old = raw.settings.alerts;
+  if (!ALERT_KEYS.some((k) => k in old)) return { value: raw, changed: false };
+  const alerts: Record<string, unknown> = { ...old };
+  const channels = Array.isArray(old.channels) ? [...old.channels] : [];
+  const taken = new Set(channels.filter(isRecord).map((c) => c.id));
+  const events = {
+    onDown: true,
+    onRecovery: old.notifyOnRecovery !== false,
+    onWarning: true,
+    onWebhooks: true,
+  };
+  const moved: Record<string, unknown>[] = [];
+  const url = typeof old.webhookUrl === "string" ? old.webhookUrl.trim() : "";
+  if (url && !taken.has("webhook")) {
+    moved.push({
+      id: "webhook",
+      type: "webhook",
+      enabled: old.webhookEnabled !== false,
+      ...events,
+      ...(typeof old.type === "string" ? { format: old.type } : {}),
+      url,
+    });
+  }
+  const email = isRecord(old.email) ? old.email : {};
+  const filled = (k: string) => typeof email[k] === "string" && (email[k] as string).trim() !== "";
+  if ((filled("host") || filled("from") || filled("to")) && !taken.has("email")) {
+    const smtp = { ...email };
+    delete smtp.enabled;
+    moved.push({ id: "email", type: "email", enabled: email.enabled === true, ...events, smtp });
+  }
+  for (const k of ALERT_KEYS) delete alerts[k];
+  alerts.channels = [...moved, ...channels];
+  return { value: { ...raw, settings: { ...raw.settings, alerts } }, changed: true };
 };
 
 // Widgets become instances (#297) and the layout the home board (#298).

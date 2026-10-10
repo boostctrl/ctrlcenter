@@ -360,11 +360,7 @@ const channel = (over: Record<string, unknown>) =>
   alertChannelSchema.parse({ id: "c1", type: "webhook", url: "https://hook.example.com/x", ...over });
 
 describe("sendTestAlert", () => {
-  const webhookOnly = alertsSchema.parse({
-    webhookEnabled: true,
-    webhookUrl: "https://hook.example.com/x",
-    type: "generic",
-  });
+  const webhookOnly = alertsSchema.parse({ channels: [channel({ id: "hook" })] });
 
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -376,7 +372,7 @@ describe("sendTestAlert", () => {
     vi.stubGlobal("fetch", fetchMock);
     const result = await sendTestAlert(webhookOnly);
     expect(result).toEqual({
-      results: [{ id: "legacy-webhook", label: "Webhook", ok: true, detail: "HTTP 204" }],
+      results: [{ id: "hook", label: "Webhook", ok: true, detail: "HTTP 204" }],
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
@@ -412,18 +408,17 @@ describe("sendTestAlert", () => {
     sendMailMock.mockResolvedValue({});
     const config = alertsSchema.parse({
       enabled: false,
-      webhookEnabled: true,
-      webhookUrl: "https://hook.example.com/x",
-      email: { enabled: true, host: "smtp.example.com", from: "a@x", to: "b@y" },
       channels: [
+        channel({ id: "hook" }),
+        channel({ id: "mail", type: "email", smtp: { host: "smtp.example.com", from: "a@x", to: "b@y" } }),
         channel({ id: "tg", type: "telegram", token: "t", chatId: "1" }),
         channel({ id: "off", enabled: false }),
       ],
     });
     const { results } = await sendTestAlert(config);
     expect(results.map((r) => [r.id, r.ok, r.detail])).toEqual([
-      ["legacy-webhook", true, "HTTP 200"],
-      ["legacy-email", true, "sent"],
+      ["hook", true, "HTTP 200"],
+      ["mail", true, "sent"],
       ["tg", true, "HTTP 200"],
     ]);
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -505,21 +500,6 @@ describe("processAlerts", () => {
     fetchMock.mockClear();
     await processAlerts([{ id: "a", up: true }], apps, config, prior);
     expect(hits().sort()).toEqual(["https://all.test", "https://up.test"]);
-  });
-
-  it("keeps notifyOnRecovery for the original webhook", async () => {
-    const config = alertsSchema.parse({
-      enabled: true,
-      confirmations: 1,
-      notifyOnRecovery: false,
-      webhookUrl: "https://legacy.test",
-      channels: [channel({ url: "https://new.test" })],
-    });
-    await processAlerts([{ id: "a", up: false }], apps, config, prior);
-    expect(hits().sort()).toEqual(["https://legacy.test", "https://new.test"]);
-    fetchMock.mockClear();
-    await processAlerts([{ id: "a", up: true }], apps, config, prior);
-    expect(hits()).toEqual(["https://new.test"]);
   });
 
   it("sends warnings to the channels that take them", async () => {

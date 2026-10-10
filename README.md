@@ -194,6 +194,7 @@ What moved where:
 | Each widget's content in `settings.notes`, `.countdown`, `.worldClocks`, `.systemStats`, `.calendar`, `.feeds` | one entry per widget in `widgets:`, each with an `id`. You can now have more than one of any kind. |
 | A bookmark's `category` | `groups:`, which bookmarks (and now apps) name with `group:` |
 | `settings.integrations.<service>` | `integrations:`, a list, so you can connect two of a kind. Ones you'd never set up are dropped. |
+| `settings.alerts.webhookUrl`, `.type`, `.email` (the single alert webhook and email from before 2.13) | the first entries of `settings.alerts.channels`, sending as they did |
 
 Your `CTRLCENTER_*` environment variables keep working for the services and
 the calendar they were set for. New ones can be referenced as `${NAME}` in any
@@ -266,8 +267,7 @@ settings:
           # user: ""        # SMTP username
           # pass: ""        # or set the CTRLCENTER_SMTP_PASS env var instead
     # Before 2.13 there was one webhook (type, webhookUrl) and one email
-    # section; those keys still work and can be moved into the list from
-    # Settings → Monitoring → Alerts.
+    # section; upgrading to 3.0 turns them into the first entries here.
   settingsButton: true      # the floating corner navigation menu
   # Further sections mirror the admin UI one-to-one and are easiest to edit
   # there: favicon, announcement (the site-wide banner), statusAnnouncements,

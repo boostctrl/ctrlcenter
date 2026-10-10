@@ -109,6 +109,28 @@ describe.each(FIXTURES)("upgrading a %s config", (version) => {
       if (w.type === "feed" || w.type === "calendar") expect(w, String(w.id)).not.toHaveProperty("enabled");
   });
 
+  it("folds the original alert webhook and email into the channel list (#320)", () => {
+    const old = rec(rec(before.settings).alerts);
+    const alerts = rec(after.settings.alerts);
+    for (const key of ["webhookUrl", "webhookEnabled", "type", "email", "notifyOnRecovery"])
+      expect(alerts, key).not.toHaveProperty(key);
+    const byId = new Map(after.settings.alerts.channels.map((c) => [c.id, c]));
+    const url = typeof old.webhookUrl === "string" ? old.webhookUrl.trim() : "";
+    if (url)
+      expect(byId.get("webhook")).toMatchObject({
+        type: "webhook",
+        url,
+        enabled: old.webhookEnabled !== false,
+        onRecovery: old.notifyOnRecovery !== false,
+      });
+    const email = rec(old.email);
+    if (typeof email.host === "string" && email.host)
+      expect(byId.get("email")).toMatchObject({ type: "email", enabled: email.enabled === true, smtp: { host: email.host } });
+    // The channels it already had come after, unchanged in order.
+    const had = list(old.channels).map((c) => c.id);
+    expect(after.settings.alerts.channels.map((c) => c.id).filter((id) => had.includes(id))).toEqual(had);
+  });
+
   it("is done once: a second pass changes nothing", () => {
     expect(migrateConfig(after).changed).toBe(false);
   });
@@ -117,7 +139,11 @@ describe.each(FIXTURES)("upgrading a %s config", (version) => {
 // The settings the upgrade moves to a new place (#306). A comment on one of
 // them doesn't follow it — the writer keeps comments by where a key sits, and
 // these keys go away — so it lives on in config.v2.bak.yaml only.
-const MOVED = new Set(["feeds", "feed", "notes", "countdown", "worldClocks", "systemStats", "calendar", "integrations", "components", "sections"]);
+const MOVED = new Set([
+  "feeds", "feed", "notes", "countdown", "worldClocks", "systemStats", "calendar", "integrations", "components", "sections",
+  // The original alert keys, folded into alerts.channels (#320).
+  "webhookUrl", "webhookEnabled", "type", "email", "notifyOnRecovery",
+]);
 
 // The full-line comments of a YAML text, but for those on (or inside) a moved
 // key: each comment belongs to the next key line, at that line's path.

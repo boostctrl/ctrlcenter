@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import type { Board, BoardVisibility, Integration, Settings, SettingsInput, WidgetInstance } from "@/lib/schema";
+import type { AlertType, Board, BoardVisibility, Integration, Settings, SettingsInput, WidgetInstance } from "@/lib/schema";
 import {
   type WebhookService,
   alertChannelSchema,
@@ -12,7 +12,6 @@ import {
   newBoardId,
   integrationSchema,
 } from "@/lib/schema";
-import { moveLegacyIntoChannels } from "@/lib/alert-channels";
 import type { ThemePack } from "@/lib/theme";
 import { newThemeId } from "@/lib/prefs";
 import { defaultSpanFor, resolveLayout, type WidgetType } from "@/lib/layout";
@@ -131,11 +130,6 @@ export function useSettingsDraft(
     if (!ok) return;
     setChannels((cs) => cs.filter((c) => c.id !== id));
   };
-  const moveLegacyChannels = () =>
-    setSettings((s) => ({
-      ...s,
-      alerts: { ...s.alerts, ...moveLegacyIntoChannels(s.alerts, newThemeId) },
-    }));
 
   // The integrations (#300): a list of instances with their own autosave.
   const updateIntegration = (id: string, patch: Partial<Integration>) =>
@@ -279,13 +273,13 @@ export function useSettingsDraft(
   const widgetToggles = PLAIN_TYPES.flatMap((type) =>
     instancesOf(type).map((w) => ({ id: w.id, label: widgetLabels[w.id] }))
   );
-  const alertTypeLabel: Record<Settings["alerts"]["type"], string> = {
+  const alertTypeLabel: Record<AlertType, string> = {
     generic: "Generic JSON webhook",
     discord: "Discord",
     slack: "Slack",
     ntfy: "ntfy",
   };
-  const alertUrlPlaceholder: Record<Settings["alerts"]["type"], string> = {
+  const alertUrlPlaceholder: Record<AlertType, string> = {
     generic: "https://example.com/hook",
     discord: "https://discord.com/api/webhooks/…",
     slack: "https://hooks.slack.com/services/…",
@@ -416,7 +410,6 @@ export function useSettingsDraft(
     addChannel,
     updateChannel,
     removeChannel,
-    moveLegacyChannels,
     integrations,
     updateIntegration,
     addIntegration,

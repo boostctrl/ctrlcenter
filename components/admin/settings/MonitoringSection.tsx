@@ -1,20 +1,17 @@
 "use client";
 
 import { WEBHOOK_SERVICES } from "@/lib/schema";
-import { activeChannels, channelLabel, channelReady, legacyChannels } from "@/lib/alert-channels";
+import { activeChannels, channelLabel } from "@/lib/alert-channels";
 import { STATUS_RANGES } from "@/lib/status";
 import {
   AddButton,
-  Button,
   Card,
   ControlRow,
   NumberRow,
   ToggleRow,
   fieldLabelClasses,
-  subCardClasses,
 } from "../ui";
 import { ChipGroup } from "@/components/ChipGroup";
-import AlertTest from "../AlertTest";
 import { WEBHOOK_LABELS, WebhookUrlRow } from "./WebhookUrlRow";
 import { AlertChannelEditor } from "./AlertChannelEditor";
 import { INTERVAL_PRESETS } from "./constants";
@@ -35,7 +32,6 @@ export default function MonitoringSection({
     addChannel,
     updateChannel,
     removeChannel,
-    moveLegacyChannels,
     status,
     webhooks,
     updateWebhooks,
@@ -45,7 +41,6 @@ export default function MonitoringSection({
     alertTypeLabel,
     alertUrlPlaceholder,
   } = d;
-  const legacy = legacyChannels(alerts);
   // A Send test waits out a pending autosave so it never tests old values.
   const saving = status === "saving";
   return (
@@ -121,40 +116,9 @@ export default function MonitoringSection({
               onChange={(confirmations) => updateAlerts({ confirmations })}
             />
 
-            {legacy.length > 0 && (
-              <div className={`${subCardClasses} flex flex-col gap-3 p-3`}>
-                <div>
-                  <p className={fieldLabelClasses}>Set up in an earlier version</p>
-                  <p className="text-xs text-ink-45">
-                    These still send, for every app. Move them into the
-                    channel list to edit them or choose their events and apps.
-                  </p>
-                </div>
-                {legacy.map((ch) => (
-                  <div key={ch.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                    <span className="text-sm text-ink-70">
-                      {ch.type === "webhook"
-                        ? `Webhook (${alertTypeLabel[ch.format]})`
-                        : `Email via ${ch.smtp.host || "SMTP"}`}
-                      {!ch.enabled && <span className="text-ink-45"> · off</span>}
-                    </span>
-                    <AlertTest channel={ch.id} ready={channelReady(ch)} saving={saving} />
-                  </div>
-                ))}
-                <ToggleRow
-                  label="Notify on recovery"
-                  checked={alerts.notifyOnRecovery}
-                  onChange={(notifyOnRecovery) => updateAlerts({ notifyOnRecovery })}
-                />
-                <Button variant="ghost" size="sm" className="self-start" onClick={moveLegacyChannels}>
-                  Move into the channel list
-                </Button>
-              </div>
-            )}
-
             <div className="flex flex-col gap-2">
               <span className={fieldLabelClasses}>Channels</span>
-              {alerts.channels.length === 0 && legacy.length === 0 && (
+              {alerts.channels.length === 0 && (
                 <p className="text-xs text-ink-45">
                   Add a channel to start sending: a webhook (Discord, Slack,
                   ntfy or your own), email, Telegram, Gotify, Pushover, or an

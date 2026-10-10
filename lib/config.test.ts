@@ -6,6 +6,7 @@ import * as YAML from "js-yaml";
 import type { z } from "zod";
 import {
   CONFIG_SCHEMA_VERSION,
+  alertChannelSchema,
   appInputSchema,
   bookmarkInputSchema,
   integrationSchema,
@@ -289,13 +290,12 @@ describe("apps CRUD", () => {
 describe("updateSettings generic merge (#287)", () => {
   it("deep-merges a nested section, keeping keys the patch leaves out", async () => {
     await config.updateSettings(
-      settingsInput({ alerts: { enabled: true, type: "ntfy", webhookUrl: "https://ntfy.test/x", notifyOnRecovery: true, confirmations: 2, email: { enabled: true, host: "smtp.test", port: 587, secure: false, subject: "", user: "u", pass: "p", from: "a@test", to: "b@test" } } })
+      settingsInput({ weather: { enabled: true, latitude: 51.5, longitude: -0.12, units: "metric" } })
     );
-    // A later patch touching one email field leaves the rest of the section.
-    await config.updateSettings({ alerts: { email: { host: "smtp2.test" } } } as never);
-    const alerts = (await config.getSettings()).alerts;
-    expect(alerts.email).toMatchObject({ host: "smtp2.test", user: "u", pass: "p", enabled: true });
-    expect(alerts.webhookUrl).toBe("https://ntfy.test/x");
+    // A later patch touching one field leaves the rest of the section.
+    await config.updateSettings({ weather: { latitude: 48.9 } } as never);
+    const weather = (await config.getSettings()).weather;
+    expect(weather).toMatchObject({ latitude: 48.9, longitude: -0.12, units: "metric", enabled: true });
   });
 
   it("replaces the theme whole, so an omitted custom color is cleared", async () => {
@@ -947,23 +947,26 @@ describe("settings-secret redaction", () => {
   const withSecrets = {
     alerts: {
       enabled: true,
-      type: "generic" as const,
-      webhookUrl: "https://hooks.example.com/T0/B0/xyz",
-      notifyOnRecovery: true,
       confirmations: 2,
-      email: {
-        enabled: true,
-        host: "smtp.example.com",
-        port: 587,
-        secure: false,
-        subject: "",
-        user: "mailer",
-        pass: "smtp-secret",
-        from: "alerts@example.com",
-        to: "me@example.com",
-      },
+      channels: [
+        alertChannelSchema.parse({ id: "hook", type: "webhook", url: "https://hooks.example.com/T0/B0/xyz" }),
+        alertChannelSchema.parse({
+          id: "mail",
+          type: "email",
+          smtp: {
+            host: "smtp.example.com",
+            port: 587,
+            user: "mailer",
+            pass: "smtp-secret",
+            from: "alerts@example.com",
+            to: "me@example.com",
+          },
+        }),
+      ],
     },
   };
+  const channel = (alerts: { channels: { id: string; url: string; smtp: Record<string, unknown> }[] }, id: string) =>
+    alerts.channels.find((c) => c.id === id)!;
 
   it("stripSecrets blanks every credential while keeping non-secret fields", async () => {
     await config.updateSettings(settingsInput(withSecrets));
@@ -977,12 +980,8 @@ describe("settings-secret redaction", () => {
     const pub = config.stripSecrets(config.stripAuth(full));
     const pubCal = pub.widgets.find((w) => w.id === "calendar")!;
     expect(pubCal).toMatchObject({ username: "", password: "" });
-    expect(pub.settings.alerts.webhookUrl).toBe("");
-    expect(pub.settings.alerts.email.user).toBe("");
-    expect(pub.settings.alerts.email.pass).toBe("");
-    expect(pub.settings.alerts.email.host).toBe("");
-    expect(pub.settings.alerts.email.from).toBe("");
-    expect(pub.settings.alerts.email.to).toBe("");
+    expect(channel(pub.settings.alerts, "hook").url).toBe("");
+    expect(channel(pub.settings.alerts, "mail").smtp).toMatchObject({ user: "", pass: "", host: "", from: "", to: "" });
     // Integrations (#189, #300): the whole list goes — credentials, URLs
     // (internal topology), even which services are connected.
     expect(pub.integrations).toEqual([]);
@@ -990,11 +989,11 @@ describe("settings-secret redaction", () => {
     // Non-secret fields survive so the widgets/nav still render and fetch.
     expect(pubCal).toMatchObject({ url: calendar.url });
     expect(pub.settings.alerts.enabled).toBe(true);
-    expect(pub.settings.alerts.email.port).toBe(587);
+    expect(channel(pub.settings.alerts, "mail").smtp.port).toBe(587);
 
     // Redaction doesn't mutate the source config.
     expect(full.widgets.find((w) => w.id === "calendar")).toMatchObject({ password: "cal-secret" });
-    expect(full.settings.alerts.email.pass).toBe("smtp-secret");
+    expect(channel(full.settings.alerts, "mail").smtp.pass).toBe("smtp-secret");
     expect(full.integrations.map((i) => i.password || i.apiKey)).toEqual(["qbit-secret", "sonarr-secret"]);
   });
 
