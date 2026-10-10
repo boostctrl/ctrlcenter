@@ -4,8 +4,9 @@
 // past). Shared by `npm run smoke` (scripts/smoke.mjs, run in CI) and the
 // visual-verify skill's screenshot CLI.
 //
-// Off-origin trouble (weather geolocation rate limits, …), console errors and
-// aborted Next.js ?_rsc= prefetches are reported as warnings only.
+// Off-origin trouble (weather geolocation rate limits, …), a 4xx from the
+// icon CDN proxy (#338), console errors and aborted Next.js ?_rsc= prefetches
+// are reported as warnings only.
 //
 // With `axe: true` the page is also audited with axe-core against WCAG 2.1 A
 // and AA plus axe's best-practice rules (contrast, labels, landmarks, heading
@@ -76,9 +77,15 @@ export async function checkPage(context, url, { screenshot, axe = false, before 
     if (err.includes("ERR_ABORTED")) return;
     (ours(r.url()) ? failures : warnings).push(`request failed: ${err} ${r.url()}`);
   });
+  // /api/icons/cdn/<slug> proxies a third-party CDN: a 404 there is the
+  // CDN being unreachable (the client falls back to a letter avatar), not a
+  // broken page, so it's off-origin trouble in all but address (#338).
+  const proxied = (u) => u.startsWith(origin + "/api/icons/cdn/");
   page.on("response", (r) => {
     if (r.status() >= 400)
-      (ours(r.url()) ? failures : warnings).push(`HTTP ${r.status()} ${r.url()}`);
+      (ours(r.url()) && !(proxied(r.url()) && r.status() < 500) ? failures : warnings).push(
+        `HTTP ${r.status()} ${r.url()}`
+      );
   });
   page.on("pageerror", (e) => failures.push(`page error: ${e}`));
   page.on("console", (m) => {
