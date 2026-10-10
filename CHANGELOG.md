@@ -60,6 +60,16 @@ here.
 
 ### Changed
 
+- **Drag cards to move and resize them (3.0).** Grab a card anywhere to move
+  it, with a mouse or by touch (press and hold first, so swiping still
+  scrolls). The page shows where everything will land before you let go,
+  scrolls when you reach the top or bottom, and Esc cancels. Drag a card
+  onto the tray to hide it, or a hidden widget from the tray to exactly
+  where you want it. Resize from the right edge, the bottom edge or the new
+  corner handle: the 24 columns show while you change a width, heights snap
+  to 20px steps and back to automatic near the content's own height, and
+  the size shows beside the pointer instead of over the card. A drag is one
+  undo step, and saving waits until you let go. (#312)
 - **A calmer layout editor (3.0).** The editor now shows the page exactly as
   visitors see it, each card outlined with its name, instead of a strip of
   controls on every card that changed their heights. Click a card to select

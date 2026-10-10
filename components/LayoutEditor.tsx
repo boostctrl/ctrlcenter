@@ -35,99 +35,9 @@ import {
 import { MoveButtons } from "./admin/ui";
 import { useConfirm } from "./admin/Confirm";
 import { SaveStatus, type SaveState } from "./admin/useAutosave";
-import { useDragResize } from "./useDragResize";
+import { useDragResize, type ResizeDrag } from "./useDragResize";
+import type { CardDrag } from "./usePointerReorder";
 import { useUndoGesture } from "./useUndoHistory";
-
-// Which edge of the hovered cell a drop would insert on, in flow order, and
-// which axis that edge sits on ("x" = beside the cell, "y" = above/below it).
-export type DropSide = "before" | "after";
-export type DropAxis = "x" | "y";
-export type DropTarget = { side: DropSide; axis: DropAxis };
-
-// Native HTML5 drag reordering for the widget flow grid — the 2-D sibling of
-// useReorder (components/admin/useReorder.ts). Reordering starts from the grip
-// handle only (so the card's resize edges are free for useDragResize); the whole
-// cell stays the drop target. Cells can sit side by side on lg+ screens, so the
-// insertion side comes from the pointer's x position within the hovered cell
-// there — except for cells spanning their whole row, where a drop can only land
-// above or below, so the y axis decides (as it does for every cell below lg,
-// where cells stack). Drag is mouse-only by design; MoveButtons in each frame
-// are the keyboard/touch path.
-export function useFlowReorder(onMove: (from: number, to: number) => void) {
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [over, setOver] = useState<
-    ({ index: number } & DropTarget) | null
-  >(null);
-
-  function reset() {
-    setDragIndex(null);
-    setOver(null);
-  }
-
-  // The grip: the drag source. draggable lives here, not on the cell, so a
-  // pointer-down on a resize edge can't start a reorder.
-  function gripHandlers(index: number) {
-    return {
-      draggable: true,
-      onDragStart: (e: React.DragEvent) => {
-        e.dataTransfer.effectAllowed = "move";
-        setDragIndex(index);
-      },
-      onDragEnd: reset,
-    };
-  }
-
-  // The cell: the drop target.
-  function dropHandlers(index: number) {
-    return {
-      onDragOver: (e: React.DragEvent) => {
-        if (dragIndex === null) return;
-        e.preventDefault(); // required to allow dropping
-        const rect = e.currentTarget.getBoundingClientRect();
-        const grid = e.currentTarget.parentElement;
-        const fullRow =
-          grid !== null &&
-          rect.width >= grid.getBoundingClientRect().width - 1;
-        const sideBySide =
-          window.matchMedia("(min-width: 1024px)").matches && !fullRow;
-        const axis: DropAxis = sideBySide ? "x" : "y";
-        const ratio =
-          axis === "x"
-            ? (e.clientX - rect.left) / rect.width
-            : (e.clientY - rect.top) / rect.height;
-        const side: DropSide = ratio > 0.5 ? "after" : "before";
-        if (over?.index !== index || over.side !== side || over.axis !== axis)
-          setOver({ index, side, axis });
-      },
-      onDrop: (e: React.DragEvent) => {
-        e.preventDefault();
-        if (dragIndex === null || over === null) {
-          reset();
-          return;
-        }
-        // Insert at the hovered cell's edge, accounting for the dragged item
-        // leaving its old slot when it comes from earlier in the list.
-        let to = over.index + (over.side === "after" ? 1 : 0);
-        if (dragIndex < to) to -= 1;
-        if (to !== dragIndex) onMove(dragIndex, to);
-        reset();
-      },
-    };
-  }
-
-  return { gripHandlers, dropHandlers, dragIndex, over };
-}
-
-// The insertion indicator: a vertical accent bar beside the hovered cell when
-// the drop would land beside it (x axis), a horizontal one above/below it when
-// the drop lands in the flow (y axis — stacked cells and full-row cells).
-// Complete static class strings so Tailwind's extractor keeps every variant.
-const DROP_BAR: Record<`${DropSide}:${DropAxis}`, string> = {
-  "before:y": "absolute right-0 left-0 -top-2 h-1 rounded-full bg-violet-400",
-  "after:y": "absolute right-0 left-0 -bottom-2 h-1 rounded-full bg-violet-400",
-  "before:x": "absolute top-0 bottom-0 -left-2 w-1 rounded-full bg-violet-400",
-  "after:x": "absolute top-0 bottom-0 -right-2 w-1 rounded-full bg-violet-400",
-};
 
 const stepBtn =
   "px-2 py-1 text-ink-60 transition-colors select-none touch-none hover:bg-fg/10 hover:text-fg disabled:pointer-events-none disabled:opacity-30 pointer-coarse:px-3 pointer-coarse:py-2.5";
@@ -373,10 +283,10 @@ export function WidgetFrame({
   onSpace,
   onToggleHidden,
   onToggleLabel,
-  gripHandlers,
-  dropHandlers,
-  dragging,
-  drop,
+  onGrab,
+  clickEndsDrag,
+  placeholder = false,
+  moving = false,
   landed = false,
 }: {
   widget: LayoutWidget;
@@ -411,17 +321,23 @@ export function WidgetFrame({
   onSpace: (key: string, side: SpaceSide, value: number | undefined) => void;
   onToggleHidden: (key: string) => void;
   onToggleLabel: (key: string) => void;
-  gripHandlers: React.HTMLAttributes<HTMLElement> & { draggable?: boolean };
-  dropHandlers: React.HTMLAttributes<HTMLDivElement>;
-  dragging: boolean;
-  drop: DropTarget | null;
+  // A press on the card, which becomes a move drag past the slop or after a
+  // long press (usePointerReorder, #312).
+  onGrab: (e: React.PointerEvent<HTMLDivElement>) => void;
+  // Whether the click now arriving ends a drag (and so selects nothing).
+  clickEndsDrag: () => boolean;
+  // The slot this card would land in while it's being dragged: the card,
+  // invisible but holding its exact size, inside a dashed outline.
+  placeholder?: boolean;
+  // Some card is being dragged: toolbars and handles stand down.
+  moving?: boolean;
   // Just shown from the tray (#315): outlined for a moment.
   landed?: boolean;
 }) {
   const key = widget.id;
   const isLarge = useIsLarge();
   const gesture = useUndoGesture();
-  const { frameRef, previewRef, drag, widthHandle, heightHandle } = useDragResize(
+  const { frameRef, previewRef, drag, widthHandle, heightHandle, cornerHandle } = useDragResize(
     {
       span: widget.span,
       height: widget.height,
@@ -611,14 +527,18 @@ export function WidgetFrame({
     </FrameToolbar>
   );
 
-  const handleClass = `absolute z-20 touch-none rounded-full bg-violet-400/80 outline-none transition-opacity focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-400 ${
-    selected || drag ? "opacity-100" : "opacity-0 group-hover/frame:opacity-100"
+  // A handle is a generous hit strip along the card's outline with a small
+  // visible grip in its middle.
+  const showHandles = (selected || drag) && !moving && !placeholder;
+  const handleClass = `group/handle absolute z-20 flex touch-none items-center justify-center outline-none transition-opacity ${
+    showHandles ? "opacity-100" : moving || placeholder ? "hidden" : "opacity-0 group-hover/frame:opacity-100"
   }`;
+  const grip =
+    "rounded-full bg-violet-400 shadow-sm transition-transform group-hover/handle:scale-110 group-focus-visible/handle:outline-2 group-focus-visible/handle:outline-offset-2 group-focus-visible/handle:outline-violet-400";
 
   return (
     <div
       ref={frameRef}
-      {...dropHandlers}
       data-widget-id={key}
       data-selected={selected || undefined}
       role="group"
@@ -627,37 +547,43 @@ export function WidgetFrame({
       aria-describedby={selected ? "layout-selected-help" : "layout-card-help"}
       tabIndex={0}
       onKeyDown={onKeyDown}
+      onPointerDown={onGrab}
       onClick={(e) => {
+        if (clickEndsDrag()) return;
         // Clicks in the toolbar or on a handle don't (re)select.
         if ((e.target as HTMLElement).closest("[data-frame-chrome]")) return;
         onSelect(key);
       }}
+      // A long press starts a drag on touch; no callout menu on top of it.
+      onContextMenu={(e) => e.preventDefault()}
       data-space-top={space.top || undefined}
       data-space-right={space.right || undefined}
       data-space-bottom={space.bottom || undefined}
       data-space-left={space.left || undefined}
-      className={`group/frame relative cursor-pointer rounded-2xl outline-offset-4 transition-[opacity,outline-color] select-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-violet-400 ${
-        selected || landed
-          ? "outline-2 outline-solid outline-violet-400"
-          : "outline-1 outline-dashed outline-fg/25 hover:outline-fg/50"
-      } ${dragging ? "opacity-40" : ""} ${cellClass}`}
+      className={`group/frame relative cursor-grab rounded-2xl outline-offset-4 transition-[outline-color] select-none [-webkit-touch-callout:none] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-violet-400 ${
+        placeholder
+          ? "bg-violet-400/10 outline-2 outline-dashed outline-violet-400"
+          : selected || landed
+            ? "outline-2 outline-solid outline-violet-400"
+            : "outline-1 outline-dashed outline-fg/25 hover:outline-fg/50"
+      } ${cellClass}`}
     >
-      {drop && <span className={DROP_BAR[`${drop.side}:${drop.axis}`]} aria-hidden />}
       {/* The live card, as visitors get it. Inert: the editor owns every
           click and Tab stop here. */}
-      <div ref={previewRef} inert className={previewClass} style={previewStyle}>
+      <div
+        ref={previewRef}
+        inert
+        className={`${previewClass} ${placeholder ? "invisible" : ""}`}
+        style={previewStyle}
+      >
         {node}
       </div>
       {/* The name tag, over the card's top-right corner (section headings
-          start at the top left); it's also the drag source for reordering by
-          mouse. The group's own label already names the card, so the tag is
-          hidden from assistive tech. */}
+          start at the top left). The group's own label already names the
+          card, so the tag is hidden from assistive tech. */}
       <span
-        {...gripHandlers}
-        data-frame-chrome
         aria-hidden
-        title="Drag to move"
-        className={`absolute -top-2.5 right-3 z-20 flex max-w-[calc(100%-1.5rem)] cursor-grab items-center gap-1 rounded-full border px-2 py-px text-[10px] leading-4 font-medium whitespace-nowrap shadow-sm active:cursor-grabbing ${
+        className={`absolute -top-2.5 right-3 z-20 flex max-w-[calc(100%-1.5rem)] items-center gap-1 rounded-full border px-2 py-px text-[10px] leading-4 font-medium whitespace-nowrap shadow-sm ${placeholder ? "invisible" : ""} ${
           selected
             ? "border-violet-500 bg-violet-600 text-white"
             : "border-fg/15 bg-[var(--background)] text-ink-70"
@@ -666,9 +592,10 @@ export function WidgetFrame({
         <span aria-hidden>⠿</span>
         <span className="truncate">{label}</span>
       </span>
-      {selected && controls}
-      {/* Drag-to-resize edges: right = width (lg+, where spans apply), bottom =
-          height. Shown on hover and on the selected card; focusable (as
+      {selected && !moving && !placeholder && controls}
+      {/* Drag-to-resize (#312): the right edge sets the width (lg+, where
+          spans apply), the bottom edge the height, the corner both. Shown on
+          hover and on the selected card; the edges are focusable (as
           sliders) only on the selected one, so Tab still walks card to card.
           Up/Right increases per the ARIA convention, Home/End jump the range,
           and Delete returns the height to automatic. */}
@@ -699,8 +626,10 @@ export function WidgetFrame({
             e.preventDefault();
             onSpan(key, next);
           }}
-          className={`${handleClass} top-1/2 right-0 h-12 w-2 translate-x-1/2 -translate-y-1/2 cursor-col-resize pointer-coarse:h-16 pointer-coarse:w-4`}
-        />
+          className={`${handleClass} top-3 -right-[11px] bottom-3 w-3.5 cursor-col-resize pointer-coarse:w-6`}
+        >
+          <span className={`${grip} h-10 w-1.5 pointer-coarse:w-2`} />
+        </span>
       )}
       <span
         {...heightHandle}
@@ -733,18 +662,103 @@ export function WidgetFrame({
           e.preventDefault();
           onHeight(key, next);
         }}
-        className={`${handleClass} bottom-0 left-1/2 h-2 w-12 -translate-x-1/2 translate-y-1/2 cursor-row-resize pointer-coarse:h-4 pointer-coarse:w-16`}
-      />
-      {drag && (
+        className={`${handleClass} right-3 -bottom-[11px] left-3 h-3.5 cursor-row-resize pointer-coarse:h-6`}
+      >
+        <span className={`${grip} h-1.5 w-10 pointer-coarse:h-2`} />
+      </span>
+      {isLarge && (
         <span
-          className={`pointer-events-none absolute z-30 rounded-md bg-violet-500 px-1.5 py-0.5 text-[10px] font-medium text-white tabular-nums ${
-            drag.kind === "width" ? "top-1/2 right-3 -translate-y-1/2" : "bottom-3 left-1/2 -translate-x-1/2"
-          }`}
+          {...cornerHandle}
+          data-frame-chrome
+          aria-hidden
+          className={`${handleClass} -right-[13px] -bottom-[13px] size-5 cursor-nwse-resize`}
         >
-          {drag.kind === "width" ? `${drag.value}/${GRID_COLUMNS}` : `${drag.value}px`}
+          <span className={`${grip} size-2.5`} />
         </span>
       )}
+      {drag && <ResizeFeedback drag={drag} />}
     </div>
+  );
+}
+
+// The card being dragged (#312), floating under the pointer, slightly lifted:
+// a grid card at its own size (scaled down when it's big, so the preview
+// underneath stays visible), a tray widget as its chip. A portal, fixed to
+// the viewport; inert.
+export function DragGhost({ drag, label, node }: { drag: CardDrag; label: string; node: ReactNode }) {
+  if (drag.from === null) {
+    return createPortal(
+      <div
+        aria-hidden
+        className="pointer-events-none fixed z-[60] rounded-lg border border-violet-400 bg-[var(--background)] px-2.5 py-1.5 text-xs font-medium text-ink-80 shadow-xl"
+        style={{ left: drag.x + 8, top: drag.y + 8 }}
+      >
+        {label}
+      </div>,
+      document.body
+    );
+  }
+  const scale = Math.min(1, 420 / drag.width, 320 / drag.height);
+  return createPortal(
+    <div
+      aria-hidden
+      inert
+      className="pointer-events-none fixed top-0 left-0 z-[60] origin-top-left rounded-2xl opacity-90 shadow-2xl ring-2 ring-violet-400"
+      style={{
+        width: drag.width,
+        height: drag.height,
+        transform: `translate(${drag.x - drag.grabX * scale}px, ${drag.y - drag.grabY * scale}px) scale(${scale})`,
+      }}
+    >
+      {node}
+    </div>,
+    document.body
+  );
+}
+
+// While a resize drag runs: the new value in a badge beside the pointer
+// (never over the card's content), and for a width the grid's 24 columns
+// faintly drawn, the card's own tinted. Fixed to the viewport, in a portal so
+// no transformed ancestor can shift it.
+function ResizeFeedback({ drag }: { drag: NonNullable<ResizeDrag> }) {
+  const width = drag.kind !== "height";
+  const height = drag.kind !== "width";
+  const parts = [
+    width ? `${drag.span}/${GRID_COLUMNS}` : null,
+    height ? (drag.height === undefined ? "Auto" : `${drag.height}px`) : null,
+  ].filter(Boolean);
+  let guides: ReactNode = null;
+  if (width) {
+    const { left, width: gridWidth, gap } = drag.grid;
+    guides = (
+      <div
+        aria-hidden
+        className="pointer-events-none fixed top-0 z-[35] grid h-screen"
+        style={{ left, width: gridWidth, columnGap: gap, gridTemplateColumns: `repeat(${GRID_COLUMNS}, 1fr)` }}
+      >
+        {Array.from({ length: GRID_COLUMNS }, (_, i) => (
+          <div
+            key={i}
+            className={
+              i >= drag.startColumn && i < drag.startColumn + drag.span ? "bg-violet-400/[0.08]" : "bg-fg/[0.025]"
+            }
+          />
+        ))}
+      </div>
+    );
+  }
+  return createPortal(
+    <>
+      {guides}
+      <span
+        aria-hidden
+        className="pointer-events-none fixed z-[60] rounded-md bg-violet-600 px-1.5 py-0.5 text-[11px] font-medium text-white tabular-nums shadow"
+        style={{ left: drag.x + 16, top: drag.y + 16 }}
+      >
+        {parts.join(" · ")}
+      </span>
+    </>,
+    document.body
   );
 }
 

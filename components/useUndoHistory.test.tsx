@@ -61,6 +61,17 @@ describe("useUndoHistory", () => {
     expect(h.value).toBe(0);
   });
 
+  it("leaves no step for a gesture that ends where it began", () => {
+    const h = setup();
+    h.change(5);
+    act(() => h.result.current.beginGesture());
+    h.change(6);
+    h.change(5);
+    act(() => h.result.current.endGesture(h.value));
+    h.undo();
+    expect(h.value).toBe(0);
+  });
+
   it("merges keyboard repeats only while focus stays on one control", () => {
     const h = setup();
     control(false);

@@ -754,13 +754,24 @@ export default async function HelpPage() {
               the bar at the bottom. <Kbd>Esc</Kbd> deselects it.
             </li>
             <li>
-              <strong>Reorder.</strong> Drag a card by its name tag, use the
-              move arrows, or press the arrow keys on a selected card.
+              <strong>Reorder.</strong> Drag a card anywhere on it — on a
+              phone, press and hold it first. The page shows where everything
+              lands before you let go, scrolls when you reach the edge, and{" "}
+              <Kbd>Esc</Kbd> cancels. The move arrows and the arrow keys on a
+              selected card do the same one step at a time.
+            </li>
+            <li>
+              <strong>Hide or place from the tray.</strong> Drag a card onto
+              the tray below the page to hide it, or a hidden widget from the
+              tray to exactly where you want it.
             </li>
             <li>
               <strong>Resize.</strong> Drag a card&apos;s right edge to set its{" "}
-              <strong>width</strong> in columns, or its bottom edge to set its{" "}
-              <strong>height</strong>; the steppers do the same in exact steps,
+              <strong>width</strong> in columns (the columns show while you
+              drag), its bottom edge to set its <strong>height</strong>, or the
+              corner for both. Heights snap to 20px steps, and back to
+              automatic when you drag near the content&apos;s own height. The
+              steppers do the same in exact steps,
               and so do <Kbd>Shift</Kbd>+arrow keys on a selected card.
               A <strong>Fill</strong> button widens a card to close the gap
               when it doesn&apos;t reach the end of its row.

@@ -390,10 +390,31 @@ async function editorTray(ctx) {
     });
     for (let i = 0; i < 3; i++) await page.keyboard.press("Control+z");
     await page.getByRole("button", { name: "Show Clock" }).waitFor({ timeout: 5_000 });
+    // Drag a card by its body (#312): the drop lands where the preview
+    // showed, and one undo takes it back.
+    const order = () =>
+      page.evaluate(() =>
+        Array.from(document.querySelectorAll("main .grid > [data-widget-id]")).map((e) => e.dataset.widgetId)
+      );
+    const before = await order();
+    const from = await page.locator('main .grid > [data-widget-id="search"]').boundingBox();
+    const to = await page.locator('main .grid > [data-widget-id="greeting"]').boundingBox();
+    await page.mouse.move(from.x + 40, from.y + from.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(from.x + 40, from.y + from.height / 2 - 20, { steps: 4 });
+    await page.mouse.move(to.x + 20, to.y + 10, { steps: 15 });
+    await page.waitForTimeout(300);
+    const preview = await order();
+    await page.mouse.up();
+    const dropped = await order();
+    if (dropped.join() === before.join() || dropped.join() !== preview.join())
+      throw new Error(`drag: ${before} → preview ${preview} → dropped ${dropped}`);
+    await page.keyboard.press("Control+z");
+    if ((await order()).join() !== before.join()) throw new Error("drag: undo didn't restore the order");
     // Past the autosave's debounce, then its save.
     await page.waitForTimeout(1_500);
     await page.getByText("Saved").first().waitFor({ timeout: 10_000 });
-    console.log("ok    the editor tray hides empty widgets and shows where a widget landed");
+    console.log("ok    the editor tray works, and a dragged card lands where its preview showed");
   } catch (e) {
     failures.push(`editor tray: ${e instanceof Error ? e.message.split("\n")[0] : e}`);
   } finally {

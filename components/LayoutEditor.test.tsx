@@ -115,10 +115,8 @@ function frame(overrides: Partial<Parameters<typeof WidgetFrame>[0]> = {}) {
     onSpace: vi.fn(),
     onToggleHidden: vi.fn(),
     onToggleLabel: vi.fn(),
-    gripHandlers: {},
-    dropHandlers: {},
-    dragging: false,
-    drop: null,
+    onGrab: vi.fn(),
+    clickEndsDrag: () => false,
     ...overrides,
   };
   render(<WidgetFrame {...props} />);

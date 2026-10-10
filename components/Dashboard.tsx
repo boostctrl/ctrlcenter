@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   buildSearchUrl,
@@ -27,7 +27,8 @@ import {
 import { useEditMode } from "./EditMode";
 import { ConfirmProvider } from "./admin/Confirm";
 import { reorder } from "./admin/useReorder";
-import { WidgetFrame, EditToolbar, useFlowReorder } from "./LayoutEditor";
+import { WidgetFrame, EditToolbar, DragGhost } from "./LayoutEditor";
+import { usePointerReorder } from "./usePointerReorder";
 import { useGridLayout } from "./useGridLayout";
 import { useLayoutEditor } from "./useLayoutEditor";
 import { UndoGestureContext } from "./useUndoHistory";
@@ -100,6 +101,8 @@ export default function Dashboard({
   // back here (for the "/" hotkey); the state setter is the callback ref.
   const [searchInput, setSearchInput] = useState<HTMLInputElement | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+  // The tray of widgets not on the live page (edit mode), a drop target too.
+  const trayRef = useRef<HTMLDivElement>(null);
   const { favorites } = useFavorites();
   const { editing, setEditing } = useEditMode();
 
@@ -135,8 +138,19 @@ export default function Dashboard({
     setEditing,
     gridRef,
   });
-  const { gripHandlers, dropHandlers, dragIndex, over } =
-    useFlowReorder(moveVisible);
+  // Moving cards by dragging them (#312): nothing changes until the drop.
+  const pointer = usePointerReorder({
+    enabled: editing,
+    gridRef,
+    trayRef,
+    onMove: (id, from, to) => {
+      moveVisible(from, to);
+      select(id);
+    },
+    onHide: (id) => showOrHide(id),
+    onPlace: (id, to) => placeFromTray(id, to),
+  });
+  const cardDrag = pointer.drag;
   // Drives the grid's vertical layout: deterministic masonry packing on lg+ (in
   // both the editor and the live page, so the preview matches), single-column
   // flow below lg — honoring the grid gap, per-widget heights and per-side
@@ -345,6 +359,81 @@ export default function Dashboard({
     );
   }
 
+  // Put a tray widget on the page at a visible index (a drag from the tray,
+  // #312): shown and placed in one change, so one undo step.
+  function placeFromTray(id: string, toV: number) {
+    const widget = layout.sections.find((w) => w.id === id);
+    if (!widget) return;
+    const rest = layout.sections.filter((w) => w.id !== id);
+    const anchor = liveWidgets[toV];
+    const last = liveWidgets[liveWidgets.length - 1];
+    const at = anchor
+      ? rest.findIndex((w) => w.id === anchor.id)
+      : last
+        ? rest.findIndex((w) => w.id === last.id) + 1
+        : rest.length;
+    rest.splice(at, 0, { ...widget, hidden: false });
+    announce(`${labelFor(widget)} placed at position ${toV + 1} of ${liveWidgets.length + 1}`);
+    mutateSections(rest);
+    select(id);
+    landingSeq.current += 1;
+    setLanded({ id, seq: landingSeq.current });
+  }
+
+  // While a card is dragged the grid shows the result (#312): the order a
+  // drop would leave, with the dragged card (or the tray widget on its way
+  // in) as an invisible placeholder in its slot.
+  let displayCells = liveCells;
+  if (cardDrag && cardDrag.to !== null) {
+    if (cardDrag.from !== null) {
+      displayCells = reorder(liveCells, cardDrag.from, cardDrag.to);
+    } else {
+      const incoming = cells.find((c) => c.widget.id === cardDrag.id);
+      if (incoming?.node)
+        displayCells = [
+          ...liveCells.slice(0, cardDrag.to),
+          { widget: { ...incoming.widget, hidden: false }, node: incoming.node },
+          ...liveCells.slice(cardDrag.to),
+        ];
+    }
+  }
+  const displayWidgets = displayCells.map(({ widget }) => widget);
+  const draggedCell = cardDrag ? cells.find((c) => c.widget.id === cardDrag.id) : undefined;
+  // The other cards glide to their new places as the preview changes
+  // (FLIP), measured in page coordinates so auto-scroll isn't mistaken for
+  // movement.
+  const flipRects = useRef(new Map<string, { x: number; y: number }>());
+  const flipKey = cardDrag ? `${cardDrag.id}:${cardDrag.to}` : "";
+  const flipPrevKey = useRef("");
+  useLayoutEffect(() => {
+    // Only between two previews of one drag: the positions from before it
+    // started may be from long ago.
+    const animate = flipKey !== "" && flipPrevKey.current.split(":")[0] === flipKey.split(":")[0];
+    flipPrevKey.current = flipKey;
+    const grid = gridRef.current;
+    if (!grid) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const next = new Map<string, { x: number; y: number }>();
+    for (const el of grid.querySelectorAll<HTMLElement>(":scope > [data-widget-id]")) {
+      const id = el.dataset.widgetId!;
+      const r = el.getBoundingClientRect();
+      const at = { x: r.left + window.scrollX, y: r.top + window.scrollY };
+      next.set(id, at);
+      const prev = flipRects.current.get(id);
+      if (!animate || reduce || !prev || id === cardDrag?.id) continue;
+      const dx = prev.x - at.x;
+      const dy = prev.y - at.y;
+      if (dx || dy)
+        el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }], {
+          duration: 180,
+          easing: "ease-out",
+        });
+    }
+    flipRects.current = next;
+    // Only when the preview's order changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flipKey]);
+
   // The editor's live region (#313): moves, resizes and selection, said out
   // loud. A repeat of the same words still re-announces (the key changes).
   const [announcement, setAnnouncement] = useState({ text: "", n: 0 });
@@ -370,7 +459,6 @@ export default function Dashboard({
   // hidden one into the tray. Scroll to where it landed, outline it for a
   // moment and move focus there, rather than leave focus on a button that
   // just went away. A widget shown while still empty stays in the tray.
-  const trayRef = useRef<HTMLDivElement>(null);
   // `seq` makes a repeat on the same widget a new landing.
   const landingSeq = useRef(0);
   const [landed, setLanded] = useState<{ id: string; seq: number } | null>(null);
@@ -412,7 +500,7 @@ export default function Dashboard({
         ref={gridRef}
         className="grid grid-cols-1 gap-x-8 gap-y-8 lg:grid-cols-24 lg:items-start"
       >
-        {liveCells.map(({ widget, node }, vIndex) => {
+        {displayCells.map(({ widget, node }, vIndex) => {
           const cellClass = `${COL_SPAN[widget.span]} ${widgetDef(widget.type).align ?? ""}`;
           // An explicit height sizes the cell exactly: content widgets scroll
           // their overflow, the others center their content (so a sized greeting
@@ -464,7 +552,7 @@ export default function Dashboard({
                   ? cardsFor(widget)
                   : undefined
               }
-              fillTo={fillSpan(liveWidgets, vIndex)}
+              fillTo={fillSpan(displayWidgets, vIndex)}
               titled={TITLED_WIDGET_TYPES.includes(widget.type)}
               previewStyle={heightStyle}
               previewClass={heightClass}
@@ -479,14 +567,10 @@ export default function Dashboard({
               selected={selectedId === widget.id}
               onSelect={selectCard}
               onAnnounce={announce}
-              gripHandlers={gripHandlers(vIndex)}
-              dropHandlers={dropHandlers(vIndex)}
-              dragging={dragIndex === vIndex}
-              drop={
-                over?.index === vIndex && dragIndex !== vIndex
-                  ? { side: over.side, axis: over.axis }
-                  : null
-              }
+              onGrab={(e) => pointer.begin(e, widget.id, vIndex)}
+              clickEndsDrag={pointer.clickEndsDrag}
+              placeholder={cardDrag?.id === widget.id}
+              moving={cardDrag !== null}
             />
           );
         })}
@@ -496,25 +580,36 @@ export default function Dashboard({
           hidden ones can be shown (then placed in the grid above), empty ones
           say what would give them content. */}
       {editing && trayCells.length > 0 && (
-        <div ref={trayRef} className="rounded-2xl border border-dashed border-fg/15 p-4">
-          <p className="text-xs font-medium text-ink-70">Not on the live page</p>
+        <div
+          ref={trayRef}
+          className={`rounded-2xl border border-dashed p-4 transition-colors ${
+            cardDrag?.overTray && cardDrag.from !== null ? "border-violet-400 bg-violet-400/10" : "border-fg/15"
+          }`}
+        >
+          <p className="text-xs font-medium text-ink-70">
+            {cardDrag && cardDrag.from !== null ? "Drop here to hide it" : "Not on the live page"}
+          </p>
           <p className="mt-0.5 max-w-prose text-xs text-ink-55">
             These widgets don&apos;t render for visitors right now — hidden ones
             by choice, empty ones until they have something to show. The grid
-            above packs exactly like the live page. Show a hidden widget to
-            place it.
+            above packs exactly like the live page. Show a hidden widget, or
+            drag it into place.
           </p>
           <div className="mt-3 flex flex-wrap items-start gap-2">
-            {trayCells.map(({ widget }) => {
+            {trayCells.map(({ widget, node }) => {
               const label = labelFor(widget);
+              // A hidden widget with content can be dragged onto the page.
+              const draggable = widget.hidden && node !== null;
               return (
                 <div
                   key={widget.id}
                   data-widget-id={widget.id}
                   tabIndex={-1}
-                  className={`flex max-w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border bg-fg/5 px-2.5 py-1.5 text-xs text-ink-60 outline-none transition-colors sm:max-w-md ${
+                  onPointerDown={draggable ? (e) => pointer.begin(e, widget.id, null) : undefined}
+                  onContextMenu={draggable ? (e) => e.preventDefault() : undefined}
+                  className={`flex max-w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border bg-fg/5 px-2.5 py-1.5 text-xs text-ink-60 outline-none transition-colors select-none sm:max-w-md ${
                     landed?.id === widget.id ? "border-violet-400 ring-2 ring-violet-400/60" : "border-fg/10"
-                  }`}
+                  } ${draggable ? "cursor-grab" : ""} ${cardDrag?.id === widget.id ? "opacity-40" : ""}`}
                 >
                   <span className="font-medium">{label}</span>
                   <span className="rounded bg-fg/10 px-1.5 py-0.5 text-[10px] tracking-wide text-ink-60 uppercase">
@@ -541,6 +636,10 @@ export default function Dashboard({
             })}
           </div>
         </div>
+      )}
+
+      {cardDrag && draggedCell && (
+        <DragGhost drag={cardDrag} label={labelFor(draggedCell.widget)} node={draggedCell.node} />
       )}
 
       {!editing && hasVisibleContent && !hasResults && parsedBang && (

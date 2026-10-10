@@ -92,8 +92,12 @@ export function useLayoutEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
 
+  // During a pointer gesture (a resize drag, a held stepper) the autosave
+  // sees the layout as it was when the gesture began, so it saves once the
+  // gesture ends rather than partway through (#312).
+  const [gestureStart, setGestureStart] = useState<EditableLayout | null>(null);
   const { status: saveStatus, error: saveError } = useAutosave(
-    layout,
+    gestureStart ?? layout,
     async (value, opts) => {
       if (!dirtyRef.current) return;
       await saveLayout(boardId, value, opts);
@@ -119,27 +123,34 @@ export function useLayoutEditor({
     main.style.setProperty("--top-gap-lg", `${layout.topGap}px`);
   }, [gridRef, layout.topGap]);
 
-  function mutateLayout(next: EditableLayout) {
-    history.record(layout);
+  // The newest layout, updated as each change is made rather than when React
+  // renders it: two changes in one frame (a corner drag's width and height,
+  // pointer events landing before a render) must build on each other, not
+  // both on the last render's layout. The hotkeys' and gestures' handlers,
+  // which outlive a render, read it too.
+  const latestRef = useRef(layout);
+  type Update<T> = T | ((prev: T) => T);
+  function mutateLayout(update: Update<EditableLayout>) {
+    const prev = latestRef.current;
+    const next = typeof update === "function" ? update(prev) : update;
+    history.record(prev);
     dirtyRef.current = true;
+    latestRef.current = next;
     setLayout(next);
   }
-  // The hotkeys' handlers outlive a render, so they read the layout here.
-  const layoutRef = useRef(layout);
-  useEffect(() => {
-    layoutRef.current = layout;
-  }, [layout]);
   const { undo, redo } = history;
   const undoLast = useCallback(() => {
-    const prev = undo(layoutRef.current);
+    const prev = undo(latestRef.current);
     if (!prev) return;
     dirtyRef.current = true;
+    latestRef.current = prev;
     setLayout(prev);
   }, [undo]);
   const redoLast = useCallback(() => {
-    const next = redo(layoutRef.current);
+    const next = redo(latestRef.current);
     if (!next) return;
     dirtyRef.current = true;
+    latestRef.current = next;
     setLayout(next);
   }, [redo]);
   // Revert and Reset are their own undo steps, so Ctrl+Z can take either
@@ -151,98 +162,79 @@ export function useLayoutEditor({
     // The home board: the stock arrangement over the stock instances, with
     // any other instance (a second notes card, say) back in the tray. Any
     // other board: empty, everything in the tray.
-    mutateLayout({
+    mutateLayout((prev) => ({
       sections: resolveLayout(
         isHome ? DEFAULT_SECTIONS : [],
-        layout.sections.map(({ id, type }) => ({ id, type }))
+        prev.sections.map(({ id, type }) => ({ id, type }))
       ),
       scale: DEFAULT_UI_SCALE,
       gap: DEFAULT_GRID_GAP,
       topGap: DEFAULT_TOP_GAP,
-    });
+    }));
   }
-  const mutateSections = (sections: LayoutWidget[]) =>
-    mutateLayout({ ...layout, sections });
+  const mutateSections = (update: Update<LayoutWidget[]>) =>
+    mutateLayout((prev) => ({
+      ...prev,
+      sections: typeof update === "function" ? update(prev.sections) : update,
+    }));
   // Per-widget edits match on the instance id, so two widgets of a type stay
   // independent.
+  const editWidget = (key: string, edit: (w: LayoutWidget) => LayoutWidget) =>
+    mutateSections((sections) => sections.map((w) => (w.id === key ? edit(w) : w)));
+  // An optional key set, or dropped when undefined so the stored entry stays
+  // clean.
+  function withOptional<K extends "cards" | "height">(w: LayoutWidget, key: K, value: LayoutWidget[K]) {
+    const rest = { ...w };
+    if (value !== undefined) rest[key] = value;
+    else delete rest[key];
+    return rest;
+  }
   const setWidgetSpan = (key: string, span: number) =>
-    mutateSections(
-      layout.sections.map((w) =>
-        w.id === key
-          ? { ...w, span: Math.min(GRID_COLUMNS, Math.max(1, span)) }
-          : w
-      )
-    );
-  // Cards per row for the card-grid widgets; undefined returns to auto (the
-  // key is dropped so the stored entry stays clean).
+    editWidget(key, (w) => ({ ...w, span: Math.min(GRID_COLUMNS, Math.max(1, span)) }));
+  // Cards per row for the card-grid widgets; undefined returns to auto.
   const setWidgetCards = (key: string, cards: number | undefined) =>
-    mutateSections(
-      layout.sections.map((w) => {
-        if (w.id !== key) return w;
-        if (cards !== undefined) return { ...w, cards };
-        const rest = { ...w };
-        delete rest.cards;
-        return rest;
-      })
-    );
-  // Explicit height (px) for any widget; undefined clears it back to auto (the
-  // key is dropped so the stored entry stays clean, like `cards`).
+    editWidget(key, (w) => withOptional(w, "cards", cards));
+  // Explicit height (px) for any widget; undefined clears it back to auto.
   const setWidgetHeight = (key: string, height: number | undefined) =>
-    mutateSections(
-      layout.sections.map((w) => {
-        if (w.id !== key) return w;
-        if (height !== undefined) return { ...w, height };
-        const rest = { ...w };
-        delete rest.height;
-        return rest;
-      })
-    );
+    editWidget(key, (w) => withOptional(w, "height", height));
   // Extra space (px) on one side of a widget; undefined/0 clears that side. An
   // emptied `space` object is dropped so stored entries stay clean (like cards).
-  const setWidgetSpace = (
-    key: string,
-    side: SpaceSide,
-    value: number | undefined
-  ) =>
-    mutateSections(
-      layout.sections.map((w) => {
-        if (w.id !== key) return w;
-        const nextSpace = { ...(w.space ?? {}) };
-        if (value) nextSpace[side] = value;
-        else delete nextSpace[side];
-        const rest = { ...w };
-        if (Object.keys(nextSpace).length > 0) rest.space = nextSpace;
-        else delete rest.space;
-        return rest;
-      })
-    );
-  const setScale = (next: number) => mutateLayout({ ...layout, scale: next });
-  const setGap = (next: number) => mutateLayout({ ...layout, gap: next });
-  const setTopGap = (next: number) =>
-    mutateLayout({ ...layout, topGap: next });
-  const toggleWidgetHidden = (key: string) =>
-    mutateSections(
-      layout.sections.map((w) =>
-        w.id === key ? { ...w, hidden: !w.hidden } : w
-      )
-    );
+  const setWidgetSpace = (key: string, side: SpaceSide, value: number | undefined) =>
+    editWidget(key, (w) => {
+      const nextSpace = { ...(w.space ?? {}) };
+      if (value) nextSpace[side] = value;
+      else delete nextSpace[side];
+      const rest = { ...w };
+      if (Object.keys(nextSpace).length > 0) rest.space = nextSpace;
+      else delete rest.space;
+      return rest;
+    });
+  const setScale = (next: number) => mutateLayout((prev) => ({ ...prev, scale: next }));
+  const setGap = (next: number) => mutateLayout((prev) => ({ ...prev, gap: next }));
+  const setTopGap = (next: number) => mutateLayout((prev) => ({ ...prev, topGap: next }));
+  const toggleWidgetHidden = (key: string) => editWidget(key, (w) => ({ ...w, hidden: !w.hidden }));
   // Toggle the section heading. Stored only when off (the key is dropped when
   // turning it back on) so entries stay clean, like `cards`.
   const toggleWidgetLabel = (key: string) =>
-    mutateSections(
-      layout.sections.map((w) => {
-        if (w.id !== key) return w;
-        if (w.hideLabel) {
-          const rest = { ...w };
-          delete rest.hideLabel;
-          return rest;
-        }
-        return { ...w, hideLabel: true };
-      })
-    );
+    editWidget(key, (w) => {
+      if (!w.hideLabel) return { ...w, hideLabel: true };
+      const rest = { ...w };
+      delete rest.hideLabel;
+      return rest;
+    });
   const { beginGesture, endGesture, group } = history;
   const gesture = useMemo(
-    () => ({ begin: beginGesture, end: endGesture, group }),
+    () => ({
+      begin: () => {
+        beginGesture();
+        setGestureStart(latestRef.current);
+      },
+      end: () => {
+        endGesture(latestRef.current);
+        setGestureStart(null);
+      },
+      group,
+    }),
     [beginGesture, endGesture, group]
   );
   const clearHistory = history.clear;

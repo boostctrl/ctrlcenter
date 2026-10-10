@@ -101,10 +101,21 @@ export function useUndoHistory<T>() {
   const beginGesture = useCallback(() => {
     gestureRef.current = { recorded: false };
   }, []);
-  const endGesture = useCallback(() => {
-    gestureRef.current = null;
-    lastControlRef.current = null;
-  }, []);
+  // `current` is the value the gesture ended on: one that ends where it
+  // began (a drag out and back) leaves no step behind.
+  const endGesture = useCallback(
+    (current?: T) => {
+      const gesture = gestureRef.current;
+      gestureRef.current = null;
+      lastControlRef.current = null;
+      const top = undoRef.current.at(-1);
+      if (gesture?.recorded && current !== undefined && top !== undefined && JSON.stringify(top) === JSON.stringify(current)) {
+        undoRef.current.pop();
+        sync();
+      }
+    },
+    [sync]
+  );
   // Name the kind of the next change, so keyboard repeats of that kind on the
   // focused control fold together.
   const group = useCallback((key: string) => {
