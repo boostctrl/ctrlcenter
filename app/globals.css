@@ -989,20 +989,21 @@ select optgroup {
   animation-duration: calc(44s * var(--motion-scale, 1));
 }
 
-/* Beams scene — diagonal light bars sweeping across (components/scenes/Beams.tsx). */
+/* Beams scene — carry the bar layer steadily to the right by one horizontal
+   period of its pattern (SWEEP in components/scenes/Beams.tsx, which sizes
+   the gradient to match), so the linear loop restarts on an identical frame. */
 @keyframes beam-sweep {
-  0%,
-  100% {
-    transform: translateX(-6%);
+  from {
+    transform: translateX(0);
   }
-  50% {
-    transform: translateX(6%);
+  to {
+    transform: translateX(1200px);
   }
 }
 
 .animate-beams {
-  animation: beam-sweep 36s ease-in-out infinite;
-  animation-duration: calc(36s * var(--motion-scale, 1));
+  animation: beam-sweep 48s linear infinite;
+  animation-duration: calc(48s * var(--motion-scale, 1));
 }
 
 /* Scenes manage their own JS-driven motion (e.g. the Abyss canvas draws a
