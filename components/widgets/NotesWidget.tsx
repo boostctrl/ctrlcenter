@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo } from "react";
+import { Fragment, createElement, useMemo } from "react";
 import SectionTitle from "../SectionTitle";
 import {
   parseMarkdown,
@@ -63,14 +63,23 @@ const HEADING_CLASS: Record<1 | 2 | 3, string> = {
   3: "text-sm font-medium text-ink-75",
 };
 
-function Block({ block }: { block: MarkdownBlock }) {
+// A note's headings continue the page's outline: its top heading level sits
+// right under the card's title (an h2), or under the page's h1 when the title
+// is hidden, so a note that starts at `##` doesn't skip a level. The styling
+// still follows the level written.
+type HeadingTag = "h2" | "h3" | "h4" | "h5" | "h6";
+export function headingTag(level: 1 | 2 | 3, top: number, titled: boolean): HeadingTag {
+  const n = Math.min(6, (titled ? 3 : 2) + level - top);
+  return `h${n}` as HeadingTag;
+}
+
+function Block({ block, top, titled }: { block: MarkdownBlock; top: number; titled: boolean }) {
   switch (block.kind) {
     case "heading": {
-      const Tag = (["h3", "h4", "h5"] as const)[block.level - 1];
-      return (
-        <Tag className={HEADING_CLASS[block.level]}>
-          <Inline tokens={block.children} />
-        </Tag>
+      return createElement(
+        headingTag(block.level, top, titled),
+        { className: HEADING_CLASS[block.level] },
+        <Inline tokens={block.children} />
       );
     }
     case "paragraph":
@@ -128,12 +137,14 @@ export default function NotesWidget({
 }) {
   const blocks = useMemo(() => parseMarkdown(content), [content]);
   if (blocks.length === 0) return null;
+  const titled = showTitle && title.trim() !== "";
+  const top = Math.min(4, ...blocks.flatMap((b) => (b.kind === "heading" ? [b.level] : [])));
   return (
     <section>
-      {showTitle && title.trim() !== "" && <SectionTitle>{title}</SectionTitle>}
+      {titled && <SectionTitle>{title}</SectionTitle>}
       <div className="glass-card space-y-3 p-6 text-sm leading-relaxed text-ink-70">
         {blocks.map((b, i) => (
-          <Block key={i} block={b} />
+          <Block key={i} block={b} top={top} titled={titled} />
         ))}
       </div>
     </section>

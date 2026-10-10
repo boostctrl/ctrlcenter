@@ -113,6 +113,9 @@ here.
 
 ### Fixed
 
+- **Notes headings.** A note's headings now follow on from its card's
+  title, so one that starts with `##` no longer skips a heading level for
+  screen readers.
 - **Layout editor undo.** Ctrl+Z now takes back one action at a time: a
   resize drag or a held − / + button is one step however long it takes, and
   showing a widget and then resizing it are two. **Redo** is new: the Redo
