@@ -12,6 +12,12 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Resize from any corner.** In edit mode every corner of a card takes a
+  diagonal drag for width and height together, not just the bottom-right
+  one. Pull a corner away from the card to grow it. (#343)
+
 ### Changed
 
 - **Seerr, by its new name.** Overseerr and Jellyseerr merged into Seerr, and

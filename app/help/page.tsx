@@ -821,7 +821,7 @@ export default async function HelpPage() {
             <li>
               <strong>Resize.</strong> Drag a card&apos;s right edge to set its{" "}
               <strong>width</strong> in columns (the columns show while you
-              drag), its bottom edge to set its <strong>height</strong>, or the
+              drag), its bottom edge to set its <strong>height</strong>, or any
               corner for both. Heights snap to 20px steps, and back to
               automatic when you drag near the content&apos;s own height. The
               steppers do the same in exact steps,
