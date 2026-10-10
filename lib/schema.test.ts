@@ -136,6 +136,8 @@ describe("configSchema defaults", () => {
     expect(config.settings.weather.enabled).toBe(true);
     expect(config.settings.weather.units).toBe("imperial");
     expect(config.settings.webhooks.digestSeconds).toBe(60);
+    // The email report shows everything unless switched off (#347).
+    expect(config.settings.webhooks).toMatchObject({ poster: true, facts: true, synopsis: true, subjectPrefix: "" });
   });
 
   it("coerces per-field on a status announcement, keeping the row", () => {
@@ -383,6 +385,15 @@ describe("settingsInputSchema partial merge semantics", () => {
     expect(settingsInputSchema.safeParse({ webhooks: { digestSeconds: 301 } }).success).toBe(false);
     expect(settingsInputSchema.safeParse({ webhooks: { digestSeconds: 1.5 } }).success).toBe(false);
     expect(settingsInputSchema.safeParse({ webhooks: { digestSeconds: -1 } }).success).toBe(false);
+  });
+
+  it("takes the email report options one at a time, the prefix capped (#347)", () => {
+    expect(settingsInputSchema.parse({ webhooks: { synopsis: false } })).toEqual({
+      webhooks: { synopsis: false },
+    });
+    expect(settingsInputSchema.safeParse({ webhooks: { subjectPrefix: "[Home]" } }).success).toBe(true);
+    expect(settingsInputSchema.safeParse({ webhooks: { subjectPrefix: "x".repeat(41) } }).success).toBe(false);
+    expect(settingsInputSchema.safeParse({ webhooks: { poster: "no" } }).success).toBe(false);
   });
 
   it("takes the page-level layout values partially, with no rows (#298)", () => {

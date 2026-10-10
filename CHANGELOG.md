@@ -25,6 +25,14 @@ here.
   for* sets the wait (a minute by default); Off keeps one message per
   event. Health issues, updates, failed downloads and a sender's Test are
   never held, and the relay now accepts larger bursts. (#346)
+- **See webhook notifications before they arrive.** *Settings → Monitoring
+  → Inbound webhooks* now has an *Email report* block — switch the poster,
+  the facts table and the synopsis on or off, and set a subject prefix for
+  your mail rules — and a live preview that renders a sample Sonarr, Radarr
+  or Seerr event as the email, in light and dark mode, and as the one-liner
+  the push channels get, updating as you type. Each channel that takes
+  inbound webhooks gets a *Send sample* button, like the uptime *Send
+  test*. (#347)
 
 ### Changed
 

@@ -35,6 +35,11 @@ export function cleanHeader(s: string): string {
 
 const isHttp = (u: string | undefined): u is string => !!u && /^https?:\/\//i.test(u);
 const isHttps = (u: string | undefined): u is string => !!u && /^https:\/\//i.test(u);
+// A poster is an https image, or an inline raster/SVG data URL: the admin
+// preview (#347) shows a placeholder tile that way so it fetches nothing.
+// The parsers only ever emit https, and an <img> never runs an SVG's script.
+const isPoster = (u: string | undefined): u is string =>
+  isHttps(u) || (!!u && /^data:image\/(?:png|jpeg|gif|webp|svg\+xml)[;,]/i.test(u));
 
 // The host of a URL for the caption under the button; "" when it isn't one.
 function hostOf(url: string): string {
@@ -175,7 +180,7 @@ function bandHtml(app: string, event: string, level: NotificationLevel): string 
 // stays, tinted, with the alt text as its caption; the text column never
 // moves because the cell keeps its width either way.
 function posterHtml(image: WebhookReport["image"]): string {
-  if (!image || !isHttps(image.url)) return "";
+  if (!image || !isPoster(image.url)) return "";
   const caption = `font-family:${FONT};font-size:11px;line-height:14px;color:${L.muted};text-align:center`;
   return `<td width="72" valign="top" style="width:72px;padding:4px 0 0 24px">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse"><tr>
@@ -292,14 +297,21 @@ function sheetOf(c: WebhookNotification): Sheet {
   };
 }
 
+// The hidden inbox preview line: the report's own, else the summary and the
+// chips. Exported so the admin preview (#347) shows what the inbox would.
+export function buildPreheader(c: WebhookNotification): string {
+  const r = sheetOf(c);
+  return clamp(
+    cleanHeader(r.preheader || [r.summary, ...(r.chips ?? [])].filter(Boolean).join(" · ")),
+    140
+  );
+}
+
 function renderHtml(c: WebhookNotification, ctx: NotificationContext, subject: string): string {
   const r = sheetOf(c);
   const o: ReportOptions = ctx.options ?? {};
   const when = whenOf(ctx);
-  const preheader = clamp(
-    cleanHeader(r.preheader || [r.summary, ...(r.chips ?? [])].filter(Boolean).join(" · ")),
-    140
-  );
+  const preheader = buildPreheader(c);
   const relay = c.report ? ` · relayed from ${escapeHtml(relayOf(c.report))}` : "";
   const poster = o.poster === false ? "" : posterHtml(r.image);
   return `<!doctype html>

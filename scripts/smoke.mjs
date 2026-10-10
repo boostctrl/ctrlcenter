@@ -366,6 +366,9 @@ async function statusPhase(run) {
       { id: "smoke-telegram", type: "telegram", name: "Phone", token: "smoke", apps: ["smoke-down"] },
     ],
   };
+  // Inbound webhooks with a service on, so the card shows its report
+  // options and the open email preview (#347) for the audit in both schemes.
+  config.settings.webhooks = { enabled: true, sonarr: { enabled: true, token: "smoke" } };
   fs.writeFileSync(configPath, YAML.dump(config));
 
   // Each state as /api/status reports it.

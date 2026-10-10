@@ -657,7 +657,7 @@ export default async function HelpPage() {
             other channel gets a one-line summary.
           </P>
           <P>
-            Turn on <strong>Settings → Alerts → Inbound webhooks</strong>,
+            Turn on <strong>Settings → Monitoring → Inbound webhooks</strong>,
             enable a service, and copy its URL. In that app&apos;s{" "}
             <strong>Connect → Webhook</strong> settings paste the URL, set the
             method to <strong>POST</strong>, and pick which events to send. Each
@@ -676,6 +676,18 @@ export default async function HelpPage() {
             for one message per event. Health issues, updates, failed
             downloads and a sender&apos;s Test are never held. Events still
             waiting when CtrlCenter restarts are dropped.
+          </P>
+          <P>
+            <strong>Email report</strong> chooses what an email channel
+            shows: the poster, the facts table and the synopsis can each be
+            switched off, and a <strong>Subject prefix</strong> goes in front
+            of every subject for a mail rule to file on. The{" "}
+            <strong>Preview</strong> at the foot of the card renders a sample event —
+            a season import, a movie grab, a request, a health warning — as
+            the email and as the one-liner the push channels get, in light
+            and dark mode, changing as you type. <strong>Send sample</strong>{" "}
+            delivers that event through a channel for real, with the options
+            as saved.
           </P>
         </Card>
 

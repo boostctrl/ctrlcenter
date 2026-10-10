@@ -301,7 +301,9 @@ settings:
   settingsButton: true      # the floating corner navigation menu
   # Further sections mirror the admin UI one-to-one and are easiest to edit
   # there: favicon, announcement (the site-wide banner), statusAnnouncements,
-  # and webhooks (inbound service events).
+  # and webhooks (inbound service events: enabled, digestSeconds, the email
+  # report's poster / facts / synopsis switches and subjectPrefix, and a
+  # sonarr / radarr / seerr block each with enabled and token).
   layout:                   # shared by every board:
     scale: 100              # UI scale, percent
     gap: 32                 # space between cards (px)

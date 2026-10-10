@@ -933,6 +933,30 @@ describe("readConfigInternal stays off public surfaces", () => {
   });
 });
 
+// Structural guard for #347: the settings form renders the webhook email
+// preview in the browser through lib/webhook-email.ts and
+// lib/notification-samples.ts, which stay import-free of Node. lib/alerts.ts
+// is the server side of the same feature — nodemailer, secrets, timeouts —
+// and must never be pulled into a client component by mistake.
+describe("lib/alerts stays out of the components tree", () => {
+  it("no file under components/ imports it", async () => {
+    const dir = path.join(__dirname, "..", "components");
+    const found: string[] = [];
+    async function walk(d: string) {
+      for (const entry of await fs.readdir(d, { withFileTypes: true })) {
+        const full = path.join(d, entry.name);
+        if (entry.isDirectory()) await walk(full);
+        else if (/\.(ts|tsx)$/.test(entry.name)) {
+          const source = await fs.readFile(full, "utf8");
+          if (/from\s+["'][^"']*lib\/alerts["']/.test(source)) found.push(path.relative(dir, full));
+        }
+      }
+    }
+    await walk(dir);
+    expect(found, "Client code renders through lib/webhook-email.ts, not lib/alerts.ts").toEqual([]);
+  });
+});
+
 // #157: the secrets embedded in settings (calendar credentials, alert
 // webhook/SMTP) must be blanked by stripSecrets so readPublicConfig's result is
 // safe to serialize, while the server-only getCalendarAuth still yields the real

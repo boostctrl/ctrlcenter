@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { readConfigInternal } from "@/lib/config";
 import { WEBHOOK_SERVICES, type WebhookService } from "@/lib/schema";
-import { parseWebhook } from "@/lib/webhooks";
+import { parseWebhook, reportOptions } from "@/lib/webhooks";
 import { holdForDigest } from "@/lib/webhook-digest";
 import { sendNotification, anyChannelReady } from "@/lib/alerts";
 import { rateLimit, pruneRateLimit, clientKey } from "@/lib/rate-limit";
@@ -132,6 +132,7 @@ export async function POST(
           at: Date.now(),
           timeZone: settings.timezone,
           siteTitle: settings.title,
+          options: reportOptions(settings.webhooks),
         });
       },
     });
@@ -139,10 +140,13 @@ export async function POST(
     return NextResponse.json({ ok: true, queued: true });
   }
 
+  // The report options (#347) are read with the rest of the settings, so a
+  // toggle flipped while a burst was pending applies when it goes out.
   await sendNotification(settings.alerts, notification, {
     at: Date.now(),
     timeZone: settings.timezone,
     siteTitle: settings.title,
+    options: reportOptions(settings.webhooks),
   });
   log.info("webhook relayed", { service });
   return NextResponse.json({ ok: true, delivered: true });

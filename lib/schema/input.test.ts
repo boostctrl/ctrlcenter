@@ -19,6 +19,16 @@ describe("derived input schemas", () => {
     // to overwrite.
     expect(webhooksUpdateSchema.parse({})).toEqual({});
     expect(webhooksUpdateSchema.parse({ digestSeconds: 0 })).toEqual({ digestSeconds: 0 });
+    // One report option (#347) writes none of its siblings.
+    expect(webhooksUpdateSchema.parse({ poster: false })).toEqual({ poster: false });
+    expect(webhooksUpdateSchema.parse({ subjectPrefix: "[Home]" })).toEqual({ subjectPrefix: "[Home]" });
+  });
+
+  it("keep the stored bounds (#346, #347)", () => {
+    for (const bad of [{ digestSeconds: 301 }, { digestSeconds: 1.5 }, { subjectPrefix: "x".repeat(41) }, { facts: "yes" }]) {
+      expect(webhooksUpdateSchema.safeParse(bad).success, JSON.stringify(bad)).toBe(false);
+    }
+    expect(webhooksUpdateSchema.safeParse({ subjectPrefix: "x".repeat(40) }).success).toBe(true);
   });
 
   it("are strict where the stored schema is lenient", () => {

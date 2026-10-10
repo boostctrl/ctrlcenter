@@ -1,4 +1,4 @@
-import type { AlertChannel, AlertConfig, AlertType, SmtpConfig } from "./schema";
+import type { AlertChannel, AlertConfig, AlertType, Settings, SmtpConfig } from "./schema";
 import {
   activeChannels,
   channelLabel,
@@ -8,8 +8,9 @@ import {
 import { log, hostOf, errorReason } from "./log";
 import { resolveSecret } from "./secrets";
 import { fetchWithTimeout } from "./fetch-body";
-import type { NotificationContext, WebhookNotification } from "./webhooks";
+import { reportOptions, type NotificationContext, type WebhookNotification } from "./webhooks";
 import { buildNotificationEmail, escapeHtml } from "./webhook-email";
+import { sampleNotification, type SampleId } from "./notification-samples";
 
 // Outbound uptime alerting. The background poller (lib/status-poller.ts) feeds
 // each tick's results through here; we detect down/recovery transitions and
@@ -547,6 +548,40 @@ export async function sendTestAlert(
     event: { id: "test", type: "down" },
     app: { name: "CtrlCenter test alert", url: "" },
     at: Date.now(),
+  };
+  const results = await Promise.all(
+    channels.map(async (ch) => ({ id: ch.id, label: channelLabel(ch), ...(await deliver(ch, out)) }))
+  );
+  return { results };
+}
+
+// Send a sample inbound-webhook event (#347, lib/notification-samples.ts)
+// through the real delivery path, so the admin can see the report options
+// land in a mailbox or the one-liner reach a phone without waiting for
+// Sonarr. Same channel choice as sendTestAlert, narrowed to the channels
+// that take inbound webhooks when none is named; the saved report options
+// apply, as a real event's would, and the season sample is merged or single
+// by the saved burst window. Goes straight to the channels — never held in
+// the burst store — and ignores `alerts.enabled` like the test. Never throws.
+export async function sendSampleNotification(
+  settings: Pick<Settings, "alerts" | "webhooks" | "title" | "timezone">,
+  sample: SampleId,
+  channelId?: string
+): Promise<{ results: TestResult[] }> {
+  const { alerts, webhooks } = settings;
+  const channels =
+    channelId === undefined
+      ? activeChannels(alerts).filter((ch) => ch.onWebhooks)
+      : alerts.channels.filter((ch) => ch.id === channelId && channelReady(ch));
+  const out: Outgoing = {
+    kind: "notification",
+    content: sampleNotification(sample, { digest: webhooks.digestSeconds > 0 }),
+    ctx: {
+      at: Date.now(),
+      timeZone: settings.timezone,
+      siteTitle: settings.title,
+      options: reportOptions(webhooks),
+    },
   };
   const results = await Promise.all(
     channels.map(async (ch) => ({ id: ch.id, label: channelLabel(ch), ...(await deliver(ch, out)) }))

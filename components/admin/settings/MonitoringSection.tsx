@@ -7,13 +7,16 @@ import {
   AddButton,
   Card,
   ControlRow,
+  Hint,
   NumberRow,
+  TextField,
   ToggleRow,
   fieldLabelClasses,
 } from "../ui";
 import { ChipGroup } from "@/components/ChipGroup";
 import { WEBHOOK_LABELS, WebhookUrlRow } from "./WebhookUrlRow";
 import { AlertChannelEditor } from "./AlertChannelEditor";
+import WebhookPreview from "./WebhookPreview";
 import { DIGEST_PRESETS, INTERVAL_PRESETS, digestPresetLabel } from "./constants";
 import type { SettingsDraft } from "./useSettingsDraft";
 
@@ -203,6 +206,55 @@ export default function MonitoringSection({
                 </div>
               );
             })}
+
+            {/* What the email report carries (#347). The push and chat
+                channels get the one-line summary whatever is set here. */}
+            <div className="flex flex-col gap-3 border-t border-fg/10 pt-4">
+              <div className="flex flex-col gap-1">
+                <span className={fieldLabelClasses}>Email report</span>
+                <Hint>
+                  What an email channel shows for an event. Every other
+                  channel gets the one-line summary.
+                </Hint>
+              </div>
+              <ToggleRow
+                label="Poster"
+                hint="The show or movie poster. Your mail client fetches it from TheTVDB or TMDB when the email is opened."
+                checked={webhooks.poster}
+                onChange={(poster) => updateWebhooks({ poster })}
+              />
+              <ToggleRow
+                label="Facts table"
+                hint="Quality, size, release group, indexer, client, requester: the fields that matter for each event."
+                checked={webhooks.facts}
+                onChange={(facts) => updateWebhooks({ facts })}
+              />
+              <ToggleRow
+                label="Synopsis"
+                hint="The overview Radarr and Seerr send, or Sonarr's episode summary, which can spoil an episode."
+                checked={webhooks.synopsis}
+                onChange={(synopsis) => updateWebhooks({ synopsis })}
+              />
+              <TextField
+                label="Subject prefix"
+                hint="Put in front of every webhook email subject, e.g. a tag your mail rules file on. Counts toward the 78-character limit."
+                maxLength={40}
+                placeholder="[Home]"
+                autoComplete="off"
+                value={webhooks.subjectPrefix}
+                onChange={(e) => updateWebhooks({ subjectPrefix: e.target.value })}
+              />
+            </div>
+
+            {/* The preview renders the draft; its Send sample reads the
+                saved config, so it also waits out a failed save. */}
+            <WebhookPreview
+              webhooks={webhooks}
+              alerts={alerts}
+              siteTitle={settings.title}
+              timeZone={settings.timezone}
+              saving={saving || status === "error"}
+            />
           </>
         )}
       </Card>

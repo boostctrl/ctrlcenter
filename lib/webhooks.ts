@@ -134,6 +134,13 @@ export type NotificationContext = {
   options?: ReportOptions;
 };
 
+// The report options out of the webhooks settings (#347): the four keys the
+// renderer reads and nothing beside them, so the service tokens stored next
+// to them never ride along in a context.
+export function reportOptions(w: ReportOptions): ReportOptions {
+  return { poster: w.poster, facts: w.facts, synopsis: w.synopsis, subjectPrefix: w.subjectPrefix };
+}
+
 // --- Small value helpers ---
 
 const asRecord = (v: unknown): Record<string, unknown> =>
