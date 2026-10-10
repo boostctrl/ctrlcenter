@@ -379,6 +379,12 @@ export function useSettingsDraft(
       sceneMotion: undefined,
       sceneIntensityLight: undefined,
       sceneMotionLight: undefined,
+      // A pack's fonts when it carries them (#330); else the current ones stay.
+      font: pack.font ?? theme.font,
+      headingFont: pack.headingFont,
+      headingFontLight: undefined,
+      density: undefined,
+      densityLight: undefined,
     });
   }
 
@@ -399,6 +405,8 @@ export function useSettingsDraft(
         tuneLight: undefined,
         sceneIntensityLight: undefined,
         sceneMotionLight: undefined,
+        headingFontLight: undefined,
+        densityLight: undefined,
       });
       return;
     }
@@ -415,6 +423,9 @@ export function useSettingsDraft(
       tuneLight: pack.tune,
       sceneIntensityLight: undefined,
       sceneMotionLight: undefined,
+      fontLight: pack.font,
+      headingFontLight: pack.headingFont,
+      densityLight: undefined,
     });
   }
 

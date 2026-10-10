@@ -33,6 +33,10 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     sceneFxFor,
     setSceneFx,
     colorsFor,
+    headingFontFor,
+    setHeadingFont,
+    densityFor,
+    setDensity,
     applyPack,
     customThemes,
     activeLook,
@@ -90,7 +94,9 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     sceneFor(mode) === p.scene &&
     colorSetsEqual(colorsFor(mode), p[mode]) &&
     tunesEqual(tuneFor(mode), p.tune ?? null) &&
-    sceneFxEqual(sceneFxFor(mode), null);
+    sceneFxEqual(sceneFxFor(mode), null) &&
+    (!p.font || fontFor(mode) === p.font) &&
+    (!p.headingFont || headingFontFor(mode) === p.headingFont);
   const savedActive = (t: CustomTheme) =>
     (["dark", "light"] as const).every(
       (mode) =>
@@ -99,7 +105,9 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
         fontFor(mode) === (mode === "dark" ? t.font : t.fontLight) &&
         colorSetsEqual(colorsFor(mode), t[mode]) &&
         tunesEqual(tuneFor(mode), mode === "dark" ? t.tune : t.tuneLight) &&
-        sceneFxEqual(sceneFxFor(mode), mode === "dark" ? t.sceneFx : t.sceneFxLight)
+        sceneFxEqual(sceneFxFor(mode), mode === "dark" ? t.sceneFx : t.sceneFxLight) &&
+        headingFontFor(mode) === ((mode === "dark" ? t.headingFont : t.headingFontLight) ?? null) &&
+        densityFor(mode) === ((mode === "dark" ? t.density : t.densityLight) ?? "comfortable")
     );
   const paletteActive = (p: ModeColors) =>
     colorSetsEqual(colorsFor("dark"), p.dark) && colorSetsEqual(colorsFor("light"), p.light);
@@ -388,6 +396,10 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     sceneFxFor,
     setSceneFx,
     colorsFor,
+    headingFontFor,
+    setHeadingFont,
+    densityFor,
+    setDensity,
     applyPack: applyPackTracked,
     customThemes,
     activeAccent,

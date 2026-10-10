@@ -406,6 +406,11 @@ function ThemeStep({ settings, onSave, packs }: StepProps & { packs: ThemePack[]
                 sceneMotion: undefined,
                 sceneIntensityLight: undefined,
                 sceneMotionLight: undefined,
+                font: pack.font ?? settings.theme.font,
+                headingFont: pack.headingFont,
+                headingFontLight: undefined,
+                density: undefined,
+                densityLight: undefined,
               },
             },
             { fallback: "Couldn't save the theme" }

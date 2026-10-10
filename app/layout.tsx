@@ -18,7 +18,7 @@ import { getSettings } from "@/lib/config";
 import { DEFAULT_UI_SCALE } from "@/lib/layout";
 import { resolveIconUrl } from "@/lib/icons";
 import { serializeForScript } from "@/lib/serialize";
-import { DESIGN_IDS, SCENE_IDS } from "@/lib/theme";
+import { DENSITY_IDS, DESIGN_IDS, SCENE_IDS } from "@/lib/theme";
 import { inlineThemeScript } from "@/lib/theme-paint";
 import { FONT_IDS } from "@/lib/fonts";
 import { PrefsProvider } from "@/components/PrefsProvider";
@@ -123,6 +123,7 @@ export default async function RootLayout({
     design: DESIGN_IDS,
     scene: SCENE_IDS,
     font: FONT_IDS,
+    density: DENSITY_IDS,
   });
 
   // suppressHydrationWarning on <html>: the inline theme script below mutates its

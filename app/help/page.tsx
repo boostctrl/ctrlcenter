@@ -314,7 +314,8 @@ export default async function HelpPage() {
             </li>
             <li>
               <strong>Font.</strong> Pick from twelve typefaces, from
-              geometric sans to serif and mono.
+              geometric sans to serif and mono, a separate face for headings
+              if you like, and a density: compact, comfortable or spacious.
             </li>
           </ul>
           <P>

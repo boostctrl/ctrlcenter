@@ -78,6 +78,15 @@
      scene runs as designed. */
   --scene-opacity: 1;
   --motion-scale: 1;
+
+  /* Typography (#330). The heading face defaults to the body face; a
+     `heading-<id>` class on <html> repoints it (see the font classes below).
+     Density scales Tailwind's one spacing token, which every padding, gap and
+     spacing-sized box derives from, so a theme can be tighter or airier
+     without touching text sizes. Set on <html> by the theme resolver. */
+  --font-heading: var(--font-sans);
+  --density: 1;
+  --spacing: calc(0.25rem * var(--density));
 }
 [data-motion="calm"] {
   --motion-scale: 2.5;
@@ -614,39 +623,83 @@ select optgroup {
 }
 
 /* Font presets: a `font-<id>` class on <html> repoints --font-sans (the default,
-   "jakarta", is the :root token and carries no class). See lib/fonts.ts. */
+   "jakarta", is the :root token and carries no class); a `heading-<id>` class
+   repoints --font-heading for h1–h3 (#330). See lib/fonts.ts. */
+@layer base {
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-heading), system-ui, sans-serif;
+  }
+}
+.heading-jakarta {
+  --font-heading: var(--font-jakarta);
+}
 .font-inter {
   --font-sans: var(--font-inter);
+}
+.heading-inter {
+  --font-heading: var(--font-inter);
 }
 .font-poppins {
   --font-sans: var(--font-poppins);
 }
+.heading-poppins {
+  --font-heading: var(--font-poppins);
+}
 .font-nunito {
   --font-sans: var(--font-nunito);
+}
+.heading-nunito {
+  --font-heading: var(--font-nunito);
 }
 .font-lora {
   --font-sans: var(--font-lora);
 }
+.heading-lora {
+  --font-heading: var(--font-lora);
+}
 .font-jetbrains {
   --font-sans: var(--font-jetbrains);
+}
+.heading-jetbrains {
+  --font-heading: var(--font-jetbrains);
 }
 .font-outfit {
   --font-sans: var(--font-outfit);
 }
+.heading-outfit {
+  --font-heading: var(--font-outfit);
+}
 .font-grotesk {
   --font-sans: var(--font-grotesk);
+}
+.heading-grotesk {
+  --font-heading: var(--font-grotesk);
 }
 .font-manrope {
   --font-sans: var(--font-manrope);
 }
+.heading-manrope {
+  --font-heading: var(--font-manrope);
+}
 .font-rubik {
   --font-sans: var(--font-rubik);
+}
+.heading-rubik {
+  --font-heading: var(--font-rubik);
 }
 .font-playfair {
   --font-sans: var(--font-playfair);
 }
+.heading-playfair {
+  --font-heading: var(--font-playfair);
+}
 .font-quicksand {
   --font-sans: var(--font-quicksand);
+}
+.heading-quicksand {
+  --font-heading: var(--font-quicksand);
 }
 
 @layer utilities {

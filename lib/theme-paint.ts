@@ -47,11 +47,21 @@ export type PaintDefaults = {
   sceneMotion?: string;
   sceneIntensityLight?: number;
   sceneMotionLight?: string;
+  // Typography (#330): a heading font (unset = the body font) and a density.
+  headingFont?: string;
+  headingFontLight?: string;
+  density?: string;
+  densityLight?: string;
 };
 
 // The valid ids per part, so a stored value the current build doesn't know
 // falls back to the default instead of adding a dead class.
-export type PaintIds = { design: readonly string[]; scene: readonly string[]; font: readonly string[] };
+export type PaintIds = {
+  design: readonly string[];
+  scene: readonly string[];
+  font: readonly string[];
+  density: readonly string[];
+};
 
 // The resolved state for the mode on screen. `background`/`foreground` are
 // null when no look applies (the CSS :root / .theme-light defaults show).
@@ -72,6 +82,9 @@ export type PaintInput = {
   design?: string;
   scene?: string;
   font?: string;
+  // The heading font (null = the body font) and the density (#330).
+  headingFont?: string | null;
+  density?: string | null;
 };
 
 // What to paint: `vars` maps a CSS custom property to its value, or null to
@@ -84,6 +97,8 @@ export type Paint = {
   design?: string;
   scene?: string;
   font?: string;
+  headingFont?: string | null;
+  density?: string | null;
 };
 
 // The ids that carry no class (the :root tokens).
@@ -97,6 +112,8 @@ export function makeThemePaint() {
   const CARD_FILL = 0.1;
   // The tune knobs, each painted as --tune-<key> (a multiplier; 100% = 1).
   const TUNE = ["radius", "border", "blur", "shadow", "fill", "glow"];
+  // The density factors, by id (lib/theme.ts DENSITIES).
+  const DENSITY: Record<string, number> = { compact: 0.85, comfortable: 1, spacious: 1.15 };
 
   function hexToRgb(hex: string): [number, number, number] | null {
     const m = HEX.exec((hex || "").trim());
@@ -258,10 +275,13 @@ export function makeThemePaint() {
     const motion = input.reduceMotion ? "off" : fx && (fx.motion === "calm" || fx.motion === "off") ? fx.motion : "normal";
     const attrs: Record<string, string | null> = {};
     attrs["data-motion"] = motion === "normal" ? null : motion;
+    const factor = input.density ? DENSITY[input.density] : undefined;
+    vars["--density"] = factor !== undefined && factor !== 1 ? String(factor) : null;
     const paint: Paint = { dark: input.dark, vars: vars, attrs: attrs };
     if (input.design !== undefined) paint.design = input.design;
     if (input.scene !== undefined) paint.scene = input.scene;
     if (input.font !== undefined) paint.font = input.font;
+    if (input.headingFont !== undefined) paint.headingFont = input.headingFont;
     return paint;
   }
 
@@ -285,6 +305,9 @@ export function makeThemePaint() {
       ["design-", paint.design, ids.design, DEFAULT_DESIGN_ID],
       ["scene-", paint.scene, ids.scene, DEFAULT_SCENE_ID],
       ["font-", paint.font, ids.font, DEFAULT_FONT_ID],
+      // The heading font has no default id: null means "the body font", so
+      // every heading-* class comes off and none goes on.
+      ["heading-", paint.headingFont === null ? "" : paint.headingFont, ids.font, ""],
     ];
     for (let i = 0; i < parts.length; i++) {
       const prefix = parts[i][0];
@@ -436,6 +459,17 @@ export function makeThemePaint() {
       if (typeof v === "string" && valid.indexOf(v) >= 0) return v;
       return dark ? dd : dl || dd;
     };
+    // The heading font: stored pair, else the admin default (light falls
+    // back to dark); none means the body font. The visitor's stored "body"
+    // sentinel clears the admin default.
+    const headingStored = get("ctrlcenter:heading");
+    const headingRaw = isObj(headingStored) ? (dark ? headingStored.dark : headingStored.light) : null;
+    let headingFont: string | null = null;
+    if (typeof headingRaw === "string" && ids.font.indexOf(headingRaw) >= 0) headingFont = headingRaw;
+    else if (headingRaw !== "body") {
+      const dh = dark ? dt.headingFont : dt.headingFontLight || dt.headingFont;
+      if (typeof dh === "string" && ids.font.indexOf(dh) >= 0) headingFont = dh;
+    }
 
     return {
       dark: dark,
@@ -449,6 +483,8 @@ export function makeThemePaint() {
       design: pick("ctrlcenter:design", ids.design, dt.design, dt.designLight),
       scene: pick("ctrlcenter:scene", ids.scene, dt.scene, dt.sceneLight),
       font: pick("ctrlcenter:font", ids.font, dt.font, dt.fontLight),
+      headingFont: headingFont,
+      density: pick("ctrlcenter:density", ids.density, dt.density || "comfortable", dt.densityLight),
     };
   }
 

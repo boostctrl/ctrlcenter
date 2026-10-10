@@ -243,3 +243,24 @@ describe("theme codes (#329)", () => {
     expect(decodeThemeCode("ctc1." + Buffer.from("{\"name\":1}").toString("base64url"))).toBeNull();
   });
 });
+
+describe("sanitizeCustomTheme typography (#330)", () => {
+  it("keeps a heading face and a non-default density, and promotes them", () => {
+    const t = sanitizeCustomTheme({
+      name: "Serif",
+      dark: valid,
+      light: { ...valid, background: "#eceef3", foreground: "#181b24" },
+      headingFont: "playfair",
+      headingFontLight: "nope",
+      density: "compact",
+      densityLight: "comfortable",
+    })!;
+    expect(t.headingFont).toBe("playfair");
+    expect(t.headingFontLight).toBeUndefined();
+    expect(t.density).toBe("compact");
+    expect(t.densityLight).toBeUndefined();
+    const site = themeInputSchema.parse(siteThemeFromCustomTheme(t, "dark"));
+    expect(site.headingFont).toBe("playfair");
+    expect(site.density).toBe("compact");
+  });
+});

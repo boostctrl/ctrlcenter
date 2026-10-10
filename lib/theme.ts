@@ -1,3 +1,7 @@
+// Type-only: lib/theme.ts must stay free of runtime imports, since the smoke
+// run loads it straight into Node (scripts/smoke.mjs).
+import type { FontId } from "./fonts";
+
 // The built-in default accent gradient (page heading, primary buttons, focus
 // rings, background glow), used when neither the admin nor the visitor has
 // chosen one.
@@ -250,6 +254,25 @@ export const BASE_THEMES: PresetTheme[] = [
   },
 ];
 
+// Density (#330): how much air the layout has. Tailwind derives every spacing
+// utility (paddings, gaps, the icon boxes) from one --spacing token, so the
+// resolver scales that token by the factor on <html> and text stays its size.
+export type Density = "compact" | "comfortable" | "spacious";
+
+export const DENSITIES: { id: Density; name: string; factor: number; description: string }[] = [
+  { id: "compact", name: "Compact", factor: 0.85, description: "Tighter paddings and gaps" },
+  { id: "comfortable", name: "Comfortable", factor: 1, description: "As designed" },
+  { id: "spacious", name: "Spacious", factor: 1.15, description: "More air around everything" },
+];
+
+export const DENSITY_IDS = DENSITIES.map((d) => d.id) as [Density, ...Density[]];
+
+export const DEFAULT_DENSITY: Density = "comfortable";
+
+export function isDensity(v: unknown): v is Density {
+  return typeof v === "string" && (DENSITY_IDS as string[]).includes(v);
+}
+
 // Scene effects (#327): how strongly the backdrop shows (intensity, a percent
 // of its full opacity) and how much it moves — "normal" as designed, "calm"
 // at half speed, "off" a still frame. Chosen per mode alongside the scene,
@@ -363,7 +386,16 @@ export function sceneFxEqual(a: SceneFx | null | undefined, b: SceneFx | null | 
 // design. Applying one sets all of it at once (a pack without a tune resets
 // the tune); the visitor can still tweak each part afterward. (Surfaced as "Themes"
 // in the builder, alongside the visitor's saved CustomThemes.)
-export type ThemePack = { name: string; design: DesignId; scene: SceneId; tune?: Tune } & ModeColors;
+// A pack may also carry a body font and a heading font (#330); without them
+// the visitor's (or the site default's) fonts stay as they are.
+export type ThemePack = {
+  name: string;
+  design: DesignId;
+  scene: SceneId;
+  tune?: Tune;
+  font?: FontId;
+  headingFont?: FontId;
+} & ModeColors;
 
 // The built-in theme that mirrors the app's stock appearance (first in the list,
 // badged in the builder).

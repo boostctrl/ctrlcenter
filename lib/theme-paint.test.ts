@@ -6,11 +6,11 @@ import {
   type PaintDefaults,
   type PaintIds,
 } from "./theme-paint";
-import { BASE_THEMES, DESIGN_IDS, SCENE_IDS, THEME_PACKS } from "./theme";
+import { BASE_THEMES, DENSITY_IDS, DESIGN_IDS, SCENE_IDS, THEME_PACKS } from "./theme";
 import { FONT_IDS } from "./fonts";
 import { serializeForScript } from "./serialize";
 
-const IDS: PaintIds = { design: DESIGN_IDS, scene: SCENE_IDS, font: FONT_IDS };
+const IDS: PaintIds = { design: DESIGN_IDS, scene: SCENE_IDS, font: FONT_IDS, density: DENSITY_IDS };
 
 const DT: PaintDefaults = {
   mode: "system",
@@ -223,6 +223,25 @@ describe("computePaint scene effects (#327)", () => {
   });
 });
 
+describe("typography (#330)", () => {
+  const base = { dark: true, background: null, foreground: null, accentFrom: "#a78bfa", accentTo: "#22d3ee" };
+
+  it("paints the density factor and carries the heading font", () => {
+    const paint = themePaint.computePaint({ ...base, density: "compact", headingFont: "lora" });
+    expect(paint.vars["--density"]).toBe("0.85");
+    expect(paint.headingFont).toBe("lora");
+    expect(themePaint.computePaint({ ...base, density: "comfortable", headingFont: null }).vars["--density"]).toBeNull();
+  });
+
+  it("reads the stored heading and density, with \"body\" overriding the default face", () => {
+    const dt: PaintDefaults = { ...DT, headingFont: "playfair", density: "spacious" };
+    expect(themePaint.readStored(storage({}), dt, IDS, true)).toMatchObject({ headingFont: "playfair", density: "spacious" });
+    const s = storage({ "ctrlcenter:heading": { dark: "body", light: "inter" }, "ctrlcenter:density": { dark: "compact", light: "nope" } });
+    expect(themePaint.readStored(s, dt, IDS, true)).toMatchObject({ headingFont: null, density: "compact" });
+    expect(themePaint.readStored(s, { ...dt, mode: "light" }, IDS, true)).toMatchObject({ headingFont: "inter", density: "spacious" });
+  });
+});
+
 describe("readStored (the no-flash path)", () => {
   it("reads the stored scene effects and the Reduce motion key", () => {
     const s = storage({
@@ -265,6 +284,8 @@ describe("readStored (the no-flash path)", () => {
       design: "glass",
       scene: "aurora",
       font: "jakarta",
+      headingFont: null,
+      density: "comfortable",
     });
   });
 

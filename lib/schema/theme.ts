@@ -1,6 +1,6 @@
 // Site default theme, theme-pack overrides, and their admin inputs.
 import { z } from "zod";
-import { DESIGN_IDS, MOTION_IDS, SCENE_IDS, TUNE_FIELDS } from "../theme";
+import { DENSITY_IDS, DESIGN_IDS, MOTION_IDS, SCENE_IDS, TUNE_FIELDS } from "../theme";
 import { FONT_IDS, DEFAULT_FONT } from "../fonts";
 import { hexColor } from "./shared";
 
@@ -65,6 +65,12 @@ export const themeSchema = z.object({
   sceneMotion: z.enum(MOTION_IDS).optional(),
   sceneIntensityLight: z.number().int().min(0).max(100).optional(),
   sceneMotionLight: z.enum(MOTION_IDS).optional(),
+  // Typography (#330): a heading font (absent = the body font) and the
+  // layout density, per mode (light falls back to dark).
+  headingFont: z.enum(FONT_IDS).optional().catch(undefined),
+  headingFontLight: z.enum(FONT_IDS).optional().catch(undefined),
+  density: z.enum(DENSITY_IDS).optional().catch(undefined),
+  densityLight: z.enum(DENSITY_IDS).optional().catch(undefined),
 });
 
 // A cohesive set of surface + accent colors (one mode of a theme).
@@ -90,8 +96,10 @@ export const themePackSchema = z.object({
   // failing the whole config read.
   design: z.enum(DESIGN_IDS).catch("glass"),
   scene: z.enum(SCENE_IDS).catch("aurora"),
-  // A pack may ship a tune over its design (#326).
+  // A pack may ship a tune over its design (#326), and fonts (#330).
   tune: tuneSchema.optional(),
+  font: z.enum(FONT_IDS).optional().catch(undefined),
+  headingFont: z.enum(FONT_IDS).optional().catch(undefined),
   dark: colorSetSchema,
   light: colorSetSchema,
 });
@@ -129,4 +137,8 @@ export const themeInputSchema = z.object({
   sceneMotion: z.enum(MOTION_IDS).optional(),
   sceneIntensityLight: z.number().int().min(0).max(100).optional(),
   sceneMotionLight: z.enum(MOTION_IDS).optional(),
+  headingFont: z.enum(FONT_IDS).optional(),
+  headingFontLight: z.enum(FONT_IDS).optional(),
+  density: z.enum(DENSITY_IDS).optional(),
+  densityLight: z.enum(DENSITY_IDS).optional(),
 });

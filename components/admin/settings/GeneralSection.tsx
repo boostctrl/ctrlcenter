@@ -2,6 +2,7 @@
 
 import type { ThemePack } from "@/lib/theme";
 import { FONTS, fontVar, type FontId } from "@/lib/fonts";
+import { DENSITIES, type Density } from "@/lib/theme";
 import { Card, ControlRow, SelectField, TextField, controlClasses, fieldLabelClasses } from "../ui";
 import { ChipGroup } from "@/components/ChipGroup";
 import IconField from "../IconField";
@@ -111,10 +112,10 @@ export default function GeneralSection({
           ))}
         </SelectField>
 
-        {/* Theme packs deliberately don't carry a font, so the default font
-            is its own control rather than part of the pack selects above.
-            Each option renders in its own face (every font is loaded up
-            front in the root layout, so the variables exist here too). */}
+        {/* A pack may carry fonts (#330) but most don't, so the default font
+            is its own control beside the pack selects above. Each option
+            renders in its own face (every font is loaded up front in the
+            root layout, so the variables exist here too). */}
         <SelectField
           label="Default font"
           value={theme.font}
@@ -149,6 +150,38 @@ export default function GeneralSection({
             </option>
           ))}
         </SelectField>
+
+        {/* The heading face (#330): titles and section headings in their own
+            font, or the body's. */}
+        <SelectField
+          label="Heading font"
+          value={theme.headingFont ?? ""}
+          onChange={(e) =>
+            updateTheme({
+              headingFont: (e.target.value || undefined) as FontId | undefined,
+            })
+          }
+          style={theme.headingFont ? { fontFamily: fontVar(theme.headingFont) } : undefined}
+        >
+          <option value="">Same as the body font</option>
+          {FONTS.map((f) => (
+            <option key={f.id} value={f.id} style={{ fontFamily: fontVar(f.id) }}>
+              {f.name}
+            </option>
+          ))}
+        </SelectField>
+
+        <ControlRow label="Density">
+          <ChipGroup
+            label="Density"
+            shrink
+            options={DENSITIES.map((d) => ({ value: d.id, label: d.name }))}
+            value={(theme.density ?? "comfortable") as Density}
+            onChange={(density) =>
+              updateTheme({ density: density === "comfortable" ? undefined : density })
+            }
+          />
+        </ControlRow>
 
         {/* Preview of the default look's dark + light surfaces with the accent. */}
         <div className="grid grid-cols-2 gap-2">

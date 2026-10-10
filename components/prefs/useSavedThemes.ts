@@ -13,18 +13,22 @@ import {
   saveFont,
   saveTune,
   saveSceneFx,
+  saveHeadingFont,
+  saveDensity,
   newThemeId,
   NO_ACCENT_OVERRIDES,
+  type HeadingChoice,
   type CustomTheme,
   type AccentOverrides,
   type ModePair,
 } from "@/lib/prefs";
-import type { ColorSet, DesignId, ModeColors, SceneFx, SceneId, Tune } from "@/lib/theme";
+import type { ColorSet, Density, DesignId, ModeColors, SceneFx, SceneId, Tune } from "@/lib/theme";
 import type { FontId } from "@/lib/fonts";
 import {
   applyAll as paintAll,
   applyDesign,
   applyFont,
+  applyHeadingFont,
   applyScene,
   overrideFor,
   resolveAccent,
@@ -53,6 +57,10 @@ function themeKey(t: CustomTheme): string {
     t.tuneLight ?? null,
     t.sceneFx ?? null,
     t.sceneFxLight ?? null,
+    t.headingFont ?? null,
+    t.headingFontLight ?? null,
+    t.density ?? null,
+    t.densityLight ?? null,
   ]);
 }
 
@@ -80,6 +88,10 @@ export function useSavedThemes({
   setTunes,
   setSceneFxs,
   reduceMotion,
+  resolveHeading,
+  resolveDensity,
+  setHeadings,
+  setDensities,
 }: {
   activeLook: ModeColors | null;
   seedColorSet: (dark: boolean) => ColorSet;
@@ -100,6 +112,10 @@ export function useSavedThemes({
   setTunes: Dispatch<SetStateAction<ModePair<Tune | null>>>;
   setSceneFxs: Dispatch<SetStateAction<ModePair<SceneFx | null>>>;
   reduceMotion: boolean;
+  resolveHeading: (dark: boolean) => FontId | null;
+  resolveDensity: (dark: boolean) => Density;
+  setHeadings: Dispatch<SetStateAction<ModePair<HeadingChoice | null>>>;
+  setDensities: Dispatch<SetStateAction<ModePair<Density | null>>>;
 }) {
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([]);
 
@@ -144,6 +160,16 @@ export function useSavedThemes({
       const fxLight = resolveSceneFx(false);
       if (fx) entry.sceneFx = fx;
       if (fxLight) entry.sceneFxLight = fxLight;
+      // Typography (#330): the heading face when one is set, the density
+      // when it isn't the default.
+      const heading = resolveHeading(true);
+      const headingLight = resolveHeading(false);
+      if (heading) entry.headingFont = heading;
+      if (headingLight) entry.headingFontLight = headingLight;
+      const density = resolveDensity(true);
+      const densityLight = resolveDensity(false);
+      if (density !== "comfortable") entry.density = density;
+      if (densityLight !== "comfortable") entry.densityLight = densityLight;
       return entry;
     },
     [
@@ -156,6 +182,8 @@ export function useSavedThemes({
       resolveFont,
       resolveTune,
       resolveSceneFx,
+      resolveHeading,
+      resolveDensity,
     ]
   );
 
@@ -199,6 +227,20 @@ export function useSavedThemes({
       const nextFx = { dark: t.sceneFx ?? null, light: t.sceneFxLight ?? null };
       setSceneFxs(nextFx);
       saveSceneFx(nextFx);
+      // A saved theme without a heading face means the body font — "body",
+      // so an admin default heading face doesn't show through it.
+      const nextHeadings: ModePair<HeadingChoice | null> = {
+        dark: t.headingFont ?? "body",
+        light: t.headingFontLight ?? "body",
+      };
+      setHeadings(nextHeadings);
+      saveHeadingFont(nextHeadings);
+      const nextDensities: ModePair<Density | null> = {
+        dark: t.density ?? "comfortable",
+        light: t.densityLight ?? "comfortable",
+      };
+      setDensities(nextDensities);
+      saveDensity(nextDensities);
       applyThemeColors({ dark: t.dark, light: t.light });
       const dark = resolveDark(displayTheme);
       // applyThemeColors painted with this render's tune and effects (the
@@ -212,10 +254,12 @@ export function useSavedThemes({
         tune: (dark ? t.tune : t.tuneLight) ?? defTune(dark),
         sceneFx: (dark ? t.sceneFx : t.sceneFxLight) ?? defSceneFx(dark),
         reduceMotion,
+        density: (dark ? t.density : t.densityLight) ?? "comfortable",
       });
       applyDesign(dark ? t.design : t.designLight);
       applyScene(dark ? t.scene : t.sceneLight);
       applyFont(dark ? t.font : t.fontLight);
+      applyHeadingFont((dark ? t.headingFont : t.headingFontLight) ?? null);
     },
     // The setters are PrefsProvider's useState setters — stable, listed only
     // because they arrive as arguments here.
@@ -231,6 +275,8 @@ export function useSavedThemes({
       setFonts,
       setTunes,
       setSceneFxs,
+      setHeadings,
+      setDensities,
     ]
   );
 

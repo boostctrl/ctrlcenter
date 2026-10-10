@@ -5,11 +5,13 @@
 import {
   DEFAULT_DESIGN,
   DEFAULT_SCENE,
+  isDensity,
   isDesignId,
   isSceneId,
   sanitizeSceneFx,
   sanitizeTune,
   type ColorSet,
+  type Density,
   type DesignId,
   type ModeColors,
   type SceneFx,
@@ -194,6 +196,12 @@ export type CustomTheme = ModeColors & {
   // Each mode's scene effects (#327); absent = as the scene is designed.
   sceneFx?: SceneFx;
   sceneFxLight?: SceneFx;
+  // Typography (#330): a heading font (absent = the body font) and the
+  // density (absent = comfortable), per mode.
+  headingFont?: FontId;
+  headingFontLight?: FontId;
+  density?: Density;
+  densityLight?: Density;
 };
 
 // The active custom look's light+dark colors (the resolved mode selects which
@@ -288,6 +296,10 @@ export function siteThemeFromCustomTheme(
     sceneMotion: theme.sceneFx?.motion,
     sceneIntensityLight: theme.sceneFxLight?.intensity,
     sceneMotionLight: theme.sceneFxLight?.motion,
+    headingFont: theme.headingFont,
+    headingFontLight: theme.headingFontLight,
+    density: theme.density,
+    densityLight: theme.densityLight,
   };
 }
 
@@ -311,6 +323,10 @@ export function sanitizeCustomTheme(input: unknown): CustomTheme | null {
   const tuneLight = sanitizeTune(t.tuneLight);
   const sceneFx = sanitizeSceneFx(t.sceneFx);
   const sceneFxLight = sanitizeSceneFx(t.sceneFxLight);
+  const headingFont = isFontId(t.headingFont) ? t.headingFont : undefined;
+  const headingFontLight = isFontId(t.headingFontLight) ? t.headingFontLight : undefined;
+  const density = isDensity(t.density) && t.density !== "comfortable" ? t.density : undefined;
+  const densityLight = isDensity(t.densityLight) && t.densityLight !== "comfortable" ? t.densityLight : undefined;
   return {
     id: typeof t.id === "string" ? t.id : newThemeId(),
     name: t.name.slice(0, 40),
@@ -324,6 +340,10 @@ export function sanitizeCustomTheme(input: unknown): CustomTheme | null {
     ...(tuneLight ? { tuneLight } : {}),
     ...(sceneFx ? { sceneFx } : {}),
     ...(sceneFxLight ? { sceneFxLight } : {}),
+    ...(headingFont ? { headingFont } : {}),
+    ...(headingFontLight ? { headingFontLight } : {}),
+    ...(density ? { density } : {}),
+    ...(densityLight ? { densityLight } : {}),
     ...colors,
   };
 }
@@ -642,6 +662,34 @@ export function saveReduceMotion(reduce: boolean): void {
   } catch {
     // ignore
   }
+}
+
+// The heading typeface (#330), per mode: a FontId, "body" (the visitor chose
+// to follow the body font, overriding an admin default heading face), or null
+// (not chosen). Stored as a `{dark,light}` pair like the font.
+export const HEADING_KEY = "ctrlcenter:heading";
+
+export type HeadingChoice = FontId | "body";
+
+const isHeadingChoice = (v: unknown): v is HeadingChoice => v === "body" || isFontId(v);
+
+export function loadHeadingFont(): ModePair<HeadingChoice | null> {
+  return loadModePair(HEADING_KEY, isHeadingChoice);
+}
+
+export function saveHeadingFont(pair: ModePair<HeadingChoice | null> | null): void {
+  saveModePair(HEADING_KEY, pair);
+}
+
+// The layout density (#330), per mode.
+export const DENSITY_KEY = "ctrlcenter:density";
+
+export function loadDensity(): ModePair<Density | null> {
+  return loadModePair(DENSITY_KEY, isDensity);
+}
+
+export function saveDensity(pair: ModePair<Density | null> | null): void {
+  saveModePair(DENSITY_KEY, pair);
 }
 
 // The UI typeface (Plus Jakarta Sans, Inter, …), per mode. Applied as a

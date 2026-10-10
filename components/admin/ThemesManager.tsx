@@ -13,6 +13,7 @@ import {
   type ThemePack,
 } from "@/lib/theme";
 import type { ThemePackConfig } from "@/lib/schema";
+import { FONTS, fontVar, type FontId } from "@/lib/fonts";
 import { ChipGroup } from "@/components/ChipGroup";
 import { SelectField } from "./ui";
 import { apiErrorMessage } from "./apiError";
@@ -247,6 +248,38 @@ function PackEditor({
         }}
         aria-hidden
       />
+
+      {/* Fonts a pack may carry (#330); "Visitor's choice" leaves them alone. */}
+      <div className="grid grid-cols-2 gap-2">
+        <SelectField
+          label="Font"
+          value={pack.font ?? ""}
+          onChange={(e) => onField({ font: (e.target.value || undefined) as FontId | undefined })}
+          style={pack.font ? { fontFamily: fontVar(pack.font) } : undefined}
+        >
+          <option value="">Visitor&apos;s choice</option>
+          {FONTS.map((f) => (
+            <option key={f.id} value={f.id} style={{ fontFamily: fontVar(f.id) }}>
+              {f.name}
+            </option>
+          ))}
+        </SelectField>
+        <SelectField
+          label="Heading font"
+          value={pack.headingFont ?? ""}
+          onChange={(e) =>
+            onField({ headingFont: (e.target.value || undefined) as FontId | undefined })
+          }
+          style={pack.headingFont ? { fontFamily: fontVar(pack.headingFont) } : undefined}
+        >
+          <option value="">Visitor&apos;s choice</option>
+          {FONTS.map((f) => (
+            <option key={f.id} value={f.id} style={{ fontFamily: fontVar(f.id) }}>
+              {f.name}
+            </option>
+          ))}
+        </SelectField>
+      </div>
 
       {/* The pack's fine-tune over its design (#326), both modes. */}
       <details className="text-xs">

@@ -11,10 +11,12 @@ import {
   type ColorSet,
   type DesignId,
   type ModeColors,
+  type Density,
   type SceneFx,
   type SceneId,
   type Tune,
 } from "@/lib/theme";
+import { DENSITY_IDS } from "@/lib/theme";
 import { FONT_IDS, type FontId } from "@/lib/fonts";
 import { themePaint, type PaintIds } from "@/lib/theme-paint";
 
@@ -24,7 +26,7 @@ export type Mode = "dark" | "light";
 
 export type Accent = AccentColors;
 
-const IDS: PaintIds = { design: DESIGN_IDS, scene: SCENE_IDS, font: FONT_IDS };
+const IDS: PaintIds = { design: DESIGN_IDS, scene: SCENE_IDS, font: FONT_IDS, density: DENSITY_IDS };
 
 // Resolve whether the given mode renders dark right now ("system" follows the
 // OS). The no-flash script resolves the same way (lib/theme-paint.ts readStored).
@@ -60,6 +62,15 @@ export function applyFont(font: FontId): void {
   const el = document.documentElement;
   FONT_IDS.forEach((f) => el.classList.remove(`font-${f}`));
   if (font !== "jakarta") el.classList.add(`font-${font}`);
+}
+
+// Swap the heading font class on <html> (#330): `heading-<id>` repoints
+// --font-heading; null means the body font (no class).
+export function applyHeadingFont(font: FontId | null): void {
+  if (typeof document === "undefined") return;
+  const el = document.documentElement;
+  FONT_IDS.forEach((f) => el.classList.remove(`heading-${f}`));
+  if (font) el.classList.add(`heading-${font}`);
 }
 
 // Perceived luminance (0–1) of a #rrggbb color; non-hex falls back to mid-gray.
@@ -111,6 +122,7 @@ export function applyAll(opts: {
   tune?: Tune | null;
   sceneFx?: SceneFx | null;
   reduceMotion?: boolean;
+  density?: Density | null;
 }): void {
   if (typeof document === "undefined") return;
   const dark = resolveDark(opts.theme);
@@ -127,6 +139,7 @@ export function applyAll(opts: {
       tune: opts.tune ?? null,
       sceneFx: opts.sceneFx ?? null,
       reduceMotion: opts.reduceMotion ?? false,
+      density: opts.density ?? null,
     }),
     IDS
   );

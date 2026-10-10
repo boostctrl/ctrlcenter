@@ -14,6 +14,14 @@ here.
 
 ### Added
 
+- **Heading fonts and density (3.0).** The theme builder's Font tab gains
+  a separate face for titles and section headings (or the body font), and
+  a density choice: compact, comfortable or spacious, which tightens or
+  loosens every padding and gap without changing text sizes. Both are per
+  light and dark theme, saved with your themes, and promotable to the site
+  default, which also gets a heading font and density in Settings →
+  General. A built-in theme can now carry a body and heading font of its
+  own (Themes tab); the ones that don't leave your choice alone. (#330)
 - **Share a theme as a code (3.0).** *Copy as code* in the theme builder
   puts the current look on the clipboard as a short text code; *Paste a
   code* in another browser applies it and saves it to that browser's
