@@ -88,9 +88,18 @@ export type SceneId =
   | "blueprint"
   | "prisms"
   | "petals"
-  | "comets";
+  | "comets"
+  | "topography"
+  | "snow"
+  | "embers"
+  | "bokeh"
+  | "beams"
+  | "bubbles"
+  | "glyphs";
 
-export const SCENES: { id: SceneId; name: string; description: string }[] = [
+// `still` marks a scene that never moves (badged "Still" in the pickers; the
+// motion controls have nothing to do for it).
+export const SCENES: { id: SceneId; name: string; description: string; still?: true }[] = [
   { id: "none", name: "None", description: "A plain surface, no backdrop" },
   { id: "aurora", name: "Aurora", description: "Floating accent glow (default)" },
   { id: "abyss", name: "Abyss", description: "Deep sea — drifting marine snow" },
@@ -103,13 +112,20 @@ export const SCENES: { id: SceneId; name: string; description: string }[] = [
   { id: "dots", name: "Dots", description: "Drifting halftone dot field" },
   { id: "horizon", name: "Horizon", description: "Retro sun sinking to a glowing horizon" },
   { id: "orbit", name: "Orbit", description: "Orbital rings with wandering planets" },
-  { id: "peaks", name: "Peaks", description: "Layered mountain ridgelines in haze" },
+  { id: "peaks", name: "Peaks", description: "Layered mountain ridgelines in haze", still: true },
   { id: "rain", name: "Rain", description: "Gentle streaks of falling accent rain" },
   { id: "fireflies", name: "Fireflies", description: "Wandering, softly pulsing lights" },
-  { id: "blueprint", name: "Blueprint", description: "Drafting-paper grid with construction marks" },
+  { id: "blueprint", name: "Blueprint", description: "Drafting-paper grid with construction marks", still: true },
   { id: "prisms", name: "Prisms", description: "Drifting translucent geometric shards" },
   { id: "petals", name: "Petals", description: "Cherry-blossom petals on the breeze" },
   { id: "comets", name: "Comets", description: "Shooting stars with fading trails" },
+  { id: "topography", name: "Topography", description: "Nested contour lines, a map's relief", still: true },
+  { id: "snow", name: "Snow", description: "Round flakes drifting down on a shared gust" },
+  { id: "embers", name: "Embers", description: "Sparks lifting off the base, fading as they climb" },
+  { id: "bokeh", name: "Bokeh", description: "Out-of-focus discs of light, drifting" },
+  { id: "beams", name: "Beams", description: "Diagonal bars of light sweeping slowly" },
+  { id: "bubbles", name: "Bubbles", description: "Rings rising, wobbling and popping" },
+  { id: "glyphs", name: "Glyphs", description: "Terminal glyphs raining down, lit by the accent" },
 ];
 
 export const SCENE_IDS = SCENES.map((s) => s.id) as [SceneId, ...SceneId[]];

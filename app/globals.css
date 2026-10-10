@@ -970,10 +970,43 @@ select optgroup {
   animation-duration: calc(60s * var(--motion-scale, 1));
 }
 
+/* Bokeh scene — out-of-focus discs drifting slowly (components/scenes/Bokeh.tsx). */
+@keyframes bokeh-drift {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(18px, -24px);
+  }
+}
+
+.animate-bokeh {
+  animation: bokeh-drift 28s ease-in-out infinite;
+  animation-duration: calc(28s * var(--motion-scale, 1));
+}
+
+/* Beams scene — diagonal light bars sweeping across (components/scenes/Beams.tsx). */
+@keyframes beam-sweep {
+  0%,
+  100% {
+    transform: translateX(-6%);
+  }
+  50% {
+    transform: translateX(6%);
+  }
+}
+
+.animate-beams {
+  animation: beam-sweep 36s ease-in-out infinite;
+  animation-duration: calc(36s * var(--motion-scale, 1));
+}
+
 /* Scenes manage their own JS-driven motion (e.g. the Abyss canvas draws a
    single static frame), but the CSS animations must be quieted here too —
    for the OS preference, and for the theme's "Still" motion or the visitor's
-   Reduce motion switch, which the resolver paints as data-motion="off". */
+   Reduce motion switch, which the resolver paints as data-motion="off".
+   Every .animate-* class above belongs in BOTH lists. */
 @media (prefers-reduced-motion: reduce) {
   .animate-float,
   .animate-breathe,
@@ -981,7 +1014,9 @@ select optgroup {
   .animate-rays,
   .animate-grid,
   .animate-wave,
-  .animate-spin-slow {
+  .animate-spin-slow,
+  .animate-bokeh,
+  .animate-beams {
     animation: none;
   }
 }
@@ -991,6 +1026,8 @@ select optgroup {
 [data-motion="off"] .animate-rays,
 [data-motion="off"] .animate-grid,
 [data-motion="off"] .animate-wave,
-[data-motion="off"] .animate-spin-slow {
+[data-motion="off"] .animate-spin-slow,
+[data-motion="off"] .animate-bokeh,
+[data-motion="off"] .animate-beams {
   animation: none;
 }

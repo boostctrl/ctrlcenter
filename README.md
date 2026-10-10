@@ -64,11 +64,12 @@ Built with Next.js 16, React 19, and Tailwind v4.
     `aura`, `emboss`, `carve`, `stripe`, `sketch`, `console` — each with a
     **Tune** tab of sliders over it (corner radius, border, blur, shadow, fill,
     glow).
-  - **Scenes** (18, or none) — an animated backdrop: `aurora`, `abyss`,
+  - **Scenes** (25, or none) — an animated backdrop: `aurora`, `abyss`,
     `nebula`, `grid`, `starfield`, `waves`, `rays`, `traces`, `dots`,
     `horizon`, `orbit`, `peaks`, `rain`, `fireflies`, `blueprint`, `prisms`,
-    `petals`, `comets`, with intensity and motion controls (and a Reduce-motion
-    switch that stills them all). A **wallpaper** can sit behind the scene,
+    `petals`, `comets`, `topography`, `snow`, `embers`, `bokeh`, `beams`,
+    `bubbles`, `glyphs`, with intensity and motion controls (and a
+    Reduce-motion switch that stills them all). A **wallpaper** can sit behind the scene,
     blurred and dimmed.
   - **Colors & type** — a palette plus an accent gradient, or your own colors,
     including the status colors (up, down, warning, info); or pick one accent
@@ -232,7 +233,7 @@ settings:
   theme:                    # site-wide default (visitors can override in /settings)
     mode: system            # system | light | dark
     design: glass           # glass aero flat soft minimal bold cyber clay frost outline paper gradient aura emboss carve stripe sketch console
-    scene: aurora           # aurora abyss nebula grid starfield waves rays traces dots horizon orbit peaks rain fireflies blueprint prisms petals comets none
+    scene: aurora           # aurora abyss nebula grid starfield waves rays traces dots horizon orbit peaks rain fireflies blueprint prisms petals comets topography snow embers bokeh beams bubbles glyphs none
     font: jakarta           # jakarta inter poppins nunito lora jetbrains outfit grotesk manrope rubik playfair quicksand
     accentFrom: '#a78bfa'   # accent gradient start (#rrggbb)
     accentTo: '#22d3ee'     # accent gradient end (same as start = solid)

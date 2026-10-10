@@ -56,6 +56,26 @@ const SCENE_SWATCHES: Record<SceneId, (s: Swatch) => string> = {
     `radial-gradient(5px 3px at 22% 30%, ${from} 70%, transparent), radial-gradient(4px 2.5px at 46% 62%, ${mix(from, 75)} 70%, transparent), radial-gradient(5px 3px at 68% 26%, ${to} 70%, transparent), radial-gradient(4px 2.5px at 84% 70%, ${mix(from, 70)} 70%, transparent), radial-gradient(4.5px 3px at 32% 82%, ${mix(to, 70)} 70%, transparent), radial-gradient(4px 2.5px at 58% 44%, ${mix(from, 60)} 70%, transparent), ${bg}`,
   comets: ({ from, to, bg, mix }) =>
     `radial-gradient(2.5px 2.5px at 30% 38%, ${from}, transparent), linear-gradient(150deg, transparent 30%, ${mix(from, 65)} 36%, transparent 39%) no-repeat 0 0 / 62% 76%, radial-gradient(2px 2px at 72% 64%, ${to}, transparent), linear-gradient(150deg, transparent 56%, ${mix(to, 50)} 62%, transparent 65%) no-repeat 40% 100% / 60% 100%, ${bg}`,
+  topography: ({ from, to, bg, mix }) =>
+    `repeating-radial-gradient(circle at 30% 45%, ${mix(from, 55)} 0 1px, transparent 1px 7px), repeating-radial-gradient(circle at 80% 70%, ${mix(to, 45)} 0 1px, transparent 1px 7px), ${bg}`,
+  snow: ({ from, bg, mix }) =>
+    `radial-gradient(2.5px 2.5px at 18% 24%, ${mix(from, 85)}, transparent), radial-gradient(2px 2px at 42% 56%, ${mix(from, 70)}, transparent), radial-gradient(3px 3px at 66% 32%, ${mix(from, 90)}, transparent), radial-gradient(2px 2px at 84% 72%, ${mix(from, 65)}, transparent), radial-gradient(2.5px 2.5px at 30% 80%, ${mix(from, 75)}, transparent), radial-gradient(2px 2px at 58% 12%, ${mix(from, 60)}, transparent), ${bg}`,
+  embers: ({ from, to, bg, mix }) =>
+    `radial-gradient(2px 2px at 28% 42%, ${from}, transparent), radial-gradient(1.5px 1.5px at 52% 26%, ${to}, transparent), radial-gradient(2px 2px at 70% 58%, ${from}, transparent), radial-gradient(1.5px 1.5px at 40% 66%, ${to}, transparent), linear-gradient(to top, ${mix(from, 55)}, transparent 55%), ${bg}`,
+  bokeh: ({ from, to, bg, mix }) =>
+    `radial-gradient(circle at 28% 40%, ${mix(from, 35)} 0 9px, ${mix(from, 60)} 9.5px 10.5px, transparent 11px), radial-gradient(circle at 66% 62%, ${mix(to, 30)} 0 7px, ${mix(to, 55)} 7.5px 8.5px, transparent 9px), radial-gradient(circle at 82% 26%, ${mix(from, 30)} 0 5px, ${mix(from, 55)} 5.5px 6.5px, transparent 7px), ${bg}`,
+  beams: ({ from, to, bg, mix }) =>
+    `linear-gradient(115deg, transparent 18%, ${mix(from, 45)} 22% 30%, transparent 34% 48%, ${mix(to, 35)} 52% 58%, transparent 62% 76%, ${mix(from, 30)} 80% 84%, transparent 88%), ${bg}`,
+  bubbles: ({ from, to, bg, mix }) =>
+    `radial-gradient(circle at 30% 60%, transparent 6px, ${mix(from, 70)} 6.5px 7.5px, transparent 8px), radial-gradient(circle at 60% 34%, transparent 4px, ${mix(to, 60)} 4.5px 5.5px, transparent 6px), radial-gradient(circle at 80% 68%, transparent 5px, ${mix(from, 55)} 5.5px 6.5px, transparent 7px), radial-gradient(circle at 46% 78%, transparent 3px, ${mix(to, 50)} 3.5px 4.5px, transparent 5px), ${bg}`,
+  glyphs: ({ from, to, bg, mix }) =>
+    [
+      `repeating-linear-gradient(0deg, ${mix(from, 70)} 0 2px, transparent 2px 5px) 10% 0 / 2px 60% no-repeat`,
+      `repeating-linear-gradient(0deg, ${mix(from, 50)} 0 2px, transparent 2px 5px) 34% 100% / 2px 75% no-repeat`,
+      `repeating-linear-gradient(0deg, ${mix(to, 60)} 0 2px, transparent 2px 5px) 58% 0 / 2px 45% no-repeat`,
+      `repeating-linear-gradient(0deg, ${mix(from, 60)} 0 2px, transparent 2px 5px) 82% 100% / 2px 65% no-repeat`,
+      bg,
+    ].join(", "),
 };
 
 export function scenePreview(id: SceneId, from: string, to: string): string {

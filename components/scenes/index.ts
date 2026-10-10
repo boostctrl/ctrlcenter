@@ -18,6 +18,13 @@ import Blueprint from "./Blueprint";
 import Prisms from "./Prisms";
 import Petals from "./Petals";
 import Comets from "./Comets";
+import Topography from "./Topography";
+import Snow from "./Snow";
+import Embers from "./Embers";
+import Bokeh from "./Bokeh";
+import Beams from "./Beams";
+import Bubbles from "./Bubbles";
+import Glyphs from "./Glyphs";
 
 // Scenes render a different treatment for light vs dark surfaces, so each
 // backdrop receives the resolved surface lightness, and the motion level it
@@ -56,4 +63,11 @@ export const SCENE_REGISTRY: Record<SceneId, ComponentType<SceneProps>> = {
   prisms: Prisms,
   petals: Petals,
   comets: Comets,
+  topography: Topography,
+  snow: Snow,
+  embers: Embers,
+  bokeh: Bokeh,
+  beams: Beams,
+  bubbles: Bubbles,
+  glyphs: Glyphs,
 };

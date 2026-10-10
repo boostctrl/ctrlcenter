@@ -12,6 +12,18 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Seven new scenes.** Topography, a still map of nested contour lines;
+  Snow, round flakes drifting down in three depths on a shared gust; Embers,
+  sparks lifting off the base and fading as they climb; Bokeh, out-of-focus
+  discs of light drifting by; Beams, diagonal bars of light sweeping slowly;
+  Bubbles, rings rising, wobbling and popping; and Glyphs, terminal glyphs
+  raining down and catching the accent as they fall. Each recolours with
+  your palette and follows the intensity and motion controls, and the
+  scenes that never move (Peaks, Blueprint, Topography) now say *Still* in
+  the picker. (#348)
+
 ## [3.0.0-rc.1] - 2026-10-10
 
 ### Added

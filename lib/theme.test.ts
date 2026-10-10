@@ -28,9 +28,9 @@ import {
 } from "./theme";
 
 describe("catalog sizes", () => {
-  it("ships 18 designs, 18 scenes plus None, 21 palettes, 12 themes", () => {
+  it("ships 18 designs, 25 scenes plus None, 21 palettes, 12 themes", () => {
     expect(DESIGNS).toHaveLength(18);
-    expect(SCENES).toHaveLength(19);
+    expect(SCENES).toHaveLength(26);
     expect(SCENES[0].id).toBe("none");
     expect(BASE_THEMES).toHaveLength(21);
     expect(THEME_PACKS).toHaveLength(12);

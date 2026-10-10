@@ -45,6 +45,7 @@ export default function SceneTab({ d, canUpload = false }: { d: ThemeDraft; canU
             name={s.name}
             desc={s.description}
             title={s.description}
+            badge={s.still ? "Still" : undefined}
           >
             <span
               className="block h-10 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
