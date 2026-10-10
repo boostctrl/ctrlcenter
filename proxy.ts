@@ -48,6 +48,9 @@ export async function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("content-security-policy", csp);
+  // The path, for the root layout: a board's own theme (#337) paints from
+  // the first byte when the layout knows which board the request shows.
+  requestHeaders.set("x-pathname", request.nextUrl.pathname);
   const withCsp = (res: NextResponse) => {
     res.headers.set("content-security-policy", csp);
     return res;

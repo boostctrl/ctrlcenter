@@ -65,7 +65,7 @@ export default function UpgradeBanner({ notice }: { notice: UpgradeSummary }) {
           Dismiss
         </Button>
         {error && (
-          <span role="alert" className="text-sm text-red-400">
+          <span role="alert" className="text-sm text-status-down">
             {error}
           </span>
         )}

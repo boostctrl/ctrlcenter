@@ -29,13 +29,13 @@ const STATE_LABELS: Record<TorrentState, string> = {
 };
 
 const STATE_TONES: Record<TorrentState, string> = {
-  downloading: "text-emerald-400/90",
-  seeding: "text-sky-400/80",
+  downloading: "text-status-up/90",
+  seeding: "text-status-info/80",
   paused: "text-ink-40",
   queued: "text-ink-40",
-  checking: "text-amber-400/80",
-  stalled: "text-amber-400/80",
-  error: "text-red-400",
+  checking: "text-status-warning/80",
+  stalled: "text-status-warning/80",
+  error: "text-status-down",
 };
 
 // Torrent ordering the list can be sorted by (#231). "Activity" keeps the
@@ -285,10 +285,10 @@ export default function QbittorrentDetail({
           {data.counts.downloading} downloading · {data.counts.seeding} seeding ·{" "}
           {data.counts.paused} paused
           {data.counts.errored > 0 && (
-            <span className="text-red-400"> · {data.counts.errored} errored</span>
+            <span className="text-status-down"> · {data.counts.errored} errored</span>
           )}
         </p>
-        {actionError && <p className="text-xs text-red-400">{actionError}</p>}
+        {actionError && <p className="text-xs text-status-down">{actionError}</p>}
       </section>
 
       <section className="glass-card flex flex-col gap-3 p-6">

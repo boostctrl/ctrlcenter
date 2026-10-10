@@ -10,6 +10,9 @@ import { navPages, pickBoard } from "@/lib/nav";
 import { boardName, monitoredApps } from "@/lib/schema";
 import { loadHomeData } from "@/lib/widgets/load";
 import { shownToGuests } from "@/lib/widgets/integration-tiles";
+import { boardDefaultTheme } from "@/lib/board-theme";
+import { resolveThemeGallery } from "@/lib/theme";
+import BoardTheme from "@/components/BoardTheme";
 
 // One board, server-rendered (#298): the home page (`boardId` null, the first
 // board this visitor can open) or /b/<id>. A private board is a 404 for
@@ -76,6 +79,10 @@ export default async function BoardPage({
   // (Dashboard keeps these variables live while editing). The stored value
   // applies on large screens; smaller ones cap it at the stock 48px.
   const { topGap, scale, gap } = settings.layout;
+  // The board's own theme (#337), for PrefsProvider while it's open; the
+  // editor's board menu offers the gallery to pin one.
+  const gallery = resolveThemeGallery(config.themes).map((r) => r.pack);
+  const boardTheme = board.theme ? boardDefaultTheme(settings.theme, board, gallery) : null;
 
   return (
     <main
@@ -89,6 +96,7 @@ export default async function BoardPage({
       className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-12 px-6 pt-[var(--top-gap)] pb-24 sm:px-10 lg:pt-[var(--top-gap-lg)]"
     >
       {!hasGreeting && <h1 className="sr-only">{boardName(board)}</h1>}
+      <BoardTheme theme={boardTheme} />
       <StatusProvider enabled={statusEnabled}>
         <EditModeProvider isAdmin={isAdmin} initialEditing={isAdmin && edit}>
           <Dashboard
@@ -102,7 +110,8 @@ export default async function BoardPage({
             topGap={topGap}
             data={data}
             // The editor's board menu (#303); only the admin edits.
-            boards={isAdmin ? config.boards.map(({ id, name, visibility }) => ({ id, name, visibility })) : []}
+            boards={isAdmin ? config.boards.map(({ id, name, visibility, theme }) => ({ id, name, visibility, theme })) : []}
+            packNames={isAdmin ? gallery.map((p) => p.name) : []}
           />
           <BoardKeys boards={nav.boards} />
           {settings.settingsButton && <FloatingNav {...nav} />}

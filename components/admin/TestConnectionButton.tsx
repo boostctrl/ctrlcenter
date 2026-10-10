@@ -77,7 +77,7 @@ export default function TestConnectionButton<T>({
           {loading ? pendingLabel : label}
         </button>
         {!loading && error !== null && (
-          <span className="text-xs text-red-400">✗ {error}</span>
+          <span className="text-xs text-status-down">✗ {error}</span>
         )}
         {settled && renderResult(result)}
       </div>

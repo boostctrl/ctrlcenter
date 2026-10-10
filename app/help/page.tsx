@@ -286,7 +286,10 @@ export default async function HelpPage() {
         <Card title="Themes & looks">
           <P>
             The theme builder in <A href="/settings">Settings</A> makes the
-            dashboard yours, with a live preview as you go.
+            dashboard yours, with a live preview as you go: the page itself,
+            and a miniature beside the controls. The theme, palette, design,
+            scene and font in use are marked, and once you tweak a theme the
+            builder says so and offers to revert.
           </P>
           <ul className={LIST_CLASS}>
             <li>
@@ -294,25 +297,47 @@ export default async function HelpPage() {
               Frost to Cyber, Emboss, and Sketch (18 in all).
             </li>
             <li>
-              <strong>Scene.</strong> The animated backdrop: Aurora,
-              Starfield, Petals, Comets, and more (18 in all).
+              <strong>Tune.</strong> Sliders over the chosen design: corner
+              radius, border weight, blur, shadow depth, card opacity and the
+              scene glow, each as a percentage of the design&apos;s own value.
             </li>
             <li>
-              <strong>Accent and colors.</strong> The accent gradient, plus
-              optional custom surface colors.
+              <strong>Scene.</strong> The animated backdrop: Aurora,
+              Starfield, Petals, Comets, and more (18 in all), or none. Set
+              how strongly it shows and whether it moves at full speed, calmly
+              or not at all; a <em>Reduced</em> motion preference stills every
+              scene whatever the theme says. Put a photo behind it as a
+              wallpaper, blurred and dimmed to taste.
+            </li>
+            <li>
+              <strong>Accent and colors.</strong> The accent gradient, custom
+              surface colors, and the status colors: up, down, warning and
+              info for the dots, errors and notices. Or pick one accent and
+              let <em>Build a palette</em> derive the rest for both modes,
+              with contrast checked.
             </li>
             <li>
               <strong>Font.</strong> Pick from twelve typefaces, from
-              geometric sans to serif and mono.
+              geometric sans to serif and mono, a separate face for headings
+              if you like, and a density: compact, comfortable or spacious.
             </li>
           </ul>
           <P>
             Light and dark can carry wholly independent looks. Like the rest of
             your preferences, everything stays on your device, so each visitor
-            gets their own. Signed-in admins get one extra control here: the
+            gets their own. A site&apos;s admin may limit this to picking one
+            of the site&apos;s themes, or lock the theme altogether; the
+            Settings page says so when they have. A site that switches its
+            theme by time of day shows a <em>Day &amp; night theme</em>
+            switch in Settings, to follow it or keep the usual theme. To carry a look elsewhere, <em>Copy as code</em>{" "}
+            puts it on the clipboard as a short code; <em>Paste a code</em> in
+            another browser&apos;s builder applies and saves it, and a link of
+            the form <Code>/settings#theme=&lt;code&gt;</Code> does the same on
+            arrival. Export and Import move your whole list as a file. Signed-in admins get two extra controls here: the
             globe on a saved theme makes that look the site-wide default every
-            visitor starts from — a copy, so editing the saved theme later
-            doesn&apos;t change the site.
+            visitor starts from, and the grid adds it to the site&apos;s theme
+            gallery for every visitor to pick — both copies, so editing the
+            saved theme later doesn&apos;t change the site.
           </P>
         </Card>
 
@@ -707,8 +732,10 @@ export default async function HelpPage() {
             <strong>Settings → Layout → Boards</strong> (a Media board, an
             Infra board…), and each gets its own address, /b/ and the
             board&apos;s id. Rename and reorder them there, give one an icon
-            to show beside its name in the menus, and{" "}
-            <strong>Arrange</strong> opens one in the layout editor.
+            to show beside its name in the menus, pin one of the site&apos;s
+            themes on it (an Infra board in Circuit while the home board
+            stays as it is; visitors&apos; own choices still apply over it),
+            and <strong>Arrange</strong> opens one in the layout editor.
           </P>
           <P>
             Set a board to <strong>Only me</strong> and it&apos;s private:
@@ -780,8 +807,9 @@ export default async function HelpPage() {
             <li>
               <strong>Boards.</strong> The <strong>Board</strong> menu in the
               editor bar switches to another board&apos;s editor; renames,
-              reorders or deletes this one, or sets who can open it; and
-              starts a new board. Deleting a board keeps its widgets.
+              reorders or deletes this one, sets who can open it or pins a
+              theme on it; and starts a new board. Deleting a board keeps its
+              widgets.
             </li>
             <li>
               <strong>Hide or place from the tray.</strong> Drag a card onto
@@ -856,9 +884,24 @@ export default async function HelpPage() {
       >
         <Card title="Themes">
           <P>
-            The <strong>Themes</strong> tab edits the built-in theme packs
-            visitors can choose from: the design, scene, and colors for both
-            light and dark. Reset any pack to restore its original values.
+            The <strong>Themes</strong> tab is the gallery visitors choose
+            from in their theme builder, in the order shown. Edit a built-in
+            theme (design, scene, colors, fonts, tune and wallpaper, for light
+            and dark) or reset it to its original; add themes of your own,
+            duplicate one as a starting point, hide any from visitors, and
+            drag or use the arrows to reorder. Each card previews the theme as
+            visitors will see it. In your own theme builder, a saved theme
+            can be added to the gallery from its card. <em>Visitors can
+            change</em> in Settings → General decides how much of this
+            visitors get: the whole builder, the gallery and the light/dark
+            mode only, or nothing at all (for kiosks and shared screens);
+            signed-in admins are never limited. <em>Day &amp; night
+            schedule</em> there switches the site between two gallery themes
+            by time of day: at sunrise and sunset, worked out for the weather
+            location with no network, or at fixed times in the site&apos;s
+            time zone, each with its own appearance mode if you like. An open
+            page switches on time without a reload; visitors&apos; own
+            choices still win, and they can turn the schedule off.
           </P>
         </Card>
 

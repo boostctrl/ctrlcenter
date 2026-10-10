@@ -33,12 +33,12 @@ export default function FeedTest({
       disabled={url.trim() === ""}
       renderResult={(data) =>
         data.ok ? (
-          <span className="text-xs text-emerald-400">
+          <span className="text-xs text-status-up">
             ✓ {data.title ? `“${data.title}”` : "Readable"} — {data.count}{" "}
             entr{data.count === 1 ? "y" : "ies"}
           </span>
         ) : (
-          <span className="text-xs text-red-400">✗ {data.error}</span>
+          <span className="text-xs text-status-down">✗ {data.error}</span>
         )
       }
       renderExtra={(data) =>

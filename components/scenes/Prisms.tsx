@@ -8,7 +8,7 @@ import { effectRgbFor } from "./color";
 // upward while rotating, stroked in the accent with a faint fill, alternating
 // between the two gradient stops. The only geometric-shape scene in the
 // catalog. A static frame is drawn under prefers-reduced-motion.
-export default function Prisms({ light }: SceneProps) {
+export default function Prisms({ light, motion }: SceneProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -17,7 +17,11 @@ export default function Prisms({ light }: SceneProps) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reduced =
+      motion === "off" || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Calm motion: advance every other frame — half speed, half the work.
+    const calm = motion === "calm";
+    let tick = 0;
     const dpr = window.devicePixelRatio || 1;
     const strokeA = light ? 0.4 : 0.34;
     const fillA = light ? 0.08 : 0.07;
@@ -105,6 +109,10 @@ export default function Prisms({ light }: SceneProps) {
     };
 
     const draw = () => {
+      if (calm && (tick++ & 1)) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
       drawFrame(false);
       raf = requestAnimationFrame(draw);
     };
@@ -117,10 +125,10 @@ export default function Prisms({ light }: SceneProps) {
       window.removeEventListener("resize", resize);
       cancelAnimationFrame(raf);
     };
-  }, [light]);
+  }, [light, motion]);
 
   return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 -z-10">
+    <div aria-hidden className="scene-root pointer-events-none fixed inset-0 -z-10">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
     </div>
   );

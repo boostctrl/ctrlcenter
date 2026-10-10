@@ -22,8 +22,8 @@ export default function Orbit({ light }: SceneProps) {
   return (
     <div
       aria-hidden
-      className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
-      style={{ opacity: "var(--glow-opacity, 1)" }}
+      className="scene-root pointer-events-none fixed inset-0 -z-10 overflow-hidden"
+      style={{ opacity: "calc(var(--glow-opacity, 1) * var(--scene-opacity, 1))" }}
     >
       {/* A soft core glow at the anchor the orbits circle. */}
       <div
@@ -43,7 +43,7 @@ export default function Orbit({ light }: SceneProps) {
             marginLeft: `${-o.size / 2}vmin`,
             border: `1px solid ${mix(i % 2 ? "var(--scene-to)" : "var(--scene-from)", ring)}`,
             transform: `rotate(${o.angle}deg)`,
-            animationDuration: `${o.dur}s`,
+            animationDuration: `calc(${o.dur}s * var(--motion-scale, 1))`,
             animationDelay: `${-(o.angle / 360) * o.dur}s`,
           }}
         >

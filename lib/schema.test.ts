@@ -88,18 +88,32 @@ describe("themesInputSchema", () => {
     expect(parsed[0].name).toBe("Ocean");
   });
 
-  it("coerces a retired/unknown design or scene to the default", () => {
+  it("drops a retired/unknown design or scene, for the resolver to fill in", () => {
     // `.catch` keeps an old config (e.g. a since-removed scene) loadable instead
-    // of failing the whole parse.
+    // of failing the whole parse; resolveThemeGallery then uses the built-in's
+    // value, or the stock one for a theme of the admin's own.
     const d = themesInputSchema.parse([{ ...pack, design: "nope" }]);
-    expect(d[0].design).toBe("glass");
+    expect(d[0].design).toBeUndefined();
     const s = themesInputSchema.parse([{ ...pack, scene: "hologram" }]);
-    expect(s[0].scene).toBe("aurora");
+    expect(s[0].scene).toBeUndefined();
   });
 
   it("rejects a non-hex color", () => {
     const bad = { ...pack, dark: { ...pack.dark, background: "red" } };
     expect(themesInputSchema.safeParse([bad]).success).toBe(false);
+  });
+
+  it("takes a bare or hidden built-in reference, and a theme of the admin's own with its colors (#334)", () => {
+    expect(themesInputSchema.safeParse([{ key: "Tide", builtin: "Tide" }]).success).toBe(true);
+    expect(themesInputSchema.safeParse([{ key: "Tide", builtin: "Tide", hidden: true, name: "Surf" }]).success).toBe(true);
+    expect(themesInputSchema.safeParse([{ key: "custom-1", ...pack, name: "Mine" }]).success).toBe(true);
+    expect(themesInputSchema.safeParse([{ key: "custom-1", ...pack, name: "Mine", designLight: "paper", sceneLight: "none" }]).success).toBe(true);
+  });
+
+  it("rejects a reference to a built-in that doesn't exist, and an own theme missing its colors (#334)", () => {
+    expect(themesInputSchema.safeParse([{ key: "x", builtin: "Nope" }]).success).toBe(false);
+    expect(themesInputSchema.safeParse([{ key: "custom-1", name: "Mine", design: "flat" }]).success).toBe(false);
+    expect(themesInputSchema.safeParse([{ key: "custom-1", name: "Mine", dark: pack.dark }]).success).toBe(false);
   });
 });
 
@@ -180,6 +194,13 @@ describe("configSchema defaults", () => {
 });
 
 describe("settingsSchema", () => {
+  it("defaults the visitor theming policy to everything, and takes the others (#335)", () => {
+    expect(settingsSchema.parse({}).visitorTheming).toBe("all");
+    expect(settingsSchema.parse({ visitorTheming: "packs" }).visitorTheming).toBe("packs");
+    expect(settingsInputSchema.safeParse({ visitorTheming: "none" }).success).toBe(true);
+    expect(settingsInputSchema.safeParse({ visitorTheming: "some" }).success).toBe(false);
+  });
+
   it("nests weather defaults", () => {
     const settings = settingsSchema.parse({});
     expect(settings.weather).toMatchObject({

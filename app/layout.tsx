@@ -15,10 +15,25 @@ import {
   Quicksand,
 } from "next/font/google";
 import { getSettings } from "@/lib/config";
+import { readPublicConfig } from "@/lib/api-auth";
 import { DEFAULT_UI_SCALE } from "@/lib/layout";
 import { resolveIconUrl } from "@/lib/icons";
 import { serializeForScript } from "@/lib/serialize";
-import { DESIGN_IDS, SCENE_IDS } from "@/lib/theme";
+import {
+  DENSITY_IDS,
+  DESIGN_IDS,
+  SCENE_IDS,
+  packFields,
+  resolveThemeGallery,
+  resolveThemePacks,
+  type ThemePack,
+  type VisitorTheming,
+} from "@/lib/theme";
+import type { Settings } from "@/lib/schema";
+import { inlineThemeScript } from "@/lib/theme-paint";
+import { scheduleState, themeWithPack } from "@/lib/theme-schedule";
+import { boardDefaultTheme, boardForPath } from "@/lib/board-theme";
+import type { ScheduleProps } from "@/components/prefs/useScheduledTheme";
 import { FONT_IDS } from "@/lib/fonts";
 import { PrefsProvider } from "@/components/PrefsProvider";
 import SceneLayer from "@/components/scenes/SceneLayer";
@@ -94,39 +109,85 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+// The day/night schedule (#336) resolved for this request: the site theme
+// for each phase, and the phase at this moment (read here, outside the
+// component, which must stay pure).
+function resolveSchedule(settings: Settings, packs: ThemePack[]): ScheduleProps | null {
+  const sched = settings.themeSchedule;
+  if (!sched.enabled) return null;
+  const timeZone = settings.timezone || "UTC";
+  const location = { latitude: settings.weather.latitude, longitude: settings.weather.longitude };
+  const byName = (name: string) => packs.find((p) => p.name === name);
+  return {
+    config: sched,
+    base: settings.theme,
+    day: themeWithPack(settings.theme, byName(sched.day), sched.dayMode),
+    night: themeWithPack(settings.theme, byName(sched.night), sched.nightMode),
+    phase: scheduleState(sched, location, timeZone, Date.now()).phase,
+    location,
+    timeZone,
+  };
+}
+
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const settings = await getSettings();
+  // The settings and, for the theming policy (#335), whether this is an
+  // admin: admins are never limited, so the policy the page carries is the
+  // effective one for this visitor.
+  const { config, isAdmin } = await readPublicConfig();
+  const settings = config.settings;
   const weather = settings.weather;
-  const defaultTheme = settings.theme;
+  const visitorTheming: VisitorTheming = isAdmin ? "all" : settings.visitorTheming;
+  const packs = resolveThemePacks(config.themes);
+  // The day/night schedule (#336): the site theme for each phase and the
+  // phase now, so the first paint is right; PrefsProvider flips it live.
   // Per-request CSP nonce from the proxy, so our inline theme script is allowed
   // without script-src 'unsafe-inline'. Reading headers() also opts pages into
   // dynamic rendering, which is required for a per-request nonce to match.
-  const nonce = (await headers()).get("x-nonce") ?? undefined;
+  const requestHeaders = await headers();
+  const nonce = requestHeaders.get("x-nonce") ?? undefined;
+  // A board's own theme (#337), when the request shows a board that pins
+  // one: it stands in for the site theme on that page, schedule included
+  // (the pin is the board's whole look). The proxy passes the path along;
+  // BoardPage hands the same theme to PrefsProvider for client-side moves.
+  const gallery = resolveThemeGallery(config.themes).map((r) => r.pack);
+  const board = boardForPath(requestHeaders.get("x-pathname"), config.boards, isAdmin);
+  const pinned = board?.theme ? boardDefaultTheme(settings.theme, board, gallery) : null;
+  // The schedule may name a pack hidden from visitors (a kiosk's night
+  // look), so it resolves against the whole gallery.
+  const schedule = pinned ? null : resolveSchedule(settings, gallery);
+  const defaultTheme = pinned ?? (schedule ? (schedule.phase === "day" ? schedule.day : schedule.night) : settings.theme);
 
   // Apply the effective theme before first paint — imperatively, so React never
   // controls the <html> color variables (which would otherwise clobber it on
-  // hydration). Precedence (visitor wins, then the admin default theme): a saved
-  // `.theme-light` always tracks the resolved mode; an active look (visitor
-  // custom, else the admin custom default colors) supplies the surface colors
-  // for that mode — the look carries both variants, so picking a mode just flips
-  // which one shows — else the CSS defaults apply. Accent override and
-  // design/scene classes are layered on last. Runs as the first node in <body>.
-  // MUST mirror applyAll() (components/prefs/themeApply.ts) / resolveLook() in
-  // PrefsProvider — including the
-  // --scene-* deepen for light (dp() mirrors deepenForLight in scenes/color.ts),
-  // so scene backdrops paint saturated on the first frame rather than washing in,
-  // and the --accent-fg contrast pick (lm() mirrors applyAccent's luminance), so
-  // accent buttons get legible text before hydration too.
+  // hydration). The script is the shared theme resolver's own source
+  // (lib/theme-paint.ts, #325), run against localStorage and the serialized
+  // site default: precedence (visitor wins, then the admin default theme), the
+  // --scene-* deepen for light, the --accent-fg contrast pick and the per-theme
+  // ink lift are therefore exactly what PrefsProvider paints after hydration.
+  // Runs as the first node in <body>.
   // serializeForScript (not raw JSON.stringify) escapes `<`/`>`/`&` so a config
   // string value like a `preset` of `</script>…` can't break out of this inline
   // script and inject HTML into the page served to every visitor.
-  const themeScript = `(function(){try{var dt=${serializeForScript(
-    defaultTheme
-  )};var el=document.documentElement;var s=el.style;var prefersDark=window.matchMedia('(prefers-color-scheme: dark)').matches;var m=localStorage.getItem('ctrlcenter:theme');var modeChosen=(m==='light'||m==='dark'||m==='system');var mode=modeChosen?m:dt.mode;var dark=mode==='dark'||(mode==='system'&&prefersDark);el.classList.toggle('theme-light',!dark);function cs(o){return o&&typeof o.background==='string'&&typeof o.accentFrom==='string'?o:null;}var look=null;var ct=localStorage.getItem('ctrlcenter:activeTheme');if(ct){try{var c=JSON.parse(ct);if(c){if(cs(c.dark)&&cs(c.light)){look={dark:c.dark,light:c.light};}else if(cs(c)){look={dark:c,light:c};}}}catch(e){}}if(!look&&dt.background&&dt.foreground){look={dark:{background:dt.background,foreground:dt.foreground,accentFrom:dt.accentFrom,accentTo:dt.accentTo},light:{background:dt.backgroundLight||dt.background,foreground:dt.foregroundLight||dt.foreground,accentFrom:dt.accentFromLight||dt.accentFrom,accentTo:dt.accentToLight||dt.accentTo}};}var v=look?(dark?look.dark:look.light):null;if(v){s.setProperty('--background',v.background);s.setProperty('--foreground',v.foreground);s.setProperty('--fg',v.foreground);}var af=v?v.accentFrom:dt.accentFrom;var at=v?v.accentTo:dt.accentTo;var ao=localStorage.getItem('ctrlcenter:accent');if(ao){try{var a=JSON.parse(ao);if(a&&(a.dark||a.light)){a=dark?a.dark:a.light;}if(a&&a.from&&a.to){af=a.from;at=a.to;}}catch(e){}}s.setProperty('--accent-from',af);s.setProperty('--accent-to',at);function lm(hx){var m=/^#?([0-9a-fA-F]{6})$/.exec((hx||'').trim());if(!m)return 0.5;var n=parseInt(m[1],16);return(0.299*((n>>16)&255)+0.587*((n>>8)&255)+0.114*(n&255))/255;}s.setProperty('--accent-fg',(lm(af)+lm(at))/2>=0.6?'#000000':'#ffffff');function dp(hx){var m=/^#?([0-9a-fA-F]{6})$/.exec((hx||'').trim());if(!m)return hx;var n=parseInt(m[1],16);var r=((n>>16)&255)/255,g=((n>>8)&255)/255,b=(n&255)/255;var mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2,sa=0,h=0;if(mx!==mn){var d=mx-mn;sa=l>0.5?d/(2-mx-mn):d/(mx+mn);if(mx===r)h=(g-b)/d+(g<b?6:0);else if(mx===g)h=(b-r)/d+2;else h=(r-g)/d+4;h/=6;}l*=0.6;sa=Math.min(1,sa*1.15);function hu(p,q,t){if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p;}var qq=l<0.5?l*(1+sa):l+sa-l*sa,pp=2*l-qq;function tc(t){return Math.round(hu(pp,qq,t)*255);}return 'rgb('+tc(h+1/3)+','+tc(h)+','+tc(h-1/3)+')';}s.setProperty('--scene-from',dark?af:dp(af));s.setProperty('--scene-to',dark?at:dp(at));function pick(k,valid,dd,dl){var raw=localStorage.getItem(k);var v=null;if(raw){var o=null;try{o=JSON.parse(raw);}catch(e){}if(o&&typeof o==='object'){v=dark?o.dark:o.light;}}if(valid.indexOf(v)<0){v=dark?dd:(dl||dd);}return v;}var design=pick('ctrlcenter:design',${JSON.stringify(DESIGN_IDS)},dt.design,dt.designLight);if(design&&design!=='glass'){el.classList.add('design-'+design);}var scene=pick('ctrlcenter:scene',${JSON.stringify(SCENE_IDS)},dt.scene,dt.sceneLight);if(scene&&scene!=='aurora'){el.classList.add('scene-'+scene);}var font=pick('ctrlcenter:font',${JSON.stringify(FONT_IDS)},dt.font,dt.fontLight);if(font&&font!=='jakarta'){el.classList.add('font-'+font);}}catch(e){}})();`;
+  // Under "themes only" the script needs the site's themes, since what's
+  // stored is a chosen pack's name; otherwise just the policy rides along.
+  const themeScript = inlineThemeScript(
+    serializeForScript({
+      ...defaultTheme,
+      policy: visitorTheming,
+      ...(visitorTheming === "packs" ? { packs: packs.map(packFields) } : {}),
+      ...(schedule ? { unscheduled: schedule.base } : {}),
+    }),
+    {
+    design: DESIGN_IDS,
+    scene: SCENE_IDS,
+    font: FONT_IDS,
+    density: DENSITY_IDS,
+    }
+  );
 
   // suppressHydrationWarning on <html>: the inline theme script below mutates its
   // classes/inline styles (theme-light, design-*, scene-*, font-*, color vars)
@@ -159,6 +220,9 @@ export default async function RootLayout({
         <PrefsProvider
           weatherEnabled={weather.enabled}
           defaultTheme={defaultTheme}
+          visitorTheming={visitorTheming}
+          packs={packs}
+          schedule={schedule}
           defaults={{
             timezone: settings.timezone || "UTC",
             latitude: weather.latitude,

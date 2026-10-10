@@ -8,6 +8,8 @@ export function scenePreview(id: SceneId, from: string, to: string): string {
     `color-mix(in srgb, ${c} ${pct}%, transparent)`;
   const bg = "var(--background)";
   switch (id) {
+    case "none":
+      return bg;
     case "abyss":
       return `radial-gradient(120% 90% at 50% -10%, ${from}, transparent 60%), ${bg}`;
     case "nebula":

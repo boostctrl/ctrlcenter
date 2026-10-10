@@ -22,7 +22,7 @@ export default function UnifiCard({
             <span
               aria-hidden
               className={`h-2.5 w-2.5 shrink-0 self-center rounded-full ${
-                data.internet.up ? "bg-emerald-400" : "bg-red-400"
+                data.internet.up ? "bg-status-up" : "bg-status-down"
               }`}
             />
             <span className="text-lg font-semibold text-ink-90">
@@ -55,13 +55,13 @@ export default function UnifiCard({
           <p className="text-xs text-ink-50">
             {data.devices.adopted} device{data.devices.adopted === 1 ? "" : "s"} online
             {data.devices.disconnected > 0 && (
-              <span className="text-red-400">
+              <span className="text-status-down">
                 {" "}
                 · {data.devices.disconnected} offline
               </span>
             )}
             {data.devices.pending > 0 && (
-              <span className="text-amber-400/90">
+              <span className="text-status-warning/90">
                 {" "}
                 · {data.devices.pending} pending
               </span>
@@ -74,7 +74,7 @@ export default function UnifiCard({
                 <li
                   key={`${issue.message}-${i}`}
                   className={`text-xs ${
-                    issue.level === "error" ? "text-red-400" : "text-amber-400/90"
+                    issue.level === "error" ? "text-status-down" : "text-status-warning/90"
                   }`}
                 >
                   {issue.message}

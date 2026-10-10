@@ -117,9 +117,9 @@ function Gauge({
 }) {
   const pct = Math.min(100, Math.max(0, ring * 100));
   const tone = alert
-    ? "text-red-400"
+    ? "text-status-down"
     : state === "stale"
-      ? "text-amber-400"
+      ? "text-status-warning"
       : "text-[var(--accent-from)]";
   return (
     <span className="relative inline-flex h-16 w-16 shrink-0 items-center justify-center">
@@ -171,7 +171,7 @@ function NumberBadge({
   return (
     <span className="flex h-16 w-16 shrink-0 flex-col items-center justify-center leading-none">
       <span
-        className={`truncate text-3xl font-bold ${alert ? "text-red-400" : "text-ink-90"}`}
+        className={`truncate text-3xl font-bold ${alert ? "text-status-down" : "text-ink-90"}`}
       >
         {center}
       </span>
@@ -185,9 +185,9 @@ function NumberBadge({
 }
 
 const SEGMENT_BG: Record<SegmentTone, string> = {
-  pending: "bg-amber-400/80",
-  processing: "bg-sky-400/70",
-  available: "bg-emerald-400/70",
+  pending: "bg-status-warning/80",
+  processing: "bg-status-info/70",
+  available: "bg-status-up/70",
 };
 
 // The purposeful bottom visual, chosen per service so it always means something.

@@ -3,11 +3,34 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { useLookPrefs } from "../PrefsProvider";
+import type { Mode } from "../prefs/themeApply";
 import { useConfirm } from "../admin/Confirm";
-import type { ModeColors } from "@/lib/theme";
-import { parseThemesExport, siteThemeFromCustomTheme } from "@/lib/prefs";
+import {
+  colorSetsEqual,
+  newThemeEntryKey,
+  packDesign,
+  packScene,
+  resolveThemeGallery,
+  sceneFxEqual,
+  semanticEqual,
+  tunesEqual,
+  uniquePackName,
+  wallpaperEqual,
+} from "@/lib/theme";
+import { derivePalette } from "@/lib/color";
+import type { ModeColors, ThemePack } from "@/lib/theme";
+import {
+  decodeThemeCode,
+  encodeThemeCode,
+  newThemeId,
+  packFromCustomTheme,
+  parseThemesExport,
+  siteThemeFromCustomTheme,
+} from "@/lib/prefs";
 import type { CustomTheme, ThemeColors } from "@/lib/prefs";
 import { saveSettingsPatch } from "../admin/settingsApi";
+import { apiErrorMessage } from "../admin/apiError";
+import type { ThemeEntryConfig } from "@/lib/schema";
 import { downloadJson } from "@/lib/download";
 import { deepenForLight } from "../scenes/color";
 import { DEFAULT_DRAFT, MODE_DEFAULTS } from "./constants";
@@ -26,6 +49,19 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     setScene,
     fontFor,
     setFont,
+    tuneFor,
+    setTune,
+    sceneFxFor,
+    setSceneFx,
+    colorsFor,
+    headingFontFor,
+    setHeadingFont,
+    densityFor,
+    setDensity,
+    statusFor,
+    setStatusColors,
+    wallpaperFor,
+    setWallpaper,
     applyPack,
     customThemes,
     activeLook,
@@ -35,12 +71,16 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     setAccentOverride,
     saveNamedTheme,
     applyNamedTheme,
+    captureTheme,
+    adoptTheme,
     renameNamedTheme,
     deleteNamedTheme,
     importNamedThemes,
     resetTheme,
     resolvedMode,
     setPreviewMode,
+    hydrated,
+    visitorTheming,
   } = useLookPrefs();
   const confirm = useConfirm();
 
@@ -72,6 +112,65 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
   });
   useEffect(() => () => dropPreview.current(null), []);
 
+  // Which theme a mode matches exactly — design, scene, colors, tune and
+  // scene effects — so the tiles can show an active state (#328). A pack is
+  // per mode (it carries no font); a saved theme is both modes, font included.
+  const packActive = (p: ThemePack, mode: Mode) =>
+    designFor(mode) === packDesign(p, mode === "dark") &&
+    sceneFor(mode) === packScene(p, mode === "dark") &&
+    colorSetsEqual(colorsFor(mode), p[mode]) &&
+    tunesEqual(tuneFor(mode), p.tune ?? null) &&
+    sceneFxEqual(sceneFxFor(mode), null) &&
+    (!p.font || fontFor(mode) === p.font) &&
+    (!p.headingFont || headingFontFor(mode) === p.headingFont) &&
+    semanticEqual(statusFor(mode), (mode === "dark" ? p.status : p.statusLight ?? p.status) ?? null) &&
+    wallpaperEqual(wallpaperFor(mode), (mode === "dark" ? p.wallpaper : p.wallpaperLight ?? p.wallpaper) ?? null);
+  const savedActive = (t: CustomTheme) =>
+    (["dark", "light"] as const).every(
+      (mode) =>
+        designFor(mode) === (mode === "dark" ? t.design : t.designLight) &&
+        sceneFor(mode) === (mode === "dark" ? t.scene : t.sceneLight) &&
+        fontFor(mode) === (mode === "dark" ? t.font : t.fontLight) &&
+        colorSetsEqual(colorsFor(mode), t[mode]) &&
+        tunesEqual(tuneFor(mode), mode === "dark" ? t.tune : t.tuneLight) &&
+        sceneFxEqual(sceneFxFor(mode), mode === "dark" ? t.sceneFx : t.sceneFxLight) &&
+        headingFontFor(mode) === ((mode === "dark" ? t.headingFont : t.headingFontLight) ?? null) &&
+        densityFor(mode) === ((mode === "dark" ? t.density : t.densityLight) ?? "comfortable") &&
+        semanticEqual(statusFor(mode), (mode === "dark" ? t.status : t.statusLight) ?? null) &&
+        wallpaperEqual(wallpaperFor(mode), (mode === "dark" ? t.wallpaper : t.wallpaperLight) ?? null)
+    );
+  const paletteActive = (p: ModeColors) =>
+    colorSetsEqual(colorsFor("dark"), p.dark) && colorSetsEqual(colorsFor("light"), p.light);
+
+  // The theme last applied from a tile (this visit), so the builder can say
+  // what the look is based on and offer to go back to it once it's been
+  // tweaked. A pack applies to one mode; a saved theme to both.
+  type Applied = { kind: "pack"; pack: ThemePack; mode: Mode } | { kind: "saved"; id: string };
+  const [applied, setApplied] = useState<Applied | null>(null);
+  const appliedTheme = applied?.kind === "saved" ? customThemes.find((t) => t.id === applied.id) : undefined;
+  const appliedName = applied?.kind === "pack" ? applied.pack.name : appliedTheme?.name;
+  const appliedActive =
+    applied?.kind === "pack"
+      ? packActive(applied.pack, applied.mode)
+      : appliedTheme
+        ? savedActive(appliedTheme)
+        : false;
+  // Modified: a theme was applied and the look no longer matches it.
+  const modified = !!appliedName && !appliedActive;
+  function applyPackTracked(p: ThemePack, mode: Mode) {
+    applyPack(p, mode);
+    setApplied({ kind: "pack", pack: p, mode });
+  }
+  function applyNamedThemeTracked(id: string) {
+    applyNamedTheme(id);
+    setApplied({ kind: "saved", id });
+  }
+  function revertToApplied() {
+    if (!applied) return;
+    if (applied.kind === "pack") applyPack(applied.pack, applied.mode);
+    else applyNamedTheme(applied.id);
+  }
+
   const [draft, setDraft] = useState<ThemeColors>(DEFAULT_DRAFT);
   const [name, setName] = useState("");
   // Saving a theme can fail when the browser blocks local storage (private
@@ -84,6 +183,9 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
   // Outcome of the last "set as site theme" (admin only), same treatment.
   const [promoteStatus, setPromoteStatus] = useState<string | null>(null);
   const [promoting, setPromoting] = useState(false);
+  // Outcome of the last "add to site themes" (admin only, #334).
+  const [galleryStatus, setGalleryStatus] = useState<string | null>(null);
+  const [addingToGallery, setAddingToGallery] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Whether the accent editor shows one color well or a from→to pair. Solid is
   // just a gradient with two equal stops, so this is purely a UI simplification
@@ -108,6 +210,78 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
       accentTo: activeAccent.to,
     });
   }, [activeLook, editMode, activeAccent]);
+
+  // Auto-pair (#332): a whole palette from the accent being edited — surfaces
+  // tinted toward its hue, ink and the second stop fitted for contrast, and
+  // the status colors to match — for both modes at once, applied like a
+  // palette tile so it's one undoable step.
+  function autoPair(hueShift?: number) {
+    const derived = derivePalette(draft.accentFrom, hueShift === undefined ? {} : { hueShift });
+    applyThemeColors({ dark: derived.dark, light: derived.light });
+    setStatusColors(derived.status, "dark");
+    setStatusColors(derived.statusLight, "light");
+  }
+
+  // Sharing as text (#329): the current look as a code on the clipboard, a
+  // pasted code (or link) adopted into the saved list and applied, and a
+  // /settings#theme=<code> link handled once on arrival. Status lines sit in
+  // the Your-themes section like the file import's.
+  const [codeStatus, setCodeStatus] = useState<string | null>(null);
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState("");
+  async function copyCode() {
+    const theme = captureTheme(name.trim() || "Shared look", newThemeId());
+    const code = encodeThemeCode(theme);
+    try {
+      await navigator.clipboard.writeText(code);
+      setCodeStatus("Copied this look as a code — paste it into another browser's theme builder.");
+    } catch {
+      // No clipboard (plain HTTP, denied): show the code to copy by hand.
+      setPasteText(code);
+      setPasteOpen(true);
+      setCodeStatus("Couldn't reach the clipboard — the code is in the box below, ready to copy.");
+    }
+  }
+  function takeCode(text: string): boolean {
+    const theme = decodeThemeCode(text);
+    if (!theme) {
+      setCodeStatus("That isn't a theme code.");
+      return false;
+    }
+    const adopted = adoptTheme(theme);
+    setCodeStatus(
+      adopted
+        ? `Applied “${adopted.name}”${adopted.id === theme.id ? " and saved it to your themes" : ""}.`
+        : "Couldn't save the theme — your browser is blocking local storage (private mode or full storage)."
+    );
+    return !!adopted;
+  }
+  function pasteCode() {
+    if (takeCode(pasteText)) {
+      setPasteText("");
+      setPasteOpen(false);
+    }
+  }
+  // The link form: taken once the stored look has hydrated (this hook's own
+  // mount effect runs before PrefsProvider's, when the saved list is still
+  // the empty SSR state and would be clobbered), through a latest-value ref
+  // so the adopt sees the loaded list; then cleared from the address bar so
+  // a reload doesn't re-import it.
+  const takeCodeRef = useRef(takeCode);
+  useEffect(() => {
+    takeCodeRef.current = takeCode;
+  });
+  const linkTaken = useRef(false);
+  useEffect(() => {
+    if (!hydrated || linkTaken.current || visitorTheming !== "all") return;
+    const hash = window.location.hash;
+    if (!hash.startsWith("#theme=")) return;
+    linkTaken.current = true;
+    // The URL is the external system here; the status it sets is the
+    // outcome of reading it, once.
+    takeCodeRef.current(hash);
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+  }, [hydrated, visitorTheming]);
 
   // A palette or saved theme can bring in a two-color accent the Solid editor
   // can't represent — flip back to the gradient editor when that happens.
@@ -220,6 +394,56 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     }
   }
 
+  // Put a saved theme in the site's theme gallery (#334), as a theme of the
+  // admin's own every visitor can pick: both modes' design, scene and
+  // colors, and its tune, fonts, status colors and wallpapers. A copy — later
+  // edits to the saved theme don't follow; the Themes tab edits the gallery
+  // one. The whole gallery is read and written back, as the admin Themes tab
+  // does, with the name made unique among the packs.
+  async function addToGallery(t: CustomTheme) {
+    if (!promote || addingToGallery) return;
+    const ok = await confirm({
+      title: `Add “${t.name}” to the site's themes?`,
+      message:
+        "Every visitor can then pick it in their theme builder, and it can be " +
+        "edited in the admin Themes tab. It's a copy — later edits to this saved " +
+        "theme won't follow.",
+      confirmLabel: "Add to site themes",
+    });
+    if (!ok) return;
+    setAddingToGallery(true);
+    try {
+      const res = await fetch("/api/themes");
+      if (!res.ok) throw new Error("Couldn't read the site's themes.");
+      const entries = (await res.json()) as ThemeEntryConfig[];
+      const gallery = resolveThemeGallery(entries);
+      const stored: ThemeEntryConfig[] = gallery.map((r) =>
+        r.entry ? { ...r.entry, key: r.key, builtin: r.builtin } : { key: r.key, builtin: r.builtin }
+      );
+      const pack = packFromCustomTheme(t);
+      const name = uniquePackName(pack.name, gallery.map((r) => r.pack.name));
+      stored.push({ key: newThemeEntryKey(), ...pack, name });
+      const put = await fetch("/api/themes", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(stored),
+      });
+      if (!put.ok) {
+        const data = await put.json().catch(() => null);
+        throw new Error(apiErrorMessage(data, "Couldn't add it to the site's themes."));
+      }
+      setGalleryStatus(
+        name === pack.name
+          ? `“${name}” is now one of the site's themes.`
+          : `Added as “${name}” (a site theme already had that name).`
+      );
+    } catch (e) {
+      setGalleryStatus(e instanceof Error ? e.message : "Couldn't add it to the site's themes.");
+    } finally {
+      setAddingToGallery(false);
+    }
+  }
+
   // Download the saved themes as a JSON file the visitor can carry to another
   // browser (or back it up).
   function exportThemes() {
@@ -254,13 +478,6 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     }
   }
 
-  // A full-look swatch (surface bg + accent glow) for the current mode — used
-  // for the theme packs and saved themes, which restyle the mode being edited.
-  const lookSwatch = (look: ModeColors) => {
-    const cs = editMode === "light" ? look.light : look.dark;
-    return `radial-gradient(120% 100% at 50% -10%, ${cs.accentFrom}, transparent 60%), ${cs.background}`;
-  };
-
   return {
     designFor,
     setDesign,
@@ -268,12 +485,31 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     setScene,
     fontFor,
     setFont,
-    applyPack,
+    tuneFor,
+    setTune,
+    sceneFxFor,
+    setSceneFx,
+    colorsFor,
+    headingFontFor,
+    setHeadingFont,
+    densityFor,
+    setDensity,
+    statusFor,
+    setStatusColors,
+    wallpaperFor,
+    setWallpaper,
+    applyPack: applyPackTracked,
     customThemes,
     activeAccent,
     applyThemeColors,
-    applyNamedTheme,
+    applyNamedTheme: applyNamedThemeTracked,
     deleteNamedTheme,
+    packActive,
+    savedActive,
+    paletteActive,
+    appliedName,
+    modified,
+    revertToApplied,
     resetTheme,
     setPreviewMode,
     confirm,
@@ -289,6 +525,16 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     importStatus,
     promoteStatus,
     promoting,
+    galleryStatus,
+    addingToGallery,
+    codeStatus,
+    pasteOpen,
+    setPasteOpen,
+    pasteText,
+    setPasteText,
+    copyCode,
+    pasteCode,
+    autoPair,
     fileInputRef,
     accentStyle,
     updateBase,
@@ -298,9 +544,9 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     commitRename,
     hasDuplicateNames,
     promoteTheme,
+    addToGallery,
     exportThemes,
     handleImportFile,
-    lookSwatch,
   };
 }
 

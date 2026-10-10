@@ -43,7 +43,7 @@ export default function AdguardCard({
           <p className="text-xs text-ink-50">
             <span
               className={
-                data.protectionEnabled ? "text-emerald-400/90" : "text-amber-400/90"
+                data.protectionEnabled ? "text-status-up/90" : "text-status-warning/90"
               }
             >
               {data.protectionEnabled

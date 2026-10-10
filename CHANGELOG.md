@@ -14,6 +14,89 @@ here.
 
 ### Added
 
+- **A theme per board (3.0).** Pin one of the site's themes on a board, in
+  Settings → Layout → Boards or from the editor's Board menu, so an Infra
+  board can be Circuit while the home board stays as it is. It paints from
+  the first byte and follows you between boards; visitors' own choices
+  still apply over it. (#337)
+- **A day theme and a night theme (3.0).** *Day & night schedule* in
+  Settings → General switches the site between two gallery themes by time
+  of day: at sunrise and sunset, worked out for the weather location with
+  no network, or at fixed times in the site's time zone, each with its own
+  appearance mode if you like. The first paint is already right, and an
+  open page switches on time without a reload. Visitors' own choices still
+  win, and a *Day & night theme* switch in their Settings keeps the usual
+  theme instead. (#336)
+- **Decide how much visitors can theme (3.0).** *Visitors can change* in
+  Settings → General: everything (as before), the site's themes and the
+  light/dark mode only, or nothing — the site theme is final, for kiosks,
+  wall tablets and shared screens. A browser customized before the policy
+  changed falls back at once, before the first paint. Signed-in admins are
+  never limited. (#335)
+- **A theme gallery you curate (3.0).** The admin Themes tab now holds the
+  whole list visitors pick from: add themes of your own, duplicate one as a
+  starting point, hide any built-in from visitors, and drag (or use the
+  arrows) to reorder; each card previews the theme as visitors will see it,
+  in its own design, scene, colours and fonts, for light and dark. A theme
+  can give light mode its own design and scene. From the theme builder, an
+  admin can add a saved theme to the gallery in one tap. Existing edits to
+  built-in themes carry over unchanged. (#334)
+- **Wallpapers (3.0).** A photo can sit behind the scene: in the builder's
+  Scene tab, give it a web address, then blur it, dim it toward the page
+  colour and choose how it fits (fill, fit or tile), per light and dark
+  theme. It is saved with your themes and shared in codes. Admins can
+  upload a wallpaper (PNG, JPEG or WebP, up to 4 MB) there, set one as the
+  site default in Settings → General, and give a built-in theme one in the
+  Themes tab. (#333)
+- **A palette from one colour (3.0).** In the builder's Colors tab, *Build
+  a palette from this accent* derives everything else from the accent you
+  chose: surfaces tinted toward its hue, ink, a second accent stop (an
+  analogous hue, or a complementary one) and the four status colours, for
+  both light and dark, each fitted so text reads at 7:1, accents at 3:1 and
+  status colours at 4.5:1 on their surface. Then tweak anything. (#332)
+- **Status colors are part of the theme (3.0).** The green, red, amber and
+  blue of status dots, errors, warnings, badges and notices are now theme
+  tokens, so a theme can carry its own up, down, warning and info colours
+  per light and dark mode: pick them in the builder's Colors tab, save them
+  with your themes, share them in codes, and promote them to the site
+  default; built-in themes may carry their own. Nothing changes until you
+  do: the standard colours stay exactly as they were. (#331)
+- **Heading fonts and density (3.0).** The theme builder's Font tab gains
+  a separate face for titles and section headings (or the body font), and
+  a density choice: compact, comfortable or spacious, which tightens or
+  loosens every padding and gap without changing text sizes. Both are per
+  light and dark theme, saved with your themes, and promotable to the site
+  default, which also gets a heading font and density in Settings →
+  General. A built-in theme can now carry a body and heading font of its
+  own (Themes tab); the ones that don't leave your choice alone. (#330)
+- **Share a theme as a code (3.0).** *Copy as code* in the theme builder
+  puts the current look on the clipboard as a short text code; *Paste a
+  code* in another browser applies it and saves it to that browser's
+  themes. A link of the form `/settings#theme=<code>` does the same when
+  opened. Codes carry both modes, the fine-tune and the scene effects, and
+  a code from a newer version still lands. (#329)
+- **A theme builder that shows its work (3.0).** A live miniature of the
+  dashboard (greeting, an app card, buttons and text at every level) sits
+  beside the builder's tabs, and above them on a phone, where the real page
+  is off-screen while you edit. Theme and palette tiles now mark the one in
+  use, and theme tiles draw their design over their scene instead of a
+  colour bar. Once you tweak a theme, the builder says what it's based on
+  and offers to revert. (#328)
+- **Scene intensity, motion and a None scene (3.0).** The theme builder's
+  Scene tab gains an intensity slider (how strongly the backdrop shows) and a
+  motion choice for each theme: full, calm (half speed, half the work) or
+  still. A new *None* scene is a plain surface with no backdrop. Saved with
+  your themes and promoted with them. Preferences gains a *Motion* switch:
+  *Reduced* stills the scene and the surface animations in this browser
+  whatever the theme says, like the system setting does. (#327)
+- **Fine-tune any design (3.0).** The theme builder's new *Tune* tab puts
+  six sliders over the design you chose: corner radius, border weight,
+  blur, shadow depth, card opacity and the scene glow, each as a percentage
+  of the design's own value, so 100% everywhere is the design as drawn and
+  any design stays the recipe underneath. Tuned per light and dark theme,
+  saved with your themes, carried by export and import, and promoted with
+  a saved theme to the site default. Admins can also give a built-in theme
+  its own tune in the Themes tab. (#326)
 - **Boards: more than one dashboard (3.0).** Add boards in Settings →
   Layout (a Media board, an Infra board…), each with its own arrangement of
   widgets and its own address, `/b/<name>`. The first board is still the
@@ -88,6 +171,14 @@ here.
 
 ### Changed
 
+- **Four designs now look like themselves in light mode.** Console, Sketch,
+  Minimal and Outline were told apart on the dark surface by hairlines,
+  dashes and glows that all but vanished on the pale one. In light mode,
+  Minimal is now a borderless flat slab, Outline draws a heavier outline in
+  the accent, Sketch gets a firmer pencil line with a second offset stroke
+  on a paper-white wash, and Console shows its scanlines and a firmer frame
+  around its accent rule. Sketch's corners are now a little uneven in both
+  modes, like a hand-drawn rectangle. (#308)
 - **Upgrading from 2.x (3.0).** Your `config.yaml` is converted to the 3.0
   shape on first start, keeping your comments (but those on the settings
   that move, which stay in the backup): the home page layout becomes the
@@ -161,6 +252,21 @@ here.
   the widget lands far up the page. A widget that's empty can be hidden again
   from the tray (it used to have no button), says it will appear once it has
   content, and its hint about what to add is no longer cut off. (#315)
+- **Accent buttons stay readable with any accent.** The text on an accent
+  button (Save theme, the selected option's tick, today in the calendar) is
+  now black or white by measured contrast against the colour it sits on.
+  Before, a bright start colour with a darker end colour got white text:
+  on the Forest, Monokai and Mariana looks it fell to under 2:1. The
+  greeting's accent mark also deepens on the light surface like the scenes
+  do, instead of washing out. (#321)
+- **Secondary text keeps its contrast on every palette.** The dimmer text
+  (hints, descriptions, timestamps) was tuned to pass 4.5:1 only on the
+  default colours; on Everforest, Tokyo, Nord, Catppuccin and others it fell
+  under. Each look now sets its own lift so the dimmest common step reads at
+  4.5:1 on that look's cards. Everforest's light-mode ink is a step deeper
+  for the same reason. The smoke check in CI renders the home page under
+  every built-in theme and palette, in both modes, so a new look can't ship
+  under the line. (#322)
 
 ## [2.13.0] - 2026-10-09
 

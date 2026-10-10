@@ -14,6 +14,10 @@ export default function SettingsControls() {
   const {
     theme,
     setTheme,
+    reduceMotion,
+    setReduceMotion,
+    visitorTheming,
+    themeSchedule,
     timezone,
     units,
     location,
@@ -57,6 +61,8 @@ export default function SettingsControls() {
       </div>
 
       <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+        {/* Under the "nothing" theming policy (#335) the mode is the site's too. */}
+        {visitorTheming !== "none" && (
         <div className="space-y-1.5">
           <span className="text-ink-50">Appearance mode</span>
           <ChipGroup
@@ -75,6 +81,49 @@ export default function SettingsControls() {
             Light, dark, or follow your device.
           </p>
         </div>
+        )}
+
+        <div className="space-y-1.5">
+          <span className="text-ink-50">Motion</span>
+          <ChipGroup
+            label="Motion"
+            size="md"
+            fit
+            options={[
+              { value: "theme", label: "As themed" },
+              { value: "reduce", label: "Reduced" },
+            ]}
+            value={reduceMotion ? "reduce" : "theme"}
+            onChange={(v) => setReduceMotion(v === "reduce")}
+          />
+          <p className="text-xs text-ink-40">
+            Reduced stills the scene behind the page and the surface animations,
+            whatever the theme says.
+          </p>
+        </div>
+
+        {/* The site's day/night schedule (#336): follow it, or keep the
+            site's usual theme under your own choices. */}
+        {themeSchedule && visitorTheming !== "none" && (
+          <div className="space-y-1.5">
+            <span className="text-ink-50">Day &amp; night theme</span>
+            <ChipGroup
+              label="Day and night theme"
+              size="md"
+              fit
+              options={[
+                { value: "follow", label: "Follow the site" },
+                { value: "off", label: "Off" },
+              ]}
+              value={themeSchedule.follow ? "follow" : "off"}
+              onChange={(v) => themeSchedule.setFollow(v === "follow")}
+            />
+            <p className="text-xs text-ink-40">
+              This site switches its theme by time of day; it&apos;s {themeSchedule.phase} now.
+              Off keeps the site&apos;s usual theme under your own choices.
+            </p>
+          </div>
+        )}
 
         <div className="space-y-1.5">
           <label htmlFor="greeting-name" className="text-ink-50">
@@ -171,7 +220,7 @@ export default function SettingsControls() {
                 Search a city, or use your device&apos;s location.
               </p>
               {locationError && (
-                <p className="text-xs text-red-400">{locationError}</p>
+                <p className="text-xs text-status-down">{locationError}</p>
               )}
             </div>
           </>
@@ -196,7 +245,7 @@ export default function SettingsControls() {
             )
               reset();
           }}
-          className="rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-xs text-ink-60 transition-colors hover:bg-red-500/10 hover:text-red-400"
+          className="rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-xs text-ink-60 transition-colors hover:bg-status-down/10 hover:text-status-down"
         >
           Reset all settings
         </button>

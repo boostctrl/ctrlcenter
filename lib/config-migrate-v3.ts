@@ -20,6 +20,7 @@
 // it doesn't migrate untouched.
 
 import { slugId } from "./slug";
+import { THEME_PACKS } from "./theme";
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
@@ -308,6 +309,11 @@ const integrationsStep: Step = (raw) => {
 // - an override saved before renaming existed (1.9) had no `key` and was
 //   matched by its name, which was then still the built-in's; it gets that
 //   name as its key.
+// Then the list becomes the theme gallery (#334): one entry per built-in in
+// the shipped order, the edited ones as they were and the rest as bare
+// references, each naming its built-in — so the order is the file's from
+// here on. An empty list stays empty (the built-ins as shipped). A list
+// that already names a built-in was written by the gallery and is left be.
 const RETIRED_SCENES = new Set(["glow", "vortex", "mesh"]);
 const themesStep: Step = (raw) => {
   let changed = false;
@@ -322,7 +328,7 @@ const themesStep: Step = (raw) => {
     }
     settings.theme = theme;
   }
-  const themes = Array.isArray(raw.themes)
+  let themes = Array.isArray(raw.themes)
     ? raw.themes.map((t) => {
         if (!isRecord(t)) return t;
         let next = t;
@@ -332,6 +338,18 @@ const themesStep: Step = (raw) => {
         return next;
       })
     : raw.themes;
+  if (Array.isArray(themes) && themes.length > 0 && !themes.some((t) => isRecord(t) && typeof t.builtin === "string")) {
+    const entries = themes.filter(isRecord);
+    const byKey = new Map(entries.map((t) => [t.key, t] as const));
+    const gallery: Record<string, unknown>[] = THEME_PACKS.map((p) => {
+      const t = byKey.get(p.name);
+      return t ? { key: p.name, builtin: p.name, ...t } : { key: p.name, builtin: p.name };
+    });
+    // Anything naming no built-in stays, after them, as it was.
+    for (const t of entries) if (typeof t.key !== "string" || !THEME_PACKS.some((p) => p.name === t.key)) gallery.push(t);
+    themes = gallery;
+    changed = true;
+  }
   return changed ? { value: { ...raw, settings, themes }, changed } : { value: raw, changed: false };
 };
 

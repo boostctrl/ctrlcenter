@@ -5,7 +5,7 @@
 // the DOM application of all of it. PrefsProvider exposes the result as its
 // own context (useLookPrefs), so a color change doesn't re-render consumers
 // that only read the location or favorites.
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   loadActiveTheme,
   saveActiveTheme,
@@ -18,18 +18,51 @@ import {
   saveScene,
   loadFont,
   saveFont,
+  loadTune,
+  saveTune,
+  loadSceneFx,
+  saveSceneFx,
+  loadReduceMotion,
+  saveReduceMotion,
+  loadHeadingFont,
+  saveHeadingFont,
+  loadDensity,
+  saveDensity,
+  loadStatusColors,
+  saveStatusColors,
+  loadWallpaper,
+  saveWallpaper,
+  loadPackChoice,
+  savePackChoice,
   NO_ACCENT_OVERRIDES,
+  type HeadingChoice,
+  type WallpaperChoice,
   type CustomTheme,
   type AccentColors,
   type AccentOverrides,
   type ModePair,
 } from "@/lib/prefs";
-import type { ColorSet, DesignId, ModeColors, SceneId, ThemePack } from "@/lib/theme";
+import { packDesign, packScene } from "@/lib/theme";
+import type {
+  ColorSet,
+  Density,
+  DesignId,
+  ModeColors,
+  MotionLevel,
+  SceneFx,
+  SceneId,
+  SemanticColors,
+  ThemePack,
+  Tune,
+  VisitorTheming,
+  Wallpaper,
+} from "@/lib/theme";
 import type { FontId } from "@/lib/fonts";
 import {
-  applyAll,
+  applyAll as paintAll,
   applyDesign,
   applyFont,
+  applyHeadingFont,
   applyScene,
   isLightColor,
   overrideFor,
@@ -67,6 +100,25 @@ export type DefaultTheme = {
   foreground?: string;
   backgroundLight?: string;
   foregroundLight?: string;
+  // The site default's fine-tune over the design, per mode (#326).
+  tune?: Tune;
+  tuneLight?: Tune;
+  // The site default's scene effects, per mode (#327).
+  sceneIntensity?: number;
+  sceneMotion?: MotionLevel;
+  sceneIntensityLight?: number;
+  sceneMotionLight?: MotionLevel;
+  // The site default's heading font and density, per mode (#330).
+  headingFont?: FontId;
+  headingFontLight?: FontId;
+  density?: Density;
+  densityLight?: Density;
+  // The site default's semantic colors, per mode (#331).
+  status?: SemanticColors;
+  statusLight?: SemanticColors;
+  // The site default's wallpaper, per mode (#333).
+  wallpaper?: Wallpaper;
+  wallpaperLight?: Wallpaper;
 };
 
 export type LookValue = {
@@ -84,6 +136,35 @@ export type LookValue = {
   designFor: (mode: Mode) => DesignId;
   sceneFor: (mode: Mode) => SceneId;
   fontFor: (mode: Mode) => FontId;
+  // The effective fine-tune for a mode (visitor's, else the admin default),
+  // or null when the design is untouched (#326).
+  tuneFor: (mode: Mode) => Tune | null;
+  // The effective scene effects for a mode (visitor's, else the admin
+  // default), or null when the scene is as designed (#327).
+  sceneFxFor: (mode: Mode) => SceneFx | null;
+  // The effective colors for a mode — the active look's variant (else the
+  // admin default, else the stock colors) with that mode's accent override
+  // applied — so the builder can tell which theme or palette is active (#328).
+  colorsFor: (mode: Mode) => ColorSet;
+  // The effective heading font for a mode (null = the body font) and the
+  // density (#330).
+  headingFontFor: (mode: Mode) => FontId | null;
+  densityFor: (mode: Mode) => Density;
+  // The effective semantic colors for a mode, or null for the stylesheet's
+  // defaults (#331).
+  statusFor: (mode: Mode) => SemanticColors | null;
+  // The effective wallpaper for a mode, or null for none (#333).
+  wallpaperFor: (mode: Mode) => Wallpaper | null;
+  // What this visitor may change (#335): "all" for an admin.
+  visitorTheming: VisitorTheming;
+  // The visitor's Reduce motion switch, and the motion level the scenes run
+  // at now: "off" when the switch is on, else the displayed mode's effects.
+  reduceMotion: boolean;
+  motion: MotionLevel;
+  // True once the stored look (saved themes included) has been read on
+  // mount, so a consumer that writes the saved list from a link (#329) can
+  // wait for it rather than clobber it with the empty SSR state.
+  hydrated: boolean;
   // Whether the effective background reads as light (for theme-aware icons).
   surfaceIsLight: boolean;
   customThemes: CustomTheme[];
@@ -102,6 +183,18 @@ export type LookValue = {
   setDesign: (design: DesignId, mode: Mode) => void;
   setScene: (scene: SceneId, mode: Mode) => void;
   setFont: (font: FontId, mode: Mode) => void;
+  // Set (or, with null, clear back to the admin default) a mode's fine-tune.
+  setTune: (tune: Tune | null, mode: Mode) => void;
+  setSceneFx: (fx: SceneFx | null, mode: Mode) => void;
+  setReduceMotion: (reduce: boolean) => void;
+  // A heading font for a mode: a face, "body" (follow the body font, even
+  // over an admin default heading face), or null (not chosen).
+  setHeadingFont: (font: HeadingChoice | null, mode: Mode) => void;
+  setDensity: (density: Density | null, mode: Mode) => void;
+  setStatusColors: (status: SemanticColors | null, mode: Mode) => void;
+  // A wallpaper for a mode: an image, "none" (no wallpaper, even over an
+  // admin default), or null (not chosen).
+  setWallpaper: (wallpaper: WallpaperChoice | null, mode: Mode) => void;
   applyPack: (pack: ThemePack, mode: Mode) => void;
   applyThemeColors: (colors: ModeColors, mode?: Mode) => void;
   setBaseColors: (
@@ -116,6 +209,12 @@ export type LookValue = {
   // position) instead of appending a second copy.
   saveNamedTheme: (name: string, overwriteId?: string) => boolean;
   applyNamedTheme: (id: string) => void;
+  // The current look as a theme object under `name`, without saving it — for
+  // "Copy as code" (#329).
+  captureTheme: (name: string, id: string) => CustomTheme;
+  // Save (unless already saved) and apply a theme from a code or link; null
+  // when it couldn't be stored.
+  adoptTheme: (theme: CustomTheme) => CustomTheme | null;
   // Rename a saved theme in place. Returns false for an empty name, an unknown
   // id, or a failed write.
   renameNamedTheme: (id: string, name: string) => boolean;
@@ -130,10 +229,16 @@ export type LookValue = {
 
 // All look state for `defaultTheme`. `resetLook` drops every customization,
 // mode included (the theme half of the global reset).
-export function useLook(defaultTheme: DefaultTheme): {
+export function useLook(
+  defaultTheme: DefaultTheme,
+  // What this visitor may change (#335), and the site's themes a "packs"
+  // choice resolves against. An admin gets "all" whatever the site says.
+  gate: { policy: VisitorTheming; packs: ThemePack[] } = { policy: "all", packs: [] }
+): {
   look: LookValue;
   resetLook: () => void;
 } {
+  const policy = gate.policy;
   // The admin default accent, and the admin custom default colors (a baseline
   // theme applied when the visitor hasn't customized colors or picked a mode).
   const defaultAccent: Accent = useMemo(
@@ -185,6 +290,32 @@ export function useLook(defaultTheme: DefaultTheme): {
     dark: null,
     light: null,
   });
+  const [tunes, setTunes] = useState<ModePair<Tune | null>>({
+    dark: null,
+    light: null,
+  });
+  const [sceneFxs, setSceneFxs] = useState<ModePair<SceneFx | null>>({
+    dark: null,
+    light: null,
+  });
+  const [reduceMotion, setReduceMotionState] = useState(false);
+  const [headings, setHeadings] = useState<ModePair<HeadingChoice | null>>({
+    dark: null,
+    light: null,
+  });
+  const [densities, setDensities] = useState<ModePair<Density | null>>({
+    dark: null,
+    light: null,
+  });
+  const [statuses, setStatuses] = useState<ModePair<SemanticColors | null>>({
+    dark: null,
+    light: null,
+  });
+  const [wallpapers, setWallpapers] = useState<ModePair<WallpaperChoice | null>>({
+    dark: null,
+    light: null,
+  });
+  const [hydrated, setHydrated] = useState(false);
   const [activeLook, setActiveLook] = useState<ModeColors | null>(null);
   const [accentOverride, setAccentOverrideState] =
     useState<AccentOverrides>(NO_ACCENT_OVERRIDES);
@@ -227,6 +358,53 @@ export function useLook(defaultTheme: DefaultTheme): {
       dark ? defaultTheme.font : defaultTheme.fontLight ?? defaultTheme.font,
     [defaultTheme.font, defaultTheme.fontLight]
   );
+  const defTune = useCallback(
+    (dark: boolean): Tune | null =>
+      (dark ? defaultTheme.tune : defaultTheme.tuneLight ?? defaultTheme.tune) ?? null,
+    [defaultTheme.tune, defaultTheme.tuneLight]
+  );
+  // The admin default heading font / density for a mode (light falls back
+  // to dark). A heading of null means the body font.
+  const defHeading = useCallback(
+    (dark: boolean): FontId | null =>
+      (dark ? defaultTheme.headingFont : defaultTheme.headingFontLight ?? defaultTheme.headingFont) ?? null,
+    [defaultTheme.headingFont, defaultTheme.headingFontLight]
+  );
+  const defDensity = useCallback(
+    (dark: boolean): Density =>
+      (dark ? defaultTheme.density : defaultTheme.densityLight ?? defaultTheme.density) ?? "comfortable",
+    [defaultTheme.density, defaultTheme.densityLight]
+  );
+  const defStatus = useCallback(
+    (dark: boolean): SemanticColors | null =>
+      (dark ? defaultTheme.status : defaultTheme.statusLight ?? defaultTheme.status) ?? null,
+    [defaultTheme.status, defaultTheme.statusLight]
+  );
+  const defWallpaper = useCallback(
+    (dark: boolean): Wallpaper | null =>
+      (dark ? defaultTheme.wallpaper : defaultTheme.wallpaperLight ?? defaultTheme.wallpaper) ?? null,
+    [defaultTheme.wallpaper, defaultTheme.wallpaperLight]
+  );
+  // The admin default scene effects for a mode: light falls back to dark per
+  // field; null when neither field is set.
+  const defSceneFx = useCallback(
+    (dark: boolean): SceneFx | null => {
+      const intensity = dark
+        ? defaultTheme.sceneIntensity
+        : defaultTheme.sceneIntensityLight ?? defaultTheme.sceneIntensity;
+      const motion = dark
+        ? defaultTheme.sceneMotion
+        : defaultTheme.sceneMotionLight ?? defaultTheme.sceneMotion;
+      if (intensity === undefined && motion === undefined) return null;
+      return { intensity: intensity ?? 100, motion: motion ?? "normal" };
+    },
+    [
+      defaultTheme.sceneIntensity,
+      defaultTheme.sceneMotion,
+      defaultTheme.sceneIntensityLight,
+      defaultTheme.sceneMotionLight,
+    ]
+  );
 
   // The effective design/scene/font for a mode: the visitor's per-mode choice,
   // else the admin default for that mode.
@@ -242,15 +420,72 @@ export function useLook(defaultTheme: DefaultTheme): {
     (dark: boolean): FontId => (dark ? fonts.dark : fonts.light) ?? defFont(dark),
     [fonts, defFont]
   );
+  const resolveTune = useCallback(
+    (dark: boolean): Tune | null => (dark ? tunes.dark : tunes.light) ?? defTune(dark),
+    [tunes, defTune]
+  );
+  const resolveSceneFx = useCallback(
+    (dark: boolean): SceneFx | null => (dark ? sceneFxs.dark : sceneFxs.light) ?? defSceneFx(dark),
+    [sceneFxs, defSceneFx]
+  );
+  // The heading font: the visitor's choice ("body" = none, over the admin
+  // default), else the admin default.
+  const resolveHeading = useCallback(
+    (dark: boolean): FontId | null => {
+      const v = dark ? headings.dark : headings.light;
+      if (v === "body") return null;
+      return v ?? defHeading(dark);
+    },
+    [headings, defHeading]
+  );
+  const resolveDensity = useCallback(
+    (dark: boolean): Density => (dark ? densities.dark : densities.light) ?? defDensity(dark),
+    [densities, defDensity]
+  );
+  const resolveStatus = useCallback(
+    (dark: boolean): SemanticColors | null => (dark ? statuses.dark : statuses.light) ?? defStatus(dark),
+    [statuses, defStatus]
+  );
+  // The wallpaper: the visitor's ("none" = cleared, over the admin default),
+  // else the admin default.
+  const resolveWallpaper = useCallback(
+    (dark: boolean): Wallpaper | null => {
+      const v = dark ? wallpapers.dark : wallpapers.light;
+      if (v === "none") return null;
+      return v ?? defWallpaper(dark);
+    },
+    [wallpapers, defWallpaper]
+  );
 
-  // Apply the design/scene/font classes for whichever mode is displayed now.
+  // Paint the look state, with the fine-tune, scene effects and Reduce motion
+  // switch resolved for the mode it shows unless the caller passes one
+  // explicitly (an edit paints its new value before the state commits).
+  const applyAll = useCallback(
+    (opts: Parameters<typeof paintAll>[0]) => {
+      const dark = resolveDark(opts.theme);
+      paintAll({
+        tune: resolveTune(dark),
+        sceneFx: resolveSceneFx(dark),
+        reduceMotion,
+        density: resolveDensity(dark),
+        status: resolveStatus(dark),
+        wallpaper: resolveWallpaper(dark),
+        ...opts,
+      });
+    },
+    [resolveTune, resolveSceneFx, reduceMotion, resolveDensity, resolveStatus, resolveWallpaper]
+  );
+
+  // Apply the design/scene/font/heading classes for whichever mode is
+  // displayed now.
   const applyChrome = useCallback(
     (dark: boolean) => {
       applyDesign(resolveDesign(dark));
       applyScene(resolveScene(dark));
       applyFont(resolveFont(dark));
+      applyHeadingFont(resolveHeading(dark));
     },
-    [resolveDesign, resolveScene, resolveFont]
+    [resolveDesign, resolveScene, resolveFont, resolveHeading]
   );
 
   // A seeded color set for a mode when there's no active custom look yet, so
@@ -294,7 +529,7 @@ export function useLook(defaultTheme: DefaultTheme): {
       });
       applyChrome(resolveDark(next));
     },
-    [activeLook, accentOverride, defaultAccent, resolveLook, applyChrome]
+    [activeLook, accentOverride, defaultAccent, resolveLook, applyChrome, applyAll]
   );
 
   // Preview a mode's appearance live (theme builder) without persisting it, or
@@ -313,7 +548,7 @@ export function useLook(defaultTheme: DefaultTheme): {
       });
       applyChrome(resolveDark(dt));
     },
-    [theme, activeLook, accentOverride, defaultAccent, resolveLook, applyChrome]
+    [theme, activeLook, accentOverride, defaultAccent, resolveLook, applyChrome, applyAll]
   );
 
   // Set one mode's design/scene/font. Persists the per-mode pair and applies the
@@ -374,18 +609,181 @@ export function useLook(defaultTheme: DefaultTheme): {
         defaultAccent,
       });
     },
-    [displayTheme, defaultAccent, activeLook, seedColorSet]
+    [displayTheme, defaultAccent, activeLook, seedColorSet, applyAll]
   );
 
-  // Apply a curated pack to one mode: its design + scene + that mode's colorset.
-  // (Font isn't part of a pack, so the mode's font is left as-is.)
+  // Set (or clear) one mode's fine-tune over its design. Persists the per-mode
+  // pair and repaints only when that mode is the one on screen, with the new
+  // value passed explicitly so the paint doesn't wait for the state to commit.
+  const setTune = useCallback(
+    (next: Tune | null, mode: Mode) => {
+      setTunes((prev) => {
+        const updated = { ...prev, [mode]: next };
+        saveTune(updated);
+        return updated;
+      });
+      const dark = resolveDark(displayTheme);
+      if ((mode === "dark") === dark) {
+        applyAll({
+          theme: displayTheme,
+          look: resolveLook(activeLook),
+          accentOverride,
+          defaultAccent,
+          tune: next ?? defTune(dark),
+        });
+      }
+    },
+    [displayTheme, resolveLook, activeLook, accentOverride, defaultAccent, defTune, applyAll]
+  );
+
+  // Set one mode's heading font (a face, "body", or null to fall back to the
+  // admin default); the class swaps only when that mode is on screen.
+  const setHeadingFont = useCallback(
+    (next: HeadingChoice | null, mode: Mode) => {
+      setHeadings((prev) => {
+        const updated = { ...prev, [mode]: next };
+        saveHeadingFont(updated);
+        return updated;
+      });
+      const dark = resolveDark(displayTheme);
+      if ((mode === "dark") === dark) {
+        applyHeadingFont(next === "body" ? null : (next ?? defHeading(dark)));
+      }
+    },
+    [displayTheme, defHeading]
+  );
+
+  // Set (or clear) one mode's density, painting its factor when on screen.
+  const setDensity = useCallback(
+    (next: Density | null, mode: Mode) => {
+      setDensities((prev) => {
+        const updated = { ...prev, [mode]: next };
+        saveDensity(updated);
+        return updated;
+      });
+      const dark = resolveDark(displayTheme);
+      if ((mode === "dark") === dark) {
+        applyAll({
+          theme: displayTheme,
+          look: resolveLook(activeLook),
+          accentOverride,
+          defaultAccent,
+          density: next ?? defDensity(dark),
+        });
+      }
+    },
+    [displayTheme, resolveLook, activeLook, accentOverride, defaultAccent, defDensity, applyAll]
+  );
+
+  // Set (or clear) one mode's semantic colors, like setTune.
+  const setStatusColors = useCallback(
+    (next: SemanticColors | null, mode: Mode) => {
+      setStatuses((prev) => {
+        const updated = { ...prev, [mode]: next };
+        saveStatusColors(updated);
+        return updated;
+      });
+      const dark = resolveDark(displayTheme);
+      if ((mode === "dark") === dark) {
+        applyAll({
+          theme: displayTheme,
+          look: resolveLook(activeLook),
+          accentOverride,
+          defaultAccent,
+          status: next ?? defStatus(dark),
+        });
+      }
+    },
+    [displayTheme, resolveLook, activeLook, accentOverride, defaultAccent, defStatus, applyAll]
+  );
+
+  // Set (or clear) one mode's wallpaper, like setTune; "none" hides an
+  // admin default wallpaper too.
+  const setWallpaper = useCallback(
+    (next: WallpaperChoice | null, mode: Mode) => {
+      setWallpapers((prev) => {
+        const updated = { ...prev, [mode]: next };
+        saveWallpaper(updated);
+        return updated;
+      });
+      const dark = resolveDark(displayTheme);
+      if ((mode === "dark") === dark) {
+        applyAll({
+          theme: displayTheme,
+          look: resolveLook(activeLook),
+          accentOverride,
+          defaultAccent,
+          wallpaper: next === "none" ? null : (next ?? defWallpaper(dark)),
+        });
+      }
+    },
+    [displayTheme, resolveLook, activeLook, accentOverride, defaultAccent, defWallpaper, applyAll]
+  );
+
+  // Set (or clear) one mode's scene effects, like setTune.
+  const setSceneFx = useCallback(
+    (next: SceneFx | null, mode: Mode) => {
+      setSceneFxs((prev) => {
+        const updated = { ...prev, [mode]: next };
+        saveSceneFx(updated);
+        return updated;
+      });
+      const dark = resolveDark(displayTheme);
+      if ((mode === "dark") === dark) {
+        applyAll({
+          theme: displayTheme,
+          look: resolveLook(activeLook),
+          accentOverride,
+          defaultAccent,
+          sceneFx: next ?? defSceneFx(dark),
+        });
+      }
+    },
+    [displayTheme, resolveLook, activeLook, accentOverride, defaultAccent, defSceneFx, applyAll]
+  );
+
+  // The Reduce motion switch: a preference, not a theme part, so it survives
+  // "Reset theme" (the global reset clears it).
+  const setReduceMotion = useCallback(
+    (reduce: boolean) => {
+      setReduceMotionState(reduce);
+      saveReduceMotion(reduce);
+      applyAll({
+        theme: displayTheme,
+        look: resolveLook(activeLook),
+        accentOverride,
+        defaultAccent,
+        reduceMotion: reduce,
+      });
+    },
+    [displayTheme, resolveLook, activeLook, accentOverride, defaultAccent, applyAll]
+  );
+
+  // Apply a curated pack to one mode: its design + scene + that mode's colorset,
+  // and its tune over the design (a pack without one resets the tune, so the
+  // curated look lands as designed). Font isn't part of a pack, so the mode's
+  // font is left as-is.
   const applyPack = useCallback(
     (pack: ThemePack, mode: Mode) => {
-      setDesign(pack.design, mode);
-      setScene(pack.scene, mode);
+      setDesign(packDesign(pack, mode === "dark"), mode);
+      setScene(packScene(pack, mode === "dark"), mode);
+      setTune(pack.tune ?? null, mode);
+      setSceneFx(null, mode);
+      // Fonts only when the pack carries them (#330); else the mode keeps its own.
+      if (pack.font) setFont(pack.font, mode);
+      if (pack.headingFont) setHeadingFont(pack.headingFont, mode);
+      // Its semantic colors for the mode, or the stylesheet's (#331).
+      setStatusColors((mode === "dark" ? pack.status : pack.statusLight ?? pack.status) ?? null, mode);
+      // Its wallpaper (#333), or none — a pack is a whole look, so an admin
+      // default wallpaper doesn't show through one.
+      setWallpaper((mode === "dark" ? pack.wallpaper : pack.wallpaperLight ?? pack.wallpaper) ?? "none", mode);
       applyThemeColors({ dark: pack.dark, light: pack.light }, mode);
+      // Under "themes only" (#335) the choice is the pack's name: the parts
+      // above are what this visit paints, but the next page load resolves
+      // the name against the site's themes and reads nothing else.
+      if (policy === "packs") savePackChoice({ ...loadPackChoice(), [mode]: pack.name });
     },
-    [setDesign, setScene, applyThemeColors]
+    [policy, setDesign, setScene, setTune, setSceneFx, setFont, setHeadingFont, setStatusColors, setWallpaper, applyThemeColors]
   );
 
   // Update only the background/foreground for the CURRENT mode's variant,
@@ -421,7 +819,7 @@ export function useLook(defaultTheme: DefaultTheme): {
       // preview), so editing the previewed mode shows immediately.
       applyAll({ theme: displayTheme, look: next, accentOverride, defaultAccent });
     },
-    [displayTheme, defaultAccent, accentOverride, activeLook, seedColorSet]
+    [displayTheme, defaultAccent, accentOverride, activeLook, seedColorSet, applyAll]
   );
 
   // Set or clear one mode's accent on its own, leaving the background/foreground
@@ -438,14 +836,16 @@ export function useLook(defaultTheme: DefaultTheme): {
         defaultAccent,
       });
     },
-    [accentOverride, displayTheme, defaultAccent, activeLook, resolveLook]
+    [accentOverride, displayTheme, defaultAccent, activeLook, resolveLook, applyAll]
   );
 
   const {
     customThemes,
     setCustomThemes,
+    captureTheme,
     saveNamedTheme,
     applyNamedTheme,
+    adoptTheme,
     renameNamedTheme,
     deleteNamedTheme,
     importNamedThemes,
@@ -457,11 +857,26 @@ export function useLook(defaultTheme: DefaultTheme): {
     resolveDesign,
     resolveScene,
     resolveFont,
+    resolveTune,
+    defTune,
+    resolveSceneFx,
+    defSceneFx,
     applyThemeColors,
     displayTheme,
     setDesigns,
     setScenes,
     setFonts,
+    setTunes,
+    setSceneFxs,
+    reduceMotion,
+    resolveHeading,
+    resolveDensity,
+    setHeadings,
+    setDensities,
+    resolveStatus,
+    setStatuses,
+    resolveWallpaper,
+    setWallpapers,
   });
 
 
@@ -476,7 +891,7 @@ export function useLook(defaultTheme: DefaultTheme): {
       accentOverride: NO_ACCENT_OVERRIDES,
       defaultAccent,
     });
-  }, [defaultAccent, displayTheme, resolveLook]);
+  }, [defaultAccent, displayTheme, resolveLook, applyAll]);
 
   // Reset just the theme (colors, accent, design, scene, font — both modes) back
   // to the admin defaults, leaving mode/location/greeting alone — the theme
@@ -489,20 +904,53 @@ export function useLook(defaultTheme: DefaultTheme): {
     saveDesign(null);
     saveScene(null);
     saveFont(null);
+    saveTune(null);
+    saveSceneFx(null);
+    saveHeadingFont(null);
+    saveDensity(null);
+    saveStatusColors(null);
+    saveWallpaper(null);
+    savePackChoice(null);
     setDesigns({ dark: null, light: null });
     setScenes({ dark: null, light: null });
     setFonts({ dark: null, light: null });
+    setTunes({ dark: null, light: null });
+    setSceneFxs({ dark: null, light: null });
+    setHeadings({ dark: null, light: null });
+    setDensities({ dark: null, light: null });
+    setStatuses({ dark: null, light: null });
+    setWallpapers({ dark: null, light: null });
+    const dark = resolveDark(displayTheme);
     applyAll({
       theme: displayTheme,
       look: resolveLook(null),
       accentOverride: NO_ACCENT_OVERRIDES,
       defaultAccent,
+      tune: defTune(dark),
+      sceneFx: defSceneFx(dark),
+      density: defDensity(dark),
+      status: defStatus(dark),
+      wallpaper: defWallpaper(dark),
     });
-    const dark = resolveDark(displayTheme);
     applyDesign(defDesign(dark));
     applyScene(defScene(dark));
     applyFont(defFont(dark));
-  }, [defaultAccent, displayTheme, resolveLook, defDesign, defScene, defFont]);
+    applyHeadingFont(defHeading(dark));
+  }, [
+    defaultAccent,
+    displayTheme,
+    resolveLook,
+    defDesign,
+    defScene,
+    defFont,
+    defTune,
+    defSceneFx,
+    defDensity,
+    defHeading,
+    defStatus,
+    defWallpaper,
+    applyAll,
+  ]);
 
   const resetLook = useCallback(() => {
     // Drop all theme customizations so the visitor falls back to the admin
@@ -517,27 +965,55 @@ export function useLook(defaultTheme: DefaultTheme): {
     saveDesign(null);
     saveScene(null);
     saveFont(null);
+    saveTune(null);
+    saveSceneFx(null);
+    saveReduceMotion(false);
+    saveHeadingFont(null);
+    saveDensity(null);
+    saveStatusColors(null);
+    saveWallpaper(null);
+    savePackChoice(null);
     setActiveLook(null);
     setAccentOverrideState(NO_ACCENT_OVERRIDES);
     setThemeState(defaultTheme.mode);
     setDesigns({ dark: null, light: null });
     setScenes({ dark: null, light: null });
     setFonts({ dark: null, light: null });
-    applyAll({
+    setTunes({ dark: null, light: null });
+    setSceneFxs({ dark: null, light: null });
+    setReduceMotionState(false);
+    setHeadings({ dark: null, light: null });
+    setDensities({ dark: null, light: null });
+    setStatuses({ dark: null, light: null });
+    setWallpapers({ dark: null, light: null });
+    const dark = resolveDark(defaultTheme.mode);
+    paintAll({
       theme: defaultTheme.mode,
       look: adminLook,
       accentOverride: NO_ACCENT_OVERRIDES,
       defaultAccent,
+      tune: defTune(dark),
+      sceneFx: defSceneFx(dark),
+      reduceMotion: false,
+      density: defDensity(dark),
+      status: defStatus(dark),
+      wallpaper: defWallpaper(dark),
     });
-    const dark = resolveDark(defaultTheme.mode);
     applyDesign(defDesign(dark));
     applyScene(defScene(dark));
     applyFont(defFont(dark));
+    applyHeadingFont(defHeading(dark));
   }, [
     defaultTheme.mode,
     defDesign,
     defScene,
     defFont,
+    defTune,
+    defSceneFx,
+    defDensity,
+    defHeading,
+    defStatus,
+    defWallpaper,
     adminLook,
     defaultAccent,
   ]);
@@ -546,50 +1022,116 @@ export function useLook(defaultTheme: DefaultTheme): {
   // with OS changes. Anything the visitor hasn't set falls back to the admin
   // default theme.
   useEffect(() => {
+    // What this visitor may change (#335): under "packs" the stored look is
+    // the chosen pack per mode, resolved against the site's themes, and the
+    // mode; under "none" nothing but the Reduce motion switch. The rest of
+    // what's stored is left unread, so a browser customized before the
+    // policy changed falls back at once — as the no-flash script did.
+    const gated = policy !== "all";
     let stored: Theme = defaultTheme.mode;
-    try {
-      const raw = window.localStorage.getItem(THEME_KEY);
-      if (raw === "light" || raw === "dark" || raw === "system") {
-        stored = raw;
+    if (policy !== "none") {
+      try {
+        const raw = window.localStorage.getItem(THEME_KEY);
+        if (raw === "light" || raw === "dark" || raw === "system") {
+          stored = raw;
+        }
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
     }
-    const active = loadActiveTheme();
-    const overrideAccent = loadAccentOverride();
-    const storedDesigns = loadDesign();
-    const storedScenes = loadScene();
-    const storedFonts = loadFont();
-    // Resolve a mode's design/scene/font from the loaded pairs + admin defaults
-    // (the state isn't committed yet, so resolve from the raw values here).
+    const choice = policy === "packs" ? loadPackChoice() : { dark: null, light: null };
+    const packOf = (dark: boolean): ThemePack | null => {
+      const name = dark ? choice.dark : choice.light;
+      return name ? (gate.packs.find((p) => p.name === name) ?? null) : null;
+    };
+    const dp = packOf(true);
+    const lp = packOf(false);
+    const fromPacks = <T,>(f: (p: ThemePack, dark: boolean) => T | null): ModePair<T | null> => ({
+      dark: dp ? f(dp, true) : null,
+      light: lp ? f(lp, false) : null,
+    });
+    const active = gated
+      ? dp || lp
+        ? { dark: dp ? dp.dark : seedColorSet(true), light: lp ? lp.light : seedColorSet(false) }
+        : null
+      : loadActiveTheme();
+    const overrideAccent = gated ? NO_ACCENT_OVERRIDES : loadAccentOverride();
+    const storedDesigns = gated ? fromPacks(packDesign) : loadDesign();
+    const storedScenes = gated ? fromPacks(packScene) : loadScene();
+    const storedFonts = gated ? fromPacks((p) => p.font ?? null) : loadFont();
+    const storedTunes = gated ? fromPacks((p) => p.tune ?? null) : loadTune();
+    const storedFx: ModePair<SceneFx | null> = gated ? { dark: null, light: null } : loadSceneFx();
+    const storedReduce = loadReduceMotion();
+    const storedHeadings: ModePair<HeadingChoice | null> = gated ? fromPacks((p) => p.headingFont ?? null) : loadHeadingFont();
+    const storedDensities: ModePair<Density | null> = gated ? { dark: null, light: null } : loadDensity();
+    const storedStatuses = gated
+      ? fromPacks((p, dark) => (dark ? p.status : p.statusLight ?? p.status) ?? null)
+      : loadStatusColors();
+    const storedWallpapers: ModePair<WallpaperChoice | null> = gated
+      ? fromPacks((p, dark) => (dark ? p.wallpaper : p.wallpaperLight ?? p.wallpaper) ?? "none")
+      : loadWallpaper();
+    const wallpaperOf = (dark: boolean): Wallpaper | null => {
+      const v = dark ? storedWallpapers.dark : storedWallpapers.light;
+      if (v === "none") return null;
+      return v ?? defWallpaper(dark);
+    };
+    const headingOf = (dark: boolean): FontId | null => {
+      const v = dark ? storedHeadings.dark : storedHeadings.light;
+      if (v === "body") return null;
+      return v ?? defHeading(dark);
+    };
+    // Resolve a mode's design/scene/font/tune/effects from the loaded pairs +
+    // admin defaults (the state isn't committed yet, so resolve from the raw
+    // values).
     const chromeFor = (dark: boolean) => ({
       design: (dark ? storedDesigns.dark : storedDesigns.light) ?? defDesign(dark),
       scene: (dark ? storedScenes.dark : storedScenes.light) ?? defScene(dark),
       font: (dark ? storedFonts.dark : storedFonts.light) ?? defFont(dark),
+      tune: (dark ? storedTunes.dark : storedTunes.light) ?? defTune(dark),
+      sceneFx: (dark ? storedFx.dark : storedFx.light) ?? defSceneFx(dark),
+      heading: headingOf(dark),
+      density: (dark ? storedDensities.dark : storedDensities.light) ?? defDensity(dark),
+      status: (dark ? storedStatuses.dark : storedStatuses.light) ?? defStatus(dark),
+      wallpaper: wallpaperOf(dark),
     });
     /* eslint-disable react-hooks/set-state-in-effect */
     setThemeState(stored);
     setDesigns(storedDesigns);
     setScenes(storedScenes);
     setFonts(storedFonts);
+    setTunes(storedTunes);
+    setSceneFxs(storedFx);
+    setReduceMotionState(storedReduce);
+    setHeadings(storedHeadings);
+    setDensities(storedDensities);
+    setStatuses(storedStatuses);
+    setWallpapers(storedWallpapers);
     setActiveLook(active);
     setAccentOverrideState(overrideAccent);
-    setCustomThemes(loadThemes());
+    setCustomThemes(gated ? [] : loadThemes());
     setSystemDark(
       window.matchMedia("(prefers-color-scheme: dark)").matches
     );
+    setHydrated(true);
     /* eslint-enable react-hooks/set-state-in-effect */
     // The inline script already applied these; re-apply for consistency.
-    applyAll({
+    const initial = chromeFor(resolveDark(stored));
+    paintAll({
       theme: stored,
       look: resolveLook(active),
       accentOverride: overrideAccent,
       defaultAccent,
+      tune: initial.tune,
+      sceneFx: initial.sceneFx,
+      reduceMotion: storedReduce,
+      density: initial.density,
+      status: initial.status,
+      wallpaper: initial.wallpaper,
     });
-    const initial = chromeFor(resolveDark(stored));
     applyDesign(initial.design);
     applyScene(initial.scene);
     applyFont(initial.font);
+    applyHeadingFont(initial.heading);
 
     // Re-apply on OS scheme change. Only "system" mode tracks the OS — but the
     // look AND the design/scene/font are mode-aware, so "system" must re-resolve
@@ -604,19 +1146,26 @@ export function useLook(defaultTheme: DefaultTheme): {
         // ignore
       }
       const isMode = raw === "light" || raw === "dark" || raw === "system";
-      const mode: Theme = isMode ? (raw as Theme) : defaultTheme.mode;
+      const mode: Theme = isMode && policy !== "none" ? (raw as Theme) : defaultTheme.mode;
       if (mode !== "system") return;
-      const look = resolveLook(loadActiveTheme());
-      applyAll({
+      const look = resolveLook(gated ? active : loadActiveTheme());
+      const next = chromeFor(mq.matches);
+      paintAll({
         theme: "system",
         look,
-        accentOverride: loadAccentOverride(),
+        accentOverride: gated ? NO_ACCENT_OVERRIDES : loadAccentOverride(),
         defaultAccent,
+        tune: next.tune,
+        sceneFx: next.sceneFx,
+        reduceMotion: loadReduceMotion(),
+        density: next.density,
+        status: next.status,
+        wallpaper: next.wallpaper,
       });
-      const next = chromeFor(mq.matches);
       applyDesign(next.design);
       applyScene(next.scene);
       applyFont(next.font);
+      applyHeadingFont(next.heading);
     };
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
@@ -624,6 +1173,41 @@ export function useLook(defaultTheme: DefaultTheme): {
     // re-running this on a new prop identity would clobber live theme state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // The site default can change under an open page — a day/night schedule
+  // switch (#336) hands in a new one. Repaint what the visitor hasn't
+  // customized from it; the mount effect above is deliberately mount-only.
+  // Compared by content: a board page hands in the theme the layout already
+  // painted (#337), and that shouldn't repaint.
+  const defaultKey = JSON.stringify(defaultTheme);
+  const paintedDefault = useRef(defaultKey);
+  useEffect(() => {
+    if (paintedDefault.current === defaultKey) return;
+    paintedDefault.current = defaultKey;
+    // The mode too, unless the visitor chose one (a phase can bring its
+    // own, as the site's own mode does for an un-customized visitor).
+    let stored: string | null = null;
+    if (policy !== "none") {
+      try {
+        stored = window.localStorage.getItem(THEME_KEY);
+      } catch {
+        // ignore
+      }
+    }
+    const ownMode = stored === "light" || stored === "dark" || stored === "system";
+    const theme = ownMode || previewMode ? displayTheme : defaultTheme.mode;
+    if (!ownMode && !previewMode) setThemeState(defaultTheme.mode);
+    const dark = resolveDark(theme);
+    applyAll({
+      theme,
+      look: resolveLook(activeLook),
+      accentOverride,
+      defaultAccent,
+    });
+    applyChrome(dark);
+    // Only a new default should repaint; the callbacks are this render's.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultKey]);
 
   const look = useMemo<LookValue>(() => {
     // Resolve the displayed mode (saved `theme`, or a live builder preview) to a
@@ -651,6 +1235,22 @@ export function useLook(defaultTheme: DefaultTheme): {
       designFor: (mode: Mode) => resolveDesign(mode === "dark"),
       sceneFor: (mode: Mode) => resolveScene(mode === "dark"),
       fontFor: (mode: Mode) => resolveFont(mode === "dark"),
+      tuneFor: (mode: Mode) => resolveTune(mode === "dark"),
+      sceneFxFor: (mode: Mode) => resolveSceneFx(mode === "dark"),
+      headingFontFor: (mode: Mode) => resolveHeading(mode === "dark"),
+      densityFor: (mode: Mode) => resolveDensity(mode === "dark"),
+      statusFor: (mode: Mode) => resolveStatus(mode === "dark"),
+      wallpaperFor: (mode: Mode) => resolveWallpaper(mode === "dark"),
+      visitorTheming: policy,
+      colorsFor: (mode: Mode) => {
+        const dark = mode === "dark";
+        const cs = variantFor(effectiveLook, dark) ?? seedColorSet(dark);
+        const a = resolveAccent(overrideFor(accentOverride, dark), cs, defaultAccent);
+        return { ...cs, accentFrom: a.from, accentTo: a.to };
+      },
+      reduceMotion,
+      motion: reduceMotion ? "off" : (resolveSceneFx(displayDark)?.motion ?? "normal"),
+      hydrated,
       surfaceIsLight,
       customThemes,
       activeLook,
@@ -666,12 +1266,21 @@ export function useLook(defaultTheme: DefaultTheme): {
       setDesign,
       setScene,
       setFont,
+      setTune,
+      setSceneFx,
+      setReduceMotion,
+      setHeadingFont,
+      setDensity,
+      setStatusColors,
+      setWallpaper,
       applyPack,
       applyThemeColors,
       setBaseColors,
       setAccentOverride,
       saveNamedTheme,
       applyNamedTheme,
+      captureTheme,
+      adoptTheme,
       renameNamedTheme,
       deleteNamedTheme,
       importNamedThemes,
@@ -686,6 +1295,16 @@ export function useLook(defaultTheme: DefaultTheme): {
     resolveDesign,
     resolveScene,
     resolveFont,
+    resolveTune,
+    resolveSceneFx,
+    reduceMotion,
+    resolveHeading,
+    resolveDensity,
+    resolveStatus,
+    resolveWallpaper,
+    policy,
+    hydrated,
+    seedColorSet,
     systemDark,
     customThemes,
     activeLook,
@@ -695,12 +1314,21 @@ export function useLook(defaultTheme: DefaultTheme): {
     setDesign,
     setScene,
     setFont,
+    setTune,
+    setSceneFx,
+    setReduceMotion,
+    setHeadingFont,
+    setDensity,
+    setStatusColors,
+    setWallpaper,
     applyPack,
     applyThemeColors,
     setBaseColors,
     setAccentOverride,
     saveNamedTheme,
     applyNamedTheme,
+    captureTheme,
+    adoptTheme,
     renameNamedTheme,
     deleteNamedTheme,
     importNamedThemes,

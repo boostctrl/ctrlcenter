@@ -47,7 +47,7 @@ export function FeedHealthBadge({ health }: { health?: FeedHealth }) {
       {agoLabel(health.at)}
     </span>
   ) : (
-    <span className="text-xs text-red-400/90">
+    <span className="text-xs text-status-down/90">
       {health.error} · {agoLabel(health.at)}
     </span>
   );

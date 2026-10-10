@@ -83,6 +83,7 @@ export default function Dashboard({
   boardId,
   isHome,
   boards = [],
+  packNames = [],
   widgets,
   scale = DEFAULT_UI_SCALE,
   gap = DEFAULT_GRID_GAP,
@@ -94,6 +95,8 @@ export default function Dashboard({
   isHome: boolean;
   // Every board, for the editor's board menu (#303); empty for visitors.
   boards?: EditorBoard[];
+  // The gallery's pack names, for pinning a theme on the board there (#337).
+  packNames?: string[];
   // The board's resolved widget arrangement (order + span + hidden).
   widgets: LayoutWidget[];
   // The saved UI scale (percent); SSR already renders it on <html>, this seeds
@@ -833,7 +836,7 @@ export default function Dashboard({
             onDone={doneEditing}
             leading={
               <>
-                {boards.length > 0 && <BoardsMenu boards={boards} currentId={boardId} />}
+                {boards.length > 0 && <BoardsMenu boards={boards} currentId={boardId} packNames={packNames} />}
                 <WidgetPalette onAdd={addWidget} className="shrink-0" />
               </>
             }

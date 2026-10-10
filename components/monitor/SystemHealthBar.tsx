@@ -87,7 +87,7 @@ export default function SystemHealthBar({
               className={`mt-1 space-y-0.5 text-xs ${
                 // Full strength, and amber's deepest light-mode shade: small
                 // text on the glass card needs 4.5:1 in both schemes.
-                criticalAlerts ? "text-red-300" : "text-amber-200"
+                criticalAlerts ? "text-status-down" : "text-status-warning"
               }`}
             >
               {problems.slice(0, PROBLEM_CAP).map((p, i) => (
@@ -136,8 +136,8 @@ export default function SystemHealthBar({
           <span
             className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${
               criticalAlerts
-                ? "border-red-500/30 bg-red-500/10 text-red-300"
-                : "border-amber-400/30 bg-amber-400/10 text-amber-200/90"
+                ? "border-status-down/30 bg-status-down/10 text-status-down"
+                : "border-status-warning/30 bg-status-warning/10 text-status-warning/90"
             }`}
           >
             {alerts.length} alert{alerts.length === 1 ? "" : "s"}

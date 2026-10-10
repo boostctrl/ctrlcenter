@@ -12,7 +12,7 @@ import {
   newBoardId,
   integrationSchema,
 } from "@/lib/schema";
-import type { ThemePack } from "@/lib/theme";
+import { packDesign, packScene, type ThemePack } from "@/lib/theme";
 import { newThemeId } from "@/lib/prefs";
 import { defaultSpanFor, resolveLayout, type WidgetType } from "@/lib/layout";
 import { instanceLabels } from "@/lib/widgets/labels";
@@ -76,12 +76,13 @@ export function useSettingsDraft(
   const boardsSave = useAutosave(boards, async (next, opts) => {
     const before = new Map(savedBoards.current.map((b) => [b.id, b.layout]));
     await saveBoards(
-      next.map(({ id, name, visibility, icon, layout }) => ({
+      next.map(({ id, name, visibility, icon, theme, layout }) => ({
         id,
         name,
         visibility,
         // Sent every time ("" for none), so clearing one here sticks.
         icon: icon ?? "",
+        theme: theme ?? "",
         ...(JSON.stringify(before.get(id)) === JSON.stringify(layout)
           ? {}
           : { layout: { sections: layout.sections } }),
@@ -221,12 +222,16 @@ export function useSettingsDraft(
     ]);
   };
   // An icon of "" clears it (#316).
-  const updateBoard = (id: string, patch: { name?: string; visibility?: BoardVisibility; icon?: string }) =>
+  const updateBoard = (
+    id: string,
+    patch: { name?: string; visibility?: BoardVisibility; icon?: string; theme?: string }
+  ) =>
     setBoards((bs) =>
       bs.map((b) => {
         if (b.id !== id) return b;
         const next = { ...b, ...patch };
         if (!next.icon) delete next.icon;
+        if (!next.theme) delete next.theme;
         return next;
       })
     );
@@ -369,10 +374,27 @@ export function useSettingsDraft(
       background: pack.dark.background,
       foreground: pack.dark.foreground,
       presetLight: undefined,
-      designLight: undefined,
-      sceneLight: undefined,
+      // A pack's own light design/scene (#334), else light follows dark.
+      designLight: pack.designLight,
+      sceneLight: pack.sceneLight,
       backgroundLight: pack.light.background,
       foregroundLight: pack.light.foreground,
+      tune: pack.tune,
+      tuneLight: undefined,
+      sceneIntensity: undefined,
+      sceneMotion: undefined,
+      sceneIntensityLight: undefined,
+      sceneMotionLight: undefined,
+      // A pack's fonts when it carries them (#330); else the current ones stay.
+      font: pack.font ?? theme.font,
+      headingFont: pack.headingFont,
+      headingFontLight: undefined,
+      density: undefined,
+      densityLight: undefined,
+      status: pack.status,
+      statusLight: pack.statusLight,
+      wallpaper: pack.wallpaper,
+      wallpaperLight: pack.wallpaperLight,
     });
   }
 
@@ -384,12 +406,19 @@ export function useSettingsDraft(
       const darkPack = themePacks.find((p) => p.name === theme.preset);
       updateTheme({
         presetLight: undefined,
-        designLight: undefined,
-        sceneLight: undefined,
+        designLight: darkPack?.designLight,
+        sceneLight: darkPack?.sceneLight,
         accentFromLight: undefined,
         accentToLight: undefined,
         backgroundLight: darkPack?.light.background,
         foregroundLight: darkPack?.light.foreground,
+        tuneLight: undefined,
+        sceneIntensityLight: undefined,
+        sceneMotionLight: undefined,
+        headingFontLight: undefined,
+        densityLight: undefined,
+        statusLight: darkPack?.statusLight,
+        wallpaperLight: darkPack?.wallpaperLight,
       });
       return;
     }
@@ -397,12 +426,20 @@ export function useSettingsDraft(
     if (!pack) return;
     updateTheme({
       presetLight: pack.name,
-      designLight: pack.design,
-      sceneLight: pack.scene,
+      designLight: packDesign(pack, false),
+      sceneLight: packScene(pack, false),
       accentFromLight: undefined,
       accentToLight: undefined,
       backgroundLight: pack.light.background,
       foregroundLight: pack.light.foreground,
+      tuneLight: pack.tune,
+      sceneIntensityLight: undefined,
+      sceneMotionLight: undefined,
+      fontLight: pack.font,
+      headingFontLight: pack.headingFont,
+      densityLight: undefined,
+      statusLight: pack.statusLight ?? pack.status,
+      wallpaperLight: pack.wallpaperLight ?? pack.wallpaper,
     });
   }
 

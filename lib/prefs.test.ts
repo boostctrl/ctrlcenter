@@ -3,10 +3,14 @@ import {
   sanitizePrefs,
   sanitizeColors,
   sanitizeModeColors,
+  sanitizeCustomTheme,
   siteThemeFromCustomTheme,
+  packFromCustomTheme,
+  encodeThemeCode,
+  decodeThemeCode,
   type CustomTheme,
 } from "./prefs";
-import { themeInputSchema } from "./schema";
+import { themeInputSchema, themeEntrySchema } from "./schema";
 
 const valid = {
   background: "#06070d",
@@ -164,5 +168,174 @@ describe("siteThemeFromCustomTheme", () => {
       .filter((k) => !omittedOnPurpose.includes(k))
       .sort();
     expect(mapped).toEqual(schemaKeys);
+  });
+});
+
+describe("sanitizeCustomTheme tune (#326)", () => {
+  const base = {
+    name: "Tuned",
+    dark: valid,
+    light: { ...valid, background: "#eceef3", foreground: "#181b24" },
+  };
+
+  it("keeps a valid tune per mode and drops an invalid one", () => {
+    const t = sanitizeCustomTheme({ ...base, tune: { radius: 50 }, tuneLight: "x" });
+    expect(t?.tune).toEqual({ radius: 50, border: 100, blur: 100, shadow: 100, fill: 100, glow: 100 });
+    expect(t?.tuneLight).toBeUndefined();
+  });
+
+  it("promotes the tune to the site theme", () => {
+    const t = sanitizeCustomTheme({ ...base, tune: { glow: 0 }, tuneLight: { blur: 50 } })!;
+    const site = siteThemeFromCustomTheme(t, "system");
+    expect(site.tune?.glow).toBe(0);
+    expect(site.tuneLight?.blur).toBe(50);
+    expect(themeInputSchema.parse(site).tuneLight?.blur).toBe(50);
+  });
+});
+
+describe("sanitizeCustomTheme scene effects (#327)", () => {
+  const base = {
+    name: "Calm",
+    dark: valid,
+    light: { ...valid, background: "#eceef3", foreground: "#181b24" },
+  };
+
+  it("keeps valid effects per mode and promotes them to the site theme", () => {
+    const t = sanitizeCustomTheme({ ...base, sceneFx: { motion: "calm" }, sceneFxLight: { intensity: 30 } })!;
+    expect(t.sceneFx).toEqual({ intensity: 100, motion: "calm" });
+    expect(t.sceneFxLight).toEqual({ intensity: 30, motion: "normal" });
+    const site = themeInputSchema.parse(siteThemeFromCustomTheme(t, "dark"));
+    expect(site.sceneMotion).toBe("calm");
+    expect(site.sceneIntensityLight).toBe(30);
+    expect(sanitizeCustomTheme({ ...base, sceneFx: { motion: "nope" } })?.sceneFx).toBeUndefined();
+  });
+});
+
+describe("theme codes (#329)", () => {
+  const theme = sanitizeCustomTheme({
+    name: "Rosé nuit",
+    dark: valid,
+    light: { ...valid, background: "#eceef3", foreground: "#181b24" },
+    design: "cyber",
+    scene: "grid",
+    font: "inter",
+    tune: { glow: 50 },
+    sceneFx: { motion: "calm" },
+  })!;
+
+  it("round-trips a theme through a code, minting a new id", () => {
+    const code = encodeThemeCode(theme);
+    expect(code.startsWith("ctc1.")).toBe(true);
+    expect(code).not.toMatch(/[+/=]/);
+    const back = decodeThemeCode(code)!;
+    expect(back.id).not.toBe(theme.id);
+    const { id: _a, ...a } = theme;
+    const { id: _b, ...b } = back;
+    void _a;
+    void _b;
+    expect(b).toEqual(a);
+  });
+
+  it("accepts a link and surrounding whitespace, and rejects anything else", () => {
+    const code = encodeThemeCode(theme);
+    expect(decodeThemeCode(`  https://home.lan/settings#theme=${code}\n`)?.name).toBe("Rosé nuit");
+    expect(decodeThemeCode("ctc1.not base64!!")).toBeNull();
+    expect(decodeThemeCode("hello")).toBeNull();
+    expect(decodeThemeCode("ctc1." + Buffer.from("{\"name\":1}").toString("base64url"))).toBeNull();
+  });
+});
+
+describe("sanitizeCustomTheme typography (#330)", () => {
+  it("keeps a heading face and a non-default density, and promotes them", () => {
+    const t = sanitizeCustomTheme({
+      name: "Serif",
+      dark: valid,
+      light: { ...valid, background: "#eceef3", foreground: "#181b24" },
+      headingFont: "playfair",
+      headingFontLight: "nope",
+      density: "compact",
+      densityLight: "comfortable",
+    })!;
+    expect(t.headingFont).toBe("playfair");
+    expect(t.headingFontLight).toBeUndefined();
+    expect(t.density).toBe("compact");
+    expect(t.densityLight).toBeUndefined();
+    const site = themeInputSchema.parse(siteThemeFromCustomTheme(t, "dark"));
+    expect(site.headingFont).toBe("playfair");
+    expect(site.density).toBe("compact");
+  });
+});
+
+describe("sanitizeCustomTheme status colors (#331)", () => {
+  it("keeps a full set per mode and promotes it", () => {
+    const set = { up: "#00ff00", down: "#ff0000", warning: "#ffaa00", info: "#00aaff" };
+    const t = sanitizeCustomTheme({
+      name: "Signals",
+      dark: valid,
+      light: { ...valid, background: "#eceef3", foreground: "#181b24" },
+      status: set,
+      statusLight: { up: "#00ff00" },
+    })!;
+    expect(t.status).toEqual(set);
+    expect(t.statusLight).toBeUndefined();
+    expect(themeInputSchema.parse(siteThemeFromCustomTheme(t, "dark")).status?.down).toBe("#ff0000");
+  });
+});
+
+describe("sanitizeCustomTheme wallpaper (#333)", () => {
+  it("keeps a valid wallpaper per mode, drops a bad one, and promotes it", () => {
+    const wp = { src: "https://example.com/sea.jpg", blur: 8, dim: 40, fit: "tile" };
+    const t = sanitizeCustomTheme({
+      name: "Shore",
+      dark: valid,
+      light: { ...valid, background: "#eceef3", foreground: "#181b24" },
+      wallpaper: wp,
+      wallpaperLight: { src: "javascript:alert(1)" },
+    })!;
+    expect(t.wallpaper).toEqual(wp);
+    expect(t.wallpaperLight).toBeUndefined();
+    const site = themeInputSchema.parse(siteThemeFromCustomTheme(t, "dark"));
+    expect(site.wallpaper?.src).toBe("https://example.com/sea.jpg");
+    expect(site.wallpaperLight).toBeUndefined();
+    // Survives a code round trip.
+    expect(decodeThemeCode(encodeThemeCode(t))?.wallpaper).toEqual(wp);
+  });
+});
+
+describe("packFromCustomTheme (#334)", () => {
+  it("maps a saved theme to a gallery pack the schema accepts, with light's own design and scene", () => {
+    const t = sanitizeCustomTheme({
+      name: "Shore",
+      design: "paper",
+      scene: "rain",
+      designLight: "flat",
+      sceneLight: "none",
+      font: "inter",
+      headingFont: "lora",
+      dark: valid,
+      light: { ...valid, background: "#eceef3", foreground: "#181b24" },
+      tune: { radius: 50, border: 100, blur: 100, shadow: 100, fill: 100, glow: 100 },
+      status: { up: "#00ff00", down: "#ff0000", warning: "#ffaa00", info: "#00aaff" },
+      wallpaper: { src: "https://example.com/sea.jpg", blur: 8, dim: 40, fit: "tile" },
+    })!;
+    const pack = packFromCustomTheme(t);
+    expect(pack).toMatchObject({
+      name: "Shore",
+      design: "paper",
+      scene: "rain",
+      designLight: "flat",
+      sceneLight: "none",
+      font: "inter",
+      headingFont: "lora",
+      wallpaper: { src: "https://example.com/sea.jpg" },
+    });
+    expect(pack.tune?.radius).toBe(50);
+    expect(pack.status?.down).toBe("#ff0000");
+    expect(themeEntrySchema.safeParse({ key: "custom-1", ...pack }).success).toBe(true);
+    // The same design and scene in both modes, and the default font, are left out.
+    const plain = packFromCustomTheme(sanitizeCustomTheme({ name: "Plain", dark: valid, light: valid })!);
+    expect(plain.designLight).toBeUndefined();
+    expect(plain.sceneLight).toBeUndefined();
+    expect(plain.font).toBeUndefined();
   });
 });

@@ -16,8 +16,8 @@ export default function Rays({ light }: SceneProps) {
   return (
     <div
       aria-hidden
-      className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
-      style={{ opacity: "var(--glow-opacity, 1)" }}
+      className="scene-root pointer-events-none fixed inset-0 -z-10 overflow-hidden"
+      style={{ opacity: "calc(var(--glow-opacity, 1) * var(--scene-opacity, 1))" }}
     >
       <div
         className="animate-rays absolute top-[-20%] left-1/2 h-[130vmax] w-[130vmax]"

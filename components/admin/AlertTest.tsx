@@ -27,9 +27,9 @@ export default function AlertTest({
       disabled={!ready || saving}
       renderResult={(data) => {
         const r = data.results[0];
-        if (!r) return <span className="text-xs text-red-400">✗ Not sent</span>;
+        if (!r) return <span className="text-xs text-status-down">✗ Not sent</span>;
         return (
-          <span className={`text-xs ${r.ok ? "text-emerald-400" : "text-red-400"}`}>
+          <span className={`text-xs ${r.ok ? "text-status-up" : "text-status-down"}`}>
             {r.ok ? "✓ Sent" : "✗ Failed"} ({r.detail})
           </span>
         );

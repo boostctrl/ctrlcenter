@@ -9,7 +9,7 @@ import { effectRgbFor } from "./color";
 // inside a wide soft halo so they glow rather than twinkle. Distinct from
 // Starfield: far fewer, larger, no links, and they fade in and out completely.
 // A static frame (mid-pulse) is drawn under prefers-reduced-motion.
-export default function Fireflies({ light }: SceneProps) {
+export default function Fireflies({ light, motion }: SceneProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -18,7 +18,11 @@ export default function Fireflies({ light }: SceneProps) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reduced =
+      motion === "off" || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Calm motion: advance every other frame — half speed, half the work.
+    const calm = motion === "calm";
+    let tick = 0;
     const dpr = window.devicePixelRatio || 1;
     const peak = light ? 0.85 : 0.9;
     let w = 0;
@@ -94,6 +98,10 @@ export default function Fireflies({ light }: SceneProps) {
     };
 
     const draw = () => {
+      if (calm && (tick++ & 1)) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
       drawFrame(false);
       raf = requestAnimationFrame(draw);
     };
@@ -106,10 +114,10 @@ export default function Fireflies({ light }: SceneProps) {
       window.removeEventListener("resize", resize);
       cancelAnimationFrame(raf);
     };
-  }, [light]);
+  }, [light, motion]);
 
   return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 -z-10">
+    <div aria-hidden className="scene-root pointer-events-none fixed inset-0 -z-10">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
     </div>
   );

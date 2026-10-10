@@ -3,15 +3,17 @@
 import { useState } from "react";
 import { ChipGroup } from "./ChipGroup";
 import { useEdgeFade } from "./useEdgeFade";
-import type { ThemePack } from "@/lib/theme";
+import type { ThemePack, VisitorTheming } from "@/lib/theme";
 import { buttonClasses } from "@/lib/buttons";
 import { TABS, type TabId } from "./theme-builder/constants";
 import { useThemeDraft } from "./theme-builder/useThemeDraft";
 import ThemesTab from "./theme-builder/ThemesTab";
 import ColorsTab from "./theme-builder/ColorsTab";
 import DesignTab from "./theme-builder/DesignTab";
+import TuneTab from "./theme-builder/TuneTab";
 import SceneTab from "./theme-builder/SceneTab";
 import FontTab from "./theme-builder/FontTab";
+import { PreviewCard } from "./theme-builder/PreviewCard";
 
 // The visitor theme builder: a header (mode switch), a tab strip and a footer
 // (save/reset) around the open tab. The draft and every action live in
@@ -23,13 +25,19 @@ import FontTab from "./theme-builder/FontTab";
 // which promotion must preserve (the settings API replaces the whole theme
 // object). Promotion is a snapshot — later edits to the saved theme don't
 // follow it.
+// `policy` (#335): under "packs" only the site's themes and the mode are
+// offered — no tabs, no saved themes, no codes — and Reset returns to the
+// site default.
 export default function ThemeBuilder({
   packs,
+  policy = "all",
   promote,
 }: {
   packs: ThemePack[];
+  policy?: Exclude<VisitorTheming, "none">;
   promote?: { siteMode: "system" | "light" | "dark" };
 }) {
+  const packsOnly = policy === "packs";
   const draft = useThemeDraft(promote);
   const {
     setPreviewMode,
@@ -40,6 +48,9 @@ export default function ThemeBuilder({
     setName,
     saveFailed,
     saveTheme,
+    appliedName,
+    modified,
+    revertToApplied,
   } = draft;
 
   const [tab, setTab] = useState<TabId>("themes");
@@ -56,10 +67,11 @@ export default function ThemeBuilder({
     <div className="space-y-4 text-sm">
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
         <div>
-          <h2 className="font-semibold">Theme builder</h2>
+          <h2 className="font-semibold">{packsOnly ? "Theme" : "Theme builder"}</h2>
           <p className="text-xs text-ink-50">
-            Light and dark are two independent themes — design each with its own
-            style, scene, font &amp; colors. Everything applies live.
+            {packsOnly
+              ? "Pick one of the site's themes for light and for dark. Everything applies live."
+              : "Light and dark are two independent themes — design each with its own style, scene, font & colors. Everything applies live."}
           </p>
         </div>
         <div className="flex flex-col items-end gap-1">
@@ -106,6 +118,34 @@ export default function ThemeBuilder({
         </div>
       </div>
 
+      {/* What the look is based on, once a theme tile has been applied this
+          visit, and a way back once it's been tweaked (#328). */}
+      {appliedName && (
+        <p role="status" className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-50">
+          <span>
+            Based on <span className="text-ink-80">{appliedName}</span>
+            {modified ? " · modified" : ""}
+          </span>
+          {modified && (
+            <button
+              type="button"
+              onClick={revertToApplied}
+              className="rounded-md px-1.5 py-0.5 text-ink-70 underline underline-offset-2 transition-colors hover:text-fg"
+            >
+              Revert to {appliedName}
+            </button>
+          )}
+        </p>
+      )}
+
+      {/* The preview sits beside the tabs on a wide screen and above them on
+          a phone, where the live page is off-screen while editing. */}
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_15rem] lg:items-start lg:gap-6">
+      <div className="mb-4 lg:order-last lg:sticky lg:top-4 lg:mb-0">
+        <PreviewCard mode={editMode} />
+      </div>
+      <div className="min-w-0 space-y-4">
+      {!packsOnly && (
       <div
         ref={tablistRef}
         role="tablist"
@@ -144,14 +184,20 @@ export default function ThemeBuilder({
           );
         })}
       </div>
+      )}
 
-      {tab === "themes" && <ThemesTab d={draft} packs={packs} promote={promote} />}
+      {tab === "themes" && <ThemesTab d={draft} packs={packs} promote={promote} packsOnly={packsOnly} />}
       {tab === "colors" && <ColorsTab d={draft} />}
       {tab === "design" && <DesignTab d={draft} />}
-      {tab === "scene" && <SceneTab d={draft} />}
+      {tab === "tune" && <TuneTab d={draft} />}
+      {tab === "scene" && <SceneTab d={draft} canUpload={!!promote} />}
       {tab === "font" && <FontTab d={draft} />}
+      </div>
+      </div>
 
       <div className="flex flex-wrap items-center gap-2 border-t border-fg/10 pt-4">
+        {!packsOnly && (
+        <>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -169,6 +215,8 @@ export default function ThemeBuilder({
         >
           Save theme
         </button>
+        </>
+        )}
         <button
           type="button"
           onClick={async () => {
@@ -190,7 +238,7 @@ export default function ThemeBuilder({
           Reset theme
         </button>
         {saveFailed && (
-          <p role="status" className="w-full text-xs text-red-400">
+          <p role="status" className="w-full text-xs text-status-down">
             Couldn&apos;t save this theme — your browser is blocking local
             storage (private mode or full storage).
           </p>

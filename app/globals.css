@@ -13,11 +13,10 @@
   --fg: #ffffff;
   --accent-from: #a78bfa;
   --accent-to: #22d3ee;
-  /* Legible ink for text/icons sitting on the accent gradient (e.g. .btn-accent).
-     Chosen from the accent's perceived luminance — near-black on bright accents,
-     white on dark ones — so accent buttons stay readable with any accent, in
-     either mode. Set imperatively on <html> by the no-flash script and
-     applyAccent(); this is the default-accent fallback pre-hydration. */
+  /* Legible ink for text/icons sitting on the accent (e.g. .btn-accent): black
+     or white, whichever contrasts more with the painted accent stop (#321).
+     Set imperatively on <html> by the no-flash script and applyAll(); this is
+     the default-accent fallback pre-hydration. */
   --accent-fg: #000000;
   /* Scene backdrops paint translucent accent over the page background. A bright
      accent reads as a vivid burst over the dark surface but washes out over the
@@ -31,7 +30,7 @@
   /* Design tokens — the `glass-card` surface and the background glow read these,
      so a "design" (Glass, Flat, Bold, …) is just a different set of values while
      the colors above stay in control. The defaults here are the Glass design. */
-  --surface-radius: 1rem;
+  --surface-radius: calc(1rem * var(--tune-radius));
   --surface-border-width: 1px;
   --surface-border-style: solid;
   --surface-border: color-mix(in srgb, var(--fg) 10%, transparent);
@@ -40,139 +39,215 @@
      the card radius so each design shapes its buttons to match its personality
      — square on Bold, pills on Soft and Clay — without inheriting the much
      larger surface rounding. */
-  --control-radius: 0.5rem;
-  --surface-bg: color-mix(in srgb, var(--fg) 4%, transparent);
-  --surface-bg-hover: color-mix(in srgb, var(--fg) 7%, transparent);
+  --control-radius: calc(0.5rem * var(--tune-radius));
+  --surface-bg: color-mix(in srgb, var(--fg) calc(4% * var(--tune-fill)), transparent);
+  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(7% * var(--tune-fill)), transparent);
   --surface-bg-image: none;
   --surface-blur: 24px;
   /* Shadow ink, flipped per mode (see .theme-light) so card drop-shadows read
      as deep black on dark surfaces but a softer cool slate on light ones, where
      pure-black shadows look harsh. Every design's shadow references it. */
   --shadow-tint: 0, 0, 0;
-  --surface-shadow: 0 8px 30px rgba(var(--shadow-tint), 0.35);
+  --surface-shadow: 0 8px 30px rgba(var(--shadow-tint), calc(0.35 * var(--tune-shadow)));
   /* Two layered glows — one per accent stop — so hovering a card reveals the
      whole accent gradient, not just the primary color. */
   --surface-shadow-hover: 0 12px 40px
-      color-mix(in srgb, var(--accent-from) 22%, transparent),
-    0 6px 22px color-mix(in srgb, var(--accent-to) 18%, transparent);
+      color-mix(in srgb, var(--accent-from) calc(22% * var(--tune-shadow)), transparent),
+    0 6px 22px color-mix(in srgb, var(--accent-to) calc(18% * var(--tune-shadow)), transparent);
   --surface-lift: -2px;
-  --glow-opacity: 1;
+  /* The scene glow's strength is a design token (--design-glow, 0–1) times the
+     visitor's tune; scenes read the product. */
+  --design-glow: 1;
+  --glow-opacity: calc(var(--design-glow) * var(--tune-glow));
+
+  /* Fine-tune multipliers (#326), 1 = the design untouched. The design tokens
+     above and below multiply these in, so one slider in the theme builder
+     scales every design's radius, border, blur, shadow, fill or glow without
+     per-design CSS. Set on <html> by the theme resolver (lib/theme-paint.ts);
+     absent, these defaults apply. */
+  --tune-radius: 1;
+  --tune-border: 1;
+  --tune-blur: 1;
+  --tune-shadow: 1;
+  --tune-fill: 1;
+  --tune-glow: 1;
+
+  /* Scene effects (#327), set on <html> by the theme resolver: the backdrop's
+     opacity, and the motion level as data-motion ("calm" slows every CSS
+     scene animation by this factor; "off" stills them below). Absent, the
+     scene runs as designed. */
+  --scene-opacity: 1;
+  --motion-scale: 1;
+
+  /* Typography (#330). The heading face defaults to the body face; a
+     `heading-<id>` class on <html> repoints it (see the font classes below).
+     Density scales Tailwind's one spacing token, which every padding, gap and
+     spacing-sized box derives from, so a theme can be tighter or airier
+     without touching text sizes. Set on <html> by the theme resolver. */
+  --font-heading: var(--font-sans);
+  --density: 1;
+  --spacing: calc(0.25rem * var(--density));
+
+  /* Semantic colors (#331): up, down, warning and info, and the five group
+     hues, as theme tokens. These are the dark-surface defaults (the pale
+     Tailwind -400 / -300 shades the app always used); .theme-light deepens
+     them. A theme may set its own `status` colors per mode; the resolver
+     paints them over these. Tailwind utilities reach them as
+     text-status-up, bg-status-down/15, ring-status-info/30, … (see @theme). */
+  --status-up: #00d294;
+  --status-down: #ff6568;
+  --status-warning: #fcbb00;
+  --status-info: #00bcfe;
+  --group-violet: #c4b4ff;
+  --group-sky: #77d4ff;
+  --group-emerald: #5ee9b5;
+  --group-amber: #ffd236;
+  --group-rose: #ffa2ae;
+}
+[data-motion="calm"] {
+  --motion-scale: 2.5;
+}
+/* Every scene's root layer (components/scenes); scenes that already gate on
+   --glow-opacity fold --scene-opacity into that inline value instead. */
+.scene-root {
+  opacity: var(--scene-opacity, 1);
+}
+/* The wallpaper (#333): an image behind the scene (z below the scene layers),
+   from variables the theme resolver sets on <html>; with none set the layer
+   is an empty fixed box. Blurred edges are hidden by overscanning the box by
+   twice the blur; the dim is a wash of the page color over the image. */
+.wallpaper-layer {
+  position: fixed;
+  inset: calc(-2 * var(--wallpaper-blur, 0px));
+  z-index: -20;
+  pointer-events: none;
+  background-image: var(--wallpaper-image, none);
+  background-size: var(--wallpaper-size, cover);
+  background-repeat: var(--wallpaper-repeat, no-repeat);
+  background-position: center;
+  filter: blur(var(--wallpaper-blur, 0px));
+}
+.wallpaper-layer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--background) calc(var(--wallpaper-dim, 0) * 100%), transparent);
 }
 
 /* --- Designs: each overrides the surface tokens above (applied as a class on
    <html>, or on a wrapper for the theme-builder previews). Colors are inherited,
    so every design works with any palette. --- */
 .design-flat {
-  --surface-radius: 0.75rem;
+  --surface-radius: calc(0.75rem * var(--tune-radius));
   --surface-border: color-mix(in srgb, var(--fg) 12%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--fg) 22%, transparent);
-  --surface-bg: color-mix(in srgb, var(--fg) 5%, var(--background));
-  --surface-bg-hover: color-mix(in srgb, var(--fg) 9%, var(--background));
+  --surface-bg: color-mix(in srgb, var(--fg) calc(5% * var(--tune-fill)), var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(9% * var(--tune-fill)), var(--background));
   --surface-bg-image: none;
   --surface-blur: 0px;
-  --surface-shadow: 0 1px 2px rgba(var(--shadow-tint), 0.2);
-  --surface-shadow-hover: 0 2px 6px rgba(var(--shadow-tint), 0.25);
+  --surface-shadow: 0 1px 2px rgba(var(--shadow-tint), calc(0.2 * var(--tune-shadow)));
+  --surface-shadow-hover: 0 2px 6px rgba(var(--shadow-tint), calc(0.25 * var(--tune-shadow)));
   --surface-lift: -1px;
-  --glow-opacity: 0;
+  --design-glow: 0;
 }
 
 .design-minimal {
-  --surface-radius: 0.5rem;
-  --control-radius: 0.375rem;
+  --surface-radius: calc(0.5rem * var(--tune-radius));
+  --control-radius: calc(0.375rem * var(--tune-radius));
   --surface-border-width: 1px;
   --surface-border: color-mix(in srgb, var(--fg) 8%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--fg) 14%, transparent);
   --surface-bg: transparent;
-  --surface-bg-hover: color-mix(in srgb, var(--fg) 3%, transparent);
+  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(3% * var(--tune-fill)), transparent);
   --surface-bg-image: none;
   --surface-blur: 0px;
   --surface-shadow: none;
   --surface-shadow-hover: none;
   --surface-lift: 0px;
-  --glow-opacity: 0;
+  --design-glow: 0;
 }
 
 .design-bold {
-  --surface-radius: 0px;
-  --control-radius: 0px;
+  --surface-radius: calc(0px * var(--tune-radius));
+  --control-radius: calc(0px * var(--tune-radius));
   --surface-border-width: 2px;
   --surface-border: color-mix(in srgb, var(--fg) 85%, transparent);
   --surface-border-hover: var(--accent-from);
-  --surface-bg: color-mix(in srgb, var(--fg) 5%, var(--background));
-  --surface-bg-hover: color-mix(in srgb, var(--fg) 8%, var(--background));
+  --surface-bg: color-mix(in srgb, var(--fg) calc(5% * var(--tune-fill)), var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(8% * var(--tune-fill)), var(--background));
   --surface-bg-image: none;
   --surface-blur: 0px;
-  --surface-shadow: 5px 5px 0 0 var(--accent-from);
-  --surface-shadow-hover: 7px 7px 0 0 var(--accent-from);
+  --surface-shadow: calc(5px * var(--tune-shadow)) calc(5px * var(--tune-shadow)) 0 0 var(--accent-from);
+  --surface-shadow-hover: calc(7px * var(--tune-shadow)) calc(7px * var(--tune-shadow)) 0 0 var(--accent-from);
   --surface-lift: -1px;
-  --glow-opacity: 0;
+  --design-glow: 0;
 }
 
 .design-soft {
-  --surface-radius: 1.5rem;
-  --control-radius: 9999px;
+  --surface-radius: calc(1.5rem * var(--tune-radius));
+  --control-radius: calc(9999px * var(--tune-radius));
   --surface-border-width: 0px;
   --surface-border: transparent;
   --surface-border-hover: transparent;
-  --surface-bg: color-mix(in srgb, var(--fg) 6%, var(--background));
-  --surface-bg-hover: color-mix(in srgb, var(--fg) 9%, var(--background));
+  --surface-bg: color-mix(in srgb, var(--fg) calc(6% * var(--tune-fill)), var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(9% * var(--tune-fill)), var(--background));
   --surface-bg-image: none;
   --surface-blur: 0px;
-  --surface-shadow: 0 10px 30px rgba(var(--shadow-tint), 0.22), 0 2px 8px rgba(var(--shadow-tint), 0.14);
-  --surface-shadow-hover: 0 16px 40px rgba(var(--shadow-tint), 0.28),
-    0 4px 12px rgba(var(--shadow-tint), 0.18);
+  --surface-shadow: 0 10px 30px rgba(var(--shadow-tint), calc(0.22 * var(--tune-shadow))), 0 2px 8px rgba(var(--shadow-tint), calc(0.14 * var(--tune-shadow)));
+  --surface-shadow-hover: 0 16px 40px rgba(var(--shadow-tint), calc(0.28 * var(--tune-shadow))),
+    0 4px 12px rgba(var(--shadow-tint), calc(0.18 * var(--tune-shadow)));
   --surface-lift: -3px;
-  --glow-opacity: 0.4;
+  --design-glow: 0.4;
 }
 
 .design-cyber {
-  --surface-radius: 0.25rem;
-  --control-radius: 0.25rem;
+  --surface-radius: calc(0.25rem * var(--tune-radius));
+  --control-radius: calc(0.25rem * var(--tune-radius));
   --surface-border-width: 1px;
   --surface-border: color-mix(in srgb, var(--accent-from) 45%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--accent-to) 70%, transparent);
-  --surface-bg: color-mix(in srgb, var(--accent-from) 7%, var(--background));
-  --surface-bg-hover: color-mix(in srgb, var(--accent-from) 11%, var(--background));
+  --surface-bg: color-mix(in srgb, var(--accent-from) calc(7% * var(--tune-fill)), var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--accent-from) calc(11% * var(--tune-fill)), var(--background));
   --surface-bg-image: none;
   --surface-blur: 0px;
-  --surface-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-from) 15%, transparent),
-    0 0 18px color-mix(in srgb, var(--accent-from) 18%, transparent);
+  --surface-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-from) calc(15% * var(--tune-shadow)), transparent),
+    0 0 18px color-mix(in srgb, var(--accent-from) calc(18% * var(--tune-shadow)), transparent);
   --surface-shadow-hover: 0 0 0 1px
-      color-mix(in srgb, var(--accent-to) 25%, transparent),
-    0 0 26px color-mix(in srgb, var(--accent-to) 28%, transparent);
+      color-mix(in srgb, var(--accent-to) calc(25% * var(--tune-shadow)), transparent),
+    0 0 26px color-mix(in srgb, var(--accent-to) calc(28% * var(--tune-shadow)), transparent);
   --surface-lift: 0px;
-  --glow-opacity: 0.8;
+  --design-glow: 0.8;
 }
 
 .design-clay {
   /* Claymorphism: big rounding, no border, a soft outer drop plus light/dark
      inset edges so cards look moulded out of the background. */
-  --surface-radius: 1.75rem;
-  --control-radius: 9999px;
+  --surface-radius: calc(1.75rem * var(--tune-radius));
+  --control-radius: calc(9999px * var(--tune-radius));
   --surface-border-width: 0px;
   --surface-border: transparent;
   --surface-border-hover: transparent;
-  --surface-bg: color-mix(in srgb, var(--fg) 8%, var(--background));
-  --surface-bg-hover: color-mix(in srgb, var(--fg) 12%, var(--background));
+  --surface-bg: color-mix(in srgb, var(--fg) calc(8% * var(--tune-fill)), var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(12% * var(--tune-fill)), var(--background));
   --surface-bg-image: none;
   --surface-blur: 0px;
-  --surface-shadow: 0 12px 28px rgba(var(--shadow-tint), 0.3),
-    inset 0 2px 3px color-mix(in srgb, var(--fg) 18%, transparent),
-    inset 0 -3px 5px rgba(var(--shadow-tint), 0.25);
-  --surface-shadow-hover: 0 16px 36px rgba(var(--shadow-tint), 0.36),
-    inset 0 2px 3px color-mix(in srgb, var(--fg) 24%, transparent),
-    inset 0 -3px 5px rgba(var(--shadow-tint), 0.3);
+  --surface-shadow: 0 12px 28px rgba(var(--shadow-tint), calc(0.3 * var(--tune-shadow))),
+    inset 0 2px 3px color-mix(in srgb, var(--fg) calc(18% * var(--tune-shadow)), transparent),
+    inset 0 -3px 5px rgba(var(--shadow-tint), calc(0.25 * var(--tune-shadow)));
+  --surface-shadow-hover: 0 16px 36px rgba(var(--shadow-tint), calc(0.36 * var(--tune-shadow))),
+    inset 0 2px 3px color-mix(in srgb, var(--fg) calc(24% * var(--tune-shadow)), transparent),
+    inset 0 -3px 5px rgba(var(--shadow-tint), calc(0.3 * var(--tune-shadow)));
   --surface-lift: -3px;
-  --glow-opacity: 0.3;
+  --design-glow: 0.3;
 }
 
 .design-aero {
-  --surface-radius: 0.75rem;
+  --surface-radius: calc(0.75rem * var(--tune-radius));
   --surface-border-width: 1px;
   --surface-border: color-mix(in srgb, var(--fg) 30%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--fg) 45%, transparent);
-  --surface-bg: color-mix(in srgb, var(--fg) 6%, transparent);
-  --surface-bg-hover: color-mix(in srgb, var(--fg) 9%, transparent);
+  --surface-bg: color-mix(in srgb, var(--fg) calc(6% * var(--tune-fill)), transparent);
+  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(9% * var(--tune-fill)), transparent);
   --surface-bg-image: linear-gradient(
     to bottom,
     color-mix(in srgb, var(--fg) 16%, transparent),
@@ -180,210 +255,210 @@
     color-mix(in srgb, var(--fg) 6%, transparent)
   );
   --surface-blur: 16px;
-  --surface-shadow: 0 8px 24px rgba(var(--shadow-tint), 0.3),
-    inset 0 1px 0 color-mix(in srgb, var(--fg) 45%, transparent);
-  --surface-shadow-hover: 0 10px 28px rgba(var(--shadow-tint), 0.34),
-    inset 0 1px 0 color-mix(in srgb, var(--fg) 55%, transparent);
+  --surface-shadow: 0 8px 24px rgba(var(--shadow-tint), calc(0.3 * var(--tune-shadow))),
+    inset 0 1px 0 color-mix(in srgb, var(--fg) calc(45% * var(--tune-shadow)), transparent);
+  --surface-shadow-hover: 0 10px 28px rgba(var(--shadow-tint), calc(0.34 * var(--tune-shadow))),
+    inset 0 1px 0 color-mix(in srgb, var(--fg) calc(55% * var(--tune-shadow)), transparent);
   --surface-lift: -2px;
-  --glow-opacity: 0.7;
+  --design-glow: 0.7;
 }
 
 .design-frost {
   /* Heavier frosted glass: more blur and a brighter translucent fill than Glass,
      with a soft top sheen. */
-  --surface-radius: 1.25rem;
-  --control-radius: 0.75rem;
+  --surface-radius: calc(1.25rem * var(--tune-radius));
+  --control-radius: calc(0.75rem * var(--tune-radius));
   --surface-border-width: 1px;
   --surface-border: color-mix(in srgb, var(--fg) 16%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--fg) 28%, transparent);
-  --surface-bg: color-mix(in srgb, var(--fg) 12%, transparent);
-  --surface-bg-hover: color-mix(in srgb, var(--fg) 16%, transparent);
+  --surface-bg: color-mix(in srgb, var(--fg) calc(12% * var(--tune-fill)), transparent);
+  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(16% * var(--tune-fill)), transparent);
   --surface-bg-image: linear-gradient(
     to bottom,
     color-mix(in srgb, var(--fg) 14%, transparent),
     transparent 60%
   );
   --surface-blur: 48px;
-  --surface-shadow: 0 8px 30px rgba(var(--shadow-tint), 0.28),
-    inset 0 1px 0 color-mix(in srgb, var(--fg) 20%, transparent);
-  --surface-shadow-hover: 0 12px 40px rgba(var(--shadow-tint), 0.34),
-    inset 0 1px 0 color-mix(in srgb, var(--fg) 28%, transparent);
+  --surface-shadow: 0 8px 30px rgba(var(--shadow-tint), calc(0.28 * var(--tune-shadow))),
+    inset 0 1px 0 color-mix(in srgb, var(--fg) calc(20% * var(--tune-shadow)), transparent);
+  --surface-shadow-hover: 0 12px 40px rgba(var(--shadow-tint), calc(0.34 * var(--tune-shadow))),
+    inset 0 1px 0 color-mix(in srgb, var(--fg) calc(28% * var(--tune-shadow)), transparent);
   --surface-lift: -2px;
-  --glow-opacity: 0.9;
+  --design-glow: 0.9;
 }
 
 .design-outline {
   /* No fill — just an accent-tinted outline that brightens on hover. */
-  --surface-radius: 0.875rem;
-  --control-radius: 0.625rem;
+  --surface-radius: calc(0.875rem * var(--tune-radius));
+  --control-radius: calc(0.625rem * var(--tune-radius));
   --surface-border-width: 1.5px;
   --surface-border: color-mix(in srgb, var(--accent-from) 45%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--accent-to) 70%, transparent);
   --surface-bg: transparent;
-  --surface-bg-hover: color-mix(in srgb, var(--accent-from) 6%, transparent);
+  --surface-bg-hover: color-mix(in srgb, var(--accent-from) calc(6% * var(--tune-fill)), transparent);
   --surface-bg-image: none;
   --surface-blur: 0px;
   --surface-shadow: none;
   --surface-shadow-hover: 0 0 0 1px
-    color-mix(in srgb, var(--accent-to) 30%, transparent);
+    color-mix(in srgb, var(--accent-to) calc(30% * var(--tune-shadow)), transparent);
   --surface-lift: 0px;
-  --glow-opacity: 0.2;
+  --design-glow: 0.2;
 }
 
 .design-paper {
   /* Opaque "material" card: a solid fill over the background with a soft, layered
      drop shadow and a small radius. */
-  --surface-radius: 0.5rem;
-  --control-radius: 0.375rem;
+  --surface-radius: calc(0.5rem * var(--tune-radius));
+  --control-radius: calc(0.375rem * var(--tune-radius));
   --surface-border-width: 1px;
   --surface-border: color-mix(in srgb, var(--fg) 8%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--fg) 14%, transparent);
-  --surface-bg: color-mix(in srgb, var(--fg) 10%, var(--background));
-  --surface-bg-hover: color-mix(in srgb, var(--fg) 14%, var(--background));
+  --surface-bg: color-mix(in srgb, var(--fg) calc(10% * var(--tune-fill)), var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(14% * var(--tune-fill)), var(--background));
   --surface-bg-image: none;
   --surface-blur: 0px;
-  --surface-shadow: 0 1px 2px rgba(var(--shadow-tint), 0.16),
-    0 6px 16px rgba(var(--shadow-tint), 0.12);
-  --surface-shadow-hover: 0 2px 4px rgba(var(--shadow-tint), 0.2),
-    0 10px 24px rgba(var(--shadow-tint), 0.16);
+  --surface-shadow: 0 1px 2px rgba(var(--shadow-tint), calc(0.16 * var(--tune-shadow))),
+    0 6px 16px rgba(var(--shadow-tint), calc(0.12 * var(--tune-shadow)));
+  --surface-shadow-hover: 0 2px 4px rgba(var(--shadow-tint), calc(0.2 * var(--tune-shadow))),
+    0 10px 24px rgba(var(--shadow-tint), calc(0.16 * var(--tune-shadow)));
   --surface-lift: -2px;
-  --glow-opacity: 0;
+  --design-glow: 0;
 }
 
 .design-gradient {
   /* A faint accent gradient washed across the surface, with an accent-tinted
      border and glow on hover. */
-  --surface-radius: 1rem;
+  --surface-radius: calc(1rem * var(--tune-radius));
   --surface-border-width: 1px;
   --surface-border: color-mix(in srgb, var(--accent-from) 30%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--accent-to) 50%, transparent);
-  --surface-bg: color-mix(in srgb, var(--fg) 5%, transparent);
-  --surface-bg-hover: color-mix(in srgb, var(--fg) 8%, transparent);
+  --surface-bg: color-mix(in srgb, var(--fg) calc(5% * var(--tune-fill)), transparent);
+  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(8% * var(--tune-fill)), transparent);
   --surface-bg-image: linear-gradient(
     135deg,
     color-mix(in srgb, var(--accent-from) 30%, transparent),
     color-mix(in srgb, var(--accent-to) 18%, transparent)
   );
   --surface-blur: 14px;
-  --surface-shadow: 0 8px 28px rgba(var(--shadow-tint), 0.3);
+  --surface-shadow: 0 8px 28px rgba(var(--shadow-tint), calc(0.3 * var(--tune-shadow)));
   --surface-shadow-hover: 0 12px 36px
-    color-mix(in srgb, var(--accent-from) 22%, transparent);
+    color-mix(in srgb, var(--accent-from) calc(22% * var(--tune-shadow)), transparent);
   --surface-lift: -2px;
-  --glow-opacity: 0.7;
+  --design-glow: 0.7;
 }
 
 .design-aura {
   /* Borderless surfaces floating in a soft two-stop accent halo — the glow IS
      the card edge. */
-  --surface-radius: 1.25rem;
-  --control-radius: 0.75rem;
+  --surface-radius: calc(1.25rem * var(--tune-radius));
+  --control-radius: calc(0.75rem * var(--tune-radius));
   --surface-border-width: 0px;
   --surface-border: transparent;
   --surface-border-hover: transparent;
-  --surface-bg: color-mix(in srgb, var(--fg) 5%, var(--background));
-  --surface-bg-hover: color-mix(in srgb, var(--fg) 8%, var(--background));
+  --surface-bg: color-mix(in srgb, var(--fg) calc(5% * var(--tune-fill)), var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(8% * var(--tune-fill)), var(--background));
   --surface-bg-image: none;
   --surface-blur: 0px;
-  --surface-shadow: 0 0 24px color-mix(in srgb, var(--accent-from) 25%, transparent),
-    0 0 8px color-mix(in srgb, var(--accent-to) 15%, transparent);
+  --surface-shadow: 0 0 24px color-mix(in srgb, var(--accent-from) calc(25% * var(--tune-shadow)), transparent),
+    0 0 8px color-mix(in srgb, var(--accent-to) calc(15% * var(--tune-shadow)), transparent);
   --surface-shadow-hover: 0 0 34px
-      color-mix(in srgb, var(--accent-from) 38%, transparent),
-    0 0 12px color-mix(in srgb, var(--accent-to) 24%, transparent);
+      color-mix(in srgb, var(--accent-from) calc(38% * var(--tune-shadow)), transparent),
+    0 0 12px color-mix(in srgb, var(--accent-to) calc(24% * var(--tune-shadow)), transparent);
   --surface-lift: -1px;
-  --glow-opacity: 0.6;
+  --design-glow: 0.6;
 }
 
 .design-emboss {
   /* Neumorphic: raised from a same-color surface by a paired light/dark shadow
      — no border, the shadows do all the shaping. The highlight flips to true
      white in light mode (see .theme-light.design-emboss). */
-  --surface-radius: 1.25rem;
-  --control-radius: 9999px;
+  --surface-radius: calc(1.25rem * var(--tune-radius));
+  --control-radius: calc(9999px * var(--tune-radius));
   --surface-border-width: 0px;
   --surface-border: transparent;
   --surface-border-hover: transparent;
-  --surface-bg: color-mix(in srgb, var(--fg) 3%, var(--background));
-  --surface-bg-hover: color-mix(in srgb, var(--fg) 5%, var(--background));
+  --surface-bg: color-mix(in srgb, var(--fg) calc(3% * var(--tune-fill)), var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(5% * var(--tune-fill)), var(--background));
   --surface-bg-image: none;
   --surface-blur: 0px;
-  --surface-shadow: -6px -6px 14px color-mix(in srgb, var(--fg) 7%, transparent),
-    6px 6px 14px rgba(var(--shadow-tint), 0.35);
+  --surface-shadow: -6px -6px 14px color-mix(in srgb, var(--fg) calc(7% * var(--tune-shadow)), transparent),
+    6px 6px 14px rgba(var(--shadow-tint), calc(0.35 * var(--tune-shadow)));
   --surface-shadow-hover: -8px -8px 18px
-      color-mix(in srgb, var(--fg) 9%, transparent),
-    8px 8px 18px rgba(var(--shadow-tint), 0.4);
+      color-mix(in srgb, var(--fg) calc(9% * var(--tune-shadow)), transparent),
+    8px 8px 18px rgba(var(--shadow-tint), calc(0.4 * var(--tune-shadow)));
   --surface-lift: -1px;
-  --glow-opacity: 0.25;
+  --design-glow: 0.25;
 }
 
 .design-carve {
   /* The inverse of Emboss: panels pressed INTO the page — a slightly darkened
      well with an inset top shadow and a bright inset bottom lip. */
-  --surface-radius: 1rem;
-  --control-radius: 0.625rem;
+  --surface-radius: calc(1rem * var(--tune-radius));
+  --control-radius: calc(0.625rem * var(--tune-radius));
   --surface-border-width: 0px;
   --surface-border: transparent;
   --surface-border-hover: transparent;
-  --surface-bg: color-mix(in srgb, var(--background), rgb(var(--shadow-tint)) 10%);
-  --surface-bg-hover: color-mix(in srgb, var(--background), rgb(var(--shadow-tint)) 6%);
+  --surface-bg: color-mix(in srgb, var(--background), rgb(var(--shadow-tint)) calc(10% * var(--tune-fill)));
+  --surface-bg-hover: color-mix(in srgb, var(--background), rgb(var(--shadow-tint)) calc(6% * var(--tune-fill)));
   --surface-bg-image: none;
   --surface-blur: 0px;
-  --surface-shadow: inset 0 2px 6px rgba(var(--shadow-tint), 0.4),
-    inset 0 -1px 0 color-mix(in srgb, var(--fg) 10%, transparent);
-  --surface-shadow-hover: inset 0 2px 6px rgba(var(--shadow-tint), 0.45),
-    inset 0 -1px 0 color-mix(in srgb, var(--fg) 14%, transparent);
+  --surface-shadow: inset 0 2px 6px rgba(var(--shadow-tint), calc(0.4 * var(--tune-shadow))),
+    inset 0 -1px 0 color-mix(in srgb, var(--fg) calc(10% * var(--tune-shadow)), transparent);
+  --surface-shadow-hover: inset 0 2px 6px rgba(var(--shadow-tint), calc(0.45 * var(--tune-shadow))),
+    inset 0 -1px 0 color-mix(in srgb, var(--fg) calc(14% * var(--tune-shadow)), transparent);
   --surface-lift: 0px;
-  --glow-opacity: 0.3;
+  --design-glow: 0.3;
 }
 
 .design-stripe {
   /* Editorial: an opaque card with a crisp accent bar along its top edge (drawn
      as an inset shadow so no extra element is needed); the bar flips to the
      secondary accent on hover. */
-  --surface-radius: 0.375rem;
-  --control-radius: 0.25rem;
+  --surface-radius: calc(0.375rem * var(--tune-radius));
+  --control-radius: calc(0.25rem * var(--tune-radius));
   --surface-border-width: 1px;
   --surface-border: color-mix(in srgb, var(--fg) 10%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--fg) 18%, transparent);
-  --surface-bg: color-mix(in srgb, var(--fg) 7%, var(--background));
-  --surface-bg-hover: color-mix(in srgb, var(--fg) 10%, var(--background));
+  --surface-bg: color-mix(in srgb, var(--fg) calc(7% * var(--tune-fill)), var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(10% * var(--tune-fill)), var(--background));
   --surface-bg-image: none;
   --surface-blur: 0px;
   --surface-shadow: inset 0 3px 0 0 var(--accent-from),
-    0 4px 14px rgba(var(--shadow-tint), 0.18);
+    0 4px 14px rgba(var(--shadow-tint), calc(0.18 * var(--tune-shadow)));
   --surface-shadow-hover: inset 0 3px 0 0 var(--accent-to),
-    0 6px 18px rgba(var(--shadow-tint), 0.24);
+    0 6px 18px rgba(var(--shadow-tint), calc(0.24 * var(--tune-shadow)));
   --surface-lift: -1px;
-  --glow-opacity: 0;
+  --design-glow: 0;
 }
 
 .design-sketch {
   /* Wireframe: hand-drawn dashed ink outlines on a bare surface. */
-  --surface-radius: 0.75rem;
-  --control-radius: 0.75rem;
+  --surface-radius: calc(0.75rem * var(--tune-radius));
+  --control-radius: calc(0.75rem * var(--tune-radius));
   --surface-border-width: 1.5px;
   --surface-border-style: dashed;
   --surface-border: color-mix(in srgb, var(--fg) 40%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--fg) 60%, transparent);
-  --surface-bg: color-mix(in srgb, var(--fg) 2%, transparent);
-  --surface-bg-hover: color-mix(in srgb, var(--fg) 5%, transparent);
+  --surface-bg: color-mix(in srgb, var(--fg) calc(2% * var(--tune-fill)), transparent);
+  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(5% * var(--tune-fill)), transparent);
   --surface-bg-image: none;
   --surface-blur: 0px;
   --surface-shadow: none;
   --surface-shadow-hover: none;
   --surface-lift: 0px;
-  --glow-opacity: 0.15;
+  --design-glow: 0.15;
 }
 
 .design-console {
   /* Terminal panel: square, near-opaque, a thick accent rule down the left edge
      (inset shadow) and a faint scanline wash. */
-  --surface-radius: 0px;
-  --control-radius: 0px;
+  --surface-radius: calc(0px * var(--tune-radius));
+  --control-radius: calc(0px * var(--tune-radius));
   --surface-border-width: 1px;
   --surface-border: color-mix(in srgb, var(--fg) 14%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--accent-from) 50%, transparent);
-  --surface-bg: color-mix(in srgb, var(--fg) 4%, var(--background));
-  --surface-bg-hover: color-mix(in srgb, var(--fg) 7%, var(--background));
+  --surface-bg: color-mix(in srgb, var(--fg) calc(4% * var(--tune-fill)), var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(7% * var(--tune-fill)), var(--background));
   --surface-bg-image: repeating-linear-gradient(
     0deg,
     color-mix(in srgb, var(--fg) 2.5%, transparent) 0 1px,
@@ -392,9 +467,9 @@
   --surface-blur: 0px;
   --surface-shadow: inset 3px 0 0 0 var(--accent-from);
   --surface-shadow-hover: inset 3px 0 0 0 var(--accent-to),
-    0 0 16px color-mix(in srgb, var(--accent-from) 15%, transparent);
+    0 0 16px color-mix(in srgb, var(--accent-from) calc(15% * var(--tune-shadow)), transparent);
   --surface-lift: 0px;
-  --glow-opacity: 0.35;
+  --design-glow: 0.35;
 }
 
 /* Light theme: toggled by adding `.theme-light` to <html>. */
@@ -413,37 +488,99 @@
      before hydration. */
 }
 
-/* Status colors (#273): the pale -200…-400 shades used for error, warning and
-   up/down text and dots are tuned for the dark surface; on the light one they
-   fall to ~2–3:1. Tailwind reads each palette color from a variable, so
-   remapping these here deepens every use (text, dots, /NN variants) in light
-   mode only, leaving the dark theme untouched. */
+/* Semantic colors on the light surface (#273, #331): the pale dark-surface
+   shades fall to ~2–3:1 on the pale page, so the tokens deepen to the -700 /
+   -800 shades here. Every use (text, dots, /NN variants) follows. */
 .theme-light {
-  --color-red-300: var(--color-red-700);
-  --color-red-400: var(--color-red-700);
-  --color-amber-200: var(--color-amber-800);
-  --color-amber-300: var(--color-amber-700);
-  --color-amber-400: var(--color-amber-700);
-  --color-emerald-400: var(--color-emerald-700);
-  --color-sky-400: var(--color-sky-700);
+  --status-up: #007956;
+  --status-down: #bf000f;
+  /* amber-800, not -700: small warning text on a card's fill sits at 4.0:1
+     one shade lighter. */
+  --status-warning: #953d00;
+  --status-info: #0069a4;
+  --group-violet: #5d0ec0;
+  --group-sky: #005986;
+  --group-emerald: #005f46;
+  --group-amber: #953d00;
+  --group-rose: #a30037;
 }
 
 /* Emboss's light-source highlight must be a true white in light mode — the
    --fg-based one would invert into a dark smudge on the pale surface. */
-.theme-light.design-emboss {
-  --surface-shadow: -6px -6px 14px rgba(255, 255, 255, 0.85),
-    6px 6px 14px rgba(var(--shadow-tint), 0.18);
-  --surface-shadow-hover: -8px -8px 18px rgba(255, 255, 255, 0.95),
-    8px 8px 18px rgba(var(--shadow-tint), 0.22);
+.theme-light.design-emboss,
+.theme-light .design-emboss {
+  --surface-shadow: -6px -6px 14px rgba(255, 255, 255, calc(0.85 * var(--tune-shadow))),
+    6px 6px 14px rgba(var(--shadow-tint), calc(0.18 * var(--tune-shadow)));
+  --surface-shadow-hover: -8px -8px 18px rgba(255, 255, 255, calc(0.95 * var(--tune-shadow))),
+    8px 8px 18px rgba(var(--shadow-tint), calc(0.22 * var(--tune-shadow)));
 }
 
 /* Aero's glossy top highlight is a light inset line — keep it light-on-light in
    light mode (the --fg-based one would invert to a dark smudge). */
-.theme-light.design-aero {
-  --surface-shadow: 0 8px 24px rgba(var(--shadow-tint), 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7);
-  --surface-shadow-hover: 0 10px 28px rgba(var(--shadow-tint), 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+.theme-light.design-aero,
+.theme-light .design-aero {
+  --surface-shadow: 0 8px 24px rgba(var(--shadow-tint), calc(0.16 * var(--tune-shadow))),
+    inset 0 1px 0 rgba(255, 255, 255, calc(0.7 * var(--tune-shadow)));
+  --surface-shadow-hover: 0 10px 28px rgba(var(--shadow-tint), calc(0.2 * var(--tune-shadow))),
+    inset 0 1px 0 rgba(255, 255, 255, calc(0.85 * var(--tune-shadow)));
+}
+
+/* Light-mode signature traits (#308). Console, Sketch, Minimal and Outline
+   told apart on dark by hairlines, dashes and glows that all but vanish on the
+   pale surface, so each gets one trait that survives it. Dark is untouched.
+   Each rule also matches the class on a wrapper (the theme builder's design
+   tiles), so the tiles preview the light variant too. */
+.theme-light.design-minimal,
+.theme-light .design-minimal {
+  /* No border at all: a flat, faintly darker slab, and spacing does the work. */
+  --surface-border-width: 0px;
+  --surface-border: transparent;
+  --surface-border-hover: transparent;
+  --surface-bg: color-mix(in srgb, var(--fg) calc(5% * var(--tune-fill)), var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(8% * var(--tune-fill)), var(--background));
+}
+.theme-light.design-outline,
+.theme-light .design-outline {
+  /* A heavier outline in the deepened accent (the --scene-* tone the light
+     surface already uses for backdrops and the focus ring), still no fill. */
+  --surface-border-width: 2px;
+  --surface-border: color-mix(in srgb, var(--scene-from) 75%, transparent);
+  --surface-border-hover: var(--scene-to);
+  --surface-bg-hover: color-mix(in srgb, var(--scene-from) 6%, transparent);
+  --surface-shadow-hover: none;
+}
+.theme-light.design-sketch,
+.theme-light .design-sketch {
+  /* Heavier pencil, a second offset stroke like a hand-drawn double line, and a
+     paper-white wash under it. */
+  --surface-border-width: 2px;
+  --surface-border: color-mix(in srgb, var(--fg) 62%, transparent);
+  --surface-border-hover: color-mix(in srgb, var(--fg) 80%, transparent);
+  --surface-bg: rgba(255, 255, 255, calc(0.45 * var(--tune-fill)));
+  --surface-bg-hover: rgba(255, 255, 255, calc(0.65 * var(--tune-fill)));
+  --surface-shadow: calc(3px * var(--tune-shadow)) calc(3px * var(--tune-shadow)) 0 0 color-mix(in srgb, var(--fg) calc(22% * var(--tune-shadow)), transparent);
+  --surface-shadow-hover: calc(4px * var(--tune-shadow)) calc(4px * var(--tune-shadow)) 0 0 color-mix(in srgb, var(--fg) calc(30% * var(--tune-shadow)), transparent);
+}
+.design-sketch {
+  /* Uneven corners, the hand-drawn rectangle: the browser scales the oversized
+     radii to fit, so every card comes out a little off-square. Both modes —
+     it's the design's signature. */
+  --surface-radius: calc(255px * var(--tune-radius)) calc(18px * var(--tune-radius)) calc(225px * var(--tune-radius)) calc(18px * var(--tune-radius)) / calc(18px * var(--tune-radius)) calc(225px * var(--tune-radius)) calc(18px * var(--tune-radius)) calc(255px * var(--tune-radius));
+}
+.theme-light.design-console,
+.theme-light .design-console {
+  /* A visible scanline wash and a firmer frame around the accent rule. */
+  --surface-border: color-mix(in srgb, var(--fg) 22%, transparent);
+  --surface-bg: color-mix(in srgb, var(--fg) calc(6% * var(--tune-fill)), var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(9% * var(--tune-fill)), var(--background));
+  --surface-bg-image: repeating-linear-gradient(
+    0deg,
+    color-mix(in srgb, var(--fg) 7%, transparent) 0 1px,
+    transparent 1px 4px
+  );
+  --surface-shadow: inset 4px 0 0 0 var(--scene-from);
+  --surface-shadow-hover: inset 4px 0 0 0 var(--scene-to),
+    0 0 16px color-mix(in srgb, var(--scene-from) calc(15% * var(--tune-shadow)), transparent);
 }
 
 /* Weather emoji: white glyphs (☁️, 🌫️, ❄️) vanish on the pale light surface, so
@@ -461,7 +598,10 @@
    use `text-ink-*` for any text whose opacity is below 100. */
 :root {
   /* A small lift in dark mode too: white at /40–/45 lands just under 4.5:1 on
-     the near-black surfaces (3.8–4.49 measured). */
+     the near-black surfaces (3.8–4.49 measured). These are the per-mode FLOORS,
+     tuned for the default colors; whenever a look (a palette, theme or custom
+     colors) is applied, the theme resolver sets --ink-lift on <html> to the
+     smallest value at which that look's /40 ink clears 4.5:1 (#322). */
   --ink-lift: 0.15;
 }
 .theme-light {
@@ -490,6 +630,10 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-fg: var(--fg);
+  --color-status-up: var(--status-up);
+  --color-status-down: var(--status-down);
+  --color-status-warning: var(--status-warning);
+  --color-status-info: var(--status-info);
   --font-sans: var(--font-jakarta);
 }
 
@@ -522,39 +666,83 @@ select optgroup {
 }
 
 /* Font presets: a `font-<id>` class on <html> repoints --font-sans (the default,
-   "jakarta", is the :root token and carries no class). See lib/fonts.ts. */
+   "jakarta", is the :root token and carries no class); a `heading-<id>` class
+   repoints --font-heading for h1–h3 (#330). See lib/fonts.ts. */
+@layer base {
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-heading), system-ui, sans-serif;
+  }
+}
+.heading-jakarta {
+  --font-heading: var(--font-jakarta);
+}
 .font-inter {
   --font-sans: var(--font-inter);
+}
+.heading-inter {
+  --font-heading: var(--font-inter);
 }
 .font-poppins {
   --font-sans: var(--font-poppins);
 }
+.heading-poppins {
+  --font-heading: var(--font-poppins);
+}
 .font-nunito {
   --font-sans: var(--font-nunito);
+}
+.heading-nunito {
+  --font-heading: var(--font-nunito);
 }
 .font-lora {
   --font-sans: var(--font-lora);
 }
+.heading-lora {
+  --font-heading: var(--font-lora);
+}
 .font-jetbrains {
   --font-sans: var(--font-jetbrains);
+}
+.heading-jetbrains {
+  --font-heading: var(--font-jetbrains);
 }
 .font-outfit {
   --font-sans: var(--font-outfit);
 }
+.heading-outfit {
+  --font-heading: var(--font-outfit);
+}
 .font-grotesk {
   --font-sans: var(--font-grotesk);
+}
+.heading-grotesk {
+  --font-heading: var(--font-grotesk);
 }
 .font-manrope {
   --font-sans: var(--font-manrope);
 }
+.heading-manrope {
+  --font-heading: var(--font-manrope);
+}
 .font-rubik {
   --font-sans: var(--font-rubik);
+}
+.heading-rubik {
+  --font-heading: var(--font-rubik);
 }
 .font-playfair {
   --font-sans: var(--font-playfair);
 }
+.heading-playfair {
+  --font-heading: var(--font-playfair);
+}
 .font-quicksand {
   --font-sans: var(--font-quicksand);
+}
+.heading-quicksand {
+  --font-heading: var(--font-quicksand);
 }
 
 @layer utilities {
@@ -564,13 +752,13 @@ select optgroup {
   .glass-card {
     position: relative;
     border-radius: var(--surface-radius);
-    border: var(--surface-border-width) var(--surface-border-style, solid)
-      var(--surface-border);
+    border: calc(var(--surface-border-width) * var(--tune-border))
+      var(--surface-border-style, solid) var(--surface-border);
     background-color: var(--surface-bg);
     background-image: var(--surface-bg-image);
     box-shadow: var(--surface-shadow);
-    -webkit-backdrop-filter: blur(var(--surface-blur));
-    backdrop-filter: blur(var(--surface-blur));
+    -webkit-backdrop-filter: blur(calc(var(--surface-blur) * var(--tune-blur)));
+    backdrop-filter: blur(calc(var(--surface-blur) * var(--tune-blur)));
     transition: all 0.3s ease;
   }
   .glass-card:hover {
@@ -579,8 +767,12 @@ select optgroup {
     background-color: var(--surface-bg-hover);
     box-shadow: var(--surface-shadow-hover);
   }
+  /* Drawn from the scene colors rather than the raw accent: on the light
+     surface those are the accent deepened and saturated (lib/theme-paint.ts),
+     so the greeting's mark keeps reading instead of washing to 1.6:1 (#321);
+     on dark they ARE the accent. */
   .gradient-text {
-    background-image: linear-gradient(135deg, var(--accent-from), var(--accent-to));
+    background-image: linear-gradient(135deg, var(--scene-from), var(--scene-to));
     background-clip: text;
     -webkit-background-clip: text;
     color: transparent;
@@ -617,29 +809,31 @@ select optgroup {
   .accent-focus:focus {
     border-color: var(--accent-to);
   }
-  /* The danger button's red tint over a translucent surface (a confirmation
-     over a tinted page) can leave red-700 text just under 4.5:1, so on the
-     light theme its text goes one shade deeper. */
+  /* The danger button's tint over a translucent surface (a confirmation over
+     a tinted page) leaves the light-surface "down" token just under 4.5:1,
+     so on the light theme its text deepens a step further (#277, #331). */
   .theme-light .btn-danger {
-    color: var(--color-red-800);
+    color: color-mix(in srgb, var(--status-down) 80%, black);
   }
-  /* A group's color (#316, lib/schema/groups.ts GROUP_COLORS): a pale shade
-     on the dark surface and a deep one on the light surface, so its name
-     keeps 4.5:1 either way. */
-  .group-color-violet { color: var(--color-violet-300); }
-  .group-color-sky { color: var(--color-sky-300); }
-  .group-color-emerald { color: var(--color-emerald-300); }
-  .group-color-amber { color: var(--color-amber-300); }
-  .group-color-rose { color: var(--color-rose-300); }
-  .theme-light .group-color-violet { color: var(--color-violet-800); }
-  .theme-light .group-color-sky { color: var(--color-sky-800); }
-  .theme-light .group-color-emerald { color: var(--color-emerald-800); }
-  .theme-light .group-color-amber { color: var(--color-amber-800); }
-  .theme-light .group-color-rose { color: var(--color-rose-800); }
+  /* A group's color (#316, lib/schema/groups.ts GROUP_COLORS): the --group-*
+     token, pale on the dark surface and deep on the light one (see :root and
+     .theme-light), so its name keeps 4.5:1 either way. */
+  .group-color-violet { color: var(--group-violet); }
+  .group-color-sky { color: var(--group-sky); }
+  .group-color-emerald { color: var(--group-emerald); }
+  .group-color-amber { color: var(--group-amber); }
+  .group-color-rose { color: var(--group-rose); }
   /* A glow on top of the border tint: the 1px border change alone was barely
      visible, and links using this class have no border at all (#274). */
   .accent-focus:focus-visible {
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--scene-from) 55%, transparent);
+  }
+  /* The fine-tune sliders (#326): the accent for the filled track and thumb,
+     on the design's control rounding. */
+  .tune-range {
+    accent-color: var(--accent-from);
+    height: 1.25rem;
+    cursor: pointer;
   }
   /* Native color inputs in the theme builder. The UA renders a bordered square
      swatch inside the control's padding; strip that chrome so the chosen color
@@ -676,6 +870,7 @@ select optgroup {
 
 .animate-float {
   animation: float 20s ease-in-out infinite;
+  animation-duration: calc(20s * var(--motion-scale, 1));
 }
 
 /* The Abyss scene's bioluminescent halo (components/scenes/Abyss.tsx). */
@@ -693,6 +888,7 @@ select optgroup {
 
 .animate-breathe {
   animation: breathe 7s ease-in-out infinite;
+  animation-duration: calc(7s * var(--motion-scale, 1));
 }
 
 /* Nebula scene — slow, wide drift of the accent clouds (larger range than
@@ -709,6 +905,7 @@ select optgroup {
 
 .animate-drift {
   animation: drift 32s ease-in-out infinite;
+  animation-duration: calc(32s * var(--motion-scale, 1));
 }
 
 /* Rays scene — gently sweep the fan of light beams side to side (origin pinned
@@ -726,6 +923,7 @@ select optgroup {
 .animate-rays {
   transform-origin: 50% 0%;
   animation: rays-sweep 24s ease-in-out infinite;
+  animation-duration: calc(24s * var(--motion-scale, 1));
 }
 
 /* Grid scene — scroll the grid toward the horizon. */
@@ -740,6 +938,7 @@ select optgroup {
 
 .animate-grid {
   animation: grid-scroll 4s linear infinite;
+  animation-duration: calc(4s * var(--motion-scale, 1));
 }
 
 /* Waves scene — slide a wave layer horizontally. */
@@ -768,10 +967,13 @@ select optgroup {
 
 .animate-spin-slow {
   animation: spin-slow 60s linear infinite;
+  animation-duration: calc(60s * var(--motion-scale, 1));
 }
 
 /* Scenes manage their own JS-driven motion (e.g. the Abyss canvas draws a
-   single static frame), but the CSS animations must be quieted here too. */
+   single static frame), but the CSS animations must be quieted here too —
+   for the OS preference, and for the theme's "Still" motion or the visitor's
+   Reduce motion switch, which the resolver paints as data-motion="off". */
 @media (prefers-reduced-motion: reduce) {
   .animate-float,
   .animate-breathe,
@@ -782,4 +984,13 @@ select optgroup {
   .animate-spin-slow {
     animation: none;
   }
+}
+[data-motion="off"] .animate-float,
+[data-motion="off"] .animate-breathe,
+[data-motion="off"] .animate-drift,
+[data-motion="off"] .animate-rays,
+[data-motion="off"] .animate-grid,
+[data-motion="off"] .animate-wave,
+[data-motion="off"] .animate-spin-slow {
+  animation: none;
 }

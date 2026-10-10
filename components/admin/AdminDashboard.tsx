@@ -9,7 +9,7 @@ import type {
   Board,
   Group,
   Integration,
-  ThemePackConfig,
+  ThemeEntryConfig,
   WidgetInstance,
 } from "@/lib/schema";
 import AppsManager from "./AppsManager";
@@ -18,10 +18,10 @@ import SettingsManager from "./SettingsManager";
 import ThemesManager from "./ThemesManager";
 import PageNav from "@/components/PageNav";
 import { useEdgeFade } from "@/components/useEdgeFade";
-import { resolveThemePacks } from "@/lib/theme";
+import { resolveThemeGallery } from "@/lib/theme";
 import { navPages } from "@/lib/nav";
 import { useGroups } from "./useGroups";
-import { useItems, useThemeOverrides } from "./useAdminData";
+import { useItems, useThemeGallery } from "./useAdminData";
 import { downloadJson } from "@/lib/download";
 import { buttonClasses } from "@/lib/buttons";
 import { Button } from "./ui";
@@ -49,7 +49,7 @@ type Props = {
   initialBoards: Board[];
   initialGroups: Group[];
   initialIntegrations: Integration[];
-  initialThemes: ThemePackConfig[];
+  initialThemes: ThemeEntryConfig[];
   initialTwoFactorEnabled: boolean;
   // What the 2.x → 3.0 upgrade did, until the admin dismisses it (#306).
   upgradeNotice?: UpgradeSummary | null;
@@ -91,11 +91,13 @@ function AdminBody({
   // Applications, Bookmarks and Settings tabs.
   const groupsState = useGroups(initialGroups);
   const items = useItems(initialApps, initialBookmarks);
-  // Likewise the theme overrides, edited in Themes and offered in Settings.
-  const themes = useThemeOverrides(initialThemes);
+  // Likewise the theme gallery, edited in Themes and offered in Settings —
+  // hidden packs included, since the site default may well be one visitors
+  // can't pick themselves.
+  const themes = useThemeGallery(initialThemes);
   const themePacks = useMemo(
-    () => resolveThemePacks(Object.values(themes.overrides)),
-    [themes.overrides]
+    () => resolveThemeGallery(themes.entries).map((r) => r.pack),
+    [themes.entries]
   );
   // The URL is the initial source of truth (?tab=settings deep-links and
   // survives refresh); an unknown value falls back to the first tab.

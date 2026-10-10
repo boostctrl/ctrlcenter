@@ -64,7 +64,7 @@ function TrendChart({
           <path
             d={seriesPath(blockedSeries, max, false)}
             fill="none"
-            className="text-red-400"
+            className="text-status-down"
             stroke="currentColor"
             strokeOpacity="0.7"
             strokeWidth="1.5"
@@ -81,7 +81,7 @@ function TrendChart({
           </span>
           {hasBlocked && (
             <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-red-400/70" />
+              <span className="h-2 w-2 rounded-full bg-status-down/70" />
               blocked
             </span>
           )}

@@ -323,7 +323,7 @@ export function RemoveButton({
       type="button"
       onClick={onClick}
       aria-label={label}
-      className="shrink-0 rounded-md px-2 py-1 text-ink-40 transition-colors hover:bg-fg/10 hover:text-red-400"
+      className="shrink-0 rounded-md px-2 py-1 text-ink-40 transition-colors hover:bg-fg/10 hover:text-status-down"
     >
       ✕
     </button>

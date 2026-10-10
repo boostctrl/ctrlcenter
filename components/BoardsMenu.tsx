@@ -17,6 +17,8 @@ export type EditorBoard = {
   id: string;
   name: string;
   visibility: "public" | "private";
+  // A gallery pack pinned as the board's theme (#337).
+  theme?: string;
 };
 
 const MAX_BOARDS = 20;
@@ -30,9 +32,12 @@ const editorHref = (boards: EditorBoard[], id: string) =>
 export default function BoardsMenu({
   boards,
   currentId,
+  packNames = [],
 }: {
   boards: EditorBoard[];
   currentId: string;
+  // The gallery's pack names, to pin one as this board's theme (#337).
+  packNames?: string[];
 }) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -81,7 +86,8 @@ export default function BoardsMenu({
     setError(null);
     try {
       await saveBoards(
-        next.map(({ id, name, visibility }) => ({ id, name, visibility })),
+        // The theme goes every time ("" for none), so clearing it sticks.
+        next.map(({ id, name, visibility, theme }) => ({ id, name, visibility, theme: theme ?? "" })),
       );
       if (then) then();
       else router.refresh();
@@ -104,6 +110,11 @@ export default function BoardsMenu({
 
   function setVisibility(visibility: EditorBoard["visibility"]) {
     save(boards.map((b) => (b.id === currentId ? { ...b, visibility } : b)));
+  }
+
+  // Pin a gallery theme on this board, or "" for the site's (#337).
+  function setTheme(theme: string) {
+    save(boards.map((b) => (b.id === currentId ? { ...b, theme: theme || undefined } : b)));
   }
 
   // Delete this board, then edit the home board. Its widgets stay: on other
@@ -284,6 +295,31 @@ export default function BoardsMenu({
                 </p>
               )}
             </div>
+            {packNames.length > 0 && (
+              <div className="flex flex-col gap-1.5 border-t border-fg/10 pt-3">
+                <label htmlFor="editor-board-theme" className="text-xs text-ink-60">
+                  This board&apos;s theme
+                </label>
+                <select
+                  id="editor-board-theme"
+                  value={current.theme && packNames.includes(current.theme) ? current.theme : ""}
+                  disabled={busy}
+                  onChange={(e) => setTheme(e.target.value)}
+                  className={field}
+                >
+                  <option value="">The site theme</option>
+                  {packNames.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-ink-55">
+                  A theme from the gallery, on this board only. Visitors&apos; own
+                  choices still apply over it.
+                </p>
+              </div>
+            )}
             {boards.length < MAX_BOARDS && (
               <form
                 className="flex flex-col gap-1.5 border-t border-fg/10 pt-3"
@@ -330,7 +366,7 @@ export default function BoardsMenu({
               </div>
             )}
             {error && (
-              <p role="alert" className="text-xs text-red-400">
+              <p role="alert" className="text-xs text-status-down">
                 {error}
               </p>
             )}

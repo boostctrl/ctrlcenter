@@ -26,7 +26,7 @@ function DeviceRow({ device }: { device: UnifiDevice }) {
         <span
           aria-hidden
           className={`h-2 w-2 shrink-0 rounded-full ${
-            device.up ? "bg-emerald-400" : "bg-red-400"
+            device.up ? "bg-status-up" : "bg-status-down"
           }`}
         />
         <span className="truncate" title={device.name}>
@@ -43,7 +43,7 @@ function DeviceRow({ device }: { device: UnifiDevice }) {
             {device.uptime !== null && <span>up {uptimeLabel(device.uptime)}</span>}
           </>
         ) : (
-          <span className="text-red-400">offline</span>
+          <span className="text-status-down">offline</span>
         )}
       </span>
     </li>

@@ -17,8 +17,8 @@ export default function Blueprint({ light }: SceneProps) {
   return (
     <div
       aria-hidden
-      className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
-      style={{ opacity: "var(--glow-opacity, 1)" }}
+      className="scene-root pointer-events-none fixed inset-0 -z-10 overflow-hidden"
+      style={{ opacity: "calc(var(--glow-opacity, 1) * var(--scene-opacity, 1))" }}
     >
       {/* The sheet: fine grid + major lines, faded toward the edges. */}
       <div

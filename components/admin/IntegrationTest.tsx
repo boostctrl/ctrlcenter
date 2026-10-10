@@ -37,11 +37,11 @@ export default function IntegrationTest({
       disabled={url.trim() === ""}
       renderResult={(data) =>
         data.ok ? (
-          <span className="text-xs text-emerald-400">
+          <span className="text-xs text-status-up">
             ✓ Connected{data.detail ? ` — ${data.detail}` : ""}
           </span>
         ) : (
-          <span className="text-xs text-red-400">✗ {data.error}</span>
+          <span className="text-xs text-status-down">✗ {data.error}</span>
         )
       }
     />

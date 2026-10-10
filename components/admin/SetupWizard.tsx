@@ -136,7 +136,7 @@ export default function SetupWizard({ settings, packs }: { settings: Settings; p
         {step === 2 && <AlertsStep {...props} />}
         {step === 3 && <ThemeStep {...props} packs={packs} />}
         {error && (
-          <p role="alert" className="text-sm text-red-400">
+          <p role="alert" className="text-sm text-status-down">
             {error}
           </p>
         )}
@@ -242,7 +242,7 @@ function LocationStep({ settings, onSave }: StepProps) {
             </span>
           )}
         </div>
-        {locateError && <p className="text-xs text-red-400">{locateError}</p>}
+        {locateError && <p className="text-xs text-status-down">{locateError}</p>}
       </div>
       <TextField
         label="Time zone"
@@ -396,10 +396,25 @@ function ThemeStep({ settings, onSave, packs }: StepProps & { packs: ThemePack[]
                 background: pack.dark.background,
                 foreground: pack.dark.foreground,
                 presetLight: undefined,
-                designLight: undefined,
-                sceneLight: undefined,
+                designLight: pack.designLight,
+                sceneLight: pack.sceneLight,
                 backgroundLight: pack.light.background,
                 foregroundLight: pack.light.foreground,
+                tune: pack.tune,
+                tuneLight: undefined,
+                sceneIntensity: undefined,
+                sceneMotion: undefined,
+                sceneIntensityLight: undefined,
+                sceneMotionLight: undefined,
+                font: pack.font ?? settings.theme.font,
+                headingFont: pack.headingFont,
+                headingFontLight: undefined,
+                density: undefined,
+                densityLight: undefined,
+                status: pack.status,
+                statusLight: pack.statusLight,
+                wallpaper: pack.wallpaper,
+                wallpaperLight: pack.wallpaperLight,
               },
             },
             { fallback: "Couldn't save the theme" }

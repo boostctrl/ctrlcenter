@@ -5,12 +5,23 @@
 import {
   DEFAULT_DESIGN,
   DEFAULT_SCENE,
+  isDensity,
   isDesignId,
   isSceneId,
+  sanitizeSceneFx,
+  sanitizeSemantic,
+  sanitizeTune,
+  sanitizeWallpaper,
   type ColorSet,
+  type SemanticColors,
+  type Wallpaper,
+  type Density,
   type DesignId,
   type ModeColors,
+  type SceneFx,
   type SceneId,
+  type ThemePack,
+  type Tune,
 } from "./theme";
 import { DEFAULT_FONT, isFontId, type FontId } from "./fonts";
 import { isValidTimeZone } from "./datetime";
@@ -184,6 +195,24 @@ export type CustomTheme = ModeColors & {
   designLight: DesignId;
   sceneLight: SceneId;
   fontLight: FontId;
+  // The fine-tune over each mode's design (#326); absent = design untouched.
+  tune?: Tune;
+  tuneLight?: Tune;
+  // Each mode's scene effects (#327); absent = as the scene is designed.
+  sceneFx?: SceneFx;
+  sceneFxLight?: SceneFx;
+  // Typography (#330): a heading font (absent = the body font) and the
+  // density (absent = comfortable), per mode.
+  headingFont?: FontId;
+  headingFontLight?: FontId;
+  density?: Density;
+  densityLight?: Density;
+  // Semantic colors (#331), per mode; absent = the stylesheet's.
+  status?: SemanticColors;
+  statusLight?: SemanticColors;
+  // A wallpaper (#333), per mode; absent = none.
+  wallpaper?: Wallpaper;
+  wallpaperLight?: Wallpaper;
 };
 
 // The active custom look's light+dark colors (the resolved mode selects which
@@ -252,6 +281,29 @@ export function saveActiveTheme(colors: ModeColors | null): void {
 // the admin Appearance picker correctly reads "Custom" afterwards. A test
 // pins this mapping against the settings schema's key list, so a new theme
 // field can't be silently dropped from promotion.
+// A saved theme as a gallery pack (#334), for "Add to site themes": both
+// modes' design, scene and colors, and its optional parts. A pack has one
+// body font, so the dark theme's is taken.
+export function packFromCustomTheme(t: CustomTheme): ThemePack {
+  const pack: ThemePack = {
+    name: t.name,
+    design: t.design,
+    scene: t.scene,
+    dark: t.dark,
+    light: t.light,
+  };
+  if (t.designLight !== t.design) pack.designLight = t.designLight;
+  if (t.sceneLight !== t.scene) pack.sceneLight = t.sceneLight;
+  if (t.tune) pack.tune = t.tune;
+  if (t.font !== DEFAULT_FONT) pack.font = t.font;
+  if (t.headingFont) pack.headingFont = t.headingFont;
+  if (t.status) pack.status = t.status;
+  if (t.statusLight) pack.statusLight = t.statusLight;
+  if (t.wallpaper) pack.wallpaper = t.wallpaper;
+  if (t.wallpaperLight) pack.wallpaperLight = t.wallpaperLight;
+  return pack;
+}
+
 export function siteThemeFromCustomTheme(
   theme: CustomTheme,
   mode: "system" | "light" | "dark"
@@ -272,6 +324,20 @@ export function siteThemeFromCustomTheme(
     foreground: theme.dark.foreground,
     backgroundLight: theme.light.background,
     foregroundLight: theme.light.foreground,
+    tune: theme.tune,
+    tuneLight: theme.tuneLight,
+    sceneIntensity: theme.sceneFx?.intensity,
+    sceneMotion: theme.sceneFx?.motion,
+    sceneIntensityLight: theme.sceneFxLight?.intensity,
+    sceneMotionLight: theme.sceneFxLight?.motion,
+    headingFont: theme.headingFont,
+    headingFontLight: theme.headingFontLight,
+    density: theme.density,
+    densityLight: theme.densityLight,
+    status: theme.status,
+    statusLight: theme.statusLight,
+    wallpaper: theme.wallpaper,
+    wallpaperLight: theme.wallpaperLight,
   };
 }
 
@@ -291,6 +357,18 @@ export function sanitizeCustomTheme(input: unknown): CustomTheme | null {
   const designLight = isDesignId(t.designLight) ? t.designLight : design;
   const sceneLight = isSceneId(t.sceneLight) ? t.sceneLight : scene;
   const fontLight = isFontId(t.fontLight) ? t.fontLight : font;
+  const tune = sanitizeTune(t.tune);
+  const tuneLight = sanitizeTune(t.tuneLight);
+  const sceneFx = sanitizeSceneFx(t.sceneFx);
+  const sceneFxLight = sanitizeSceneFx(t.sceneFxLight);
+  const headingFont = isFontId(t.headingFont) ? t.headingFont : undefined;
+  const headingFontLight = isFontId(t.headingFontLight) ? t.headingFontLight : undefined;
+  const status = sanitizeSemantic(t.status);
+  const statusLight = sanitizeSemantic(t.statusLight);
+  const wallpaper = sanitizeWallpaper(t.wallpaper);
+  const wallpaperLight = sanitizeWallpaper(t.wallpaperLight);
+  const density = isDensity(t.density) && t.density !== "comfortable" ? t.density : undefined;
+  const densityLight = isDensity(t.densityLight) && t.densityLight !== "comfortable" ? t.densityLight : undefined;
   return {
     id: typeof t.id === "string" ? t.id : newThemeId(),
     name: t.name.slice(0, 40),
@@ -300,6 +378,18 @@ export function sanitizeCustomTheme(input: unknown): CustomTheme | null {
     designLight,
     sceneLight,
     fontLight,
+    ...(tune ? { tune } : {}),
+    ...(tuneLight ? { tuneLight } : {}),
+    ...(sceneFx ? { sceneFx } : {}),
+    ...(sceneFxLight ? { sceneFxLight } : {}),
+    ...(headingFont ? { headingFont } : {}),
+    ...(headingFontLight ? { headingFontLight } : {}),
+    ...(density ? { density } : {}),
+    ...(densityLight ? { densityLight } : {}),
+    ...(status ? { status } : {}),
+    ...(statusLight ? { statusLight } : {}),
+    ...(wallpaper ? { wallpaper } : {}),
+    ...(wallpaperLight ? { wallpaperLight } : {}),
     ...colors,
   };
 }
@@ -349,6 +439,54 @@ export function saveThemes(themes: CustomTheme[]): boolean {
     return true;
   } catch {
     return false;
+  }
+}
+
+// A theme as a short text code (#329): "ctc1." plus the base64url of the
+// theme's JSON without its id, so it can be pasted into another browser or
+// carried in a link (/settings#theme=<code>). Decoding runs the same forgiving
+// sanitizer as a file import, so a code from a newer version with fields this
+// build doesn't know still lands; the id is minted fresh.
+const CODE_PREFIX = "ctc1.";
+
+function bytesToBase64Url(bytes: Uint8Array): string {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function base64UrlToBytes(text: string): Uint8Array | null {
+  const b64 = text.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (text.length % 4)) % 4);
+  try {
+    const bin = atob(b64);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+export function encodeThemeCode(theme: CustomTheme): string {
+  const { id: _id, ...rest } = theme;
+  void _id;
+  return CODE_PREFIX + bytesToBase64Url(new TextEncoder().encode(JSON.stringify(rest)));
+}
+
+// The theme in a code (whitespace around it is ignored), or null when it
+// isn't one. Accepts the bare code or a full /settings#theme=<code> link.
+export function decodeThemeCode(input: string): CustomTheme | null {
+  let text = input.trim();
+  const hash = text.indexOf("#theme=");
+  if (hash >= 0) text = text.slice(hash + "#theme=".length);
+  if (!text.startsWith(CODE_PREFIX)) return null;
+  const bytes = base64UrlToBytes(text.slice(CODE_PREFIX.length));
+  if (!bytes) return null;
+  try {
+    const theme = sanitizeCustomTheme(JSON.parse(new TextDecoder().decode(bytes)));
+    return theme ? { ...theme, id: newThemeId() } : null;
+  } catch {
+    return null;
   }
 }
 
@@ -493,6 +631,208 @@ export function loadScene(): ModePair<SceneId | null> {
 
 export function saveScene(scene: ModePair<SceneId | null> | null): void {
   saveModePair(SCENE_KEY, scene);
+}
+
+// The fine-tune over the design (#326), per mode: a Tune or null (= the
+// design untouched / the admin default). Stored as a `{dark,light}` pair.
+export const TUNE_KEY = "ctrlcenter:tune";
+
+const isTune = (v: unknown): v is Tune => sanitizeTune(v) !== null;
+
+export function loadTune(): ModePair<Tune | null> {
+  const pair = loadModePair(TUNE_KEY, isTune);
+  return {
+    dark: pair.dark ? sanitizeTune(pair.dark) : null,
+    light: pair.light ? sanitizeTune(pair.light) : null,
+  };
+}
+
+export function saveTune(tune: ModePair<Tune | null> | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (tune && (tune.dark || tune.light)) {
+      window.localStorage.setItem(TUNE_KEY, JSON.stringify({ dark: tune.dark, light: tune.light }));
+    } else {
+      window.localStorage.removeItem(TUNE_KEY);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+// Scene effects (#327), per mode: a SceneFx or null (= as designed / the
+// admin default). Stored as a `{dark,light}` pair.
+export const SCENE_FX_KEY = "ctrlcenter:scene-fx";
+
+const isSceneFx = (v: unknown): v is SceneFx => sanitizeSceneFx(v) !== null;
+
+export function loadSceneFx(): ModePair<SceneFx | null> {
+  const pair = loadModePair(SCENE_FX_KEY, isSceneFx);
+  return {
+    dark: pair.dark ? sanitizeSceneFx(pair.dark) : null,
+    light: pair.light ? sanitizeSceneFx(pair.light) : null,
+  };
+}
+
+export function saveSceneFx(fx: ModePair<SceneFx | null> | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (fx && (fx.dark || fx.light)) {
+      window.localStorage.setItem(SCENE_FX_KEY, JSON.stringify({ dark: fx.dark, light: fx.light }));
+    } else {
+      window.localStorage.removeItem(SCENE_FX_KEY);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+// The visitor's Reduce motion switch (#327): stills every scene and the
+// surface animations regardless of the theme, like the OS setting would.
+export const MOTION_KEY = "ctrlcenter:motion";
+
+export function loadReduceMotion(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(MOTION_KEY) === "reduce";
+  } catch {
+    return false;
+  }
+}
+
+export function saveReduceMotion(reduce: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (reduce) window.localStorage.setItem(MOTION_KEY, "reduce");
+    else window.localStorage.removeItem(MOTION_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+// The heading typeface (#330), per mode: a FontId, "body" (the visitor chose
+// to follow the body font, overriding an admin default heading face), or null
+// (not chosen). Stored as a `{dark,light}` pair like the font.
+export const HEADING_KEY = "ctrlcenter:heading";
+
+export type HeadingChoice = FontId | "body";
+
+const isHeadingChoice = (v: unknown): v is HeadingChoice => v === "body" || isFontId(v);
+
+export function loadHeadingFont(): ModePair<HeadingChoice | null> {
+  return loadModePair(HEADING_KEY, isHeadingChoice);
+}
+
+export function saveHeadingFont(pair: ModePair<HeadingChoice | null> | null): void {
+  saveModePair(HEADING_KEY, pair);
+}
+
+// Semantic colors (#331), per mode: a set or null (not chosen / the admin
+// default). Stored as a `{dark,light}` pair.
+export const STATUS_KEY = "ctrlcenter:status";
+
+const isSemantic = (v: unknown): v is SemanticColors => sanitizeSemantic(v) !== null;
+
+export function loadStatusColors(): ModePair<SemanticColors | null> {
+  return loadModePair(STATUS_KEY, isSemantic);
+}
+
+export function saveStatusColors(pair: ModePair<SemanticColors | null> | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (pair && (pair.dark || pair.light)) {
+      window.localStorage.setItem(STATUS_KEY, JSON.stringify({ dark: pair.dark, light: pair.light }));
+    } else {
+      window.localStorage.removeItem(STATUS_KEY);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+// A wallpaper (#333), per mode: a Wallpaper, "none" (the visitor cleared an
+// admin default), or null (not chosen). Stored as a `{dark,light}` pair; the
+// cleared state is stored as { src: "" }, which the no-flash script reads too.
+export const WALLPAPER_KEY = "ctrlcenter:wallpaper";
+
+export type WallpaperChoice = Wallpaper | "none";
+
+export function loadWallpaper(): ModePair<WallpaperChoice | null> {
+  const read = (v: unknown): WallpaperChoice | null => {
+    if (v && typeof v === "object" && (v as { src?: unknown }).src === "") return "none";
+    return sanitizeWallpaper(v);
+  };
+  if (typeof window === "undefined") return { dark: null, light: null };
+  try {
+    const raw = window.localStorage.getItem(WALLPAPER_KEY);
+    if (!raw) return { dark: null, light: null };
+    const o: unknown = JSON.parse(raw);
+    if (!o || typeof o !== "object") return { dark: null, light: null };
+    const pair = o as Record<string, unknown>;
+    return { dark: read(pair.dark), light: read(pair.light) };
+  } catch {
+    return { dark: null, light: null };
+  }
+}
+
+export function saveWallpaper(pair: ModePair<WallpaperChoice | null> | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (pair && (pair.dark || pair.light)) {
+      const enc = (v: WallpaperChoice | null) => (v === "none" ? { src: "" } : v);
+      window.localStorage.setItem(WALLPAPER_KEY, JSON.stringify({ dark: enc(pair.dark), light: enc(pair.light) }));
+    } else {
+      window.localStorage.removeItem(WALLPAPER_KEY);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+// The layout density (#330), per mode.
+export const DENSITY_KEY = "ctrlcenter:density";
+
+export function loadDensity(): ModePair<Density | null> {
+  return loadModePair(DENSITY_KEY, isDensity);
+}
+
+export function saveDensity(pair: ModePair<Density | null> | null): void {
+  saveModePair(DENSITY_KEY, pair);
+}
+
+// The visitor's day/night schedule switch (#336): "off" keeps the site's
+// usual theme under their own choices; anything else follows the schedule.
+export const SCHEDULE_KEY = "ctrlcenter:schedule";
+
+export function loadFollowSchedule(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    return window.localStorage.getItem(SCHEDULE_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}
+
+export function saveFollowSchedule(follow: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (follow) window.localStorage.removeItem(SCHEDULE_KEY);
+    else window.localStorage.setItem(SCHEDULE_KEY, "off");
+  } catch {
+    // ignore
+  }
+}
+
+// Under the "themes only" policy (#335), the visitor's choice is a pack's
+// name per mode; the no-flash script resolves it against the site's themes.
+export const PACK_KEY = "ctrlcenter:pack";
+
+export function loadPackChoice(): ModePair<string | null> {
+  return loadModePair(PACK_KEY, (v): v is string => typeof v === "string" && v.length > 0 && v.length <= 80);
+}
+
+export function savePackChoice(pair: ModePair<string | null> | null): void {
+  saveModePair(PACK_KEY, pair);
 }
 
 // The UI typeface (Plus Jakarta Sans, Inter, …), per mode. Applied as a
