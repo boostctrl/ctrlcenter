@@ -7,10 +7,12 @@ import {
   DEFAULT_SCENE,
   isDesignId,
   isSceneId,
+  sanitizeSceneFx,
   sanitizeTune,
   type ColorSet,
   type DesignId,
   type ModeColors,
+  type SceneFx,
   type SceneId,
   type Tune,
 } from "./theme";
@@ -189,6 +191,9 @@ export type CustomTheme = ModeColors & {
   // The fine-tune over each mode's design (#326); absent = design untouched.
   tune?: Tune;
   tuneLight?: Tune;
+  // Each mode's scene effects (#327); absent = as the scene is designed.
+  sceneFx?: SceneFx;
+  sceneFxLight?: SceneFx;
 };
 
 // The active custom look's light+dark colors (the resolved mode selects which
@@ -279,6 +284,10 @@ export function siteThemeFromCustomTheme(
     foregroundLight: theme.light.foreground,
     tune: theme.tune,
     tuneLight: theme.tuneLight,
+    sceneIntensity: theme.sceneFx?.intensity,
+    sceneMotion: theme.sceneFx?.motion,
+    sceneIntensityLight: theme.sceneFxLight?.intensity,
+    sceneMotionLight: theme.sceneFxLight?.motion,
   };
 }
 
@@ -300,6 +309,8 @@ export function sanitizeCustomTheme(input: unknown): CustomTheme | null {
   const fontLight = isFontId(t.fontLight) ? t.fontLight : font;
   const tune = sanitizeTune(t.tune);
   const tuneLight = sanitizeTune(t.tuneLight);
+  const sceneFx = sanitizeSceneFx(t.sceneFx);
+  const sceneFxLight = sanitizeSceneFx(t.sceneFxLight);
   return {
     id: typeof t.id === "string" ? t.id : newThemeId(),
     name: t.name.slice(0, 40),
@@ -311,6 +322,8 @@ export function sanitizeCustomTheme(input: unknown): CustomTheme | null {
     fontLight,
     ...(tune ? { tune } : {}),
     ...(tuneLight ? { tuneLight } : {}),
+    ...(sceneFx ? { sceneFx } : {}),
+    ...(sceneFxLight ? { sceneFxLight } : {}),
     ...colors,
   };
 }
@@ -528,6 +541,56 @@ export function saveTune(tune: ModePair<Tune | null> | null): void {
     } else {
       window.localStorage.removeItem(TUNE_KEY);
     }
+  } catch {
+    // ignore
+  }
+}
+
+// Scene effects (#327), per mode: a SceneFx or null (= as designed / the
+// admin default). Stored as a `{dark,light}` pair.
+export const SCENE_FX_KEY = "ctrlcenter:scene-fx";
+
+const isSceneFx = (v: unknown): v is SceneFx => sanitizeSceneFx(v) !== null;
+
+export function loadSceneFx(): ModePair<SceneFx | null> {
+  const pair = loadModePair(SCENE_FX_KEY, isSceneFx);
+  return {
+    dark: pair.dark ? sanitizeSceneFx(pair.dark) : null,
+    light: pair.light ? sanitizeSceneFx(pair.light) : null,
+  };
+}
+
+export function saveSceneFx(fx: ModePair<SceneFx | null> | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (fx && (fx.dark || fx.light)) {
+      window.localStorage.setItem(SCENE_FX_KEY, JSON.stringify({ dark: fx.dark, light: fx.light }));
+    } else {
+      window.localStorage.removeItem(SCENE_FX_KEY);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+// The visitor's Reduce motion switch (#327): stills every scene and the
+// surface animations regardless of the theme, like the OS setting would.
+export const MOTION_KEY = "ctrlcenter:motion";
+
+export function loadReduceMotion(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(MOTION_KEY) === "reduce";
+  } catch {
+    return false;
+  }
+}
+
+export function saveReduceMotion(reduce: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (reduce) window.localStorage.setItem(MOTION_KEY, "reduce");
+    else window.localStorage.removeItem(MOTION_KEY);
   } catch {
     // ignore
   }

@@ -14,6 +14,13 @@ here.
 
 ### Added
 
+- **Scene intensity, motion and a None scene (3.0).** The theme builder's
+  Scene tab gains an intensity slider (how strongly the backdrop shows) and a
+  motion choice for each theme: full, calm (half speed, half the work) or
+  still. A new *None* scene is a plain surface with no backdrop. Saved with
+  your themes and promoted with them. Preferences gains a *Motion* switch:
+  *Reduced* stills the scene and the surface animations in this browser
+  whatever the theme says, like the system setting does. (#327)
 - **Fine-tune any design (3.0).** The theme builder's new *Tune* tab puts
   six sliders over the design you chose: corner radius, border weight,
   blur, shadow depth, card opacity and the scene glow, each as a percentage

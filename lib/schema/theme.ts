@@ -1,6 +1,6 @@
 // Site default theme, theme-pack overrides, and their admin inputs.
 import { z } from "zod";
-import { DESIGN_IDS, SCENE_IDS, TUNE_FIELDS } from "../theme";
+import { DESIGN_IDS, MOTION_IDS, SCENE_IDS, TUNE_FIELDS } from "../theme";
 import { FONT_IDS, DEFAULT_FONT } from "../fonts";
 import { hexColor } from "./shared";
 
@@ -59,6 +59,12 @@ export const themeSchema = z.object({
   // dark tune). Absent = the design untouched.
   tune: tuneSchema.optional(),
   tuneLight: tuneSchema.optional(),
+  // Optional scene effects (#327), per mode: the backdrop's intensity (0–100)
+  // and motion. Absent = as the scene is designed.
+  sceneIntensity: z.number().int().min(0).max(100).optional(),
+  sceneMotion: z.enum(MOTION_IDS).optional(),
+  sceneIntensityLight: z.number().int().min(0).max(100).optional(),
+  sceneMotionLight: z.enum(MOTION_IDS).optional(),
 });
 
 // A cohesive set of surface + accent colors (one mode of a theme).
@@ -119,4 +125,8 @@ export const themeInputSchema = z.object({
   foregroundLight: hexColor.optional(),
   tune: tuneSchema.optional(),
   tuneLight: tuneSchema.optional(),
+  sceneIntensity: z.number().int().min(0).max(100).optional(),
+  sceneMotion: z.enum(MOTION_IDS).optional(),
+  sceneIntensityLight: z.number().int().min(0).max(100).optional(),
+  sceneMotionLight: z.enum(MOTION_IDS).optional(),
 });

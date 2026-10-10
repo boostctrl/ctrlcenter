@@ -375,6 +375,10 @@ export function useSettingsDraft(
       foregroundLight: pack.light.foreground,
       tune: pack.tune,
       tuneLight: undefined,
+      sceneIntensity: undefined,
+      sceneMotion: undefined,
+      sceneIntensityLight: undefined,
+      sceneMotionLight: undefined,
     });
   }
 
@@ -393,6 +397,8 @@ export function useSettingsDraft(
         backgroundLight: darkPack?.light.background,
         foregroundLight: darkPack?.light.foreground,
         tuneLight: undefined,
+        sceneIntensityLight: undefined,
+        sceneMotionLight: undefined,
       });
       return;
     }
@@ -407,6 +413,8 @@ export function useSettingsDraft(
       backgroundLight: pack.light.background,
       foregroundLight: pack.light.foreground,
       tuneLight: pack.tune,
+      sceneIntensityLight: undefined,
+      sceneMotionLight: undefined,
     });
   }
 

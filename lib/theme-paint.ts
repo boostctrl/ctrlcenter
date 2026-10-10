@@ -42,6 +42,11 @@ export type PaintDefaults = {
   foregroundLight?: string;
   tune?: PaintTune;
   tuneLight?: PaintTune;
+  // Scene effects (#327): intensity 0–100, motion normal | calm | off.
+  sceneIntensity?: number;
+  sceneMotion?: string;
+  sceneIntensityLight?: number;
+  sceneMotionLight?: string;
 };
 
 // The valid ids per part, so a stored value the current build doesn't know
@@ -60,6 +65,10 @@ export type PaintInput = {
   accentTo: string;
   // The fine-tune over the design (null = the design untouched).
   tune?: PaintTune | null;
+  // The scene's effects (null = as designed), and the visitor's Reduce motion
+  // switch, which stills every scene whatever the effects say (#327).
+  sceneFx?: { intensity: number; motion: string } | null;
+  reduceMotion?: boolean;
   design?: string;
   scene?: string;
   font?: string;
@@ -70,6 +79,8 @@ export type PaintInput = {
 export type Paint = {
   dark: boolean;
   vars: Record<string, string | null>;
+  // Attributes on <html> (null = remove): data-motion for the stylesheet.
+  attrs: Record<string, string | null>;
   design?: string;
   scene?: string;
   font?: string;
@@ -241,7 +252,13 @@ export function makeThemePaint() {
       const v = input.tune ? input.tune[k] : undefined;
       vars["--tune-" + k] = typeof v === "number" && isFinite(v) && v !== 100 ? String(v / 100) : null;
     }
-    const paint: Paint = { dark: input.dark, vars: vars };
+    const fx = input.sceneFx;
+    const intensity = fx && typeof fx.intensity === "number" && isFinite(fx.intensity) ? fx.intensity : 100;
+    vars["--scene-opacity"] = intensity !== 100 ? String(Math.min(100, Math.max(0, intensity)) / 100) : null;
+    const motion = input.reduceMotion ? "off" : fx && (fx.motion === "calm" || fx.motion === "off") ? fx.motion : "normal";
+    const attrs: Record<string, string | null> = {};
+    attrs["data-motion"] = motion === "normal" ? null : motion;
+    const paint: Paint = { dark: input.dark, vars: vars, attrs: attrs };
     if (input.design !== undefined) paint.design = input.design;
     if (input.scene !== undefined) paint.scene = input.scene;
     if (input.font !== undefined) paint.font = input.font;
@@ -258,6 +275,11 @@ export function makeThemePaint() {
       const v = paint.vars[name];
       if (v === null) s.removeProperty(name);
       else s.setProperty(name, v);
+    }
+    for (const name in paint.attrs) {
+      const v = paint.attrs[name];
+      if (v === null) el.removeAttribute(name);
+      else el.setAttribute(name, v);
     }
     const parts: [string, string | undefined, readonly string[], string][] = [
       ["design-", paint.design, ids.design, DEFAULT_DESIGN_ID],
@@ -371,6 +393,41 @@ export function makeThemePaint() {
     let tune = isObj(storedTune) ? tuneOf(dark ? storedTune.dark : storedTune.light) : null;
     if (!tune) tune = tuneOf(dark ? dt.tune : dt.tuneLight || dt.tune);
 
+    // Scene effects: the stored per-mode pair, else the admin default for the
+    // mode (light falls back to dark). The Reduce motion switch is its own key.
+    const fxOf = (o: unknown): { intensity: number; motion: string } | null => {
+      if (!isObj(o)) return null;
+      const out = { intensity: 100, motion: "normal" };
+      let any = false;
+      if (typeof o.intensity === "number" && isFinite(o.intensity)) {
+        out.intensity = Math.min(100, Math.max(0, Math.round(o.intensity)));
+        any = true;
+      }
+      if (o.motion === "normal" || o.motion === "calm" || o.motion === "off") {
+        out.motion = o.motion;
+        any = true;
+      }
+      return any ? out : null;
+    };
+    const storedFx = get("ctrlcenter:scene-fx");
+    let sceneFx = isObj(storedFx) ? fxOf(dark ? storedFx.dark : storedFx.light) : null;
+    if (!sceneFx) {
+      sceneFx = fxOf(
+        dark
+          ? { intensity: dt.sceneIntensity, motion: dt.sceneMotion }
+          : {
+              intensity: dt.sceneIntensityLight === undefined ? dt.sceneIntensity : dt.sceneIntensityLight,
+              motion: dt.sceneMotionLight === undefined ? dt.sceneMotion : dt.sceneMotionLight,
+            }
+      );
+    }
+    let reduceMotion = false;
+    try {
+      reduceMotion = storage.getItem("ctrlcenter:motion") === "reduce";
+    } catch {
+      // ignore
+    }
+
     // Design / scene / font: the stored per-mode pair, validated against the
     // ids this build knows, else the admin default for the mode.
     const pick = (key: string, valid: readonly string[], dd: string, dl: string | undefined): string => {
@@ -387,6 +444,8 @@ export function makeThemePaint() {
       accentFrom: accentFrom,
       accentTo: accentTo,
       tune: tune,
+      sceneFx: sceneFx,
+      reduceMotion: reduceMotion,
       design: pick("ctrlcenter:design", ids.design, dt.design, dt.designLight),
       scene: pick("ctrlcenter:scene", ids.scene, dt.scene, dt.sceneLight),
       font: pick("ctrlcenter:font", ids.font, dt.font, dt.fontLight),

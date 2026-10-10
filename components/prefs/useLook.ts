@@ -20,13 +20,17 @@ import {
   saveFont,
   loadTune,
   saveTune,
+  loadSceneFx,
+  saveSceneFx,
+  loadReduceMotion,
+  saveReduceMotion,
   NO_ACCENT_OVERRIDES,
   type CustomTheme,
   type AccentColors,
   type AccentOverrides,
   type ModePair,
 } from "@/lib/prefs";
-import type { ColorSet, DesignId, ModeColors, SceneId, ThemePack, Tune } from "@/lib/theme";
+import type { ColorSet, DesignId, ModeColors, MotionLevel, SceneFx, SceneId, ThemePack, Tune } from "@/lib/theme";
 import type { FontId } from "@/lib/fonts";
 import {
   applyAll as paintAll,
@@ -72,6 +76,11 @@ export type DefaultTheme = {
   // The site default's fine-tune over the design, per mode (#326).
   tune?: Tune;
   tuneLight?: Tune;
+  // The site default's scene effects, per mode (#327).
+  sceneIntensity?: number;
+  sceneMotion?: MotionLevel;
+  sceneIntensityLight?: number;
+  sceneMotionLight?: MotionLevel;
 };
 
 export type LookValue = {
@@ -92,6 +101,13 @@ export type LookValue = {
   // The effective fine-tune for a mode (visitor's, else the admin default),
   // or null when the design is untouched (#326).
   tuneFor: (mode: Mode) => Tune | null;
+  // The effective scene effects for a mode (visitor's, else the admin
+  // default), or null when the scene is as designed (#327).
+  sceneFxFor: (mode: Mode) => SceneFx | null;
+  // The visitor's Reduce motion switch, and the motion level the scenes run
+  // at now: "off" when the switch is on, else the displayed mode's effects.
+  reduceMotion: boolean;
+  motion: MotionLevel;
   // Whether the effective background reads as light (for theme-aware icons).
   surfaceIsLight: boolean;
   customThemes: CustomTheme[];
@@ -112,6 +128,8 @@ export type LookValue = {
   setFont: (font: FontId, mode: Mode) => void;
   // Set (or, with null, clear back to the admin default) a mode's fine-tune.
   setTune: (tune: Tune | null, mode: Mode) => void;
+  setSceneFx: (fx: SceneFx | null, mode: Mode) => void;
+  setReduceMotion: (reduce: boolean) => void;
   applyPack: (pack: ThemePack, mode: Mode) => void;
   applyThemeColors: (colors: ModeColors, mode?: Mode) => void;
   setBaseColors: (
@@ -199,6 +217,11 @@ export function useLook(defaultTheme: DefaultTheme): {
     dark: null,
     light: null,
   });
+  const [sceneFxs, setSceneFxs] = useState<ModePair<SceneFx | null>>({
+    dark: null,
+    light: null,
+  });
+  const [reduceMotion, setReduceMotionState] = useState(false);
   const [activeLook, setActiveLook] = useState<ModeColors | null>(null);
   const [accentOverride, setAccentOverrideState] =
     useState<AccentOverrides>(NO_ACCENT_OVERRIDES);
@@ -246,6 +269,26 @@ export function useLook(defaultTheme: DefaultTheme): {
       (dark ? defaultTheme.tune : defaultTheme.tuneLight ?? defaultTheme.tune) ?? null,
     [defaultTheme.tune, defaultTheme.tuneLight]
   );
+  // The admin default scene effects for a mode: light falls back to dark per
+  // field; null when neither field is set.
+  const defSceneFx = useCallback(
+    (dark: boolean): SceneFx | null => {
+      const intensity = dark
+        ? defaultTheme.sceneIntensity
+        : defaultTheme.sceneIntensityLight ?? defaultTheme.sceneIntensity;
+      const motion = dark
+        ? defaultTheme.sceneMotion
+        : defaultTheme.sceneMotionLight ?? defaultTheme.sceneMotion;
+      if (intensity === undefined && motion === undefined) return null;
+      return { intensity: intensity ?? 100, motion: motion ?? "normal" };
+    },
+    [
+      defaultTheme.sceneIntensity,
+      defaultTheme.sceneMotion,
+      defaultTheme.sceneIntensityLight,
+      defaultTheme.sceneMotionLight,
+    ]
+  );
 
   // The effective design/scene/font for a mode: the visitor's per-mode choice,
   // else the admin default for that mode.
@@ -265,14 +308,25 @@ export function useLook(defaultTheme: DefaultTheme): {
     (dark: boolean): Tune | null => (dark ? tunes.dark : tunes.light) ?? defTune(dark),
     [tunes, defTune]
   );
+  const resolveSceneFx = useCallback(
+    (dark: boolean): SceneFx | null => (dark ? sceneFxs.dark : sceneFxs.light) ?? defSceneFx(dark),
+    [sceneFxs, defSceneFx]
+  );
 
-  // Paint the look state, with the fine-tune resolved for the mode it shows
-  // unless the caller passes one explicitly (a tune edit paints its new value
-  // before the state commits).
+  // Paint the look state, with the fine-tune, scene effects and Reduce motion
+  // switch resolved for the mode it shows unless the caller passes one
+  // explicitly (an edit paints its new value before the state commits).
   const applyAll = useCallback(
-    (opts: Parameters<typeof paintAll>[0]) =>
-      paintAll({ tune: resolveTune(resolveDark(opts.theme)), ...opts }),
-    [resolveTune]
+    (opts: Parameters<typeof paintAll>[0]) => {
+      const dark = resolveDark(opts.theme);
+      paintAll({
+        tune: resolveTune(dark),
+        sceneFx: resolveSceneFx(dark),
+        reduceMotion,
+        ...opts,
+      });
+    },
+    [resolveTune, resolveSceneFx, reduceMotion]
   );
 
   // Apply the design/scene/font classes for whichever mode is displayed now.
@@ -421,7 +475,7 @@ export function useLook(defaultTheme: DefaultTheme): {
       });
       const dark = resolveDark(displayTheme);
       if ((mode === "dark") === dark) {
-        paintAll({
+        applyAll({
           theme: displayTheme,
           look: resolveLook(activeLook),
           accentOverride,
@@ -430,7 +484,46 @@ export function useLook(defaultTheme: DefaultTheme): {
         });
       }
     },
-    [displayTheme, resolveLook, activeLook, accentOverride, defaultAccent, defTune]
+    [displayTheme, resolveLook, activeLook, accentOverride, defaultAccent, defTune, applyAll]
+  );
+
+  // Set (or clear) one mode's scene effects, like setTune.
+  const setSceneFx = useCallback(
+    (next: SceneFx | null, mode: Mode) => {
+      setSceneFxs((prev) => {
+        const updated = { ...prev, [mode]: next };
+        saveSceneFx(updated);
+        return updated;
+      });
+      const dark = resolveDark(displayTheme);
+      if ((mode === "dark") === dark) {
+        applyAll({
+          theme: displayTheme,
+          look: resolveLook(activeLook),
+          accentOverride,
+          defaultAccent,
+          sceneFx: next ?? defSceneFx(dark),
+        });
+      }
+    },
+    [displayTheme, resolveLook, activeLook, accentOverride, defaultAccent, defSceneFx, applyAll]
+  );
+
+  // The Reduce motion switch: a preference, not a theme part, so it survives
+  // "Reset theme" (the global reset clears it).
+  const setReduceMotion = useCallback(
+    (reduce: boolean) => {
+      setReduceMotionState(reduce);
+      saveReduceMotion(reduce);
+      applyAll({
+        theme: displayTheme,
+        look: resolveLook(activeLook),
+        accentOverride,
+        defaultAccent,
+        reduceMotion: reduce,
+      });
+    },
+    [displayTheme, resolveLook, activeLook, accentOverride, defaultAccent, applyAll]
   );
 
   // Apply a curated pack to one mode: its design + scene + that mode's colorset,
@@ -442,9 +535,10 @@ export function useLook(defaultTheme: DefaultTheme): {
       setDesign(pack.design, mode);
       setScene(pack.scene, mode);
       setTune(pack.tune ?? null, mode);
+      setSceneFx(null, mode);
       applyThemeColors({ dark: pack.dark, light: pack.light }, mode);
     },
-    [setDesign, setScene, setTune, applyThemeColors]
+    [setDesign, setScene, setTune, setSceneFx, applyThemeColors]
   );
 
   // Update only the background/foreground for the CURRENT mode's variant,
@@ -518,6 +612,8 @@ export function useLook(defaultTheme: DefaultTheme): {
     resolveFont,
     resolveTune,
     setTune,
+    resolveSceneFx,
+    setSceneFx,
     applyThemeColors,
     displayTheme,
     setDesigns,
@@ -551,22 +647,25 @@ export function useLook(defaultTheme: DefaultTheme): {
     saveScene(null);
     saveFont(null);
     saveTune(null);
+    saveSceneFx(null);
     setDesigns({ dark: null, light: null });
     setScenes({ dark: null, light: null });
     setFonts({ dark: null, light: null });
     setTunes({ dark: null, light: null });
+    setSceneFxs({ dark: null, light: null });
     const dark = resolveDark(displayTheme);
-    paintAll({
+    applyAll({
       theme: displayTheme,
       look: resolveLook(null),
       accentOverride: NO_ACCENT_OVERRIDES,
       defaultAccent,
       tune: defTune(dark),
+      sceneFx: defSceneFx(dark),
     });
     applyDesign(defDesign(dark));
     applyScene(defScene(dark));
     applyFont(defFont(dark));
-  }, [defaultAccent, displayTheme, resolveLook, defDesign, defScene, defFont, defTune]);
+  }, [defaultAccent, displayTheme, resolveLook, defDesign, defScene, defFont, defTune, defSceneFx, applyAll]);
 
   const resetLook = useCallback(() => {
     // Drop all theme customizations so the visitor falls back to the admin
@@ -582,6 +681,8 @@ export function useLook(defaultTheme: DefaultTheme): {
     saveScene(null);
     saveFont(null);
     saveTune(null);
+    saveSceneFx(null);
+    saveReduceMotion(false);
     setActiveLook(null);
     setAccentOverrideState(NO_ACCENT_OVERRIDES);
     setThemeState(defaultTheme.mode);
@@ -589,6 +690,8 @@ export function useLook(defaultTheme: DefaultTheme): {
     setScenes({ dark: null, light: null });
     setFonts({ dark: null, light: null });
     setTunes({ dark: null, light: null });
+    setSceneFxs({ dark: null, light: null });
+    setReduceMotionState(false);
     const dark = resolveDark(defaultTheme.mode);
     paintAll({
       theme: defaultTheme.mode,
@@ -596,6 +699,8 @@ export function useLook(defaultTheme: DefaultTheme): {
       accentOverride: NO_ACCENT_OVERRIDES,
       defaultAccent,
       tune: defTune(dark),
+      sceneFx: defSceneFx(dark),
+      reduceMotion: false,
     });
     applyDesign(defDesign(dark));
     applyScene(defScene(dark));
@@ -606,6 +711,7 @@ export function useLook(defaultTheme: DefaultTheme): {
     defScene,
     defFont,
     defTune,
+    defSceneFx,
     adminLook,
     defaultAccent,
   ]);
@@ -629,13 +735,17 @@ export function useLook(defaultTheme: DefaultTheme): {
     const storedScenes = loadScene();
     const storedFonts = loadFont();
     const storedTunes = loadTune();
-    // Resolve a mode's design/scene/font/tune from the loaded pairs + admin
-    // defaults (the state isn't committed yet, so resolve from the raw values).
+    const storedFx = loadSceneFx();
+    const storedReduce = loadReduceMotion();
+    // Resolve a mode's design/scene/font/tune/effects from the loaded pairs +
+    // admin defaults (the state isn't committed yet, so resolve from the raw
+    // values).
     const chromeFor = (dark: boolean) => ({
       design: (dark ? storedDesigns.dark : storedDesigns.light) ?? defDesign(dark),
       scene: (dark ? storedScenes.dark : storedScenes.light) ?? defScene(dark),
       font: (dark ? storedFonts.dark : storedFonts.light) ?? defFont(dark),
       tune: (dark ? storedTunes.dark : storedTunes.light) ?? defTune(dark),
+      sceneFx: (dark ? storedFx.dark : storedFx.light) ?? defSceneFx(dark),
     });
     /* eslint-disable react-hooks/set-state-in-effect */
     setThemeState(stored);
@@ -643,6 +753,8 @@ export function useLook(defaultTheme: DefaultTheme): {
     setScenes(storedScenes);
     setFonts(storedFonts);
     setTunes(storedTunes);
+    setSceneFxs(storedFx);
+    setReduceMotionState(storedReduce);
     setActiveLook(active);
     setAccentOverrideState(overrideAccent);
     setCustomThemes(loadThemes());
@@ -658,6 +770,8 @@ export function useLook(defaultTheme: DefaultTheme): {
       accentOverride: overrideAccent,
       defaultAccent,
       tune: initial.tune,
+      sceneFx: initial.sceneFx,
+      reduceMotion: storedReduce,
     });
     applyDesign(initial.design);
     applyScene(initial.scene);
@@ -686,6 +800,8 @@ export function useLook(defaultTheme: DefaultTheme): {
         accentOverride: loadAccentOverride(),
         defaultAccent,
         tune: next.tune,
+        sceneFx: next.sceneFx,
+        reduceMotion: loadReduceMotion(),
       });
       applyDesign(next.design);
       applyScene(next.scene);
@@ -725,6 +841,9 @@ export function useLook(defaultTheme: DefaultTheme): {
       sceneFor: (mode: Mode) => resolveScene(mode === "dark"),
       fontFor: (mode: Mode) => resolveFont(mode === "dark"),
       tuneFor: (mode: Mode) => resolveTune(mode === "dark"),
+      sceneFxFor: (mode: Mode) => resolveSceneFx(mode === "dark"),
+      reduceMotion,
+      motion: reduceMotion ? "off" : (resolveSceneFx(displayDark)?.motion ?? "normal"),
       surfaceIsLight,
       customThemes,
       activeLook,
@@ -741,6 +860,8 @@ export function useLook(defaultTheme: DefaultTheme): {
       setScene,
       setFont,
       setTune,
+      setSceneFx,
+      setReduceMotion,
       applyPack,
       applyThemeColors,
       setBaseColors,
@@ -762,6 +883,8 @@ export function useLook(defaultTheme: DefaultTheme): {
     resolveScene,
     resolveFont,
     resolveTune,
+    resolveSceneFx,
+    reduceMotion,
     systemDark,
     customThemes,
     activeLook,
@@ -772,6 +895,8 @@ export function useLook(defaultTheme: DefaultTheme): {
     setScene,
     setFont,
     setTune,
+    setSceneFx,
+    setReduceMotion,
     applyPack,
     applyThemeColors,
     setBaseColors,

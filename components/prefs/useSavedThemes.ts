@@ -16,7 +16,7 @@ import {
   type AccentOverrides,
   type ModePair,
 } from "@/lib/prefs";
-import type { ColorSet, DesignId, ModeColors, SceneId, Tune } from "@/lib/theme";
+import type { ColorSet, DesignId, ModeColors, SceneFx, SceneId, Tune } from "@/lib/theme";
 import type { FontId } from "@/lib/fonts";
 import {
   applyDesign,
@@ -44,6 +44,8 @@ export function useSavedThemes({
   resolveFont,
   resolveTune,
   setTune,
+  resolveSceneFx,
+  setSceneFx,
   applyThemeColors,
   displayTheme,
   setDesigns,
@@ -59,6 +61,8 @@ export function useSavedThemes({
   resolveFont: (dark: boolean) => FontId;
   resolveTune: (dark: boolean) => Tune | null;
   setTune: (tune: Tune | null, mode: Mode) => void;
+  resolveSceneFx: (dark: boolean) => SceneFx | null;
+  setSceneFx: (fx: SceneFx | null, mode: Mode) => void;
   applyThemeColors: (colors: ModeColors, mode?: Mode) => void;
   displayTheme: Theme;
   setDesigns: Dispatch<SetStateAction<ModePair<DesignId | null>>>;
@@ -111,6 +115,11 @@ export function useSavedThemes({
       const tuneLight = resolveTune(false);
       if (tune) entry.tune = tune;
       if (tuneLight) entry.tuneLight = tuneLight;
+      // And each mode's scene effects (#327).
+      const fx = resolveSceneFx(true);
+      const fxLight = resolveSceneFx(false);
+      if (fx) entry.sceneFx = fx;
+      if (fxLight) entry.sceneFxLight = fxLight;
       return commitThemes(
         existing
           ? customThemes.map((t) => (t.id === existing.id ? entry : t))
@@ -128,6 +137,7 @@ export function useSavedThemes({
       resolveScene,
       resolveFont,
       resolveTune,
+      resolveSceneFx,
     ]
   );
 
@@ -153,6 +163,8 @@ export function useSavedThemes({
       // displayed mode's one itself.
       setTune(t.tune ?? null, "dark");
       setTune(t.tuneLight ?? null, "light");
+      setSceneFx(t.sceneFx ?? null, "dark");
+      setSceneFx(t.sceneFxLight ?? null, "light");
       applyThemeColors({ dark: t.dark, light: t.light });
       const dark = resolveDark(displayTheme);
       applyDesign(dark ? t.design : t.designLight);
@@ -161,7 +173,7 @@ export function useSavedThemes({
     },
     // The setters are PrefsProvider's useState setters — stable, listed only
     // because they arrive as arguments here.
-    [customThemes, applyThemeColors, displayTheme, setDesigns, setScenes, setFonts, setTune]
+    [customThemes, applyThemeColors, displayTheme, setDesigns, setScenes, setFonts, setTune, setSceneFx]
   );
 
   const deleteNamedTheme = useCallback((id: string) => {
@@ -210,6 +222,8 @@ export function useSavedThemes({
           colorKey(t.light),
           t.tune ?? null,
           t.tuneLight ?? null,
+          t.sceneFx ?? null,
+          t.sceneFxLight ?? null,
         ]);
       const seen = new Set(customThemes.map(keyOf));
       const added: CustomTheme[] = [];

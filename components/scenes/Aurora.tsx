@@ -10,8 +10,8 @@ export default function Aurora({ light }: SceneProps) {
   return (
     <div
       aria-hidden
-      className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
-      style={{ opacity: "var(--glow-opacity, 1)" }}
+      className="scene-root pointer-events-none fixed inset-0 -z-10 overflow-hidden"
+      style={{ opacity: "calc(var(--glow-opacity, 1) * var(--scene-opacity, 1))" }}
     >
       <div
         className="animate-float absolute -top-32 -left-32 h-96 w-96 rounded-full blur-3xl"

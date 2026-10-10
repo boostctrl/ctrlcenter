@@ -11,6 +11,7 @@ import {
   type ColorSet,
   type DesignId,
   type ModeColors,
+  type SceneFx,
   type SceneId,
   type Tune,
 } from "@/lib/theme";
@@ -108,6 +109,8 @@ export function applyAll(opts: {
   accentOverride: AccentOverrides;
   defaultAccent: Accent;
   tune?: Tune | null;
+  sceneFx?: SceneFx | null;
+  reduceMotion?: boolean;
 }): void {
   if (typeof document === "undefined") return;
   const dark = resolveDark(opts.theme);
@@ -122,6 +125,8 @@ export function applyAll(opts: {
       accentFrom: accent.from,
       accentTo: accent.to,
       tune: opts.tune ?? null,
+      sceneFx: opts.sceneFx ?? null,
+      reduceMotion: opts.reduceMotion ?? false,
     }),
     IDS
   );

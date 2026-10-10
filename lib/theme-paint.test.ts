@@ -55,6 +55,8 @@ describe("makeThemePaint is self-contained", () => {
         font: "inter",
       };
       expect(isolated.computePaint(input)).toEqual(themePaint.computePaint(input));
+    const stored = storage({ "ctrlcenter:scene-fx": { dark: { motion: "calm" } }, "ctrlcenter:tune": { dark: { glow: 50 } } });
+    expect(isolated.readStored(stored, DT, IDS, true)).toEqual(themePaint.readStored(stored, DT, IDS, true));
     }
   });
 
@@ -200,7 +202,46 @@ describe("computePaint tune (#326)", () => {
   });
 });
 
+describe("computePaint scene effects (#327)", () => {
+  const base = { dark: true, background: null, foreground: null, accentFrom: "#a78bfa", accentTo: "#22d3ee" };
+
+  it("paints the intensity and the motion attribute", () => {
+    const paint = themePaint.computePaint({ ...base, sceneFx: { intensity: 40, motion: "calm" } });
+    expect(paint.vars["--scene-opacity"]).toBe("0.4");
+    expect(paint.attrs["data-motion"]).toBe("calm");
+  });
+
+  it("leaves both alone when the scene is as designed", () => {
+    const paint = themePaint.computePaint({ ...base, sceneFx: null });
+    expect(paint.vars["--scene-opacity"]).toBeNull();
+    expect(paint.attrs["data-motion"]).toBeNull();
+  });
+
+  it("stills everything for the Reduce motion switch, whatever the effects say", () => {
+    const paint = themePaint.computePaint({ ...base, sceneFx: { intensity: 100, motion: "normal" }, reduceMotion: true });
+    expect(paint.attrs["data-motion"]).toBe("off");
+  });
+});
+
 describe("readStored (the no-flash path)", () => {
+  it("reads the stored scene effects and the Reduce motion key", () => {
+    const s = storage({
+      "ctrlcenter:scene-fx": { dark: { intensity: 60, motion: "off" }, light: null },
+      "ctrlcenter:motion": "reduce",
+    });
+    const input = themePaint.readStored(s, DT, IDS, true);
+    expect(input.sceneFx).toEqual({ intensity: 60, motion: "off" });
+    expect(input.reduceMotion).toBe(true);
+    // Light: nothing stored, the default carries a motion only.
+    const dt: PaintDefaults = { ...DT, sceneMotion: "calm", sceneIntensityLight: 50 };
+    expect(themePaint.readStored(s, { ...dt, mode: "light" }, IDS, true).sceneFx).toEqual({
+      intensity: 50,
+      motion: "calm",
+    });
+    expect(themePaint.readStored(storage({}), DT, IDS, true).sceneFx).toBeNull();
+    expect(themePaint.readStored(storage({}), DT, IDS, true).reduceMotion).toBe(false);
+  });
+
   it("reads the stored per-mode tune, else the default's, clamped", () => {
     const s = storage({ "ctrlcenter:tune": { dark: { radius: 50, glow: 400 }, light: null } });
     expect(themePaint.readStored(s, DT, IDS, true).tune).toEqual({ radius: 50, glow: 300 });
@@ -219,6 +260,8 @@ describe("readStored (the no-flash path)", () => {
       accentFrom: "#a78bfa",
       accentTo: "#22d3ee",
       tune: null,
+      sceneFx: null,
+      reduceMotion: false,
       design: "glass",
       scene: "aurora",
       font: "jakarta",

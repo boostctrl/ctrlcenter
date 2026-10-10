@@ -9,7 +9,7 @@ import { effectRgbFor } from "./color";
 // side and turning. Distinct from Rain (dense straight streaks) and Fireflies
 // (stationary pulsing glows): these are solid little shapes with lateral
 // drift. A static mid-fall scatter is drawn under prefers-reduced-motion.
-export default function Petals({ light }: SceneProps) {
+export default function Petals({ light, motion }: SceneProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -18,7 +18,11 @@ export default function Petals({ light }: SceneProps) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reduced =
+      motion === "off" || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Calm motion: advance every other frame — half speed, half the work.
+    const calm = motion === "calm";
+    let tick = 0;
     const dpr = window.devicePixelRatio || 1;
     // Translucent so they read as petals over the surface, not confetti.
     const alpha = light ? 0.5 : 0.55;
@@ -98,6 +102,10 @@ export default function Petals({ light }: SceneProps) {
     };
 
     const draw = () => {
+      if (calm && (tick++ & 1)) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
       drawFrame(false);
       raf = requestAnimationFrame(draw);
     };
@@ -110,10 +118,10 @@ export default function Petals({ light }: SceneProps) {
       window.removeEventListener("resize", resize);
       cancelAnimationFrame(raf);
     };
-  }, [light]);
+  }, [light, motion]);
 
   return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 -z-10">
+    <div aria-hidden className="scene-root pointer-events-none fixed inset-0 -z-10">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
     </div>
   );

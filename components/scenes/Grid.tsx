@@ -42,7 +42,7 @@ export default function Grid({ light }: SceneProps) {
   return (
     <div
       aria-hidden
-      className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
+      className="scene-root pointer-events-none fixed inset-0 -z-10 overflow-hidden"
     >
       <div className="absolute inset-0" style={flat} />
       {!light && (

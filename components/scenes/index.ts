@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import type { SceneId } from "@/lib/theme";
+import type { MotionLevel, SceneId } from "@/lib/theme";
 import Aurora from "./Aurora";
 import { AbyssBackdrop } from "./Abyss";
 import Nebula from "./Nebula";
@@ -20,14 +20,24 @@ import Petals from "./Petals";
 import Comets from "./Comets";
 
 // Scenes render a different treatment for light vs dark surfaces, so each
-// backdrop receives the resolved surface lightness.
-export type SceneProps = { light: boolean };
+// backdrop receives the resolved surface lightness, and the motion level it
+// should run at (#327): "normal" as designed, "calm" at half speed, "off" a
+// still frame. Canvas scenes read the prop; CSS-animated ones follow the
+// data-motion attribute the resolver sets on <html>. The OS reduced-motion
+// preference stills everything regardless.
+export type SceneProps = { light: boolean; motion: MotionLevel };
+
+// The None scene: a plain surface, nothing drawn.
+function None() {
+  return null;
+}
 
 // Maps each scene to its backdrop component (a fixed layer behind everything).
 // <SceneLayer> renders the active scene; the `scene-<id>` class on <html> covers
 // any pure-CSS styling. To add a scene: build the component, register it here,
 // and add its id to lib/theme.ts SCENES.
 export const SCENE_REGISTRY: Record<SceneId, ComponentType<SceneProps>> = {
+  none: None,
   aurora: Aurora,
   abyss: AbyssBackdrop,
   nebula: Nebula,

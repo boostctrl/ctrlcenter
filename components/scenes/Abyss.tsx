@@ -9,7 +9,7 @@ import { effectRgb } from "./color";
 // re-themed — a bright wash from above and deeper, contrasting motes. Built from
 // the accent / background CSS vars so it recolors with the active palette, and
 // all motion is disabled under prefers-reduced-motion. Ported from the 404 page.
-export function AbyssBackdrop({ light }: SceneProps) {
+export function AbyssBackdrop({ light, motion }: SceneProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -18,9 +18,11 @@ export function AbyssBackdrop({ light }: SceneProps) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const reduced = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
+    const reduced =
+      motion === "off" || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Calm motion: advance every other frame — half speed, half the work.
+    const calm = motion === "calm";
+    let tick = 0;
     const dpr = window.devicePixelRatio || 1;
     let w = 0;
     let h = 0;
@@ -67,6 +69,10 @@ export function AbyssBackdrop({ light }: SceneProps) {
     };
 
     const draw = () => {
+      if (calm && (tick++ & 1)) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
       ctx.clearRect(0, 0, w, h);
       for (const p of particles) {
         p.y += p.vy;
@@ -94,7 +100,7 @@ export function AbyssBackdrop({ light }: SceneProps) {
       window.removeEventListener("resize", resize);
       cancelAnimationFrame(raf);
     };
-  }, [light]);
+  }, [light, motion]);
 
   // Depth tint (trench) vs. a sunlight wash from above (shallows).
   const tint = light
@@ -105,7 +111,7 @@ export function AbyssBackdrop({ light }: SceneProps) {
   const haloPct = light ? "24%" : "18%";
 
   return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 -z-10">
+    <div aria-hidden className="scene-root pointer-events-none fixed inset-0 -z-10">
       <div className="absolute inset-0" style={{ background: tint }} />
       <div
         className="animate-breathe absolute left-1/2 top-[38%] h-[360px] w-[360px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-md"

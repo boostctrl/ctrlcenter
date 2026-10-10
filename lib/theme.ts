@@ -63,8 +63,10 @@ export function isDesignId(v: unknown): v is DesignId {
 // palette. "aurora" is the default — the floating accent glow blobs.
 // The pre-1.4 "glow", "vortex" and "mesh" scenes were retired (all three were
 // soft gradient washes Aurora/Nebula already cover); the 3.0 migration put a
-// config still naming one back on the default (#305).
+// config still naming one back on the default (#305). "none" is a plain
+// surface with no backdrop at all (#327).
 export type SceneId =
+  | "none"
   | "aurora"
   | "abyss"
   | "nebula"
@@ -85,6 +87,7 @@ export type SceneId =
   | "comets";
 
 export const SCENES: { id: SceneId; name: string; description: string }[] = [
+  { id: "none", name: "None", description: "A plain surface, no backdrop" },
   { id: "aurora", name: "Aurora", description: "Floating accent glow (default)" },
   { id: "abyss", name: "Abyss", description: "Deep sea — drifting marine snow" },
   { id: "nebula", name: "Nebula", description: "Drifting clouds of accent light" },
@@ -246,6 +249,51 @@ export const BASE_THEMES: PresetTheme[] = [
     light: { background: "#f8eef3", foreground: "#2a121f", accentFrom: "#e11d48", accentTo: "#db2777" },
   },
 ];
+
+// Scene effects (#327): how strongly the backdrop shows (intensity, a percent
+// of its full opacity) and how much it moves — "normal" as designed, "calm"
+// at half speed, "off" a still frame. Chosen per mode alongside the scene,
+// saved with a theme and promotable, like the tune. The visitor's own Reduce
+// motion switch (Preferences) overrides the motion to "off" everywhere.
+export type MotionLevel = "normal" | "calm" | "off";
+
+export const MOTION_LEVELS: { id: MotionLevel; name: string; description: string }[] = [
+  { id: "normal", name: "Full", description: "As the scene is designed" },
+  { id: "calm", name: "Calm", description: "Half speed, half the work" },
+  { id: "off", name: "Still", description: "A single frame, no movement" },
+];
+
+export const MOTION_IDS = MOTION_LEVELS.map((m) => m.id) as [MotionLevel, ...MotionLevel[]];
+
+export function isMotionLevel(v: unknown): v is MotionLevel {
+  return typeof v === "string" && (MOTION_IDS as string[]).includes(v);
+}
+
+export type SceneFx = { intensity: number; motion: MotionLevel };
+
+export const DEFAULT_SCENE_FX: SceneFx = { intensity: 100, motion: "normal" };
+
+export function isDefaultSceneFx(fx: SceneFx | null | undefined): boolean {
+  return !fx || (fx.intensity === 100 && fx.motion === "normal");
+}
+
+// Validate stored/imported scene effects, or null. A partial object keeps the
+// defaults for what it lacks.
+export function sanitizeSceneFx(input: unknown): SceneFx | null {
+  if (!input || typeof input !== "object") return null;
+  const raw = input as Record<string, unknown>;
+  const out = { ...DEFAULT_SCENE_FX };
+  let any = false;
+  if (typeof raw.intensity === "number" && Number.isFinite(raw.intensity)) {
+    out.intensity = Math.min(100, Math.max(0, Math.round(raw.intensity)));
+    any = true;
+  }
+  if (isMotionLevel(raw.motion)) {
+    out.motion = raw.motion;
+    any = true;
+  }
+  return any ? out : null;
+}
 
 // Fine-tuning over a design (#326): each knob scales one of the design's
 // surface tokens — radius, border weight, blur, shadow depth, fill (card

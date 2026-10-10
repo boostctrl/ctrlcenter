@@ -402,6 +402,10 @@ function ThemeStep({ settings, onSave, packs }: StepProps & { packs: ThemePack[]
                 foregroundLight: pack.light.foreground,
                 tune: pack.tune,
                 tuneLight: undefined,
+                sceneIntensity: undefined,
+                sceneMotion: undefined,
+                sceneIntensityLight: undefined,
+                sceneMotionLight: undefined,
               },
             },
             { fallback: "Couldn't save the theme" }

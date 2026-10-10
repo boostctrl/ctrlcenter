@@ -18,7 +18,7 @@ export default function Waves({ light }: SceneProps) {
   return (
     <div
       aria-hidden
-      className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
+      className="scene-root pointer-events-none fixed inset-0 -z-10 overflow-hidden"
     >
       {layers.map((l, i) => (
         <svg
@@ -26,7 +26,7 @@ export default function Waves({ light }: SceneProps) {
           className="animate-wave absolute bottom-0 left-0 w-[200%]"
           style={{
             height: l.h,
-            animationDuration: l.dur,
+            animationDuration: `calc(${l.dur} * var(--motion-scale, 1))`,
             fill: `color-mix(in srgb, ${l.color} ${l.pct}%, transparent)`,
           }}
           viewBox="0 0 1440 160"

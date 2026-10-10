@@ -36,7 +36,7 @@ function pointAt(t: Trace, d: number): Pt {
   return { x: last.x, y: last.y };
 }
 
-export default function Traces({ light }: SceneProps) {
+export default function Traces({ light, motion }: SceneProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -45,7 +45,11 @@ export default function Traces({ light }: SceneProps) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reduced =
+      motion === "off" || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Calm motion: advance every other frame — half speed, half the work.
+    const calm = motion === "calm";
+    let tick = 0;
     const dpr = window.devicePixelRatio || 1;
     const traceAlpha = light ? 0.28 : 0.22;
     const padAlpha = light ? 0.5 : 0.45;
@@ -143,6 +147,10 @@ export default function Traces({ light }: SceneProps) {
     };
 
     const draw = () => {
+      if (calm && (tick++ & 1)) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
       drawFrame(false);
       raf = requestAnimationFrame(draw);
     };
@@ -155,10 +163,10 @@ export default function Traces({ light }: SceneProps) {
       window.removeEventListener("resize", resize);
       cancelAnimationFrame(raf);
     };
-  }, [light]);
+  }, [light, motion]);
 
   return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 -z-10">
+    <div aria-hidden className="scene-root pointer-events-none fixed inset-0 -z-10">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
     </div>
   );

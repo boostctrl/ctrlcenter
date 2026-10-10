@@ -9,7 +9,7 @@ import { effectRgbFor } from "./color";
 // time. Distinct from Rain (dense, uniform, slow) and Starfield (stationary
 // twinkle): comets are rare, fast and directional. A pair of frozen streaks
 // is drawn under prefers-reduced-motion.
-export default function Comets({ light }: SceneProps) {
+export default function Comets({ light, motion }: SceneProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -18,7 +18,11 @@ export default function Comets({ light }: SceneProps) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reduced =
+      motion === "off" || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Calm motion: advance every other frame — half speed, half the work.
+    const calm = motion === "calm";
+    let tick = 0;
     const dpr = window.devicePixelRatio || 1;
     const peak = light ? 0.8 : 0.9;
     let w = 0;
@@ -96,6 +100,10 @@ export default function Comets({ light }: SceneProps) {
     };
 
     const draw = () => {
+      if (calm && (tick++ & 1)) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
       ctx.clearRect(0, 0, w, h);
       // Sparse: at most three in flight, spawned on random chance so showers
       // cluster naturally instead of ticking on a metronome.
@@ -124,10 +132,10 @@ export default function Comets({ light }: SceneProps) {
       window.removeEventListener("resize", resize);
       cancelAnimationFrame(raf);
     };
-  }, [light]);
+  }, [light, motion]);
 
   return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 -z-10">
+    <div aria-hidden className="scene-root pointer-events-none fixed inset-0 -z-10">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
     </div>
   );

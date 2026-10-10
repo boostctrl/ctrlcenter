@@ -189,3 +189,21 @@ describe("sanitizeCustomTheme tune (#326)", () => {
     expect(themeInputSchema.parse(site).tuneLight?.blur).toBe(50);
   });
 });
+
+describe("sanitizeCustomTheme scene effects (#327)", () => {
+  const base = {
+    name: "Calm",
+    dark: valid,
+    light: { ...valid, background: "#eceef3", foreground: "#181b24" },
+  };
+
+  it("keeps valid effects per mode and promotes them to the site theme", () => {
+    const t = sanitizeCustomTheme({ ...base, sceneFx: { motion: "calm" }, sceneFxLight: { intensity: 30 } })!;
+    expect(t.sceneFx).toEqual({ intensity: 100, motion: "calm" });
+    expect(t.sceneFxLight).toEqual({ intensity: 30, motion: "normal" });
+    const site = themeInputSchema.parse(siteThemeFromCustomTheme(t, "dark"));
+    expect(site.sceneMotion).toBe("calm");
+    expect(site.sceneIntensityLight).toBe(30);
+    expect(sanitizeCustomTheme({ ...base, sceneFx: { motion: "nope" } })?.sceneFx).toBeUndefined();
+  });
+});

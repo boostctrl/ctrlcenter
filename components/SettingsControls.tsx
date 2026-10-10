@@ -14,6 +14,8 @@ export default function SettingsControls() {
   const {
     theme,
     setTheme,
+    reduceMotion,
+    setReduceMotion,
     timezone,
     units,
     location,
@@ -73,6 +75,25 @@ export default function SettingsControls() {
           />
           <p className="text-xs text-ink-40">
             Light, dark, or follow your device.
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <span className="text-ink-50">Motion</span>
+          <ChipGroup
+            label="Motion"
+            size="md"
+            fit
+            options={[
+              { value: "theme", label: "As themed" },
+              { value: "reduce", label: "Reduced" },
+            ]}
+            value={reduceMotion ? "reduce" : "theme"}
+            onChange={(v) => setReduceMotion(v === "reduce")}
+          />
+          <p className="text-xs text-ink-40">
+            Reduced stills the scene behind the page and the surface animations,
+            whatever the theme says.
           </p>
         </div>
 

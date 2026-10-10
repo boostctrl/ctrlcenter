@@ -8,7 +8,7 @@ import { effectRgbFor } from "./color";
 // with varied speed, length and opacity, alternating between the two accent
 // stops. A faint wash at the base suggests where it lands. A single static
 // frame is drawn under prefers-reduced-motion.
-export default function Rain({ light }: SceneProps) {
+export default function Rain({ light, motion }: SceneProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -17,7 +17,11 @@ export default function Rain({ light }: SceneProps) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reduced =
+      motion === "off" || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Calm motion: advance every other frame — half speed, half the work.
+    const calm = motion === "calm";
+    let tick = 0;
     const dpr = window.devicePixelRatio || 1;
     const alpha = light ? 0.4 : 0.34;
     // A shared wind angle so the shower reads as one weather system.
@@ -83,6 +87,10 @@ export default function Rain({ light }: SceneProps) {
     };
 
     const draw = () => {
+      if (calm && (tick++ & 1)) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
       drawFrame(false);
       raf = requestAnimationFrame(draw);
     };
@@ -95,10 +103,10 @@ export default function Rain({ light }: SceneProps) {
       window.removeEventListener("resize", resize);
       cancelAnimationFrame(raf);
     };
-  }, [light]);
+  }, [light, motion]);
 
   return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 -z-10">
+    <div aria-hidden className="scene-root pointer-events-none fixed inset-0 -z-10">
       {/* A faint pooling wash along the base. */}
       <div
         className="absolute inset-x-0 bottom-0 h-1/4"

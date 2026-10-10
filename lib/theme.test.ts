@@ -3,6 +3,8 @@ import {
   resolveThemePacks,
   sanitizeTune,
   isDefaultTune,
+  sanitizeSceneFx,
+  isDefaultSceneFx,
   DEFAULT_TUNE,
   THEME_PACKS,
   DESIGNS,
@@ -12,9 +14,10 @@ import {
 } from "./theme";
 
 describe("catalog sizes", () => {
-  it("ships 18 designs, 18 scenes, 21 palettes, 12 themes", () => {
+  it("ships 18 designs, 18 scenes plus None, 21 palettes, 12 themes", () => {
     expect(DESIGNS).toHaveLength(18);
-    expect(SCENES).toHaveLength(18);
+    expect(SCENES).toHaveLength(19);
+    expect(SCENES[0].id).toBe("none");
     expect(BASE_THEMES).toHaveLength(21);
     expect(THEME_PACKS).toHaveLength(12);
   });
@@ -95,5 +98,21 @@ describe("sanitizeTune (#326)", () => {
     expect(isDefaultTune(null)).toBe(true);
     expect(isDefaultTune(DEFAULT_TUNE)).toBe(true);
     expect(isDefaultTune({ ...DEFAULT_TUNE, glow: 80 })).toBe(false);
+  });
+});
+
+describe("sanitizeSceneFx (#327)", () => {
+  it("clamps the intensity and validates the motion level", () => {
+    expect(sanitizeSceneFx({ intensity: 140, motion: "calm" })).toEqual({ intensity: 100, motion: "calm" });
+    expect(sanitizeSceneFx({ intensity: 33.4 })).toEqual({ intensity: 33, motion: "normal" });
+    expect(sanitizeSceneFx({ motion: "off" })).toEqual({ intensity: 100, motion: "off" });
+    expect(sanitizeSceneFx({ motion: "fast" })).toBeNull();
+    expect(sanitizeSceneFx(null)).toBeNull();
+  });
+
+  it("knows the as-designed effects", () => {
+    expect(isDefaultSceneFx(null)).toBe(true);
+    expect(isDefaultSceneFx({ intensity: 100, motion: "normal" })).toBe(true);
+    expect(isDefaultSceneFx({ intensity: 100, motion: "calm" })).toBe(false);
   });
 });
