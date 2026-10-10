@@ -421,8 +421,10 @@ export default async function HelpPage() {
             </li>
             <li>
               <strong>Settings → Layout → Groups</strong> lists every group
-              with what&apos;s in it: rename and reorder them there, and
-              delete one once nothing uses it.
+              with what&apos;s in it: rename and reorder them there, give
+              one an icon and a color (shown on its bookmark card&apos;s
+              heading and its apps&apos; tags), and delete one once nothing
+              uses it.
             </li>
             <li>
               <strong>Icons</strong> are matched by name against the
@@ -704,7 +706,8 @@ export default async function HelpPage() {
             first board is the home page; add more in{" "}
             <strong>Settings → Layout → Boards</strong> (a Media board, an
             Infra board…), and each gets its own address, /b/ and the
-            board&apos;s id. Rename and reorder them there, and{" "}
+            board&apos;s id. Rename and reorder them there, give one an icon
+            to show beside its name in the menus, and{" "}
             <strong>Arrange</strong> opens one in the layout editor.
           </P>
           <P>

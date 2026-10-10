@@ -76,10 +76,12 @@ export function useSettingsDraft(
   const boardsSave = useAutosave(boards, async (next, opts) => {
     const before = new Map(savedBoards.current.map((b) => [b.id, b.layout]));
     await saveBoards(
-      next.map(({ id, name, visibility, layout }) => ({
+      next.map(({ id, name, visibility, icon, layout }) => ({
         id,
         name,
         visibility,
+        // Sent every time ("" for none), so clearing one here sticks.
+        icon: icon ?? "",
         ...(JSON.stringify(before.get(id)) === JSON.stringify(layout)
           ? {}
           : { layout: { sections: layout.sections } }),
@@ -214,12 +216,20 @@ export function useSettingsDraft(
         id: newBoardId(name, bs.map((b) => b.id)),
         name: name.trim(),
         visibility: "public",
-        layout: { columns: 24, sections: [] },
+        layout: { sections: [] },
       },
     ]);
   };
-  const updateBoard = (id: string, patch: { name?: string; visibility?: BoardVisibility }) =>
-    setBoards((bs) => bs.map((b) => (b.id === id ? { ...b, ...patch } : b)));
+  // An icon of "" clears it (#316).
+  const updateBoard = (id: string, patch: { name?: string; visibility?: BoardVisibility; icon?: string }) =>
+    setBoards((bs) =>
+      bs.map((b) => {
+        if (b.id !== id) return b;
+        const next = { ...b, ...patch };
+        if (!next.icon) delete next.icon;
+        return next;
+      })
+    );
   const moveBoard = (from: number, to: number) => setBoards((bs) => reorder(bs, from, to));
   const removeBoard = async (id: string, label: string) => {
     if (boards.length <= 1) return;

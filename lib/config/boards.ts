@@ -5,16 +5,21 @@ import type { Board, BoardsUpdate, boardLayoutUpdateSchema } from "../schema";
 import { mutate } from "./store";
 
 // Replace the board list. A board sent without a layout keeps the one stored
-// under its id, and a new board starts empty.
+// under its id, and a new board starts empty. Its icon likewise: left out, the
+// stored one stays (the editor's board menu doesn't send icons); "" removes it.
 export async function replaceBoards(input: BoardsUpdate): Promise<Board[]> {
   return mutate((config) => {
     const stored = new Map(config.boards.map((b) => [b.id, b]));
-    config.boards = input.map(({ layout, ...meta }) => ({
-      ...meta,
-      layout: layout
-        ? { sections: layout.sections }
-        : (stored.get(meta.id)?.layout ?? { sections: [] }),
-    }));
+    config.boards = input.map(({ layout, icon, ...meta }) => {
+      const kept = icon === undefined ? stored.get(meta.id)?.icon : icon;
+      return {
+        ...meta,
+        ...(kept ? { icon: kept } : {}),
+        layout: layout
+          ? { sections: layout.sections }
+          : (stored.get(meta.id)?.layout ?? { sections: [] }),
+      };
+    });
     return config.boards;
   });
 }

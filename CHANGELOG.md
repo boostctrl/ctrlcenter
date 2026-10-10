@@ -59,6 +59,14 @@ here.
   that names the boards it's on. A *Board* menu in the editor switches between
   boards' editors, renames or reorders the current board, sets who can open
   it, deletes it, and starts a new one. (#303, #318)
+- **Icons for boards, icons and colors for groups (3.0).** Give a board an
+  icon in Settings → Layout → Boards and it shows beside the board's name in
+  the corner menu and the page links (on a phone, in place of the name).
+  Give a group an icon and a color in Settings → Layout → Groups and they
+  mark its bookmark card's heading and its apps' group tags. Colors come
+  from a small palette that stays readable in light and dark mode. The icon
+  picker also takes a pasted image address, and offers *No icon* to clear
+  one. (#316)
 - **API widgets (3.0).** Show values from any JSON endpoint — a NAS, a
   router, a home-automation hub, your own script — as a single stat, a gauge,
   label/value rows or a list (Settings → Widgets → API widgets). Point each

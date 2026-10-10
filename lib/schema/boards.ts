@@ -13,6 +13,9 @@ const boardId = z.string().min(1).max(64).regex(BOARD_ID_PATTERN);
 
 export const MAX_BOARDS = 20;
 export const MAX_BOARD_NAME = 60;
+// An icon: what an app's icon takes — a dashboard-icons slug, an image URL,
+// or an uploaded icon's address (#316).
+export const MAX_ICON_LENGTH = 2048;
 
 // Who can open a board: everyone, or only the signed-in admin. A private
 // board is a 404 for everyone else, and never appears in their navigation.
@@ -25,6 +28,9 @@ export const boardSchema = z.object({
   id: boardId,
   name: z.string().max(MAX_BOARD_NAME).catch("").default(""),
   visibility: boardVisibilitySchema.catch("public").default("public"),
+  // Shown before its name in the navigation (#316). Optional, so a board
+  // without one stores nothing.
+  icon: z.string().trim().min(1).max(MAX_ICON_LENGTH).optional().catch(undefined),
   layout: boardLayoutSchema.default(boardLayoutSchema.parse({})),
 });
 export type Board = z.infer<typeof boardSchema>;
@@ -68,13 +74,15 @@ export const newBoardId = (name: string, taken: readonly string[]): string =>
 
 // Admin input (PUT /api/boards): the whole list, in order. A board sent
 // without `layout` keeps its stored rows (a new one starts empty), so this
-// form can't overwrite an arrangement the editor saved meanwhile.
+// form can't overwrite an arrangement the editor saved meanwhile. `icon`
+// works the same way: left out, the stored one stays; "" clears it.
 export const boardsUpdateSchema = z
   .array(
     z.object({
       id: boardId,
       name: z.string().max(MAX_BOARD_NAME),
       visibility: boardVisibilitySchema,
+      icon: z.string().trim().max(MAX_ICON_LENGTH).optional(),
       layout: z.object({ sections: z.array(layoutRowInputSchema).max(MAX_BOARD_ROWS) }).optional(),
     })
   )

@@ -46,4 +46,20 @@ describe("/api/groups and /api/apps/bulk", () => {
     expect((await put([])).status).toBe(409);
     expect((await put([{ id: "a b", name: "X" }])).status).toBe(400);
   });
+
+  it("keeps a group's icon and color, and drops a color outside the palette rather than the group (#316)", async () => {
+    const groups = await (await get()).json();
+    expect(groups.length).toBeGreaterThan(0);
+    const styled = groups.map((g: { id: string; name: string }, i: number) =>
+      i === 0 ? { ...g, icon: "proton", color: "emerald" } : i === 1 ? { ...g, color: "chartreuse" } : g
+    );
+    expect((await put(styled)).status).toBe(200);
+    const after = await (await get()).json();
+    expect(after[0]).toMatchObject({ icon: "proton", color: "emerald" });
+    if (after[1]) {
+      expect(after[1].id).toBe(groups[1].id);
+      expect(after[1]).not.toHaveProperty("color");
+    }
+  });
 });
+

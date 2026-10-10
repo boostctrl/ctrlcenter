@@ -11,9 +11,20 @@ const groupId = z.string().min(1).max(64).regex(GROUP_ID_PATTERN);
 export const MAX_GROUPS = 100;
 export const MAX_GROUP_NAME = 60;
 
+// A group's colour (#316): a small palette, each shade holding 4.5:1 against
+// both the dark and the light surface (the .group-color-* classes in
+// app/globals.css), rather than free hex.
+export const GROUP_COLORS = ["violet", "sky", "emerald", "amber", "rose"] as const;
+export type GroupColor = (typeof GROUP_COLORS)[number];
+export const MAX_GROUP_ICON = 2048;
+
 export const groupSchema = z.object({
   id: groupId,
   name: z.string().trim().min(1).max(MAX_GROUP_NAME),
+  // Optional, shown on its bookmark cards' headings and on app chips; one
+  // that won't parse is dropped rather than losing the group.
+  icon: z.string().trim().min(1).max(MAX_GROUP_ICON).optional().catch(undefined),
+  color: z.enum(GROUP_COLORS).optional().catch(undefined),
 });
 export type Group = z.infer<typeof groupSchema>;
 

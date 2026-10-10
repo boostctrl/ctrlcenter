@@ -13,13 +13,17 @@ const UPLOAD_ACCEPT = ".png,.jpg,.jpeg,.webp,.gif,.svg,.ico,image/*";
 
 // Searchable browser for the dashboard-icons set plus the admin's own uploaded
 // icons, so admins can pick a slug (or a custom image) instead of memorizing it.
-// Clicking an icon fills the field with its slug or served URL.
+// Clicking an icon fills the field with its slug or served URL; an image
+// address typed into the search is offered as is (#316). `onClear`, when
+// given, adds a "No icon" choice.
 export default function IconPicker({
   onPick,
   onClose,
+  onClear,
 }: {
   onPick: (slug: string) => void;
   onClose: () => void;
+  onClear?: () => void;
 }) {
   const [slugs, setSlugs] = useState<string[] | null>(null);
   const [error, setError] = useState(false);
@@ -87,6 +91,8 @@ export default function IconPicker({
     : uploaded;
 
   const shown = results.slice(0, MAX_RESULTS);
+  // An image address typed into the search, offered as the icon itself.
+  const typedUrl = /^https?:\/\/\S+$/i.test(query.trim()) ? query.trim() : "";
 
   // Portaled to <body> so the overlay escapes the admin settings card's stacking
   // context: a .glass-card's backdrop-filter creates one (and a containing block
@@ -118,6 +124,18 @@ export default function IconPicker({
                 e.target.value = "";
               }}
             />
+            {onClear && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClear();
+                  onClose();
+                }}
+                className="rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-ink-80 transition-colors hover:bg-fg/10"
+              >
+                No icon
+              </button>
+            )}
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
@@ -143,9 +161,24 @@ export default function IconPicker({
           ref={inputRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search icons…"
+          placeholder="Search icons, or paste an image address…"
+          aria-label="Search icons, or paste an image address"
           className="accent-focus w-full rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-fg outline-none transition-colors"
         />
+
+        {typedUrl && (
+          <button
+            type="button"
+            onClick={() => {
+              onPick(typedUrl);
+              onClose();
+            }}
+            className="flex items-center gap-3 self-start rounded-lg border border-fg/10 bg-fg/[0.03] px-3 py-2 text-sm text-ink-80 transition-colors hover:border-fg/30 hover:bg-fg/[0.06]"
+          >
+            <Icon icon={typedUrl} name="?" size={24} />
+            Use this image address
+          </button>
+        )}
 
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
           {shownUploaded.length > 0 && (

@@ -623,6 +623,19 @@ select optgroup {
   .theme-light .btn-danger {
     color: var(--color-red-800);
   }
+  /* A group's color (#316, lib/schema/groups.ts GROUP_COLORS): a pale shade
+     on the dark surface and a deep one on the light surface, so its name
+     keeps 4.5:1 either way. */
+  .group-color-violet { color: var(--color-violet-300); }
+  .group-color-sky { color: var(--color-sky-300); }
+  .group-color-emerald { color: var(--color-emerald-300); }
+  .group-color-amber { color: var(--color-amber-300); }
+  .group-color-rose { color: var(--color-rose-300); }
+  .theme-light .group-color-violet { color: var(--color-violet-800); }
+  .theme-light .group-color-sky { color: var(--color-sky-800); }
+  .theme-light .group-color-emerald { color: var(--color-emerald-800); }
+  .theme-light .group-color-amber { color: var(--color-amber-800); }
+  .theme-light .group-color-rose { color: var(--color-rose-800); }
   /* A glow on top of the border tint: the 1px border change alone was barely
      visible, and links using this class have no border at all (#274). */
   .accent-focus:focus-visible {

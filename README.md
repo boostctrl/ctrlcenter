@@ -286,7 +286,6 @@ boards:                     # the dashboards; the first is the home page, the
     name: Home
     visibility: public      # public | private (only the signed-in admin)
     layout:
-      columns: 24
       sections:             # order = position; widgets flow row by row
         - { widget: greeting, span: 16 }    # `widget` names an instance below
         - { widget: headerCard, span: 8 }
@@ -302,6 +301,8 @@ boards:                     # the dashboards; the first is the home page, the
   - id: infra
     name: Infra
     visibility: private
+    icon: proxmox           # optional, beside its name in the menus: a slug,
+                            # an image URL or an uploaded icon, like an app's
     layout:
       sections:
         - { widget: todo, span: 12 }
@@ -334,8 +335,9 @@ integrations:               # the private Monitor page's connections, any number
       apiKey: "${PORTAINER_TOKEN}", allowActions: true }
 
 groups:                     # what apps and bookmarks are sorted into, in order
-  - { id: media, name: Media }
-  - { id: shopping, name: Shopping }
+  - { id: media, name: Media, icon: jellyfin, color: violet }  # icon and color
+  - { id: shopping, name: Shopping }  # optional; color: violet | sky | emerald
+                                      # | amber | rose
 
 apps:
   - id: <uuid>

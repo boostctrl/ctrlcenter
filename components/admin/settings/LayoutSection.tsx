@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { buttonClasses } from "@/lib/buttons";
-import { boardName, MAX_BOARD_NAME, MAX_BOARDS, MAX_GROUP_NAME } from "@/lib/schema";
+import { boardName, GROUP_COLORS, MAX_BOARD_NAME, MAX_BOARDS, MAX_GROUP_NAME, type GroupColor } from "@/lib/schema";
+import IconChooser from "../IconChooser";
 import { findGroupByName, groupUsage } from "@/lib/groups";
 import { useConfirm } from "../Confirm";
 import { useToast } from "../Toast";
@@ -26,7 +27,7 @@ function BoardsCard({ d }: { d: SettingsDraft }) {
   return (
     <Card
       title="Boards"
-      intro="Separate dashboards, each with its own arrangement of widgets. The first board is the home page; switch boards from the corner menu, or with the 1–9, [ and ] keys. A private board is only there for you, signed in."
+      intro="Separate dashboards, each with its own arrangement of widgets. The first board is the home page; switch boards from the corner menu, or with the 1–9, [ and ] keys. A private board is only there for you, signed in. A board's icon shows beside its name in the menus."
     >
       <ListPanel>
         {boards.map((b, i) => {
@@ -38,6 +39,12 @@ function BoardsCard({ d }: { d: SettingsDraft }) {
                 {boards.length > 1 && (
                   <MoveButtons index={i} count={boards.length} label={`${label} board`} onMove={moveBoard} />
                 )}
+                <IconChooser
+                  value={b.icon ?? ""}
+                  onChange={(icon) => updateBoard(b.id, { icon })}
+                  label={`Icon for the ${label} board`}
+                  name={label}
+                />
                 <input
                   value={b.name}
                   maxLength={MAX_BOARD_NAME}
@@ -112,6 +119,14 @@ function BoardsCard({ d }: { d: SettingsDraft }) {
   );
 }
 
+const COLOR_LABELS: Record<GroupColor, string> = {
+  violet: "Violet",
+  sky: "Sky",
+  emerald: "Emerald",
+  amber: "Amber",
+  rose: "Rose",
+};
+
 // The groups apps and bookmarks belong to (#299): rename (onto another
 // group's name merges the two), reorder (the bookmarks widgets' order), and
 // delete once nothing uses a group. Groups are made by naming one in an app
@@ -125,6 +140,15 @@ function GroupsCard({ groupsState, items }: { groupsState: GroupsState; items: I
   const confirm = useConfirm();
   const toast = useToast();
   const usage = groupUsage(items.apps, items.bookmarks);
+  // The list with one group's icon or color changed; "" or undefined drops it.
+  const withStyle = (id: string, patch: { icon?: string; color?: GroupColor }) =>
+    groups.map((g) => {
+      if (g.id !== id) return g;
+      const next = { ...g, ...patch };
+      if (!next.icon) delete next.icon;
+      if (!next.color) delete next.color;
+      return next;
+    });
   const persist = async (next: typeof groups, done: string) => {
     try {
       // The items' groups, for the usage counts; a merge moves some.
@@ -159,7 +183,7 @@ function GroupsCard({ groupsState, items }: { groupsState: GroupsState; items: I
   return (
     <Card
       title="Groups"
-      intro="The groups apps and bookmarks belong to. Bookmarks widgets list them in this order, and an Applications widget can show one. Start a group by naming it in an app or bookmark form."
+      intro="The groups apps and bookmarks belong to. Bookmarks widgets list them in this order, and an Applications widget can show one. Start a group by naming it in an app or bookmark form. An icon and a color mark a group's bookmark card and its app tags."
     >
       {groups.length === 0 ? (
         <Hint>No groups yet.</Hint>
@@ -187,6 +211,12 @@ function GroupsCard({ groupsState, items }: { groupsState: GroupsState; items: I
                     }}
                   />
                 )}
+                <IconChooser
+                  value={g.icon ?? ""}
+                  onChange={(icon) => void persist(withStyle(g.id, { icon }), "Group icon saved")}
+                  label={`Icon for the ${g.name} group`}
+                  name={g.name}
+                />
                 <input
                   value={names[g.id] ?? g.name}
                   maxLength={MAX_GROUP_NAME}
@@ -199,6 +229,24 @@ function GroupsCard({ groupsState, items }: { groupsState: GroupsState; items: I
                   aria-label={`Name of the ${g.name} group`}
                   className={`${controlClasses} min-w-0 flex-1 basis-40`}
                 />
+                <select
+                  value={g.color ?? ""}
+                  onChange={(e) =>
+                    void persist(
+                      withStyle(g.id, { color: (e.target.value || undefined) as GroupColor | undefined }),
+                      "Group color saved"
+                    )
+                  }
+                  aria-label={`Color of the ${g.name} group`}
+                  className={`${controlClasses} ${g.color ? `group-color-${g.color}` : ""}`}
+                >
+                  <option value="">No color</option>
+                  {GROUP_COLORS.map((c) => (
+                    <option key={c} value={c}>
+                      {COLOR_LABELS[c]}
+                    </option>
+                  ))}
+                </select>
                 <span className="w-32 shrink-0 text-right text-xs text-ink-55">{count}</span>
                 {!u && (
                   <RemoveButton

@@ -379,12 +379,23 @@ async function addBoards() {
         id: "media",
         name: "Media",
         visibility: "public",
+        // A board icon in the menus (#316).
+        icon: "jellyfin",
         layout: { sections: [{ widget: "search" }, { widget: "bookmarks" }] },
       },
       { id: "infra", name: "Infra", visibility: "private", layout: { sections: [{ widget: "apps" }] } },
     ],
   });
   if (!res.ok()) throw new Error(`adding boards failed: HTTP ${res.status()}`);
+  // Group icons and colors (#316) on the example's bookmark groups, so their
+  // headings are audited in both schemes: one of each palette color.
+  const groups = await (await ctx.request.get(`${base}/api/groups`)).json();
+  const colors = ["violet", "sky", "emerald", "amber", "rose"];
+  const styled = await ctx.request.put(`${base}/api/groups`, {
+    headers: { Origin: base },
+    data: groups.map((g, i) => ({ ...g, color: colors[i % colors.length], ...(i === 0 ? { icon: "amazon" } : {}) })),
+  });
+  if (!styled.ok()) throw new Error(`styling groups failed: HTTP ${styled.status()}`);
   // Two of one integration type (#300), pointed at a closed local port so the
   // Monitor renders their offline tiles without reaching anything real.
   const dead = `http://127.0.0.1:${await freePort()}`;

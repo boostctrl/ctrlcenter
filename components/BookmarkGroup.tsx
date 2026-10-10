@@ -1,21 +1,31 @@
 import Icon from "./Icon";
-import type { BookmarkItem } from "@/lib/schema";
+import type { BookmarkItem, GroupColor } from "@/lib/schema";
 
 // `topId` marks the search's top match (the link Enter opens), #274.
 export default function BookmarkGroup({
   name,
+  icon,
+  color,
   items,
   topId = null,
 }: {
-  // The group's name (#299).
+  // The group's name (#299), and its own icon and color (#316).
   name: string;
+  icon?: string;
+  color?: GroupColor;
   items: BookmarkItem[];
   topId?: string | null;
 }) {
   return (
     <div className="glass-card px-5 py-4">
-      <h3 className="accent-label mb-3 text-xs font-semibold tracking-[0.18em] uppercase">
-        {name}
+      <h3
+        className={`mb-3 flex items-center gap-2 text-xs font-semibold tracking-[0.18em] uppercase ${
+          color ? `group-color-${color}` : ""
+        }`}
+      >
+        {icon && <Icon icon={icon} name={name} size={16} />}
+        {/* The accent gradient unless the group has its own color. */}
+        <span className={`min-w-0 truncate ${color ? "" : "accent-label"}`}>{name}</span>
       </h3>
       <ul className="space-y-1">
         {items.map((b) => (

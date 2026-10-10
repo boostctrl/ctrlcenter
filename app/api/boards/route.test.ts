@@ -34,6 +34,18 @@ describe("PUT /api/boards", () => {
     expect((await put([{ id: "a b", name: "", visibility: "public" }])).status).toBe(400);
   });
 
+  it("sets a board's icon, keeps it when a save leaves it out, and clears it with \"\" (#316)", async () => {
+    const current = (await stored()).boards.map(({ id, name, visibility }) => ({ id, name, visibility }));
+    const home = current[0].id;
+    expect((await put(current.map((b) => (b.id === home ? { ...b, icon: "jellyfin" } : b)))).status).toBe(200);
+    expect((await stored()).boards[0].icon).toBe("jellyfin");
+    // The editor's board menu saves without icons.
+    expect((await put(current)).status).toBe(200);
+    expect((await stored()).boards[0].icon).toBe("jellyfin");
+    expect((await put(current.map((b) => (b.id === home ? { ...b, icon: "" } : b)))).status).toBe(200);
+    expect((await stored()).boards[0]).not.toHaveProperty("icon");
+  });
+
   it("keeps a board's stored rows when none are sent, and starts a new board empty", async () => {
     const before = (await stored()).boards[0].layout;
     const res = await put([

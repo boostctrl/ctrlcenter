@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useEditMode } from "./EditMode";
 import type { NavPages } from "@/lib/nav";
+import Icon from "./Icon";
 
 // The floating corner control — the old settings gear, evolved into a small menu
 // that links to every enabled page so navigation is reachable from anywhere
@@ -65,8 +66,9 @@ export default function FloatingNav({ boards, weather, status, calendar }: NavPa
                   <span
                     key={b.id}
                     aria-current="page"
-                    className="px-4 py-2 text-sm font-medium text-ink-90"
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-ink-90"
                   >
+                    {b.icon && <Icon icon={b.icon} name={b.name} size={18} />}
                     {b.name}
                   </span>
                 ) : (
@@ -74,8 +76,9 @@ export default function FloatingNav({ boards, weather, status, calendar }: NavPa
                     key={b.id}
                     href={b.href}
                     onClick={() => setOpen(false)}
-                    className="px-4 py-2 text-sm text-ink-70 transition-colors hover:bg-fg/10 hover:text-fg"
+                    className="flex items-center gap-2 px-4 py-2 text-sm text-ink-70 transition-colors hover:bg-fg/10 hover:text-fg"
                   >
+                    {b.icon && <Icon icon={b.icon} name={b.name} size={18} />}
                     {b.name}
                   </Link>
                 )

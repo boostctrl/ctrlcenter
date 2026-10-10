@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import type { AppItem } from "@/lib/schema";
+import type { AppItem, Group } from "@/lib/schema";
 import { CHECK_TYPES, type CheckType } from "@/lib/status";
 import Icon from "@/components/Icon";
 import { ChipGroup } from "@/components/ChipGroup";
@@ -434,11 +434,7 @@ export default function AppsManager({
                 </p>
                 {(app.group || app.tags.length > 0) && (
                   <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-ink-55">
-                    {app.group && (
-                      <span className="rounded-full border border-fg/15 px-2 py-0.5">
-                        {groupName(groups, app.group)}
-                      </span>
-                    )}
+                    {app.group && <GroupChip group={groups.find((g) => g.id === app.group)} name={groupName(groups, app.group)} />}
                     {app.tags.map((t) => (
                       <span key={t} className="rounded-full bg-fg/[0.06] px-2 py-0.5">
                         #{t}
@@ -841,5 +837,19 @@ function BulkBar({
         Clear selection
       </Button>
     </div>
+  );
+}
+
+// An app's group, with the group's own icon and color when it has them (#316).
+function GroupChip({ group, name }: { group?: Group; name: string }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border border-fg/15 px-2 py-0.5 ${
+        group?.color ? `group-color-${group.color}` : ""
+      }`}
+    >
+      {group?.icon && <Icon icon={group.icon} name={name} size={12} />}
+      {name}
+    </span>
   );
 }

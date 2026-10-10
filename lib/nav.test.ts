@@ -6,7 +6,7 @@ import { boardsSchema, newInstance, settingsSchema } from "./schema";
 const boards = boardsSchema.parse([
   { id: "home", name: "Home", layout: { sections: [{ widget: "cal-public" }] } },
   { id: "infra", name: "Infra", visibility: "private", layout: { sections: [{ widget: "cal-private" }] } },
-  { id: "media", layout: { sections: [{ widget: "cal-hidden", hidden: true }] } },
+  { id: "media", icon: "jellyfin", layout: { sections: [{ widget: "cal-hidden", hidden: true }] } },
 ]);
 const cal = (id: string) => ({ ...newInstance("calendar", id), url: `https://cal.test/${id}.ics` });
 const widgets = [cal("cal-public"), cal("cal-private"), cal("cal-hidden"), { ...newInstance("calendar", "cal-nourl") }];
@@ -18,16 +18,16 @@ describe("visibleBoards / navBoards", () => {
     expect(visibleBoards(boards, false).map((b) => b.id)).toEqual(["home", "media"]);
   });
 
-  it("links the visitor's first board to / and names a nameless one by id", () => {
+  it("links the visitor's first board to / and names a nameless one by id, with its icon (#316)", () => {
     expect(navBoards(boards, false)).toEqual([
-      { id: "home", name: "Home", href: "/" },
-      { id: "media", name: "media", href: "/b/media" },
+      { id: "home", name: "Home", href: "/", icon: "" },
+      { id: "media", name: "media", href: "/b/media", icon: "jellyfin" },
     ]);
   });
 
   it("makes the first public board a guest's home when the first board is private", () => {
     const privateFirst = boardsSchema.parse([{ id: "mine", visibility: "private" }, { id: "family" }]);
-    expect(navBoards(privateFirst, false)).toEqual([{ id: "family", name: "family", href: "/" }]);
+    expect(navBoards(privateFirst, false)).toEqual([{ id: "family", name: "family", href: "/", icon: "" }]);
     expect(navBoards(privateFirst, true).map((b) => b.href)).toEqual(["/", "/b/family"]);
   });
 });

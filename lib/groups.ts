@@ -19,7 +19,8 @@ export function findGroupByName(groups: readonly Group[], name: string): Group |
   return key ? groups.find((g) => g.name.trim().toLowerCase() === key) : undefined;
 }
 
-export type BookmarkGroupView = { id: string; name: string; items: BookmarkItem[] };
+// `icon` and `color` are the group's own (#316), absent when it has none.
+export type BookmarkGroupView = { id: string; name: string; items: BookmarkItem[] } & Pick<Group, "icon" | "color">;
 
 // Bookmarks under their groups: groups in list order, then any group id the
 // list doesn't carry in first-seen order, each keeping the bookmarks' own
@@ -41,7 +42,14 @@ export function groupBookmarks(
     const items = byGroup.get(id);
     if (!items || done.has(id)) continue;
     done.add(id);
-    out.push({ id, name: groupName(groups, id), items });
+    const group = groups.find((g) => g.id === id);
+    out.push({
+      id,
+      name: groupName(groups, id),
+      items,
+      ...(group?.icon ? { icon: group.icon } : {}),
+      ...(group?.color ? { color: group.color } : {}),
+    });
   }
   return out;
 }

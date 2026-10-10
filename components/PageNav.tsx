@@ -1,5 +1,6 @@
 import Link from "next/link";
 import BackHome from "./BackHome";
+import Icon from "./Icon";
 import type { NavPages } from "@/lib/nav";
 
 // The shared subpage navigation strip (#164): one identical row at the top of
@@ -12,7 +13,9 @@ import type { NavPages } from "@/lib/nav";
 // renders the strip with no current page: it's a gated portal, not a sibling
 // page, so it isn't listed here (it stays in the floating menu). With more
 // than one board (#298), the boards after the home board follow the back-home
-// link, which stands for the home board.
+// link, which stands for the home board. A board with an icon (#316) shows it
+// before its name, and on phones in place of it (the name stays for screen
+// readers), the way BackHome goes icon-only there.
 
 export type PageNavCurrent =
   | "weather"
@@ -31,13 +34,13 @@ export default function PageNav({
 }: NavPages & { current: PageNavCurrent }) {
   const pages = (
     [
-      ...boards.slice(1).map((b) => ({ key: `board:${b.id}`, href: b.href, label: b.name })),
+      ...boards.slice(1).map((b) => ({ key: `board:${b.id}`, href: b.href, label: b.name, icon: b.icon })),
       weather ? { key: "weather", href: "/weather", label: "Weather" } : null,
       status ? { key: "status", href: "/status", label: "Status" } : null,
       calendar ? { key: "calendar", href: "/calendar", label: "Calendar" } : null,
       { key: "help", href: "/help", label: "Help" },
       { key: "settings", href: "/settings", label: "Settings" },
-    ].filter(Boolean) as { key: string; href: string; label: string }[]
+    ].filter(Boolean) as { key: string; href: string; label: string; icon?: string }[]
   );
 
   return (
@@ -55,20 +58,30 @@ export default function PageNav({
           <span
             key={p.key}
             aria-current="page"
-            className="text-sm font-medium text-ink-90"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-90"
           >
-            {p.label}
+            <PageLabel {...p} />
           </span>
         ) : (
           <Link
             key={p.key}
             href={p.href}
-            className="text-sm text-ink-50 transition-colors hover:text-ink-80"
+            className="inline-flex items-center gap-1.5 text-sm text-ink-50 transition-colors hover:text-ink-80"
           >
-            {p.label}
+            <PageLabel {...p} />
           </Link>
         )
       )}
     </nav>
+  );
+}
+
+function PageLabel({ label, icon }: { label: string; icon?: string }) {
+  if (!icon) return <>{label}</>;
+  return (
+    <>
+      <Icon icon={icon} name={label} size={16} />
+      <span className="max-sm:sr-only">{label}</span>
+    </>
   );
 }

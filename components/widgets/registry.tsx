@@ -277,7 +277,7 @@ export const WIDGET_RENDERERS: Record<WidgetType, Renderer> = {
         {!widget.hideLabel && <SectionTitle>{w.title.trim() || "Bookmarks"}</SectionTitle>}
         <div className={cardGridClass(widget, "gap-6")}>
           {groups.map((g) => (
-            <BookmarkGroup key={g.id} name={g.name} items={g.items} topId={topMatchId} />
+            <BookmarkGroup key={g.id} name={g.name} icon={g.icon} color={g.color} items={g.items} topId={topMatchId} />
           ))}
         </div>
       </section>

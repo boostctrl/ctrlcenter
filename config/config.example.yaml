@@ -19,7 +19,6 @@ settings:
 #   - id: home
 #     name: Home
 #     layout:
-#       columns: 24
 #       sections:
 #         - { widget: greeting, span: 16 }
 #         - { widget: headerCard, span: 8 }           # clock/weather/status card

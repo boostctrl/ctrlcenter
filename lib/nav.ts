@@ -13,12 +13,14 @@ export function visibleBoards<B extends Pick<Board, "visibility">>(boards: reado
 
 // A board link as the navigation shows it. The first board the visitor can
 // open is their home page, at `/`.
-export type NavBoard = { id: string; name: string; href: string };
+// `icon` is "" for a board without one (#316).
+export type NavBoard = { id: string; name: string; href: string; icon: string };
 export function navBoards(boards: readonly Board[], isAdmin: boolean): NavBoard[] {
   return visibleBoards(boards, isAdmin).map((b, i) => ({
     id: b.id,
     name: boardName(b),
     href: i === 0 ? "/" : `/b/${encodeURIComponent(b.id)}`,
+    icon: b.icon ?? "",
   }));
 }
 

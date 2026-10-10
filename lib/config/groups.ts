@@ -36,7 +36,13 @@ export async function replaceGroups(input: Group[]): Promise<GroupsResult> {
     for (const g of input) {
       const same = findGroupByName(next, g.name);
       if (same) merged.set(g.id, same.id);
-      else next.push({ id: g.id, name: g.name.trim() });
+      else
+        next.push({
+          id: g.id,
+          name: g.name.trim(),
+          ...(g.icon ? { icon: g.icon } : {}),
+          ...(g.color ? { color: g.color } : {}),
+        });
     }
     const moveTo = (id: string) => merged.get(id) ?? id;
     for (const a of config.apps) a.group = moveTo(a.group);
