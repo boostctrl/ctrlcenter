@@ -3,11 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { buttonClasses } from "@/lib/buttons";
-import { boardName, MAX_BOARD_NAME, MAX_BOARDS, MAX_GROUP_NAME, type AppItem, type BookmarkItem } from "@/lib/schema";
+import { boardName, MAX_BOARD_NAME, MAX_BOARDS, MAX_GROUP_NAME } from "@/lib/schema";
 import { findGroupByName, groupUsage } from "@/lib/groups";
 import { useConfirm } from "../Confirm";
 import { useToast } from "../Toast";
 import type { GroupsState } from "../useGroups";
+import type { ItemsState } from "../useAdminData";
 import { Button, Card, Hint, ListPanel, MoveButtons, RemoveButton, ToggleRow, controlClasses } from "../ui";
 import type { SettingsDraft } from "./useSettingsDraft";
 
@@ -115,18 +116,8 @@ function BoardsCard({ d }: { d: SettingsDraft }) {
 // group's name merges the two), reorder (the bookmarks widgets' order), and
 // delete once nothing uses a group. Groups are made by naming one in an app
 // or bookmark form.
-function GroupsCard({
-  groupsState,
-  initialApps,
-  initialBookmarks,
-}: {
-  groupsState: GroupsState;
-  initialApps: Pick<AppItem, "group">[];
-  initialBookmarks: Pick<BookmarkItem, "group">[];
-}) {
+function GroupsCard({ groupsState, items }: { groupsState: GroupsState; items: ItemsState }) {
   const { groups, save } = groupsState;
-  // The items' groups, for the usage counts; a merge moves some.
-  const [items, setItems] = useState({ apps: initialApps, bookmarks: initialBookmarks });
   // Names being typed, by group id, until committed on blur or Enter.
   const [names, setNames] = useState<Record<string, string>>({});
   const dropName = (id: string) =>
@@ -136,8 +127,10 @@ function GroupsCard({
   const usage = groupUsage(items.apps, items.bookmarks);
   const persist = async (next: typeof groups, done: string) => {
     try {
+      // The items' groups, for the usage counts; a merge moves some.
       const moved = await save(next);
-      setItems(moved);
+      items.setApps(moved.apps);
+      items.setBookmarks(moved.bookmarks);
       toast(done);
     } catch (e) {
       toast(e instanceof Error ? e.message : "Couldn't save the groups", "error");
@@ -225,13 +218,11 @@ function GroupsCard({
 export default function LayoutSection({
   d,
   groupsState,
-  initialApps,
-  initialBookmarks,
+  items,
 }: {
   d: SettingsDraft;
   groupsState: GroupsState;
-  initialApps: Pick<AppItem, "group">[];
-  initialBookmarks: Pick<BookmarkItem, "group">[];
+  items: ItemsState;
 }) {
   const { settings, setSettings, isWidgetShown, setWidgetShown, widgetToggles, instancesOf, updateWidget, widgetLabels } =
     d;
@@ -239,7 +230,7 @@ export default function LayoutSection({
   return (
     <>
       <BoardsCard d={d} />
-      <GroupsCard groupsState={groupsState} initialApps={initialApps} initialBookmarks={initialBookmarks} />
+      <GroupsCard groupsState={groupsState} items={items} />
       <Card
         title="Visible widgets"
         intro="Show or hide widgets on the home page (the first board). The content widgets (calendars, feeds, notes…) each have their own switch under Widgets; the split clock/weather/status widgets are managed in the home-page editor."

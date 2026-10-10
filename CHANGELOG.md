@@ -132,6 +132,13 @@ here.
 
 ### Fixed
 
+- **Admin tabs.** Switching between the admin tabs no longer shows an old
+  copy of your apps and bookmarks: an app added, edited or removed is listed
+  as it is now when you come back, and Settings sees it straight away (its
+  app filters, tags and group counts). Settings and Themes also keep your
+  place and any edits in progress across a switch, and Settings' theme
+  pickers show a theme renamed or recoloured in Themes. Before, editing an
+  app from the old list could undo a change made since. (#317)
 - **Notes headings.** A note's headings now follow on from its card's
   title, so one that starts with `##` no longer skips a heading level for
   screen readers.

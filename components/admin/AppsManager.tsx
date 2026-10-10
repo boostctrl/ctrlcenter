@@ -32,6 +32,7 @@ import { CopyUrlField, useOrigin } from "./CopyUrlField";
 import { apiErrorMessage } from "./apiError";
 import { allTags, groupName } from "@/lib/groups";
 import type { GroupsState } from "./useGroups";
+import type { ItemsState } from "./useAdminData";
 
 type FormState = {
   name: string;
@@ -136,13 +137,13 @@ function modeFromExpect(v: string): UpMode {
 }
 
 export default function AppsManager({
-  initialApps,
+  items,
   groupsState,
   statusChecksEnabled,
   statusInterval,
 }: {
-  initialApps: AppItem[];
-  // The shared group list (#299).
+  // The shared app list (#317) and group list (#299).
+  items: ItemsState;
   groupsState: GroupsState;
   // From the server-rendered settings; toggling checks this session updates on
   // reload, like the nav flags.
@@ -150,7 +151,7 @@ export default function AppsManager({
   // The global check interval (minutes), shown as the per-app default.
   statusInterval: number;
 }) {
-  const [apps, setApps] = useState(initialApps);
+  const { apps, setApps } = items;
   const [form, setForm] = useState<FormState>(emptyForm);
   const [upMode, setUpMode] = useState<UpMode>("any");
   const [editingId, setEditingId] = useState<string | null>(null);

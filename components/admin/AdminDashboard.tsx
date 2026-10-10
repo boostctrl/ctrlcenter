@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import type {
   AppItem,
   BookmarkItem,
@@ -15,13 +15,13 @@ import type {
 import AppsManager from "./AppsManager";
 import BookmarksManager from "./BookmarksManager";
 import SettingsManager from "./SettingsManager";
-import { monitoredApps } from "@/lib/schema";
 import ThemesManager from "./ThemesManager";
 import PageNav from "@/components/PageNav";
 import { useEdgeFade } from "@/components/useEdgeFade";
 import { resolveThemePacks } from "@/lib/theme";
 import { navPages } from "@/lib/nav";
 import { useGroups } from "./useGroups";
+import { useItems, useThemeOverrides } from "./useAdminData";
 import { downloadJson } from "@/lib/download";
 import { buttonClasses } from "@/lib/buttons";
 import { Button } from "./ui";
@@ -87,14 +87,25 @@ function AdminBody({
   initialTab,
   initialSection,
 }: Props) {
-  // The groups (#299), shared by the Applications, Bookmarks and Settings
-  // tabs, which remount on every switch.
+  // The groups (#299) and the apps and bookmarks (#317), shared by the
+  // Applications, Bookmarks and Settings tabs.
   const groupsState = useGroups(initialGroups);
+  const items = useItems(initialApps, initialBookmarks);
+  // Likewise the theme overrides, edited in Themes and offered in Settings.
+  const themes = useThemeOverrides(initialThemes);
+  const themePacks = useMemo(
+    () => resolveThemePacks(Object.values(themes.overrides)),
+    [themes.overrides]
+  );
   // The URL is the initial source of truth (?tab=settings deep-links and
   // survives refresh); an unknown value falls back to the first tab.
   const [tab, setTab] = useState<Tab>(() =>
     TABS.some((t) => t.key === initialTab) ? (initialTab as Tab) : "apps"
   );
+  // A tab mounts when first opened and then stays mounted, hidden while
+  // another is showing, so what it holds — the Settings and Themes drafts, a
+  // half-filled form — is still there on the way back (#317).
+  const [opened, setOpened] = useState<ReadonlySet<Tab>>(() => new Set([tab]));
   const fileRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
   const confirm = useConfirm();
@@ -119,6 +130,7 @@ function AdminBody({
 
   function selectTab(next: Tab) {
     setTab(next);
+    setOpened((s) => (s.has(next) ? s : new Set(s).add(next)));
     replaceUrlParams((params) => {
       params.set("tab", next);
       // `section` belongs to the settings tab alone.
@@ -289,35 +301,40 @@ function AdminBody({
         ))}
       </div>
 
-      {tab === "apps" && (
-        <AppsManager
-          initialApps={initialApps}
-          groupsState={groupsState}
-          statusChecksEnabled={initialSettings.statusChecks}
-          statusInterval={initialSettings.statusInterval}
-        />
+      {opened.has("apps") && (
+        <div hidden={tab !== "apps"}>
+          <AppsManager
+            items={items}
+            groupsState={groupsState}
+            statusChecksEnabled={initialSettings.statusChecks}
+            statusInterval={initialSettings.statusInterval}
+          />
+        </div>
       )}
-      {tab === "bookmarks" && (
-        <BookmarksManager
-          initialBookmarks={initialBookmarks}
-          groupsState={groupsState}
-        />
+      {opened.has("bookmarks") && (
+        <div hidden={tab !== "bookmarks"}>
+          <BookmarksManager items={items} groupsState={groupsState} />
+        </div>
       )}
-      {tab === "themes" && <ThemesManager initialOverrides={initialThemes} />}
-      {tab === "settings" && (
-        <SettingsManager
-          initialSettings={initialSettings}
-          initialWidgets={initialWidgets}
-          initialBoards={initialBoards}
-          initialIntegrations={initialIntegrations}
-          groupsState={groupsState}
-          initialApps={initialApps}
-          initialBookmarks={initialBookmarks}
-          apps={monitoredApps(initialApps).map(({ id, name }) => ({ id, name }))}
-          themePacks={resolveThemePacks(initialThemes)}
-          initialSection={initialSection}
-          initialTwoFactorEnabled={initialTwoFactorEnabled}
-        />
+      {opened.has("themes") && (
+        <div hidden={tab !== "themes"}>
+          <ThemesManager themes={themes} />
+        </div>
+      )}
+      {opened.has("settings") && (
+        <div hidden={tab !== "settings"}>
+          <SettingsManager
+            initialSettings={initialSettings}
+            initialWidgets={initialWidgets}
+            initialBoards={initialBoards}
+            initialIntegrations={initialIntegrations}
+            groupsState={groupsState}
+            items={items}
+            themePacks={themePacks}
+            initialSection={initialSection}
+            initialTwoFactorEnabled={initialTwoFactorEnabled}
+          />
+        </div>
       )}
     </main>
   );

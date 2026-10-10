@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
-import type { AppItem, Board, BookmarkItem, Integration, Settings, WidgetInstance } from "@/lib/schema";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { monitoredApps, type Board, type Integration, type Settings, type WidgetInstance } from "@/lib/schema";
 import { allTags } from "@/lib/groups";
 import type { GroupsState } from "./useGroups";
+import type { ItemsState } from "./useAdminData";
 import type { ThemePack } from "@/lib/theme";
 import { replaceUrlParams } from "./urlState";
 import { SaveStatus } from "./useAutosave";
@@ -31,9 +32,7 @@ export default function SettingsManager({
   initialBoards,
   initialIntegrations,
   groupsState,
-  initialApps,
-  initialBookmarks,
-  apps,
+  items,
   themePacks,
   initialSection,
   initialTwoFactorEnabled,
@@ -45,14 +44,12 @@ export default function SettingsManager({
   initialBoards: Board[];
   // The integrations (#300), edited in the Integrations section.
   initialIntegrations: Integration[];
-  // The groups (#299), shared with the other tabs; and the items, for the
-  // groups' usage counts and the tags the apps filter offers.
+  // The groups (#299) and the apps and bookmarks (#317), shared with the
+  // other tabs: for the groups' usage counts, the tags the apps filter
+  // offers, and the monitored apps the alert channels and maintenance
+  // windows pick from.
   groupsState: GroupsState;
-  initialApps: AppItem[];
-  initialBookmarks: BookmarkItem[];
-  // The monitored apps, for the alert channels' app filter and maintenance
-  // windows.
-  apps: { id: string; name: string }[];
+  items: ItemsState;
   themePacks: ThemePack[];
   // The ?section deep-link param, read server-side by /admin's page (see
   // AdminDashboard's matching prop for why useSearchParams is avoided).
@@ -61,6 +58,10 @@ export default function SettingsManager({
 }) {
   const draft = useSettingsDraft(initialSettings, initialWidgets, initialBoards, initialIntegrations, themePacks);
   const { status, error } = draft;
+  const apps = useMemo(
+    () => monitoredApps(items.apps).map(({ id, name }) => ({ id, name })),
+    [items.apps]
+  );
   // The URL seeds the active section (?tab=settings&section=widgets is a
   // shareable deep link that survives refresh); rail clicks mirror it back
   // with a history replace. AdminDashboard owns the `tab` param the same way.
@@ -154,12 +155,11 @@ export default function SettingsManager({
           <LayoutSection
             d={draft}
             groupsState={groupsState}
-            initialApps={initialApps}
-            initialBookmarks={initialBookmarks}
+            items={items}
           />
         )}
         {section === "widgets" && (
-          <WidgetsSection d={draft} groups={groupsState.groups} tags={allTags(initialApps)} />
+          <WidgetsSection d={draft} groups={groupsState.groups} tags={allTags(items.apps)} />
         )}
         {section === "monitoring" && <MonitoringSection d={draft} apps={apps} />}
         {section === "integrations" && <IntegrationsSection d={draft} />}

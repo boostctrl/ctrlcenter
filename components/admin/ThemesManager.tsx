@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { ThemeOverridesState } from "./useAdminData";
 import {
   DESIGNS,
   SCENES,
@@ -49,21 +50,13 @@ function builtin(name: string): ThemePack {
 }
 
 export default function ThemesManager({
-  initialOverrides,
+  themes,
 }: {
-  initialOverrides: ThemePackConfig[];
+  // Held by the admin page, so Settings' theme pickers show edits made here
+  // (#317).
+  themes: ThemeOverridesState;
 }) {
-  // Overrides keyed by the built-in's stable `key` (its original name), so the
-  // editable display `name` can differ. Normalize legacy key-less overrides.
-  const [overrides, setOverrides] = useState<Record<string, ThemePackConfig>>(
-    () =>
-      Object.fromEntries(
-        initialOverrides.map((o) => {
-          const key = o.key ?? o.name;
-          return [key, { ...o, key }];
-        })
-      )
-  );
+  const { overrides, setOverrides } = themes;
   // Edits debounce-save automatically (local state stays authoritative).
   const { status, error } = useAutosave(overrides, saveThemes);
   const confirm = useConfirm();

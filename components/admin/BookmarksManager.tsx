@@ -24,6 +24,7 @@ import { useRevealForm } from "./useRevealForm";
 import { withHttpScheme } from "@/lib/urls";
 import { apiErrorMessage } from "./apiError";
 import type { GroupsState } from "./useGroups";
+import type { ItemsState } from "./useAdminData";
 
 type FormState = {
   name: string;
@@ -42,15 +43,16 @@ const emptyForm: FormState = {
 };
 
 export default function BookmarksManager({
-  initialBookmarks,
+  items,
   groupsState,
 }: {
-  initialBookmarks: BookmarkItem[];
+  // The shared bookmark list (#317).
+  items: ItemsState;
   // The shared group list (#299): bookmarks are listed under their groups,
   // in its order.
   groupsState: GroupsState;
 }) {
-  const [bookmarks, setBookmarks] = useState(initialBookmarks);
+  const { bookmarks, setBookmarks } = items;
   const { groups, refresh: refreshGroups, save: saveGroups } = groupsState;
   const [form, setForm] = useState<FormState>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
