@@ -23,7 +23,7 @@ function PoolRow({ pool }: { pool: TruenasPool }) {
           <span
             aria-hidden
             className={`h-2 w-2 shrink-0 rounded-full ${
-              pool.healthy ? "bg-emerald-400" : "bg-red-400"
+              pool.healthy ? "bg-status-up" : "bg-status-down"
             }`}
           />
           <span className="truncate" title={pool.name}>
@@ -31,7 +31,7 @@ function PoolRow({ pool }: { pool: TruenasPool }) {
           </span>
           <span
             className={`text-xs ${
-              pool.healthy ? "text-ink-45" : "text-red-400"
+              pool.healthy ? "text-ink-45" : "text-status-down"
             }`}
           >
             {pool.status}
@@ -52,17 +52,17 @@ function PoolRow({ pool }: { pool: TruenasPool }) {
 // Running apps read green; a crash is red, a transitional state amber, anything
 // else (stopped/unknown) a muted grey — matching the pool health dots.
 function appDot(app: TruenasApp): string {
-  if (app.running) return "bg-emerald-400";
-  if (app.state === "CRASHED") return "bg-red-400";
-  if (app.state === "DEPLOYING" || app.state === "STOPPING") return "bg-amber-400";
+  if (app.running) return "bg-status-up";
+  if (app.state === "CRASHED") return "bg-status-down";
+  if (app.state === "DEPLOYING" || app.state === "STOPPING") return "bg-status-warning";
   return "bg-fg/25";
 }
 
 // A container's state dot: running is green, a stopped/exited one red, anything
 // transitional or unknown muted — the same vocabulary as the app and pool dots.
 function containerDot(state: string): string {
-  if (state === "running") return "bg-emerald-400";
-  if (state === "exited" || state === "dead" || state === "stopped") return "bg-red-400";
+  if (state === "running") return "bg-status-up";
+  if (state === "exited" || state === "dead" || state === "stopped") return "bg-status-down";
   return "bg-fg/25";
 }
 
@@ -106,7 +106,7 @@ function AppRow({ app }: { app: TruenasApp }) {
           {!app.running && (
             <span
               className={`shrink-0 text-xs ${
-                app.state === "CRASHED" ? "text-red-400" : "text-ink-45"
+                app.state === "CRASHED" ? "text-status-down" : "text-ink-45"
               }`}
             >
               {app.state.toLowerCase()}
@@ -115,7 +115,7 @@ function AppRow({ app }: { app: TruenasApp }) {
         </span>
         <span className="flex shrink-0 items-baseline gap-2 text-xs tabular-nums text-ink-50">
           {app.upgradeAvailable && (
-            <span className="rounded border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-amber-200/90 uppercase">
+            <span className="rounded border border-status-warning/30 bg-status-warning/10 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-status-warning/90 uppercase">
               update
             </span>
           )}
@@ -157,8 +157,8 @@ export default function TruenasCard({
                   key={`${a.message}-${i}`}
                   className={`flex items-baseline gap-2 rounded-lg border px-3 py-2 text-xs ${
                     a.level === "critical"
-                      ? "border-red-500/30 bg-red-500/10 text-red-300"
-                      : "border-amber-400/30 bg-amber-400/10 text-amber-200/90"
+                      ? "border-status-down/30 bg-status-down/10 text-status-down"
+                      : "border-status-warning/30 bg-status-warning/10 text-status-warning/90"
                   }`}
                 >
                   <span aria-hidden className="shrink-0 font-semibold uppercase">

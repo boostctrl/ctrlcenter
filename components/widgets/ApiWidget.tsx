@@ -6,8 +6,8 @@ import type { ApiResult, ApiTone } from "@/lib/api-widget";
 // presentational; nothing here ever saw the raw response.
 const TONE: Record<ApiTone, string> = {
   ok: "text-ink-90",
-  warn: "text-amber-200",
-  critical: "text-red-300",
+  warn: "text-status-warning",
+  critical: "text-status-down",
 };
 
 export default function ApiWidget({
@@ -69,7 +69,7 @@ export default function ApiWidget({
 // about 100, so the dash array is the percentage.
 function Ring({ ratio, tone }: { ratio: number; tone: ApiTone }) {
   const pct = Math.round(ratio * 100);
-  const color = tone === "critical" ? "text-red-400" : tone === "warn" ? "text-amber-400" : "text-[var(--accent-from)]";
+  const color = tone === "critical" ? "text-status-down" : tone === "warn" ? "text-status-warning" : "text-[var(--accent-from)]";
   return (
     <svg viewBox="0 0 36 36" className="h-14 w-14 shrink-0 -rotate-90" role="img" aria-label={`${pct}%`}>
       <circle cx="18" cy="18" r="15.9155" fill="none" className="text-fg/10" stroke="currentColor" strokeWidth="3" />

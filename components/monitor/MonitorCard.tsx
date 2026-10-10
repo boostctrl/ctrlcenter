@@ -37,9 +37,9 @@ function hasData(state: ServiceState): boolean {
 // The header dot's tone per state — the at-a-glance health read, shared with the
 // SystemHealthBar's tally so a dot means the same thing everywhere.
 export const STATE_DOT: Record<ServiceState, string> = {
-  live: "bg-emerald-400",
-  stale: "bg-amber-400",
-  unreachable: "bg-red-400",
+  live: "bg-status-up",
+  stale: "bg-status-warning",
+  unreachable: "bg-status-down",
   disabled: "bg-fg/25",
   unconfigured: "border border-dashed border-fg/30",
 };
@@ -181,7 +181,7 @@ export default function MonitorCard({
           {title}
         </h2>
       {state === "stale" && status.error && (
-        <span className="text-right text-xs text-amber-400/90">
+        <span className="text-right text-xs text-status-warning/90">
           Stale — {status.error}
         </span>
       )}

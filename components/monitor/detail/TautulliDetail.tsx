@@ -60,7 +60,7 @@ export default function TautulliDetail({
                   </span>
                   <span className="flex shrink-0 items-baseline gap-2 text-xs tabular-nums text-ink-50">
                     {h.playback === "transcode" && (
-                      <span className="text-amber-400/80">transcode</span>
+                      <span className="text-status-warning/80">transcode</span>
                     )}
                     {mounted && <span>{relTime(h.at)}</span>}
                   </span>

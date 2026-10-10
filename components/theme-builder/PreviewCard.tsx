@@ -32,8 +32,8 @@ export function PreviewCard({ mode }: { mode: Mode }) {
       </p>
       <div className="glass-card mt-2 flex items-center gap-3 px-3 py-2.5">
         <span className="relative flex h-2 w-2 shrink-0" aria-hidden>
-          <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400/60" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+          <span className="absolute inline-flex h-full w-full rounded-full bg-status-up/60" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-status-up" />
         </span>
         <span
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-fg/5 ring-1 ring-fg/10"

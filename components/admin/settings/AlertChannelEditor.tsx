@@ -135,7 +135,7 @@ export function AlertChannelEditor({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <AlertTest channel={ch.id} ready={missing.length === 0} saving={saving} />
         {missing.length > 0 && (
-          <p className="text-xs text-amber-200">
+          <p className="text-xs text-status-warning">
             Add {andList(missing)} to start sending.
           </p>
         )}

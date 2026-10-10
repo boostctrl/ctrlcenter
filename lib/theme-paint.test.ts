@@ -242,6 +242,25 @@ describe("typography (#330)", () => {
   });
 });
 
+describe("semantic colors (#331)", () => {
+  const base = { dark: true, background: null, foreground: null, accentFrom: "#a78bfa", accentTo: "#22d3ee" };
+  const set = { up: "#00ff00", down: "#ff0000", warning: "#ffaa00", info: "#00aaff" };
+
+  it("paints --status-* from the theme, or removes them", () => {
+    const paint = themePaint.computePaint({ ...base, status: set });
+    expect(paint.vars["--status-up"]).toBe("#00ff00");
+    expect(paint.vars["--status-info"]).toBe("#00aaff");
+    const none = themePaint.computePaint({ ...base, status: null });
+    expect(none.vars["--status-up"]).toBeNull();
+  });
+
+  it("reads the stored set, else the default's, and rejects a partial one", () => {
+    expect(themePaint.readStored(storage({ "ctrlcenter:status": { dark: set, light: null } }), DT, IDS, true).status).toEqual(set);
+    expect(themePaint.readStored(storage({ "ctrlcenter:status": { dark: { up: "#00ff00" } } }), DT, IDS, true).status).toBeNull();
+    expect(themePaint.readStored(storage({}), { ...DT, status: set }, IDS, false).status).toEqual(set);
+  });
+});
+
 describe("readStored (the no-flash path)", () => {
   it("reads the stored scene effects and the Reduce motion key", () => {
     const s = storage({
@@ -286,6 +305,7 @@ describe("readStored (the no-flash path)", () => {
       font: "jakarta",
       headingFont: null,
       density: "comfortable",
+      status: null,
     });
   });
 

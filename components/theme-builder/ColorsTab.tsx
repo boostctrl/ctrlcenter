@@ -1,8 +1,9 @@
 "use client";
 
 import { ChipGroup } from "../ChipGroup";
-import { BASE_THEMES } from "@/lib/theme";
+import { BASE_THEMES, DEFAULT_SEMANTIC, SEMANTIC_FIELDS } from "@/lib/theme";
 import type { ModeColors } from "@/lib/theme";
+import { buttonClasses } from "@/lib/buttons";
 import { BASE_FIELDS } from "./constants";
 import { OptionCard } from "./OptionCard";
 import type { ThemeDraft } from "./useThemeDraft";
@@ -55,7 +56,11 @@ export default function ColorsTab({ d }: { d: ThemeDraft }) {
     updateAccent,
     chooseAccentStyle,
     paletteActive,
+    statusFor,
+    setStatusColors,
   } = d;
+  const status = statusFor(editMode);
+  const statusShown = status ?? DEFAULT_SEMANTIC[editMode];
   return (
     <div
       role="tabpanel"
@@ -215,6 +220,52 @@ export default function ColorsTab({ d }: { d: ThemeDraft }) {
               Colors buttons, highlights &amp; the scene glow.
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* Semantic colors (#331): the status dots, errors and notices in the
+          theme's own hues rather than the stock ones. */}
+      <div className="space-y-3 border-t border-fg/10 pt-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <span className="text-[10px] font-semibold tracking-[0.15em] text-ink-45 uppercase">
+              Status colors — {editMode} theme only
+            </span>
+            <p className="text-xs text-ink-40">
+              Up, down, warning and info: the dots, errors, badges and notices.
+            </p>
+          </div>
+          {status && (
+            <button
+              type="button"
+              onClick={() => setStatusColors(null, editMode)}
+              className={buttonClasses("ghost", "sm")}
+            >
+              Reset to standard
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {SEMANTIC_FIELDS.map((f) => (
+            <label
+              key={f.key}
+              className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-fg/10 bg-fg/5 p-2 transition-colors hover:border-fg/25"
+            >
+              <input
+                type="color"
+                value={statusShown[f.key]}
+                onChange={(e) =>
+                  setStatusColors({ ...statusShown, [f.key]: e.target.value }, editMode)
+                }
+                aria-label={`${f.label} color`}
+                className="color-well h-9 w-9 shrink-0 cursor-pointer rounded-full"
+              />
+              <span className="min-w-0">
+                <span className="block truncate text-xs text-ink-75">{f.label}</span>
+                <span className="block truncate text-[10px] text-ink-40">{f.description}</span>
+              </span>
+            </label>
+          ))}
         </div>
       </div>
     </div>

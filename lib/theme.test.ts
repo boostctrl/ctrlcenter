@@ -8,6 +8,8 @@ import {
   colorSetsEqual,
   tunesEqual,
   sceneFxEqual,
+  sanitizeSemantic,
+  semanticEqual,
   DEFAULT_SCENE_FX,
   DEFAULT_TUNE,
   THEME_PACKS,
@@ -134,5 +136,22 @@ describe("look equality (#328)", () => {
     expect(tunesEqual({ ...DEFAULT_TUNE, glow: 50 }, { ...DEFAULT_TUNE, glow: 50 })).toBe(true);
     expect(sceneFxEqual(null, DEFAULT_SCENE_FX)).toBe(true);
     expect(sceneFxEqual({ intensity: 50, motion: "calm" }, { intensity: 50, motion: "off" })).toBe(false);
+  });
+});
+
+describe("semantic colors (#331)", () => {
+  const set = { up: "#00ff00", down: "#ff0000", warning: "#ffaa00", info: "#00aaff" };
+
+  it("needs all four hex colors", () => {
+    expect(sanitizeSemantic(set)).toEqual(set);
+    expect(sanitizeSemantic({ ...set, info: "blue" })).toBeNull();
+    expect(sanitizeSemantic({ up: "#00ff00" })).toBeNull();
+    expect(sanitizeSemantic(null)).toBeNull();
+  });
+
+  it("compares case-insensitively and treats absent as absent", () => {
+    expect(semanticEqual(set, { ...set, up: "#00FF00" })).toBe(true);
+    expect(semanticEqual(set, null)).toBe(false);
+    expect(semanticEqual(undefined, null)).toBe(true);
   });
 });

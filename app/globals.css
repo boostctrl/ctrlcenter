@@ -87,6 +87,22 @@
   --font-heading: var(--font-sans);
   --density: 1;
   --spacing: calc(0.25rem * var(--density));
+
+  /* Semantic colors (#331): up, down, warning and info, and the five group
+     hues, as theme tokens. These are the dark-surface defaults (the pale
+     Tailwind -400 / -300 shades the app always used); .theme-light deepens
+     them. A theme may set its own `status` colors per mode; the resolver
+     paints them over these. Tailwind utilities reach them as
+     text-status-up, bg-status-down/15, ring-status-info/30, … (see @theme). */
+  --status-up: #00d294;
+  --status-down: #ff6568;
+  --status-warning: #fcbb00;
+  --status-info: #00bcfe;
+  --group-violet: #c4b4ff;
+  --group-sky: #77d4ff;
+  --group-emerald: #5ee9b5;
+  --group-amber: #ffd236;
+  --group-rose: #ffa2ae;
 }
 [data-motion="calm"] {
   --motion-scale: 2.5;
@@ -451,19 +467,21 @@
      before hydration. */
 }
 
-/* Status colors (#273): the pale -200…-400 shades used for error, warning and
-   up/down text and dots are tuned for the dark surface; on the light one they
-   fall to ~2–3:1. Tailwind reads each palette color from a variable, so
-   remapping these here deepens every use (text, dots, /NN variants) in light
-   mode only, leaving the dark theme untouched. */
+/* Semantic colors on the light surface (#273, #331): the pale dark-surface
+   shades fall to ~2–3:1 on the pale page, so the tokens deepen to the -700 /
+   -800 shades here. Every use (text, dots, /NN variants) follows. */
 .theme-light {
-  --color-red-300: var(--color-red-700);
-  --color-red-400: var(--color-red-700);
-  --color-amber-200: var(--color-amber-800);
-  --color-amber-300: var(--color-amber-700);
-  --color-amber-400: var(--color-amber-700);
-  --color-emerald-400: var(--color-emerald-700);
-  --color-sky-400: var(--color-sky-700);
+  --status-up: #007956;
+  --status-down: #bf000f;
+  /* amber-800, not -700: small warning text on a card's fill sits at 4.0:1
+     one shade lighter. */
+  --status-warning: #953d00;
+  --status-info: #0069a4;
+  --group-violet: #5d0ec0;
+  --group-sky: #005986;
+  --group-emerald: #005f46;
+  --group-amber: #953d00;
+  --group-rose: #a30037;
 }
 
 /* Emboss's light-source highlight must be a true white in light mode — the
@@ -591,6 +609,10 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-fg: var(--fg);
+  --color-status-up: var(--status-up);
+  --color-status-down: var(--status-down);
+  --color-status-warning: var(--status-warning);
+  --color-status-info: var(--status-info);
   --font-sans: var(--font-jakarta);
 }
 
@@ -766,25 +788,20 @@ select optgroup {
   .accent-focus:focus {
     border-color: var(--accent-to);
   }
-  /* The danger button's red tint over a translucent surface (a confirmation
-     over a tinted page) can leave red-700 text just under 4.5:1, so on the
-     light theme its text goes one shade deeper. */
+  /* The danger button's tint over a translucent surface (a confirmation over
+     a tinted page) leaves the light-surface "down" token just under 4.5:1,
+     so on the light theme its text deepens a step further (#277, #331). */
   .theme-light .btn-danger {
-    color: var(--color-red-800);
+    color: color-mix(in srgb, var(--status-down) 80%, black);
   }
-  /* A group's color (#316, lib/schema/groups.ts GROUP_COLORS): a pale shade
-     on the dark surface and a deep one on the light surface, so its name
-     keeps 4.5:1 either way. */
-  .group-color-violet { color: var(--color-violet-300); }
-  .group-color-sky { color: var(--color-sky-300); }
-  .group-color-emerald { color: var(--color-emerald-300); }
-  .group-color-amber { color: var(--color-amber-300); }
-  .group-color-rose { color: var(--color-rose-300); }
-  .theme-light .group-color-violet { color: var(--color-violet-800); }
-  .theme-light .group-color-sky { color: var(--color-sky-800); }
-  .theme-light .group-color-emerald { color: var(--color-emerald-800); }
-  .theme-light .group-color-amber { color: var(--color-amber-800); }
-  .theme-light .group-color-rose { color: var(--color-rose-800); }
+  /* A group's color (#316, lib/schema/groups.ts GROUP_COLORS): the --group-*
+     token, pale on the dark surface and deep on the light one (see :root and
+     .theme-light), so its name keeps 4.5:1 either way. */
+  .group-color-violet { color: var(--group-violet); }
+  .group-color-sky { color: var(--group-sky); }
+  .group-color-emerald { color: var(--group-emerald); }
+  .group-color-amber { color: var(--group-amber); }
+  .group-color-rose { color: var(--group-rose); }
   /* A glow on top of the border tint: the 1px border change alone was barely
      visible, and links using this class have no border at all (#274). */
   .accent-focus:focus-visible {

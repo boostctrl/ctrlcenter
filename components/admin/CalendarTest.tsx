@@ -26,12 +26,12 @@ export default function CalendarTest({
       disabled={url.trim() === ""}
       renderResult={(data) =>
         data.ok ? (
-          <span className="text-xs text-emerald-400">
+          <span className="text-xs text-status-up">
             ✓ Reachable — {data.count} upcoming event
             {data.count === 1 ? "" : "s"}
           </span>
         ) : (
-          <span className="text-xs text-red-400">✗ {data.error}</span>
+          <span className="text-xs text-status-down">✗ {data.error}</span>
         )
       }
     />

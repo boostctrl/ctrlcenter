@@ -152,7 +152,7 @@ function OutageRow({
           {instantLabel(outage.startMs, timeZone)}
           {" – "}
           {ongoing ? (
-            <span className="text-red-400">ongoing</span>
+            <span className="text-status-down">ongoing</span>
           ) : (
             instantLabel(outage.endMs!, timeZone)
           )}
@@ -164,7 +164,7 @@ function OutageRow({
         </span>
         <span
           className={`text-sm tabular-nums ${
-            ongoing ? "text-red-400" : "text-ink-55"
+            ongoing ? "text-status-down" : "text-ink-55"
           }`}
         >
           down {ongoing ? downDuration(outage.startMs, now) : fmtDuration(outage.downMs)}
@@ -204,7 +204,7 @@ function OutageRow({
               </button>
             )}
             {failed && (
-              <p className="text-xs text-red-400">Couldn&apos;t save the note.</p>
+              <p className="text-xs text-status-down">Couldn&apos;t save the note.</p>
             )}
           </div>
         )
@@ -319,11 +319,11 @@ export default function StatusDetail({
       <div
         className={`glass-card flex items-center gap-4 px-5 py-4 ${
           live?.maintenance
-            ? "ring-1 ring-sky-400/30"
+            ? "ring-1 ring-status-info/30"
             : live && !live.up
-              ? "ring-1 ring-red-400/30"
+              ? "ring-1 ring-status-down/30"
               : live?.warning
-                ? "ring-1 ring-amber-400/30"
+                ? "ring-1 ring-status-warning/30"
                 : ""
         }`}
       >
@@ -343,11 +343,11 @@ export default function StatusDetail({
             }
             className={`text-sm ${
               live?.maintenance
-                ? "text-sky-400"
+                ? "text-status-info"
                 : live && !live.up
-                  ? "text-red-400"
+                  ? "text-status-down"
                   : live?.warning
-                    ? "text-amber-200"
+                    ? "text-status-warning"
                     : "text-ink-70"
             }`}
           >

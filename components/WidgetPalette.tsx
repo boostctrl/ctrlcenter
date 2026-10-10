@@ -116,7 +116,7 @@ export default function WidgetPalette({
               ))}
             </ul>
             {error && (
-              <p role="alert" className="px-1 pt-2 text-xs text-red-400">
+              <p role="alert" className="px-1 pt-2 text-xs text-status-down">
                 {error}
               </p>
             )}

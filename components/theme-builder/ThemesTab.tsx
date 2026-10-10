@@ -257,7 +257,7 @@ export default function ThemesTab({
                         deleteNamedTheme(t.id);
                     }}
                     aria-label={`Delete ${t.name}`}
-                    className="absolute top-1 right-1 rounded-md bg-background/70 px-1 text-xs text-ink-50 transition-colors hover:text-red-400"
+                    className="absolute top-1 right-1 rounded-md bg-background/70 px-1 text-xs text-ink-50 transition-colors hover:text-status-down"
                   >
                     ✕
                   </button>

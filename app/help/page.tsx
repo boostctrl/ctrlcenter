@@ -309,8 +309,9 @@ export default async function HelpPage() {
               scene whatever the theme says.
             </li>
             <li>
-              <strong>Accent and colors.</strong> The accent gradient, plus
-              optional custom surface colors.
+              <strong>Accent and colors.</strong> The accent gradient, custom
+              surface colors, and the status colors: up, down, warning and
+              info for the dots, errors and notices.
             </li>
             <li>
               <strong>Font.</strong> Pick from twelve typefaces, from

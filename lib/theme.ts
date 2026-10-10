@@ -254,6 +254,47 @@ export const BASE_THEMES: PresetTheme[] = [
   },
 ];
 
+// Semantic colors (#331): up, down, warning and info, as a theme's own per
+// mode. Absent, the stylesheet's defaults apply (pale on dark, deep on light).
+export type SemanticKey = "up" | "down" | "warning" | "info";
+
+export type SemanticColors = Record<SemanticKey, string>;
+
+export const SEMANTIC_FIELDS: { key: SemanticKey; label: string; description: string }[] = [
+  { key: "up", label: "Up", description: "Online dots, success, recovered" },
+  { key: "down", label: "Down", description: "Offline dots, errors, danger buttons" },
+  { key: "warning", label: "Warning", description: "Certificates near expiry, cautions" },
+  { key: "info", label: "Info", description: "Maintenance, notices" },
+];
+
+export const SEMANTIC_KEYS = SEMANTIC_FIELDS.map((f) => f.key) as [SemanticKey, ...SemanticKey[]];
+
+// The stylesheet's defaults per mode (app/globals.css), for the pickers.
+export const DEFAULT_SEMANTIC: Record<"dark" | "light", SemanticColors> = {
+  dark: { up: "#00d294", down: "#ff6568", warning: "#fcbb00", info: "#00bcfe" },
+  light: { up: "#007956", down: "#bf000f", warning: "#953d00", info: "#0069a4" },
+};
+
+const HEX6 = /^#[0-9a-fA-F]{6}$/;
+
+// Validate a stored/imported set: all four #rrggbb colors, or null.
+export function sanitizeSemantic(input: unknown): SemanticColors | null {
+  if (!input || typeof input !== "object") return null;
+  const raw = input as Record<string, unknown>;
+  const out = {} as SemanticColors;
+  for (const k of SEMANTIC_KEYS) {
+    const v = raw[k];
+    if (typeof v !== "string" || !HEX6.test(v)) return null;
+    out[k] = v;
+  }
+  return out;
+}
+
+export function semanticEqual(a: SemanticColors | null | undefined, b: SemanticColors | null | undefined): boolean {
+  if (!a || !b) return !a && !b;
+  return SEMANTIC_KEYS.every((k) => a[k].toLowerCase() === b[k].toLowerCase());
+}
+
 // Density (#330): how much air the layout has. Tailwind derives every spacing
 // utility (paddings, gaps, the icon boxes) from one --spacing token, so the
 // resolver scales that token by the factor on <html> and text stays its size.
@@ -395,6 +436,9 @@ export type ThemePack = {
   tune?: Tune;
   font?: FontId;
   headingFont?: FontId;
+  // Its own semantic colors per mode (#331); absent = the stylesheet's.
+  status?: SemanticColors;
+  statusLight?: SemanticColors;
 } & ModeColors;
 
 // The built-in theme that mirrors the app's stock appearance (first in the list,

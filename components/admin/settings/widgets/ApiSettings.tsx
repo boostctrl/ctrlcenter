@@ -320,7 +320,7 @@ function ApiTest({ widget }: { widget: Api }) {
                 )}
               </ul>
             ) : (
-              <span className="text-xs text-red-400">✗ {result.error}</span>
+              <span className="text-xs text-status-down">✗ {result.error}</span>
             )}
           </div>
         </div>

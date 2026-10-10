@@ -154,7 +154,7 @@ export default function MonitoringSection({
         {webhooks.enabled && (
           <>
             {!activeChannels(alerts).some((ch) => ch.onWebhooks) && (
-              <p className="text-xs text-amber-200">
+              <p className="text-xs text-status-warning">
                 Add an alert channel that sends inbound webhooks, in Alerts
                 above. Events have nowhere to go until then.
               </p>

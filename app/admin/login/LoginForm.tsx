@@ -117,7 +117,7 @@ export default function LoginForm({
           />
         </>
       )}
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-status-down">{error}</p>}
       <Button type="submit" disabled={loading}>
         {loading ? "Signing in..." : needCode ? "Verify" : "Sign in"}
       </Button>

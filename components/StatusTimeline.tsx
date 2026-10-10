@@ -81,17 +81,17 @@ export function instantLabel(from: number, timeZone: string): string {
 }
 
 // A maintenance bar (#293) is neutral: the downtime was planned.
-const MAINT_BAR = "bg-sky-400/60";
+const MAINT_BAR = "bg-status-info/60";
 
 export function uptimeColor(u: number | null): string {
   // No-data bars read as clearly empty slots (much fainter than any colored
   // "has-data" bar) so gaps don't get mistaken for a red "down" reading.
   if (u == null) return "bg-fg/[0.06]";
-  if (u >= 99.5) return "bg-emerald-400/80"; // perfect
-  if (u >= 95) return "bg-emerald-400/55"; // a few blips
-  if (u >= 75) return "bg-amber-400/70"; // degraded
+  if (u >= 99.5) return "bg-status-up/80"; // perfect
+  if (u >= 95) return "bg-status-up/55"; // a few blips
+  if (u >= 75) return "bg-status-warning/70"; // degraded
   if (u >= 50) return "bg-orange-500/80"; // heavily degraded
-  return "bg-red-400/75"; // mostly down
+  return "bg-status-down/75"; // mostly down
 }
 
 export function StateDot({ status }: { status: AppStatus | undefined }) {
@@ -99,16 +99,16 @@ export function StateDot({ status }: { status: AppStatus | undefined }) {
   const cls = !status
     ? "bg-fg/25"
     : warn
-      ? "bg-amber-400"
+      ? "bg-status-warning"
       : status.up
-        ? "bg-emerald-400"
+        ? "bg-status-up"
         : status.maintenance
-          ? "bg-sky-400"
-          : "bg-red-400";
+          ? "bg-status-info"
+          : "bg-status-down";
   return (
     <span className="relative flex h-2.5 w-2.5 shrink-0">
       {status?.up && !warn && (
-        <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-emerald-400/60" />
+        <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-status-up/60" />
       )}
       <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${cls}`} />
     </span>

@@ -78,19 +78,19 @@ export function StatusDot({ id }: { id: string }) {
       aria-label={label}
     >
       {status.up && !warn && (
-        <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-emerald-400/60" />
+        <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-status-up/60" />
       )}
       {/* Up is a solid dot, down a hollow ring, so the state reads by shape
           as well as color for color-blind visitors (#273). */}
       <span
         className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
           warn
-            ? "bg-amber-400"
+            ? "bg-status-warning"
             : status.up
-              ? "bg-emerald-400"
+              ? "bg-status-up"
               : status.maintenance
-                ? "border-2 border-sky-400"
-                : "border-2 border-red-400"
+                ? "border-2 border-status-info"
+                : "border-2 border-status-down"
         }`}
       />
     </span>
@@ -138,11 +138,11 @@ export function StatusSummary({
     >
       <span className="relative flex h-2.5 w-2.5" aria-hidden>
         {allUp && !maintenanceNames.length && (
-          <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-emerald-400/60" />
+          <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-status-up/60" />
         )}
         <span
           className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
-            !allUp ? "bg-red-400" : maintenanceNames.length ? "bg-sky-400" : "bg-emerald-400"
+            !allUp ? "bg-status-down" : maintenanceNames.length ? "bg-status-info" : "bg-status-up"
           }`}
         />
       </span>

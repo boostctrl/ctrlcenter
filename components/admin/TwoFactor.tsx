@@ -188,7 +188,7 @@ export default function TwoFactor({ initialEnabled }: { initialEnabled: boolean 
                       value={code}
                       onChange={(e) => setCode(e.target.value)}
                     />
-                    {error && <p className="text-sm text-red-400">{error}</p>}
+                    {error && <p className="text-sm text-status-down">{error}</p>}
                     <div className="flex gap-2">
                       <Button type="submit" disabled={busy}>
                         {busy ? "Verifying…" : "Activate"}
@@ -247,7 +247,7 @@ export default function TwoFactor({ initialEnabled }: { initialEnabled: boolean 
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
                 />
-                {error && <p className="text-sm text-red-400">{error}</p>}
+                {error && <p className="text-sm text-status-down">{error}</p>}
                 <div className="flex gap-2">
                   <Button type="submit" disabled={busy}>
                     {busy ? "Disabling…" : "Disable"}

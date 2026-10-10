@@ -15,6 +15,7 @@ import {
   saveSceneFx,
   saveHeadingFont,
   saveDensity,
+  saveStatusColors,
   newThemeId,
   NO_ACCENT_OVERRIDES,
   type HeadingChoice,
@@ -22,7 +23,7 @@ import {
   type AccentOverrides,
   type ModePair,
 } from "@/lib/prefs";
-import type { ColorSet, Density, DesignId, ModeColors, SceneFx, SceneId, Tune } from "@/lib/theme";
+import type { ColorSet, Density, DesignId, ModeColors, SceneFx, SceneId, SemanticColors, Tune } from "@/lib/theme";
 import type { FontId } from "@/lib/fonts";
 import {
   applyAll as paintAll,
@@ -61,6 +62,8 @@ function themeKey(t: CustomTheme): string {
     t.headingFontLight ?? null,
     t.density ?? null,
     t.densityLight ?? null,
+    t.status ?? null,
+    t.statusLight ?? null,
   ]);
 }
 
@@ -92,6 +95,8 @@ export function useSavedThemes({
   resolveDensity,
   setHeadings,
   setDensities,
+  resolveStatus,
+  setStatuses,
 }: {
   activeLook: ModeColors | null;
   seedColorSet: (dark: boolean) => ColorSet;
@@ -116,6 +121,8 @@ export function useSavedThemes({
   resolveDensity: (dark: boolean) => Density;
   setHeadings: Dispatch<SetStateAction<ModePair<HeadingChoice | null>>>;
   setDensities: Dispatch<SetStateAction<ModePair<Density | null>>>;
+  resolveStatus: (dark: boolean) => SemanticColors | null;
+  setStatuses: Dispatch<SetStateAction<ModePair<SemanticColors | null>>>;
 }) {
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([]);
 
@@ -170,6 +177,11 @@ export function useSavedThemes({
       const densityLight = resolveDensity(false);
       if (density !== "comfortable") entry.density = density;
       if (densityLight !== "comfortable") entry.densityLight = densityLight;
+      // Semantic colors (#331), when a mode has its own.
+      const status = resolveStatus(true);
+      const statusLight = resolveStatus(false);
+      if (status) entry.status = status;
+      if (statusLight) entry.statusLight = statusLight;
       return entry;
     },
     [
@@ -184,6 +196,7 @@ export function useSavedThemes({
       resolveSceneFx,
       resolveHeading,
       resolveDensity,
+      resolveStatus,
     ]
   );
 
@@ -241,6 +254,12 @@ export function useSavedThemes({
       };
       setDensities(nextDensities);
       saveDensity(nextDensities);
+      const nextStatuses: ModePair<SemanticColors | null> = {
+        dark: t.status ?? null,
+        light: t.statusLight ?? null,
+      };
+      setStatuses(nextStatuses);
+      saveStatusColors(nextStatuses);
       applyThemeColors({ dark: t.dark, light: t.light });
       const dark = resolveDark(displayTheme);
       // applyThemeColors painted with this render's tune and effects (the
@@ -255,6 +274,7 @@ export function useSavedThemes({
         sceneFx: (dark ? t.sceneFx : t.sceneFxLight) ?? defSceneFx(dark),
         reduceMotion,
         density: (dark ? t.density : t.densityLight) ?? "comfortable",
+        status: (dark ? t.status : t.statusLight) ?? null,
       });
       applyDesign(dark ? t.design : t.designLight);
       applyScene(dark ? t.scene : t.sceneLight);
@@ -277,6 +297,7 @@ export function useSavedThemes({
       setSceneFxs,
       setHeadings,
       setDensities,
+      setStatuses,
     ]
   );
 

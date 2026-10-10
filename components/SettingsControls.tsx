@@ -192,7 +192,7 @@ export default function SettingsControls() {
                 Search a city, or use your device&apos;s location.
               </p>
               {locationError && (
-                <p className="text-xs text-red-400">{locationError}</p>
+                <p className="text-xs text-status-down">{locationError}</p>
               )}
             </div>
           </>
@@ -217,7 +217,7 @@ export default function SettingsControls() {
             )
               reset();
           }}
-          className="rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-xs text-ink-60 transition-colors hover:bg-red-500/10 hover:text-red-400"
+          className="rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-xs text-ink-60 transition-colors hover:bg-status-down/10 hover:text-status-down"
         >
           Reset all settings
         </button>

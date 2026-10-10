@@ -14,6 +14,7 @@ import {
   type Density,
   type SceneFx,
   type SceneId,
+  type SemanticColors,
   type Tune,
 } from "@/lib/theme";
 import { DENSITY_IDS } from "@/lib/theme";
@@ -123,6 +124,7 @@ export function applyAll(opts: {
   sceneFx?: SceneFx | null;
   reduceMotion?: boolean;
   density?: Density | null;
+  status?: SemanticColors | null;
 }): void {
   if (typeof document === "undefined") return;
   const dark = resolveDark(opts.theme);
@@ -140,6 +142,7 @@ export function applyAll(opts: {
       sceneFx: opts.sceneFx ?? null,
       reduceMotion: opts.reduceMotion ?? false,
       density: opts.density ?? null,
+      status: opts.status ?? null,
     }),
     IDS
   );

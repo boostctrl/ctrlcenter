@@ -1,6 +1,6 @@
 // Site default theme, theme-pack overrides, and their admin inputs.
 import { z } from "zod";
-import { DENSITY_IDS, DESIGN_IDS, MOTION_IDS, SCENE_IDS, TUNE_FIELDS } from "../theme";
+import { DENSITY_IDS, DESIGN_IDS, MOTION_IDS, SCENE_IDS, SEMANTIC_KEYS, TUNE_FIELDS } from "../theme";
 import { FONT_IDS, DEFAULT_FONT } from "../fonts";
 import { hexColor } from "./shared";
 
@@ -14,6 +14,14 @@ export const tuneSchema = z.object(
 );
 
 export type TuneConfig = z.infer<typeof tuneSchema>;
+
+// A theme's semantic colors (#331): up, down, warning, info, all required.
+export const semanticSchema = z.object(
+  Object.fromEntries(SEMANTIC_KEYS.map((k) => [k, hexColor])) as Record<
+    (typeof SEMANTIC_KEYS)[number],
+    typeof hexColor
+  >
+);
 
 // The site-wide default theme. Visitors can override every part of this in
 // their own browser (the theme builder / settings page); these values are the
@@ -71,6 +79,9 @@ export const themeSchema = z.object({
   headingFontLight: z.enum(FONT_IDS).optional().catch(undefined),
   density: z.enum(DENSITY_IDS).optional().catch(undefined),
   densityLight: z.enum(DENSITY_IDS).optional().catch(undefined),
+  // Optional semantic colors (#331), per mode (light falls back to dark).
+  status: semanticSchema.optional().catch(undefined),
+  statusLight: semanticSchema.optional().catch(undefined),
 });
 
 // A cohesive set of surface + accent colors (one mode of a theme).
@@ -100,6 +111,8 @@ export const themePackSchema = z.object({
   tune: tuneSchema.optional(),
   font: z.enum(FONT_IDS).optional().catch(undefined),
   headingFont: z.enum(FONT_IDS).optional().catch(undefined),
+  status: semanticSchema.optional().catch(undefined),
+  statusLight: semanticSchema.optional().catch(undefined),
   dark: colorSetSchema,
   light: colorSetSchema,
 });
@@ -141,4 +154,6 @@ export const themeInputSchema = z.object({
   headingFontLight: z.enum(FONT_IDS).optional(),
   density: z.enum(DENSITY_IDS).optional(),
   densityLight: z.enum(DENSITY_IDS).optional(),
+  status: semanticSchema.optional(),
+  statusLight: semanticSchema.optional(),
 });

@@ -26,10 +26,10 @@ import {
 // confirmed) and its logs viewed read-only.
 
 function stateTone(state: string): string {
-  if (state === "running") return "text-emerald-400/90";
+  if (state === "running") return "text-status-up/90";
   if (state === "exited" || state === "dead" || state === "created")
     return "text-ink-45";
-  return "text-amber-400/80"; // restarting, paused, removing, …
+  return "text-status-warning/80"; // restarting, paused, removing, …
 }
 
 // Read-only, scrollable, capped log tail. Portaled to the body: the card is a
@@ -72,7 +72,7 @@ function LogModal({
         {loading ? (
           <p className="text-sm text-ink-50">Loading…</p>
         ) : error ? (
-          <p className="text-sm text-red-400">{error}</p>
+          <p className="text-sm text-status-down">{error}</p>
         ) : (
           <pre className="min-h-0 flex-1 overflow-auto rounded-lg bg-black/70 p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap text-neutral-200">
             {logs.trim() ? logs : "No log output."}
@@ -152,12 +152,12 @@ function EndpointRow({
       </span>
       {endpoint.hasSnapshot ? (
         <span className="flex shrink-0 items-baseline gap-2 text-xs tabular-nums">
-          <span className="text-emerald-400/90">{endpoint.running} up</span>
+          <span className="text-status-up/90">{endpoint.running} up</span>
           {endpoint.stopped > 0 && (
             <span className="text-ink-50">{endpoint.stopped} stopped</span>
           )}
           {endpoint.unhealthy > 0 && (
-            <span className="text-red-400">{endpoint.unhealthy} unhealthy</span>
+            <span className="text-status-down">{endpoint.unhealthy} unhealthy</span>
           )}
         </span>
       ) : (
@@ -293,7 +293,7 @@ export default function PortainerCard({
             <span className="text-xs text-ink-50">
               {data.totals.stopped} stopped
               {data.totals.unhealthy > 0 && (
-                <span className="text-red-400">
+                <span className="text-status-down">
                   {" "}
                   · {data.totals.unhealthy} unhealthy
                 </span>
@@ -301,7 +301,7 @@ export default function PortainerCard({
               · {data.totals.total} total
             </span>
           </div>
-          {error && <p className="text-xs text-red-400">{error}</p>}
+          {error && <p className="text-xs text-status-down">{error}</p>}
           {data.endpoints.length > 0 ? (
             <ul className="flex flex-col gap-1.5 border-t border-fg/10 pt-3">
               {data.endpoints.map((e, i) => {
@@ -323,7 +323,7 @@ export default function PortainerCard({
                         {loadingList ? (
                           <p className="py-2 text-xs text-ink-50">Loading…</p>
                         ) : listError ? (
-                          <p className="py-2 text-xs text-red-400">{listError}</p>
+                          <p className="py-2 text-xs text-status-down">{listError}</p>
                         ) : containers.length > 0 ? (
                           <ul className="divide-y divide-fg/10">
                             {containers.map((c) => (

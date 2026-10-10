@@ -136,7 +136,7 @@ export default function SetupWizard({ settings, packs }: { settings: Settings; p
         {step === 2 && <AlertsStep {...props} />}
         {step === 3 && <ThemeStep {...props} packs={packs} />}
         {error && (
-          <p role="alert" className="text-sm text-red-400">
+          <p role="alert" className="text-sm text-status-down">
             {error}
           </p>
         )}
@@ -242,7 +242,7 @@ function LocationStep({ settings, onSave }: StepProps) {
             </span>
           )}
         </div>
-        {locateError && <p className="text-xs text-red-400">{locateError}</p>}
+        {locateError && <p className="text-xs text-status-down">{locateError}</p>}
       </div>
       <TextField
         label="Time zone"
@@ -411,6 +411,8 @@ function ThemeStep({ settings, onSave, packs }: StepProps & { packs: ThemePack[]
                 headingFontLight: undefined,
                 density: undefined,
                 densityLight: undefined,
+                status: pack.status,
+                statusLight: pack.statusLight,
               },
             },
             { fallback: "Couldn't save the theme" }

@@ -225,7 +225,7 @@ export default function ThemeBuilder({
           Reset theme
         </button>
         {saveFailed && (
-          <p role="status" className="w-full text-xs text-red-400">
+          <p role="status" className="w-full text-xs text-status-down">
             Couldn&apos;t save this theme — your browser is blocking local
             storage (private mode or full storage).
           </p>

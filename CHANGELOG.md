@@ -14,6 +14,13 @@ here.
 
 ### Added
 
+- **Status colors are part of the theme (3.0).** The green, red, amber and
+  blue of status dots, errors, warnings, badges and notices are now theme
+  tokens, so a theme can carry its own up, down, warning and info colours
+  per light and dark mode: pick them in the builder's Colors tab, save them
+  with your themes, share them in codes, and promote them to the site
+  default; built-in themes may carry their own. Nothing changes until you
+  do: the standard colours stay exactly as they were. (#331)
 - **Heading fonts and density (3.0).** The theme builder's Font tab gains
   a separate face for titles and section headings (or the body font), and
   a density choice: compact, comfortable or spacious, which tightens or

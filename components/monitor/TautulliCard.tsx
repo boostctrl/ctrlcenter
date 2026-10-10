@@ -24,13 +24,13 @@ function SessionRow({ session }: { session: TautulliSession }) {
         </span>
         <span className="flex shrink-0 items-baseline gap-2 text-xs tabular-nums">
           {session.state !== "playing" && (
-            <span className="text-amber-400/80">{session.state}</span>
+            <span className="text-status-warning/80">{session.state}</span>
           )}
           <span
             className={
               session.playback === "transcode"
-                ? "text-amber-400/80"
-                : "text-emerald-400/90"
+                ? "text-status-warning/80"
+                : "text-status-up/90"
             }
           >
             {session.playback === "transcode" ? "transcode" : "direct"}
@@ -68,7 +68,7 @@ export default function TautulliCard({
             )}
           </div>
           {data.transcodeCount > 0 && (
-            <p className="text-xs text-amber-400/80">
+            <p className="text-xs text-status-warning/80">
               {data.transcodeCount} transcoding
             </p>
           )}

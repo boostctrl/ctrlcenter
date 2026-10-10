@@ -119,7 +119,7 @@ export default function WidgetPanel({
       </div>
       <div className="flex-1 overflow-y-auto px-4 py-4">
         {error ? (
-          <p className="text-sm text-red-400">{error}</p>
+          <p className="text-sm text-status-down">{error}</p>
         ) : !context ? (
           <p className="text-sm text-ink-55">Loading…</p>
         ) : (
@@ -236,7 +236,7 @@ function RemoveWidget({
         Deletes it from every board. To take it off this board only, use Hide.
       </p>
       {error && (
-        <p role="alert" className="text-xs text-red-400">
+        <p role="alert" className="text-xs text-status-down">
           {error}
         </p>
       )}

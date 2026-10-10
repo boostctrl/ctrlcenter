@@ -385,6 +385,8 @@ export function useSettingsDraft(
       headingFontLight: undefined,
       density: undefined,
       densityLight: undefined,
+      status: pack.status,
+      statusLight: pack.statusLight,
     });
   }
 
@@ -407,6 +409,7 @@ export function useSettingsDraft(
         sceneMotionLight: undefined,
         headingFontLight: undefined,
         densityLight: undefined,
+        statusLight: darkPack?.statusLight,
       });
       return;
     }
@@ -426,6 +429,7 @@ export function useSettingsDraft(
       fontLight: pack.font,
       headingFontLight: pack.headingFont,
       densityLight: undefined,
+      statusLight: pack.statusLight ?? pack.status,
     });
   }
 

@@ -28,6 +28,8 @@ import {
   saveHeadingFont,
   loadDensity,
   saveDensity,
+  loadStatusColors,
+  saveStatusColors,
   NO_ACCENT_OVERRIDES,
   type HeadingChoice,
   type CustomTheme,
@@ -35,7 +37,18 @@ import {
   type AccentOverrides,
   type ModePair,
 } from "@/lib/prefs";
-import type { ColorSet, Density, DesignId, ModeColors, MotionLevel, SceneFx, SceneId, ThemePack, Tune } from "@/lib/theme";
+import type {
+  ColorSet,
+  Density,
+  DesignId,
+  ModeColors,
+  MotionLevel,
+  SceneFx,
+  SceneId,
+  SemanticColors,
+  ThemePack,
+  Tune,
+} from "@/lib/theme";
 import type { FontId } from "@/lib/fonts";
 import {
   applyAll as paintAll,
@@ -92,6 +105,9 @@ export type DefaultTheme = {
   headingFontLight?: FontId;
   density?: Density;
   densityLight?: Density;
+  // The site default's semantic colors, per mode (#331).
+  status?: SemanticColors;
+  statusLight?: SemanticColors;
 };
 
 export type LookValue = {
@@ -123,6 +139,9 @@ export type LookValue = {
   // density (#330).
   headingFontFor: (mode: Mode) => FontId | null;
   densityFor: (mode: Mode) => Density;
+  // The effective semantic colors for a mode, or null for the stylesheet's
+  // defaults (#331).
+  statusFor: (mode: Mode) => SemanticColors | null;
   // The visitor's Reduce motion switch, and the motion level the scenes run
   // at now: "off" when the switch is on, else the displayed mode's effects.
   reduceMotion: boolean;
@@ -157,6 +176,7 @@ export type LookValue = {
   // over an admin default heading face), or null (not chosen).
   setHeadingFont: (font: HeadingChoice | null, mode: Mode) => void;
   setDensity: (density: Density | null, mode: Mode) => void;
+  setStatusColors: (status: SemanticColors | null, mode: Mode) => void;
   applyPack: (pack: ThemePack, mode: Mode) => void;
   applyThemeColors: (colors: ModeColors, mode?: Mode) => void;
   setBaseColors: (
@@ -263,6 +283,10 @@ export function useLook(defaultTheme: DefaultTheme): {
     dark: null,
     light: null,
   });
+  const [statuses, setStatuses] = useState<ModePair<SemanticColors | null>>({
+    dark: null,
+    light: null,
+  });
   const [hydrated, setHydrated] = useState(false);
   const [activeLook, setActiveLook] = useState<ModeColors | null>(null);
   const [accentOverride, setAccentOverrideState] =
@@ -323,6 +347,11 @@ export function useLook(defaultTheme: DefaultTheme): {
       (dark ? defaultTheme.density : defaultTheme.densityLight ?? defaultTheme.density) ?? "comfortable",
     [defaultTheme.density, defaultTheme.densityLight]
   );
+  const defStatus = useCallback(
+    (dark: boolean): SemanticColors | null =>
+      (dark ? defaultTheme.status : defaultTheme.statusLight ?? defaultTheme.status) ?? null,
+    [defaultTheme.status, defaultTheme.statusLight]
+  );
   // The admin default scene effects for a mode: light falls back to dark per
   // field; null when neither field is set.
   const defSceneFx = useCallback(
@@ -380,6 +409,10 @@ export function useLook(defaultTheme: DefaultTheme): {
     (dark: boolean): Density => (dark ? densities.dark : densities.light) ?? defDensity(dark),
     [densities, defDensity]
   );
+  const resolveStatus = useCallback(
+    (dark: boolean): SemanticColors | null => (dark ? statuses.dark : statuses.light) ?? defStatus(dark),
+    [statuses, defStatus]
+  );
 
   // Paint the look state, with the fine-tune, scene effects and Reduce motion
   // switch resolved for the mode it shows unless the caller passes one
@@ -392,10 +425,11 @@ export function useLook(defaultTheme: DefaultTheme): {
         sceneFx: resolveSceneFx(dark),
         reduceMotion,
         density: resolveDensity(dark),
+        status: resolveStatus(dark),
         ...opts,
       });
     },
-    [resolveTune, resolveSceneFx, reduceMotion, resolveDensity]
+    [resolveTune, resolveSceneFx, reduceMotion, resolveDensity, resolveStatus]
   );
 
   // Apply the design/scene/font/heading classes for whichever mode is
@@ -597,6 +631,28 @@ export function useLook(defaultTheme: DefaultTheme): {
     [displayTheme, resolveLook, activeLook, accentOverride, defaultAccent, defDensity, applyAll]
   );
 
+  // Set (or clear) one mode's semantic colors, like setTune.
+  const setStatusColors = useCallback(
+    (next: SemanticColors | null, mode: Mode) => {
+      setStatuses((prev) => {
+        const updated = { ...prev, [mode]: next };
+        saveStatusColors(updated);
+        return updated;
+      });
+      const dark = resolveDark(displayTheme);
+      if ((mode === "dark") === dark) {
+        applyAll({
+          theme: displayTheme,
+          look: resolveLook(activeLook),
+          accentOverride,
+          defaultAccent,
+          status: next ?? defStatus(dark),
+        });
+      }
+    },
+    [displayTheme, resolveLook, activeLook, accentOverride, defaultAccent, defStatus, applyAll]
+  );
+
   // Set (or clear) one mode's scene effects, like setTune.
   const setSceneFx = useCallback(
     (next: SceneFx | null, mode: Mode) => {
@@ -649,9 +705,11 @@ export function useLook(defaultTheme: DefaultTheme): {
       // Fonts only when the pack carries them (#330); else the mode keeps its own.
       if (pack.font) setFont(pack.font, mode);
       if (pack.headingFont) setHeadingFont(pack.headingFont, mode);
+      // Its semantic colors for the mode, or the stylesheet's (#331).
+      setStatusColors((mode === "dark" ? pack.status : pack.statusLight ?? pack.status) ?? null, mode);
       applyThemeColors({ dark: pack.dark, light: pack.light }, mode);
     },
-    [setDesign, setScene, setTune, setSceneFx, setFont, setHeadingFont, applyThemeColors]
+    [setDesign, setScene, setTune, setSceneFx, setFont, setHeadingFont, setStatusColors, applyThemeColors]
   );
 
   // Update only the background/foreground for the CURRENT mode's variant,
@@ -741,6 +799,8 @@ export function useLook(defaultTheme: DefaultTheme): {
     resolveDensity,
     setHeadings,
     setDensities,
+    resolveStatus,
+    setStatuses,
   });
 
 
@@ -772,6 +832,7 @@ export function useLook(defaultTheme: DefaultTheme): {
     saveSceneFx(null);
     saveHeadingFont(null);
     saveDensity(null);
+    saveStatusColors(null);
     setDesigns({ dark: null, light: null });
     setScenes({ dark: null, light: null });
     setFonts({ dark: null, light: null });
@@ -779,6 +840,7 @@ export function useLook(defaultTheme: DefaultTheme): {
     setSceneFxs({ dark: null, light: null });
     setHeadings({ dark: null, light: null });
     setDensities({ dark: null, light: null });
+    setStatuses({ dark: null, light: null });
     const dark = resolveDark(displayTheme);
     applyAll({
       theme: displayTheme,
@@ -788,6 +850,7 @@ export function useLook(defaultTheme: DefaultTheme): {
       tune: defTune(dark),
       sceneFx: defSceneFx(dark),
       density: defDensity(dark),
+      status: defStatus(dark),
     });
     applyDesign(defDesign(dark));
     applyScene(defScene(dark));
@@ -804,6 +867,7 @@ export function useLook(defaultTheme: DefaultTheme): {
     defSceneFx,
     defDensity,
     defHeading,
+    defStatus,
     applyAll,
   ]);
 
@@ -825,6 +889,7 @@ export function useLook(defaultTheme: DefaultTheme): {
     saveReduceMotion(false);
     saveHeadingFont(null);
     saveDensity(null);
+    saveStatusColors(null);
     setActiveLook(null);
     setAccentOverrideState(NO_ACCENT_OVERRIDES);
     setThemeState(defaultTheme.mode);
@@ -836,6 +901,7 @@ export function useLook(defaultTheme: DefaultTheme): {
     setReduceMotionState(false);
     setHeadings({ dark: null, light: null });
     setDensities({ dark: null, light: null });
+    setStatuses({ dark: null, light: null });
     const dark = resolveDark(defaultTheme.mode);
     paintAll({
       theme: defaultTheme.mode,
@@ -846,6 +912,7 @@ export function useLook(defaultTheme: DefaultTheme): {
       sceneFx: defSceneFx(dark),
       reduceMotion: false,
       density: defDensity(dark),
+      status: defStatus(dark),
     });
     applyDesign(defDesign(dark));
     applyScene(defScene(dark));
@@ -860,6 +927,7 @@ export function useLook(defaultTheme: DefaultTheme): {
     defSceneFx,
     defDensity,
     defHeading,
+    defStatus,
     adminLook,
     defaultAccent,
   ]);
@@ -887,6 +955,7 @@ export function useLook(defaultTheme: DefaultTheme): {
     const storedReduce = loadReduceMotion();
     const storedHeadings = loadHeadingFont();
     const storedDensities = loadDensity();
+    const storedStatuses = loadStatusColors();
     const headingOf = (dark: boolean): FontId | null => {
       const v = dark ? storedHeadings.dark : storedHeadings.light;
       if (v === "body") return null;
@@ -903,6 +972,7 @@ export function useLook(defaultTheme: DefaultTheme): {
       sceneFx: (dark ? storedFx.dark : storedFx.light) ?? defSceneFx(dark),
       heading: headingOf(dark),
       density: (dark ? storedDensities.dark : storedDensities.light) ?? defDensity(dark),
+      status: (dark ? storedStatuses.dark : storedStatuses.light) ?? defStatus(dark),
     });
     /* eslint-disable react-hooks/set-state-in-effect */
     setThemeState(stored);
@@ -914,6 +984,7 @@ export function useLook(defaultTheme: DefaultTheme): {
     setReduceMotionState(storedReduce);
     setHeadings(storedHeadings);
     setDensities(storedDensities);
+    setStatuses(storedStatuses);
     setActiveLook(active);
     setAccentOverrideState(overrideAccent);
     setCustomThemes(loadThemes());
@@ -933,6 +1004,7 @@ export function useLook(defaultTheme: DefaultTheme): {
       sceneFx: initial.sceneFx,
       reduceMotion: storedReduce,
       density: initial.density,
+      status: initial.status,
     });
     applyDesign(initial.design);
     applyScene(initial.scene);
@@ -965,6 +1037,7 @@ export function useLook(defaultTheme: DefaultTheme): {
         sceneFx: next.sceneFx,
         reduceMotion: loadReduceMotion(),
         density: next.density,
+        status: next.status,
       });
       applyDesign(next.design);
       applyScene(next.scene);
@@ -1008,6 +1081,7 @@ export function useLook(defaultTheme: DefaultTheme): {
       sceneFxFor: (mode: Mode) => resolveSceneFx(mode === "dark"),
       headingFontFor: (mode: Mode) => resolveHeading(mode === "dark"),
       densityFor: (mode: Mode) => resolveDensity(mode === "dark"),
+      statusFor: (mode: Mode) => resolveStatus(mode === "dark"),
       colorsFor: (mode: Mode) => {
         const dark = mode === "dark";
         const cs = variantFor(effectiveLook, dark) ?? seedColorSet(dark);
@@ -1037,6 +1111,7 @@ export function useLook(defaultTheme: DefaultTheme): {
       setReduceMotion,
       setHeadingFont,
       setDensity,
+      setStatusColors,
       applyPack,
       applyThemeColors,
       setBaseColors,
@@ -1064,6 +1139,7 @@ export function useLook(defaultTheme: DefaultTheme): {
     reduceMotion,
     resolveHeading,
     resolveDensity,
+    resolveStatus,
     hydrated,
     seedColorSet,
     systemDark,
@@ -1080,6 +1156,7 @@ export function useLook(defaultTheme: DefaultTheme): {
     setReduceMotion,
     setHeadingFont,
     setDensity,
+    setStatusColors,
     applyPack,
     applyThemeColors,
     setBaseColors,

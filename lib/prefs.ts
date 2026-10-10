@@ -9,8 +9,10 @@ import {
   isDesignId,
   isSceneId,
   sanitizeSceneFx,
+  sanitizeSemantic,
   sanitizeTune,
   type ColorSet,
+  type SemanticColors,
   type Density,
   type DesignId,
   type ModeColors,
@@ -202,6 +204,9 @@ export type CustomTheme = ModeColors & {
   headingFontLight?: FontId;
   density?: Density;
   densityLight?: Density;
+  // Semantic colors (#331), per mode; absent = the stylesheet's.
+  status?: SemanticColors;
+  statusLight?: SemanticColors;
 };
 
 // The active custom look's light+dark colors (the resolved mode selects which
@@ -300,6 +305,8 @@ export function siteThemeFromCustomTheme(
     headingFontLight: theme.headingFontLight,
     density: theme.density,
     densityLight: theme.densityLight,
+    status: theme.status,
+    statusLight: theme.statusLight,
   };
 }
 
@@ -325,6 +332,8 @@ export function sanitizeCustomTheme(input: unknown): CustomTheme | null {
   const sceneFxLight = sanitizeSceneFx(t.sceneFxLight);
   const headingFont = isFontId(t.headingFont) ? t.headingFont : undefined;
   const headingFontLight = isFontId(t.headingFontLight) ? t.headingFontLight : undefined;
+  const status = sanitizeSemantic(t.status);
+  const statusLight = sanitizeSemantic(t.statusLight);
   const density = isDensity(t.density) && t.density !== "comfortable" ? t.density : undefined;
   const densityLight = isDensity(t.densityLight) && t.densityLight !== "comfortable" ? t.densityLight : undefined;
   return {
@@ -344,6 +353,8 @@ export function sanitizeCustomTheme(input: unknown): CustomTheme | null {
     ...(headingFontLight ? { headingFontLight } : {}),
     ...(density ? { density } : {}),
     ...(densityLight ? { densityLight } : {}),
+    ...(status ? { status } : {}),
+    ...(statusLight ? { statusLight } : {}),
     ...colors,
   };
 }
@@ -679,6 +690,29 @@ export function loadHeadingFont(): ModePair<HeadingChoice | null> {
 
 export function saveHeadingFont(pair: ModePair<HeadingChoice | null> | null): void {
   saveModePair(HEADING_KEY, pair);
+}
+
+// Semantic colors (#331), per mode: a set or null (not chosen / the admin
+// default). Stored as a `{dark,light}` pair.
+export const STATUS_KEY = "ctrlcenter:status";
+
+const isSemantic = (v: unknown): v is SemanticColors => sanitizeSemantic(v) !== null;
+
+export function loadStatusColors(): ModePair<SemanticColors | null> {
+  return loadModePair(STATUS_KEY, isSemantic);
+}
+
+export function saveStatusColors(pair: ModePair<SemanticColors | null> | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (pair && (pair.dark || pair.light)) {
+      window.localStorage.setItem(STATUS_KEY, JSON.stringify({ dark: pair.dark, light: pair.light }));
+    } else {
+      window.localStorage.removeItem(STATUS_KEY);
+    }
+  } catch {
+    // ignore
+  }
 }
 
 // The layout density (#330), per mode.

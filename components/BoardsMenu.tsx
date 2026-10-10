@@ -330,7 +330,7 @@ export default function BoardsMenu({
               </div>
             )}
             {error && (
-              <p role="alert" className="text-xs text-red-400">
+              <p role="alert" className="text-xs text-status-down">
                 {error}
               </p>
             )}

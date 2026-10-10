@@ -264,3 +264,19 @@ describe("sanitizeCustomTheme typography (#330)", () => {
     expect(site.density).toBe("compact");
   });
 });
+
+describe("sanitizeCustomTheme status colors (#331)", () => {
+  it("keeps a full set per mode and promotes it", () => {
+    const set = { up: "#00ff00", down: "#ff0000", warning: "#ffaa00", info: "#00aaff" };
+    const t = sanitizeCustomTheme({
+      name: "Signals",
+      dark: valid,
+      light: { ...valid, background: "#eceef3", foreground: "#181b24" },
+      status: set,
+      statusLight: { up: "#00ff00" },
+    })!;
+    expect(t.status).toEqual(set);
+    expect(t.statusLight).toBeUndefined();
+    expect(themeInputSchema.parse(siteThemeFromCustomTheme(t, "dark")).status?.down).toBe("#ff0000");
+  });
+});

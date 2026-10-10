@@ -52,7 +52,12 @@ export type PaintDefaults = {
   headingFontLight?: string;
   density?: string;
   densityLight?: string;
+  // Semantic colors (#331), per mode: { up, down, warning, info } hex.
+  status?: PaintSemantic;
+  statusLight?: PaintSemantic;
 };
+
+export type PaintSemantic = Record<string, string>;
 
 // The valid ids per part, so a stored value the current build doesn't know
 // falls back to the default instead of adding a dead class.
@@ -85,6 +90,8 @@ export type PaintInput = {
   // The heading font (null = the body font) and the density (#330).
   headingFont?: string | null;
   density?: string | null;
+  // The theme's semantic colors (null = the stylesheet's defaults).
+  status?: PaintSemantic | null;
 };
 
 // What to paint: `vars` maps a CSS custom property to its value, or null to
@@ -114,6 +121,8 @@ export function makeThemePaint() {
   const TUNE = ["radius", "border", "blur", "shadow", "fill", "glow"];
   // The density factors, by id (lib/theme.ts DENSITIES).
   const DENSITY: Record<string, number> = { compact: 0.85, comfortable: 1, spacious: 1.15 };
+  // The semantic color keys, each painted as --status-<key>.
+  const SEMANTIC = ["up", "down", "warning", "info"];
 
   function hexToRgb(hex: string): [number, number, number] | null {
     const m = HEX.exec((hex || "").trim());
@@ -277,6 +286,11 @@ export function makeThemePaint() {
     attrs["data-motion"] = motion === "normal" ? null : motion;
     const factor = input.density ? DENSITY[input.density] : undefined;
     vars["--density"] = factor !== undefined && factor !== 1 ? String(factor) : null;
+    for (let i = 0; i < SEMANTIC.length; i++) {
+      const k = SEMANTIC[i];
+      const v = input.status ? input.status[k] : undefined;
+      vars["--status-" + k] = typeof v === "string" && HEX.test(v) ? v : null;
+    }
     const paint: Paint = { dark: input.dark, vars: vars, attrs: attrs };
     if (input.design !== undefined) paint.design = input.design;
     if (input.scene !== undefined) paint.scene = input.scene;
@@ -459,6 +473,22 @@ export function makeThemePaint() {
       if (typeof v === "string" && valid.indexOf(v) >= 0) return v;
       return dark ? dd : dl || dd;
     };
+    // Semantic colors: the stored per-mode set, else the admin default for
+    // the mode (light falls back to dark); all four must be hex.
+    const semOf = (o: unknown): PaintSemantic | null => {
+      if (!isObj(o)) return null;
+      const out: PaintSemantic = {};
+      for (let i = 0; i < SEMANTIC.length; i++) {
+        const v = o[SEMANTIC[i]];
+        if (!isHex(v)) return null;
+        out[SEMANTIC[i]] = v;
+      }
+      return out;
+    };
+    const storedStatus = get("ctrlcenter:status");
+    let status = isObj(storedStatus) ? semOf(dark ? storedStatus.dark : storedStatus.light) : null;
+    if (!status) status = semOf(dark ? dt.status : dt.statusLight || dt.status);
+
     // The heading font: stored pair, else the admin default (light falls
     // back to dark); none means the body font. The visitor's stored "body"
     // sentinel clears the admin default.
@@ -485,6 +515,7 @@ export function makeThemePaint() {
       font: pick("ctrlcenter:font", ids.font, dt.font, dt.fontLight),
       headingFont: headingFont,
       density: pick("ctrlcenter:density", ids.density, dt.density || "comfortable", dt.densityLight),
+      status: status,
     };
   }
 

@@ -48,11 +48,11 @@ const STATUS_LABELS: Record<SeerrRequestStatus, string> = {
 };
 
 const STATUS_TONES: Record<SeerrRequestStatus, string> = {
-  pending: "text-amber-400/90",
-  declined: "text-red-400",
-  approved: "text-sky-400/80",
-  processing: "text-sky-400/80",
-  available: "text-emerald-400/90",
+  pending: "text-status-warning/90",
+  declined: "text-status-down",
+  approved: "text-status-info/80",
+  processing: "text-status-info/80",
+  available: "text-status-up/90",
 };
 
 function RequestRow({
@@ -147,7 +147,7 @@ export default function SeerrCard({
               {data.totalRequests} total
             </span>
           </div>
-          {error && <p className="text-xs text-red-400">{error}</p>}
+          {error && <p className="text-xs text-status-down">{error}</p>}
           {data.requests.length > 0 ? (
             <div className="flex flex-col gap-2">
               <p className="text-[11px] font-medium tracking-wide text-ink-40 uppercase">

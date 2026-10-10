@@ -125,16 +125,16 @@ export function SaveStatus({
     <span
       role="status"
       className={`inline-flex items-center gap-1.5 text-xs ${
-        status === "error" ? "text-red-400" : "text-ink-45"
+        status === "error" ? "text-status-down" : "text-ink-45"
       }`}
     >
       <span
         className={`h-1.5 w-1.5 rounded-full ${
           status === "saving"
-            ? "bg-amber-400"
+            ? "bg-status-warning"
             : status === "saved"
-              ? "bg-emerald-400"
-              : "bg-red-400"
+              ? "bg-status-up"
+              : "bg-status-down"
         }`}
         aria-hidden
       />

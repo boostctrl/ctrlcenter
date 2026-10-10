@@ -60,7 +60,7 @@ export default function CalendarSettings({ w, onChange }: InstanceEditorProps<"c
       />
       <CalendarTest url={w.url} username={w.username} password={w.password} />
       {w.username.trim() !== "" && /^http:\/\//i.test(w.url.trim()) && (
-        <p className="text-xs text-amber-200">
+        <p className="text-xs text-status-warning">
           This URL is plain http, so the credentials are sent in cleartext.
           Use https where possible.
         </p>

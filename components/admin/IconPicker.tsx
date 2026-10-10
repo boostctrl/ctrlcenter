@@ -155,7 +155,7 @@ export default function IconPicker({
           </div>
         </div>
 
-        {uploadError && <p className="text-sm text-red-400">{uploadError}</p>}
+        {uploadError && <p className="text-sm text-status-down">{uploadError}</p>}
 
         <input
           ref={inputRef}
@@ -207,7 +207,7 @@ export default function IconPicker({
                       type="button"
                       onClick={() => handleDelete(u.name)}
                       aria-label={`Delete ${u.name}`}
-                      className="absolute top-1 right-1 rounded-md bg-background/70 px-1 text-xs text-ink-50 opacity-0 transition-opacity hover:text-red-400 group-hover:opacity-100"
+                      className="absolute top-1 right-1 rounded-md bg-background/70 px-1 text-xs text-ink-50 opacity-0 transition-opacity hover:text-status-down group-hover:opacity-100"
                     >
                       ✕
                     </button>

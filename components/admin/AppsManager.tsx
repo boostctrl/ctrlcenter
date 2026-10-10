@@ -618,7 +618,7 @@ export default function AppsManager({
                     onChange={(e) => setForm({ ...form, jsonQuery: e.target.value })}
                     hint={
                       form.jsonQuery.trim() && "error" in parseJsonQuery(form.jsonQuery) ? (
-                        <span className="text-red-400">
+                        <span className="text-status-down">
                           {(parseJsonQuery(form.jsonQuery) as { error: string }).error}
                         </span>
                       ) : (

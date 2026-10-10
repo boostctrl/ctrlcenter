@@ -126,10 +126,10 @@ export default function StatusPage({
               !polled
                 ? "bg-fg/25"
                 : !allUp
-                  ? "bg-red-400"
+                  ? "bg-status-down"
                   : maintenanceNames.length
-                    ? "bg-sky-400"
-                    : "bg-emerald-400"
+                    ? "bg-status-info"
+                    : "bg-status-up"
             }`}
             aria-hidden
           />
@@ -248,7 +248,7 @@ export default function StatusPage({
                     </p>
                   )}
                   {s?.maintenance && (
-                    <p className="text-xs text-sky-400">Under maintenance</p>
+                    <p className="text-xs text-status-info">Under maintenance</p>
                   )}
                   {s && isOutage(s) && (
                     <p
@@ -261,13 +261,13 @@ export default function StatusPage({
                           ? `down since ${instantLabel(outageStart, timezone)}`
                           : undefined
                       }
-                      className="text-xs text-red-400"
+                      className="text-xs text-status-down"
                     >
                       {dur ? `Down for ${dur}` : "Down"}
                     </p>
                   )}
                   {s?.up && s.warning && (
-                    <p className="text-xs text-amber-200">{s.warning}</p>
+                    <p className="text-xs text-status-warning">{s.warning}</p>
                   )}
                 </>
               );
@@ -286,11 +286,11 @@ export default function StatusPage({
                   key={app.id}
                   className={`glass-card relative px-5 py-4 transition-colors hover:bg-fg/[0.03] ${
                     s?.maintenance
-                      ? "ring-1 ring-sky-400/30"
+                      ? "ring-1 ring-status-info/30"
                       : s && !s.up
-                        ? "ring-1 ring-red-400/30"
+                        ? "ring-1 ring-status-down/30"
                         : s?.warning
-                          ? "ring-1 ring-amber-400/30"
+                          ? "ring-1 ring-status-warning/30"
                           : ""
                   }`}
                 >
