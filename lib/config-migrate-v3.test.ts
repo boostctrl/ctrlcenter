@@ -355,3 +355,35 @@ describe("migrateV2toV3: groups (#299)", () => {
   });
 });
 
+describe("migrateV2toV3: integrations (#300)", () => {
+  it("turns each set-up fixed key into an integration with the service's id, dropping the rest", () => {
+    const out = migrateV2toV3({
+      settings: {
+        integrations: {
+          sonarr: { enabled: true, url: "http://sonarr.lan", apiKey: "k" },
+          radarr: { enabled: false, url: "http://radarr.lan", apiKey: "" },
+          tautulli: { enabled: false, url: "", apiKey: "" },
+          unifi: { enabled: true, url: "", username: "u", password: "p", allowInsecureTls: true },
+          bogus: { enabled: true, url: "http://x" },
+        },
+      },
+    }).value as Out & { integrations: Record<string, unknown>[] };
+    expect(out.integrations.map((i) => [i.id, i.type, i.enabled])).toEqual([
+      ["sonarr", "sonarr", true],
+      ["radarr", "radarr", false],
+      ["unifi", "unifi", true],
+    ]);
+    expect(out.integrations[2]).toMatchObject({ username: "u", password: "p", allowInsecureTls: true });
+    expect(out.settings).not.toHaveProperty("integrations");
+    const config = configReadSchema.parse(migrateConfig({ schemaVersion: 2, settings: { integrations: { sonarr: { enabled: true, url: "http://s" } } } }).value);
+    expect(config.integrations).toEqual([expect.objectContaining({ id: "sonarr", type: "sonarr", url: "http://s", name: "" })]);
+  });
+
+  it("leaves a file without the old key, or with the new list, alone", () => {
+    const v3 = { schemaVersion: 3, settings: {}, boards: [], groups: [], widgets: [] };
+    expect(migrateV2toV3(v3)).toEqual({ value: v3, changed: false });
+    const both = { ...v3, integrations: [], settings: { integrations: { sonarr: { enabled: true } } } };
+    expect(migrateV2toV3(both).changed).toBe(false);
+  });
+});
+

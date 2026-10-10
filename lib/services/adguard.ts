@@ -17,19 +17,12 @@ import {
   runProbe,
   type ProbeResult,
 } from "./http";
-import { resolveSecret } from "../secrets";
 
 export type AdguardConfig = {
   url: string;
   username: string;
   password: string;
 };
-
-// The password can come from the environment instead of config.yaml, same
-// convention as the other integrations.
-export function resolveAdguardPassword(cfg: { password: string }): string {
-  return resolveSecret("CTRLCENTER_ADGUARD_PASS", cfg.password);
-}
 
 export type AdguardSnapshot = {
   protectionEnabled: boolean;
@@ -130,7 +123,7 @@ function adguardHeaders(cfg: AdguardConfig): Record<string, string> {
   const user = cfg.username.trim();
   // No account configured — an open AdGuard Home install answers without auth.
   if (user === "") return {};
-  const pass = resolveAdguardPassword(cfg);
+  const pass = cfg.password;
   return {
     Authorization:
       "Basic " + Buffer.from(`${user}:${pass}`).toString("base64"),

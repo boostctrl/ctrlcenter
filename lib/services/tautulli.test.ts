@@ -3,7 +3,6 @@ import {
   getTautulliSnapshot,
   getTautulliDetail,
   probeTautulli,
-  resolveTautulliApiKey,
   mapTautulliActivity,
   mapTautulliHistory,
   TAUTULLI_SESSION_CAP,
@@ -210,14 +209,3 @@ describe("probeTautulli", () => {
   });
 });
 
-describe("resolveTautulliApiKey", () => {
-  it("prefers the env var over the stored key", () => {
-    vi.stubEnv("CTRLCENTER_TAUTULLI_KEY", "env-key");
-    expect(resolveTautulliApiKey({ apiKey: "stored" })).toBe("env-key");
-  });
-
-  it("falls back to the stored key when the env var is unset", () => {
-    vi.stubEnv("CTRLCENTER_TAUTULLI_KEY", "");
-    expect(resolveTautulliApiKey({ apiKey: "stored" })).toBe("stored");
-  });
-});

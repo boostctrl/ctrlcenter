@@ -3,7 +3,6 @@ import {
   getUnifiSnapshot,
   getUnifiDetail,
   probeUnifi,
-  resolveUnifiPassword,
   mapUnifiHealth,
   mapUnifiDevices,
   UNIFI_ISSUE_CAP,
@@ -256,14 +255,3 @@ describe("mapUnifiDevices", () => {
   });
 });
 
-describe("resolveUnifiPassword", () => {
-  it("prefers the env var over the stored password", () => {
-    vi.stubEnv("CTRLCENTER_UNIFI_PASS", "env-pw");
-    expect(resolveUnifiPassword({ password: "stored" })).toBe("env-pw");
-  });
-
-  it("falls back to the stored password when the env var is unset", () => {
-    vi.stubEnv("CTRLCENTER_UNIFI_PASS", "");
-    expect(resolveUnifiPassword({ password: "stored" })).toBe("stored");
-  });
-});

@@ -537,10 +537,11 @@ export default async function HelpPage() {
 
         <Card title="The Monitor page">
           <P>
-            Connect <strong>qBittorrent</strong>, <strong>Sonarr</strong>, or{" "}
-            <strong>Radarr</strong> under{" "}
-            <strong>Settings → Integrations</strong> (each has a
-            test-connection button) and the private{" "}
+            Connect qBittorrent, Sonarr, Radarr, AdGuard Home, Tautulli,
+            Seerr, Portainer, TrueNAS or UniFi under{" "}
+            <strong>Settings → Integrations</strong> — as many of each as you
+            run, each with its own name and a test-connection button — and the
+            private{" "}
             <A href="/admin/monitor">Monitor</A> page shows what they&apos;re
             doing: transfer speeds and the busiest torrents for qBittorrent,
             and — for Sonarr and Radarr — what&apos;s coming up (upcoming
@@ -552,9 +553,10 @@ export default async function HelpPage() {
             Everything about it is admin-only: the page, the data it polls,
             and the stored credentials all sit behind your sign-in, and
             nothing from an integration ever appears on the public dashboard.
-            Each credential can also come from an environment variable
-            instead of the config file (see the README&apos;s environment
-            table).
+            Any field can name an environment variable instead of holding the
+            secret: write <Code>{"${SONARR_4K_KEY}"}</Code> and set that
+            variable for the container. It&apos;s read on the server and never
+            shown in the admin.
           </P>
           <P>
             Connections are read-only by default. For{" "}

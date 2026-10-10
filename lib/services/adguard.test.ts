@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getAdguardSnapshot,
   probeAdguard,
-  resolveAdguardPassword,
   mapAdguardSnapshot,
   ADGUARD_TOP_BLOCKED_CAP,
 } from "./adguard";
@@ -145,14 +144,3 @@ describe("probeAdguard", () => {
   });
 });
 
-describe("resolveAdguardPassword", () => {
-  it("prefers the env var over the stored password", () => {
-    vi.stubEnv("CTRLCENTER_ADGUARD_PASS", "env-pw");
-    expect(resolveAdguardPassword({ password: "stored" })).toBe("env-pw");
-  });
-
-  it("falls back to the stored password when the env var is unset", () => {
-    vi.stubEnv("CTRLCENTER_ADGUARD_PASS", "");
-    expect(resolveAdguardPassword({ password: "stored" })).toBe("stored");
-  });
-});

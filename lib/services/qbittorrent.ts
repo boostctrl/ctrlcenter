@@ -21,7 +21,6 @@ import {
   runProbe,
   type ProbeResult,
 } from "./http";
-import { resolveSecret } from "../secrets";
 import { log, hostOf } from "../log";
 import { globalSingleton } from "../singleton";
 
@@ -30,14 +29,6 @@ export type QbittorrentConfig = {
   username: string;
   password: string;
 };
-
-// The password can come from the environment instead of config.yaml, same
-// convention as CTRLCENTER_SMTP_PASS / CTRLCENTER_CALDAV_PASS.
-export function resolveQbittorrentPassword(cfg: {
-  password: string;
-}): string {
-  return resolveSecret("CTRLCENTER_QBITTORRENT_PASS", cfg.password);
-}
 
 // qBittorrent reports ~15 raw states; the cards need far fewer. Buckets:
 // moving data now / seeding / deliberately stopped / waiting its turn /
@@ -217,7 +208,7 @@ async function mintSession(
     },
     body: new URLSearchParams({
       username: cfg.username,
-      password: resolveQbittorrentPassword(cfg),
+      password: cfg.password,
     }).toString(),
   });
   throwForStatus(res, { 403: "Login refused — IP temporarily banned?" });

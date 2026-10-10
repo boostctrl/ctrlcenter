@@ -10,7 +10,9 @@ import { log, errorReason } from "@/lib/log";
 // four gates as the write actions (requireAction) — it exposes container
 // internals, so it belongs behind the allowActions opt-in too.
 export async function GET(request: NextRequest) {
-  const guard = await requireAction(request, "portainer");
+  // Which Portainer (#300): ?integration=<id>.
+  const integration = request.nextUrl.searchParams.get("integration") ?? "";
+  const guard = await requireAction(request, integration, "portainer");
   if (!guard.ok) {
     return NextResponse.json({ error: guard.error }, { status: guard.status });
   }

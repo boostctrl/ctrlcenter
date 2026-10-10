@@ -1,24 +1,31 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getMonitorSnapshot, invalidateService } from "./monitor";
 import { swrCache } from "./swr-cache";
-import type { IntegrationsConfig } from "./schema";
+import { integrationSchema, type Integration } from "./schema";
+import { SERVICE_IDS, type ServiceId } from "./services/ids";
+import type { MonitorSnapshot } from "./monitor";
+import type { ArrSnapshot } from "./services/arr";
 
 const TTL = 30_000;
 
-const integrations = (
-  over: Partial<IntegrationsConfig> = {}
-): IntegrationsConfig => ({
-  qbittorrent: { enabled: false, url: "", username: "", password: "", allowInsecureTls: false, allowActions: false },
-  sonarr: { enabled: false, url: "", apiKey: "", allowInsecureTls: false, allowActions: false },
-  radarr: { enabled: false, url: "", apiKey: "", allowInsecureTls: false, allowActions: false },
-  adguard: { enabled: false, url: "", username: "", password: "", allowInsecureTls: false, allowActions: false },
-  tautulli: { enabled: false, url: "", apiKey: "", allowInsecureTls: false, allowActions: false },
-  seerr: { enabled: false, url: "", apiKey: "", allowInsecureTls: false, allowActions: false },
-  portainer: { enabled: false, url: "", apiKey: "", allowInsecureTls: false, allowActions: false },
-  truenas: { enabled: false, url: "", apiKey: "", allowInsecureTls: false, allowActions: false },
-  unifi: { enabled: false, url: "", username: "", password: "", allowInsecureTls: false, allowActions: false },
-  ...over,
-});
+// One integration of every type, id = type, all off — the shape a migrated
+// 2.x config has — with `over` merged per type.
+type Over = Partial<Record<ServiceId, Partial<Integration>>>;
+const integrations = (over: Over = {}): Integration[] =>
+  SERVICE_IDS.map((type) =>
+    integrationSchema.parse({ id: type, type, enabled: false, ...over[type] })
+  );
+
+// The Sonarr entry's upcoming list.
+const upcoming = (snap: MonitorSnapshot) =>
+  (at(snap, "sonarr").data as ArrSnapshot | null)?.upcoming;
+
+// Look an integration up in a snapshot by id.
+const at = (snap: MonitorSnapshot, id: string) => {
+  const entry = snap.find((e) => e.id === id);
+  if (!entry) throw new Error(`no ${id}`);
+  return entry;
+};
 
 // Sonarr is the simplest service to drive end-to-end (no login dance).
 const sonarrOn = (url = "http://sonarr.local:8989") =>
@@ -79,7 +86,7 @@ describe("getMonitorSnapshot", () => {
     const snap = await getMonitorSnapshot(
       integrations({ radarr: { enabled: true, url: "   ", apiKey: "k", allowInsecureTls: false, allowActions: false } })
     );
-    expect(snap.qbittorrent).toEqual({
+    expect(at(snap, "qbittorrent")).toMatchObject({
       configured: false,
       enabled: false,
       urlSet: false,
@@ -88,7 +95,7 @@ describe("getMonitorSnapshot", () => {
       error: null,
       at: null,
     });
-    expect(snap.radarr.configured).toBe(false);
+    expect(at(snap, "radarr").configured).toBe(false);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -112,17 +119,17 @@ describe("getMonitorSnapshot", () => {
       })
     );
 
-    expect(snap.qbittorrent.configured).toBe(false);
-    expect(snap.qbittorrent.enabled).toBe(false);
-    expect(snap.qbittorrent.urlSet).toBe(true);
+    expect(at(snap, "qbittorrent").configured).toBe(false);
+    expect(at(snap, "qbittorrent").enabled).toBe(false);
+    expect(at(snap, "qbittorrent").urlSet).toBe(true);
 
-    expect(snap.radarr.configured).toBe(false);
-    expect(snap.radarr.enabled).toBe(true);
-    expect(snap.radarr.urlSet).toBe(false);
+    expect(at(snap, "radarr").configured).toBe(false);
+    expect(at(snap, "radarr").enabled).toBe(true);
+    expect(at(snap, "radarr").urlSet).toBe(false);
 
-    expect(snap.sonarr.configured).toBe(true);
-    expect(snap.sonarr.enabled).toBe(true);
-    expect(snap.sonarr.urlSet).toBe(true);
+    expect(at(snap, "sonarr").configured).toBe(true);
+    expect(at(snap, "sonarr").enabled).toBe(true);
+    expect(at(snap, "sonarr").urlSet).toBe(true);
     // Only the configured service was polled.
     expect(
       fetchMock.mock.calls.every(([input]) =>
@@ -148,8 +155,8 @@ describe("getMonitorSnapshot", () => {
     stubSonarr(() => 1);
     // Configured but actions off (the default posture) — read-only.
     const readOnly = await getMonitorSnapshot(sonarrOn());
-    expect(readOnly.sonarr.configured).toBe(true);
-    expect(readOnly.sonarr.actionsAllowed).toBe(false);
+    expect(at(readOnly, "sonarr").configured).toBe(true);
+    expect(at(readOnly, "sonarr").actionsAllowed).toBe(false);
 
     // Same target with the opt-in turned on — actions live.
     const opted = await getMonitorSnapshot(
@@ -157,7 +164,7 @@ describe("getMonitorSnapshot", () => {
         sonarr: { enabled: true, url: "http://sonarr.local:8989", apiKey: "k", allowInsecureTls: false, allowActions: true },
       })
     );
-    expect(opted.sonarr.actionsAllowed).toBe(true);
+    expect(at(opted, "sonarr").actionsAllowed).toBe(true);
   });
 
   it("blocks only on a cold cache, then serves the cache within the TTL", async () => {
@@ -165,9 +172,9 @@ describe("getMonitorSnapshot", () => {
     const first = await getMonitorSnapshot(sonarrOn());
     const second = await getMonitorSnapshot(sonarrOn());
 
-    expect(first.sonarr.configured).toBe(true);
-    expect(first.sonarr.data?.upcoming).toHaveLength(5);
-    expect(second.sonarr.data?.upcoming).toHaveLength(5);
+    expect(at(first, "sonarr").configured).toBe(true);
+    expect(upcoming(first)).toHaveLength(5);
+    expect(upcoming(second)).toHaveLength(5);
     // One calendar + one history + one health fetch — the second was cached.
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
@@ -183,11 +190,11 @@ describe("getMonitorSnapshot", () => {
     now.mockReturnValue(base + TTL + 1);
     // The stale snapshot comes back without waiting on the refresh.
     const stale = await getMonitorSnapshot(sonarrOn());
-    expect(stale.sonarr.data?.upcoming).toHaveLength(1);
+    expect(upcoming(stale)).toHaveLength(1);
 
     await settle();
     const fresh = await getMonitorSnapshot(sonarrOn());
-    expect(fresh.sonarr.data?.upcoming).toHaveLength(2);
+    expect(upcoming(fresh)).toHaveLength(2);
   });
 
   it("keeps the last good data and reports the error when a refresh fails", async () => {
@@ -203,8 +210,8 @@ describe("getMonitorSnapshot", () => {
     await settle();
 
     const after = await getMonitorSnapshot(sonarrOn());
-    expect(after.sonarr.data?.upcoming).toHaveLength(4); // stale-on-failure
-    expect(after.sonarr.error).toBe("HTTP 500");
+    expect(upcoming(after)).toHaveLength(4); // stale-on-failure
+    expect(at(after, "sonarr").error).toBe("HTTP 500");
   });
 
   it("treats a config edit as a cold cache instead of serving the old target", async () => {
@@ -256,8 +263,46 @@ describe("getMonitorSnapshot", () => {
 
     const callsAfterRace = fetchMock.mock.calls.length; // A(3) + B(3)
     const readB = await getMonitorSnapshot(sonarrOn("http://b.local"));
-    expect(readB.sonarr.data?.upcoming).toHaveLength(3); // still B's data
+    expect(upcoming(readB)).toHaveLength(3); // still B's data
     // Served from cache: no redundant blocking refetch was triggered.
     expect(fetchMock.mock.calls.length).toBe(callsAfterRace);
   });
 });
+
+describe("integration instances (#300)", () => {
+  it("polls two of a type separately, each labelled", async () => {
+    const fetchMock = stubSonarr(() => 2);
+    const snap = await getMonitorSnapshot([
+      integrationSchema.parse({ id: "sonarr", type: "sonarr", url: "http://hd.local:8989", apiKey: "a" }),
+      integrationSchema.parse({ id: "sonarr-4k", type: "sonarr", name: "Sonarr 4K", url: "http://uhd.local:8989", apiKey: "b" }),
+      integrationSchema.parse({ id: "sonarr-3", type: "sonarr", url: "http://x.local:8989", apiKey: "c", enabled: false }),
+    ]);
+    expect(snap.map((e) => [e.id, e.label, e.configured])).toEqual([
+      ["sonarr", "Sonarr", true],
+      ["sonarr-4k", "Sonarr 4K", true],
+      ["sonarr-3", "Sonarr 2", false],
+    ]);
+    const hosts = new Set(fetchMock.mock.calls.map(([u]) => new URL(String(u)).host));
+    expect(hosts).toEqual(new Set(["hd.local:8989", "uhd.local:8989"]));
+  });
+
+  it("sends a key from an ${ENV} reference, and the legacy variable only to the migrated id", async () => {
+    vi.stubEnv("SONARR_4K_KEY", "from-ref");
+    vi.stubEnv("CTRLCENTER_SONARR_KEY", "legacy");
+    const fetchMock = stubSonarr(() => 1);
+    await getMonitorSnapshot([
+      integrationSchema.parse({ id: "sonarr", type: "sonarr", url: "http://hd.local:8989", apiKey: "stored" }),
+      integrationSchema.parse({ id: "uhd", type: "sonarr", url: "http://uhd.local:8989", apiKey: "${SONARR_4K_KEY}" }),
+      integrationSchema.parse({ id: "other", type: "sonarr", url: "http://other.local:8989", apiKey: "own" }),
+    ]);
+    const keyFor = (host: string) =>
+      fetchMock.mock.calls
+        .filter(([u]) => new URL(String(u)).host === host)
+        .map((call) => new Headers(((call as unknown[])[1] as RequestInit | undefined)?.headers).get("X-Api-Key"))[0];
+    expect(keyFor("hd.local:8989")).toBe("legacy");
+    expect(keyFor("uhd.local:8989")).toBe("from-ref");
+    expect(keyFor("other.local:8989")).toBe("own");
+    vi.unstubAllEnvs();
+  });
+});
+

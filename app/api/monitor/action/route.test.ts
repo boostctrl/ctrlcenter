@@ -20,7 +20,9 @@ async function writeIntegrations(qbittorrent: Record<string, unknown>) {
 const act = (body: unknown, auth = true) =>
   POST(request("/api/monitor/action", { method: "POST", body, session: auth ? session : undefined }));
 
-const pause = { service: "qbittorrent", action: "pause", hash: "abc" };
+// A 2.x-shaped config migrates the qBittorrent key to an integration with id
+// "qbittorrent" (#300).
+const pause = { integration: "qbittorrent", service: "qbittorrent", action: "pause", hash: "abc" };
 
 beforeAll(async () => {
   configPath = await useScratchConfig();
@@ -36,7 +38,8 @@ describe("POST /api/monitor/action", () => {
   });
 
   it("rejects an unknown action", async () => {
-    expect((await act({ service: "qbittorrent", action: "format-disk", hash: "x" })).status).toBe(400);
+    expect((await act({ ...pause, action: "format-disk" })).status).toBe(400);
+    expect((await act({ service: "qbittorrent", action: "pause", hash: "x" })).status).toBe(400);
   });
 
   it("refuses an integration that isn't configured (409)", async () => {

@@ -6,7 +6,6 @@ import {
   listContainers,
   mapContainers,
   probePortainer,
-  resolvePortainerApiKey,
   restartContainer,
   startContainer,
   stopContainer,
@@ -229,14 +228,3 @@ describe("probePortainer", () => {
   });
 });
 
-describe("resolvePortainerApiKey", () => {
-  it("prefers the env var over the stored key", () => {
-    vi.stubEnv("CTRLCENTER_PORTAINER_KEY", "env-key");
-    expect(resolvePortainerApiKey({ apiKey: "stored" })).toBe("env-key");
-  });
-
-  it("falls back to the stored key when the env var is unset", () => {
-    vi.stubEnv("CTRLCENTER_PORTAINER_KEY", "");
-    expect(resolvePortainerApiKey({ apiKey: "stored" })).toBe("stored");
-  });
-});

@@ -1,76 +1,88 @@
-// Connections to other self-hosted services (Monitor dashboard).
+// Integrations (#189, #300): connections to other self-hosted services, shown
+// only on the private Monitor dashboard (/admin/monitor). Since 3.0 they're a
+// top-level list of instances — two Sonarrs, three Portainers — each with its
+// own id (its Monitor URL, /admin/monitor/<id>), type, name and credentials.
+// The type's facts live in lib/services/ids.ts (SERVICE_META).
+//
+// The credentials are secrets, and the URLs internal topology, so the whole
+// list is admin-only: readPublicConfig drops it, and stripSecrets blanks it in
+// anything serialized. Any text field may hold `${ENV_VAR}` references,
+// resolved server-side at use time (lib/services/resolve.ts) and never sent to
+// the browser.
+//
+// One shape serves every type: a WebUI login (username/password) or an API
+// key; each type reads the fields its SERVICE_META.credentials names.
 import { z } from "zod";
-import { patchOf } from "./input";
+import { SERVICE_IDS } from "../services/ids";
+import { wholeOf } from "./input";
 
-// --- Integrations (#189): connections to other self-hosted services, shown
-// only on the private Monitor dashboard (/admin/monitor). Read-only in the
-// 2.3.x–2.4.x arc. Stored leniently like every settings section. The
-// credentials are secrets — and the URLs are internal topology — so the
-// whole section is marked secret (settingsSchema) and stripSecrets
-// neutralizes it in anything a public surface serializes (#157); each
-// credential can also come from a CTRLCENTER_* env
-// var instead of the file (resolved at use time in lib/services/*).
-//
-// Two credential shapes cover every service: a WebUI login
-// (username/password) and an API key. A new service reuses one of these and
-// adds its id to integrationsSchema + the registry (lib/services/registry.ts).
-// Opt-in, default off: skip TLS certificate verification for this service.
-// Only honored by clients that support it (UniFi) and only for an https URL —
-// it exists for controllers that ship a self-signed cert with no plaintext
-// alternative. Not a secret (a boolean), so stripSecrets leaves it intact.
-//
-// `allowActions` is the write-side opt-in (#201/#202/#203): default off, so a
-// configured integration stays read-only until the admin turns it on. Only the
-// action-capable services (qBittorrent, Seerr, Portainer) expose the toggle and
-// honor it; every service carries the field so both credential shapes share one
-// schema. Public redaction forces every boolean off too, so this can't leak
-// either.
-export const userPassIntegrationSchema = z.object({
-  enabled: z.boolean().default(false),
-  url: z.string().default(""),
-  username: z.string().default(""),
-  password: z.string().default(""),
-  allowInsecureTls: z.boolean().default(false),
-  allowActions: z.boolean().default(false),
+const integrationId = z.string().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/);
+
+export const integrationSchema = z.object({
+  id: integrationId,
+  type: z.enum(SERVICE_IDS),
+  // What the admin calls it ("Sonarr 4K"); blank for the type's label.
+  name: z.string().max(60).catch("").default(""),
+  enabled: z.boolean().catch(true).default(true),
+  url: z.string().catch("").default(""),
+  username: z.string().catch("").default(""),
+  password: z.string().catch("").default(""),
+  apiKey: z.string().catch("").default(""),
+  // Opt-in, default off: skip TLS certificate verification. Only honored by
+  // clients that support it (UniFi) and only for an https URL — it exists for
+  // controllers that ship a self-signed cert with no plaintext alternative.
+  allowInsecureTls: z.boolean().catch(false).default(false),
+  // The write-side opt-in (#201/#202/#203): default off, so a configured
+  // integration stays read-only until the admin turns it on. Only the
+  // action-capable types expose the toggle and honor it.
+  allowActions: z.boolean().catch(false).default(false),
 });
-export type UserPassIntegration = z.infer<typeof userPassIntegrationSchema>;
+export type Integration = z.infer<typeof integrationSchema>;
 
-export const apiKeyIntegrationSchema = z.object({
-  enabled: z.boolean().default(false),
-  url: z.string().default(""),
-  apiKey: z.string().default(""),
-  allowInsecureTls: z.boolean().default(false),
-  allowActions: z.boolean().default(false),
-});
-export type ApiKeyIntegration = z.infer<typeof apiKeyIntegrationSchema>;
+// The shapes the clients take: a login, or a key. Kept so each client module
+// can type its own slice.
+export type UserPassIntegration = Pick<
+  Integration,
+  "enabled" | "url" | "username" | "password" | "allowInsecureTls" | "allowActions"
+>;
+export type ApiKeyIntegration = Pick<
+  Integration,
+  "enabled" | "url" | "apiKey" | "allowInsecureTls" | "allowActions"
+>;
 
-const userPass = () =>
-  userPassIntegrationSchema.default(userPassIntegrationSchema.parse({}));
-const apiKey = () =>
-  apiKeyIntegrationSchema.default(apiKeyIntegrationSchema.parse({}));
+export const MAX_INTEGRATIONS = 50;
 
-export const integrationsSchema = z.object({
-  qbittorrent: userPass(),
-  sonarr: apiKey(),
-  radarr: apiKey(),
-  adguard: userPass(),
-  tautulli: apiKey(),
-  seerr: apiKey(),
-  portainer: apiKey(),
-  truenas: apiKey(),
-  unifi: userPass(),
-});
-export type IntegrationsConfig = z.infer<typeof integrationsSchema>;
+// Stored leniently: an entry that won't parse is dropped, a repeated id keeps
+// its first entry. The whole list is secret: stripSecrets empties it.
+export const integrationsSchema = z
+  .array(z.unknown())
+  .catch([])
+  .default([])
+  .transform((rows): Integration[] => {
+    const seen = new Set<string>();
+    const out: Integration[] = [];
+    for (const row of rows) {
+      const parsed = integrationSchema.safeParse(row);
+      if (!parsed.success || seen.has(parsed.data.id)) continue;
+      seen.add(parsed.data.id);
+      out.push(parsed.data);
+    }
+    return out.slice(0, MAX_INTEGRATIONS);
+  });
 
-// Admin input, derived from the stored schema (lib/schema/input.ts).
-//
-// No URL-format refine here on purpose: because the entire Settings object is
-// one autosave PUT, a refine failure on a half-typed integration URL (e.g. a
-// schemeless "192.168.1.10:8080" pasted straight from the service's own UI)
-// would 400 the whole request and block saving every OTHER section too, with
-// only a generic "Couldn't save". Integration URLs are validated at point of
-// use instead — serviceBase() (lib/services/http.ts) rejects a non-http(s)
-// URL with a clear message shown on the Monitor card and the Test-connection
-// button — and stored leniently, so a bad value stays inert rather than
-// wedging the admin form.
-export const integrationsUpdateSchema = patchOf(integrationsSchema);
+// Admin input (PUT /api/integrations): the whole list, each entry complete.
+// No URL-format check on purpose: a half-typed URL (a schemeless
+// "192.168.1.10:8080" pasted from the service's own UI) shouldn't block the
+// autosave. URLs are validated at use — serviceBase() (lib/services/http.ts)
+// rejects a non-http(s) URL with a clear message on the Monitor tile and the
+// Test button — so a bad value stays inert.
+export const integrationsUpdateSchema = z
+  .array(wholeOf(integrationSchema))
+  .max(MAX_INTEGRATIONS)
+  .superRefine((list, ctx) => {
+    const ids = new Set<string>();
+    list.forEach((i, idx) => {
+      if (ids.has(i.id)) ctx.addIssue({ code: "custom", message: "Duplicate integration id", path: [idx, "id"] });
+      ids.add(i.id);
+    });
+  });

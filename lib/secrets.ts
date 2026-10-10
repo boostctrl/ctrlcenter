@@ -11,6 +11,18 @@ export function resolveSecret(envName: string, stored: string): string {
   return process.env[envName] || stored;
 }
 
+// `${NAME}` references in a stored value (#300): an integration's URL,
+// username, password or key can name environment variables instead of
+// holding the secret. Expanded server-side at use time; an unset variable
+// expands to "". Inside withoutEnvSecrets every reference expands to "", so a
+// probe of a typed-in URL can't be handed one.
+const ENV_REF = /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
+export function expandEnvRefs(value: string): string {
+  if (!value.includes("${")) return value;
+  const off = envSecretsOff.getStore();
+  return value.replace(ENV_REF, (_, name: string) => (off ? "" : (process.env[name] ?? "")));
+}
+
 // Env-held secrets belong to the services they were configured for. A "Test
 // connection" probe takes its URL from the admin form, so if it ran with them
 // it would send e.g. CTRLCENTER_SONARR_KEY to whatever URL was typed in —

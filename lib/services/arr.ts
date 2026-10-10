@@ -15,20 +15,10 @@ import {
   runProbe,
   type ProbeResult,
 } from "./http";
-import { resolveSecret } from "../secrets";
 
 export type ArrKind = "sonarr" | "radarr";
 
 export type ArrConfig = { url: string; apiKey: string };
-
-// The API key can come from the environment instead of config.yaml, same
-// convention as CTRLCENTER_SMTP_PASS / CTRLCENTER_CALDAV_PASS.
-export function resolveArrApiKey(kind: ArrKind, cfg: { apiKey: string }): string {
-  return resolveSecret(
-    kind === "sonarr" ? "CTRLCENTER_SONARR_KEY" : "CTRLCENTER_RADARR_KEY",
-    cfg.apiKey
-  );
-}
 
 // One row of the "upcoming" list: a series/movie title, a short qualifier
 // (episode code, or the release kind for a movie), and when it airs/releases.
@@ -100,7 +90,7 @@ async function arrJson<T>(
 ): Promise<T> {
   const base = serviceBase(cfg.url);
   const { res, text } = await serviceRequest(`${base}${path}`, {
-    headers: { "X-Api-Key": resolveArrApiKey(kind, cfg) },
+    headers: { "X-Api-Key": cfg.apiKey },
   });
   // 401 has exactly one meaning here; say it in the admin's terms.
   throwForStatus(res, { 401: "Invalid API key" });

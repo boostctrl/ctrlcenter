@@ -32,7 +32,6 @@ import {
   runProbe,
   type ProbeResult,
 } from "./http";
-import { resolveSecret } from "../secrets";
 import { globalSingleton } from "../singleton";
 
 export type UnifiConfig = {
@@ -41,12 +40,6 @@ export type UnifiConfig = {
   password: string;
   allowInsecureTls: boolean;
 };
-
-// The password can come from the environment instead of config.yaml, same
-// convention as the other integrations.
-export function resolveUnifiPassword(cfg: { password: string }): string {
-  return resolveSecret("CTRLCENTER_UNIFI_PASS", cfg.password);
-}
 
 export type UnifiSnapshot = {
   internet: {
@@ -272,7 +265,7 @@ function login(base: string, cfg: UnifiConfig): Promise<Session> {
 async function mintSession(base: string, cfg: UnifiConfig): Promise<Session> {
   const body = JSON.stringify({
     username: cfg.username,
-    password: resolveUnifiPassword(cfg),
+    password: cfg.password,
     rememberMe: false,
   });
   const attempt = (path: string) =>

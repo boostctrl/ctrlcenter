@@ -5,7 +5,6 @@ import {
   getQbittorrentSnapshot,
   pauseTorrent,
   probeQbittorrent,
-  resolveQbittorrentPassword,
   resumeTorrent,
   simplifyTorrentState,
   TORRENT_LIST_CAP,
@@ -464,21 +463,6 @@ describe("qBittorrent actions", () => {
   });
 });
 
-describe("resolveQbittorrentPassword", () => {
-  it("prefers CTRLCENTER_QBITTORRENT_PASS over the stored password", () => {
-    vi.stubEnv("CTRLCENTER_QBITTORRENT_PASS", "env-secret");
-    expect(resolveQbittorrentPassword({ password: "file-secret" })).toBe(
-      "env-secret"
-    );
-  });
-
-  it("falls back to the stored password when the env var is unset", () => {
-    vi.stubEnv("CTRLCENTER_QBITTORRENT_PASS", "");
-    expect(resolveQbittorrentPassword({ password: "file-secret" })).toBe(
-      "file-secret"
-    );
-  });
-});
 
 describe("applyMaindata", () => {
   const torrent = (over: Record<string, unknown> = {}) => ({

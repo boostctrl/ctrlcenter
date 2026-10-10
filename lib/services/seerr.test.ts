@@ -4,7 +4,6 @@ import {
   declineRequest,
   getSeerrSnapshot,
   probeSeerr,
-  resolveSeerrApiKey,
   mapSeerrRequest,
   requestStatus,
 } from "./seerr";
@@ -190,14 +189,3 @@ describe("probeSeerr", () => {
   });
 });
 
-describe("resolveSeerrApiKey", () => {
-  it("prefers the env var over the stored key", () => {
-    vi.stubEnv("CTRLCENTER_SEERR_KEY", "env-key");
-    expect(resolveSeerrApiKey({ apiKey: "stored" })).toBe("env-key");
-  });
-
-  it("falls back to the stored key when the env var is unset", () => {
-    vi.stubEnv("CTRLCENTER_SEERR_KEY", "");
-    expect(resolveSeerrApiKey({ apiKey: "stored" })).toBe("stored");
-  });
-});

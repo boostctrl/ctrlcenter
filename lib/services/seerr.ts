@@ -18,15 +18,8 @@ import {
   runProbe,
   type ProbeResult,
 } from "./http";
-import { resolveSecret } from "../secrets";
 
 export type SeerrConfig = { url: string; apiKey: string };
-
-// The API key can come from the environment instead of config.yaml, same
-// convention as the other integrations.
-export function resolveSeerrApiKey(cfg: { apiKey: string }): string {
-  return resolveSecret("CTRLCENTER_SEERR_KEY", cfg.apiKey);
-}
 
 // A request's standing: its approval state, or — once approved — how far the
 // media has progressed toward being available.
@@ -138,7 +131,7 @@ const KEY_ERRORS = { 403: "Invalid API key" };
 async function seerrJson<T>(cfg: SeerrConfig, path: string): Promise<T> {
   const base = serviceBase(cfg.url);
   const { res, text } = await serviceRequest(`${base}${path}`, {
-    headers: { "X-Api-Key": resolveSeerrApiKey(cfg) },
+    headers: { "X-Api-Key": cfg.apiKey },
   });
   throwForStatus(res, KEY_ERRORS);
   return parseJson<T>(text);
@@ -198,7 +191,7 @@ async function seerrAction(cfg: SeerrConfig, path: string): Promise<void> {
   const base = serviceBase(cfg.url);
   const { res } = await serviceRequest(`${base}${path}`, {
     method: "POST",
-    headers: { "X-Api-Key": resolveSeerrApiKey(cfg) },
+    headers: { "X-Api-Key": cfg.apiKey },
   });
   throwForStatus(res, KEY_ERRORS);
 }

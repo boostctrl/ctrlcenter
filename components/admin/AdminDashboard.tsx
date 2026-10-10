@@ -8,6 +8,7 @@ import type {
   Settings,
   Board,
   Group,
+  Integration,
   ThemePackConfig,
   WidgetInstance,
 } from "@/lib/schema";
@@ -45,6 +46,7 @@ type Props = {
   initialWidgets: WidgetInstance[];
   initialBoards: Board[];
   initialGroups: Group[];
+  initialIntegrations: Integration[];
   initialThemes: ThemePackConfig[];
   initialTwoFactorEnabled: boolean;
   // The ?tab / ?section deep-link params, read server-side by the page (NOT
@@ -74,6 +76,7 @@ function AdminBody({
   initialWidgets,
   initialBoards,
   initialGroups,
+  initialIntegrations,
   initialThemes,
   initialTwoFactorEnabled,
   initialTab,
@@ -299,6 +302,7 @@ function AdminBody({
           initialSettings={initialSettings}
           initialWidgets={initialWidgets}
           initialBoards={initialBoards}
+          initialIntegrations={initialIntegrations}
           groupsState={groupsState}
           initialApps={initialApps}
           initialBookmarks={initialBookmarks}

@@ -7,6 +7,7 @@ import {
   redactSecrets,
   type AppItem,
   type Config,
+  type Integration,
   type Settings,
   type WidgetInstance,
 } from "../schema";
@@ -25,9 +26,9 @@ export function stripAuth(config: Config): Omit<Config, "auth"> {
 // receive them. Which fields those are is marked on the schemas themselves
 // (secretFields in lib/schema/meta.ts, #287): the calendar Basic-auth
 // credentials, the alert webhook URL and SMTP details, and — neutralized
-// whole — the integrations (#189: URLs map internal topology) and inbound
-// webhook tokens — plus, per app, the push-check token (#294), and per widget
-// instance, a calendar's credentials (#297). stripAuth only
+// whole — the inbound webhook tokens and the integrations list (#189, #300:
+// URLs map internal topology) — plus, per app, the push-check token (#294),
+// and per widget instance, a calendar's credentials (#297). stripAuth only
 // removes the top-level admin credential; these secrets live inside
 // `settings` and the app rows, where they'd otherwise ride along in
 // anything serialized from a public surface. readPublicConfig
@@ -37,10 +38,17 @@ export function stripAuth(config: Config): Omit<Config, "auth"> {
 // alert poller and the monitor snapshot via readConfigInternal-backed
 // accessors.
 export function stripSecrets<
-  T extends { settings: Settings; apps?: AppItem[]; widgets?: WidgetInstance[] },
+  T extends {
+    settings: Settings;
+    apps?: AppItem[];
+    widgets?: WidgetInstance[];
+    integrations?: Integration[];
+  },
 >(config: T): T {
   return {
     ...config,
+    // Admin-only wholesale (#300): URLs, credentials, even which services run.
+    ...(config.integrations ? { integrations: [] } : {}),
     settings: redactSecrets(settingsSchema, config.settings),
     ...(config.apps ? { apps: config.apps.map((a) => redactSecrets(appItemSchema, a)) } : {}),
     ...(config.widgets

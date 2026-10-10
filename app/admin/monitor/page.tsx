@@ -19,7 +19,7 @@ export default async function MonitorPage() {
   await requireAdminPage("/admin/monitor");
   // Admin-only (the proxy gates /admin), so every board is listed.
   const site = await getSiteConfig();
-  const snapshot = await getMonitorSnapshot(site.settings.integrations);
+  const snapshot = await getMonitorSnapshot(site.integrations);
   return (
     <>
       <MonitorDashboard initial={snapshot} nav={navPages(site, true)} />

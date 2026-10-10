@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import type { AppItem, Board, BookmarkItem, Settings, WidgetInstance } from "@/lib/schema";
+import type { AppItem, Board, BookmarkItem, Integration, Settings, WidgetInstance } from "@/lib/schema";
 import { allTags } from "@/lib/groups";
 import type { GroupsState } from "./useGroups";
 import type { ThemePack } from "@/lib/theme";
@@ -30,6 +30,7 @@ export default function SettingsManager({
   initialSettings,
   initialWidgets,
   initialBoards,
+  initialIntegrations,
   groupsState,
   initialApps,
   initialBookmarks,
@@ -43,6 +44,8 @@ export default function SettingsManager({
   initialWidgets: WidgetInstance[];
   // The boards (#298), managed in the Layout section.
   initialBoards: Board[];
+  // The integrations (#300), edited in the Integrations section.
+  initialIntegrations: Integration[];
   // The groups (#299), shared with the other tabs; and the items, for the
   // groups' usage counts and the tags the apps filter offers.
   groupsState: GroupsState;
@@ -57,7 +60,7 @@ export default function SettingsManager({
   initialSection?: string;
   initialTwoFactorEnabled: boolean;
 }) {
-  const draft = useSettingsDraft(initialSettings, initialWidgets, initialBoards, themePacks);
+  const draft = useSettingsDraft(initialSettings, initialWidgets, initialBoards, initialIntegrations, themePacks);
   const { status, error } = draft;
   // The URL seeds the active section (?tab=settings&section=widgets is a
   // shareable deep link that survives refresh); rail clicks mirror it back

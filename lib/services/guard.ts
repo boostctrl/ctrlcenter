@@ -16,41 +16,46 @@
 import type { NextRequest } from "next/server";
 import { isAdminRequest } from "../api-auth";
 import { readConfigInternal } from "../config";
-import type { IntegrationsConfig } from "../schema";
+import type { Integration } from "../schema";
 import type { ServiceId } from "./ids";
 import { isServiceConfigured } from "./registry";
+import { resolveIntegration, type ResolvedIntegration } from "./resolve";
 
 export type GuardFailure = { ok: false; status: number; error: string };
-export type GuardSuccess<K extends ServiceId> = {
+export type GuardSuccess = {
   ok: true;
-  cfg: IntegrationsConfig[K];
+  integration: Integration;
+  // The credentials the action's client call uses.
+  cfg: ResolvedIntegration;
 };
 
-// Resolve the action's target config after the gates, or the reason it was
-// refused. Generic over the id so the returned config stays the service's own
-// slice (qBittorrent's user/pass, Seerr's key, …). One config read covers the
-// session check and the integration lookup.
-export async function requireAction<K extends ServiceId>(
+// Resolve the action's target integration after the gates, or the reason it
+// was refused. The request names the integration by id (#300) and the type
+// it expects, so an action can only reach an integration of the right type.
+// One config read covers the session check and the lookup.
+export async function requireAction(
   request: NextRequest,
-  service: K
-): Promise<GuardSuccess<K> | GuardFailure> {
+  integrationId: string,
+  type: ServiceId
+): Promise<GuardSuccess | GuardFailure> {
   const config = await readConfigInternal();
   if (!(await isAdminRequest(request, config.auth.passwordHash))) {
     return { ok: false, status: 401, error: "Unauthorized" };
   }
-  const cfg = config.settings.integrations[service];
-  // A disabled or URL-less integration has no target — 409, not 403: the
-  // request isn't forbidden, there's just nothing configured to act on.
-  if (!isServiceConfigured(cfg)) {
+  const integration = config.integrations.find((i) => i.id === integrationId && i.type === type);
+  // A missing, disabled or URL-less integration has no target — 409, not
+  // 403: the request isn't forbidden, there's just nothing configured to act
+  // on.
+  if (!integration || !isServiceConfigured(integration)) {
     return { ok: false, status: 409, error: "Integration not configured" };
   }
   // The opt-in gate: configured but read-only until the admin turns actions on.
-  if (!cfg.allowActions) {
+  if (!integration.allowActions) {
     return {
       ok: false,
       status: 403,
       error: "Actions are not enabled for this integration",
     };
   }
-  return { ok: true, cfg };
+  return { ok: true, integration, cfg: resolveIntegration(integration) };
 }

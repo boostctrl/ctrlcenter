@@ -144,6 +144,8 @@ try {
       ["/admin?tab=settings", "admin-settings"],
       ["/admin?tab=settings&section=widgets", "admin-widgets"],
       ["/admin?tab=settings&section=layout", "admin-layout"],
+      ["/admin?tab=settings&section=integrations", "admin-integrations"],
+      ["/admin/monitor/sonarr-4k", "monitor-detail"],
       ["/b/infra", "board-private"],
       ["/admin/monitor", "admin-monitor"],
     ]) {
@@ -264,7 +266,7 @@ async function statusPhase(run) {
 }
 
 // Two boards beside the example's home board (#298): a public one, and a
-// private one only the admin can open. Saved through the admin API, the way
+// private one only the admin can open. Then two integrations of one type. Saved through the admin API, the way
 // Settings → Layout saves them; the home board keeps its stored rows.
 async function addBoards() {
   const ctx = await browser.newContext();
@@ -283,6 +285,17 @@ async function addBoards() {
     ],
   });
   if (!res.ok()) throw new Error(`adding boards failed: HTTP ${res.status()}`);
+  // Two of one integration type (#300), pointed at a closed local port so the
+  // Monitor renders their offline tiles without reaching anything real.
+  const dead = `http://127.0.0.1:${await freePort()}`;
+  const ints = await ctx.request.put(`${base}/api/integrations`, {
+    headers: { Origin: base },
+    data: [
+      { id: "sonarr", type: "sonarr", name: "", enabled: true, url: dead, username: "", password: "", apiKey: "k", allowInsecureTls: false, allowActions: false },
+      { id: "sonarr-4k", type: "sonarr", name: "Sonarr 4K", enabled: true, url: dead, username: "", password: "", apiKey: "${SMOKE_KEY}", allowInsecureTls: false, allowActions: false },
+    ],
+  });
+  if (!ints.ok()) throw new Error(`adding integrations failed: HTTP ${ints.status()}`);
   await ctx.close();
 }
 

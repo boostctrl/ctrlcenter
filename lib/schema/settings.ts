@@ -8,7 +8,6 @@ import { searchSchema, searchUpdateSchema } from "./search";
 import { alertsSchema, alertsUpdateSchema } from "./alerts";
 import { webhooksSchema, webhooksUpdateSchema } from "./webhooks";
 import { weatherSchema, weatherUpdateSchema } from "./widgets";
-import { integrationsSchema, integrationsUpdateSchema } from "./integrations";
 import {
   announcementSchema,
   statusAnnouncementSchema,
@@ -39,12 +38,7 @@ export const settingsSchema = z.object({
   // board's layout rows (used directly in this shared schema): one malformed
   // hand-edited row is dropped rather than failing the whole settings parse.
   statusAnnouncements: lenientArray(statusAnnouncementSchema).default([]),
-  // Private wholesale (#157, #189): URLs are internal topology, the rest
-  // credentials, and even which ones are switched on isn't a visitor's business.
-  integrations: integrationsSchema
-    .default(integrationsSchema.parse({}))
-    .register(secretFields, { redact: "all" }),
-  // Inbound-webhook tokens are shared secrets (#204); same treatment.
+  // Inbound-webhook tokens are shared secrets (#204), private wholesale.
   webhooks: webhooksSchema
     .default(webhooksSchema.parse({}))
     .register(secretFields, { redact: "all" }),
@@ -73,7 +67,6 @@ export const settingsInputSchema = z.object({
   // updateSettings replaces it wholesale — it flows through `rest` like the
   // other plain settings arrays.
   statusAnnouncements: statusAnnouncementsUpdateSchema.optional(),
-  integrations: integrationsUpdateSchema.optional(),
   webhooks: webhooksUpdateSchema.optional(),
   settingsButton: z.boolean().optional(),
   layout: layoutUpdateSchema.optional(),

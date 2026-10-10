@@ -1,8 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import type { MonitorSnapshot } from "@/lib/monitor";
-import { SERVICE_IDS, SERVICE_LABELS } from "@/lib/services/ids";
+import type { MonitorEntry, MonitorSnapshot } from "@/lib/monitor";
 import { serviceState, STATE_DOT, type ServiceState } from "./MonitorCard";
 
 // The cockpit's master status bar (#208): the at-a-glance system-health read
@@ -32,7 +31,7 @@ export default function SystemHealthBar({
 }: {
   snapshot: MonitorSnapshot;
 }) {
-  const states = SERVICE_IDS.map((id) => serviceState(snapshot[id]));
+  const states = snapshot.map((e) => serviceState(e));
   const n = (s: ServiceState) => states.filter((x) => x === s).length;
   const live = n("live");
   const stale = n("stale");
@@ -41,11 +40,14 @@ export default function SystemHealthBar({
   const unconfigured = n("unconfigured");
   const connected = live + stale + offline;
 
-  // Cross-service highlights — best effort. Read whenever a snapshot is present
-  // (live or last-good/stale); a missing service simply omits its stat.
-  const downloading = snapshot.qbittorrent.data?.counts.downloading ?? 0;
-  const streams = snapshot.tautulli.data?.streamCount ?? 0;
-  const alerts = snapshot.truenas.data?.alerts ?? [];
+  // Cross-service highlights — best effort, summed over every integration of
+  // the type (#300). Read whenever a snapshot is present (live or
+  // last-good/stale); a missing one simply adds nothing.
+  const ofType = <K extends MonitorEntry["type"]>(type: K) =>
+    snapshot.filter((e): e is Extract<MonitorEntry, { type: K }> => e.type === type);
+  const downloading = ofType("qbittorrent").reduce((n, e) => n + (e.data?.counts.downloading ?? 0), 0);
+  const streams = ofType("tautulli").reduce((n, e) => n + (e.data?.streamCount ?? 0), 0);
+  const alerts = ofType("truenas").flatMap((e) => e.data?.alerts ?? []);
   const criticalAlerts = alerts.some((a) => a.level === "critical");
 
   const attention = offline > 0 || criticalAlerts;
@@ -64,9 +66,7 @@ export default function SystemHealthBar({
   // connected count that reads oddly next to a red dot.
   const problems: string[] = [
     ...alerts.map((a) => a.message),
-    ...SERVICE_IDS.filter((id) => serviceState(snapshot[id]) === "unreachable").map(
-      (id) => `${SERVICE_LABELS[id]} offline`
-    ),
+    ...snapshot.filter((e) => serviceState(e) === "unreachable").map((e) => `${e.label} offline`),
   ];
   // Under "Attention needed" each problem gets its own line, so a long SMART
   // message reads in full instead of being comma-joined into one clipped line.
@@ -85,7 +85,9 @@ export default function SystemHealthBar({
           {showProblems ? (
             <ul
               className={`mt-1 space-y-0.5 text-xs ${
-                criticalAlerts ? "text-red-300/85" : "text-amber-300/85"
+                // Full strength, and amber's deepest light-mode shade: small
+                // text on the glass card needs 4.5:1 in both schemes.
+                criticalAlerts ? "text-red-300" : "text-amber-200"
               }`}
             >
               {problems.slice(0, PROBLEM_CAP).map((p, i) => (
@@ -101,7 +103,7 @@ export default function SystemHealthBar({
             <p className="text-xs text-ink-45">
               {connected === 0
                 ? "Connect a service in Settings to get started."
-                : `${connected} of ${SERVICE_IDS.length} services connected`}
+                : `${connected} of ${snapshot.length} integrations connected`}
             </p>
           )}
         </div>

@@ -155,7 +155,7 @@ function layoutToBoards(settings: Record<string, unknown>): Record<string, unkno
 
 type Step = (raw: Record<string, unknown>) => { value: Record<string, unknown>; changed: boolean };
 
-// The v2 → v3 step is three parts, each a no-op on a file that already has
+// The v2 → v3 step is four parts, each a no-op on a file that already has
 // what it adds, so a file written by a 3.0 pre-release build (which may have
 // instances but no boards, or boards but no groups) gets just the parts it's
 // missing.
@@ -163,7 +163,7 @@ export function migrateV2toV3(raw: unknown): { value: unknown; changed: boolean 
   if (!isRecord(raw)) return { value: raw, changed: false };
   let value = raw;
   let changed = false;
-  for (const step of [instancesStep, boardsStep, groupsStep]) {
+  for (const step of [instancesStep, boardsStep, groupsStep, integrationsStep]) {
     const out = step(value);
     if (out.changed) {
       value = out.value;
@@ -262,6 +262,38 @@ const groupsStep: Step = (raw) => {
     value: { ...raw, settings, groups, bookmarks: nextBookmarks, widgets, boards },
     changed: true,
   };
+};
+
+// Integrations (#300): settings.integrations kept one fixed key per service;
+// each one that was set up (switched on, or given a URL) becomes an instance
+// whose id and type are the service's name, so its Monitor URL is unchanged
+// and its pre-3.0 environment variable keeps applying to it
+// (lib/services/resolve.ts). Never-touched ones are dropped.
+const INTEGRATION_TYPES = [
+  "qbittorrent",
+  "sonarr",
+  "radarr",
+  "adguard",
+  "tautulli",
+  "seerr",
+  "portainer",
+  "truenas",
+  "unifi",
+];
+const integrationsStep: Step = (raw) => {
+  const settings: Record<string, unknown> = isRecord(raw.settings) ? { ...raw.settings } : {};
+  if (Array.isArray(raw.integrations) || !("integrations" in settings)) {
+    return { value: raw, changed: false };
+  }
+  const old = isRecord(settings.integrations) ? settings.integrations : {};
+  const integrations = INTEGRATION_TYPES.flatMap((type) => {
+    const cfg = old[type];
+    if (!isRecord(cfg)) return [];
+    const setUp = cfg.enabled === true || (typeof cfg.url === "string" && cfg.url.trim() !== "");
+    return setUp ? [{ ...cfg, id: type, type }] : [];
+  });
+  delete settings.integrations;
+  return { value: { ...raw, settings, integrations }, changed: true };
 };
 
 // Widgets become instances (#297) and the layout the home board (#298).

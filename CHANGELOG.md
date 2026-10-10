@@ -33,6 +33,13 @@ here.
   matches app tags. On upgrade your categories become groups in the same
   order, and "Group private apps separately" becomes a second Applications
   widget showing only private apps. (#299)
+- **Any number of each integration (3.0).** The Monitor's connections are
+  now a list: add a 4K Sonarr beside an HD one, or a Portainer per host, each
+  with its own name, tile and detail page. Any credential can be written as
+  `${ENV_VAR}` to read it from the environment instead of the config file.
+  Your existing integrations come through unchanged (same Monitor addresses),
+  and the old `CTRLCENTER_SONARR_KEY`-style variables keep working for them.
+  (#300)
 
 ### Changed
 

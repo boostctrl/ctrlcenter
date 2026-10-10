@@ -18,17 +18,10 @@ import {
   SERVICE_TIMEOUT_MS,
   type ProbeResult,
 } from "./http";
-import { resolveSecret } from "../secrets";
 import { log, hostOf, errorReason } from "../log";
 import { fetchWithTimeout } from "../fetch-body";
 
 export type PortainerConfig = { url: string; apiKey: string };
-
-// The API key can come from the environment instead of config.yaml, same
-// convention as the other integrations.
-export function resolvePortainerApiKey(cfg: { apiKey: string }): string {
-  return resolveSecret("CTRLCENTER_PORTAINER_KEY", cfg.apiKey);
-}
 
 export type PortainerEndpoint = {
   // The environment id — what the container drill-down and actions (#203)
@@ -109,7 +102,7 @@ const KEY_ERRORS = { 401: "Invalid API key", 403: "Invalid API key" };
 async function portainerJson<T>(cfg: PortainerConfig, path: string): Promise<T> {
   const base = serviceBase(cfg.url);
   const { res, text } = await serviceRequest(`${base}${path}`, {
-    headers: { "X-API-Key": resolvePortainerApiKey(cfg) },
+    headers: { "X-API-Key": cfg.apiKey },
   });
   throwForStatus(res, KEY_ERRORS);
   return parseJson<T>(text);
@@ -206,7 +199,7 @@ async function containerCommand(
   const base = serviceBase(cfg.url);
   const { res } = await serviceRequest(
     `${base}/api/endpoints/${endpointId}/docker/containers/${containerId}/${action}`,
-    { method: "POST", headers: { "X-API-Key": resolvePortainerApiKey(cfg) } }
+    { method: "POST", headers: { "X-API-Key": cfg.apiKey } }
   );
   if (res.status !== 304) throwForStatus(res, KEY_ERRORS);
 }
@@ -261,7 +254,7 @@ export async function containerLogs(
   try {
     const res = await fetchWithTimeout(
       url,
-      { headers: { "X-API-Key": resolvePortainerApiKey(cfg) } },
+      { headers: { "X-API-Key": cfg.apiKey } },
       SERVICE_TIMEOUT_MS
     );
     throwForStatus(res, KEY_ERRORS);

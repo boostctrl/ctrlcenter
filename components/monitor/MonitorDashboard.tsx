@@ -2,13 +2,13 @@
 
 import type { NavPages } from "@/lib/nav";
 import { useCallback, useEffect, useState } from "react";
-import type { MonitorSnapshot } from "@/lib/monitor";
-import { SERVICE_LABELS, type ServiceId } from "@/lib/services/ids";
+import type { MonitorEntry, MonitorSnapshot } from "@/lib/monitor";
+import { MONITOR_GROUPS, SERVICE_IDS, SERVICE_META, type ServiceId } from "@/lib/services/ids";
 import PageNav from "@/components/PageNav";
 import SystemHealthBar from "./SystemHealthBar";
 import Complication from "./Complication";
 import { serviceState, sinceLabel, type ServiceState } from "./MonitorCard";
-import { GLANCES, type GlanceVisual } from "./glances";
+import { GLANCES, type Glance, type GlanceVisual } from "./glances";
 import { settingsCardId } from "@/lib/nav";
 import { usePolling } from "@/components/usePolling";
 import { useNow } from "@/components/useNow";
@@ -17,26 +17,18 @@ import { useNow } from "@/components/useNow";
 // system-health hero over domain-grouped clusters of clickable complications,
 // server-rendered from the shared snapshot cache and kept fresh by polling
 // /api/monitor (that same cache, so however many tabs are open the services see
-// one fetch per window). Every service always holds its slot; a configured one
-// drills into its detail page, an unused one dims and points at Settings — the
-// face reads as one designed surface whether one service or all nine are in use.
-// The read-only depth (full lists, actions) lives on /admin/monitor/[id].
+// one fetch per window). Every integration holds a tile in its type's cluster,
+// several of a type side by side (#300); a configured one drills into its
+// detail page, a switched-off one dims and points at its settings, and a type
+// with none set up keeps a dimmed "set up" slot — so the face reads as one
+// designed surface whether one service is in use or a dozen. The read-only
+// depth (full lists, actions) lives on /admin/monitor/[id].
 
 const REFRESH_MS = 45_000;
-// Each off / not-set-up tile opens its own service's settings card (#277).
-function settingsLink(id: ServiceId): string {
-  return `/admin?tab=settings&section=integrations#${settingsCardId(SERVICE_LABELS[id])}`;
-}
-
-// The face's fixed layout: services clustered by domain. Network and storage —
-// the infrastructure — lead; media follows, its five services laid out 3 + 2
-// (Seerr/Radarr/Sonarr, then Tautulli/qBittorrent) so the section reads as two
-// tidy rows rather than a lopsided four-and-one.
-const GROUPS: { label: string; ids: ServiceId[] }[] = [
-  { label: "Network", ids: ["adguard", "unifi"] },
-  { label: "Storage & Containers", ids: ["truenas", "portainer"] },
-  { label: "Media", ids: ["seerr", "radarr", "sonarr", "tautulli", "qbittorrent"] },
-];
+// An off tile opens its integration's settings card (#277); a "set up" slot
+// opens the Integrations section to add one.
+const SETTINGS = "/admin?tab=settings&section=integrations";
+const settingsLink = (label: string) => `${SETTINGS}#${settingsCardId(label)}`;
 
 type ComplicationProps = {
   state: ServiceState;
@@ -49,23 +41,25 @@ type ComplicationProps = {
   visual?: GlanceVisual;
 };
 
-// One service's complication content from its status. Generic over the id so the
-// glance extractor stays correlated with its slice of the snapshot. The three
-// non-data states get standardized gauge dials; live/stale defer to the
-// per-service extractor. `now` (null until mounted) drives relative dates.
-function complicationFor<K extends ServiceId>(
-  id: K,
-  snapshot: MonitorSnapshot,
-  now: number | null
-): ComplicationProps {
-  const status = snapshot[id];
-  const state = serviceState(status);
+// A type's glance from an entry's data. The entry's type and data are
+// correlated by construction; the cast restores what the union loses.
+function glanceFor(entry: MonitorEntry, now: number | null): Glance {
+  const extract = GLANCES[entry.type] as (data: unknown, now: number | null) => Glance;
+  return extract(entry.data, now);
+}
+
+// One integration's complication content from its status. The three non-data
+// states get standardized gauge dials; live/stale defer to the type's glance
+// extractor. `now` (null until mounted) drives relative dates.
+function complicationFor(entry: MonitorEntry, now: number | null): ComplicationProps {
+  const state = serviceState(entry);
+  const detail = `/admin/monitor/${encodeURIComponent(entry.id)}`;
   if (state === "disabled")
-    return { state, href: settingsLink(id), center: "Off", caption: "", lines: ["Turned off"] };
+    return { state, href: settingsLink(entry.label), center: "Off", caption: "", lines: ["Turned off"] };
   if (state === "unconfigured")
     return {
       state,
-      href: settingsLink(id),
+      href: settingsLink(entry.label),
       center: "+",
       caption: "set up",
       lines: ["Not connected"],
@@ -73,19 +67,25 @@ function complicationFor<K extends ServiceId>(
   if (state === "unreachable")
     return {
       state,
-      href: `/admin/monitor/${id}`,
+      href: detail,
       center: "!",
       caption: "offline",
       alert: true,
-      lines: [status.error ?? "Can’t reach"],
+      lines: [entry.error ?? "Can’t reach"],
     };
   // live / stale: data is present, so the glance extractor can read it.
-  return {
-    state,
-    href: `/admin/monitor/${id}`,
-    ...GLANCES[id](status.data!, now),
-  };
+  return { state, href: detail, ...glanceFor(entry, now) };
 }
+
+// A type nobody has set up keeps a dimmed slot in its cluster.
+const setUpSlot = (type: ServiceId): ComplicationProps & { label: string } => ({
+  label: SERVICE_META[type].label,
+  state: "unconfigured",
+  href: SETTINGS,
+  center: "+",
+  caption: "set up",
+  lines: ["Not connected"],
+});
 
 export default function MonitorDashboard({
   initial,
@@ -160,22 +160,24 @@ export default function MonitorDashboard({
         <div className="glass-card p-6">
           <SystemHealthBar snapshot={snapshot} />
         </div>
-        {GROUPS.map((group) => (
-          <section key={group.label} className="flex flex-col gap-4">
-            <p className="text-[11px] font-medium tracking-wide text-ink-40 uppercase">
-              {group.label}
-            </p>
-            <div className="flex flex-wrap gap-3">
-              {group.ids.map((id) => (
-                <Complication
-                  key={id}
-                  label={SERVICE_LABELS[id]}
-                  {...complicationFor(id, snapshot, now)}
-                />
-              ))}
-            </div>
-          </section>
-        ))}
+        {MONITOR_GROUPS.map((group) => {
+          const types = SERVICE_IDS.filter((t) => SERVICE_META[t].group === group);
+          const entries = snapshot.filter((e) => SERVICE_META[e.type].group === group);
+          const unused = types.filter((t) => !entries.some((e) => e.type === t));
+          return (
+            <section key={group} className="flex flex-col gap-4">
+              <p className="text-[11px] font-medium tracking-wide text-ink-40 uppercase">{group}</p>
+              <div className="flex flex-wrap gap-3">
+                {entries.map((entry) => (
+                  <Complication key={entry.id} label={entry.label} {...complicationFor(entry, now)} />
+                ))}
+                {unused.map((type) => (
+                  <Complication key={`setup-${type}`} {...setUpSlot(type)} />
+                ))}
+              </div>
+            </section>
+          );
+        })}
       </div>
 
       <p className="text-[11px] text-ink-45">

@@ -113,8 +113,10 @@ Built with Next.js 16, React 19, and Tailwind v4.
   the RSS feed, the announcement banner, and one-click **Export/Import** of the
   whole config (uploaded icons included).
 
-- **Private Monitor page.** Connect **qBittorrent, Sonarr, and Radarr**
-  (Admin → Settings → Integrations, each with a test-connection button) and a
+- **Private Monitor page.** Connect **qBittorrent, Sonarr, Radarr, AdGuard
+  Home, Tautulli, Seerr, Portainer, TrueNAS and UniFi** — as many of each as you
+  run, say a 4K Sonarr beside an HD one — (Admin → Settings → Integrations,
+  each with a test-connection button) and a
   signed-in-only **/admin/monitor** page shows their live state: transfer
   speeds and the active torrent list for qBittorrent, and — for Sonarr and
   Radarr — what's coming up (upcoming episodes and movie releases), what was
@@ -125,8 +127,9 @@ Built with Next.js 16, React 19, and Tailwind v4.
   read-only log tail. Actions stay **off until you turn them on**, are admin-only,
   ask before anything destructive, and are logged on the server. Strictly
   admin-only throughout — the page, its API, and the stored credentials are all
-  behind the admin session, credentials can live in env vars instead of the
-  config file, and nothing integration-related ever renders on the public
+  behind the admin session, any credential can be a `${ENV_VAR}` reference
+  instead of a value in the config file, and nothing integration-related ever
+  renders on the public
   dashboard.
 
 - **Self-hosted & simple.** A single YAML config, a prebuilt multi-arch Docker
@@ -233,7 +236,7 @@ settings:
   settingsButton: true      # the floating corner navigation menu
   # Further sections mirror the admin UI one-to-one and are easiest to edit
   # there: favicon, announcement (the site-wide banner), statusAnnouncements,
-  # and integrations (the private Monitor page's service connections).
+  # and webhooks (inbound service events).
   layout:                   # shared by every board:
     scale: 100              # UI scale, percent
     gap: 32                 # space between cards (px)
@@ -280,6 +283,14 @@ widgets:                    # every widget, with its content; any type can
   # …and the other types: clock, weather, status, search, feed, countdown,
   # worldClocks, systemStats, favorites, apps, bookmarks. A widget without a
   # row on a board waits, hidden, in that board's layout editor tray.
+
+integrations:               # the private Monitor page's connections, any number
+                            # of each type (best edited in Settings → Integrations)
+  - { id: sonarr, type: sonarr, url: "http://sonarr:8989", apiKey: "${SONARR_KEY}" }
+  - { id: sonarr-4k, type: sonarr, name: Sonarr 4K, url: "http://sonarr4k:8989",
+      apiKey: "${SONARR_4K_KEY}" }   # ${NAME}: read from the environment
+  - { id: portainer, type: portainer, url: "https://portainer:9443",
+      apiKey: "${PORTAINER_TOKEN}", allowActions: true }
 
 groups:                     # what apps and bookmarks are sorted into, in order
   - { id: media, name: Media }
@@ -331,15 +342,8 @@ for reuse. You can also paste a direct image URL or a `data:` URI.
 | `CONFIG_PATH` | no | Path to the config file (default `./config/config.yaml`; the container sets `/config/config.yaml`). The uptime history (`status-history.db`, a SQLite database) and uploaded custom icons (`uploads/`) are written beside it. |
 | `CTRLCENTER_SMTP_PASS` | no | Overrides the email-alert SMTP password, so the secret can stay out of `config.yaml`. |
 | `CTRLCENTER_CALDAV_PASS` | no | Overrides the private-calendar (CalDAV/WebDAV) password of the calendar widget with id `calendar` (the one a 2.x config migrates to), so that secret can stay out of `config.yaml` too. Other calendar widgets use only their own stored credentials. |
-| `CTRLCENTER_QBITTORRENT_PASS` | no | Overrides the qBittorrent integration's password (leave the field blank in the admin), keeping that secret out of `config.yaml`. |
-| `CTRLCENTER_SONARR_KEY` | no | Overrides the Sonarr integration's API key, same convention. |
-| `CTRLCENTER_RADARR_KEY` | no | Overrides the Radarr integration's API key, same convention. |
-| `CTRLCENTER_ADGUARD_PASS` | no | Overrides the AdGuard Home integration's password, same convention. |
-| `CTRLCENTER_TAUTULLI_KEY` | no | Overrides the Tautulli integration's API key, same convention. |
-| `CTRLCENTER_SEERR_KEY` | no | Overrides the Seerr integration's API key, same convention. |
-| `CTRLCENTER_PORTAINER_KEY` | no | Overrides the Portainer integration's API key, same convention. |
-| `CTRLCENTER_TRUENAS_KEY` | no | Overrides the TrueNAS integration's API key, same convention. |
-| `CTRLCENTER_UNIFI_PASS` | no | Overrides the UniFi integration's password, same convention. |
+| *any name* | no | Referenced from an integration as `${NAME}`: any of its fields (URL, username, password, API key) can name an environment variable instead of holding the value, e.g. `apiKey: "${SONARR_4K_KEY}"`. Read on the server at use time; never shown in the admin or sent to a browser. |
+| `CTRLCENTER_QBITTORRENT_PASS`, `CTRLCENTER_SONARR_KEY`, `CTRLCENTER_RADARR_KEY`, `CTRLCENTER_ADGUARD_PASS`, `CTRLCENTER_TAUTULLI_KEY`, `CTRLCENTER_SEERR_KEY`, `CTRLCENTER_PORTAINER_KEY`, `CTRLCENTER_TRUENAS_KEY`, `CTRLCENTER_UNIFI_PASS` | no | The pre-3.0 per-service names. Each still overrides the password or key of the integration whose id is the service's name (the one a 2.x config migrates to, e.g. `sonarr`); further integrations of the type use `${…}` references instead. |
 | `CTRLCENTER_WEATHER_API` | no | Base URL the *server* uses for weather requests (default `https://api.open-meteo.com`). Point it at a [self-hosted Open-Meteo](https://open-meteo.com/en/docs#self-hosting) instance to keep weather traffic on your own network; it must speak the same `/v1/forecast` API. A visitor who sets their own location still fetches from the public API client-side. |
 | `CTRLCENTER_HOST_PROC` | no | Where the System stats widget looks for a host-mode `/proc` mount (default `/host/proc`). In a container the widget normally reports the *container's* cgroup-scoped CPU/memory; to show the host machine instead, bind-mount the host's `/proc` read-only — `-v /proc:/host/proc:ro` (compose: `- /proc:/host/proc:ro`) — and the widget switches to host mode automatically, no privileges needed. Disks are separate: a path must be mounted into the container to be measured. |
 | `CTRLCENTER_ICON_CACHE_MAX_BYTES` | no | Cap, in bytes, on the on-disk cache of icons fetched from the icon CDN (stored beside your config). Default `67108864` (64 MB) — far more than any real dashboard uses. When the cap is exceeded, the least-recently-served icons are evicted (and simply re-fetched next time they're needed). Lower it on a very small data volume. |

@@ -78,7 +78,8 @@ export default function ArrCard({
   title,
   status,
 }: {
-  title: "Sonarr" | "Radarr";
+  // The integration's label ("Sonarr", "Sonarr 4K", #300).
+  title: string;
   status: ServiceStatus<ArrSnapshot>;
 }) {
   const mounted = useMounted();

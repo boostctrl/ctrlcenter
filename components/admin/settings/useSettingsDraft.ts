@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import type { Board, BoardVisibility, Settings, SettingsInput, WidgetInstance } from "@/lib/schema";
+import type { Board, BoardVisibility, Integration, Settings, SettingsInput, WidgetInstance } from "@/lib/schema";
 import {
   type WebhookService,
   alertChannelSchema,
@@ -10,6 +10,7 @@ import {
   MAX_FEED_CARDS,
   MAX_BOARDS,
   newBoardId,
+  integrationSchema,
 } from "@/lib/schema";
 import { moveLegacyIntoChannels } from "@/lib/alert-channels";
 import type { ThemePack } from "@/lib/theme";
@@ -19,7 +20,8 @@ import { instanceLabels } from "@/lib/widgets/labels";
 import { useConfirm } from "../Confirm";
 import { useAutosave, type SaveOptions, type SaveState } from "../useAutosave";
 import { settingsPatch } from "../settingsPatch";
-import { saveBoards, saveSettingsPatch, saveWidgets } from "../settingsApi";
+import { saveBoards, saveIntegrations, saveSettingsPatch, saveWidgets } from "../settingsApi";
+import type { ServiceId } from "@/lib/services/ids";
 import { reorder } from "../useReorder";
 import { useKeyedRows } from "./useKeyedRows";
 
@@ -36,6 +38,7 @@ export function useSettingsDraft(
   initialSettings: Settings,
   initialWidgets: WidgetInstance[],
   initialBoards: Board[],
+  initialIntegrations: Integration[],
   themePacks: ThemePack[]
 ) {
   const [settings, setSettings] = useState<Settings>(initialSettings);
@@ -87,8 +90,12 @@ export function useSettingsDraft(
     savedBoards.current = next;
     setSavedBoardIds(new Set(next.map((b) => b.id)));
   });
+  const [integrations, setIntegrations] = useState<Integration[]>(initialIntegrations);
+  const integrationsSave = useAutosave(integrations, async (next, opts) => {
+    await saveIntegrations(next, { keepalive: opts?.keepalive });
+  });
   // One status for the header: saving while any is, else the latest error.
-  const saves = [settingsSave, widgetsSave, boardsSave];
+  const saves = [settingsSave, widgetsSave, boardsSave, integrationsSave];
   const status: SaveState = saves.some((x) => x.status === "saving")
     ? "saving"
     : saves.some((x) => x.status === "error")
@@ -96,7 +103,7 @@ export function useSettingsDraft(
       : saves.some((x) => x.status === "saved")
         ? "saved"
         : "idle";
-  const error = settingsSave.error ?? widgetsSave.error ?? boardsSave.error;
+  const error = saves.map((x) => x.error).find((e) => e) ?? null;
   const confirm = useConfirm();
 
   const theme = settings.theme;
@@ -130,18 +137,31 @@ export function useSettingsDraft(
       alerts: { ...s.alerts, ...moveLegacyIntoChannels(s.alerts, newThemeId) },
     }));
 
-  const integrations = settings.integrations;
-  const updateIntegration = <K extends keyof Settings["integrations"]>(
-    service: K,
-    patch: Partial<Settings["integrations"][K]>
-  ) =>
-    setSettings((s) => ({
-      ...s,
-      integrations: {
-        ...s.integrations,
-        [service]: { ...s.integrations[service], ...patch },
-      },
-    }));
+  // The integrations (#300): a list of instances with their own autosave.
+  const updateIntegration = (id: string, patch: Partial<Integration>) =>
+    setIntegrations((list) => list.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+  // A new integration's id is its type's while that's free (so the pre-3.0
+  // environment variable applies to it, as to a migrated one), else the type
+  // and a short random suffix.
+  const addIntegration = (type: ServiceId) =>
+    setIntegrations((list) => [
+      ...list,
+      integrationSchema.parse({
+        id: list.some((i) => i.id === type) ? `${type}-${newThemeId().slice(0, 6)}` : type,
+        type,
+      }),
+    ]);
+  const moveIntegration = (from: number, to: number) => setIntegrations((list) => reorder(list, from, to));
+  const removeIntegration = async (id: string, label: string) => {
+    const ok = await confirm({
+      title: `Remove ${label}?`,
+      message: "Its connection settings go with it. The service itself isn't touched.",
+      confirmLabel: "Remove",
+      danger: true,
+    });
+    if (!ok) return;
+    setIntegrations((list) => list.filter((i) => i.id !== id));
+  };
 
   // Inbound webhooks (#204). Toggling a service on mints a token if it has none;
   // "Regenerate" rotates it (invalidating the old URL). A random 32-hex token —
@@ -399,6 +419,9 @@ export function useSettingsDraft(
     moveLegacyChannels,
     integrations,
     updateIntegration,
+    addIntegration,
+    moveIntegration,
+    removeIntegration,
     webhooks,
     updateWebhooks,
     updateWebhookService,

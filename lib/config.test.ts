@@ -8,7 +8,7 @@ import {
   CONFIG_SCHEMA_VERSION,
   appInputSchema,
   bookmarkInputSchema,
-  integrationsSchema,
+  integrationSchema,
   settingsInputSchema,
   newInstance,
 } from "./schema";
@@ -913,36 +913,15 @@ describe("settings-secret redaction", () => {
         to: "me@example.com",
       },
     },
-    integrations: {
-      ...integrationsSchema.parse({}),
-      qbittorrent: {
-        enabled: true,
-        url: "http://qbit.lan:8080",
-        username: "admin",
-        password: "qbit-secret",
-        allowInsecureTls: false,
-        allowActions: false,
-      },
-      sonarr: {
-        enabled: true,
-        url: "http://sonarr.lan:8989",
-        apiKey: "sonarr-secret",
-        allowInsecureTls: false,
-        allowActions: false,
-      },
-      radarr: {
-        enabled: false,
-        url: "http://radarr.lan:7878",
-        apiKey: "radarr-secret",
-        allowInsecureTls: false,
-        allowActions: false,
-      },
-    },
   };
 
   it("stripSecrets blanks every credential while keeping non-secret fields", async () => {
     await config.updateSettings(settingsInput(withSecrets));
     await config.replaceWidgets([calendar]);
+    await config.replaceIntegrations([
+      integrationSchema.parse({ id: "qbittorrent", type: "qbittorrent", url: "http://qbit.lan:8080", username: "admin", password: "qbit-secret" }),
+      integrationSchema.parse({ id: "sonarr", type: "sonarr", url: "http://sonarr.lan:8989", apiKey: "sonarr-secret" }),
+    ]);
     const full = await config.readConfigInternal();
 
     const pub = config.stripSecrets(config.stripAuth(full));
@@ -954,21 +933,9 @@ describe("settings-secret redaction", () => {
     expect(pub.settings.alerts.email.host).toBe("");
     expect(pub.settings.alerts.email.from).toBe("");
     expect(pub.settings.alerts.email.to).toBe("");
-    // Integrations (#189, #199): credentials, URLs (internal topology), AND
-    // the enabled flags all go. Asserted generically (not field-by-field) so
-    // the guard keeps holding for a service added later: NO integration may
-    // leak anything to a public surface — every string blanked, every boolean
-    // forced off, so a public serialization can't even reveal which
-    // integrations are configured.
-    for (const [service, cfg] of Object.entries(pub.settings.integrations)) {
-      for (const [field, value] of Object.entries(cfg)) {
-        if (typeof value === "string") {
-          expect(value, `${service}.${field} must be blanked`).toBe("");
-        } else if (typeof value === "boolean") {
-          expect(value, `${service}.${field} must be forced off`).toBe(false);
-        }
-      }
-    }
+    // Integrations (#189, #300): the whole list goes — credentials, URLs
+    // (internal topology), even which services are connected.
+    expect(pub.integrations).toEqual([]);
 
     // Non-secret fields survive so the widgets/nav still render and fetch.
     expect(pubCal).toMatchObject({ url: calendar.url });
@@ -978,8 +945,7 @@ describe("settings-secret redaction", () => {
     // Redaction doesn't mutate the source config.
     expect(full.widgets.find((w) => w.id === "calendar")).toMatchObject({ password: "cal-secret" });
     expect(full.settings.alerts.email.pass).toBe("smtp-secret");
-    expect(full.settings.integrations.qbittorrent.password).toBe("qbit-secret");
-    expect(full.settings.integrations.sonarr.apiKey).toBe("sonarr-secret");
+    expect(full.integrations.map((i) => i.password || i.apiKey)).toEqual(["qbit-secret", "sonarr-secret"]);
   });
 
   it("getCalendarAuth still returns the real credentials server-side", async () => {

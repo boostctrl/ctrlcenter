@@ -11,6 +11,7 @@ type Result = { ok?: boolean; detail?: string; error?: string };
 // right service is on the other end. A thin adapter over TestConnectionButton.
 export default function IntegrationTest({
   service,
+  integration,
   url,
   username,
   password,
@@ -18,6 +19,9 @@ export default function IntegrationTest({
   allowInsecureTls,
 }: {
   service: ServiceId;
+  // The integration being edited (#300): env references and legacy env
+  // names apply only when probing its saved URL.
+  integration: string;
   url: string;
   username?: string;
   password?: string;
@@ -27,7 +31,7 @@ export default function IntegrationTest({
   return (
     <TestConnectionButton<Result>
       endpoint="/api/monitor/test"
-      body={{ service, url, username, password, apiKey, allowInsecureTls }}
+      body={{ service, integration, url, username, password, apiKey, allowInsecureTls }}
       label="Test connection"
       pendingLabel="Testing…"
       disabled={url.trim() === ""}

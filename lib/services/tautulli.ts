@@ -15,15 +15,8 @@ import {
   runProbe,
   type ProbeResult,
 } from "./http";
-import { resolveSecret } from "../secrets";
 
 export type TautulliConfig = { url: string; apiKey: string };
-
-// The API key can come from the environment instead of config.yaml, same
-// convention as the other integrations.
-export function resolveTautulliApiKey(cfg: { apiKey: string }): string {
-  return resolveSecret("CTRLCENTER_TAUTULLI_KEY", cfg.apiKey);
-}
 
 export type TautulliSession = {
   user: string;
@@ -146,7 +139,7 @@ export function mapTautulliHistory(raw: unknown): TautulliHistoryItem[] {
 
 async function tautulliCmd<T>(cfg: TautulliConfig, cmd: string): Promise<T> {
   const base = serviceBase(cfg.url);
-  const key = encodeURIComponent(resolveTautulliApiKey(cfg));
+  const key = encodeURIComponent(cfg.apiKey);
   const envelope = await serviceJson<RawEnvelope<T>>(
     `${base}/api/v2?apikey=${key}&cmd=${cmd}`
   );

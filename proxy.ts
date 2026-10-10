@@ -18,11 +18,12 @@ const ADMIN_PREFIXES = [
   "/api/themes",
   "/api/config",
   "/api/password",
-  // Widget instances (#297), boards (#298) and groups (#299); the routes
-  // re-check too.
+  // Widget instances (#297), boards (#298), groups (#299) and integrations
+  // (#300); the routes re-check too.
   "/api/widgets",
   "/api/boards",
   "/api/groups",
+  "/api/integrations",
   // Managing the TOTP second factor (#198): enroll/activate/disable are
   // admin-only. The login step itself (/api/login) stays public.
   "/api/2fa",

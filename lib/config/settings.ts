@@ -5,6 +5,7 @@ import {
   mergeRules,
   type Settings,
   type Board,
+  type Integration,
   type SettingsInput,
   type WidgetInstance,
 } from "../schema";
@@ -17,10 +18,16 @@ export async function getSettings(): Promise<Settings> {
 // What server-rendered pages derive navigation from: the settings, the boards
 // (the board links, #298) and the widget instances (the calendar link follows
 // the calendar widgets, #297). Server-only: calendar credentials ride along.
-export type SiteConfig = { settings: Settings; boards: Board[]; widgets: WidgetInstance[] };
+export type SiteConfig = {
+  settings: Settings;
+  boards: Board[];
+  widgets: WidgetInstance[];
+  // Admin-only pages (Monitor) read these; never pass them to a client.
+  integrations: Integration[];
+};
 export async function getSiteConfig(): Promise<SiteConfig> {
-  const { settings, boards, widgets } = await readConfigInternal();
-  return { settings, boards, widgets };
+  const { settings, boards, widgets, integrations } = await readConfigInternal();
+  return { settings, boards, widgets, integrations };
 }
 
 // Server-only accessor for the calendar Basic-auth credentials. readPublicConfig

@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getTruenasSnapshot,
   probeTruenas,
-  resolveTruenasApiKey,
   mapTruenasPools,
   mapTruenasApps,
   mapTruenasAlerts,
@@ -257,14 +256,3 @@ describe("probeTruenas", () => {
   });
 });
 
-describe("resolveTruenasApiKey", () => {
-  it("prefers the env var over the stored key", () => {
-    vi.stubEnv("CTRLCENTER_TRUENAS_KEY", "env-key");
-    expect(resolveTruenasApiKey({ apiKey: "stored" })).toBe("env-key");
-  });
-
-  it("falls back to the stored key when the env var is unset", () => {
-    vi.stubEnv("CTRLCENTER_TRUENAS_KEY", "");
-    expect(resolveTruenasApiKey({ apiKey: "stored" })).toBe("stored");
-  });
-});

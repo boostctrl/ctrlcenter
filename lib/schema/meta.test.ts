@@ -53,10 +53,10 @@ describe("secret marks", () => {
 
   it("blank marked strings and neutralize marked sections", () => {
     const settings = settingsSchema.parse({
-      integrations: { sonarr: { enabled: true, url: "http://10.0.0.5", apiKey: "k" } },
+      webhooks: { sonarr: { enabled: true, token: "abc" } },
     });
     const out = redactSecrets(settingsSchema, settings);
-    expect(out.integrations.sonarr).toMatchObject({ enabled: false, url: "", apiKey: "" });
+    expect(out.webhooks.sonarr).toMatchObject({ enabled: false, token: "" });
     // Into list entries too: an alert channel keeps its type, loses its keys.
     const alerts = settingsSchema.parse({
       alerts: {

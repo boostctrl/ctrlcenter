@@ -16,6 +16,7 @@ import {
   useMonitorAction,
   fetchContainers,
   fetchContainerLogs,
+  useMonitorIntegration,
 } from "./actions";
 
 // Portainer's card on the Monitor page (#197): container states grouped by
@@ -193,6 +194,7 @@ export default function PortainerCard({
   const data = status.data;
   const confirm = useConfirm();
   const { busy, error, run } = useMonitorAction(onActed);
+  const integration = useMonitorIntegration();
 
   const [expanded, setExpanded] = useState<number | null>(null);
   const [containers, setContainers] = useState<PortainerContainer[]>([]);
@@ -206,11 +208,11 @@ export default function PortainerCard({
   const loadContainers = useCallback(async (endpointId: number) => {
     setLoadingList(true);
     setListError(null);
-    const res = await fetchContainers(endpointId);
+    const res = await fetchContainers(integration, endpointId);
     setLoadingList(false);
     if (res.error) setListError(res.error);
     else setContainers(res.containers ?? []);
-  }, []);
+  }, [integration]);
 
   // On the detail page, open the first drillable environment automatically so
   // the page opens on real container detail instead of a wall of collapsed rows
@@ -271,7 +273,7 @@ export default function PortainerCard({
     setLogs("");
     setLogError(null);
     setLogLoading(true);
-    const res = await fetchContainerLogs(endpointId, c.id);
+    const res = await fetchContainerLogs(integration, endpointId, c.id);
     setLogLoading(false);
     if (res.error) setLogError(res.error);
     else setLogs(res.logs ?? "");

@@ -14,24 +14,26 @@ import { requireAction } from "./guard";
 
 const req = {} as NextRequest;
 
-// One config with a single service slice, so a test dials just the fields the
-// gate under test cares about.
+// One config with a single qBittorrent integration (#300), so a test dials
+// just the fields the gate under test cares about.
 function withQbit(over: Record<string, unknown> = {}) {
   readConfigInternal.mockResolvedValue({
     auth: { passwordHash: "hash" },
-    settings: {
-      integrations: {
-        qbittorrent: {
-          enabled: true,
-          url: "http://qbit.local:8080",
-          username: "admin",
-          password: "pw",
-          allowInsecureTls: false,
-          allowActions: true,
-          ...over,
-        },
+    integrations: [
+      {
+        id: "qbit",
+        type: "qbittorrent",
+        name: "",
+        enabled: true,
+        url: "http://qbit.local:8080",
+        username: "admin",
+        password: "pw",
+        apiKey: "",
+        allowInsecureTls: false,
+        allowActions: true,
+        ...over,
       },
-    },
+    ],
   });
 }
 
@@ -40,33 +42,41 @@ afterEach(() => {
 });
 
 describe("requireAction", () => {
-  it("passes all four gates and returns the resolved config", async () => {
+  it("passes all four gates and returns the integration and its resolved credentials", async () => {
     isAdminRequest.mockResolvedValue(true);
-    withQbit();
-    const result = await requireAction(req, "qbittorrent");
+    withQbit({ password: "${QBIT_PW}" });
+    vi.stubEnv("QBIT_PW", "from-env");
+    const result = await requireAction(req, "qbit", "qbittorrent");
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.cfg.url).toBe("http://qbit.local:8080");
+    if (result.ok) {
+      expect(result.cfg.url).toBe("http://qbit.local:8080");
+      expect(result.cfg.password).toBe("from-env");
+      expect(result.integration.id).toBe("qbit");
+    }
+    vi.unstubAllEnvs();
   });
 
   it("rejects a non-admin session with 401, before any config gate", async () => {
     isAdminRequest.mockResolvedValue(false);
     // Even with actions off AND the service disabled, the session gate wins.
     withQbit({ enabled: false, allowActions: false });
-    const result = await requireAction(req, "qbittorrent");
+    const result = await requireAction(req, "qbit", "qbittorrent");
     expect(result).toMatchObject({ ok: false, status: 401 });
   });
 
-  it("rejects an unconfigured integration with 409", async () => {
+  it("rejects an unconfigured, unknown or wrong-type integration with 409", async () => {
     isAdminRequest.mockResolvedValue(true);
     withQbit({ url: "   " });
-    const result = await requireAction(req, "qbittorrent");
-    expect(result).toMatchObject({ ok: false, status: 409 });
+    expect(await requireAction(req, "qbit", "qbittorrent")).toMatchObject({ ok: false, status: 409 });
+    withQbit();
+    expect(await requireAction(req, "nope", "qbittorrent")).toMatchObject({ ok: false, status: 409 });
+    expect(await requireAction(req, "qbit", "portainer")).toMatchObject({ ok: false, status: 409 });
   });
 
   it("rejects a configured integration with actions off with 403", async () => {
     isAdminRequest.mockResolvedValue(true);
     withQbit({ allowActions: false });
-    const result = await requireAction(req, "qbittorrent");
+    const result = await requireAction(req, "qbit", "qbittorrent");
     expect(result).toMatchObject({ ok: false, status: 403 });
   });
 });

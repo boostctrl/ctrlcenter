@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getArrSnapshot,
   probeArr,
-  resolveArrApiKey,
   mapSonarrCalendar,
   mapHistory,
   ARR_UPCOMING_CAP,
@@ -249,16 +248,3 @@ describe("probeArr", () => {
   });
 });
 
-describe("resolveArrApiKey", () => {
-  it("prefers the per-service env var over the stored key", () => {
-    vi.stubEnv("CTRLCENTER_SONARR_KEY", "env-sonarr");
-    vi.stubEnv("CTRLCENTER_RADARR_KEY", "env-radarr");
-    expect(resolveArrApiKey("sonarr", { apiKey: "file" })).toBe("env-sonarr");
-    expect(resolveArrApiKey("radarr", { apiKey: "file" })).toBe("env-radarr");
-  });
-
-  it("falls back to the stored key when the env var is unset", () => {
-    vi.stubEnv("CTRLCENTER_SONARR_KEY", "");
-    expect(resolveArrApiKey("sonarr", { apiKey: "file" })).toBe("file");
-  });
-});

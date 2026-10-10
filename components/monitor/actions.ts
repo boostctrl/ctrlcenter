@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { createContext, useCallback, useContext, useState } from "react";
 import type { PortainerContainer } from "@/lib/services/portainer";
 
 // Client helper for the Monitor cards' write actions (#201/#202/#203): POST the
@@ -29,8 +29,14 @@ export type MonitorActionBody =
 
 export type ActionResult = { ok: boolean; error?: string };
 
+// Which integration the detail page shows (#300): its actions and drill-down
+// reads name it, so they reach that one of possibly several of its type.
+// MonitorDetail provides it.
+export const MonitorIntegrationContext = createContext("");
+export const useMonitorIntegration = () => useContext(MonitorIntegrationContext);
+
 export async function runMonitorAction(
-  body: MonitorActionBody
+  body: MonitorActionBody & { integration: string }
 ): Promise<ActionResult> {
   try {
     const res = await fetch("/api/monitor/action", {
@@ -50,11 +56,12 @@ export async function runMonitorAction(
 // container's log tail. GETs to the admin-gated drill-down routes; the card
 // calls them only when the admin expands an environment or opens the logs.
 export async function fetchContainers(
+  integration: string,
   endpoint: number
 ): Promise<{ containers?: PortainerContainer[]; error?: string }> {
   try {
     const res = await fetch(
-      `/api/monitor/portainer/containers?endpoint=${endpoint}`
+      `/api/monitor/portainer/containers?integration=${encodeURIComponent(integration)}&endpoint=${endpoint}`
     );
     const data = (await res.json().catch(() => ({}))) as {
       containers?: PortainerContainer[];
@@ -68,12 +75,13 @@ export async function fetchContainers(
 }
 
 export async function fetchContainerLogs(
+  integration: string,
   endpoint: number,
   container: string
 ): Promise<{ logs?: string; error?: string }> {
   try {
     const res = await fetch(
-      `/api/monitor/portainer/logs?endpoint=${endpoint}&container=${encodeURIComponent(container)}`
+      `/api/monitor/portainer/logs?integration=${encodeURIComponent(integration)}&endpoint=${endpoint}&container=${encodeURIComponent(container)}`
     );
     const data = (await res.json().catch(() => ({}))) as {
       logs?: string;
@@ -92,6 +100,7 @@ export async function fetchContainerLogs(
 // snapshot refetch) on success so the card reflects the change promptly rather
 // than waiting for the next poll.
 export function useMonitorAction(onActed?: () => void) {
+  const integration = useMonitorIntegration();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -99,13 +108,13 @@ export function useMonitorAction(onActed?: () => void) {
     async (key: string, body: MonitorActionBody): Promise<boolean> => {
       setBusy(key);
       setError(null);
-      const res = await runMonitorAction(body);
+      const res = await runMonitorAction({ ...body, integration });
       setBusy(null);
       if (res.ok) onActed?.();
       else setError(res.error ?? "Action failed");
       return res.ok;
     },
-    [onActed]
+    [onActed, integration]
   );
 
   return { busy, error, run };

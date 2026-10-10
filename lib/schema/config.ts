@@ -8,6 +8,7 @@ import { authSchema } from "./auth";
 import { widgetInstancesSchema } from "./instances";
 import { boardsSchema } from "./boards";
 import { groupsSchema } from "./groups";
+import { integrationsSchema } from "./integrations";
 
 // The on-disk config shape's version, written on every save. Files without it
 // predate the field (2.9 and earlier). lib/config-migrate.ts keys its
@@ -24,6 +25,9 @@ export const configSchema = z.object({
   boards: boardsSchema,
   // Every widget instance, with its content (#297). Shared by the boards.
   widgets: widgetInstancesSchema,
+  // Connections to self-hosted services for the private Monitor page (#300).
+  // Admin-only: readPublicConfig drops them.
+  integrations: integrationsSchema,
   // The groups apps and bookmarks belong to (#299), in display order.
   groups: groupsSchema,
   apps: z.array(appItemSchema).default([]),

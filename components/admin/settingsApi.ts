@@ -77,3 +77,11 @@ export async function saveBoardLayout(
     keepalive
   );
 }
+
+// Save the whole integration list (#300).
+export async function saveIntegrations(
+  integrations: unknown[],
+  { keepalive }: { keepalive?: boolean } = {}
+): Promise<void> {
+  await putJson("/api/integrations", integrations, "Failed to save integrations", keepalive);
+}

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import type { DetailResult } from "@/lib/monitor-detail";
 import type { ServiceStatus } from "@/lib/monitor";
-import { SERVICE_LABELS } from "@/lib/services/ids";
+import { MonitorIntegrationContext } from "./actions";
 import { ConfirmProvider } from "@/components/admin/Confirm";
 import PageNav from "@/components/PageNav";
 import { usePolling } from "@/components/usePolling";
@@ -98,9 +98,9 @@ function renderBody(result: DetailResult, refresh: () => void): ReactNode {
         />
       );
     case "sonarr":
-      return <ArrCard title="Sonarr" status={asStatus(result)} />;
+      return <ArrCard title={result.label} status={asStatus(result)} />;
     case "radarr":
-      return <ArrCard title="Radarr" status={asStatus(result)} />;
+      return <ArrCard title={result.label} status={asStatus(result)} />;
     case "adguard":
       return <AdguardDetail status={asStatus(result)} />;
     case "tautulli":
@@ -124,7 +124,7 @@ export default function MonitorDetail({
   nav: NavPages;
 }) {
   const [result, setResult] = useState(initial);
-  const id = initial.service;
+  const id = initial.id;
   // When the shown data last came back fresh, and a client clock that ticks
   // between polls — the label is hidden until mount so it can't mismatch on
   // hydration, then set on first paint and on every good refresh.
@@ -135,7 +135,7 @@ export default function MonitorDetail({
   const load = useCallback(
     async (signal: AbortSignal) => {
       try {
-        const res = await fetch(`/api/monitor/${id}`, { signal });
+        const res = await fetch(`/api/monitor/${encodeURIComponent(id)}`, { signal });
         if (!res.ok) return; // keep the last result; the body shows its own errors
         const next = (await res.json()) as DetailResult;
         if (signal.aborted) return;
@@ -187,12 +187,14 @@ export default function MonitorDetail({
             </Link>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-            <h1 className="text-3xl font-bold">{SERVICE_LABELS[id]}</h1>
+            <h1 className="text-3xl font-bold">{result.label}</h1>
             <StatusPill state={state} updatedAt={updatedAt} now={now} />
           </div>
         </div>
         <InDetailContext.Provider value={true}>
-          {renderBody(result, refresh)}
+          <MonitorIntegrationContext.Provider value={id}>
+            {renderBody(result, refresh)}
+          </MonitorIntegrationContext.Provider>
         </InDetailContext.Provider>
       </main>
     </ConfirmProvider>

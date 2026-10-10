@@ -16,15 +16,8 @@ import {
   runProbe,
   type ProbeResult,
 } from "./http";
-import { resolveSecret } from "../secrets";
 
 export type TruenasConfig = { url: string; apiKey: string };
-
-// The API key can come from the environment instead of config.yaml, same
-// convention as the other integrations.
-export function resolveTruenasApiKey(cfg: { apiKey: string }): string {
-  return resolveSecret("CTRLCENTER_TRUENAS_KEY", cfg.apiKey);
-}
 
 export type TruenasPool = {
   name: string;
@@ -217,7 +210,7 @@ async function truenasJson<T>(
   const base = serviceBase(cfg.url);
   const { res, text } = await serviceRequest(
     `${base}${path}`,
-    { headers: { Authorization: `Bearer ${resolveTruenasApiKey(cfg)}` } },
+    { headers: { Authorization: `Bearer ${cfg.apiKey}` } },
     maxBytes
   );
   throwForStatus(res, { 401: "Invalid API key", 403: "Invalid API key" });

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { isAdminRequest } from "@/lib/api-auth";
 import { SERVICE_IDS, SERVICES } from "@/lib/services/registry";
-import { getSettings } from "@/lib/config";
+import { getSiteConfig } from "@/lib/config";
+import { resolveIntegration } from "@/lib/services/resolve";
 import { isSavedUrl, withoutEnvSecrets } from "@/lib/secrets";
 
 // Admin-only "Test connection" for the Integrations settings: probes the
@@ -13,6 +14,10 @@ import { isSavedUrl, withoutEnvSecrets } from "@/lib/secrets";
 // superset of credential fields and each service's probe reads its own.
 const bodySchema = z.object({
   service: z.enum(SERVICE_IDS),
+  // The integration being edited (#300), when it's been saved: the saved
+  // values stand in for env references and legacy env names only for its own
+  // saved URL.
+  integration: z.string().max(64).default(""),
   url: z.string().default(""),
   username: z.string().default(""),
   password: z.string().default(""),
@@ -28,16 +33,22 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
-  const { service, ...fields } = parsed.data;
+  const { service, integration, ...fields } = parsed.data;
   if (!fields.url.trim()) {
     return NextResponse.json({ ok: false, error: "No URL set" });
   }
-  // Env-held credentials (CTRLCENTER_*_KEY/PASS) only go to the saved URL; a
-  // probe of a newly typed URL uses just what the form sent.
-  const saved = (await getSettings()).integrations[service].url;
-  const probe = () => SERVICES[service].probe(fields);
-  const result = isSavedUrl(fields.url, saved)
-    ? await probe()
-    : await withoutEnvSecrets(probe);
+  // Env-held credentials — `${ENV}` references, and the legacy
+  // CTRLCENTER_*_KEY/PASS for a migrated integration — only go to the saved
+  // URL of the integration being edited; a probe of a newly typed URL runs
+  // with them expanded to nothing.
+  const saved = (await getSiteConfig()).integrations.find(
+    (i) => i.id === integration && i.type === service
+  );
+  const run = () =>
+    SERVICES[service].probe(resolveIntegration({ ...fields, id: integration, type: service }));
+  const result =
+    saved && isSavedUrl(fields.url, saved.url)
+      ? await run()
+      : await withoutEnvSecrets(run);
   return NextResponse.json(result);
 }

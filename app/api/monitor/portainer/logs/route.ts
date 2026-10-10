@@ -8,7 +8,9 @@ import { log, errorReason } from "@/lib/log";
 // gates as the write actions (requireAction). Strictly read-only — this route
 // only ever fetches the log tail; there is no exec, attach, or console path.
 export async function GET(request: NextRequest) {
-  const guard = await requireAction(request, "portainer");
+  // Which Portainer (#300): ?integration=<id>.
+  const integration = request.nextUrl.searchParams.get("integration") ?? "";
+  const guard = await requireAction(request, integration, "portainer");
   if (!guard.ok) {
     return NextResponse.json({ error: guard.error }, { status: guard.status });
   }
