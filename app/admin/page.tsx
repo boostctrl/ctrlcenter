@@ -1,4 +1,4 @@
-import { readConfigInternal } from "@/lib/config";
+import { readConfigInternal, readUpgradeNotice } from "@/lib/config";
 import { requireAdminPage } from "@/lib/api-auth";
 import AdminDashboard from "@/components/admin/AdminDashboard";
 
@@ -17,6 +17,8 @@ export default async function AdminPage({
   const config = await readConfigInternal();
   await requireAdminPage("/admin", config.auth.passwordHash);
   const params = await searchParams;
+  // The one-time "upgraded to 3.0" banner (#306), until dismissed.
+  const upgradeNotice = await readUpgradeNotice();
 
   return (
     <AdminDashboard
@@ -30,6 +32,7 @@ export default async function AdminPage({
       initialThemes={config.themes}
       // Only the boolean crosses to the client — never the TOTP secret (#198).
       initialTwoFactorEnabled={config.auth.totp.enabled}
+      upgradeNotice={upgradeNotice}
       initialTab={typeof params.tab === "string" ? params.tab : undefined}
       initialSection={
         typeof params.section === "string" ? params.section : undefined

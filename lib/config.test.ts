@@ -37,6 +37,8 @@ beforeEach(async () => {
   // Start each test from a clean slate; readConfigInternal recreates defaults on miss.
   await fs.rm(configPath, { force: true });
   await fs.rm(`${configPath}.bak`, { force: true });
+  await fs.rm(path.join(path.dirname(configPath), "config.v2.bak.yaml"), { force: true });
+  await fs.rm(path.join(path.dirname(configPath), "upgrade-notice.json"), { force: true });
 });
 
 
@@ -469,6 +471,54 @@ describe("updateSettings partial merge", () => {
       name: "X", subtitle: "", url: "https://x.example.com", icon: "",
     }));
     await expect(fs.access(`${configPath}.bak`)).rejects.toBeTruthy();
+  });
+
+  describe("the 2.x → 3.0 upgrade (#306)", () => {
+    const v2Text = [
+      "# my homelab",
+      "schemaVersion: 2",
+      "settings:",
+      "  title: Lab",
+      "  notes: { content: hello }",
+      "  layout:",
+      "    sections:",
+      "      - { id: notes, span: 8 }",
+      "      - { id: apps, span: 24 }",
+      "apps:",
+      "  - { id: a1, name: NAS, url: 'http://nas.lan' }",
+      "bookmarks:",
+      "  - { id: b1, name: Wiki, url: 'https://wiki.example', category: Docs }",
+      "",
+    ].join("\n");
+    const v2Backup = () => path.join(path.dirname(configPath), "config.v2.bak.yaml");
+
+    it("keeps the 2.x file once as config.v2.bak.yaml, and leaves the admin a notice", async () => {
+      await fs.writeFile(configPath, v2Text, "utf8");
+      const loaded = await config.readConfigInternal();
+      expect(loaded.boards[0].layout.sections.map((r) => r.widget)).toContain("notes");
+      expect(await fs.readFile(v2Backup(), "utf8")).toBe(v2Text);
+      const notice = await config.readUpgradeNotice();
+      expect(notice).toMatchObject({ from: 2, to: 3, boards: 1, backup: "config.v2.bak.yaml" });
+      expect(notice!.widgets).toBeGreaterThan(0);
+      expect(notice!.groups).toBe(1);
+      await config.dismissUpgradeNotice();
+      expect(await config.readUpgradeNotice()).toBeNull();
+    });
+
+    it("never overwrites an existing v2 backup, and upgrades on a first write too", async () => {
+      await fs.writeFile(v2Backup(), "the first upgrade's copy", "utf8");
+      await fs.writeFile(configPath, v2Text, "utf8");
+      await config.createApp(appInput({ name: "First", url: "https://first.example.com" }));
+      expect(await fs.readFile(v2Backup(), "utf8")).toBe("the first upgrade's copy");
+      expect(await config.readUpgradeNotice()).toMatchObject({ from: 2, to: 3 });
+    });
+
+    it("leaves a 3.0 config alone", async () => {
+      await config.updateSettings(settingsInput({ title: "Already 3" }));
+      await config.readConfigInternal();
+      await expect(fs.access(v2Backup())).rejects.toBeTruthy();
+      expect(await config.readUpgradeNotice()).toBeNull();
+    });
   });
 
   it("doubles a 1.3-era 12-column span layout once, and never again", async () => {

@@ -173,6 +173,39 @@ for a sample). The container fixes ownership of that directory on startup and
 runs as a non-root user, so it works regardless of who owns the host folder — no
 manual `chown`.
 
+## Upgrading to 3.0
+
+3.0 changes how `config.yaml` is organized. There's nothing to do by hand:
+on its first start, 3.0 reads your 2.x file and saves it in the new shape,
+keeping your comments — except those on the settings that move (below),
+which stay in the backup.
+
+- **A backup first.** The 2.x file is copied beside the config as
+  `config.v2.bak.yaml`. It's written once and never overwritten, so it stays
+  your way back however many times you restart or import.
+- **A note in the log** says what was converted, and **/admin** shows a
+  one-time banner with the same summary until you dismiss it.
+
+What moved where:
+
+| 2.x | 3.0 |
+| --- | --- |
+| `settings.layout.sections` (the home page arrangement) | the first board in `boards:` — the home page. Scale and spacing stay in `settings.layout`. |
+| Each widget's content in `settings.notes`, `.countdown`, `.worldClocks`, `.systemStats`, `.calendar`, `.feeds` | one entry per widget in `widgets:`, each with an `id`. You can now have more than one of any kind. |
+| A bookmark's `category` | `groups:`, which bookmarks (and now apps) name with `group:` |
+| `settings.integrations.<service>` | `integrations:`, a list, so you can connect two of a kind. Ones you'd never set up are dropped. |
+
+Your `CTRLCENTER_*` environment variables keep working for the services and
+the calendar they were set for. New ones can be referenced as `${NAME}` in any
+integration field.
+
+**Rolling back.** 2.x can't read a 3.0 config: 2.13 stops with an error naming
+the newer config version, rather than silently dropping what it doesn't
+understand. To go back,
+stop the container, restore the backup over the live file
+(`cp config/config.v2.bak.yaml config/config.yaml`), and run the `:2.13`
+image. Anything you changed after upgrading is lost.
+
 ## Configuration
 
 Edit through **/admin** (recommended) or by hand — changes are picked up on the

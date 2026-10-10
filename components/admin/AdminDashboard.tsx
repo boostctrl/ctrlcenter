@@ -29,6 +29,8 @@ import { ToastProvider, useToast } from "./Toast";
 import { ConfirmProvider, useConfirm } from "./Confirm";
 import { replaceUrlParams } from "./urlState";
 import { apiErrorMessage } from "./apiError";
+import UpgradeBanner from "./UpgradeBanner";
+import type { UpgradeSummary } from "@/lib/config/upgrade";
 
 type Tab = "apps" | "bookmarks" | "themes" | "settings";
 
@@ -49,6 +51,8 @@ type Props = {
   initialIntegrations: Integration[];
   initialThemes: ThemePackConfig[];
   initialTwoFactorEnabled: boolean;
+  // What the 2.x → 3.0 upgrade did, until the admin dismisses it (#306).
+  upgradeNotice?: UpgradeSummary | null;
   // The ?tab / ?section deep-link params, read server-side by the page (NOT
   // useSearchParams here — that would demand a Suspense boundary whose
   // streamed segment can be left orphaned in the DOM). Unvalidated strings;
@@ -79,6 +83,7 @@ function AdminBody({
   initialIntegrations,
   initialThemes,
   initialTwoFactorEnabled,
+  upgradeNotice,
   initialTab,
   initialSection,
 }: Props) {
@@ -254,6 +259,8 @@ function AdminBody({
           </div>
         </div>
       </div>
+
+      {upgradeNotice && <UpgradeBanner notice={upgradeNotice} />}
 
       {/* The row scrolls (not the page) when the tabs outgrow a phone-width
           viewport; shrink-0 keeps each tab intact instead of squashing, and the

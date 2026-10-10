@@ -187,12 +187,43 @@ try {
   }
 
   await statusPhase(run);
+  await upgradePhase(run);
 } catch (e) {
   failures.push(`smoke run aborted: ${e instanceof Error ? e.message : e}`);
 } finally {
   await browser?.close();
   server.kill();
   tlsServer?.close();
+}
+
+// The 2.x → 3.0 upgrade (#306): swap a 2.13 config in under the running
+// server, as if a 2.13 install had just started 3.0. The first read migrates
+// it: the pages render from the upgraded file, the 2.x file is kept as
+// config.v2.bak.yaml, the file on disk is stamped 3, and the admin sees the
+// upgrade banner (audited too).
+async function upgradePhase(run) {
+  // Without its own (fake) admin credential, so ADMIN_PASSWORD still signs in.
+  const fixture = fs
+    .readFileSync(path.join(ROOT, "lib", "__fixtures__", "config-2.13.yaml"), "utf8")
+    .replace(/^auth:\n(?:[ \t].*\n?)*/m, "");
+  fs.writeFileSync(configPath, fixture, "utf8");
+  const guest = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  await run(guest, "/", "upgraded-home");
+  await guest.close();
+  const backup = path.join(dataDir, "config.v2.bak.yaml");
+  if (!fs.existsSync(backup) || fs.readFileSync(backup, "utf8") !== fixture)
+    failures.push("upgrade: config.v2.bak.yaml is missing or isn't the 2.x file");
+  const upgraded = YAML.load(fs.readFileSync(configPath, "utf8"));
+  if (upgraded?.schemaVersion !== 3 || !Array.isArray(upgraded.boards) || !Array.isArray(upgraded.widgets))
+    failures.push("upgrade: config.yaml wasn't saved in the 3.0 shape");
+  else console.log("ok    a 2.13 config upgraded on first read, with its backup");
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  await signIn(ctx);
+  const r = await run(ctx, "/admin", "upgraded-admin", async (page) => {
+    await page.getByRole("heading", { name: "Welcome to CtrlCenter 3.0" }).waitFor({ timeout: 5_000 });
+  });
+  if (!r.failures.length) console.log("ok    /admin shows the upgrade banner");
+  await ctx.close();
 }
 
 // The status surfaces (#311): the example config has checks off (they'd reach

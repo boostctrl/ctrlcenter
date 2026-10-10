@@ -1,0 +1,289 @@
+schemaVersion: 2
+# my homelab — last saved by CtrlCenter 2.10.0
+settings:
+  title: Homelab
+  favicon: 'http://nas.lan:5000/favicon.ico'
+  timezone: America/Los_Angeles
+  theme:
+    mode: dark
+    preset: Default
+    presetLight: Default
+    design: console
+    scene: traces
+    font: jetbrains
+    designLight: minimal
+    sceneLight: dots
+    accentFrom: '#22c55e'
+    accentTo: '#22c55e'
+  statusChecks: true
+  statusInterval: 1
+  statusDefaultRange: h1
+  bookmarkCategoryOrder: [Dev, Admin]
+  groupPrivateApps: false
+  search:
+    engine: google
+    customUrl: ''
+    bangs:
+      - key: npm
+        url: 'https://www.npmjs.com/search?q=%s'
+  weather:
+    enabled: false
+    latitude: 37.7749
+    longitude: -122.4194
+    units: imperial
+  alerts:
+    enabled: true
+    type: slack
+    webhookUrl: 'https://hooks.slack.com/services/FAKE/FAKE/fake-slack-token'
+    webhookEnabled: true
+    notifyOnRecovery: true
+    confirmations: 1
+    email:
+      enabled: true
+      host: smtp.mail.lan
+      port: 587
+      secure: false
+      user: alerts
+      pass: fake-pass
+      from: homelab@mail.lan
+      to: me@mail.lan
+      subject: '{service} went {status}'
+  calendar:
+    enabled: true
+    url: 'webcal://calendar.lan/public/family.ics'
+    count: 10
+    homeView: agenda
+    hideWhenEmpty: false
+    username: ''
+    password: ''
+  notes:
+    title: On-call
+    content: 'Pager rotation: **me** this week.'
+  announcement:
+    enabled: true
+    message: 'New [status page](/status) is live'
+    tone: success
+    dismissible: false
+  statusAnnouncements:
+    - id: 2b3c4d5e-6f70-4812-9a3b-cc0000000001
+      title: Router swap
+      body: Expect a few minutes of downtime.
+      kind: maintenance
+      startsAt: '2026-08-20T06:00:00.000Z'
+      endsAt: '2026-08-20T07:00:00.000Z'
+    - id: 2b3c4d5e-6f70-4812-9a3b-cc0000000002
+      title: Welcome
+      body: 'Status notices show up here.'
+      kind: info
+      startsAt: ''
+      endsAt: ''
+  feeds:
+    - id: feed
+      enabled: true
+      urls: ['https://github.blog/feed/']
+      count: 5
+      title: ''
+      summaries: true
+    - id: f-releases
+      enabled: false   # parked for now
+      urls:
+        - 'https://github.com/immich-app/immich/releases.atom'
+        - 'https://github.com/jellyfin/jellyfin/releases.atom'
+        - ''
+      count: 15
+      title: Releases
+      summaries: false
+  countdown:
+    title: Deadlines
+    items:
+      - label: Taxes
+        date: '2027-04-15'
+      - label: Half-typed row
+        date: ''
+  worldClocks:
+    title: Team
+    items:
+      - label: Berlin
+        timeZone: Europe/Berlin
+      - label: Bangalore
+        timeZone: Asia/Kolkata
+      - label: UTC
+        timeZone: UTC
+  systemStats:
+    title: Docker host
+    disks:
+      - label: Root
+        path: /
+      - label: Docker
+        path: /var/lib/docker
+  # Monitor + actions (allowActions added in 2.6)
+  integrations:
+    qbittorrent:
+      enabled: true
+      url: 'http://qbit.lan:8080'
+      username: admin
+      password: fake-pass
+      allowInsecureTls: false
+      allowActions: true
+    sonarr:
+      enabled: true
+      url: 'http://sonarr.lan:8989'
+      apiKey: fake-sonarr-key
+      allowInsecureTls: false
+      allowActions: false
+    radarr:
+      enabled: true
+      url: 'http://radarr.lan:7878'
+      apiKey: fake-radarr-key
+    adguard:
+      enabled: true
+      url: 'http://adguard.lan'
+      username: admin
+      password: fake-pass
+    tautulli:
+      enabled: false
+      url: ''
+      apiKey: ''
+    seerr:
+      enabled: true
+      url: 'http://seerr.lan:5055'
+      apiKey: fake-seerr-key
+      allowActions: true
+    portainer:
+      enabled: true
+      url: 'https://portainer.lan:9443'
+      apiKey: fake-portainer-key
+      allowInsecureTls: true
+      allowActions: true
+    truenas:
+      enabled: true
+      url: 'http://truenas.lan'
+      apiKey: fake-truenas-key
+    unifi:
+      enabled: false
+      url: 'https://unifi.lan'
+      username: ''
+      password: ''
+      allowInsecureTls: true
+  # inbound *arr / Seerr webhooks, relayed through the alert channels
+  webhooks:
+    enabled: true
+    sonarr:
+      enabled: true
+      token: fake-sonarr-hook-token
+    radarr:
+      enabled: true
+      token: fake-radarr-hook-token
+    seerr:
+      enabled: false
+      token: ''
+  components:
+    greeting: true
+    clock: false
+    search: true
+    apps: true
+    bookmarks: true
+    favorites: true
+    settingsButton: true
+  layout:
+    columns: 24
+    scale: 110
+    gap: 16
+    topGap: 32
+    sections:
+      - { id: greeting, span: 24, height: 120, space: { top: 24 } }
+      - { id: headerCard, span: 8, hidden: true }
+      - { id: clock, span: 8, hidden: true }
+      - { id: weather, span: 8, hidden: true }
+      - { id: status, span: 24, hidden: false }
+      - { id: search, span: 24, hidden: false }
+      - { id: apps, span: 16, hidden: false, cards: 4, hideLabel: true }
+      - { id: systemStats, span: 8, hidden: false }
+      - { id: feed, instanceId: feed, span: 8, hidden: false }
+      - { id: feed, instanceId: f-releases, span: 8, hidden: true }
+      - { id: calendar, span: 8, hidden: false, height: 300 }
+      - { id: notes, span: 8, hidden: false }
+      - { id: countdown, span: 8, hidden: false }
+      - { id: worldClocks, span: 8, hidden: false }
+      - { id: favorites, span: 24, hidden: false, cards: 3 }
+      - { id: bookmarks, span: 24, hidden: false, space: { bottom: 48 } }
+apps:
+  - id: 4f5a6b7c-8d9e-4f00-8a11-dd0000000001
+    name: Gitea
+    subtitle: Code
+    url: 'http://git.lan:3000'
+    icon: gitea
+    expectStatus: 200-299
+    checkType: http
+  - id: 4f5a6b7c-8d9e-4f00-8a11-dd0000000002
+    name: Portainer
+    url: 'https://portainer.lan:9443'
+    icon: portainer
+    private: true
+  - id: 4f5a6b7c-8d9e-4f00-8a11-dd0000000003
+    name: Postgres
+    subtitle: DB
+    url: 'http://db.lan'
+    icon: postgres
+    checkType: tcp
+    port: 5432
+    private: true
+  - id: 4f5a6b7c-8d9e-4f00-8a11-dd0000000004
+    name: AdGuard
+    url: 'http://adguard.lan'
+    icon: adguard-home
+    checkType: dns
+  - id: 4f5a6b7c-8d9e-4f00-8a11-dd0000000005
+    name: Immich
+    subtitle: Photos
+    url: 'http://immich.lan:2283'
+    icon: immich
+    checkType: keyword
+    keyword: immich
+  - id: 4f5a6b7c-8d9e-4f00-8a11-dd0000000006
+    name: Seerr
+    subtitle: Requests
+    url: 'http://seerr.lan:5055'
+    icon: overseerr
+bookmarks:
+  - id: 8a9b0c1d-2e3f-4a50-9b61-ee0000000001
+    category: Dev
+    name: GitHub
+    url: 'https://github.com'
+    icon: github
+  - id: 8a9b0c1d-2e3f-4a50-9b61-ee0000000002
+    category: Dev
+    name: MDN
+    url: 'https://developer.mozilla.org'
+  - id: 8a9b0c1d-2e3f-4a50-9b61-ee0000000003
+    category: Admin
+    name: Registrar
+    url: 'https://registrar.example.com'
+    private: true
+  - id: 8a9b0c1d-2e3f-4a50-9b61-ee0000000004
+    category: Admin
+    name: Backblaze
+    url: 'https://secure.backblaze.com'
+    icon: backblaze
+  - id: 8a9b0c1d-2e3f-4a50-9b61-ee0000000005
+    category: Admin
+    name: Tailscale
+    url: 'https://login.tailscale.com/admin'
+    icon: tailscale
+themes:
+  - name: Default
+    design: console
+    scene: traces
+    dark:
+      background: '#050a05'
+      foreground: '#d1fae5'
+      accentFrom: '#22c55e'
+      accentTo: '#22c55e'
+    light:
+      background: '#f0fdf4'
+      foreground: '#052e16'
+      accentFrom: '#16a34a'
+      accentTo: '#16a34a'
+auth:
+  passwordHash: fakehash1111111111111111111111111111111111111111111111111111111111
+  passwordSalt: fakesalt11111111111111111111111

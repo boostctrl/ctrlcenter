@@ -70,6 +70,17 @@ here.
 
 ### Changed
 
+- **Upgrading from 2.x (3.0).** Your `config.yaml` is converted to the 3.0
+  shape on first start, keeping your comments (but those on the settings
+  that move, which stay in the backup): the home page layout becomes the
+  first board, each widget becomes its own item in `widgets:`, bookmark
+  categories become groups, and connected services become a list under
+  `integrations:`. The 2.x file is kept beside it as `config.v2.bak.yaml`,
+  written once and never overwritten; the log says what was converted, and
+  /admin shows a one-time banner with the same summary. 2.x can't read a 3.0
+  config — to roll back, restore `config.v2.bak.yaml` as `config.yaml` and
+  run the `:2.13` image. The README's "Upgrading to 3.0" section has the
+  details. (#306)
 - **Drag cards to move and resize them (3.0).** Grab a card anywhere to move
   it, with a mouse or by touch (press and hold first, so swiping still
   scrolls). The page shows where everything will land before you let go,
@@ -91,10 +102,8 @@ here.
   home page is now its own item with its own content: two notes cards, a
   calendar per person, a feed per topic. In Settings → Widgets each kind
   lists its widgets, with *Add*, *Remove*, and an *On the home page* switch
-  for each. Your configuration is upgraded automatically on first start,
-  and the previous file is kept beside it as `config.yaml.bak`; the home
-  page looks exactly as before. To go back to 2.13, restore that file and
-  run the `:2.13` image. (#297)
+  for each. Your configuration is upgraded automatically on first start
+  and the home page looks exactly as before. (#297)
 - Feed cards and calendars no longer have a separate on/off switch: whether
   one shows is the same *On the home page* switch (or the layout editor) as
   every other widget, and one you had switched off comes through hidden.

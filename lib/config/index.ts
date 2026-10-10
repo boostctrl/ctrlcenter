@@ -19,3 +19,4 @@ export * from "./widgets";
 export * from "./boards";
 export * from "./groups";
 export * from "./integrations";
+export * from "./upgrade";

@@ -1,0 +1,372 @@
+schemaVersion: 2
+# my homelab — CtrlCenter 2.13.0 (the last 2.x shape before the 3.0 migration)
+settings:
+  title: Home Ops
+  favicon: ''
+  timezone: Europe/London
+  theme:
+    mode: system
+    preset: Mariana
+    design: aero
+    scene: peaks
+    font: outfit
+    designLight: soft
+    sceneLight: horizon
+    fontLight: quicksand
+    accentFrom: '#a78bfa'
+    accentTo: '#22d3ee'
+  statusChecks: true
+  statusInterval: 3
+  statusDefaultRange: d90
+  bookmarkCategoryOrder: [Daily, Homelab, Shopping]
+  groupPrivateApps: true
+  search:
+    engine: duckduckgo
+    customUrl: ''
+    bangs:
+      - key: w
+        url: 'https://en.wikipedia.org/w/index.php?search=%s'
+      - key: hub
+        url: 'https://hub.docker.com/search?q=%s'
+  weather:
+    enabled: true
+    latitude: 51.5072
+    longitude: -0.1276
+    units: metric
+  alerts:
+    enabled: true
+    # the original single webhook + email keys (3.0 folds them into channels)
+    type: generic
+    webhookUrl: 'http://n8n.lan:5678/webhook/fake-uptime-hook'
+    webhookEnabled: true
+    notifyOnRecovery: true
+    confirmations: 2
+    email:
+      enabled: true
+      host: smtp.mail.lan
+      port: 465
+      secure: true
+      user: alerts@mail.lan
+      pass: fake-pass
+      from: homeops@mail.lan
+      to: me@mail.lan
+      subject: ''
+    # extra channels (#291)
+    channels:
+      - id: ch-discord
+        type: webhook
+        name: 'Discord #alerts'
+        enabled: true
+        onDown: true
+        onRecovery: true
+        onWarning: true
+        onWebhooks: false
+        apps: []
+        format: discord
+        url: 'https://discord.com/api/webhooks/000000/fake-discord-token'
+      - id: ch-telegram
+        type: telegram
+        name: Phone
+        enabled: true
+        onDown: true
+        onRecovery: false
+        onWarning: false
+        onWebhooks: true
+        apps:
+          - 6a7b8c9d-0e1f-4a20-8b31-ff0000000001
+          - 6a7b8c9d-0e1f-4a20-8b31-ff0000000003
+        token: fake-telegram-bot-token
+        chatId: '123456789'
+      - id: ch-gotify
+        type: gotify
+        name: ''
+        enabled: false
+        url: 'http://gotify.lan'
+        token: fake-gotify-token
+      - id: ch-pushover
+        type: pushover
+        name: Pushover
+        token: fake-pushover-app-token
+        userKey: fake-pushover-user-key
+      - id: ch-apprise
+        type: apprise
+        name: Apprise
+        url: 'http://apprise.lan:8000/notify/homelab'
+      - id: ch-email-oncall
+        type: email
+        name: On-call mailbox
+        onWebhooks: false
+        smtp:
+          host: smtp.mail.lan
+          port: 587
+          secure: false
+          user: oncall
+          pass: fake-pass
+          from: homeops@mail.lan
+          to: oncall@mail.lan
+          subject: '[oncall] {service} is {status}'
+  calendar:
+    enabled: true
+    url: 'http://nextcloud.lan/remote.php/dav/calendars/me/family/'
+    count: 6
+    homeView: month
+    hideWhenEmpty: false
+    username: me
+    password: fake-pass
+  notes:
+    title: Notes
+    content: |
+      ## This week
+      1. migrate **Postgres** to 16
+      2. check the `restic` logs
+  announcement:
+    enabled: true
+    message: '*Heads up:* NAS maintenance Sunday night'
+    tone: accent
+    dismissible: true
+  statusAnnouncements:
+    # maintenance window covering two apps (alerts muted while active, #293)
+    - id: 9c8d7e6f-5a4b-4c3d-8e2f-110000000001
+      title: NAS disk replacement
+      body: 'Immich and Jellyfin may be **unavailable**.'
+      kind: maintenance
+      startsAt: '2026-10-18T22:00:00.000Z'
+      endsAt: '2026-10-19T02:00:00.000Z'
+      apps:
+        - 6a7b8c9d-0e1f-4a20-8b31-ff0000000002
+        - 6a7b8c9d-0e1f-4a20-8b31-ff0000000004
+    - id: 9c8d7e6f-5a4b-4c3d-8e2f-110000000002
+      title: Power cut
+      body: Everything was down for an hour.
+      kind: incident
+      startsAt: '2026-09-01T10:00:00.000Z'
+      endsAt: '2026-09-01T11:00:00.000Z'
+      apps: []
+  feeds:
+    - id: feed
+      enabled: true
+      urls:
+        - 'https://www.theregister.com/headlines.atom'
+      count: 6
+      title: The Register
+      summaries: false
+    - id: f-homelab
+      enabled: true
+      urls:
+        - 'https://www.reddit.com/r/homelab/.rss'
+      count: 8
+      title: r/homelab
+      summaries: true
+    - id: f-blogs
+      enabled: true
+      urls:
+        - 'https://jvns.ca/atom.xml'
+        - 'https://simonwillison.net/atom/everything/'
+      count: 12
+      title: Blogs
+      summaries: true
+  countdown:
+    title: Countdown
+    items:
+      - label: Christmas
+        date: '2026-12-25'
+      - label: Warranty ends
+        date: '2027-03-01'
+  worldClocks:
+    title: World clocks
+    items:
+      - label: Home
+        timeZone: Europe/London
+      - label: Mum
+        timeZone: Australia/Perth
+  systemStats:
+    title: Server
+    disks:
+      - label: Pool
+        path: /mnt/pool
+      - label: Scratch
+        path: /mnt/scratch
+  integrations:
+    qbittorrent:
+      enabled: true
+      url: 'http://qbit.lan:8080'
+      username: admin
+      password: fake-pass
+      allowInsecureTls: false
+      allowActions: true
+    sonarr:
+      enabled: true
+      url: 'http://sonarr.lan:8989'
+      apiKey: fake-sonarr-key
+      allowInsecureTls: false
+      allowActions: false
+    radarr:
+      enabled: true
+      url: 'http://radarr.lan:7878'
+      apiKey: fake-radarr-key
+      allowInsecureTls: false
+      allowActions: false
+    adguard:
+      enabled: true
+      url: 'http://adguard.lan:3000'
+      username: admin
+      password: fake-pass
+      allowInsecureTls: false
+      allowActions: false
+    tautulli:
+      enabled: true
+      url: 'http://tautulli.lan:8181'
+      apiKey: fake-tautulli-key
+      allowInsecureTls: false
+      allowActions: false
+    seerr:
+      enabled: true
+      url: 'http://seerr.lan:5055'
+      apiKey: fake-seerr-key
+      allowInsecureTls: false
+      allowActions: true
+    portainer:
+      enabled: true
+      url: 'https://portainer.lan:9443'
+      apiKey: fake-portainer-key
+      allowInsecureTls: true
+      allowActions: true
+    truenas:
+      enabled: true
+      url: 'https://truenas.lan'
+      apiKey: fake-truenas-key
+      allowInsecureTls: true
+      allowActions: false
+    unifi:
+      enabled: true
+      url: 'https://unifi.lan'
+      username: readonly
+      password: fake-pass
+      allowInsecureTls: true
+      allowActions: false
+  webhooks:
+    enabled: true
+    sonarr:
+      enabled: true
+      token: fake-sonarr-hook-token
+    radarr:
+      enabled: false
+      token: fake-radarr-hook-token
+    seerr:
+      enabled: true
+      token: fake-seerr-hook-token
+  components:
+    greeting: true
+    clock: true
+    search: true
+    apps: true
+    bookmarks: true
+    favorites: true
+    settingsButton: false
+  layout:
+    columns: 24
+    scale: 90
+    gap: 24
+    topGap: 40
+    sections:
+      - { id: greeting, span: 16 }
+      - { id: headerCard, span: 8, hidden: false }
+      - { id: clock, span: 8, hidden: true }
+      - { id: weather, span: 8, hidden: true }
+      - { id: status, span: 8, hidden: true }
+      - { id: search, span: 24, hidden: false, hideLabel: true }
+      - { id: favorites, span: 24, hidden: false, cards: 4 }
+      - { id: apps, span: 24, hidden: false, cards: 4 }
+      - { id: feed, instanceId: feed, span: 8, hidden: false, height: 360 }
+      - { id: feed, instanceId: f-homelab, span: 8, hidden: false, height: 360 }
+      - { id: feed, instanceId: f-blogs, span: 8, hidden: true }
+      - { id: calendar, span: 12, hidden: false }
+      - { id: notes, span: 12, hidden: false, space: { top: 8, right: 8, bottom: 8, left: 8 } }
+      - { id: countdown, span: 6, hidden: false }
+      - { id: worldClocks, span: 6, hidden: false }
+      - { id: systemStats, span: 12, hidden: false, height: 240 }
+      - { id: bookmarks, span: 24, hidden: false, cards: 3 }
+apps:
+  - id: 6a7b8c9d-0e1f-4a20-8b31-ff0000000001
+    name: Home Assistant
+    subtitle: House
+    url: 'https://ha.lan:8123'
+    icon: home-assistant
+    checkType: json
+    jsonQuery: '$.message == "API running."'
+    certWarnDays: 21
+    interval: 1
+    timeout: 10
+    retries: 2
+  - id: 6a7b8c9d-0e1f-4a20-8b31-ff0000000002
+    name: Immich
+    subtitle: Photos
+    url: 'http://immich.lan:2283'
+    icon: immich
+    expectStatus: 200-299
+    checkType: http
+  - id: 6a7b8c9d-0e1f-4a20-8b31-ff0000000003
+    name: Backups
+    subtitle: restic heartbeat
+    url: 'http://nas.lan:5000'
+    icon: synology
+    checkType: push
+    pushToken: fake-push-token-0001
+    interval: 60
+    private: true
+  - id: 6a7b8c9d-0e1f-4a20-8b31-ff0000000004
+    name: Jellyfin
+    url: 'https://jellyfin.example.com'
+    icon: jellyfin
+    checkType: tls
+    certWarnDays: 14
+  - id: 6a7b8c9d-0e1f-4a20-8b31-ff0000000005
+    name: Printer
+    subtitle: CUPS
+    url: 'http://printer.lan:631'
+    icon: cups
+    checkType: tcp
+    port: 631
+    monitor: false
+  - id: 6a7b8c9d-0e1f-4a20-8b31-ff0000000006
+    name: Grafana
+    url: 'http://grafana.lan:3000'
+    icon: grafana
+    checkType: keyword
+    keyword: Grafana
+    private: true
+bookmarks:
+  - id: 3e4f5a6b-7c8d-4e9f-a0b1-220000000001
+    category: Daily
+    name: BBC News
+    url: 'https://www.bbc.co.uk/news'
+    icon: youtube
+  - id: 3e4f5a6b-7c8d-4e9f-a0b1-220000000002
+    category: Daily
+    name: Gmail
+    url: 'https://mail.google.com'
+    icon: gmail
+    private: true
+  - id: 3e4f5a6b-7c8d-4e9f-a0b1-220000000003
+    category: Homelab
+    name: Awesome Selfhosted
+    url: 'https://awesome-selfhosted.net'
+  - id: 3e4f5a6b-7c8d-4e9f-a0b1-220000000004
+    category: Homelab
+    name: Dashboard icons
+    url: 'https://github.com/homarr-labs/dashboard-icons'
+    icon: github
+  - id: 3e4f5a6b-7c8d-4e9f-a0b1-220000000005
+    category: Shopping
+    name: eBay
+    url: 'https://www.ebay.co.uk'
+    icon: ebay
+themes: []
+auth:
+  passwordHash: fakehash2222222222222222222222222222222222222222222222222222222222
+  passwordSalt: fakesalt22222222222222222222222
+  totp:
+    enabled: false
+    secret: ''
+    pendingSecret: ''
+    recoveryCodes: []

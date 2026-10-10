@@ -9,6 +9,7 @@ import * as YAML from "js-yaml";
 import { migrateConfig } from "../config-migrate";
 import { updateYamlText } from "../config-yaml";
 import { log, errorReason } from "../log";
+import { recordUpgrade } from "./upgrade";
 import { globalSingleton } from "../singleton";
 import { CONFIG_SCHEMA_VERSION, configSchema, configReadSchema, type Config } from "../schema";
 
@@ -156,9 +157,13 @@ function persistShapeMigration(): Promise<void> {
       // Re-read inside the queue: a write that landed since detection has
       // already normalized the file, making this a no-op.
       const raw = await fs.readFile(CONFIG_PATH, "utf8");
-      const { value, changed } = migrateConfig(parseConfigYaml(raw));
+      const before = parseConfigYaml(raw);
+      const { value, changed } = migrateConfig(before);
       if (!changed) return;
       await writeFileAtomic(CONFIG_BAK, raw);
+      // Out of 2.x (#306): the write-once rollback copy, a summary line, the
+      // admin's notice.
+      await recordUpgrade(raw, before, value);
       await writeFileAtomic(
         CONFIG_PATH,
         updateYamlText(raw, value, parseConfigYaml, parseConfigYaml(raw)) ?? dump(value)
@@ -249,7 +254,11 @@ export async function mutate<T>(fn: (config: Config) => T): Promise<T> {
     // A mutation can be the first operation on a legacy file (a direct API
     // write before any page read triggered persistShapeMigration), so the
     // backup can't be left only to the read path.
-    if (changed) await writeFileAtomic(CONFIG_BAK, raw);
+    if (changed) {
+      await writeFileAtomic(CONFIG_BAK, raw);
+      const original = parseConfigYaml(raw);
+      await recordUpgrade(raw, original, migrateConfig(original).value);
+    }
     const before = structuredClone(config);
     const out = fn(config);
     await writeConfig(config, { raw, config: before });

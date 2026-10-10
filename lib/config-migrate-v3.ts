@@ -249,8 +249,8 @@ const groupsStep: Step = (raw) => {
         if (!isRecord(board) || !isRecord(board.layout) || !Array.isArray(board.layout.sections)) return board;
         const sections = board.layout.sections.flatMap((row) => {
           if (!isRecord(row) || typeof row.widget !== "string" || !twin.has(row.widget)) return [row];
-          const { span, hidden, cards } = row;
-          return [row, { widget: twin.get(row.widget), span, hidden, ...(cards !== undefined ? { cards } : {}) }];
+          // The twin sits right after it, sized and spaced the same.
+          return [row, { ...row, widget: twin.get(row.widget) }];
         });
         return { ...board, layout: { ...board.layout, sections } };
       });
@@ -290,7 +290,9 @@ const integrationsStep: Step = (raw) => {
     const cfg = old[type];
     if (!isRecord(cfg)) return [];
     const setUp = cfg.enabled === true || (typeof cfg.url === "string" && cfg.url.trim() !== "");
-    return setUp ? [{ ...cfg, id: type, type }] : [];
+    // `enabled` is written out: 2.x read a missing one as off, 3.0 as on, so a
+    // hand-edited entry with a URL but no switch would otherwise turn on.
+    return setUp ? [{ ...cfg, id: type, type, enabled: cfg.enabled === true }] : [];
   });
   delete settings.integrations;
   return { value: { ...raw, settings, integrations }, changed: true };
@@ -319,15 +321,23 @@ const instancesStep: Step = (raw) => {
     });
 
   const content = (key: string) => (isRecord(settings[key]) ? settings[key] : {});
+  // A feed card's or the calendar's own on/off switch is gone in v3 (it hides
+  // the row instead, below), so it isn't carried into the instance.
+  const withoutSwitch = (o: Record<string, unknown>) => {
+    const rest = { ...o };
+    delete rest.enabled;
+    return rest;
+  };
   const instances: Record<string, unknown>[] = [];
   for (const def of V2_WIDGETS) {
     if (def.id === "feed") {
-      instances.push(...feeds);
+      instances.push(...feeds.map(withoutSwitch));
     } else if (def.id === "headerCard") {
       const showClock = components.clock;
       instances.push({ id: def.id, type: def.id, ...(typeof showClock === "boolean" ? { showClock } : {}) });
     } else if (["calendar", "notes", "countdown", "worldClocks", "systemStats"].includes(def.id)) {
-      instances.push({ ...content(def.id), id: def.id, type: def.id });
+      const own = def.id === "calendar" ? withoutSwitch(content(def.id)) : content(def.id);
+      instances.push({ ...own, id: def.id, type: def.id });
     } else {
       instances.push({ id: def.id, type: def.id });
     }
