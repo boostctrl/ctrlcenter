@@ -41,6 +41,12 @@ here.
   and the old `CTRLCENTER_SONARR_KEY`-style variables keep working for them.
   (#300)
 
+- **Integration tiles on boards (3.0).** Any service from Settings →
+  Integrations can sit on a board as a tile, the same one the Monitor page
+  shows (Settings → Widgets → Integration tiles). Tiles are yours alone
+  unless you set one to Everyone, and then visitors see only counts and
+  states — never names, titles, hosts, users or error messages. (#301)
+
 ### Changed
 
 - **Every widget can appear any number of times (3.0).** Each widget on the

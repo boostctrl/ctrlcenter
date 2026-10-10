@@ -35,6 +35,7 @@ import { appMatches, groupBookmarks, type BookmarkGroupView } from "@/lib/groups
 import type { LayoutWidget, WidgetType } from "@/lib/layout";
 import type { AppItem, InstanceOf } from "@/lib/schema";
 import type { HomeData } from "@/lib/widgets/data";
+import Complication from "@/components/monitor/Complication";
 
 // What a renderer can read: the server-built data, plus Dashboard's live
 // state (edit mode, the search box and what it currently matches).
@@ -211,6 +212,17 @@ export const WIDGET_RENDERERS: Record<WidgetType, Renderer> = {
     return w && stats ? (
       <SystemStatsWidget title={w.title} stats={stats} showTitle={!widget.hideLabel} />
     ) : null;
+  },
+
+  // An integration's tile (#301), built on the server (lib/widgets/
+  // integration-tiles.ts): the same Complication the Monitor face shows,
+  // filling its cell. Nothing when there's no tile (none picked, or a guest
+  // and the tile is admin-only).
+  integration: (widget, { data }) => {
+    const tile = data.integrationTiles[widget.id];
+    if (!tile) return null;
+    const { label, ...content } = tile;
+    return <Complication label={label} fill {...content} />;
   },
 
   favorites: (widget, { q, editing, favoriteApps }) =>

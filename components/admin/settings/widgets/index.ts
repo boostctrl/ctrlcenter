@@ -23,6 +23,7 @@ import WorldClocksSettings from "./WorldClocksSettings";
 import SystemStatsSettings from "./SystemStatsSettings";
 import AppsSettings from "./AppsSettings";
 import BookmarksSettings from "./BookmarksSettings";
+import IntegrationTileSettings from "./IntegrationTileSettings";
 
 export const SITE_SETTINGS: ComponentType<{ d: SettingsDraft }>[] = [SearchSettings, WeatherSettings];
 
@@ -36,6 +37,8 @@ export type InstanceEditorProps<T extends WidgetType> = {
   // The groups and app tags, for the apps and bookmarks filters (#299).
   groups: Group[];
   tags: string[];
+  // The integrations, for the integration tiles (#301).
+  integrations: { id: string; label: string }[];
 };
 
 export type InstanceGroup = {
@@ -82,6 +85,14 @@ export const INSTANCE_GROUPS: InstanceGroup[] = [
       "The latest entries from one or more RSS, Atom, or JSON feeds, merged newest-first. Fetched server-side and cached for a few minutes.",
     add: "+ Add feed card",
     Editor: FeedSettings,
+  }),
+  group({
+    type: "integration",
+    title: "Integration tiles",
+    intro:
+      "A service from Settings → Integrations as a tile on a board — the same one the Monitor shows. Only you see it unless you set it to everyone, who get counts and states only.",
+    add: "+ Add integration tile",
+    Editor: IntegrationTileSettings,
   }),
   group({
     type: "notes",

@@ -20,7 +20,9 @@ describe("widget registry", () => {
   });
 
   it("has an instance schema for every widget type, and no other (#297)", () => {
-    expect(DEFAULT_INSTANCES.map((w) => w.type)).toEqual([...WIDGET_IDS]);
+    // One stock instance per type, but the types a config has to set up
+    // first (an integration tile, #301).
+    expect(DEFAULT_INSTANCES.map((w) => w.type)).toEqual(WIDGET_IDS.filter((id) => id !== "integration"));
     for (const type of WIDGET_IDS) {
       expect(widgetInstanceSchema.safeParse({ id: "x", type }).success, type).toBe(true);
     }

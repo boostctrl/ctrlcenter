@@ -14,7 +14,8 @@ import { fetchFeeds } from "../feed";
 import { fetchWeather } from "../weather";
 import { collectSystemStats, type SystemStats } from "../system-stats";
 import { greetingFor, hourIn, shortDate } from "../datetime";
-import { getCalendarAuth } from "../config";
+import { getCalendarAuth, getSiteConfig } from "../config";
+import { integrationTiles } from "./integration-tiles";
 import {
   feedUrls,
   monitoredApps,
@@ -135,6 +136,21 @@ const LOADERS: Loader[] = [
     );
     return { systemStats };
   },
+
+  // Integration tiles (#301): admin-only ones only for the admin. The
+  // integrations' credentials come from the server-side config; the public
+  // config the page renders from carries none.
+  async (ctx) => {
+    const widgets = shownOf(ctx, "integration");
+    if (widgets.length === 0) return {};
+    const { integrations } = await getSiteConfig();
+    return {
+      integrationTiles: await integrationTiles(widgets, integrations, {
+        isAdmin: ctx.isAdmin,
+        now: ctx.now.getTime(),
+      }),
+    };
+  },
 ];
 
 export async function loadHomeData(ctx: LoadContext): Promise<HomeData> {
@@ -159,6 +175,7 @@ export async function loadHomeData(ctx: LoadContext): Promise<HomeData> {
     labels: instanceLabels(instances),
     nodes: {},
     systemStats: {},
+    integrationTiles: {},
   };
   const parts = await Promise.all(LOADERS.map((load) => load(ctx)));
   // Merge, combining the per-instance maps rather than letting one loader's
@@ -169,5 +186,7 @@ export async function loadHomeData(ctx: LoadContext): Promise<HomeData> {
     if (nodes) Object.assign(base.nodes, nodes);
     if (systemStats) Object.assign(base.systemStats, systemStats);
   }
+  // An integration tile goes by its integration's name in the editor.
+  for (const [id, tile] of Object.entries(base.integrationTiles)) base.labels[id] = tile.label;
   return base;
 }

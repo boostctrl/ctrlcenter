@@ -7,8 +7,8 @@ import { MONITOR_GROUPS, SERVICE_IDS, SERVICE_META, type ServiceId } from "@/lib
 import PageNav from "@/components/PageNav";
 import SystemHealthBar from "./SystemHealthBar";
 import Complication from "./Complication";
-import { serviceState, sinceLabel, type ServiceState } from "./MonitorCard";
-import { GLANCES, type Glance, type GlanceVisual } from "./glances";
+import { sinceLabel, type ServiceState } from "./MonitorCard";
+import { tileContent, type GlanceVisual } from "./glances";
 import { settingsCardId } from "@/lib/nav";
 import { usePolling } from "@/components/usePolling";
 import { useNow } from "@/components/useNow";
@@ -41,40 +41,16 @@ type ComplicationProps = {
   visual?: GlanceVisual;
 };
 
-// A type's glance from an entry's data. The entry's type and data are
-// correlated by construction; the cast restores what the union loses.
-function glanceFor(entry: MonitorEntry, now: number | null): Glance {
-  const extract = GLANCES[entry.type] as (data: unknown, now: number | null) => Glance;
-  return extract(entry.data, now);
-}
-
-// One integration's complication content from its status. The three non-data
-// states get standardized gauge dials; live/stale defer to the type's glance
-// extractor. `now` (null until mounted) drives relative dates.
+// One integration's complication: the shared tile content (the board tiles
+// use the same, #301) plus where it links. `now` (null until mounted)
+// drives relative dates.
 function complicationFor(entry: MonitorEntry, now: number | null): ComplicationProps {
-  const state = serviceState(entry);
-  const detail = `/admin/monitor/${encodeURIComponent(entry.id)}`;
-  if (state === "disabled")
-    return { state, href: settingsLink(entry.label), center: "Off", caption: "", lines: ["Turned off"] };
-  if (state === "unconfigured")
-    return {
-      state,
-      href: settingsLink(entry.label),
-      center: "+",
-      caption: "set up",
-      lines: ["Not connected"],
-    };
-  if (state === "unreachable")
-    return {
-      state,
-      href: detail,
-      center: "!",
-      caption: "offline",
-      alert: true,
-      lines: [entry.error ?? "Can’t reach"],
-    };
-  // live / stale: data is present, so the glance extractor can read it.
-  return { state, href: detail, ...glanceFor(entry, now) };
+  const content = tileContent(entry, now, "admin");
+  const offOrNew = content.state === "disabled" || content.state === "unconfigured";
+  return {
+    ...content,
+    href: offOrNew ? settingsLink(entry.label) : `/admin/monitor/${encodeURIComponent(entry.id)}`,
+  };
 }
 
 // A type nobody has set up keeps a dimmed slot in its cluster.

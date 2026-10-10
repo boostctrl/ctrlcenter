@@ -4,7 +4,6 @@ import Link from "next/link";
 import { createContext, useContext, type ReactNode } from "react";
 import type { ServiceStatus } from "@/lib/monitor";
 import { buttonClasses } from "@/lib/buttons";
-import { formatBytes } from "@/components/widgets/SystemStatsWidget";
 import { settingsCardId } from "@/lib/nav";
 
 // Set on a service's detail page (#208), where the page's own <h1> already names
@@ -27,25 +26,8 @@ export const InDetailContext = createContext(false);
 //   unreachable  — configured but never answered (calm offline, not a red mess)
 //   disabled     — has a URL but the enable toggle is off (off, not broken)
 //   unconfigured — no URL yet (an inviting onboarding tile)
-export type ServiceState =
-  | "live"
-  | "stale"
-  | "unreachable"
-  | "disabled"
-  | "unconfigured";
-
-export function serviceState(
-  status: Pick<
-    ServiceStatus<unknown>,
-    "configured" | "enabled" | "urlSet" | "data" | "error"
-  >
-): ServiceState {
-  if (status.data) return status.error ? "stale" : "live";
-  if (status.configured) return "unreachable";
-  // Not configured: a URL with the toggle off is a deliberate "off"; no URL is
-  // simply not set up yet (this also folds in enabled-but-URL-blank half-setups).
-  return status.urlSet && !status.enabled ? "disabled" : "unconfigured";
-}
+export { serviceState, type ServiceState } from "@/lib/monitor-state";
+import { serviceState, type ServiceState } from "@/lib/monitor-state";
 
 // Whether a state shows the card's own live content vs. a placeholder body.
 function hasData(state: ServiceState): boolean {
@@ -228,10 +210,8 @@ export default function MonitorCard({
   );
 }
 
-// "1.2 MB/s" — rides the system-stats byte formatting so figures match.
-export function formatSpeed(bytesPerSecond: number): string {
-  return `${formatBytes(bytesPerSecond)}/s`;
-}
+// Number formatting lives in lib/format.ts (shared with server-built tiles).
+export { formatSpeed, formatEta } from "@/lib/format";
 
 // Compact "time since" for the freshness reads shared by the cockpit header and
 // the detail masthead — how long ago the shown data last came back. Under five
@@ -245,16 +225,6 @@ export function sinceLabel(ms: number): string {
   return `${Math.round(mins / 60)}h ago`;
 }
 
-// Compact remaining time: "1h 20m", "12m", "45s".
-export function formatEta(seconds: number): string {
-  if (seconds >= 3600) {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    return m > 0 ? `${h}h ${m}m` : `${h}h`;
-  }
-  if (seconds >= 60) return `${Math.floor(seconds / 60)}m`;
-  return `${Math.floor(seconds)}s`;
-}
 
 // The thin accent progress bar, shared with the home grid's widgets — one
 // definition (SystemStatsWidget's), re-exported for the monitor cards.

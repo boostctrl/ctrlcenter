@@ -1,20 +1,21 @@
 import { describe, it, expect } from "vitest";
-import { resolveLayout, toSections, fillSpan, WIDGET_TYPES, DEFAULT_SECTIONS } from "./layout";
+import { resolveLayout, toSections, fillSpan, DEFAULT_SECTIONS } from "./layout";
 import {
   settingsSchema,
   configSchema,
   layoutSchema,
   boardLayoutSchema,
   boardLayoutUpdateSchema,
+  DEFAULT_INSTANCES,
 } from "./schema";
 
 // Instances named after their type, as a fresh config has.
-const STOCK = WIDGET_TYPES.map((type) => ({ id: type as string, type }));
+const STOCK = DEFAULT_INSTANCES.map(({ id, type }) => ({ id, type }));
 
 describe("resolveLayout (#297)", () => {
   it("gives the stock arrangement for the stock rows and instances", () => {
     const out = resolveLayout(DEFAULT_SECTIONS, STOCK);
-    expect(out.map((w) => w.id)).toEqual([...WIDGET_TYPES]);
+    expect(out.map((w) => w.id)).toEqual(STOCK.map((w) => w.id));
     expect(out.find((w) => w.id === "notes")).toEqual({ id: "notes", type: "notes", span: 8, hidden: true });
   });
 
@@ -188,7 +189,7 @@ describe("layout schema", () => {
     expect(parsed.sections).toEqual([{ widget: "apps", span: 6 }]);
     // The resolver then adds every unplaced instance around what survived.
     const resolved = resolveLayout(parsed.sections, STOCK);
-    expect(resolved.map((w) => w.id).sort()).toEqual([...WIDGET_TYPES].sort());
+    expect(resolved.map((w) => w.id).sort()).toEqual(STOCK.map((w) => w.id).sort());
   });
 
   it("boardLayoutUpdateSchema bounds every row value and the page-level ones", () => {

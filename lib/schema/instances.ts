@@ -6,6 +6,7 @@
 // shape of each type's content.
 import { z } from "zod";
 import { lenientArray } from "./shared";
+import { WIDGET_DEFS, type WidgetDef } from "../widgets/defs";
 import { wholeOf } from "./input";
 import {
   calendarSchema,
@@ -53,6 +54,17 @@ const bookmarksContent = {
     .default({ group: "" }),
 };
 
+// An integration tile (#301): which integration (an id from the top-level
+// `integrations`), the view (the glance tile; type-specific views can join
+// the enum later), and who sees it. Admin-only unless set to public, and a
+// public tile shows only the type's public view (counts and states).
+export const INTEGRATION_WIDGET_VISIBILITIES = ["admin", "public"] as const;
+const integrationContent = {
+  integration: z.string().max(64).catch("").default(""),
+  view: z.enum(["glance"]).catch("glance").default("glance"),
+  visibility: z.enum(INTEGRATION_WIDGET_VISIBILITIES).catch("admin").default("admin"),
+};
+
 // The header card's own switch for its date/time row (was the site-wide
 // `settings.components.clock` before 3.0).
 const headerCardContent = { showClock: z.boolean().catch(true).default(true) };
@@ -70,6 +82,7 @@ export const widgetInstanceSchema = z.discriminatedUnion("type", [
   z.object({ ...base, type: z.literal("countdown"), ...countdownSchema.shape }),
   z.object({ ...base, type: z.literal("worldClocks"), ...worldClocksSchema.shape }),
   z.object({ ...base, type: z.literal("systemStats"), ...systemStatsSchema.shape }),
+  z.object({ ...base, type: z.literal("integration"), ...integrationContent }),
   z.object({ ...base, type: z.literal("favorites") }),
   z.object({ ...base, type: z.literal("apps"), ...appsContent }),
   z.object({ ...base, type: z.literal("bookmarks"), ...bookmarksContent }),
@@ -83,27 +96,12 @@ export function newInstance<T extends WidgetInstanceType>(type: T, id: string): 
   return widgetInstanceSchema.parse({ id, type }) as InstanceOf<T>;
 }
 
-// The stock set: one instance of every type, its id the type name, which is
-// what a v2 config migrates to as well (lib/config-migrate.ts).
-export const DEFAULT_INSTANCES: WidgetInstance[] = (
-  [
-    "greeting",
-    "headerCard",
-    "clock",
-    "weather",
-    "status",
-    "search",
-    "calendar",
-    "notes",
-    "feed",
-    "countdown",
-    "worldClocks",
-    "systemStats",
-    "favorites",
-    "apps",
-    "bookmarks",
-  ] as const
-).map((type) => newInstance(type, type));
+// The stock set: one instance of every type (but those marked noStock), its
+// id the type name, in registry order — what a v2 config migrates to as well
+// (lib/config-migrate-v3.ts).
+export const DEFAULT_INSTANCES: WidgetInstance[] = (WIDGET_DEFS as readonly WidgetDef[])
+  .filter((d) => !d.noStock)
+  .map((d) => newInstance(d.id as WidgetInstanceType, d.id));
 
 // Stored leniently: an instance of an unknown type, or one that won't parse,
 // is dropped rather than failing the whole config.

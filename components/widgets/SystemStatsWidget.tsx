@@ -10,19 +10,9 @@ import type { SystemStats } from "@/lib/system-stats";
 // the expectation-setting #153's design demands: a container without host
 // mounts genuinely cannot see the host, and the card must not imply it does.
 
-// "3.2 GB of 16 GB" style figures. Binary units (GiB semantics) shown with the
-// everyday labels, one decimal under 10.
-export function formatBytes(bytes: number): string {
-  const units = ["B", "KB", "MB", "GB", "TB", "PB"];
-  let value = bytes;
-  let u = 0;
-  while (value >= 1024 && u < units.length - 1) {
-    value /= 1024;
-    u++;
-  }
-  const rounded = value >= 10 || u === 0 ? Math.round(value) : value.toFixed(1);
-  return `${rounded} ${units[u]}`;
-}
+// Shared with the Monitor cards (lib/format.ts), so the figures match.
+export { formatBytes } from "@/lib/format";
+import { formatBytes } from "@/lib/format";
 
 // Exported for the Monitor cards (components/monitor/*), which show the same
 // thin accent bar — one definition so the figures and the bars match (#212).

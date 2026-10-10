@@ -9,6 +9,7 @@ import { readPublicConfig } from "@/lib/api-auth";
 import { navPages, pickBoard } from "@/lib/nav";
 import { boardName, monitoredApps } from "@/lib/schema";
 import { loadHomeData } from "@/lib/widgets/load";
+import { shownToGuests } from "@/lib/widgets/integration-tiles";
 
 // One board, server-rendered (#298): the home page (`boardId` null, the first
 // board this visitor can open) or /b/<id>. A private board is a 404 for
@@ -41,11 +42,19 @@ export default async function BoardPage({
   // on show: the hidden rows, and the instances behind them (a notes card
   // placed only on a private board, say), never reach the page.
   const resolved = resolveLayout(board.layout.sections, config.widgets);
-  // An apps widget showing only private apps (#299) has nothing for a guest.
-  const privateOnly = new Set(
-    config.widgets.filter((w) => w.type === "apps" && w.filter.private === "only").map((w) => w.id)
+  // Never for a guest: an apps widget showing only private apps (#299) has
+  // nothing for them, and an integration tile is admin-only unless set to
+  // "Everyone" (#301).
+  const adminOnly = new Set(
+    config.widgets
+      .filter(
+        (w) =>
+          (w.type === "apps" && w.filter.private === "only") ||
+          (w.type === "integration" && !shownToGuests(w))
+      )
+      .map((w) => w.id)
   );
-  const widgets = isAdmin ? resolved : resolved.filter((w) => !w.hidden && !privateOnly.has(w.id));
+  const widgets = isAdmin ? resolved : resolved.filter((w) => !w.hidden && !adminOnly.has(w.id));
   const onShow = new Set(widgets.map((w) => w.id));
   const data = await loadHomeData({
     settings,

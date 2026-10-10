@@ -114,7 +114,9 @@ export function defaultSpanFor(type: WidgetType): number {
 // The stock arrangement, over the stock instances (one per type, each named
 // after its type): greeting beside the header card up top, the body widgets
 // full-width below, the optional ones hidden. Registry order and defaults.
-export const DEFAULT_SECTIONS: LayoutSectionRow[] = WIDGET_DEFS.map((d: WidgetDef) => ({
+export const DEFAULT_SECTIONS: LayoutSectionRow[] = (WIDGET_DEFS as readonly WidgetDef[])
+  .filter((d) => !d.noStock)
+  .map((d: WidgetDef) => ({
   widget: d.id,
   span: d.span,
   hidden: d.hidden,

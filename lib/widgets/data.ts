@@ -7,6 +7,7 @@ import type { AppItem, BookmarkItem, Group, WidgetInstance } from "../schema";
 import type { SearchConfig } from "../search";
 import type { CurrentWeather } from "../weather";
 import type { SystemStats } from "../system-stats";
+import type { IntegrationTile } from "./integration-tiles";
 
 export type HomeData = {
   apps: AppItem[];
@@ -36,4 +37,7 @@ export type HomeData = {
   // System Stats snapshots by instance id; null when collection was skipped
   // (hidden for a guest) or failed.
   systemStats: Record<string, SystemStats | null>;
+  // Integration tiles by instance id (#301), built on the server: only the
+  // tile's content, never the service's snapshot. Missing = nothing to show.
+  integrationTiles: Record<string, IntegrationTile>;
 };

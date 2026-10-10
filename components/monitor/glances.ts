@@ -8,8 +8,9 @@
 
 import type { ServiceId } from "@/lib/services/ids";
 import type { ServiceSnapshotMap } from "@/lib/services/registry";
-import { formatSpeed, formatEta } from "./MonitorCard";
-import { formatBytes } from "@/components/widgets/SystemStatsWidget";
+import type { MonitorEntry } from "@/lib/monitor";
+import { serviceState, type ServiceState } from "@/lib/monitor-state";
+import { formatBytes, formatEta, formatSpeed } from "@/lib/format";
 
 // A service's tile visual — chosen so it always means something:
 //   spark    — a line sparkline over a per-unit series (AdGuard query volume)
@@ -286,3 +287,165 @@ function arrGlance(d: ServiceSnapshotMap["sonarr"], now: number | null): Glance 
     visual,
   };
 }
+
+// --- Public views (#301) -----------------------------------------------------
+//
+// What a board tile set to "Everyone" shows. Each type spells out its public
+// view here, built only from counts, ratios and states: never a hostname, a
+// file or torrent name, a title, a user or requester name, a domain, an ISP or
+// an error message. The admin glances above stay admin-only (the Monitor, and
+// board tiles left at "Only me"). lib/widgets/integration-tiles.test.ts holds
+// every type to this with snapshots full of identifying strings.
+
+const days7 = (d: ServiceSnapshotMap["sonarr"], now: number | null): { thisWeek: number; values: number[] } => {
+  const values = Array<number>(7).fill(0);
+  let thisWeek = 0;
+  if (now != null) {
+    const today = startOfDay(now);
+    for (const it of d.recent) {
+      if (it.at == null) continue;
+      const back = Math.round((today - startOfDay(it.at)) / DAY);
+      if (back >= 0 && back < 7) {
+        values[6 - back] += 1;
+        thisWeek += 1;
+      }
+    }
+  }
+  return { thisWeek, values };
+};
+
+const arrPublic = (d: ServiceSnapshotMap["sonarr"], now: number | null): Glance => {
+  const { thisWeek, values } = days7(d, now);
+  return {
+    center: String(thisWeek),
+    caption: "this week",
+    alert: d.health.some((h) => h.type === "error"),
+    lines: [
+      `${thisWeek} grabbed or imported`,
+      d.upcoming.length > 0 ? plural(d.upcoming.length, "upcoming") : "Nothing upcoming",
+    ],
+    visual: { kind: "days", values },
+  };
+};
+
+export const PUBLIC_GLANCES: {
+  [K in ServiceId]: (data: ServiceSnapshotMap[K], now: number | null) => Glance;
+} = {
+  qbittorrent: (d) => {
+    const { total, downloading, seeding, paused } = d.counts;
+    if (total === 0) return { center: "0", caption: "torrents", lines: ["No torrents"] };
+    return {
+      center: String(downloading > 0 ? downloading : total),
+      caption: downloading > 0 ? "downloading" : "torrents",
+      ring: (downloading + seeding) / total,
+      lines: [`↓ ${formatSpeed(d.downSpeed)}  ↑ ${formatSpeed(d.upSpeed)}`, `${seeding} seeding · ${paused} paused`],
+    };
+  },
+  sonarr: arrPublic,
+  radarr: arrPublic,
+  seerr: (d) => ({
+    center: String(d.processing),
+    caption: "processing",
+    lines: [`${d.pending} pending`, `${d.totalRequests} total`],
+    visual: {
+      kind: "segments",
+      parts: [
+        { value: d.pending, tone: "pending" },
+        { value: d.processing, tone: "processing" },
+        { value: d.available, tone: "available" },
+      ],
+    },
+  }),
+  tautulli: (d) =>
+    d.streamCount === 0
+      ? { center: "0", caption: "streams", lines: ["Nothing playing"] }
+      : {
+          center: String(d.streamCount),
+          caption: "streams",
+          ring: d.transcodeCount / d.streamCount,
+          lines: [
+            `${plural(d.streamCount, "stream")} active`,
+            d.transcodeCount > 0 ? plural(d.transcodeCount, "transcode") : "Direct play",
+          ],
+        },
+  adguard: (d) => ({
+    center: `${(d.blockedRatio * 100).toFixed(0)}%`,
+    caption: "blocked",
+    ring: d.blockedRatio,
+    alert: !d.protectionEnabled,
+    lines: [
+      d.protectionEnabled ? `${compact(d.totalQueries)} queries` : "Protection off",
+      ...(d.avgProcessingMs != null ? [`${d.avgProcessingMs.toFixed(0)} ms avg`] : []),
+    ],
+    visual: d.series.length > 1 ? { kind: "spark", values: d.series } : undefined,
+  }),
+  unifi: (d) => {
+    const { total, wireless, wired } = d.clients;
+    return {
+      center: String(total),
+      caption: "clients",
+      ring: total > 0 ? wireless / total : undefined,
+      alert: !d.internet.up || d.devices.disconnected > 0,
+      lines: [
+        `${wireless} wifi · ${wired} wired`,
+        d.internet.up ? "Internet up" : "Internet down",
+        d.devices.disconnected > 0
+          ? `${plural(d.devices.disconnected, "device")} down`
+          : `${plural(d.devices.adopted, "device")} online`,
+      ],
+    };
+  },
+  truenas: (d) => {
+    const ratios = d.pools.map((p) => p.usedRatio ?? 0);
+    const fullest = ratios.length > 0 ? Math.max(...ratios) : null;
+    const running = d.apps.filter((a) => a.running).length;
+    return {
+      center: fullest != null ? `${Math.round(fullest * 100)}%` : String(d.pools.length),
+      caption: fullest != null ? "capacity" : "pools",
+      ring: fullest ?? undefined,
+      alert: (fullest ?? 0) >= 0.9 || d.alerts.some((a) => a.level === "critical"),
+      lines: [
+        plural(d.pools.length, "pool"),
+        ...(d.apps.length > 0 ? [`${running}/${d.apps.length} apps up`] : []),
+        ...(d.alerts.length > 0 ? [plural(d.alerts.length, "alert")] : []),
+      ],
+    };
+  },
+  portainer: (d) => {
+    const { running, stopped, unhealthy, total } = d.totals;
+    return {
+      center: String(running),
+      caption: "running",
+      ring: total > 0 ? running / total : undefined,
+      alert: unhealthy > 0,
+      lines: [stopped > 0 ? `${stopped} stopped` : `${total} total`, ...(unhealthy > 0 ? [`${unhealthy} unhealthy`] : [])],
+    };
+  },
+};
+
+// A tile's whole content: its state and glance, ready to render. Built on
+// the server for board tiles (#301), so a board never ships the snapshot.
+export type TileContent = Glance & { state: ServiceState };
+
+// One integration's tile for an audience: "admin" gets the Monitor's glance
+// (and an error message when it can't connect), "public" the type's public
+// view and nothing that came from the service itself when it fails.
+export function tileContent(entry: MonitorEntry, now: number | null, audience: "admin" | "public"): TileContent {
+  const state = serviceState(entry);
+  if (state === "disabled") return { state, center: "Off", caption: "", lines: ["Turned off"] };
+  if (state === "unconfigured") return { state, center: "+", caption: "set up", lines: ["Not connected"] };
+  if (state === "unreachable")
+    return {
+      state,
+      center: "!",
+      caption: "offline",
+      alert: true,
+      lines: [audience === "admin" ? (entry.error ?? "Can’t reach") : "Can’t reach"],
+    };
+  const table = (audience === "admin" ? GLANCES : PUBLIC_GLANCES)[entry.type] as (
+    data: unknown,
+    now: number | null
+  ) => Glance;
+  return { state, ...table(entry.data, now) };
+}
+

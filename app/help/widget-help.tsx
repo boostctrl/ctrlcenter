@@ -73,6 +73,28 @@ export const WIDGET_HELP: Partial<Record<WidgetType, { title: string; body: Reac
       </>
     ),
   },
+  integration: {
+    title: "Integration tiles",
+    body: (
+      <>
+        <P>
+          Put any service from <strong>Settings → Integrations</strong> on a
+          board as a tile — the same one the{" "}
+          <strong>Monitor</strong> page shows. Add one in{" "}
+          <strong>Settings → Widgets → Integration tiles</strong>, pick the
+          integration, then place it from the board&apos;s layout editor.
+        </P>
+        <P>
+          A tile is yours alone by default: signed-out visitors don&apos;t get
+          it at all, and for you it opens the integration&apos;s Monitor page.
+          Set it to <strong>Everyone</strong> and visitors see a reduced tile
+          made only of counts and states — torrents downloading, streams
+          playing, queries blocked — never a name, title, host, user or error
+          message.
+        </P>
+      </>
+    ),
+  },
   systemStats: {
     title: "System stats card",
     body: (

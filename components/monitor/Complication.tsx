@@ -17,6 +17,7 @@ export default function Complication({
   label,
   state,
   href,
+  fill = false,
   center,
   caption,
   ring,
@@ -26,7 +27,12 @@ export default function Complication({
 }: {
   label: string;
   state: ServiceState;
-  href: string;
+  // Where the tile leads; without one it's a plain tile (a public board tile,
+  // #301).
+  href?: string;
+  // Fill its container (a board's grid cell) instead of sizing itself for
+  // the Monitor face's flex rows.
+  fill?: boolean;
   center: string;
   caption: string;
   // 0..1 gauge fill; omitted → a plain number badge (no decorative ring).
@@ -43,18 +49,16 @@ export default function Complication({
   // of claiming an equal slot. It recedes through the surface (no fill, no
   // shadow, dashed edge) rather than whole-tile opacity, which dragged its text
   // down to ~1.6:1 contrast (#273).
-  const sizing = dim
-    ? "grow-0 basis-60"
-    : "grow basis-full sm:basis-[calc(50%-0.375rem)] lg:basis-[calc(33.333%-0.5rem)]";
-  return (
-    <Link
-      href={href}
-      className={`glass-card flex min-h-[7rem] items-center gap-4 p-4 ${sizing} ${
-        dim
-          ? "[--surface-bg:transparent] [--surface-border-style:dashed] [--surface-shadow:none]"
-          : ""
-      }`}
-    >
+  const sizing = fill
+    ? "w-full"
+    : dim
+      ? "grow-0 basis-60"
+      : "grow basis-full sm:basis-[calc(50%-0.375rem)] lg:basis-[calc(33.333%-0.5rem)]";
+  const className = `glass-card flex min-h-[7rem] items-center gap-4 p-4 ${sizing} ${
+    dim ? "[--surface-bg:transparent] [--surface-border-style:dashed] [--surface-shadow:none]" : ""
+  }`;
+  const body = (
+    <>
       {ring !== undefined ? (
         <Gauge state={state} center={center} caption={caption} ring={ring} alert={alert} />
       ) : (
@@ -83,7 +87,14 @@ export default function Complication({
         ))}
         {visual && <Visual visual={visual} />}
       </div>
+    </>
+  );
+  return href ? (
+    <Link href={href} className={className}>
+      {body}
     </Link>
+  ) : (
+    <div className={className}>{body}</div>
   );
 }
 

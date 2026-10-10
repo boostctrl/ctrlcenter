@@ -31,6 +31,9 @@ export type WidgetDef = {
   align?: string;
   // The edit-mode placeholder: why the cell is empty and where to fix it.
   empty: string | ((ctx: { statusEnabled: boolean }) => string);
+  // No stock instance: a fresh config doesn't get one, because it means
+  // nothing until the admin configures it (an integration tile, #301).
+  noStock?: true;
 };
 
 export const WIDGET_DEFS = [
@@ -141,6 +144,18 @@ export const WIDGET_DEFS = [
     titled: true,
     sized: true,
     empty: "System stats couldn't be read on this server — check the server logs.",
+  },
+  // A service from Settings → Integrations as a tile, the same one the
+  // Monitor shows (#301). No stock instance: the admin adds one per
+  // integration they want on a board.
+  {
+    id: "integration",
+    label: "Integration",
+    span: 8,
+    hidden: true,
+    noStock: true,
+    empty:
+      "No integration picked, or it's off — choose one in admin Settings → Widgets → Integrations, and set it up under Settings → Integrations.",
   },
   {
     id: "favorites",

@@ -4,6 +4,7 @@ import { MAX_FEED_CARDS, type Group } from "@/lib/schema";
 import { useFeedHealth } from "../FeedHealth";
 import { AddButton, Card, Hint, RemoveButton, Switch, fieldLabelClasses, subCardClasses } from "../ui";
 import { INSTANCE_GROUPS, SITE_SETTINGS } from "./widgets";
+import { integrationLabels } from "@/lib/services/ids";
 import type { SettingsDraft } from "./useSettingsDraft";
 
 // The Widgets tab (#285): the site settings some widgets read, then every
@@ -24,6 +25,8 @@ export default function WidgetsSection({
   // Health covers every URL the home page has fetched; each feed reads its own
   // rows out of it. Polls while any feed card exists.
   const feedHealth = useFeedHealth(instancesOf("feed").length > 0);
+  const labels = integrationLabels(d.integrations);
+  const integrationOptions = d.integrations.map((i) => ({ id: i.id, label: labels[i.id] }));
   return (
     <>
       {SITE_SETTINGS.map((Settings, i) => (
@@ -61,6 +64,7 @@ export default function WidgetsSection({
                       feedHealth={feedHealth}
                       groups={groups}
                       tags={tags}
+                      integrations={integrationOptions}
                     />
                   </div>
                 );

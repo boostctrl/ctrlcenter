@@ -75,6 +75,9 @@ const server = spawn(process.execPath, [path.join(STANDALONE, "server-entry.mjs"
 });
 
 const failures = [];
+// The smoke integrations' URL (set by addBoards): it must never reach a
+// signed-out page.
+let integrationUrl = "";
 let browser;
 // The status phase's local TLS target (see startTlsServer).
 let tlsServer;
@@ -118,6 +121,11 @@ try {
     // Admin pages bounce a signed-out visitor to the login form, and a
     // private board is a plain 404 (#298).
     if (scheme === "light") {
+      const media = await (await fetch(`${base}/b/media`)).text();
+      if (!media.includes("Sonarr 4K")) failures.push("/b/media: the public integration tile is missing");
+      if (integrationUrl && media.includes(integrationUrl.replace("http://", "")))
+        failures.push("/b/media: an integration URL reached a signed-out page");
+      else console.log("ok    /b/media shows the public tile and no integration URL");
       const res = await fetch(`${base}/b/infra`);
       if (res.status !== 404) failures.push(`/b/infra: signed-out visitor got HTTP ${res.status}, not 404`);
       else console.log("ok    /b/infra is a 404 signed out");
@@ -288,6 +296,7 @@ async function addBoards() {
   // Two of one integration type (#300), pointed at a closed local port so the
   // Monitor renders their offline tiles without reaching anything real.
   const dead = `http://127.0.0.1:${await freePort()}`;
+  integrationUrl = dead;
   const ints = await ctx.request.put(`${base}/api/integrations`, {
     headers: { Origin: base },
     data: [
@@ -296,6 +305,19 @@ async function addBoards() {
     ],
   });
   if (!ints.ok()) throw new Error(`adding integrations failed: HTTP ${ints.status()}`);
+  // A public integration tile on the public board (#301): its offline tile,
+  // public view, renders for signed-out visitors.
+  const config = await (await ctx.request.get(`${base}/api/config`)).json();
+  const widgets = await ctx.request.put(`${base}/api/widgets`, {
+    headers: { Origin: base },
+    data: [...config.widgets, { id: "sonarr-tile", type: "integration", integration: "sonarr-4k", view: "glance", visibility: "public" }],
+  });
+  if (!widgets.ok()) throw new Error(`adding the integration tile failed: HTTP ${widgets.status()}`);
+  const media = await ctx.request.put(`${base}/api/boards/media/layout`, {
+    headers: { Origin: base },
+    data: { sections: [{ widget: "search" }, { widget: "sonarr-tile", span: 8 }, { widget: "bookmarks" }] },
+  });
+  if (!media.ok()) throw new Error(`placing the integration tile failed: HTTP ${media.status()}`);
   await ctx.close();
 }
 
