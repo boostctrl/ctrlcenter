@@ -5,6 +5,7 @@ import type { ThemePack } from "@/lib/theme";
 import { buttonClasses } from "@/lib/buttons";
 import { DESIGN_NAMES } from "./constants";
 import { OptionCard } from "./OptionCard";
+import { ThemeTile } from "./ThemeTile";
 import type { ThemeDraft } from "./useThemeDraft";
 
 export default function ThemesTab({
@@ -34,7 +35,8 @@ export default function ThemesTab({
     promoteTheme,
     exportThemes,
     handleImportFile,
-    lookSwatch,
+    packActive,
+    savedActive,
   } = d;
   return (
     <div
@@ -53,15 +55,12 @@ export default function ThemesTab({
           <OptionCard
             key={`builtin:${i}`}
             onClick={() => applyPack(p, editMode)}
+            selected={packActive(p, editMode)}
             name={p.name}
             title={`${p.name} · ${DESIGN_NAMES[p.design]}`}
             badge={i === 0 ? "Default" : undefined}
           >
-            <span
-              className="block h-10 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
-              style={{ background: lookSwatch(p) }}
-              aria-hidden
-            />
+            <ThemeTile design={p.design} scene={p.scene} colors={p[editMode]} mode={editMode} />
           </OptionCard>
         ))}
       </div>
@@ -129,10 +128,11 @@ export default function ThemesTab({
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
             {customThemes.map((t) => {
               const swatch = (
-                <span
-                  className="block h-10 w-full overflow-hidden rounded-md ring-1 ring-fg/10"
-                  style={{ background: lookSwatch(t) }}
-                  aria-hidden
+                <ThemeTile
+                  design={editMode === "dark" ? t.design : t.designLight}
+                  scene={editMode === "dark" ? t.scene : t.sceneLight}
+                  colors={t[editMode]}
+                  mode={editMode}
                 />
               );
               return renamingId === t.id ? (
@@ -156,6 +156,7 @@ export default function ThemesTab({
                 <div key={t.id} className="group/theme relative">
                   <OptionCard
                     onClick={() => applyNamedTheme(t.id)}
+                    selected={savedActive(t)}
                     name={t.name}
                     title={`${t.name} · ${DESIGN_NAMES[t.design]}`}
                   >

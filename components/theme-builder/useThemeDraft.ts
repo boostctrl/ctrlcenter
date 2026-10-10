@@ -3,8 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { useLookPrefs } from "../PrefsProvider";
+import type { Mode } from "../prefs/themeApply";
 import { useConfirm } from "../admin/Confirm";
-import type { ModeColors } from "@/lib/theme";
+import { colorSetsEqual, sceneFxEqual, tunesEqual } from "@/lib/theme";
+import type { ModeColors, ThemePack } from "@/lib/theme";
 import { parseThemesExport, siteThemeFromCustomTheme } from "@/lib/prefs";
 import type { CustomTheme, ThemeColors } from "@/lib/prefs";
 import { saveSettingsPatch } from "../admin/settingsApi";
@@ -30,6 +32,7 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     setTune,
     sceneFxFor,
     setSceneFx,
+    colorsFor,
     applyPack,
     customThemes,
     activeLook,
@@ -75,6 +78,57 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     dropPreview.current = setPreviewMode;
   });
   useEffect(() => () => dropPreview.current(null), []);
+
+  // Which theme a mode matches exactly — design, scene, colors, tune and
+  // scene effects — so the tiles can show an active state (#328). A pack is
+  // per mode (it carries no font); a saved theme is both modes, font included.
+  const packActive = (p: ThemePack, mode: Mode) =>
+    designFor(mode) === p.design &&
+    sceneFor(mode) === p.scene &&
+    colorSetsEqual(colorsFor(mode), p[mode]) &&
+    tunesEqual(tuneFor(mode), p.tune ?? null) &&
+    sceneFxEqual(sceneFxFor(mode), null);
+  const savedActive = (t: CustomTheme) =>
+    (["dark", "light"] as const).every(
+      (mode) =>
+        designFor(mode) === (mode === "dark" ? t.design : t.designLight) &&
+        sceneFor(mode) === (mode === "dark" ? t.scene : t.sceneLight) &&
+        fontFor(mode) === (mode === "dark" ? t.font : t.fontLight) &&
+        colorSetsEqual(colorsFor(mode), t[mode]) &&
+        tunesEqual(tuneFor(mode), mode === "dark" ? t.tune : t.tuneLight) &&
+        sceneFxEqual(sceneFxFor(mode), mode === "dark" ? t.sceneFx : t.sceneFxLight)
+    );
+  const paletteActive = (p: ModeColors) =>
+    colorSetsEqual(colorsFor("dark"), p.dark) && colorSetsEqual(colorsFor("light"), p.light);
+
+  // The theme last applied from a tile (this visit), so the builder can say
+  // what the look is based on and offer to go back to it once it's been
+  // tweaked. A pack applies to one mode; a saved theme to both.
+  type Applied = { kind: "pack"; pack: ThemePack; mode: Mode } | { kind: "saved"; id: string };
+  const [applied, setApplied] = useState<Applied | null>(null);
+  const appliedTheme = applied?.kind === "saved" ? customThemes.find((t) => t.id === applied.id) : undefined;
+  const appliedName = applied?.kind === "pack" ? applied.pack.name : appliedTheme?.name;
+  const appliedActive =
+    applied?.kind === "pack"
+      ? packActive(applied.pack, applied.mode)
+      : appliedTheme
+        ? savedActive(appliedTheme)
+        : false;
+  // Modified: a theme was applied and the look no longer matches it.
+  const modified = !!appliedName && !appliedActive;
+  function applyPackTracked(p: ThemePack, mode: Mode) {
+    applyPack(p, mode);
+    setApplied({ kind: "pack", pack: p, mode });
+  }
+  function applyNamedThemeTracked(id: string) {
+    applyNamedTheme(id);
+    setApplied({ kind: "saved", id });
+  }
+  function revertToApplied() {
+    if (!applied) return;
+    if (applied.kind === "pack") applyPack(applied.pack, applied.mode);
+    else applyNamedTheme(applied.id);
+  }
 
   const [draft, setDraft] = useState<ThemeColors>(DEFAULT_DRAFT);
   const [name, setName] = useState("");
@@ -258,13 +312,6 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     }
   }
 
-  // A full-look swatch (surface bg + accent glow) for the current mode — used
-  // for the theme packs and saved themes, which restyle the mode being edited.
-  const lookSwatch = (look: ModeColors) => {
-    const cs = editMode === "light" ? look.light : look.dark;
-    return `radial-gradient(120% 100% at 50% -10%, ${cs.accentFrom}, transparent 60%), ${cs.background}`;
-  };
-
   return {
     designFor,
     setDesign,
@@ -276,12 +323,19 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     setTune,
     sceneFxFor,
     setSceneFx,
-    applyPack,
+    colorsFor,
+    applyPack: applyPackTracked,
     customThemes,
     activeAccent,
     applyThemeColors,
-    applyNamedTheme,
+    applyNamedTheme: applyNamedThemeTracked,
     deleteNamedTheme,
+    packActive,
+    savedActive,
+    paletteActive,
+    appliedName,
+    modified,
+    revertToApplied,
     resetTheme,
     setPreviewMode,
     confirm,
@@ -308,7 +362,6 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     promoteTheme,
     exportThemes,
     handleImportFile,
-    lookSwatch,
   };
 }
 

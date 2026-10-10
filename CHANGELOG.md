@@ -14,6 +14,13 @@ here.
 
 ### Added
 
+- **A theme builder that shows its work (3.0).** A live miniature of the
+  dashboard (greeting, an app card, buttons and text at every level) sits
+  beside the builder's tabs, and above them on a phone, where the real page
+  is off-screen while you edit. Theme and palette tiles now mark the one in
+  use, and theme tiles draw their design over their scene instead of a
+  colour bar. Once you tweak a theme, the builder says what it's based on
+  and offers to revert. (#328)
 - **Scene intensity, motion and a None scene (3.0).** The theme builder's
   Scene tab gains an intensity slider (how strongly the backdrop shows) and a
   motion choice for each theme: full, calm (half speed, half the work) or

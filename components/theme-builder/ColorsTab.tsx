@@ -54,6 +54,7 @@ export default function ColorsTab({ d }: { d: ThemeDraft }) {
     updateBase,
     updateAccent,
     chooseAccentStyle,
+    paletteActive,
   } = d;
   return (
     <div
@@ -77,6 +78,7 @@ export default function ColorsTab({ d }: { d: ThemeDraft }) {
             <OptionCard
               key={t.name}
               onClick={() => applyThemeColors(t)}
+              selected={paletteActive(t)}
               name={t.name}
               title={t.name}
             >

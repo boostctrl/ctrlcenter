@@ -339,6 +339,24 @@ export function sanitizeTune(input: unknown): Tune | null {
   return any ? out : null;
 }
 
+// Equality for the builder's active-state checks (#328): hex compares
+// case-insensitively, and an absent tune or scene effects equals the default.
+export function colorSetsEqual(a: ColorSet, b: ColorSet): boolean {
+  const k = (c: ColorSet) =>
+    [c.background, c.foreground, c.accentFrom, c.accentTo].map((h) => h.toLowerCase()).join("|");
+  return k(a) === k(b);
+}
+
+export function tunesEqual(a: Tune | null | undefined, b: Tune | null | undefined): boolean {
+  if (isDefaultTune(a) || isDefaultTune(b)) return isDefaultTune(a) && isDefaultTune(b);
+  return TUNE_KEYS.every((k) => (a as Tune)[k] === (b as Tune)[k]);
+}
+
+export function sceneFxEqual(a: SceneFx | null | undefined, b: SceneFx | null | undefined): boolean {
+  if (isDefaultSceneFx(a) || isDefaultSceneFx(b)) return isDefaultSceneFx(a) && isDefaultSceneFx(b);
+  return (a as SceneFx).intensity === (b as SceneFx).intensity && (a as SceneFx).motion === (b as SceneFx).motion;
+}
+
 // A "Theme" is a curated, art-directed look applied in one tap: a palette
 // bundled with the design (card surface) and scene (backdrop) composed to go
 // with it, tailored for both light and dark, and optionally a tune over the

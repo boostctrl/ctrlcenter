@@ -286,7 +286,10 @@ export default async function HelpPage() {
         <Card title="Themes & looks">
           <P>
             The theme builder in <A href="/settings">Settings</A> makes the
-            dashboard yours, with a live preview as you go.
+            dashboard yours, with a live preview as you go: the page itself,
+            and a miniature beside the controls. The theme, palette, design,
+            scene and font in use are marked, and once you tweak a theme the
+            builder says so and offers to revert.
           </P>
           <ul className={LIST_CLASS}>
             <li>

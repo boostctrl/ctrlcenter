@@ -104,6 +104,10 @@ export type LookValue = {
   // The effective scene effects for a mode (visitor's, else the admin
   // default), or null when the scene is as designed (#327).
   sceneFxFor: (mode: Mode) => SceneFx | null;
+  // The effective colors for a mode — the active look's variant (else the
+  // admin default, else the stock colors) with that mode's accent override
+  // applied — so the builder can tell which theme or palette is active (#328).
+  colorsFor: (mode: Mode) => ColorSet;
   // The visitor's Reduce motion switch, and the motion level the scenes run
   // at now: "off" when the switch is on, else the displayed mode's effects.
   reduceMotion: boolean;
@@ -842,6 +846,12 @@ export function useLook(defaultTheme: DefaultTheme): {
       fontFor: (mode: Mode) => resolveFont(mode === "dark"),
       tuneFor: (mode: Mode) => resolveTune(mode === "dark"),
       sceneFxFor: (mode: Mode) => resolveSceneFx(mode === "dark"),
+      colorsFor: (mode: Mode) => {
+        const dark = mode === "dark";
+        const cs = variantFor(effectiveLook, dark) ?? seedColorSet(dark);
+        const a = resolveAccent(overrideFor(accentOverride, dark), cs, defaultAccent);
+        return { ...cs, accentFrom: a.from, accentTo: a.to };
+      },
       reduceMotion,
       motion: reduceMotion ? "off" : (resolveSceneFx(displayDark)?.motion ?? "normal"),
       surfaceIsLight,
@@ -885,6 +895,7 @@ export function useLook(defaultTheme: DefaultTheme): {
     resolveTune,
     resolveSceneFx,
     reduceMotion,
+    seedColorSet,
     systemDark,
     customThemes,
     activeLook,

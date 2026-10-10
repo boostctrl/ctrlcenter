@@ -5,6 +5,10 @@ import {
   isDefaultTune,
   sanitizeSceneFx,
   isDefaultSceneFx,
+  colorSetsEqual,
+  tunesEqual,
+  sceneFxEqual,
+  DEFAULT_SCENE_FX,
   DEFAULT_TUNE,
   THEME_PACKS,
   DESIGNS,
@@ -114,5 +118,21 @@ describe("sanitizeSceneFx (#327)", () => {
     expect(isDefaultSceneFx(null)).toBe(true);
     expect(isDefaultSceneFx({ intensity: 100, motion: "normal" })).toBe(true);
     expect(isDefaultSceneFx({ intensity: 100, motion: "calm" })).toBe(false);
+  });
+});
+
+describe("look equality (#328)", () => {
+  it("compares colors case-insensitively", () => {
+    const a = { background: "#06070D", foreground: "#f4f4f6", accentFrom: "#A78BFA", accentTo: "#22d3ee" };
+    expect(colorSetsEqual(a, { ...a, background: "#06070d", accentFrom: "#a78bfa" })).toBe(true);
+    expect(colorSetsEqual(a, { ...a, accentTo: "#22d3ef" })).toBe(false);
+  });
+
+  it("treats an absent tune or effects as the default", () => {
+    expect(tunesEqual(null, DEFAULT_TUNE)).toBe(true);
+    expect(tunesEqual(undefined, { ...DEFAULT_TUNE, glow: 50 })).toBe(false);
+    expect(tunesEqual({ ...DEFAULT_TUNE, glow: 50 }, { ...DEFAULT_TUNE, glow: 50 })).toBe(true);
+    expect(sceneFxEqual(null, DEFAULT_SCENE_FX)).toBe(true);
+    expect(sceneFxEqual({ intensity: 50, motion: "calm" }, { intensity: 50, motion: "off" })).toBe(false);
   });
 });

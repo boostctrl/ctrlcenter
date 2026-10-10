@@ -13,6 +13,7 @@ import DesignTab from "./theme-builder/DesignTab";
 import TuneTab from "./theme-builder/TuneTab";
 import SceneTab from "./theme-builder/SceneTab";
 import FontTab from "./theme-builder/FontTab";
+import { PreviewCard } from "./theme-builder/PreviewCard";
 
 // The visitor theme builder: a header (mode switch), a tab strip and a footer
 // (save/reset) around the open tab. The draft and every action live in
@@ -41,6 +42,9 @@ export default function ThemeBuilder({
     setName,
     saveFailed,
     saveTheme,
+    appliedName,
+    modified,
+    revertToApplied,
   } = draft;
 
   const [tab, setTab] = useState<TabId>("themes");
@@ -107,6 +111,33 @@ export default function ThemeBuilder({
         </div>
       </div>
 
+      {/* What the look is based on, once a theme tile has been applied this
+          visit, and a way back once it's been tweaked (#328). */}
+      {appliedName && (
+        <p role="status" className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-50">
+          <span>
+            Based on <span className="text-ink-80">{appliedName}</span>
+            {modified ? " · modified" : ""}
+          </span>
+          {modified && (
+            <button
+              type="button"
+              onClick={revertToApplied}
+              className="rounded-md px-1.5 py-0.5 text-ink-70 underline underline-offset-2 transition-colors hover:text-fg"
+            >
+              Revert to {appliedName}
+            </button>
+          )}
+        </p>
+      )}
+
+      {/* The preview sits beside the tabs on a wide screen and above them on
+          a phone, where the live page is off-screen while editing. */}
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_15rem] lg:items-start lg:gap-6">
+      <div className="mb-4 lg:order-last lg:sticky lg:top-4 lg:mb-0">
+        <PreviewCard mode={editMode} />
+      </div>
+      <div className="min-w-0 space-y-4">
       <div
         ref={tablistRef}
         role="tablist"
@@ -152,6 +183,8 @@ export default function ThemeBuilder({
       {tab === "tune" && <TuneTab d={draft} />}
       {tab === "scene" && <SceneTab d={draft} />}
       {tab === "font" && <FontTab d={draft} />}
+      </div>
+      </div>
 
       <div className="flex flex-wrap items-center gap-2 border-t border-fg/10 pt-4">
         <input
