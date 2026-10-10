@@ -12,6 +12,13 @@ here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Resizing a widget no longer scrolls the page to the top.** In edit
+  mode, selecting or resizing a card below the fold — with the steppers,
+  the arrow keys or a drag of an edge — jumped the page to the top on every
+  step. The page now stays where it is. (#341)
+
 ## [3.0.0-rc.1] - 2026-10-10
 
 ### Added

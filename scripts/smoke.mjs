@@ -197,6 +197,7 @@ try {
     if (scheme === "light") {
       await apiWidgetTest(ctx);
       await editorTray(ctx);
+      await editorScroll(ctx);
     }
     await ctx.close();
   }
@@ -533,6 +534,13 @@ async function editorTray(ctx) {
         Array.from(document.querySelectorAll("main .grid > [data-widget-id]")).map((e) => e.dataset.widgetId)
       );
     const before = await order();
+    // Playwright scrolled the tray's Show button into view, and the landing
+    // scroll (smooth) may still be running: back to the top, where both cards
+    // of the drag are on screen. The page no longer snaps there on its own
+    // (#341).
+    await page.waitForTimeout(600);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(200);
     const from = await page.locator('main .grid > [data-widget-id="search"]').boundingBox();
     const to = await page.locator('main .grid > [data-widget-id="greeting"]').boundingBox();
     await page.mouse.move(from.x + 40, from.y + from.height / 2);
@@ -553,6 +561,56 @@ async function editorTray(ctx) {
     console.log("ok    the editor tray works, and a dragged card lands where its preview showed");
   } catch (e) {
     failures.push(`editor tray: ${e instanceof Error ? e.message.split("\n")[0] : e}`);
+  } finally {
+    await page.close();
+  }
+}
+
+// Resizing a card below the fold keeps the page where it is (#341): the
+// grid's layout pass used to collapse the document for a moment and the
+// browser clamped the scroll position to the top. A short viewport, every
+// tray widget shown so the grid runs well past it, the last card selected and
+// made taller, then the page's scroll position compared.
+async function editorScroll(ctx) {
+  const page = await ctx.newPage();
+  try {
+    await page.setViewportSize({ width: 1280, height: 520 });
+    await page.goto(`${base}/?edit=1`);
+    await page.locator("main .grid > [data-widget-id]").first().waitFor({ timeout: 10_000 });
+    let shown = 0;
+    for (; shown < 12; shown++) {
+      const show = page.getByRole("button", { name: /^Show / }).first();
+      if (!(await show.count())) break;
+      await show.click();
+      await page.waitForTimeout(300);
+    }
+    // Past the last landing scroll (smooth).
+    await page.waitForTimeout(800);
+    // The last card's top 140px down the viewport: room for its toolbar
+    // above, and the click point on screen (Playwright would otherwise
+    // scroll the card into view itself, moving the page before the app).
+    const card = page.locator("main .grid > [data-widget-id]").last();
+    await page.evaluate((el) => window.scrollTo(0, window.scrollY + el.getBoundingClientRect().top - 140), await card.elementHandle());
+    await page.waitForTimeout(300);
+    const scrollY = () => page.evaluate(() => window.scrollY);
+    const before = await scrollY();
+    if (before < 200) throw new Error(`the page only scrolled to ${before}px — not far enough to tell`);
+    await card.click({ position: { x: 20, y: 20 } });
+    await page.getByRole("toolbar", { name: /controls$/ }).waitFor({ timeout: 5_000 });
+    await page.waitForTimeout(300);
+    const selected = await scrollY();
+    await page.getByRole("button", { name: /^Taller / }).first().click();
+    await page.waitForTimeout(300);
+    const taller = await scrollY();
+    if (Math.abs(selected - before) > 4 || Math.abs(taller - before) > 4)
+      throw new Error(`scrolled to ${before}px, ${selected}px after selecting the card, ${taller}px after making it taller`);
+    // Put the layout back (the shows and the height), past the autosave.
+    for (let i = 0; i < shown + 1; i++) await page.keyboard.press("Control+z");
+    await page.waitForTimeout(1_500);
+    await page.getByText("Saved").first().waitFor({ timeout: 10_000 });
+    console.log("ok    resizing a card below the fold keeps the page where it is");
+  } catch (e) {
+    failures.push(`editor scroll: ${e instanceof Error ? e.message.split("\n")[0] : e}`);
   } finally {
     await page.close();
   }
