@@ -3,7 +3,7 @@ import { z } from "zod";
 import { lenientArray } from "./shared";
 import { settingsSchema } from "./settings";
 import { appItemSchema, bookmarkItemSchema } from "./apps-bookmarks";
-import { themePackSchema } from "./theme";
+import { themeEntrySchema } from "./theme";
 import { authSchema } from "./auth";
 import { widgetInstancesSchema } from "./instances";
 import { boardsSchema } from "./boards";
@@ -32,9 +32,10 @@ export const configSchema = z.object({
   groups: groupsSchema,
   apps: z.array(appItemSchema).default([]),
   bookmarks: z.array(bookmarkItemSchema).default([]),
-  // Admin overrides of the built-in theme packs (edit-and-reset; see
-  // resolveThemePacks). Empty = every pack shows its built-in values.
-  themes: z.array(themePackSchema).default([]),
+  // The theme gallery (#334): the built-in packs as shipped or edited, hidden
+  // or reordered, and the admin's own (see resolveThemeGallery). Empty = the
+  // built-ins as shipped.
+  themes: z.array(themeEntrySchema).default([]),
   auth: authSchema.default(authSchema.parse({})),
 });
 
@@ -47,7 +48,7 @@ export const configSchema = z.object({
 export const configReadSchema = configSchema.extend({
   apps: lenientArray(appItemSchema),
   bookmarks: lenientArray(bookmarkItemSchema),
-  themes: lenientArray(themePackSchema),
+  themes: lenientArray(themeEntrySchema),
 });
 
 export type Config = z.infer<typeof configSchema>;

@@ -12,7 +12,7 @@ import {
   newBoardId,
   integrationSchema,
 } from "@/lib/schema";
-import type { ThemePack } from "@/lib/theme";
+import { packDesign, packScene, type ThemePack } from "@/lib/theme";
 import { newThemeId } from "@/lib/prefs";
 import { defaultSpanFor, resolveLayout, type WidgetType } from "@/lib/layout";
 import { instanceLabels } from "@/lib/widgets/labels";
@@ -369,8 +369,9 @@ export function useSettingsDraft(
       background: pack.dark.background,
       foreground: pack.dark.foreground,
       presetLight: undefined,
-      designLight: undefined,
-      sceneLight: undefined,
+      // A pack's own light design/scene (#334), else light follows dark.
+      designLight: pack.designLight,
+      sceneLight: pack.sceneLight,
       backgroundLight: pack.light.background,
       foregroundLight: pack.light.foreground,
       tune: pack.tune,
@@ -400,8 +401,8 @@ export function useSettingsDraft(
       const darkPack = themePacks.find((p) => p.name === theme.preset);
       updateTheme({
         presetLight: undefined,
-        designLight: undefined,
-        sceneLight: undefined,
+        designLight: darkPack?.designLight,
+        sceneLight: darkPack?.sceneLight,
         accentFromLight: undefined,
         accentToLight: undefined,
         backgroundLight: darkPack?.light.background,
@@ -420,8 +421,8 @@ export function useSettingsDraft(
     if (!pack) return;
     updateTheme({
       presetLight: pack.name,
-      designLight: pack.design,
-      sceneLight: pack.scene,
+      designLight: packDesign(pack, false),
+      sceneLight: packScene(pack, false),
       accentFromLight: undefined,
       accentToLight: undefined,
       backgroundLight: pack.light.background,

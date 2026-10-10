@@ -20,6 +20,7 @@ import {
   type ModeColors,
   type SceneFx,
   type SceneId,
+  type ThemePack,
   type Tune,
 } from "./theme";
 import { DEFAULT_FONT, isFontId, type FontId } from "./fonts";
@@ -280,6 +281,29 @@ export function saveActiveTheme(colors: ModeColors | null): void {
 // the admin Appearance picker correctly reads "Custom" afterwards. A test
 // pins this mapping against the settings schema's key list, so a new theme
 // field can't be silently dropped from promotion.
+// A saved theme as a gallery pack (#334), for "Add to site themes": both
+// modes' design, scene and colors, and its optional parts. A pack has one
+// body font, so the dark theme's is taken.
+export function packFromCustomTheme(t: CustomTheme): ThemePack {
+  const pack: ThemePack = {
+    name: t.name,
+    design: t.design,
+    scene: t.scene,
+    dark: t.dark,
+    light: t.light,
+  };
+  if (t.designLight !== t.design) pack.designLight = t.designLight;
+  if (t.sceneLight !== t.scene) pack.sceneLight = t.sceneLight;
+  if (t.tune) pack.tune = t.tune;
+  if (t.font !== DEFAULT_FONT) pack.font = t.font;
+  if (t.headingFont) pack.headingFont = t.headingFont;
+  if (t.status) pack.status = t.status;
+  if (t.statusLight) pack.statusLight = t.statusLight;
+  if (t.wallpaper) pack.wallpaper = t.wallpaper;
+  if (t.wallpaperLight) pack.wallpaperLight = t.wallpaperLight;
+  return pack;
+}
+
 export function siteThemeFromCustomTheme(
   theme: CustomTheme,
   mode: "system" | "light" | "dark"

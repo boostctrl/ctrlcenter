@@ -479,6 +479,10 @@ export type ThemePack = {
   name: string;
   design: DesignId;
   scene: SceneId;
+  // A light-mode design and scene of its own (#334); absent = the same as
+  // dark, as every built-in has.
+  designLight?: DesignId;
+  sceneLight?: SceneId;
   tune?: Tune;
   font?: FontId;
   headingFont?: FontId;
@@ -488,7 +492,18 @@ export type ThemePack = {
   // A wallpaper per mode (#333); absent = none.
   wallpaper?: Wallpaper;
   wallpaperLight?: Wallpaper;
+  // On a resolved gallery pack: the built-in it stands for, if any (#334);
+  // the builder badges the stock one by it whatever it's called now.
+  builtin?: string;
 } & ModeColors;
+
+// The pack's design and scene for a mode (#334).
+export function packDesign(pack: ThemePack, dark: boolean): DesignId {
+  return dark ? pack.design : pack.designLight ?? pack.design;
+}
+export function packScene(pack: ThemePack, dark: boolean): SceneId {
+  return dark ? pack.scene : pack.sceneLight ?? pack.scene;
+}
 
 // The built-in theme that mirrors the app's stock appearance (first in the list,
 // badged in the builder).
@@ -600,23 +615,202 @@ export const THEME_PACKS: ThemePack[] = [
   },
 ];
 
-// An admin override of a built-in THEME_PACK. `key` pins it to a built-in (that
-// pack's original name) so the editable `name` can differ — i.e. the admin can
-// rename a theme. `key` is optional for back-compat: an override saved before
-// renaming existed is matched by its `name` instead. resolveThemePacks() applies
-// these over the built-ins; a reset removes the override.
-export type ThemePackOverride = ThemePack & { key?: string };
+// The admin's theme gallery (#334): the `themes:` list in config.yaml. Each
+// entry either stands for a built-in pack (`builtin` names it; a `key` that
+// is a built-in's name, or a key-less entry named like one, means the same
+// for files from before 3.0) or is a pack of the admin's own. An entry can
+// hide its pack from visitors, and the list's order is the gallery's.
+//
+// A built-in entry with no pack fields is the built-in as shipped (so it can
+// be hidden or reordered while later versions' tweaks to it still show).
+// One that carries any field other than `name` is an edited copy: its own
+// optional parts (tune, fonts, status, wallpaper) apply, so clearing one
+// sticks, and only the required parts fall back to the built-in when
+// missing. A rename alone keeps everything else as shipped.
+export type ThemeEntry = Partial<ThemePack> & {
+  key?: string;
+  builtin?: string;
+  hidden?: boolean;
+};
 
-// Built-in packs with any admin overrides applied (matched to a built-in by
-// `key`, falling back to `name`; order preserved). The override's `name` becomes
-// the display label, so renamed packs show their new name. Stale overrides that
-// match no built-in are dropped.
-export function resolveThemePacks(
-  overrides: ThemePackOverride[] | undefined
-): ThemePack[] {
-  if (!overrides || overrides.length === 0) return THEME_PACKS;
-  // Matched by key: an override saved before renaming existed (1.9) got its
-  // name as its key in the 3.0 migration (#305).
-  const byKey = new Map(overrides.flatMap((o) => (o.key ? [[o.key, o] as const] : [])));
-  return THEME_PACKS.map((p) => byKey.get(p.name) ?? p);
+// Kept for the 3.0 pre-release name.
+export type ThemePackOverride = ThemeEntry;
+
+// The pack fields an entry may carry, in the order they're written.
+export const PACK_FIELDS = [
+  "name",
+  "design",
+  "scene",
+  "designLight",
+  "sceneLight",
+  "tune",
+  "font",
+  "headingFont",
+  "status",
+  "statusLight",
+  "wallpaper",
+  "wallpaperLight",
+  "dark",
+  "light",
+] as const satisfies readonly (keyof ThemePack)[];
+
+// Just a pack's own fields (no gallery bookkeeping, no `builtin` marker),
+// for storing one in an entry.
+export function packFields(pack: ThemePack): ThemePack {
+  const out: Partial<ThemePack> = {};
+  for (const f of PACK_FIELDS) {
+    const v = pack[f];
+    if (v !== undefined) (out as Record<string, unknown>)[f] = v;
+  }
+  return out as ThemePack;
+}
+
+const CUSTOM_KEY_PREFIX = "custom-";
+
+// A key for a pack of the admin's own: never a built-in's name.
+export function newThemeEntryKey(): string {
+  const rnd =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID().slice(0, 8)
+      : Math.random().toString(36).slice(2, 10);
+  return `${CUSTOM_KEY_PREFIX}${rnd}`;
+}
+
+// `base` as a name no pack in `taken` has: "Ocean", "Ocean 2", "Ocean 3"…
+export function uniquePackName(base: string, taken: Iterable<string>): string {
+  const names = new Set([...taken].map((n) => n.trim().toLowerCase()));
+  const root = base.trim().slice(0, 40) || "Theme";
+  if (!names.has(root.toLowerCase())) return root;
+  for (let i = 2; ; i++) {
+    const candidate = `${root} ${i}`.slice(0, 40);
+    if (!names.has(candidate.toLowerCase())) return candidate;
+  }
+}
+
+export type ResolvedThemeEntry = {
+  // The entry's key (a built-in's name for one standing for it).
+  key: string;
+  builtin?: string;
+  hidden: boolean;
+  // A built-in entry that carries its own fields (reset restores the shipped
+  // pack); always true for a pack of the admin's own.
+  edited: boolean;
+  pack: ThemePack;
+  // The stored entry this came from; absent for a built-in the list doesn't
+  // mention (it shows as shipped, after the listed ones).
+  entry?: ThemeEntry;
+};
+
+const builtinNamed = (name: string | undefined): ThemePack | undefined =>
+  name === undefined ? undefined : THEME_PACKS.find((p) => p.name === name);
+
+// The built-in an entry stands for, if any.
+function builtinOf(e: ThemeEntry): ThemePack | undefined {
+  if (e.builtin !== undefined) return builtinNamed(e.builtin);
+  if (e.key !== undefined) return builtinNamed(e.key);
+  // Pre-1.9 overrides had neither; they were matched by name.
+  return builtinNamed(e.name);
+}
+
+const OPTIONAL_FIELDS = [
+  "designLight",
+  "sceneLight",
+  "tune",
+  "font",
+  "headingFont",
+  "status",
+  "statusLight",
+  "wallpaper",
+  "wallpaperLight",
+] as const;
+
+function resolveBuiltin(base: ThemePack, e: ThemeEntry): { pack: ThemePack; edited: boolean } {
+  const edited = PACK_FIELDS.some((f) => f !== "name" && e[f] !== undefined);
+  if (!edited) {
+    return { pack: { ...base, ...(e.name ? { name: e.name } : {}), builtin: base.name }, edited: false };
+  }
+  const pack: ThemePack = {
+    name: e.name ?? base.name,
+    design: e.design ?? base.design,
+    scene: e.scene ?? base.scene,
+    dark: e.dark ?? base.dark,
+    light: e.light ?? base.light,
+    builtin: base.name,
+  };
+  for (const f of OPTIONAL_FIELDS) {
+    const v = e[f];
+    if (v !== undefined) (pack as Record<string, unknown>)[f] = v;
+  }
+  return { pack, edited: true };
+}
+
+// A pack of the admin's own needs a name and both colorsets; the rest has
+// defaults.
+function resolveCustom(e: ThemeEntry): ThemePack | null {
+  if (!e.name || !e.dark || !e.light) return null;
+  const pack: ThemePack = {
+    name: e.name,
+    design: e.design ?? "glass",
+    scene: e.scene ?? "aurora",
+    dark: e.dark,
+    light: e.light,
+  };
+  for (const f of OPTIONAL_FIELDS) {
+    const v = e[f];
+    if (v !== undefined) (pack as Record<string, unknown>)[f] = v;
+  }
+  return pack;
+}
+
+const shipped = (p: ThemePack): ResolvedThemeEntry => ({
+  key: p.name,
+  builtin: p.name,
+  hidden: false,
+  edited: false,
+  pack: { ...p, builtin: p.name },
+});
+
+// The whole gallery, hidden packs included, for the admin: the entries in
+// stored order (a built-in referenced twice counts once, the first time),
+// then every built-in the list doesn't mention, in their shipped order. A
+// list from before the gallery (3.0 pre-release overrides, nothing but
+// built-in edits with no `builtin` or `hidden` markers) keeps the shipped
+// order with the edits slotted in, as it always did.
+export function resolveThemeGallery(entries: ThemeEntry[] | undefined): ResolvedThemeEntry[] {
+  if (!entries || entries.length === 0) return THEME_PACKS.map(shipped);
+  const resolved: ResolvedThemeEntry[] = [];
+  const seen = new Set<string>();
+  let gallery = false;
+  for (const e of entries) {
+    if (e.builtin !== undefined || e.hidden !== undefined) gallery = true;
+    const base = builtinOf(e);
+    // Naming a built-in that doesn't exist (a config from another version,
+    // a typo in the file) is harmless: the entry is skipped, not a half-pack.
+    if (e.builtin !== undefined && !base) continue;
+    if (base) {
+      if (seen.has(base.name)) continue;
+      seen.add(base.name);
+      const { pack, edited } = resolveBuiltin(base, e);
+      resolved.push({ key: e.key ?? base.name, builtin: base.name, hidden: e.hidden === true, edited, pack, entry: e });
+    } else {
+      const pack = resolveCustom(e);
+      if (!pack) continue;
+      gallery = true;
+      resolved.push({ key: e.key ?? pack.name, hidden: e.hidden === true, edited: true, pack, entry: e });
+    }
+  }
+  if (!gallery) {
+    return THEME_PACKS.map((p) => resolved.find((r) => r.builtin === p.name) ?? shipped(p));
+  }
+  for (const p of THEME_PACKS) if (!seen.has(p.name)) resolved.push(shipped(p));
+  return resolved;
+}
+
+// The packs visitors can pick: the gallery without its hidden entries. With
+// nothing stored, the built-ins themselves.
+export function resolveThemePacks(entries: ThemeEntry[] | undefined): ThemePack[] {
+  if (!entries || entries.length === 0) return THEME_PACKS;
+  return resolveThemeGallery(entries)
+    .filter((r) => !r.hidden)
+    .map((r) => r.pack);
 }

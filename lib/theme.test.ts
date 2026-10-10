@@ -19,7 +19,12 @@ import {
   DESIGNS,
   SCENES,
   BASE_THEMES,
-  type ThemePackOverride,
+  resolveThemeGallery,
+  uniquePackName,
+  packFields,
+  packDesign,
+  packScene,
+  type ThemeEntry,
 } from "./theme";
 
 describe("catalog sizes", () => {
@@ -41,7 +46,7 @@ describe("catalog sizes", () => {
 });
 
 describe("resolveThemePacks", () => {
-  const override: ThemePackOverride = {
+  const override: ThemeEntry = {
     key: "Mariana",
     name: "Mariana",
     design: "flat",
@@ -49,6 +54,8 @@ describe("resolveThemePacks", () => {
     dark: { background: "#000000", foreground: "#ffffff", accentFrom: "#ff0000", accentTo: "#00ff00" },
     light: { background: "#ffffff", foreground: "#000000", accentFrom: "#ff0000", accentTo: "#00ff00" },
   };
+  // A resolved pack names its built-in; the shipped list doesn't.
+  const shipped = (i: number) => ({ ...THEME_PACKS[i], builtin: THEME_PACKS[i].name });
 
   it("returns the built-ins unchanged with no overrides", () => {
     expect(resolveThemePacks([])).toBe(THEME_PACKS);
@@ -59,27 +66,110 @@ describe("resolveThemePacks", () => {
     const resolved = resolveThemePacks([override]);
     expect(resolved).toHaveLength(THEME_PACKS.length);
     const idx = THEME_PACKS.findIndex((p) => p.name === "Mariana");
-    expect(resolved[idx]).toEqual(override);
+    expect(resolved[idx]).toEqual({ ...override, key: undefined, builtin: "Mariana" });
     expect(resolved[idx].design).toBe("flat");
     // Other packs untouched.
-    expect(resolved[0]).toEqual(THEME_PACKS[0]);
+    expect(resolved[0]).toEqual(shipped(0));
   });
 
-  it("ignores overrides whose key matches no built-in, and key-less ones (#305)", () => {
-    const stale: ThemePackOverride = { ...override, key: "Nope", name: "Nope" };
-    expect(resolveThemePacks([stale])).toEqual(THEME_PACKS);
-    const keyless: ThemePackOverride = { ...override, key: undefined };
-    expect(resolveThemePacks([keyless])).toEqual(THEME_PACKS);
+  it("drops an entry naming a built-in that doesn't exist, and matches a key-less one by name (#305)", () => {
+    const stale: ThemeEntry = { ...override, key: "Nope", name: "Nope", builtin: "Nope" };
+    expect(resolveThemePacks([stale])).toEqual(THEME_PACKS.map((_, i) => shipped(i)));
+    const keyless: ThemeEntry = { ...override, key: undefined };
+    const idx = THEME_PACKS.findIndex((p) => p.name === "Mariana");
+    expect(resolveThemePacks([keyless])[idx].design).toBe("flat");
   });
 
   it("renames the matched built-in via key, keeping its slot/order", () => {
-    const renamed: ThemePackOverride = { ...override, key: "Mariana", name: "Ocean" };
+    const renamed: ThemeEntry = { ...override, key: "Mariana", name: "Ocean" };
     const resolved = resolveThemePacks([renamed]);
     const idx = THEME_PACKS.findIndex((p) => p.name === "Mariana");
     expect(resolved).toHaveLength(THEME_PACKS.length);
     expect(resolved[idx].name).toBe("Ocean");
     expect(resolved[idx].design).toBe("flat");
-    expect(resolved[0]).toEqual(THEME_PACKS[0]); // others untouched
+    expect(resolved[0]).toEqual(shipped(0)); // others untouched
+  });
+});
+
+describe("the theme gallery (#334)", () => {
+  const colors = {
+    dark: { background: "#000000", foreground: "#ffffff", accentFrom: "#ff0000", accentTo: "#00ff00" },
+    light: { background: "#ffffff", foreground: "#000000", accentFrom: "#ff0000", accentTo: "#00ff00" },
+  };
+  const names = (entries: ThemeEntry[] | undefined) => resolveThemeGallery(entries).map((r) => r.pack.name);
+
+  it("lists the built-ins as shipped with nothing stored", () => {
+    const g = resolveThemeGallery([]);
+    expect(g.map((r) => r.key)).toEqual(THEME_PACKS.map((p) => p.name));
+    expect(g.every((r) => !r.hidden && !r.edited && r.builtin === r.key && r.entry === undefined)).toBe(true);
+  });
+
+  it("follows the stored order once an entry names its built-in, then the rest as shipped", () => {
+    const g = names([
+      { key: "Tide", builtin: "Tide" },
+      { key: "Default", builtin: "Default" },
+    ]);
+    expect(g.slice(0, 2)).toEqual(["Tide", "Default"]);
+    expect(g.slice(2)).toEqual(THEME_PACKS.map((p) => p.name).filter((n) => n !== "Tide" && n !== "Default"));
+    expect(g).toHaveLength(THEME_PACKS.length);
+  });
+
+  it("keeps a pack of the admin's own, in place, and drops one missing its colors", () => {
+    const mine: ThemeEntry = { key: "custom-ab12cd34", name: "Mine", design: "paper", ...colors };
+    const g = resolveThemeGallery([mine, { key: "Default", builtin: "Default" }]);
+    expect(g[0]).toMatchObject({ key: "custom-ab12cd34", hidden: false, edited: true });
+    expect(g[0].builtin).toBeUndefined();
+    expect(g[0].pack).toEqual({ name: "Mine", design: "paper", scene: "aurora", ...colors });
+    expect(g[1].key).toBe("Default");
+    expect(names([{ key: "custom-x", name: "Half", dark: colors.dark }])).toEqual(THEME_PACKS.map((p) => p.name));
+  });
+
+  it("hides from visitors but not from the admin, and never a built-in twice", () => {
+    const entries: ThemeEntry[] = [
+      { key: "Outrun", builtin: "Outrun", hidden: true },
+      { key: "Outrun", builtin: "Outrun" },
+    ];
+    expect(resolveThemePacks(entries).map((p) => p.name)).not.toContain("Outrun");
+    expect(resolveThemePacks(entries)).toHaveLength(THEME_PACKS.length - 1);
+    const g = resolveThemeGallery(entries);
+    expect(g.filter((r) => r.key === "Outrun")).toHaveLength(1);
+    expect(g[0]).toMatchObject({ key: "Outrun", hidden: true, edited: false });
+  });
+
+  it("shows a bare or renamed built-in as shipped, so later tweaks to it still reach the site", () => {
+    const tide = THEME_PACKS.find((p) => p.name === "Tide")!;
+    const bare = resolveThemeGallery([{ key: "Tide", builtin: "Tide" }])[0];
+    expect(bare.pack).toEqual({ ...tide, builtin: "Tide" });
+    expect(bare.edited).toBe(false);
+    const renamed = resolveThemeGallery([{ key: "Tide", builtin: "Tide", name: "Surf" }])[0];
+    expect(renamed.pack).toEqual({ ...tide, name: "Surf", builtin: "Tide" });
+    expect(renamed.edited).toBe(false);
+  });
+
+  it("takes an edited built-in's own optional parts, falling back only for the required ones", () => {
+    const tune = { ...DEFAULT_TUNE, radius: 50 };
+    const g = resolveThemeGallery([{ key: "Tide", builtin: "Tide", tune, scene: "rain" }])[0];
+    expect(g.edited).toBe(true);
+    expect(g.pack.tune).toEqual(tune);
+    expect(g.pack.scene).toBe("rain");
+    expect(g.pack.design).toBe(THEME_PACKS.find((p) => p.name === "Tide")!.design);
+    // An edited copy that clears its wallpaper keeps it cleared.
+    const cleared = resolveThemeGallery([{ key: "Tide", builtin: "Tide", ...packFields(THEME_PACKS[0]), wallpaper: undefined }])[0];
+    expect(cleared.pack.wallpaper).toBeUndefined();
+  });
+
+  it("gives a pack a light design and scene of its own, else the dark ones", () => {
+    const pack = { ...THEME_PACKS[0], designLight: "paper" as const };
+    expect(packDesign(pack, true)).toBe(THEME_PACKS[0].design);
+    expect(packDesign(pack, false)).toBe("paper");
+    expect(packScene(pack, false)).toBe(THEME_PACKS[0].scene);
+  });
+
+  it("makes a name unique among the packs", () => {
+    expect(uniquePackName("Ocean", ["Tide"])).toBe("Ocean");
+    expect(uniquePackName("Ocean", ["ocean"])).toBe("Ocean 2");
+    expect(uniquePackName("Ocean", ["Ocean", "Ocean 2"])).toBe("Ocean 3");
+    expect(uniquePackName("   ", [])).toBe("Theme");
   });
 });
 

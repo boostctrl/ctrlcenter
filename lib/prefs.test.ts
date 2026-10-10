@@ -5,11 +5,12 @@ import {
   sanitizeModeColors,
   sanitizeCustomTheme,
   siteThemeFromCustomTheme,
+  packFromCustomTheme,
   encodeThemeCode,
   decodeThemeCode,
   type CustomTheme,
 } from "./prefs";
-import { themeInputSchema } from "./schema";
+import { themeInputSchema, themeEntrySchema } from "./schema";
 
 const valid = {
   background: "#06070d",
@@ -298,5 +299,43 @@ describe("sanitizeCustomTheme wallpaper (#333)", () => {
     expect(site.wallpaperLight).toBeUndefined();
     // Survives a code round trip.
     expect(decodeThemeCode(encodeThemeCode(t))?.wallpaper).toEqual(wp);
+  });
+});
+
+describe("packFromCustomTheme (#334)", () => {
+  it("maps a saved theme to a gallery pack the schema accepts, with light's own design and scene", () => {
+    const t = sanitizeCustomTheme({
+      name: "Shore",
+      design: "paper",
+      scene: "rain",
+      designLight: "flat",
+      sceneLight: "none",
+      font: "inter",
+      headingFont: "lora",
+      dark: valid,
+      light: { ...valid, background: "#eceef3", foreground: "#181b24" },
+      tune: { radius: 50, border: 100, blur: 100, shadow: 100, fill: 100, glow: 100 },
+      status: { up: "#00ff00", down: "#ff0000", warning: "#ffaa00", info: "#00aaff" },
+      wallpaper: { src: "https://example.com/sea.jpg", blur: 8, dim: 40, fit: "tile" },
+    })!;
+    const pack = packFromCustomTheme(t);
+    expect(pack).toMatchObject({
+      name: "Shore",
+      design: "paper",
+      scene: "rain",
+      designLight: "flat",
+      sceneLight: "none",
+      font: "inter",
+      headingFont: "lora",
+      wallpaper: { src: "https://example.com/sea.jpg" },
+    });
+    expect(pack.tune?.radius).toBe(50);
+    expect(pack.status?.down).toBe("#ff0000");
+    expect(themeEntrySchema.safeParse({ key: "custom-1", ...pack }).success).toBe(true);
+    // The same design and scene in both modes, and the default font, are left out.
+    const plain = packFromCustomTheme(sanitizeCustomTheme({ name: "Plain", dark: valid, light: valid })!);
+    expect(plain.designLight).toBeUndefined();
+    expect(plain.sceneLight).toBeUndefined();
+    expect(plain.font).toBeUndefined();
   });
 });

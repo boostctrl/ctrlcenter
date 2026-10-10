@@ -3,6 +3,7 @@ import { migrateV2toV3 } from "./config-migrate-v3";
 import { migrateConfig } from "./config-migrate";
 import { configReadSchema } from "./schema";
 import { resolveLayout } from "./layout";
+import { THEME_PACKS } from "./theme";
 
 // The v2 → v3 step (#297): widget content moves onto instances, and the v2
 // layout is resolved once with its legacy rules (ported from the 2.x
@@ -399,9 +400,28 @@ describe("v2 → v3: themes (#305)", () => {
     expect(changed).toBe(true);
     const out = value as { settings: { theme: Record<string, unknown> }; themes: Record<string, unknown>[] };
     expect(out.settings.theme).toEqual({ design: "flat" });
-    expect(out.themes[0]).toMatchObject({ key: "Mariana", name: "Mariana", scene: "aurora" });
-    expect(out.themes[1]).toMatchObject({ key: "Ember", name: "My Ember", scene: "rays" });
+    const mariana = out.themes.find((t) => t.key === "Mariana");
+    expect(mariana).toMatchObject({ key: "Mariana", builtin: "Mariana", name: "Mariana", scene: "aurora" });
+    // One naming no built-in stays as it was, after the gallery.
+    expect(out.themes[out.themes.length - 1]).toMatchObject({ key: "Ember", name: "My Ember", scene: "rays" });
     expect(migrateV2toV3(value).changed).toBe(false);
+  });
+
+  it("turns the overrides into the gallery (#334): every built-in in shipped order, the edited ones as they were", () => {
+    const { value, changed } = migrateV2toV3({
+      themes: [{ key: "Tide", name: "Surf", design: "flat", scene: "rays" }],
+    });
+    expect(changed).toBe(true);
+    const out = value as { themes: Record<string, unknown>[] };
+    expect(out.themes.map((t) => t.key)).toEqual(THEME_PACKS.map((p) => p.name));
+    expect(out.themes.every((t) => t.builtin === t.key)).toBe(true);
+    expect(out.themes.find((t) => t.key === "Tide")).toEqual({ key: "Tide", builtin: "Tide", name: "Surf", design: "flat", scene: "rays" });
+    expect(out.themes.find((t) => t.key === "Default")).toEqual({ key: "Default", builtin: "Default" });
+    // Empty stays empty; a gallery (naming a built-in) is left be.
+    const themesOf = (raw: Record<string, unknown>) => (migrateV2toV3(raw).value as { themes: unknown }).themes;
+    expect(themesOf({ themes: [] })).toEqual([]);
+    const gallery = [{ key: "custom-1", name: "Mine" }, { key: "Tide", builtin: "Tide" }];
+    expect(themesOf({ themes: gallery })).toEqual(gallery);
   });
 });
 

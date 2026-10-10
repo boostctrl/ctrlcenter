@@ -12,6 +12,7 @@ import {
   isWallpaperSrc,
 } from "../theme";
 import { FONT_IDS, DEFAULT_FONT } from "../fonts";
+import { THEME_PACKS } from "../theme";
 import { hexColor } from "./shared";
 
 // A fine-tune over the design (#326): each knob a whole percentage of the
@@ -113,22 +114,22 @@ export const colorSetSchema = z.object({
   accentTo: hexColor,
 });
 
-// An admin override of a built-in theme pack, matched by `name`. Only edited
-// packs are stored; resolveThemePacks() (lib/theme.ts) applies them over the
-// built-ins and ignores any stale name. `name` is a plain string (not an enum)
-// on purpose, so renaming a built-in in a future version can't make an existing
-// config fail to load.
-export const themePackSchema = z.object({
-  // Stable id pinning this override to a built-in pack (its original name), so the
-  // editable `name` below can differ. An override without one matches nothing
-  // (the 3.0 migration gave the pre-1.9 key-less ones their name as key, #305).
-  key: z.string().optional(),
-  name: z.string().min(1),
-  // `.catch` so an unknown design/scene id falls back to the default instead of
-  // failing the whole config read.
-  design: z.enum(DESIGN_IDS).catch("glass"),
-  scene: z.enum(SCENE_IDS).catch("aurora"),
-  // A pack may ship a tune over its design (#326), and fonts (#330).
+// A theme gallery entry (#334): a built-in pack, as shipped or edited, or a
+// pack of the admin's own. Every pack field is optional here, since an entry
+// standing for a built-in carries only what it changes; an entry that stands
+// for no built-in must carry a name and both colorsets (the refine below), so
+// a mistyped built-in name fails loudly on an admin save and is dropped on a
+// lenient read instead of becoming a half-pack. The design/scene ids are
+// lenient on purpose (`.catch`), so renaming one in a future version can't
+// make an existing config fail to load.
+const packFieldsShape = {
+  name: z.string().min(1).max(40).optional(),
+  design: z.enum(DESIGN_IDS).optional().catch(undefined),
+  scene: z.enum(SCENE_IDS).optional().catch(undefined),
+  designLight: z.enum(DESIGN_IDS).optional().catch(undefined),
+  sceneLight: z.enum(SCENE_IDS).optional().catch(undefined),
+  // A pack may ship a tune over its design (#326), fonts (#330), its own
+  // status colors (#331) and wallpapers (#333).
   tune: tuneSchema.optional(),
   font: z.enum(FONT_IDS).optional().catch(undefined),
   headingFont: z.enum(FONT_IDS).optional().catch(undefined),
@@ -136,15 +137,41 @@ export const themePackSchema = z.object({
   statusLight: semanticSchema.optional().catch(undefined),
   wallpaper: wallpaperSchema.optional().catch(undefined),
   wallpaperLight: wallpaperSchema.optional().catch(undefined),
-  dark: colorSetSchema,
-  light: colorSetSchema,
-});
+  dark: colorSetSchema.optional(),
+  light: colorSetSchema.optional(),
+};
 
-// Admin sends the whole overrides array (PUT /api/themes); it replaces the
-// stored `themes` wholesale, so resetting a pack just omits it.
-export const themesInputSchema = z.array(themePackSchema);
+const BUILTIN_NAMES = new Set(THEME_PACKS.map((p) => p.name));
 
-export type ThemePackConfig = z.infer<typeof themePackSchema>;
+export const themeEntrySchema = z
+  .object({
+    // The entry's stable id: a built-in's name for one standing for it, a
+    // generated key for the admin's own. Optional only for files from before
+    // 3.0, which matched by name.
+    key: z.string().max(80).optional(),
+    // The built-in this entry stands for (its shipped name).
+    builtin: z.string().optional(),
+    hidden: z.boolean().optional(),
+    ...packFieldsShape,
+  })
+  .superRefine((e, ctx) => {
+    const standsForBuiltin =
+      e.builtin !== undefined ? BUILTIN_NAMES.has(e.builtin) : BUILTIN_NAMES.has(e.key ?? e.name ?? "");
+    if (standsForBuiltin) return;
+    if (e.builtin !== undefined) {
+      ctx.addIssue({ code: "custom", path: ["builtin"], message: `No built-in theme named "${e.builtin}"` });
+      return;
+    }
+    for (const f of ["name", "dark", "light"] as const) {
+      if (e[f] === undefined) ctx.addIssue({ code: "custom", path: [f], message: "Required for a theme of your own" });
+    }
+  });
+
+// Admin sends the whole gallery (PUT /api/themes); it replaces the stored
+// `themes` wholesale, so resetting a pack just omits its fields.
+export const themesInputSchema = z.array(themeEntrySchema).max(100);
+
+export type ThemeEntryConfig = z.infer<typeof themeEntrySchema>;
 
 // The admin sends the whole theme object (not a partial), so updateSettings
 // replaces it wholesale — that's how clearing the optional custom colors works

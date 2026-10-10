@@ -1,7 +1,7 @@
 "use client";
 
 import { RenameButton, RenameField } from "../InlineRename";
-import type { ThemePack } from "@/lib/theme";
+import { DEFAULT_THEME_NAME, packDesign, packScene, type ThemePack } from "@/lib/theme";
 import { buttonClasses } from "@/lib/buttons";
 import { DESIGN_NAMES } from "./constants";
 import { OptionCard } from "./OptionCard";
@@ -29,6 +29,8 @@ export default function ThemesTab({
     importStatus,
     promoteStatus,
     promoting,
+    galleryStatus,
+    addingToGallery,
     codeStatus,
     pasteOpen,
     setPasteOpen,
@@ -40,6 +42,7 @@ export default function ThemesTab({
     commitRename,
     hasDuplicateNames,
     promoteTheme,
+    addToGallery,
     exportThemes,
     handleImportFile,
     packActive,
@@ -64,10 +67,15 @@ export default function ThemesTab({
             onClick={() => applyPack(p, editMode)}
             selected={packActive(p, editMode)}
             name={p.name}
-            title={`${p.name} · ${DESIGN_NAMES[p.design]}`}
-            badge={i === 0 ? "Default" : undefined}
+            title={`${p.name} · ${DESIGN_NAMES[packDesign(p, editMode === "dark")]}`}
+            badge={(p.builtin ?? p.name) === DEFAULT_THEME_NAME ? "Default" : undefined}
           >
-            <ThemeTile design={p.design} scene={p.scene} colors={p[editMode]} mode={editMode} />
+            <ThemeTile
+              design={packDesign(p, editMode === "dark")}
+              scene={packScene(p, editMode === "dark")}
+              colors={p[editMode]}
+              mode={editMode}
+            />
           </OptionCard>
         ))}
       </div>
@@ -158,6 +166,11 @@ export default function ThemesTab({
             {promoteStatus}
           </p>
         )}
+        {galleryStatus && (
+          <p role="status" className="text-xs text-ink-50">
+            {galleryStatus}
+          </p>
+        )}
         {/* Two saved themes can share a name (saves before 1.9.3 appended,
             and an import skips only exact copies). Rename updates in place by
             id, but Save-under-a-name looks up by name and would recapture
@@ -211,6 +224,34 @@ export default function ThemesTab({
                       touch users couldn't reach them — tapping the card
                       applies the theme). Delete is confirmed: a saved theme
                       is two full modes of work with no undo (#121). */}
+                  {promote && (
+                    <button
+                      type="button"
+                      onClick={() => addToGallery(t)}
+                      disabled={addingToGallery}
+                      aria-label={`Add ${t.name} to the site's themes`}
+                      title="Add to site themes"
+                      className="absolute top-1 right-19 rounded-md bg-background/70 px-1 py-1 text-ink-50 transition-colors hover:text-ink-90 disabled:opacity-40"
+                    >
+                      <svg
+                        width="11"
+                        height="11"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden
+                      >
+                        <rect x="3" y="3" width="7" height="7" rx="1" />
+                        <rect x="14" y="3" width="7" height="7" rx="1" />
+                        <rect x="3" y="14" width="7" height="7" rx="1" />
+                        <line x1="17.5" y1="14" x2="17.5" y2="21" />
+                        <line x1="14" y1="17.5" x2="21" y2="17.5" />
+                      </svg>
+                    </button>
+                  )}
                   {promote && (
                     <button
                       type="button"

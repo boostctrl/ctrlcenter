@@ -5,12 +5,32 @@ import type { ChangeEvent } from "react";
 import { useLookPrefs } from "../PrefsProvider";
 import type { Mode } from "../prefs/themeApply";
 import { useConfirm } from "../admin/Confirm";
-import { colorSetsEqual, sceneFxEqual, semanticEqual, tunesEqual, wallpaperEqual } from "@/lib/theme";
+import {
+  colorSetsEqual,
+  newThemeEntryKey,
+  packDesign,
+  packScene,
+  resolveThemeGallery,
+  sceneFxEqual,
+  semanticEqual,
+  tunesEqual,
+  uniquePackName,
+  wallpaperEqual,
+} from "@/lib/theme";
 import { derivePalette } from "@/lib/color";
 import type { ModeColors, ThemePack } from "@/lib/theme";
-import { decodeThemeCode, encodeThemeCode, newThemeId, parseThemesExport, siteThemeFromCustomTheme } from "@/lib/prefs";
+import {
+  decodeThemeCode,
+  encodeThemeCode,
+  newThemeId,
+  packFromCustomTheme,
+  parseThemesExport,
+  siteThemeFromCustomTheme,
+} from "@/lib/prefs";
 import type { CustomTheme, ThemeColors } from "@/lib/prefs";
 import { saveSettingsPatch } from "../admin/settingsApi";
+import { apiErrorMessage } from "../admin/apiError";
+import type { ThemeEntryConfig } from "@/lib/schema";
 import { downloadJson } from "@/lib/download";
 import { deepenForLight } from "../scenes/color";
 import { DEFAULT_DRAFT, MODE_DEFAULTS } from "./constants";
@@ -95,8 +115,8 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
   // scene effects — so the tiles can show an active state (#328). A pack is
   // per mode (it carries no font); a saved theme is both modes, font included.
   const packActive = (p: ThemePack, mode: Mode) =>
-    designFor(mode) === p.design &&
-    sceneFor(mode) === p.scene &&
+    designFor(mode) === packDesign(p, mode === "dark") &&
+    sceneFor(mode) === packScene(p, mode === "dark") &&
     colorSetsEqual(colorsFor(mode), p[mode]) &&
     tunesEqual(tuneFor(mode), p.tune ?? null) &&
     sceneFxEqual(sceneFxFor(mode), null) &&
@@ -162,6 +182,9 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
   // Outcome of the last "set as site theme" (admin only), same treatment.
   const [promoteStatus, setPromoteStatus] = useState<string | null>(null);
   const [promoting, setPromoting] = useState(false);
+  // Outcome of the last "add to site themes" (admin only, #334).
+  const [galleryStatus, setGalleryStatus] = useState<string | null>(null);
+  const [addingToGallery, setAddingToGallery] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Whether the accent editor shows one color well or a from→to pair. Solid is
   // just a gradient with two equal stops, so this is purely a UI simplification
@@ -370,6 +393,56 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     }
   }
 
+  // Put a saved theme in the site's theme gallery (#334), as a theme of the
+  // admin's own every visitor can pick: both modes' design, scene and
+  // colors, and its tune, fonts, status colors and wallpapers. A copy — later
+  // edits to the saved theme don't follow; the Themes tab edits the gallery
+  // one. The whole gallery is read and written back, as the admin Themes tab
+  // does, with the name made unique among the packs.
+  async function addToGallery(t: CustomTheme) {
+    if (!promote || addingToGallery) return;
+    const ok = await confirm({
+      title: `Add “${t.name}” to the site's themes?`,
+      message:
+        "Every visitor can then pick it in their theme builder, and it can be " +
+        "edited in the admin Themes tab. It's a copy — later edits to this saved " +
+        "theme won't follow.",
+      confirmLabel: "Add to site themes",
+    });
+    if (!ok) return;
+    setAddingToGallery(true);
+    try {
+      const res = await fetch("/api/themes");
+      if (!res.ok) throw new Error("Couldn't read the site's themes.");
+      const entries = (await res.json()) as ThemeEntryConfig[];
+      const gallery = resolveThemeGallery(entries);
+      const stored: ThemeEntryConfig[] = gallery.map((r) =>
+        r.entry ? { ...r.entry, key: r.key, builtin: r.builtin } : { key: r.key, builtin: r.builtin }
+      );
+      const pack = packFromCustomTheme(t);
+      const name = uniquePackName(pack.name, gallery.map((r) => r.pack.name));
+      stored.push({ key: newThemeEntryKey(), ...pack, name });
+      const put = await fetch("/api/themes", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(stored),
+      });
+      if (!put.ok) {
+        const data = await put.json().catch(() => null);
+        throw new Error(apiErrorMessage(data, "Couldn't add it to the site's themes."));
+      }
+      setGalleryStatus(
+        name === pack.name
+          ? `“${name}” is now one of the site's themes.`
+          : `Added as “${name}” (a site theme already had that name).`
+      );
+    } catch (e) {
+      setGalleryStatus(e instanceof Error ? e.message : "Couldn't add it to the site's themes.");
+    } finally {
+      setAddingToGallery(false);
+    }
+  }
+
   // Download the saved themes as a JSON file the visitor can carry to another
   // browser (or back it up).
   function exportThemes() {
@@ -451,6 +524,8 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     importStatus,
     promoteStatus,
     promoting,
+    galleryStatus,
+    addingToGallery,
     codeStatus,
     pasteOpen,
     setPasteOpen,
@@ -468,6 +543,7 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     commitRename,
     hasDuplicateNames,
     promoteTheme,
+    addToGallery,
     exportThemes,
     handleImportFile,
   };

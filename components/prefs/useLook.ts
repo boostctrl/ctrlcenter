@@ -40,6 +40,7 @@ import {
   type AccentOverrides,
   type ModePair,
 } from "@/lib/prefs";
+import { packDesign, packScene } from "@/lib/theme";
 import type {
   ColorSet,
   Density,
@@ -753,8 +754,8 @@ export function useLook(defaultTheme: DefaultTheme): {
   // font is left as-is.
   const applyPack = useCallback(
     (pack: ThemePack, mode: Mode) => {
-      setDesign(pack.design, mode);
-      setScene(pack.scene, mode);
+      setDesign(packDesign(pack, mode === "dark"), mode);
+      setScene(packScene(pack, mode === "dark"), mode);
       setTune(pack.tune ?? null, mode);
       setSceneFx(null, mode);
       // Fonts only when the pack carries them (#330); else the mode keeps its own.

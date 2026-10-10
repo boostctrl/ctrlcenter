@@ -14,6 +14,14 @@ here.
 
 ### Added
 
+- **A theme gallery you curate (3.0).** The admin Themes tab now holds the
+  whole list visitors pick from: add themes of your own, duplicate one as a
+  starting point, hide any built-in from visitors, and drag (or use the
+  arrows) to reorder; each card previews the theme as visitors will see it,
+  in its own design, scene, colours and fonts, for light and dark. A theme
+  can give light mode its own design and scene. From the theme builder, an
+  admin can add a saved theme to the gallery in one tap. Existing edits to
+  built-in themes carry over unchanged. (#334)
 - **Wallpapers (3.0).** A photo can sit behind the scene: in the builder's
   Scene tab, give it a web address, then blur it, dim it toward the page
   colour and choose how it fits (fill, fit or tile), per light and dark

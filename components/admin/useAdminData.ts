@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { AppItem, BookmarkItem, ThemePackConfig } from "@/lib/schema";
+import type { AppItem, BookmarkItem, ThemeEntryConfig } from "@/lib/schema";
 
 // The apps and bookmarks, held once for the whole admin like the groups
 // (useGroups), so a change made in one tab is what every other tab shows
@@ -15,19 +15,12 @@ export function useItems(initialApps: AppItem[], initialBookmarks: BookmarkItem[
 
 export type ItemsState = ReturnType<typeof useItems>;
 
-// The theme overrides, edited in Themes and read by Settings' theme pickers,
-// keyed by the built-in's stable `key` (its original name) so the editable
-// display `name` can differ.
-export function useThemeOverrides(initial: ThemePackConfig[]) {
-  const [overrides, setOverrides] = useState<Record<string, ThemePackConfig>>(() =>
-    Object.fromEntries(
-      initial.map((o) => {
-        const key = o.key ?? o.name;
-        return [key, { ...o, key }];
-      })
-    )
-  );
-  return { overrides, setOverrides };
+// The theme gallery (#334), edited in Themes and read by Settings' theme
+// pickers: the stored entries in order (see resolveThemeGallery for how they
+// become packs).
+export function useThemeGallery(initial: ThemeEntryConfig[]) {
+  const [entries, setEntries] = useState<ThemeEntryConfig[]>(initial);
+  return { entries, setEntries };
 }
 
-export type ThemeOverridesState = ReturnType<typeof useThemeOverrides>;
+export type ThemeGalleryState = ReturnType<typeof useThemeGallery>;

@@ -329,10 +329,11 @@ export default async function HelpPage() {
             puts it on the clipboard as a short code; <em>Paste a code</em> in
             another browser&apos;s builder applies and saves it, and a link of
             the form <Code>/settings#theme=&lt;code&gt;</Code> does the same on
-            arrival. Export and Import move your whole list as a file. Signed-in admins get one extra control here: the
+            arrival. Export and Import move your whole list as a file. Signed-in admins get two extra controls here: the
             globe on a saved theme makes that look the site-wide default every
-            visitor starts from — a copy, so editing the saved theme later
-            doesn&apos;t change the site.
+            visitor starts from, and the grid adds it to the site&apos;s theme
+            gallery for every visitor to pick — both copies, so editing the
+            saved theme later doesn&apos;t change the site.
           </P>
         </Card>
 
@@ -876,9 +877,14 @@ export default async function HelpPage() {
       >
         <Card title="Themes">
           <P>
-            The <strong>Themes</strong> tab edits the built-in theme packs
-            visitors can choose from: the design, scene, and colors for both
-            light and dark. Reset any pack to restore its original values.
+            The <strong>Themes</strong> tab is the gallery visitors choose
+            from in their theme builder, in the order shown. Edit a built-in
+            theme (design, scene, colors, fonts, tune and wallpaper, for light
+            and dark) or reset it to its original; add themes of your own,
+            duplicate one as a starting point, hide any from visitors, and
+            drag or use the arrows to reorder. Each card previews the theme as
+            visitors will see it. In your own theme builder, a saved theme
+            can be added to the gallery from its card.
           </P>
         </Card>
 
