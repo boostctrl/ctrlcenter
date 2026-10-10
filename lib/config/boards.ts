@@ -2,7 +2,6 @@
 // whole; the layout editor saves one board's arrangement.
 import type { z } from "zod";
 import type { Board, BoardsUpdate, boardLayoutUpdateSchema } from "../schema";
-import { GRID_COLUMNS } from "../layout";
 import { mutate } from "./store";
 
 // Replace the board list. A board sent without a layout keeps the one stored
@@ -13,8 +12,8 @@ export async function replaceBoards(input: BoardsUpdate): Promise<Board[]> {
     config.boards = input.map(({ layout, ...meta }) => ({
       ...meta,
       layout: layout
-        ? { columns: GRID_COLUMNS, sections: layout.sections }
-        : (stored.get(meta.id)?.layout ?? { columns: GRID_COLUMNS, sections: [] }),
+        ? { sections: layout.sections }
+        : (stored.get(meta.id)?.layout ?? { sections: [] }),
     }));
     return config.boards;
   });
@@ -31,7 +30,7 @@ export async function updateBoardLayout(
   await mutate((config) => {
     const board = config.boards.find((b) => b.id === id);
     if (!board) throw new UnknownBoardError(id);
-    board.layout = { columns: GRID_COLUMNS, sections };
+    board.layout = { sections };
     config.settings.layout = { ...config.settings.layout, ...page };
   });
 }

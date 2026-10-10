@@ -150,7 +150,7 @@ function layoutToBoards(settings: Record<string, unknown>): Record<string, unkno
   const rows = Array.isArray(sections)
     ? sections
     : V2_WIDGETS.map((w) => ({ widget: w.id, span: w.span, hidden: w.hidden }));
-  return [{ id: "home", name: "Home", visibility: "public", layout: { columns: 24, sections: rows } }];
+  return [{ id: "home", name: "Home", visibility: "public", layout: { sections: rows } }];
 }
 
 type Step = (raw: Record<string, unknown>) => { value: Record<string, unknown>; changed: boolean };
@@ -163,7 +163,7 @@ export function migrateV2toV3(raw: unknown): { value: unknown; changed: boolean 
   if (!isRecord(raw)) return { value: raw, changed: false };
   let value = raw;
   let changed = false;
-  for (const step of [instancesStep, boardsStep, groupsStep, integrationsStep]) {
+  for (const step of [instancesStep, boardsStep, groupsStep, integrationsStep, themesStep]) {
     const out = step(value);
     if (out.changed) {
       value = out.value;
@@ -296,6 +296,40 @@ const integrationsStep: Step = (raw) => {
   });
   delete settings.integrations;
   return { value: { ...raw, settings, integrations }, changed: true };
+};
+
+// Themes (#305): two things 2.x read leniently are settled in the file, so
+// 3.0 doesn't have to:
+// - the scenes retired in 1.4 ("glow", "vortex", "mesh") go back to the
+//   default, in the site theme and in the built-in theme overrides;
+// - an override saved before renaming existed (1.9) had no `key` and was
+//   matched by its name, which was then still the built-in's; it gets that
+//   name as its key.
+const RETIRED_SCENES = new Set(["glow", "vortex", "mesh"]);
+const themesStep: Step = (raw) => {
+  let changed = false;
+  const settings: Record<string, unknown> = isRecord(raw.settings) ? { ...raw.settings } : {};
+  if (isRecord(settings.theme)) {
+    const theme = { ...settings.theme };
+    for (const key of ["scene", "sceneLight"]) {
+      if (typeof theme[key] === "string" && RETIRED_SCENES.has(theme[key] as string)) {
+        delete theme[key];
+        changed = true;
+      }
+    }
+    settings.theme = theme;
+  }
+  const themes = Array.isArray(raw.themes)
+    ? raw.themes.map((t) => {
+        if (!isRecord(t)) return t;
+        let next = t;
+        if (typeof t.key !== "string" && typeof t.name === "string") next = { key: t.name, ...next };
+        if (typeof t.scene === "string" && RETIRED_SCENES.has(t.scene)) next = { ...next, scene: "aurora" };
+        if (next !== t) changed = true;
+        return next;
+      })
+    : raw.themes;
+  return changed ? { value: { ...raw, settings, themes }, changed } : { value: raw, changed: false };
 };
 
 // Widgets become instances (#297) and the layout the home board (#298).

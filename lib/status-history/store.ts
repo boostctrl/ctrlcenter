@@ -258,7 +258,9 @@ function retentionCutoffs(now: number) {
   };
 }
 
-// Parse the JSON history file older builds wrote. Stored shape:
+// Parse the JSON history file builds before 2.12 wrote (#278). Kept in 3.0
+// (#305): an install upgrading straight from 2.0–2.11 still brings its
+// history over through this. Stored shape:
 // { apps:   { [id]: { [hour]: [up, down, msCount, msSum, msMax] } },
 //   recent: { [id]: [[t, up?1:0, ms?], …] },
 //   downSince: { [id]: ms },

@@ -6,7 +6,7 @@ import { boardsSchema, boardsUpdateSchema, boardName, newBoardId, DEFAULT_BOARDS
 describe("boardsSchema", () => {
   it("fills a board's defaults: a public, empty board named by its id", () => {
     const [b] = boardsSchema.parse([{ id: "media" }]);
-    expect(b).toEqual({ id: "media", name: "", visibility: "public", layout: { columns: 24, sections: [] } });
+    expect(b).toEqual({ id: "media", name: "", visibility: "public", layout: { sections: [] } });
     expect(boardName(b)).toBe("media");
     expect(boardName({ ...b, name: "  Media  " })).toBe("Media");
   });

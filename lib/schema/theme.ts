@@ -17,14 +17,15 @@ export const themeSchema = z.object({
   // The pack chosen for an independent light-mode default (admin Settings). When
   // unset, light mode follows the dark default's light variant.
   presetLight: z.string().optional(),
-  // `.catch` coerces a retired/unknown id back to the default so a hand-edited
-  // or pre-1.4 config (e.g. scene "mesh") still parses instead of 500-ing.
+  // `.catch` coerces an unknown id back to the default so a typo in a
+  // hand-edited config doesn't fail the whole read. (Ids retired in 1.4 were
+  // rewritten by the 3.0 migration, #305.)
   design: z.enum(DESIGN_IDS).catch("glass").default("glass"),
   scene: z.enum(SCENE_IDS).catch("aurora").default("aurora"),
   font: z.enum(FONT_IDS).catch(DEFAULT_FONT).default(DEFAULT_FONT),
   // Optional light-mode design/scene/font. When set, light mode uses a wholly
   // independent look; when omitted it falls back to the dark-mode values above.
-  // `.catch` coerces a retired id to undefined so an old config still parses.
+  // `.catch` drops an unknown id, like the defaults above.
   designLight: z.enum(DESIGN_IDS).optional().catch(undefined),
   sceneLight: z.enum(SCENE_IDS).optional().catch(undefined),
   fontLight: z.enum(FONT_IDS).optional().catch(undefined),
@@ -60,12 +61,12 @@ export const colorSetSchema = z.object({
 // config fail to load.
 export const themePackSchema = z.object({
   // Stable id pinning this override to a built-in pack (its original name), so the
-  // editable `name` below can differ. Optional for back-compat: an override saved
-  // before renaming existed has no `key` and is matched by `name` instead.
+  // editable `name` below can differ. An override without one matches nothing
+  // (the 3.0 migration gave the pre-1.9 key-less ones their name as key, #305).
   key: z.string().optional(),
   name: z.string().min(1),
-  // `.catch` so a retired design/scene id (e.g. an old "mesh" override) coerces
-  // to the default instead of failing the whole config parse on load.
+  // `.catch` so an unknown design/scene id falls back to the default instead of
+  // failing the whole config read.
   design: z.enum(DESIGN_IDS).catch("glass"),
   scene: z.enum(SCENE_IDS).catch("aurora"),
   dark: colorSetSchema,

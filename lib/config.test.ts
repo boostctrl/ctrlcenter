@@ -429,7 +429,7 @@ describe("updateSettings partial merge", () => {
       boards: { layout: { sections: { widget: string }[]; columns: number } }[];
     };
     expect(rowOf(onDisk.boards[0].layout.sections, "apps")).toEqual({ widget: "apps", span: 12, hidden: false });
-    expect(onDisk.boards[0].layout.columns).toBe(24);
+    expect(onDisk.boards[0].layout).not.toHaveProperty("columns");
     // …after snapshotting the pre-migration file verbatim to the .bak.
     const bak = YAML.load(await fs.readFile(`${configPath}.bak`, "utf8"));
     expect(bak).toEqual(legacy);
@@ -547,7 +547,7 @@ describe("updateSettings partial merge", () => {
     const reloaded = await config.readConfigInternal();
     expect(rowOf(reloaded.boards[0].layout.sections, "apps")?.span).toBe(12);
     expect(rowOf(reloaded.boards[0].layout.sections, "search")?.span).toBe(24);
-    expect(reloaded.boards[0].layout.columns).toBe(24);
+    expect(reloaded.boards[0].layout).not.toHaveProperty("columns");
   });
 
   it("migrates a pre-2.0 backup file on import", async () => {
@@ -575,7 +575,7 @@ describe("updateSettings partial merge", () => {
       hidden: false,
       space: { bottom: 40 },
     });
-    expect(replaced.boards[0].layout.columns).toBe(24);
+    expect(replaced.boards[0].layout).not.toHaveProperty("columns");
   });
 });
 

@@ -63,10 +63,11 @@ describe("per-mode design/scene/font storage", () => {
     expect(loadFont()).toEqual({ dark: "jetbrains", light: "lora" });
   });
 
-  it("reads a legacy bare-string value as both modes", () => {
-    // Saved before modes were independent: a single unquoted id.
+  it("ignores a 1.x bare-string value (#305)", () => {
+    // Saved before modes were independent: a single unquoted id. No longer
+    // read; both modes fall back to the site default.
     store.setItem(DESIGN_KEY, "bold");
-    expect(loadDesign()).toEqual({ dark: "bold", light: "bold" });
+    expect(loadDesign()).toEqual({ dark: null, light: null });
   });
 
   it("drops invalid ids per mode", () => {

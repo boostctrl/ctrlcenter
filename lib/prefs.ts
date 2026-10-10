@@ -425,10 +425,11 @@ export function saveAccentOverride(accents: AccentOverrides | null): void {
 
 // --- Per-mode design / scene / font ---
 // Each is chosen independently for light and dark, so the two modes can be wholly
-// different looks. Stored as a `{dark,light}` JSON object under the same key; a
-// legacy bare-string value (saved before modes were independent) is read as both
-// modes. A null per mode means the visitor hasn't chosen for that mode, so the
-// caller falls back to the admin-configured default.
+// different looks. Stored as a `{dark,light}` JSON object under the same key.
+// A null per mode means the visitor hasn't chosen for that mode, so the caller
+// falls back to the admin-configured default — as it does for anything else
+// under the key (the bare string 1.x saved before modes were independent is
+// no longer read, #305).
 function loadModePair<T>(
   key: string,
   valid: (v: unknown) => v is T
@@ -437,17 +438,7 @@ function loadModePair<T>(
   try {
     const raw = window.localStorage.getItem(key);
     if (!raw) return { dark: null, light: null };
-    let parsed: unknown = raw;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      // A bare legacy value like `flat` isn't valid JSON; use the raw string.
-      parsed = raw;
-    }
-    if (typeof parsed === "string") {
-      const v = valid(parsed) ? parsed : null;
-      return { dark: v, light: v };
-    }
+    const parsed: unknown = JSON.parse(raw);
     if (parsed && typeof parsed === "object") {
       const o = parsed as Record<string, unknown>;
       return {

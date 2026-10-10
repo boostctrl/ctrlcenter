@@ -8,7 +8,6 @@ import type { ThemePack } from "@/lib/theme";
 import { replaceUrlParams } from "./urlState";
 import { SaveStatus } from "./useAutosave";
 import {
-  LEGACY_SECTION_ALIASES,
   SETTINGS_SECTIONS,
   type SettingsSectionId,
 } from "./settings/constants";
@@ -68,7 +67,7 @@ export default function SettingsManager({
   const [section, setSection] = useState<SettingsSectionId>(() => {
     if (SETTINGS_SECTIONS.some((s) => s.id === initialSection))
       return initialSection as SettingsSectionId;
-    return (initialSection && LEGACY_SECTION_ALIASES[initialSection]) || "general";
+    return "general";
   });
   const activeSection =
     SETTINGS_SECTIONS.find((s) => s.id === section) ?? SETTINGS_SECTIONS[0];

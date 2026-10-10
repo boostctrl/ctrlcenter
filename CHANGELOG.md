@@ -111,6 +111,16 @@ here.
   `CTRLCENTER_CALDAV_PASS` variable keeps applying to your existing
   calendar, and only to it. (#297)
 
+### Removed
+
+- Compatibility with very old saved data that the 3.0 upgrade settles for
+  good. A theme override from before 1.9 keeps working: the upgrade gives it
+  the key newer ones have. A theme naming a scene retired in 1.4 goes back to
+  Aurora. A visitor's design, scene or font choice saved by 1.x (before light
+  and dark were chosen separately) is no longer read, so they see the site
+  default until they choose again. An old link to the admin's
+  "announcement" settings section opens General. (#305)
+
 ### Fixed
 
 - **Notes headings.** A note's headings now follow on from its card's

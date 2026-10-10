@@ -118,7 +118,7 @@ describe("layout schema", () => {
     expect(config.boards).toHaveLength(1);
     expect(config.boards[0]).toMatchObject({ id: "home", name: "Home", visibility: "public" });
     expect(config.boards[0].layout.sections).toEqual(DEFAULT_SECTIONS);
-    expect(config.boards[0].layout.columns).toBe(24);
+    expect(config.boards[0].layout).not.toHaveProperty("columns");
     expect(settingsSchema.parse({}).layout).toEqual({ scale: 100, gap: 32, topGap: 64 });
   });
 

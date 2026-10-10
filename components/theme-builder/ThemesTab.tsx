@@ -114,11 +114,11 @@ export default function ThemesTab({
             {promoteStatus}
           </p>
         )}
-        {/* Pre-1.9.3, Save always appended, so a name could land on two
-            cards. Rename updates in place by id, but Save-under-a-name looks
-            up by name and would recapture into the first match — nudge the
-            user to give duplicates distinct names so Save is unambiguous
-            (#144). */}
+        {/* Two saved themes can share a name (saves before 1.9.3 appended,
+            and an import skips only exact copies). Rename updates in place by
+            id, but Save-under-a-name looks up by name and would recapture
+            into the first match — nudge the user to give duplicates distinct
+            names so Save is unambiguous (#144). */}
         {hasDuplicateNames && (
           <p className="text-[11px] text-ink-45">
             Some saved themes share a name — rename them so saving updates the

@@ -212,7 +212,7 @@ describe("migrateV2toV3: boards (#298)", () => {
     });
     expect(out.boards).toHaveLength(1);
     expect(out.boards[0]).toMatchObject({ id: "home", name: "Home", visibility: "public" });
-    expect(out.boards[0].layout.columns).toBe(24);
+    expect(out.boards[0].layout).not.toHaveProperty("columns");
     expect(row(out, "apps")).toMatchObject({ span: 12 });
     expect(out.settings.layout).toEqual({ scale: 110, gap: 24, topGap: 40 });
   });
@@ -384,6 +384,24 @@ describe("migrateV2toV3: integrations (#300)", () => {
     expect(migrateV2toV3(v3)).toEqual({ value: v3, changed: false });
     const both = { ...v3, integrations: [], settings: { integrations: { sonarr: { enabled: true } } } };
     expect(migrateV2toV3(both).changed).toBe(false);
+  });
+});
+
+describe("v2 → v3: themes (#305)", () => {
+  it("puts retired scenes back on the default and keys the key-less overrides", () => {
+    const { value, changed } = migrateV2toV3({
+      settings: { theme: { scene: "mesh", sceneLight: "glow", design: "flat" } },
+      themes: [
+        { name: "Mariana", design: "glass", scene: "vortex" },
+        { key: "Ember", name: "My Ember", design: "glass", scene: "rays" },
+      ],
+    });
+    expect(changed).toBe(true);
+    const out = value as { settings: { theme: Record<string, unknown> }; themes: Record<string, unknown>[] };
+    expect(out.settings.theme).toEqual({ design: "flat" });
+    expect(out.themes[0]).toMatchObject({ key: "Mariana", name: "Mariana", scene: "aurora" });
+    expect(out.themes[1]).toMatchObject({ key: "Ember", name: "My Ember", scene: "rays" });
+    expect(migrateV2toV3(value).changed).toBe(false);
   });
 });
 

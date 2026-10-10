@@ -5,7 +5,6 @@ import {
   DESIGNS,
   SCENES,
   BASE_THEMES,
-  type ThemePack,
   type ThemePackOverride,
 } from "./theme";
 
@@ -27,7 +26,8 @@ describe("catalog sizes", () => {
 });
 
 describe("resolveThemePacks", () => {
-  const override: ThemePack = {
+  const override: ThemePackOverride = {
+    key: "Mariana",
     name: "Mariana",
     design: "flat",
     scene: "rays",
@@ -40,7 +40,7 @@ describe("resolveThemePacks", () => {
     expect(resolveThemePacks(undefined)).toBe(THEME_PACKS);
   });
 
-  it("replaces a built-in by name, preserving order", () => {
+  it("replaces a built-in by key, preserving order", () => {
     const resolved = resolveThemePacks([override]);
     expect(resolved).toHaveLength(THEME_PACKS.length);
     const idx = THEME_PACKS.findIndex((p) => p.name === "Mariana");
@@ -50,9 +50,11 @@ describe("resolveThemePacks", () => {
     expect(resolved[0]).toEqual(THEME_PACKS[0]);
   });
 
-  it("ignores overrides whose name matches no built-in", () => {
-    const stale: ThemePack = { ...override, name: "Nope" };
+  it("ignores overrides whose key matches no built-in, and key-less ones (#305)", () => {
+    const stale: ThemePackOverride = { ...override, key: "Nope", name: "Nope" };
     expect(resolveThemePacks([stale])).toEqual(THEME_PACKS);
+    const keyless: ThemePackOverride = { ...override, key: undefined };
+    expect(resolveThemePacks([keyless])).toEqual(THEME_PACKS);
   });
 
   it("renames the matched built-in via key, keeping its slot/order", () => {

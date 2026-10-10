@@ -179,8 +179,9 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     setRenamingId(null);
   }
 
-  // Pre-1.9.3 saves could pile two cards under one name; flag it so Save's
-  // update-in-place stays unambiguous (#144).
+  // Two saved themes can share a name — saves before 1.9.3 could, and an
+  // import still can (it skips only exact copies) — so flag it, keeping Save's
+  // update-in-place unambiguous (#144).
   const nameCounts = new Map<string, number>();
   for (const t of customThemes) {
     const key = t.name.trim().toLowerCase();

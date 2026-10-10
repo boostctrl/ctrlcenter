@@ -124,10 +124,11 @@ export type LayoutConfig = z.infer<typeof layoutSchema>;
 
 // What one board places (#298): its rows, in order. A board stored without
 // rows is empty (every instance waits in the editor's tray).
+// The spans are on the 24-column grid; a future grid change would say so with
+// the file's schemaVersion (the per-layout `columns` marker that told 1.3's
+// 12-column spans apart went with 3.0, #305 — that conversion is frozen in
+// the v1→v2 migration).
 export const boardLayoutSchema = z.object({
-  // Which grid the stored spans are for. Always 24; kept so a future grid
-  // change can tell which spans it has to convert.
-  columns: z.literal(GRID_COLUMNS).catch(GRID_COLUMNS).default(GRID_COLUMNS),
   sections: lenientArray(layoutSectionSchema).default([]),
 });
 export type BoardLayout = z.infer<typeof boardLayoutSchema>;

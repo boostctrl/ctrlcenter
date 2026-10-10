@@ -62,8 +62,8 @@ export function isDesignId(v: unknown): v is DesignId {
 // <html>; the components read the color CSS vars, so any scene works with any
 // palette. "aurora" is the default — the floating accent glow blobs.
 // The pre-1.4 "glow", "vortex" and "mesh" scenes were retired (all three were
-// soft gradient washes Aurora/Nebula already cover); stored references coerce
-// back to the default via the schema catches / isSceneId guards.
+// soft gradient washes Aurora/Nebula already cover); the 3.0 migration put a
+// config still naming one back on the default (#305).
 export type SceneId =
   | "aurora"
   | "abyss"
@@ -377,6 +377,8 @@ export function resolveThemePacks(
   overrides: ThemePackOverride[] | undefined
 ): ThemePack[] {
   if (!overrides || overrides.length === 0) return THEME_PACKS;
-  const byKey = new Map(overrides.map((o) => [o.key ?? o.name, o]));
+  // Matched by key: an override saved before renaming existed (1.9) got its
+  // name as its key in the 3.0 migration (#305).
+  const byKey = new Map(overrides.flatMap((o) => (o.key ? [[o.key, o] as const] : [])));
   return THEME_PACKS.map((p) => byKey.get(p.name) ?? p);
 }

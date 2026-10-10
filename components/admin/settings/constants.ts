@@ -49,12 +49,6 @@ export const SETTINGS_SECTIONS = [
 ] as const;
 export type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]["id"];
 
-// The banner section used to be "announcement" (singular, pre-#180); keep
-// saved deep links to it working.
-export const LEGACY_SECTION_ALIASES: Record<string, SettingsSectionId> = {
-  announcement: "announcements",
-};
-
 // Offered uptime-check intervals (minutes). The schema accepts 1–60, so a
 // hand-edited value can fall outside this list — the control shows it as an
 // extra read-only chip rather than pretending nothing is selected.
