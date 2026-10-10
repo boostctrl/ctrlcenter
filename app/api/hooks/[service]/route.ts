@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { readConfigInternal } from "@/lib/config";
 import { WEBHOOK_SERVICES, type WebhookService } from "@/lib/schema";
 import { parseWebhook } from "@/lib/webhooks";
+import { holdForDigest } from "@/lib/webhook-digest";
 import { sendNotification, anyChannelReady } from "@/lib/alerts";
 import { rateLimit, pruneRateLimit, clientKey } from "@/lib/rate-limit";
 import { log } from "@/lib/log";
@@ -19,9 +20,11 @@ export const dynamic = "force-dynamic";
 // file, with artwork and genres — so cap it generously, but cap it, so a
 // bad/hostile caller can't stream an unbounded body into memory.
 const MAX_BYTES = 256 * 1024;
-// Generous per-source rate limit — a normal app fires a handful of events, but
-// one misbehaving source shouldn't be able to hammer the relay.
-const MAX_PER_WINDOW = 60;
+// Generous per-source rate limit — one misbehaving source shouldn't be able to
+// hammer the relay — but a season upgrade is a burst in its own right: Sonarr
+// fires a delete and an import per episode, seconds apart, and never retries
+// a 429, so the limit sits well above the largest honest burst (#346).
+const MAX_PER_WINDOW = 300;
 const WINDOW_MS = 60 * 1000;
 
 function isWebhookService(v: string): v is WebhookService {
@@ -107,6 +110,33 @@ export async function POST(
   if (!anyChannelReady(settings.alerts)) {
     log.info("webhook received but no alert channel configured", { service });
     return NextResponse.json({ ok: true, delivered: false });
+  }
+
+  // An event that may be one of a burst waits for the burst to go quiet and
+  // goes out merged with its fellows (#346, lib/webhook-digest.ts); a Test, a
+  // health issue or anything else the parser left out of a digest, and every
+  // event while the window is off, is relayed at once as before.
+  const windowMs = settings.webhooks.digestSeconds * 1000;
+  if (windowMs > 0 && notification.digest) {
+    holdForDigest(notification, {
+      windowMs,
+      send: async (merged) => {
+        // Read the config afresh: a channel added or edited while the burst
+        // was pending is honoured, and one removed meanwhile isn't sent to.
+        const { settings } = await readConfigInternal();
+        if (!anyChannelReady(settings.alerts)) {
+          log.info("webhook digest dropped: no alert channel configured", { service });
+          return;
+        }
+        await sendNotification(settings.alerts, merged, {
+          at: Date.now(),
+          timeZone: settings.timezone,
+          siteTitle: settings.title,
+        });
+      },
+    });
+    log.debug("webhook held for digest", { service, key: notification.digest.key });
+    return NextResponse.json({ ok: true, queued: true });
   }
 
   await sendNotification(settings.alerts, notification, {

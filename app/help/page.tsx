@@ -665,6 +665,18 @@ export default async function HelpPage() {
             rotates it if one leaks — and events need an alert channel that
             sends inbound webhooks to land anywhere.
           </P>
+          <P>
+            A season import arrives as one event per episode. CtrlCenter waits
+            for the burst to go quiet — <strong>Group bursts for</strong>, a
+            minute by default; a burst that never goes quiet is sent after
+            five windows, ten minutes at most — and sends one notification:
+            &ldquo;Sonarr imported 8 episodes of The Bear (S04E01-E08)&rdquo;
+            with the episodes listed. A batch of movies in Radarr and a run of
+            Seerr requests merge the same way. Set it to <strong>Off</strong>{" "}
+            for one message per event. Health issues, updates, failed
+            downloads and a sender&apos;s Test are never held. Events still
+            waiting when CtrlCenter restarts are dropped.
+          </P>
         </Card>
 
         <Card title="Announcement banner">

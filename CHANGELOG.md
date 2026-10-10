@@ -17,6 +17,14 @@ here.
 - **Resize from any corner.** In edit mode every corner of a card takes a
   diagonal drag for width and height together, not just the bottom-right
   one. Pull a corner away from the card to grow it. (#343)
+- **One notification for a whole season.** Inbound webhooks that arrive in a
+  burst — Sonarr importing a season, Radarr grabbing several movies, a run
+  of Seerr requests — now go out as one message once the burst goes quiet,
+  with the episodes listed and the title carrying a range like
+  `S04E01-E08`. *Settings → Monitoring → Inbound webhooks → Group bursts
+  for* sets the wait (a minute by default); Off keeps one message per
+  event. Health issues, updates, failed downloads and a sender's Test are
+  never held, and the relay now accepts larger bursts. (#346)
 
 ### Changed
 
@@ -26,7 +34,7 @@ here.
   keeps working with the same webhook URL. (#342)
 - **Webhook emails are now a report.** An event relayed from Sonarr, Radarr
   or Seerr arrives with a short subject — `[Sonarr] Imported: The Bear
-  S04E03–E04` — and a body that shows the title, the poster, the facts
+  S04E03-E04` — and a body that shows the title, the poster, the facts
   (quality, size, release group, indexer, requester…), the message and a
   button back into the app, in light and dark mode. Other alert channels
   keep their one-line summary. (#345)

@@ -5,6 +5,7 @@ import {
   settingsInputSchema,
   settingsSchema,
   weatherUpdateSchema,
+  webhooksUpdateSchema,
   widgetInstancesUpdateSchema,
   alertsUpdateSchema,
 } from "../schema";
@@ -14,6 +15,10 @@ describe("derived input schemas", () => {
   it("leave out what a patch doesn't send — no defaults filled in", () => {
     expect(weatherUpdateSchema.parse({})).toEqual({});
     expect(alertsUpdateSchema.parse({ confirmations: 3 })).toEqual({ confirmations: 3 });
+    // A burst-window change (#346) carries no service tokens for the merge
+    // to overwrite.
+    expect(webhooksUpdateSchema.parse({})).toEqual({});
+    expect(webhooksUpdateSchema.parse({ digestSeconds: 0 })).toEqual({ digestSeconds: 0 });
   });
 
   it("are strict where the stored schema is lenient", () => {

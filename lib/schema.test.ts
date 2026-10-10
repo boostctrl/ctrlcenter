@@ -135,6 +135,7 @@ describe("configSchema defaults", () => {
     expect(config.settings.statusAnnouncements).toEqual([]);
     expect(config.settings.weather.enabled).toBe(true);
     expect(config.settings.weather.units).toBe("imperial");
+    expect(config.settings.webhooks.digestSeconds).toBe(60);
   });
 
   it("coerces per-field on a status announcement, keeping the row", () => {
@@ -372,6 +373,16 @@ describe("settingsInputSchema partial merge semantics", () => {
     expect("weather" in parsed).toBe(false);
     expect("theme" in parsed).toBe(false);
     expect("statusChecks" in parsed).toBe(false);
+  });
+
+  it("takes the webhook burst window within its bounds, leaving the services alone (#346)", () => {
+    expect(settingsInputSchema.parse({ webhooks: { digestSeconds: 0 } })).toEqual({
+      webhooks: { digestSeconds: 0 },
+    });
+    expect(settingsInputSchema.safeParse({ webhooks: { digestSeconds: 300 } }).success).toBe(true);
+    expect(settingsInputSchema.safeParse({ webhooks: { digestSeconds: 301 } }).success).toBe(false);
+    expect(settingsInputSchema.safeParse({ webhooks: { digestSeconds: 1.5 } }).success).toBe(false);
+    expect(settingsInputSchema.safeParse({ webhooks: { digestSeconds: -1 } }).success).toBe(false);
   });
 
   it("takes the page-level layout values partially, with no rows (#298)", () => {

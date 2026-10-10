@@ -1,13 +1,16 @@
-// Inbound webhook payload parsers (#204, #345). Sonarr/Radarr/Seerr POST an
-// event to /api/hooks/<service>; these pure functions fold each app's payload
-// into a WebhookReport — the structured record the email renders in full
-// (lib/webhook-email.ts) — and the flat { title, body, url } every other alert
-// channel relays (lib/alerts.ts sendNotification). Parsing is lenient — the
-// apps let the admin choose which triggers fire, and payload shapes drift
-// across versions, so a recognized event gets a tidy report and anything else
-// falls back to a humanized "<App> <event>: <title>" rather than being
-// dropped. Client-safe (imports only ./schema) so a preview can run it in the
-// browser; unit-tested directly (no IO here).
+// Inbound webhook payload parsers (#204, #345, #346). Sonarr/Radarr/Seerr POST
+// an event to /api/hooks/<service>; these pure functions fold each app's
+// payload into a WebhookReport — the structured record the email renders in
+// full (lib/webhook-email.ts) — and the flat { title, body, url } every other
+// alert channel relays (lib/alerts.ts sendNotification). An event that may be
+// one of a burst (a season's episodes, one event each) also names the digest
+// it joins; lib/webhook-digest.ts holds the burst and mergeDigest() below
+// folds it into one notification. Parsing is lenient — the apps let the admin
+// choose which triggers fire, and payload shapes drift across versions, so a
+// recognized event gets a tidy report and anything else falls back to a
+// humanized "<App> <event>: <title>" rather than being dropped. Client-safe
+// (imports only ./schema) so a preview can run it in the browser; unit-tested
+// directly (no IO here).
 
 import type { WebhookService } from "./schema";
 
@@ -41,7 +44,7 @@ export type WebhookReport = {
   headline: string;
   // "Season 4 · Episodes 3–4 · Aired Jun 25, 2025"
   subtitle?: string;
-  // The subject tail, and what the other channels say: "The Bear S04E03–E04".
+  // The subject tail, and what the other channels say: "The Bear S04E03-E04".
   summary: string;
   // Up to five scan tokens (quality, size, group…) for the preheader and the
   // flat body; the facts carry the same in full.
@@ -58,14 +61,60 @@ export type WebhookReport = {
   preheader?: string;
 };
 
+// One thing a burst is made of — an episode, a movie, a request — with what
+// its own event knew about it, so the merged report can show a quality or a
+// size when every item agrees. `id` dedupes a resent event; `season` and
+// `episode` let the merged title carry a range.
+export type DigestItem = {
+  id: string;
+  label: string;
+  season?: number;
+  episode?: number;
+  quality?: string;
+  sizeBytes?: number;
+  indexer?: string;
+  client?: string;
+  requester?: string;
+  image?: WebhookReport["image"];
+  link?: WebhookReport["link"];
+};
+
+export type DigestNoun = "episodes" | "movies" | "requests" | "series";
+
+// How an event joins a burst (#346): events sharing `key` — the service, the
+// sender's instance, the event type and, for a Sonarr series, the series,
+// "sonarr|Sonarr 4K|Download|12" — merge into one notification whose title
+// is `lead` with {n} for the count — "Sonarr imported {n} episodes of The
+// Bear" — and whose report leads with `headline`. Absent when the event is
+// never held (a Test, a health issue, anything without a subject).
+export type WebhookDigest = {
+  key: string;
+  lead: string;
+  headline: string;
+  noun: DigestNoun;
+  items: DigestItem[];
+};
+
 // What the channels relay: the flat contract every builder reads, plus the
-// report the email renders. A later change may add a `digest` for a burst of
-// like events (#346).
+// report the email renders and, for an event that may be one of a burst, the
+// digest it joins.
 export type WebhookNotification = {
   title: string;
   body?: string;
   url?: string;
   report?: WebhookReport;
+  digest?: WebhookDigest;
+};
+
+// A burst as the digest store hands it to mergeDigest(): the first event
+// whole (sent unchanged when it stayed alone), how many events joined, the
+// items kept (deduped by id, in arrival order) and how many were dropped past
+// the store's cap — counted so the merged title stays honest.
+export type DigestGroup = {
+  first: WebhookNotification;
+  events: number;
+  items: DigestItem[];
+  dropped: number;
 };
 
 // What a renderer needs beyond the notification: when it happened, the site's
@@ -172,22 +221,25 @@ function httpUrl(v: unknown): string | undefined {
   return /^https?:\/\//i.test(s) ? s : undefined;
 }
 
-// "3–5, 7" from sorted numbers, with the caller's own label for each.
-function runs(nums: number[], label: (n: number) => string): string {
+// "3–5, 7" from sorted numbers, with the caller's own label for each. The
+// en dash is for prose; an episode code passes "-" (see episodeCodes).
+function runs(nums: number[], label: (n: number) => string, dash = "–"): string {
   const out: string[] = [];
   for (let i = 0; i < nums.length; ) {
     let j = i;
     while (j + 1 < nums.length && nums[j + 1] === nums[j] + 1) j += 1;
-    out.push(j > i ? `${label(nums[i])}–${label(nums[j])}` : label(nums[i]));
+    out.push(j > i ? `${label(nums[i])}${dash}${label(nums[j])}` : label(nums[i]));
     i = j + 1;
   }
   return out.join(", ");
 }
 
-type Episode = { season: number; episode: number; title: string; airDate: string };
+type Episode = { id?: number; season: number; episode: number; title: string; airDate: string };
 
-// "S04E03–E05" for a run within one season, "S04E01–E03, E05" with a gap,
-// seasons joined with ", ".
+// "S04E03-E05" for a run within one season, "S04E01-E03, E05" with a gap,
+// seasons joined with ", "; more than three seasons collapse to "S01-S05".
+// An ASCII hyphen, not an en dash: the code reaches ntfy's Title header,
+// which takes latin-1 only, and an en dash there would drop the header.
 export function episodeCodes(eps: { season: number; episode: number }[]): string {
   const bySeason = new Map<number, Set<number>>();
   for (const e of eps) {
@@ -195,11 +247,12 @@ export function episodeCodes(eps: { season: number; episode: number }[]): string
     set.add(e.episode);
     bySeason.set(e.season, set);
   }
-  return [...bySeason.keys()]
-    .sort((a, b) => a - b)
+  const seasons = [...bySeason.keys()].sort((a, b) => a - b);
+  if (seasons.length > 3) return runs(seasons, (s) => `S${pad2(s)}`, "-");
+  return seasons
     .map((s) => {
       const nums = [...(bySeason.get(s) ?? [])].sort((a, b) => a - b);
-      return `S${pad2(s)}${runs(nums, (n) => `E${pad2(n)}`)}`;
+      return `S${pad2(s)}${runs(nums, (n) => `E${pad2(n)}`, "-")}`;
     })
     .join(", ");
 }
@@ -263,18 +316,27 @@ function episodesOf(p: Record<string, unknown>): Episode[] {
     const episode = num(ep.episodeNumber);
     return season === undefined || episode === undefined
       ? []
-      : [{ season, episode, title: str(ep.title), airDate: str(ep.airDate) }];
+      : [{ id: num(ep.id), season, episode, title: str(ep.title), airDate: str(ep.airDate) }];
   });
+}
+
+// One episode's line: S04E03 "Scrap".
+const episodeLine = (e: Episode) =>
+  `S${pad2(e.season)}E${pad2(e.episode)}${e.title ? ` "${e.title}"` : ""}`;
+
+// `lines` one per line, stopping at `max` and saying how many of `total`
+// remain — a season pack's episodes, a burst's items.
+const FACT_LINES = 24;
+function lineList(lines: string[], total: number, max: number): string {
+  const kept = lines.slice(0, max);
+  if (total > max) kept.push(`and ${total - max} more`);
+  return kept.join("\n");
 }
 
 // One line per episode: S04E03 "Scrap". Long lists (a season pack) stop at
 // 24 lines and say how many more.
 function episodeLines(eps: Episode[]): string {
-  const lines = eps.map(
-    (e) => `S${pad2(e.season)}E${pad2(e.episode)}${e.title ? ` "${e.title}"` : ""}`
-  );
-  if (lines.length > 24) lines.splice(24, lines.length, `and ${lines.length - 24} more`);
-  return lines.join("\n");
+  return lineList(eps.map(episodeLine), eps.length, FACT_LINES);
 }
 
 // "Season 4 · Episodes 3–4 · Aired Jun 25, 2025". The air date shows only
@@ -401,6 +463,95 @@ const languagesOf = (v: unknown) =>
     .join(", ");
 const clientOf = (p: Record<string, unknown>) => str(p.downloadClient) || str(p.downloadClientType);
 
+// --- Digest membership (#346) ---
+
+// The event labels that read as a verb in a merged title ("Sonarr imported
+// {n} episodes of The Bear"); any other label keeps the single-event shape
+// ("Sonarr something new: {n} series").
+const DIGEST_VERBS = new Set(["Grabbed", "Imported", "Upgraded", "Added", "Deleted", "Renamed"]);
+
+function digestLead(app: string, event: string, noun: DigestNoun, of = ""): string {
+  return DIGEST_VERBS.has(event)
+    ? `${app} ${lowerFirst(event)} {n} ${noun}${of}`
+    : `${app} ${lowerFirst(event)}: {n} ${noun}${of}`;
+}
+
+// What the digest store keeps per item and per group is payload text, so it
+// is bounded here, where it is made, rather than trusted to stay short.
+const MAX_LABEL = 120;
+const MAX_LEAD = 200;
+
+function digestOf(d: WebhookDigest): WebhookDigest {
+  return {
+    ...d,
+    lead: clamp(d.lead, MAX_LEAD),
+    headline: clamp(d.headline, MAX_LABEL),
+    items: d.items.map((it) => ({ ...it, label: clamp(it.label, MAX_LABEL) })),
+  };
+}
+
+// The sender's instanceName as a key part, control characters and runs of
+// whitespace collapsed and clamped like every other kept string: two Sonarr
+// (or Radarr) instances posting to the same relay URL never share a group,
+// and their ids — series 12 on each — never collide.
+const instanceKey = (r: Pick<WebhookReport, "instance">) =>
+  clamp((r.instance ?? "").replace(/[\p{Cc}\s]+/gu, " ").trim(), MAX_LABEL);
+
+// Which burst an arr event joins. A Sonarr event about episodes groups by
+// instance and series, one item per episode, so a season import reads "8
+// episodes of The Bear (S04E01-E08)"; anything else groups by instance and
+// event alone — Radarr's payload names no collection — with the series or
+// movie as the item. An event with no subject joins nothing.
+function arrDigest(
+  service: ArrService,
+  p: Record<string, unknown>,
+  r: Pick<WebhookReport, "app" | "instance" | "eventType" | "event" | "image" | "link">,
+  media: Media,
+  file: Pick<DigestItem, "quality" | "sizeBytes" | "indexer" | "client">
+): WebhookDigest | undefined {
+  if (!media.title) return undefined;
+  const shared = { image: r.image, link: r.link };
+  if (service === "sonarr" && media.episodes.length) {
+    const series = asRecord(p.series);
+    const sid = num(series.id) ?? num(series.tvdbId) ?? media.title;
+    return digestOf({
+      key: `sonarr|${instanceKey(r)}|${r.eventType}|${sid}`,
+      lead: digestLead(r.app, r.event, "episodes", ` of ${media.title}`),
+      headline: media.title,
+      noun: "episodes",
+      // A multi-episode event's quality, indexer and client hold for each of
+      // its episodes; its size belongs to the event (one file can span two
+      // episodes), so it rides on the first item and the rest carry 0 — the
+      // group's sum stays right either way.
+      items: media.episodes.map((e, i) => ({
+        id: `ep:${e.id ?? `S${pad2(e.season)}E${pad2(e.episode)}`}`,
+        label: episodeLine(e),
+        season: e.season,
+        episode: e.episode,
+        ...file,
+        sizeBytes: file.sizeBytes === undefined ? undefined : i === 0 ? file.sizeBytes : 0,
+        ...shared,
+      })),
+    });
+  }
+  const movie = service === "radarr";
+  const subject = asRecord(movie ? p.movie : p.series);
+  return digestOf({
+    key: `${service}|${instanceKey(r)}|${r.eventType}`,
+    lead: digestLead(r.app, r.event, movie ? "movies" : "series"),
+    headline: r.app,
+    noun: movie ? "movies" : "series",
+    items: [
+      {
+        id: `${movie ? "movie" : "series"}:${num(subject.id) ?? media.title}`,
+        label: media.summary,
+        ...file,
+        ...shared,
+      },
+    ],
+  });
+}
+
 export function parseArrWebhook(service: ArrService, payload: unknown): WebhookNotification | null {
   const p = asRecord(payload);
   const eventType = str(p.eventType);
@@ -455,13 +606,21 @@ export function parseArrWebhook(service: ArrService, payload: unknown): WebhookN
       push(facts, "Custom formats", customFormatsOf(p, release));
       push(facts, "Flags", strs(release.indexerFlags).join(", "));
       push(facts, "Release", str(release.releaseTitle), { mono: true });
-      return toContent({
-        ...base,
-        chips: [quality, size, group, indexer].filter(Boolean),
-        facts,
-        message: overview ? clamp(overview, 300) : undefined,
-        messageLabel: overview ? "Overview" : undefined,
-      });
+      return toContent(
+        {
+          ...base,
+          chips: [quality, size, group, indexer].filter(Boolean),
+          facts,
+          message: overview ? clamp(overview, 300) : undefined,
+          messageLabel: overview ? "Overview" : undefined,
+        },
+        arrDigest(service, p, base, media, {
+          quality: quality || undefined,
+          sizeBytes: num(release.size),
+          indexer: indexer || undefined,
+          client: clientOf(p) || undefined,
+        })
+      );
     }
 
     case "Download": {
@@ -471,7 +630,8 @@ export function parseArrWebhook(service: ArrService, payload: unknown): WebhookN
         // file; the per-file detail would be a wall, so it gets the sums.
         const count = num(p.fileCount) ?? files.length;
         const quality = qualityOf(files[0]);
-        const size = fmtBytes(files.reduce((sum, f) => sum + (num(f.size) ?? 0), 0));
+        const bytes = files.reduce((sum, f) => sum + (num(f.size) ?? 0), 0);
+        const size = fmtBytes(bytes);
         const indexer = str(release.indexer);
         const seasons = unique(media.episodes.map((e) => String(e.season)));
         const n = media.episodes.length || count;
@@ -483,16 +643,25 @@ export function parseArrWebhook(service: ArrService, payload: unknown): WebhookN
         push(facts, "Indexer", indexer);
         push(facts, "Download client", clientOf(p));
         push(facts, "Release", str(release.releaseTitle), { mono: true });
-        return toContent({
-          ...base,
-          summary: `${media.title || "Untitled"}${code} (${n} episodes)`,
-          chips: [quality, size, `${count} files`, indexer].filter(Boolean),
-          facts,
-        });
+        return toContent(
+          {
+            ...base,
+            summary: `${media.title || "Untitled"}${code} (${n} episodes)`,
+            chips: [quality, size, `${count} files`, indexer].filter(Boolean),
+            facts,
+          },
+          arrDigest(service, p, base, media, {
+            quality: quality || undefined,
+            sizeBytes: bytes || undefined,
+            indexer: indexer || undefined,
+            client: clientOf(p) || undefined,
+          })
+        );
       }
       const file = asRecord(service === "sonarr" ? (p.episodeFile ?? files[0]) : p.movieFile);
       const plain = qualityOf(file) || qualityOf(release);
-      const size = fmtBytes(file.size) || fmtBytes(release.size);
+      const bytes = num(file.size) || num(release.size);
+      const size = fmtBytes(bytes);
       const group = str(file.releaseGroup) || str(release.releaseGroup);
       const indexer = str(release.indexer);
       const replaced = unique(list(p.deletedFiles).map((f) => str(asRecord(f).quality))).join(", ");
@@ -507,12 +676,22 @@ export function parseArrWebhook(service: ArrService, payload: unknown): WebhookN
       push(facts, "Custom formats", customFormatsOf(p, release));
       push(facts, "Release", str(release.releaseTitle) || str(file.sceneName), { mono: true });
       const upgrade = p.isUpgrade === true;
-      return toContent({
-        ...base,
-        event: upgrade ? "Upgraded" : "Imported",
-        chips: [plain, size, group, indexer, replaced ? `was ${replaced}` : ""].filter(Boolean),
-        facts,
+      const event = upgrade ? "Upgraded" : "Imported";
+      const digest = arrDigest(service, p, { ...base, event }, media, {
+        quality: plain || undefined,
+        sizeBytes: bytes || undefined,
+        indexer: indexer || undefined,
+        client: clientOf(p) || undefined,
       });
+      return toContent(
+        {
+          ...base,
+          event,
+          chips: [plain, size, group, indexer, replaced ? `was ${replaced}` : ""].filter(Boolean),
+          facts,
+        },
+        digest
+      );
     }
 
     case "DownloadFailed":
@@ -603,23 +782,26 @@ export function parseArrWebhook(service: ArrService, payload: unknown): WebhookN
       if (renamed.length > 3) lines.push(`and ${renamed.length - 3} more`);
       if (renamed.length) push(facts, "Files", String(renamed.length));
       push(facts, "Renamed", lines.join("\n"), { mono: true });
-      return toContent({ ...base, facts });
+      return toContent({ ...base, facts }, arrDigest(service, p, base, media, {}));
     }
 
     case "SeriesAdd":
     case "MovieAdded": {
       push(facts, "Genres", media.genres.join(", "));
       push(facts, "Added via", humanize(str(p.addMethod)));
-      return toContent({
-        ...base,
-        // The type says what was added; the genres move to a row.
-        subtitle: media.title
-          ? [media.year ? String(media.year) : "", media.type].filter(Boolean).join(" · ")
-          : undefined,
-        facts,
-        message: overview ? clamp(overview, 300) : undefined,
-        messageLabel: overview ? "Overview" : undefined,
-      });
+      return toContent(
+        {
+          ...base,
+          // The type says what was added; the genres move to a row.
+          subtitle: media.title
+            ? [media.year ? String(media.year) : "", media.type].filter(Boolean).join(" · ")
+            : undefined,
+          facts,
+          message: overview ? clamp(overview, 300) : undefined,
+          messageLabel: overview ? "Overview" : undefined,
+        },
+        arrDigest(service, p, base, media, {})
+      );
     }
 
     case "SeriesDelete":
@@ -631,11 +813,14 @@ export function parseArrWebhook(service: ArrService, payload: unknown): WebhookN
       if (typeof p.deletedFiles === "boolean") push(facts, "Files deleted", p.deletedFiles ? "Yes" : "No");
       push(facts, "File", str(file.relativePath), { mono: true });
       push(facts, "Size", fmtBytes(p.movieFolderSize));
-      return toContent({ ...base, facts });
+      return toContent({ ...base, facts }, arrDigest(service, p, base, media, {}));
     }
 
     default:
-      return toContent({ ...base, headline: media.title || app, summary: media.summary || app, facts });
+      return toContent(
+        { ...base, headline: media.title || app, summary: media.summary || app, facts },
+        arrDigest(service, p, base, media, {})
+      );
   }
 }
 
@@ -659,6 +844,19 @@ const ISSUE_TYPES: Record<string, string> = {
   VIDEO: "Video",
   AUDIO: "Audio",
   SUBTITLES: "Subtitle",
+};
+
+// The merged title for a run of like requests (#346); an unlisted MEDIA_
+// event reads "Seerr <event>: {n} requests". Issues are never held — each is
+// someone's problem, and a comment thread merged would lose its order.
+const SEERR_DIGEST_LEADS: Record<string, string> = {
+  MEDIA_PENDING: "Seerr: {n} new requests need approval",
+  MEDIA_APPROVED: "Seerr: {n} requests approved",
+  MEDIA_AUTO_APPROVED: "Seerr: {n} requests auto-approved",
+  MEDIA_AUTO_REQUESTED: "Seerr: {n} titles auto-requested",
+  MEDIA_DECLINED: "Seerr: {n} requests declined",
+  MEDIA_AVAILABLE: "Seerr: {n} requests now available",
+  MEDIA_FAILED: "Seerr: {n} requests failed",
 };
 
 export function parseSeerrWebhook(payload: unknown): WebhookNotification | null {
@@ -722,26 +920,50 @@ export function parseSeerrWebhook(payload: unknown): WebhookNotification | null 
   }
 
   const text = nt === "ISSUE_COMMENT" ? str(comment.comment_message) : message;
-  const image = httpsUrl(p.image);
-  return toContent({
-    ...base,
-    event,
-    level,
-    headline: subject || event,
-    subtitle: [type, status].filter(Boolean).join(" · ") || undefined,
-    summary: (subject || event) + by,
-    facts,
-    message: text || undefined,
-    messageLabel: text ? (nt === "ISSUE_COMMENT" ? "Comment" : isIssue ? "Description" : "Overview") : undefined,
-    image: image ? { url: image, alt: `${subject || "Media"} poster` } : undefined,
-  });
+  const url = httpsUrl(p.image);
+  const image = url ? { url, alt: `${subject || "Media"} poster` } : undefined;
+  // A request event with a subject may be one of a run; the item names the
+  // requester so a burst from several people still says who asked.
+  const digest =
+    nt.startsWith("MEDIA_") && subject
+      ? digestOf({
+          key: `seerr|${nt}`,
+          lead: SEERR_DIGEST_LEADS[nt] ?? `Seerr ${lowerFirst(event)}: {n} requests`,
+          headline: "Seerr",
+          noun: "requests",
+          items: [
+            {
+              id: `req:${idOf(request.request_id) || subject}`,
+              label: subject + by,
+              requester: requester || undefined,
+              image,
+            },
+          ],
+        })
+      : undefined;
+  return toContent(
+    {
+      ...base,
+      event,
+      level,
+      headline: subject || event,
+      subtitle: [type, status].filter(Boolean).join(" · ") || undefined,
+      summary: (subject || event) + by,
+      facts,
+      message: text || undefined,
+      messageLabel: text ? (nt === "ISSUE_COMMENT" ? "Comment" : isIssue ? "Description" : "Overview") : undefined,
+      image,
+    },
+    digest
+  );
 }
 
 // Flatten a report to what the chat and push channels relay — one line, a
-// short detail, a link — and carry the report along for the email. Payload
+// short detail, a link — and carry the report along for the email, and the
+// digest for the burst store when the event may be one of a burst. Payload
 // text can hold newlines; the title becomes an ntfy header, so it gets one
 // line.
-export function toContent(r: WebhookReport): WebhookNotification {
+export function toContent(r: WebhookReport, digest?: WebhookDigest): WebhookNotification {
   const summary = r.summary.replace(/\s+/g, " ").trim();
   const chips = (r.chips ?? []).filter(Boolean);
   const body = chips.length ? chips.join(" · ") : r.message ? clamp(r.message, 200) : undefined;
@@ -750,6 +972,91 @@ export function toContent(r: WebhookReport): WebhookNotification {
     body,
     url: r.link?.url,
     report: { ...r, summary },
+    ...(digest ? { digest } : {}),
+  };
+}
+
+// --- Merging a burst (#346) ---
+
+const NOUN_LABELS: Record<DigestNoun, string> = {
+  episodes: "Episodes",
+  movies: "Movies",
+  requests: "Requests",
+  series: "Series",
+};
+// The flat body lists this many items; the report's fact lists FACT_LINES.
+const BODY_LINES = 8;
+
+// A value every item carries and agrees on, else "".
+function uniform(items: DigestItem[], pick: (it: DigestItem) => string | undefined): string {
+  const first = pick(items[0]) ?? "";
+  return first && items.every((it) => pick(it) === first) ? first : "";
+}
+
+// Fold a burst into the one notification that goes out: the lead with its
+// count and, when every item is an episode, the range — "Sonarr imported 8
+// episodes of The Bear (S04E01-E08)" — over a body listing up to eight items,
+// and a report whose facts list the items and carry a quality, indexer,
+// client or requester only when the items agree, and a size only when every
+// item had one (their sum). A group that saw one event, or holds one item,
+// sends that event unchanged: its own wording and facts say more than a
+// count of one. Pure, so it is unit-tested apart from the timers that decide
+// when it runs.
+export function mergeDigest(g: DigestGroup): WebhookNotification {
+  const d = g.first.digest;
+  const n = g.items.length + g.dropped;
+  if (!d || g.events === 1 || n === 1) return g.first;
+  const coded = g.items.every((it) => it.season !== undefined && it.episode !== undefined);
+  const items = coded
+    ? [...g.items].sort((a, b) => (a.season ?? 0) - (b.season ?? 0) || (a.episode ?? 0) - (b.episode ?? 0))
+    : g.items;
+  const codes = coded
+    ? episodeCodes(items.map((it) => ({ season: it.season ?? 0, episode: it.episode ?? 0 })))
+    : "";
+  const count = d.lead.replace("{n}", String(n));
+  const title = codes ? `${count} (${codes})` : count;
+  const labels = items.map((it) => it.label);
+  const body = lineList(labels, n, BODY_LINES);
+  const r = g.first.report;
+  const link = items.find((it) => it.link)?.link ?? r?.link;
+  const url = link?.url ?? g.first.url;
+  if (!r) return { title, body, url };
+  let subtitle = `${n} ${d.noun}`;
+  if (coded) {
+    const seasons = unique(items.map((it) => String(it.season))).map(Number).sort((a, b) => a - b);
+    subtitle += ` · ${seasons.length === 1 ? `Season ${seasons[0]}` : `Seasons ${runs(seasons, String)}`}`;
+  }
+  const quality = uniform(items, (it) => it.quality);
+  const size = items.every((it) => typeof it.sizeBytes === "number")
+    ? fmtBytes(items.reduce((sum, it) => sum + (it.sizeBytes ?? 0), 0))
+    : "";
+  const indexer = uniform(items, (it) => it.indexer);
+  const facts: ReportFact[] = [];
+  push(facts, NOUN_LABELS[d.noun], lineList(labels, n, FACT_LINES));
+  push(facts, "Quality", quality);
+  push(facts, "Size", size);
+  push(facts, "Indexer", indexer);
+  push(facts, "Download client", uniform(items, (it) => it.client));
+  push(facts, "Requested by", uniform(items, (it) => it.requester));
+  return {
+    title,
+    body,
+    url,
+    report: {
+      service: r.service,
+      app: r.app,
+      instance: r.instance,
+      eventType: r.eventType,
+      event: r.event,
+      level: r.level,
+      headline: d.headline,
+      subtitle,
+      summary: codes ? `${d.headline} ${codes}` : `${n} ${d.noun}`,
+      chips: [quality, size, indexer].filter(Boolean),
+      facts,
+      image: items.find((it) => it.image)?.image ?? r.image,
+      link,
+    },
   };
 }
 

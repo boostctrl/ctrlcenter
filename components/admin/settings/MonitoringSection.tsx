@@ -14,7 +14,7 @@ import {
 import { ChipGroup } from "@/components/ChipGroup";
 import { WEBHOOK_LABELS, WebhookUrlRow } from "./WebhookUrlRow";
 import { AlertChannelEditor } from "./AlertChannelEditor";
-import { INTERVAL_PRESETS } from "./constants";
+import { DIGEST_PRESETS, INTERVAL_PRESETS, digestPresetLabel } from "./constants";
 import type { SettingsDraft } from "./useSettingsDraft";
 
 export default function MonitoringSection({
@@ -159,6 +159,25 @@ export default function MonitoringSection({
                 above. Events have nowhere to go until then.
               </p>
             )}
+            {/* A hand-edited value outside the presets (the schema allows
+                0–300) shows as a read-only chip, as the uptime interval
+                does, so the control never reads as "nothing selected". */}
+            <ControlRow
+              label="Group bursts for"
+              hint="Events of one kind — a season's episodes, a batch of movies, a run of requests — that arrive within this long of each other go out as one notification. Off sends each as it arrives. Health issues, updates and a sender's Test are never held."
+            >
+              <ChipGroup
+                label="Group bursts for"
+                shrink
+                options={DIGEST_PRESETS.map((s) => ({
+                  value: s,
+                  label: digestPresetLabel(s),
+                }))}
+                value={webhooks.digestSeconds}
+                onChange={(digestSeconds) => updateWebhooks({ digestSeconds })}
+                offLabel={(s) => `${s} s`}
+              />
+            </ControlRow>
             {WEBHOOK_SERVICES.map((svc) => {
               const w = webhooks[svc];
               return (

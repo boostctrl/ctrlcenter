@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildNotificationEmail, buildSubject, cleanHeader, escapeHtml } from "./webhook-email";
 import {
+  mergeDigest,
   parseArrWebhook,
   parseSeerrWebhook,
   type NotificationContext,
@@ -56,7 +57,7 @@ const sonarrImport = parseArrWebhook("sonarr", {
 describe("buildSubject", () => {
   it("reads [App] Event: Summary for every event kind", () => {
     expect(subject("Sonarr", "Grabbed", "The Bear S04E03")).toBe("[Sonarr] Grabbed: The Bear S04E03");
-    expect(subject("Sonarr", "Imported", "The Bear S04E03–E04")).toBe("[Sonarr] Imported: The Bear S04E03–E04");
+    expect(subject("Sonarr", "Imported", "The Bear S04E03-E04")).toBe("[Sonarr] Imported: The Bear S04E03-E04");
     expect(subject("Radarr", "Upgraded", "Dune: Part Three (2026)")).toBe("[Radarr] Upgraded: Dune: Part Three (2026)");
     expect(subject("Radarr", "Download failed", "Dune: Part Three (2026)")).toBe(
       "[Radarr] Download failed: Dune: Part Three (2026)"
@@ -124,8 +125,8 @@ describe("escaping helpers", () => {
 describe("buildNotificationEmail", () => {
   it("renders the real Sonarr import sample: subject, sheet and text part", () => {
     const { subject: s, html, text } = buildNotificationEmail(sonarrImport, ctx);
-    expect(s).toBe("[Sonarr] Imported: The Bear S04E03–E04");
-    expect(html).toContain("<title>[Sonarr] Imported: The Bear S04E03–E04</title>");
+    expect(s).toBe("[Sonarr] Imported: The Bear S04E03-E04");
+    expect(html).toContain("<title>[Sonarr] Imported: The Bear S04E03-E04</title>");
     expect(html).toContain("<h1");
     expect((html.match(/<h1/g) ?? []).length).toBe(1);
     expect(html).toContain('bgcolor="#15803d"');
@@ -247,6 +248,30 @@ describe("buildNotificationEmail", () => {
     const prefixed = buildNotificationEmail(n, { ...ctx, options: { subjectPrefix: "[Home]" } });
     expect(prefixed.subject).toBe("[Home] [Sonarr] Grabbed: The Bear S04E03");
     expect(prefixed.html).toContain("<title>[Home] [Sonarr] Grabbed: The Bear S04E03</title>");
+  });
+
+  it("renders a merged burst as one report listing every episode (#346)", () => {
+    const burst = Array.from({ length: 8 }, (_, i) =>
+      parseArrWebhook("sonarr", {
+        eventType: "Download",
+        applicationUrl: "https://sonarr.lan/series/the-bear",
+        series: { id: 1, title: "The Bear" },
+        episodes: [{ id: 100 + i, seasonNumber: 4, episodeNumber: i + 1, title: `Ep ${i + 1}` }],
+        episodeFile: { quality: "WEBDL-1080p", size: 1024 ** 3 },
+      })!
+    );
+    const items = burst.flatMap((n) => n.digest?.items ?? []);
+    const merged = mergeDigest({ first: burst[0], events: burst.length, items, dropped: 0 });
+    const { subject: s, html, text } = buildNotificationEmail(merged, ctx);
+    expect(s).toBe("[Sonarr] Imported: The Bear S04E01-E08");
+    expect(html).toContain(">8 episodes · Season 4<");
+    expect(html).toContain(">Episodes<");
+    expect(html).toContain("S04E01 &quot;Ep 1&quot;<br>S04E02 &quot;Ep 2&quot;<br>");
+    expect(html).toContain("S04E08 &quot;Ep 8&quot;</td>");
+    expect(html).toContain(">8 GB<");
+    expect(text).toContain('Episodes          S04E01 "Ep 1"\n                  S04E02 "Ep 2"');
+    expect(text).toContain("Size              8 GB");
+    expect(text).toContain("Open in Sonarr: https://sonarr.lan/series/the-bear");
   });
 
   it("degrades an unknown time zone to UTC", () => {

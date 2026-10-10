@@ -26,6 +26,11 @@ export const webhooksSchema = z.object({
   // Master switch for the inbound endpoint. Off = the route rejects everything
   // even if a token matches, so pasting a URL somewhere can't quietly re-open it.
   enabled: z.boolean().default(false),
+  // How long a burst of like events (a season's episodes, one event each) is
+  // held before going out as one notification (#346): the wait after the
+  // last event, in seconds. 0 relays each event as it arrives. The hard cap
+  // on a burst that never goes quiet is five windows, ten minutes at most.
+  digestSeconds: z.number().int().min(0).max(300).default(60),
   sonarr: webhookService(),
   radarr: webhookService(),
   seerr: webhookService(),

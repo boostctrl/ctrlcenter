@@ -4,9 +4,12 @@ import {
   parseSeerrWebhook,
   parseWebhook,
   toContent,
+  mergeDigest,
   fmtBytes,
   episodeCodes,
   clamp,
+  type DigestGroup,
+  type WebhookNotification,
   type WebhookReport,
 } from "./webhooks";
 import { buildNotificationRequest } from "./alerts";
@@ -98,7 +101,7 @@ describe("parseArrWebhook (Sonarr/Radarr)", () => {
       release: { releaseTitle: "The.Bear.S04E03E04.1080p.WEB.H264-NTb", indexer: "NZBgeek" },
       downloadClientType: "SABnzbd",
     });
-    expect(n?.title).toBe("Sonarr upgraded: The Bear S04E03–E04");
+    expect(n?.title).toBe("Sonarr upgraded: The Bear S04E03-E04");
     expect(n?.report).toMatchObject({
       event: "Upgraded",
       level: "success",
@@ -398,9 +401,10 @@ describe("report helpers", () => {
   it("collapses episode runs within a season and joins seasons", () => {
     const ep = (season: number, episode: number) => ({ season, episode });
     expect(episodeCodes([ep(4, 3)])).toBe("S04E03");
-    expect(episodeCodes([ep(4, 4), ep(4, 3), ep(4, 5)])).toBe("S04E03–E05");
-    expect(episodeCodes([ep(4, 1), ep(4, 2), ep(4, 3), ep(4, 5)])).toBe("S04E01–E03, E05");
+    expect(episodeCodes([ep(4, 4), ep(4, 3), ep(4, 5)])).toBe("S04E03-E05");
+    expect(episodeCodes([ep(4, 1), ep(4, 2), ep(4, 3), ep(4, 5)])).toBe("S04E01-E03, E05");
     expect(episodeCodes([ep(5, 1), ep(4, 10)])).toBe("S04E10, S05E01");
+    expect(episodeCodes([1, 2, 3, 5, 6].map((s) => ep(s, 1)))).toBe("S01-S03, S05-S06");
     expect(episodeCodes([])).toBe("");
   });
 
@@ -473,5 +477,270 @@ describe("notification channel shaping", () => {
     });
     const payload = JSON.parse(req.init.body as string);
     expect(payload).toMatchObject({ title: "T", message: "B", url: "https://u" });
+  });
+});
+
+// --- Bursts (#346) ---
+
+// One Sonarr import event for episode `ep` of The Bear, as a season import
+// fires them: one episode each, the same file quality, indexer and client.
+const imported = (ep: number, over: Record<string, unknown> = {}) =>
+  parseArrWebhook("sonarr", {
+    eventType: "Download",
+    instanceName: "Sonarr",
+    applicationUrl: "https://sonarr.lan",
+    series,
+    episodes: [{ id: 100 + ep, seasonNumber: 4, episodeNumber: ep, title: `Ep ${ep}` }],
+    episodeFile: { quality: "WEBDL-1080p", size: 1024 ** 3 },
+    release: { indexer: "NZBgeek" },
+    downloadClient: "SABnzbd",
+    ...over,
+  })!;
+const movieImported = (i: number) =>
+  parseArrWebhook("radarr", {
+    eventType: "Download",
+    movie: { id: i, title: `Movie ${i}`, year: 2000 + i },
+    movieFile: { quality: i % 2 ? "Bluray-1080p" : "WEBDL-1080p", size: 1024 ** 3 },
+  })!;
+const requested = (id: number, by: string, subject = `Title ${id} (2024)`) =>
+  parseSeerrWebhook({
+    notification_type: "MEDIA_PENDING",
+    subject,
+    media: { media_type: "movie", tmdbId: String(id), status: "PENDING" },
+    request: { request_id: String(id), requestedBy_username: by },
+  })!;
+// The group the digest store would hand mergeDigest: items deduped by id in
+// arrival order.
+const groupOf = (ns: WebhookNotification[], dropped = 0): DigestGroup => {
+  const items = new Map(ns.flatMap((n) => n.digest?.items ?? []).map((it) => [it.id, it]));
+  return { first: ns[0], events: ns.length, items: [...items.values()], dropped };
+};
+const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
+
+describe("digest membership (#346)", () => {
+  it("files a Sonarr import under its series with one item per episode and what the event knew", () => {
+    const n = imported(3);
+    expect(n.digest).toMatchObject({
+      key: "sonarr|Sonarr|Download|1",
+      lead: "Sonarr imported {n} episodes of The Bear",
+      headline: "The Bear",
+      noun: "episodes",
+    });
+    expect(n.digest?.items).toEqual([
+      {
+        id: "ep:103",
+        label: 'S04E03 "Ep 3"',
+        season: 4,
+        episode: 3,
+        quality: "WEBDL-1080p",
+        sizeBytes: 1024 ** 3,
+        indexer: "NZBgeek",
+        client: "SABnzbd",
+        image: { url: POSTER, alt: "The Bear poster" },
+        link: { label: "Open in Sonarr", url: "https://sonarr.lan" },
+      },
+    ]);
+    expect(imported(3, { isUpgrade: true }).digest?.lead).toBe("Sonarr upgraded {n} episodes of The Bear");
+    const grab = parseArrWebhook("sonarr", {
+      eventType: "Grab",
+      series,
+      episodes: [episodes[0]],
+      release: { quality: "WEBDL-1080p", size: 2048, indexer: "NZBgeek" },
+    });
+    expect(grab?.digest).toMatchObject({ key: "sonarr||Grab|1", lead: "Sonarr grabbed {n} episodes of The Bear" });
+    expect(grab?.digest?.items[0]).toMatchObject({ quality: "WEBDL-1080p", sizeBytes: 2048, indexer: "NZBgeek" });
+  });
+
+  it("gives a season pack's episodeFiles[] shape the same items, the size on the first", () => {
+    const file = { quality: "Bluray-1080p", size: 1024 ** 3 };
+    const n = parseArrWebhook("sonarr", {
+      eventType: "Download",
+      series: { tvdbId: 4242, title: "The Bear" },
+      episodes: [1, 2, 3].map((e) => ({ seasonNumber: 4, episodeNumber: e, title: `Ep ${e}` })),
+      episodeFiles: [file, file, file],
+    });
+    expect(n?.digest?.key).toBe("sonarr||Download|4242");
+    expect(n?.digest?.items.map((it) => it.id)).toEqual(["ep:S04E01", "ep:S04E02", "ep:S04E03"]);
+    expect(n?.digest?.items.map((it) => it.sizeBytes)).toEqual([3 * 1024 ** 3, 0, 0]);
+    expect(n?.digest?.items.every((it) => it.quality === "Bluray-1080p")).toBe(true);
+  });
+
+  it("groups Radarr by event, a Sonarr series event by event, and Seerr by notification type", () => {
+    const movie = movieImported(7);
+    expect(movie.digest).toMatchObject({
+      key: "radarr||Download",
+      lead: "Radarr imported {n} movies",
+      headline: "Radarr",
+      noun: "movies",
+    });
+    expect(movie.digest?.items).toMatchObject([{ id: "movie:7", label: "Movie 7 (2007)", quality: "Bluray-1080p" }]);
+    const added = parseArrWebhook("sonarr", { eventType: "SeriesAdd", series: { id: 9, title: "Silo", year: 2023 } });
+    expect(added?.digest).toMatchObject({ key: "sonarr||SeriesAdd", lead: "Sonarr added {n} series", noun: "series" });
+    expect(added?.digest?.items).toMatchObject([{ id: "series:9", label: "Silo (2023)" }]);
+    const odd = parseArrWebhook("sonarr", { eventType: "SomethingNew", series: { title: "Silo" } });
+    expect(odd?.digest).toMatchObject({ key: "sonarr||SomethingNew", lead: "Sonarr something new: {n} series" });
+    expect(odd?.digest?.items).toMatchObject([{ id: "series:Silo", label: "Silo" }]);
+    const pending = requested(128, "Sam", "Wicked (2024)");
+    expect(pending.digest).toMatchObject({
+      key: "seerr|MEDIA_PENDING",
+      lead: "Seerr: {n} new requests need approval",
+      headline: "Seerr",
+      noun: "requests",
+    });
+    expect(pending.digest?.items).toEqual([{ id: "req:128", label: "Wicked (2024) by Sam", requester: "Sam", image: undefined }]);
+    const available = parseSeerrWebhook({ notification_type: "MEDIA_AVAILABLE", subject: "Flow", request: { requestedBy_username: "Sam" } });
+    expect(available?.digest).toMatchObject({ lead: "Seerr: {n} requests now available" });
+    expect(available?.digest?.items[0]).toMatchObject({ id: "req:Flow", label: "Flow" });
+  });
+
+  it("never holds a Test, a health issue, an update, a failure, an attention request, an issue or a subjectless event", () => {
+    const never = [
+      parseArrWebhook("sonarr", { eventType: "Test", series }),
+      parseArrWebhook("sonarr", { eventType: "Health", level: "warning", message: "Indexer unavailable", series }),
+      parseArrWebhook("sonarr", { eventType: "HealthIssue", message: "x", series }),
+      parseArrWebhook("sonarr", { eventType: "HealthRestored", message: "x", series }),
+      parseArrWebhook("radarr", { eventType: "ApplicationUpdate", newVersion: "5.0.2" }),
+      parseArrWebhook("sonarr", { eventType: "ManualInteractionRequired", series, episodes: [episodes[0]] }),
+      parseArrWebhook("sonarr", { eventType: "DownloadFailed", series, episodes: [episodes[0]] }),
+      parseArrWebhook("sonarr", { eventType: "SeriesAdd" }),
+      parseArrWebhook("radarr", { eventType: "Download", movieFile: { quality: "Bluray-1080p" } }),
+      parseSeerrWebhook({ notification_type: "TEST_NOTIFICATION", subject: "Test Notification" }),
+      parseSeerrWebhook({ notification_type: "ISSUE_CREATED", subject: "Wicked (2024)", issue: { issue_type: "VIDEO" } }),
+      parseSeerrWebhook({ notification_type: "ISSUE_COMMENT", subject: "Wicked (2024)" }),
+      parseSeerrWebhook({ notification_type: "MEDIA_PENDING" }),
+    ];
+    for (const n of never) {
+      expect(n).not.toBeNull();
+      expect(n?.digest).toBeUndefined();
+    }
+  });
+
+  it("keys by the sender's instance, so two instances on one relay URL never merge", () => {
+    const key = (instanceName: unknown, service: "sonarr" | "radarr" = "sonarr") =>
+      parseArrWebhook(service, {
+        eventType: "Download",
+        instanceName,
+        series,
+        episodes: [episodes[0]],
+        movie: { id: 7, title: "Flow", year: 2024 },
+      })?.digest?.key;
+    expect(key("Sonarr")).toBe("sonarr|Sonarr|Download|1");
+    expect(key("Sonarr 4K")).toBe("sonarr|Sonarr 4K|Download|1");
+    expect(key("Sonarr 4K")).not.toBe(key("Sonarr"));
+    expect(key("Sonarr")).toBe(key("Sonarr"));
+    expect(key(undefined)).toBe("sonarr||Download|1");
+    expect(key("Radarr 4K", "radarr")).toBe("radarr|Radarr 4K|Download");
+    expect(key("Radarr", "radarr")).not.toBe(key("Radarr 4K", "radarr"));
+    // Cleaned and clamped like every other kept string.
+    expect(key("Sonarr\r\n  4K\u0000")).toBe("sonarr|Sonarr 4K|Download|1");
+    expect(key("S".repeat(500))?.length).toBeLessThanOrEqual("sonarr||Download|1".length + 120);
+  });
+
+  it("bounds what the store keeps: labels and the lead are clamped", () => {
+    const n = imported(3, { series: { ...series, title: "T".repeat(500) } });
+    expect(n.digest?.lead.length).toBeLessThanOrEqual(200);
+    expect(n.digest?.headline.length).toBeLessThanOrEqual(120);
+    const long = parseSeerrWebhook({ notification_type: "MEDIA_PENDING", subject: "S".repeat(500) });
+    expect(long?.digest?.items[0].label.length).toBeLessThanOrEqual(120);
+  });
+});
+
+describe("mergeDigest (#346)", () => {
+  it("folds a season import into one notification with a range, the list and the shared facts", () => {
+    const burst = range(1, 8).map((e) => imported(e));
+    const m = mergeDigest(groupOf(burst));
+    expect(m.title).toBe("Sonarr imported 8 episodes of The Bear (S04E01-E08)");
+    expect(m.body?.split("\n")).toEqual(range(1, 8).map((e) => `S04E0${e} "Ep ${e}"`));
+    expect(m.url).toBe("https://sonarr.lan");
+    expect(m.digest).toBeUndefined();
+    expect(m.report).toMatchObject({
+      service: "sonarr",
+      app: "Sonarr",
+      eventType: "Download",
+      event: "Imported",
+      level: "success",
+      headline: "The Bear",
+      subtitle: "8 episodes · Season 4",
+      summary: "The Bear S04E01-E08",
+      chips: ["WEBDL-1080p", "8 GB", "NZBgeek"],
+      image: { url: POSTER, alt: "The Bear poster" },
+      link: { label: "Open in Sonarr", url: "https://sonarr.lan" },
+    });
+    expect(labels(m.report)).toEqual(["Episodes", "Quality", "Size", "Indexer", "Download client"]);
+    expect(fact(m.report, "Episodes")?.value.split("\n")).toHaveLength(8);
+    expect(fact(m.report, "Size")?.value).toBe("8 GB");
+    expect(fact(m.report, "Download client")?.value).toBe("SABnzbd");
+    expect(m.report?.message).toBeUndefined();
+    // The ntfy Title header takes latin-1 only: the merged title is ASCII.
+    expect(/^[\x20-\x7E]*$/.test(m.title)).toBe(true);
+  });
+
+  it("compacts gaps, restarts the prefix per season, collapses many seasons, and sorts arrivals", () => {
+    const gaps = mergeDigest(groupOf([1, 2, 3, 5, 7, 8].map((e) => imported(e))));
+    expect(gaps.title).toBe("Sonarr imported 6 episodes of The Bear (S04E01-E03, E05, E07-E08)");
+    const ep = (season: number, episode: number) =>
+      imported(episode, { episodes: [{ id: season * 100 + episode, seasonNumber: season, episodeNumber: episode }] });
+    const two = mergeDigest(groupOf([...range(1, 10).map((e) => ep(1, e)), ...range(1, 4).map((e) => ep(2, e))]));
+    expect(two.title).toBe("Sonarr imported 14 episodes of The Bear (S01E01-E10, S02E01-E04)");
+    expect(two.report?.subtitle).toBe("14 episodes · Seasons 1–2");
+    const many = mergeDigest(groupOf(range(1, 5).map((s) => ep(s, 1))));
+    expect(many.title).toBe("Sonarr imported 5 episodes of The Bear (S01-S05)");
+    const shuffled = mergeDigest(groupOf([imported(4), imported(2), imported(3)]));
+    expect(shuffled.title).toBe("Sonarr imported 3 episodes of The Bear (S04E02-E04)");
+    expect(shuffled.body?.split("\n")[0]).toBe('S04E02 "Ep 2"');
+  });
+
+  it("shows a quality, indexer or size only when the items agree, or every one had a size", () => {
+    const mixed = mergeDigest(
+      groupOf([imported(1), imported(2, { episodeFile: { quality: "Bluray-1080p", size: 1024 ** 3 } })])
+    );
+    expect(labels(mixed.report)).toEqual(["Episodes", "Size", "Indexer", "Download client"]);
+    const sizeless = mergeDigest(groupOf([imported(1), imported(2, { episodeFile: { quality: "WEBDL-1080p" } })]));
+    expect(labels(sizeless.report)).toEqual(["Episodes", "Quality", "Indexer", "Download client"]);
+    expect(sizeless.report?.chips).toEqual(["WEBDL-1080p", "NZBgeek"]);
+  });
+
+  it("lists up to eight items in the body and 24 in the report, then says how many more", () => {
+    const m = mergeDigest(groupOf(range(1, 12).map(movieImported)));
+    expect(m.title).toBe("Radarr imported 12 movies");
+    expect(m.body?.split("\n")).toHaveLength(9);
+    expect(m.body?.endsWith("\nand 4 more")).toBe(true);
+    expect(m.report).toMatchObject({ headline: "Radarr", subtitle: "12 movies", summary: "12 movies" });
+    expect(labels(m.report)).toEqual(["Movies", "Size"]);
+    expect(fact(m.report, "Movies")?.value.split("\n")).toHaveLength(12);
+    expect(fact(m.report, "Movies")?.value.split("\n")[0]).toBe("Movie 1 (2001)");
+    const big = mergeDigest(groupOf(range(1, 30).map((e) => imported(e))));
+    const lines = fact(big.report, "Episodes")?.value.split("\n") ?? [];
+    expect(lines).toHaveLength(25);
+    expect(lines[24]).toBe("and 6 more");
+    // Items the store dropped past its cap still count.
+    const capped = mergeDigest(groupOf(range(1, 8).map((e) => imported(e)), 92));
+    expect(capped.title).toBe("Sonarr imported 100 episodes of The Bear (S04E01-E08)");
+    expect(capped.body?.endsWith("\nand 92 more")).toBe(true);
+  });
+
+  it("merges a run of requests, naming the requester per item and as a fact only when it's one person", () => {
+    const m = mergeDigest(groupOf([requested(1, "Sam"), requested(2, "Mara"), requested(3, "Sam")]));
+    expect(m.title).toBe("Seerr: 3 new requests need approval");
+    expect(m.body).toBe("Title 1 (2024) by Sam\nTitle 2 (2024) by Mara\nTitle 3 (2024) by Sam");
+    expect(m.url).toBeUndefined();
+    expect(m.report).toMatchObject({ app: "Seerr", event: "New request", level: "warning", headline: "Seerr", subtitle: "3 requests" });
+    expect(labels(m.report)).toEqual(["Requests"]);
+    const one = mergeDigest(groupOf([requested(1, "Sam"), requested(2, "Sam")]));
+    expect(fact(one.report, "Requested by")?.value).toBe("Sam");
+  });
+
+  it("sends a group of one event, or one item, unchanged", () => {
+    const only = imported(3);
+    expect(mergeDigest(groupOf([only]))).toBe(only);
+    const twice = [imported(3), imported(3)];
+    expect(mergeDigest(groupOf(twice))).toBe(twice[0]);
+    const pack = parseArrWebhook("sonarr", {
+      eventType: "Download",
+      series,
+      episodes: [1, 2, 3].map((e) => ({ seasonNumber: 4, episodeNumber: e })),
+      episodeFiles: [{ size: 1 }, { size: 1 }, { size: 1 }],
+    })!;
+    expect(mergeDigest(groupOf([pack]))).toBe(pack);
   });
 });
