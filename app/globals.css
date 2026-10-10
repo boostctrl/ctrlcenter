@@ -970,20 +970,23 @@ select optgroup {
   animation-duration: calc(60s * var(--motion-scale, 1));
 }
 
-/* Bokeh scene — out-of-focus discs drifting slowly (components/scenes/Bokeh.tsx). */
+/* Bokeh scene — the third drift period for its discs (components/scenes/
+   Bokeh.tsx also reuses float and drift): a slow slide down and left with a
+   touch of defocus, the opposite corner from float so the three never march
+   together. */
 @keyframes bokeh-drift {
   0%,
   100% {
-    transform: translate(0, 0);
+    transform: translate(0, 0) scale(1);
   }
   50% {
-    transform: translate(18px, -24px);
+    transform: translate(-36px, 28px) scale(0.94);
   }
 }
 
 .animate-bokeh {
-  animation: bokeh-drift 28s ease-in-out infinite;
-  animation-duration: calc(28s * var(--motion-scale, 1));
+  animation: bokeh-drift 44s ease-in-out infinite;
+  animation-duration: calc(44s * var(--motion-scale, 1));
 }
 
 /* Beams scene — diagonal light bars sweeping across (components/scenes/Beams.tsx). */
