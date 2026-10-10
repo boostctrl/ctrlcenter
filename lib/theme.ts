@@ -254,6 +254,52 @@ export const BASE_THEMES: PresetTheme[] = [
   },
 ];
 
+// A wallpaper (#333): an image behind the scene, per mode. `src` is an
+// https:// (or http://) URL or a same-origin path such as an upload's
+// /api/icons/<name>; blur in px, dim as a percent toward the page color, and
+// how the image fits the viewport.
+export type WallpaperFit = "cover" | "contain" | "tile";
+
+export const WALLPAPER_FITS: { id: WallpaperFit; name: string }[] = [
+  { id: "cover", name: "Fill" },
+  { id: "contain", name: "Fit" },
+  { id: "tile", name: "Tile" },
+];
+
+export const WALLPAPER_FIT_IDS = WALLPAPER_FITS.map((f) => f.id) as [WallpaperFit, ...WallpaperFit[]];
+
+export type Wallpaper = { src: string; blur: number; dim: number; fit: WallpaperFit };
+
+export const MAX_WALLPAPER_BLUR = 40;
+export const MAX_WALLPAPER_SRC = 2048;
+
+// A usable wallpaper source: an absolute http(s) URL or a same-origin path
+// (not protocol-relative), with no whitespace or control characters, so it
+// can be quoted into a CSS url() safely.
+export function isWallpaperSrc(v: unknown): v is string {
+  return (
+    typeof v === "string" &&
+    v.length > 0 &&
+    v.length <= MAX_WALLPAPER_SRC &&
+    /^(https?:\/\/[^\s\x00-\x1f"'()\\]+|\/(?!\/)[^\s\x00-\x1f"'()\\]*)$/.test(v)
+  );
+}
+
+export function sanitizeWallpaper(input: unknown): Wallpaper | null {
+  if (!input || typeof input !== "object") return null;
+  const raw = input as Record<string, unknown>;
+  if (!isWallpaperSrc(raw.src)) return null;
+  const num = (v: unknown, max: number, dflt: number) =>
+    typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(0, Math.round(v))) : dflt;
+  const fit = (WALLPAPER_FIT_IDS as string[]).includes(raw.fit as string) ? (raw.fit as WallpaperFit) : "cover";
+  return { src: raw.src, blur: num(raw.blur, MAX_WALLPAPER_BLUR, 0), dim: num(raw.dim, 100, 0), fit };
+}
+
+export function wallpaperEqual(a: Wallpaper | null | undefined, b: Wallpaper | null | undefined): boolean {
+  if (!a || !b) return !a && !b;
+  return a.src === b.src && a.blur === b.blur && a.dim === b.dim && a.fit === b.fit;
+}
+
 // Semantic colors (#331): up, down, warning and info, as a theme's own per
 // mode. Absent, the stylesheet's defaults apply (pale on dark, deep on light).
 export type SemanticKey = "up" | "down" | "warning" | "info";
@@ -439,6 +485,9 @@ export type ThemePack = {
   // Its own semantic colors per mode (#331); absent = the stylesheet's.
   status?: SemanticColors;
   statusLight?: SemanticColors;
+  // A wallpaper per mode (#333); absent = none.
+  wallpaper?: Wallpaper;
+  wallpaperLight?: Wallpaper;
 } & ModeColors;
 
 // The built-in theme that mirrors the app's stock appearance (first in the list,

@@ -1,6 +1,16 @@
 // Site default theme, theme-pack overrides, and their admin inputs.
 import { z } from "zod";
-import { DENSITY_IDS, DESIGN_IDS, MOTION_IDS, SCENE_IDS, SEMANTIC_KEYS, TUNE_FIELDS } from "../theme";
+import {
+  DENSITY_IDS,
+  DESIGN_IDS,
+  MAX_WALLPAPER_BLUR,
+  MOTION_IDS,
+  SCENE_IDS,
+  SEMANTIC_KEYS,
+  TUNE_FIELDS,
+  WALLPAPER_FIT_IDS,
+  isWallpaperSrc,
+} from "../theme";
 import { FONT_IDS, DEFAULT_FONT } from "../fonts";
 import { hexColor } from "./shared";
 
@@ -22,6 +32,14 @@ export const semanticSchema = z.object(
     typeof hexColor
   >
 );
+
+// A wallpaper (#333): an image behind the scene with blur, dim and fit.
+export const wallpaperSchema = z.object({
+  src: z.string().refine(isWallpaperSrc, "an https:// URL or a same-origin path"),
+  blur: z.number().int().min(0).max(MAX_WALLPAPER_BLUR).default(0),
+  dim: z.number().int().min(0).max(100).default(0),
+  fit: z.enum(WALLPAPER_FIT_IDS).default("cover"),
+});
 
 // The site-wide default theme. Visitors can override every part of this in
 // their own browser (the theme builder / settings page); these values are the
@@ -82,6 +100,9 @@ export const themeSchema = z.object({
   // Optional semantic colors (#331), per mode (light falls back to dark).
   status: semanticSchema.optional().catch(undefined),
   statusLight: semanticSchema.optional().catch(undefined),
+  // An optional wallpaper (#333), per mode (light falls back to dark).
+  wallpaper: wallpaperSchema.optional().catch(undefined),
+  wallpaperLight: wallpaperSchema.optional().catch(undefined),
 });
 
 // A cohesive set of surface + accent colors (one mode of a theme).
@@ -113,6 +134,8 @@ export const themePackSchema = z.object({
   headingFont: z.enum(FONT_IDS).optional().catch(undefined),
   status: semanticSchema.optional().catch(undefined),
   statusLight: semanticSchema.optional().catch(undefined),
+  wallpaper: wallpaperSchema.optional().catch(undefined),
+  wallpaperLight: wallpaperSchema.optional().catch(undefined),
   dark: colorSetSchema,
   light: colorSetSchema,
 });
@@ -156,4 +179,6 @@ export const themeInputSchema = z.object({
   densityLight: z.enum(DENSITY_IDS).optional(),
   status: semanticSchema.optional(),
   statusLight: semanticSchema.optional(),
+  wallpaper: wallpaperSchema.optional(),
+  wallpaperLight: wallpaperSchema.optional(),
 });

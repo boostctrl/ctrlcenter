@@ -41,7 +41,13 @@ export default function IconPicker({
       .catch(() => active && setError(true));
     fetch("/api/icons")
       .then((r) => (r.ok ? r.json() : []))
-      .then((list) => active && setUploaded(Array.isArray(list) ? list : []))
+      .then(
+        (list) =>
+          active &&
+          setUploaded(
+            Array.isArray(list) ? list.filter((u) => !String(u.name).startsWith("wallpaper-")) : []
+          )
+      )
       .catch(() => {});
     inputRef.current?.focus();
     function onKey(e: KeyboardEvent) {

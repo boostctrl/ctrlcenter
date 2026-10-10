@@ -16,6 +16,7 @@ import {
   type SceneId,
   type SemanticColors,
   type Tune,
+  type Wallpaper,
 } from "@/lib/theme";
 import { DENSITY_IDS } from "@/lib/theme";
 import { FONT_IDS, type FontId } from "@/lib/fonts";
@@ -125,6 +126,7 @@ export function applyAll(opts: {
   reduceMotion?: boolean;
   density?: Density | null;
   status?: SemanticColors | null;
+  wallpaper?: Wallpaper | null;
 }): void {
   if (typeof document === "undefined") return;
   const dark = resolveDark(opts.theme);
@@ -143,6 +145,7 @@ export function applyAll(opts: {
       reduceMotion: opts.reduceMotion ?? false,
       density: opts.density ?? null,
       status: opts.status ?? null,
+      wallpaper: opts.wallpaper ?? null,
     }),
     IDS
   );

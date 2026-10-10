@@ -11,8 +11,10 @@ import {
   sanitizeSceneFx,
   sanitizeSemantic,
   sanitizeTune,
+  sanitizeWallpaper,
   type ColorSet,
   type SemanticColors,
+  type Wallpaper,
   type Density,
   type DesignId,
   type ModeColors,
@@ -207,6 +209,9 @@ export type CustomTheme = ModeColors & {
   // Semantic colors (#331), per mode; absent = the stylesheet's.
   status?: SemanticColors;
   statusLight?: SemanticColors;
+  // A wallpaper (#333), per mode; absent = none.
+  wallpaper?: Wallpaper;
+  wallpaperLight?: Wallpaper;
 };
 
 // The active custom look's light+dark colors (the resolved mode selects which
@@ -307,6 +312,8 @@ export function siteThemeFromCustomTheme(
     densityLight: theme.densityLight,
     status: theme.status,
     statusLight: theme.statusLight,
+    wallpaper: theme.wallpaper,
+    wallpaperLight: theme.wallpaperLight,
   };
 }
 
@@ -334,6 +341,8 @@ export function sanitizeCustomTheme(input: unknown): CustomTheme | null {
   const headingFontLight = isFontId(t.headingFontLight) ? t.headingFontLight : undefined;
   const status = sanitizeSemantic(t.status);
   const statusLight = sanitizeSemantic(t.statusLight);
+  const wallpaper = sanitizeWallpaper(t.wallpaper);
+  const wallpaperLight = sanitizeWallpaper(t.wallpaperLight);
   const density = isDensity(t.density) && t.density !== "comfortable" ? t.density : undefined;
   const densityLight = isDensity(t.densityLight) && t.densityLight !== "comfortable" ? t.densityLight : undefined;
   return {
@@ -355,6 +364,8 @@ export function sanitizeCustomTheme(input: unknown): CustomTheme | null {
     ...(densityLight ? { densityLight } : {}),
     ...(status ? { status } : {}),
     ...(statusLight ? { statusLight } : {}),
+    ...(wallpaper ? { wallpaper } : {}),
+    ...(wallpaperLight ? { wallpaperLight } : {}),
     ...colors,
   };
 }
@@ -709,6 +720,45 @@ export function saveStatusColors(pair: ModePair<SemanticColors | null> | null): 
       window.localStorage.setItem(STATUS_KEY, JSON.stringify({ dark: pair.dark, light: pair.light }));
     } else {
       window.localStorage.removeItem(STATUS_KEY);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+// A wallpaper (#333), per mode: a Wallpaper, "none" (the visitor cleared an
+// admin default), or null (not chosen). Stored as a `{dark,light}` pair; the
+// cleared state is stored as { src: "" }, which the no-flash script reads too.
+export const WALLPAPER_KEY = "ctrlcenter:wallpaper";
+
+export type WallpaperChoice = Wallpaper | "none";
+
+export function loadWallpaper(): ModePair<WallpaperChoice | null> {
+  const read = (v: unknown): WallpaperChoice | null => {
+    if (v && typeof v === "object" && (v as { src?: unknown }).src === "") return "none";
+    return sanitizeWallpaper(v);
+  };
+  if (typeof window === "undefined") return { dark: null, light: null };
+  try {
+    const raw = window.localStorage.getItem(WALLPAPER_KEY);
+    if (!raw) return { dark: null, light: null };
+    const o: unknown = JSON.parse(raw);
+    if (!o || typeof o !== "object") return { dark: null, light: null };
+    const pair = o as Record<string, unknown>;
+    return { dark: read(pair.dark), light: read(pair.light) };
+  } catch {
+    return { dark: null, light: null };
+  }
+}
+
+export function saveWallpaper(pair: ModePair<WallpaperChoice | null> | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (pair && (pair.dark || pair.light)) {
+      const enc = (v: WallpaperChoice | null) => (v === "none" ? { src: "" } : v);
+      window.localStorage.setItem(WALLPAPER_KEY, JSON.stringify({ dark: enc(pair.dark), light: enc(pair.light) }));
+    } else {
+      window.localStorage.removeItem(WALLPAPER_KEY);
     }
   } catch {
     // ignore

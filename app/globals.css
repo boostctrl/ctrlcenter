@@ -112,6 +112,27 @@
 .scene-root {
   opacity: var(--scene-opacity, 1);
 }
+/* The wallpaper (#333): an image behind the scene (z below the scene layers),
+   from variables the theme resolver sets on <html>; with none set the layer
+   is an empty fixed box. Blurred edges are hidden by overscanning the box by
+   twice the blur; the dim is a wash of the page color over the image. */
+.wallpaper-layer {
+  position: fixed;
+  inset: calc(-2 * var(--wallpaper-blur, 0px));
+  z-index: -20;
+  pointer-events: none;
+  background-image: var(--wallpaper-image, none);
+  background-size: var(--wallpaper-size, cover);
+  background-repeat: var(--wallpaper-repeat, no-repeat);
+  background-position: center;
+  filter: blur(var(--wallpaper-blur, 0px));
+}
+.wallpaper-layer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--background) calc(var(--wallpaper-dim, 0) * 100%), transparent);
+}
 
 /* --- Designs: each overrides the surface tokens above (applied as a class on
    <html>, or on a wrapper for the theme-builder previews). Colors are inherited,

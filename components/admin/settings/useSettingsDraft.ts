@@ -387,6 +387,8 @@ export function useSettingsDraft(
       densityLight: undefined,
       status: pack.status,
       statusLight: pack.statusLight,
+      wallpaper: pack.wallpaper,
+      wallpaperLight: pack.wallpaperLight,
     });
   }
 
@@ -410,6 +412,7 @@ export function useSettingsDraft(
         headingFontLight: undefined,
         densityLight: undefined,
         statusLight: darkPack?.statusLight,
+        wallpaperLight: darkPack?.wallpaperLight,
       });
       return;
     }
@@ -430,6 +433,7 @@ export function useSettingsDraft(
       headingFontLight: pack.headingFont,
       densityLight: undefined,
       statusLight: pack.statusLight ?? pack.status,
+      wallpaperLight: pack.wallpaperLight ?? pack.wallpaper,
     });
   }
 

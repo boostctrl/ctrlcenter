@@ -14,6 +14,13 @@ here.
 
 ### Added
 
+- **Wallpapers (3.0).** A photo can sit behind the scene: in the builder's
+  Scene tab, give it a web address, then blur it, dim it toward the page
+  colour and choose how it fits (fill, fit or tile), per light and dark
+  theme. It is saved with your themes and shared in codes. Admins can
+  upload a wallpaper (PNG, JPEG or WebP, up to 4 MB) there, set one as the
+  site default in Settings → General, and give a built-in theme one in the
+  Themes tab. (#333)
 - **A palette from one colour (3.0).** In the builder's Colors tab, *Build
   a palette from this accent* derives everything else from the accent you
   chose: surfaces tinted toward its hue, ink, a second accent stop (an

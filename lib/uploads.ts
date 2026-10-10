@@ -10,6 +10,17 @@ const UPLOADS_DIR = path.join(CONFIG_DIR, "uploads");
 // Icons are small; cap uploads so config storage can't be filled with large
 // images.
 export const MAX_ICON_BYTES = 512 * 1024; // 512 KB
+// Wallpapers (#333) are whole-screen photos: a larger cap, under their own
+// name prefix so the icon picker and the import caps can tell them apart.
+export const MAX_WALLPAPER_BYTES = 4 * 1024 * 1024; // 4 MB
+export const WALLPAPER_PREFIX = "wallpaper-";
+
+export function isWallpaperName(name: string): boolean {
+  return name.startsWith(WALLPAPER_PREFIX);
+}
+
+// Raster-only: a wallpaper is a photo, not a glyph.
+const WALLPAPER_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 
 // Allowed image content types → the canonical extension we store them under. The
 // extension is derived from the validated type, never from the uploaded
@@ -138,6 +149,25 @@ export async function saveIcon(
   return { name, url: uploadUrl(name) };
 }
 
+// Save an uploaded wallpaper as-is (no squaring), served like an icon at
+// /api/icons/<name>.
+export async function saveWallpaper(
+  originalName: string,
+  type: string,
+  data: Uint8Array
+): Promise<UploadedIcon> {
+  const ext = WALLPAPER_TYPES.has(type) ? extForType(type) : null;
+  if (!ext) throw new Error("Unsupported image type");
+  await fs.mkdir(UPLOADS_DIR, { recursive: true });
+  const name = `${WALLPAPER_PREFIX}${slugifyBase(originalName)}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
+  await fs.writeFile(path.join(UPLOADS_DIR, name), data);
+  return { name, url: uploadUrl(name) };
+}
+
+export function isWallpaperType(type: string): boolean {
+  return WALLPAPER_TYPES.has(type);
+}
+
 export async function listIcons(): Promise<UploadedIcon[]> {
   let entries: string[];
   try {
@@ -218,10 +248,12 @@ function decodeBundledIcon(
   const { name, data } = entry as Record<string, unknown>;
   if (typeof name !== "string" || typeof data !== "string") return null;
   if (!isSafeName(name) || !(extOf(name) in EXT_TO_TYPE)) return null;
+  // Wallpapers (#333) get their larger cap, by their name prefix.
+  const cap = isWallpaperName(name) ? MAX_WALLPAPER_BYTES : MAX_ICON_BYTES;
   // Cheap pre-check before decoding: base64 is ~4/3 of the byte length.
-  if (data.length > Math.ceil((MAX_ICON_BYTES * 4) / 3) + 4) return null;
+  if (data.length > Math.ceil((cap * 4) / 3) + 4) return null;
   const bytes = new Uint8Array(Buffer.from(data, "base64"));
-  if (bytes.byteLength === 0 || bytes.byteLength > MAX_ICON_BYTES) return null;
+  if (bytes.byteLength === 0 || bytes.byteLength > cap) return null;
   return { name, bytes };
 }
 

@@ -5,14 +5,17 @@ import { ChipGroup } from "../ChipGroup";
 import { buttonClasses } from "@/lib/buttons";
 import { OptionCard } from "./OptionCard";
 import { scenePreview } from "./scenePreview";
+import { WallpaperFields } from "./WallpaperFields";
 import type { ThemeDraft } from "./useThemeDraft";
 
-export default function SceneTab({ d }: { d: ThemeDraft }) {
+export default function SceneTab({ d, canUpload = false }: { d: ThemeDraft; canUpload?: boolean }) {
   const {
     sceneFor,
     setScene,
     sceneFxFor,
     setSceneFx,
+    wallpaperFor,
+    setWallpaper,
     editMode,
     sceneFrom,
     sceneTo,
@@ -103,6 +106,19 @@ export default function SceneTab({ d }: { d: ThemeDraft }) {
           )}
         </div>
       )}
+
+      {/* A wallpaper (#333): a photo behind the scene for the mode being
+          edited, saved with the theme. Removing it hides an admin default
+          wallpaper too. */}
+      <div className="space-y-3 border-t border-fg/10 pt-4">
+        <h3 className="text-[11px] font-medium uppercase tracking-wide text-ink-55">Wallpaper</h3>
+        <WallpaperFields
+          value={wallpaperFor(editMode)}
+          onChange={(wp) => setWallpaper(wp ?? "none", editMode)}
+          idPrefix={`tb-wallpaper-${editMode}`}
+          canUpload={canUpload}
+        />
+      </div>
     </div>
   );
 }

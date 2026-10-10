@@ -16,14 +16,26 @@ import {
   saveHeadingFont,
   saveDensity,
   saveStatusColors,
+  saveWallpaper,
   newThemeId,
   NO_ACCENT_OVERRIDES,
   type HeadingChoice,
+  type WallpaperChoice,
   type CustomTheme,
   type AccentOverrides,
   type ModePair,
 } from "@/lib/prefs";
-import type { ColorSet, Density, DesignId, ModeColors, SceneFx, SceneId, SemanticColors, Tune } from "@/lib/theme";
+import type {
+  ColorSet,
+  Density,
+  DesignId,
+  ModeColors,
+  SceneFx,
+  SceneId,
+  SemanticColors,
+  Tune,
+  Wallpaper,
+} from "@/lib/theme";
 import type { FontId } from "@/lib/fonts";
 import {
   applyAll as paintAll,
@@ -64,6 +76,8 @@ function themeKey(t: CustomTheme): string {
     t.densityLight ?? null,
     t.status ?? null,
     t.statusLight ?? null,
+    t.wallpaper ?? null,
+    t.wallpaperLight ?? null,
   ]);
 }
 
@@ -97,6 +111,8 @@ export function useSavedThemes({
   setDensities,
   resolveStatus,
   setStatuses,
+  resolveWallpaper,
+  setWallpapers,
 }: {
   activeLook: ModeColors | null;
   seedColorSet: (dark: boolean) => ColorSet;
@@ -123,6 +139,8 @@ export function useSavedThemes({
   setDensities: Dispatch<SetStateAction<ModePair<Density | null>>>;
   resolveStatus: (dark: boolean) => SemanticColors | null;
   setStatuses: Dispatch<SetStateAction<ModePair<SemanticColors | null>>>;
+  resolveWallpaper: (dark: boolean) => Wallpaper | null;
+  setWallpapers: Dispatch<SetStateAction<ModePair<WallpaperChoice | null>>>;
 }) {
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([]);
 
@@ -182,6 +200,11 @@ export function useSavedThemes({
       const statusLight = resolveStatus(false);
       if (status) entry.status = status;
       if (statusLight) entry.statusLight = statusLight;
+      // Wallpaper (#333), when a mode shows one.
+      const wallpaper = resolveWallpaper(true);
+      const wallpaperLight = resolveWallpaper(false);
+      if (wallpaper) entry.wallpaper = wallpaper;
+      if (wallpaperLight) entry.wallpaperLight = wallpaperLight;
       return entry;
     },
     [
@@ -197,6 +220,7 @@ export function useSavedThemes({
       resolveHeading,
       resolveDensity,
       resolveStatus,
+      resolveWallpaper,
     ]
   );
 
@@ -260,6 +284,14 @@ export function useSavedThemes({
       };
       setStatuses(nextStatuses);
       saveStatusColors(nextStatuses);
+      // No wallpaper in the theme means none — "none", so an admin default
+      // wallpaper doesn't show through it.
+      const nextWallpapers: ModePair<WallpaperChoice | null> = {
+        dark: t.wallpaper ?? "none",
+        light: t.wallpaperLight ?? "none",
+      };
+      setWallpapers(nextWallpapers);
+      saveWallpaper(nextWallpapers);
       applyThemeColors({ dark: t.dark, light: t.light });
       const dark = resolveDark(displayTheme);
       // applyThemeColors painted with this render's tune and effects (the
@@ -275,6 +307,7 @@ export function useSavedThemes({
         reduceMotion,
         density: (dark ? t.density : t.densityLight) ?? "comfortable",
         status: (dark ? t.status : t.statusLight) ?? null,
+        wallpaper: (dark ? t.wallpaper : t.wallpaperLight) ?? null,
       });
       applyDesign(dark ? t.design : t.designLight);
       applyScene(dark ? t.scene : t.sceneLight);
@@ -298,6 +331,7 @@ export function useSavedThemes({
       setHeadings,
       setDensities,
       setStatuses,
+      setWallpapers,
     ]
   );
 

@@ -55,7 +55,12 @@ export type PaintDefaults = {
   // Semantic colors (#331), per mode: { up, down, warning, info } hex.
   status?: PaintSemantic;
   statusLight?: PaintSemantic;
+  // A wallpaper (#333), per mode.
+  wallpaper?: PaintWallpaper;
+  wallpaperLight?: PaintWallpaper;
 };
+
+export type PaintWallpaper = { src: string; blur: number; dim: number; fit: string };
 
 export type PaintSemantic = Record<string, string>;
 
@@ -92,6 +97,8 @@ export type PaintInput = {
   density?: string | null;
   // The theme's semantic colors (null = the stylesheet's defaults).
   status?: PaintSemantic | null;
+  // The wallpaper behind the scene (null = none).
+  wallpaper?: PaintWallpaper | null;
 };
 
 // What to paint: `vars` maps a CSS custom property to its value, or null to
@@ -123,6 +130,14 @@ export function makeThemePaint() {
   const DENSITY: Record<string, number> = { compact: 0.85, comfortable: 1, spacious: 1.15 };
   // The semantic color keys, each painted as --status-<key>.
   const SEMANTIC = ["up", "down", "warning", "info"];
+  // A wallpaper source: http(s) or a same-origin path, nothing that could
+  // break out of a quoted CSS url().
+  const WALLPAPER_SRC = /^(https?:\/\/[^\s\x00-\x1f"'()\\]+|\/(?!\/)[^\s\x00-\x1f"'()\\]*)$/;
+  const FITS: Record<string, [string, string]> = {
+    cover: ["cover", "no-repeat"],
+    contain: ["contain", "no-repeat"],
+    tile: ["auto", "repeat"],
+  };
 
   function hexToRgb(hex: string): [number, number, number] | null {
     const m = HEX.exec((hex || "").trim());
@@ -290,6 +305,23 @@ export function makeThemePaint() {
       const k = SEMANTIC[i];
       const v = input.status ? input.status[k] : undefined;
       vars["--status-" + k] = typeof v === "string" && HEX.test(v) ? v : null;
+    }
+    const wp = input.wallpaper;
+    if (wp && typeof wp.src === "string" && WALLPAPER_SRC.test(wp.src) && wp.src.length <= 2048) {
+      const fit = FITS[wp.fit] || FITS.cover;
+      const blur = typeof wp.blur === "number" && isFinite(wp.blur) ? Math.min(40, Math.max(0, Math.round(wp.blur))) : 0;
+      const dim = typeof wp.dim === "number" && isFinite(wp.dim) ? Math.min(100, Math.max(0, Math.round(wp.dim))) : 0;
+      vars["--wallpaper-image"] = 'url("' + wp.src + '")';
+      vars["--wallpaper-blur"] = blur + "px";
+      vars["--wallpaper-dim"] = String(dim / 100);
+      vars["--wallpaper-size"] = fit[0];
+      vars["--wallpaper-repeat"] = fit[1];
+    } else {
+      vars["--wallpaper-image"] = null;
+      vars["--wallpaper-blur"] = null;
+      vars["--wallpaper-dim"] = null;
+      vars["--wallpaper-size"] = null;
+      vars["--wallpaper-repeat"] = null;
     }
     const paint: Paint = { dark: input.dark, vars: vars, attrs: attrs };
     if (input.design !== undefined) paint.design = input.design;
@@ -489,6 +521,26 @@ export function makeThemePaint() {
     let status = isObj(storedStatus) ? semOf(dark ? storedStatus.dark : storedStatus.light) : null;
     if (!status) status = semOf(dark ? dt.status : dt.statusLight || dt.status);
 
+    // The wallpaper: the stored per-mode one (a stored src of "" is the
+    // visitor's "none", over an admin default), else the admin default.
+    const wpOf = (o: unknown): PaintWallpaper | null => {
+      if (!isObj(o) || typeof o.src !== "string" || !WALLPAPER_SRC.test(o.src)) return null;
+      return {
+        src: o.src,
+        blur: typeof o.blur === "number" ? o.blur : 0,
+        dim: typeof o.dim === "number" ? o.dim : 0,
+        fit: typeof o.fit === "string" ? o.fit : "cover",
+      };
+    };
+    const storedWp = get("ctrlcenter:wallpaper");
+    const wpRaw = isObj(storedWp) ? (dark ? storedWp.dark : storedWp.light) : null;
+    let wallpaper: PaintWallpaper | null = null;
+    if (isObj(wpRaw) && wpRaw.src === "") wallpaper = null;
+    else {
+      wallpaper = wpOf(wpRaw);
+      if (!wallpaper) wallpaper = wpOf(dark ? dt.wallpaper : dt.wallpaperLight || dt.wallpaper);
+    }
+
     // The heading font: stored pair, else the admin default (light falls
     // back to dark); none means the body font. The visitor's stored "body"
     // sentinel clears the admin default.
@@ -516,6 +568,7 @@ export function makeThemePaint() {
       headingFont: headingFont,
       density: pick("ctrlcenter:density", ids.density, dt.density || "comfortable", dt.densityLight),
       status: status,
+      wallpaper: wallpaper,
     };
   }
 

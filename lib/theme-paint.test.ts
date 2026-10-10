@@ -261,6 +261,45 @@ describe("semantic colors (#331)", () => {
   });
 });
 
+describe("wallpaper (#333)", () => {
+  const base = { dark: true, background: null, foreground: null, accentFrom: "#a78bfa", accentTo: "#22d3ee" };
+  const wp = { src: "https://example.com/sea.jpg", blur: 8, dim: 40, fit: "contain" };
+
+  it("paints the image, blur, dim and fit vars, or removes them", () => {
+    const paint = themePaint.computePaint({ ...base, wallpaper: wp });
+    expect(paint.vars["--wallpaper-image"]).toBe('url("https://example.com/sea.jpg")');
+    expect(paint.vars["--wallpaper-blur"]).toBe("8px");
+    expect(paint.vars["--wallpaper-dim"]).toBe("0.4");
+    expect(paint.vars["--wallpaper-size"]).toBe("contain");
+    expect(paint.vars["--wallpaper-repeat"]).toBe("no-repeat");
+    const tiled = themePaint.computePaint({ ...base, wallpaper: { ...wp, fit: "tile" } });
+    expect(tiled.vars["--wallpaper-size"]).toBe("auto");
+    expect(tiled.vars["--wallpaper-repeat"]).toBe("repeat");
+    const none = themePaint.computePaint({ ...base, wallpaper: null });
+    expect(none.vars["--wallpaper-image"]).toBeNull();
+    expect(none.vars["--wallpaper-blur"]).toBeNull();
+  });
+
+  it("refuses a source that could escape the url(), and clamps blur and dim", () => {
+    const bad = themePaint.computePaint({ ...base, wallpaper: { ...wp, src: 'https://x.y/a")b.jpg' } });
+    expect(bad.vars["--wallpaper-image"]).toBeNull();
+    const js = themePaint.computePaint({ ...base, wallpaper: { ...wp, src: "javascript:alert(1)" } });
+    expect(js.vars["--wallpaper-image"]).toBeNull();
+    const big = themePaint.computePaint({ ...base, wallpaper: { ...wp, blur: 500, dim: 150 } });
+    expect(big.vars["--wallpaper-blur"]).toBe("40px");
+    expect(big.vars["--wallpaper-dim"]).toBe("1");
+  });
+
+  it("reads the stored per-mode wallpaper, a cleared one over the default, else the default's", () => {
+    expect(themePaint.readStored(storage({ "ctrlcenter:wallpaper": { dark: wp, light: null } }), DT, IDS, true).wallpaper).toEqual(wp);
+    expect(themePaint.readStored(storage({ "ctrlcenter:wallpaper": { dark: wp, light: null } }), DT, IDS, false).wallpaper).toBeNull();
+    const dt = { ...DT, wallpaper: wp };
+    expect(themePaint.readStored(storage({}), dt, IDS, false).wallpaper).toEqual(wp);
+    expect(themePaint.readStored(storage({ "ctrlcenter:wallpaper": { dark: { src: "" } } }), dt, IDS, true).wallpaper).toBeNull();
+    expect(themePaint.readStored(storage({ "ctrlcenter:wallpaper": { dark: { src: "//evil/x.png" } } }), DT, IDS, true).wallpaper).toBeNull();
+  });
+});
+
 describe("readStored (the no-flash path)", () => {
   it("reads the stored scene effects and the Reduce motion key", () => {
     const s = storage({
@@ -306,6 +345,7 @@ describe("readStored (the no-flash path)", () => {
       headingFont: null,
       density: "comfortable",
       status: null,
+      wallpaper: null,
     });
   });
 

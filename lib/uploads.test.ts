@@ -72,6 +72,36 @@ describe("save / list / read / delete round-trip", () => {
   });
 });
 
+describe("wallpapers (#333)", () => {
+  it("stores a raster upload under the wallpaper prefix, served like an icon", async () => {
+    const bytes = new Uint8Array([1, 2, 3]);
+    const { name, url } = await uploads.saveWallpaper("Sea View.jpg", "image/jpeg", bytes);
+    expect(name).toMatch(/^wallpaper-sea-view-[0-9a-f]{8}\.jpg$/);
+    expect(url).toBe(`/api/icons/${name}`);
+    expect(uploads.isWallpaperName(name)).toBe(true);
+    const read = await uploads.readIcon(name);
+    expect(read?.type).toBe("image/jpeg");
+    expect(new Uint8Array(read!.data)).toEqual(bytes);
+    await uploads.deleteIcon(name);
+  });
+
+  it("takes photos only", async () => {
+    expect(uploads.isWallpaperType("image/svg+xml")).toBe(false);
+    expect(uploads.isWallpaperType("image/webp")).toBe(true);
+    await expect(uploads.saveWallpaper("a.svg", "image/svg+xml", new Uint8Array([1]))).rejects.toThrow();
+  });
+
+  it("bundles a wallpaper under its larger cap, and an icon under its own", () => {
+    const b64 = (n: number) => Buffer.alloc(n, 1).toString("base64");
+    const overIcon = uploads.MAX_ICON_BYTES + 1;
+    expect(uploads.sanitizeBundledIcons([{ name: "wallpaper-a.png", data: b64(overIcon) }])).toHaveLength(1);
+    expect(uploads.sanitizeBundledIcons([{ name: "a.png", data: b64(overIcon) }])).toBeNull();
+    expect(
+      uploads.sanitizeBundledIcons([{ name: "wallpaper-a.png", data: b64(uploads.MAX_WALLPAPER_BYTES + 1) }])
+    ).toBeNull();
+  });
+});
+
 describe("backup bundling (sanitizeBundledIcons)", () => {
   const b64 = (bytes: number[]) => Buffer.from(bytes).toString("base64");
 

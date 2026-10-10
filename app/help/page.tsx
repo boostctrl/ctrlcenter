@@ -306,7 +306,8 @@ export default async function HelpPage() {
               Starfield, Petals, Comets, and more (18 in all), or none. Set
               how strongly it shows and whether it moves at full speed, calmly
               or not at all; a <em>Reduced</em> motion preference stills every
-              scene whatever the theme says.
+              scene whatever the theme says. Put a photo behind it as a
+              wallpaper, blurred and dimmed to taste.
             </li>
             <li>
               <strong>Accent and colors.</strong> The accent gradient, custom

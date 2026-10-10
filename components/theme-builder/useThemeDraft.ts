@@ -5,7 +5,7 @@ import type { ChangeEvent } from "react";
 import { useLookPrefs } from "../PrefsProvider";
 import type { Mode } from "../prefs/themeApply";
 import { useConfirm } from "../admin/Confirm";
-import { colorSetsEqual, sceneFxEqual, semanticEqual, tunesEqual } from "@/lib/theme";
+import { colorSetsEqual, sceneFxEqual, semanticEqual, tunesEqual, wallpaperEqual } from "@/lib/theme";
 import { derivePalette } from "@/lib/color";
 import type { ModeColors, ThemePack } from "@/lib/theme";
 import { decodeThemeCode, encodeThemeCode, newThemeId, parseThemesExport, siteThemeFromCustomTheme } from "@/lib/prefs";
@@ -40,6 +40,8 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     setDensity,
     statusFor,
     setStatusColors,
+    wallpaperFor,
+    setWallpaper,
     applyPack,
     customThemes,
     activeLook,
@@ -100,7 +102,8 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     sceneFxEqual(sceneFxFor(mode), null) &&
     (!p.font || fontFor(mode) === p.font) &&
     (!p.headingFont || headingFontFor(mode) === p.headingFont) &&
-    semanticEqual(statusFor(mode), (mode === "dark" ? p.status : p.statusLight ?? p.status) ?? null);
+    semanticEqual(statusFor(mode), (mode === "dark" ? p.status : p.statusLight ?? p.status) ?? null) &&
+    wallpaperEqual(wallpaperFor(mode), (mode === "dark" ? p.wallpaper : p.wallpaperLight ?? p.wallpaper) ?? null);
   const savedActive = (t: CustomTheme) =>
     (["dark", "light"] as const).every(
       (mode) =>
@@ -112,7 +115,8 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
         sceneFxEqual(sceneFxFor(mode), mode === "dark" ? t.sceneFx : t.sceneFxLight) &&
         headingFontFor(mode) === ((mode === "dark" ? t.headingFont : t.headingFontLight) ?? null) &&
         densityFor(mode) === ((mode === "dark" ? t.density : t.densityLight) ?? "comfortable") &&
-        semanticEqual(statusFor(mode), (mode === "dark" ? t.status : t.statusLight) ?? null)
+        semanticEqual(statusFor(mode), (mode === "dark" ? t.status : t.statusLight) ?? null) &&
+        wallpaperEqual(wallpaperFor(mode), (mode === "dark" ? t.wallpaper : t.wallpaperLight) ?? null)
     );
   const paletteActive = (p: ModeColors) =>
     colorSetsEqual(colorsFor("dark"), p.dark) && colorSetsEqual(colorsFor("light"), p.light);
@@ -418,6 +422,8 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     setDensity,
     statusFor,
     setStatusColors,
+    wallpaperFor,
+    setWallpaper,
     applyPack: applyPackTracked,
     customThemes,
     activeAccent,

@@ -413,6 +413,8 @@ function ThemeStep({ settings, onSave, packs }: StepProps & { packs: ThemePack[]
                 densityLight: undefined,
                 status: pack.status,
                 statusLight: pack.statusLight,
+                wallpaper: pack.wallpaper,
+                wallpaperLight: pack.wallpaperLight,
               },
             },
             { fallback: "Couldn't save the theme" }

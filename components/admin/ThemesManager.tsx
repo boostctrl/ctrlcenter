@@ -19,6 +19,7 @@ import { SelectField } from "./ui";
 import { apiErrorMessage } from "./apiError";
 import { useConfirm } from "./Confirm";
 import { TuneFields } from "@/components/theme-builder/TuneFields";
+import { WallpaperFields } from "@/components/theme-builder/WallpaperFields";
 import { useAutosave, SaveStatus, type SaveOptions } from "./useAutosave";
 
 async function saveThemes(
@@ -291,6 +292,22 @@ function PackEditor({
             value={pack.tune ?? null}
             onChange={(tune) => onField({ tune: tune ?? undefined })}
             idPrefix={`pack-${pack.name.replace(/\W+/g, "-")}`}
+            compact
+          />
+        </div>
+      </details>
+
+      {/* The pack's wallpaper (#333), per mode. */}
+      <details className="text-xs">
+        <summary className="cursor-pointer text-ink-50 transition-colors hover:text-ink-80">
+          Wallpaper{(mode === "dark" ? pack.wallpaper : pack.wallpaperLight) ? " · set" : ""}
+        </summary>
+        <div className="mt-2">
+          <WallpaperFields
+            value={(mode === "dark" ? pack.wallpaper : pack.wallpaperLight) ?? null}
+            onChange={(wp) => onField(mode === "dark" ? { wallpaper: wp ?? undefined } : { wallpaperLight: wp ?? undefined })}
+            idPrefix={`pack-${pack.name.replace(/\W+/g, "-")}-${mode}-wallpaper`}
+            canUpload
             compact
           />
         </div>

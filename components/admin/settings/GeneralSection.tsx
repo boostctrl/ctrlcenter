@@ -6,6 +6,7 @@ import { DENSITIES, type Density } from "@/lib/theme";
 import { Card, ControlRow, SelectField, TextField, controlClasses, fieldLabelClasses } from "../ui";
 import { ChipGroup } from "@/components/ChipGroup";
 import IconField from "../IconField";
+import { WallpaperFields } from "@/components/theme-builder/WallpaperFields";
 import type { SettingsDraft } from "./useSettingsDraft";
 
 export default function GeneralSection({
@@ -170,6 +171,37 @@ export default function GeneralSection({
             </option>
           ))}
         </SelectField>
+
+        {/* The site wallpaper (#333): behind every visitor's scene, for both
+            modes unless the light look has one of its own below. */}
+        <details className="text-xs">
+          <summary className="cursor-pointer text-ink-50 transition-colors hover:text-ink-80">
+            Wallpaper{theme.wallpaper ? " · set" : ""}
+          </summary>
+          <div className="mt-2">
+            <WallpaperFields
+              value={theme.wallpaper ?? null}
+              onChange={(wp) => updateTheme({ wallpaper: wp ?? undefined })}
+              idPrefix="site-wallpaper"
+              canUpload
+              compact
+            />
+          </div>
+        </details>
+        <details className="text-xs">
+          <summary className="cursor-pointer text-ink-50 transition-colors hover:text-ink-80">
+            Light mode wallpaper{theme.wallpaperLight ? " · set" : ""}
+          </summary>
+          <div className="mt-2">
+            <WallpaperFields
+              value={theme.wallpaperLight ?? null}
+              onChange={(wp) => updateTheme({ wallpaperLight: wp ?? undefined })}
+              idPrefix="site-wallpaper-light"
+              canUpload
+              compact
+            />
+          </div>
+        </details>
 
         <ControlRow label="Density">
           <ChipGroup

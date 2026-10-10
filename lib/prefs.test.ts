@@ -280,3 +280,23 @@ describe("sanitizeCustomTheme status colors (#331)", () => {
     expect(themeInputSchema.parse(siteThemeFromCustomTheme(t, "dark")).status?.down).toBe("#ff0000");
   });
 });
+
+describe("sanitizeCustomTheme wallpaper (#333)", () => {
+  it("keeps a valid wallpaper per mode, drops a bad one, and promotes it", () => {
+    const wp = { src: "https://example.com/sea.jpg", blur: 8, dim: 40, fit: "tile" };
+    const t = sanitizeCustomTheme({
+      name: "Shore",
+      dark: valid,
+      light: { ...valid, background: "#eceef3", foreground: "#181b24" },
+      wallpaper: wp,
+      wallpaperLight: { src: "javascript:alert(1)" },
+    })!;
+    expect(t.wallpaper).toEqual(wp);
+    expect(t.wallpaperLight).toBeUndefined();
+    const site = themeInputSchema.parse(siteThemeFromCustomTheme(t, "dark"));
+    expect(site.wallpaper?.src).toBe("https://example.com/sea.jpg");
+    expect(site.wallpaperLight).toBeUndefined();
+    // Survives a code round trip.
+    expect(decodeThemeCode(encodeThemeCode(t))?.wallpaper).toEqual(wp);
+  });
+});

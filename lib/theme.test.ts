@@ -10,6 +10,9 @@ import {
   sceneFxEqual,
   sanitizeSemantic,
   semanticEqual,
+  sanitizeWallpaper,
+  wallpaperEqual,
+  isWallpaperSrc,
   DEFAULT_SCENE_FX,
   DEFAULT_TUNE,
   THEME_PACKS,
@@ -153,5 +156,47 @@ describe("semantic colors (#331)", () => {
     expect(semanticEqual(set, { ...set, up: "#00FF00" })).toBe(true);
     expect(semanticEqual(set, null)).toBe(false);
     expect(semanticEqual(undefined, null)).toBe(true);
+  });
+});
+
+describe("wallpaper (#333)", () => {
+  it("accepts http(s) URLs and same-origin paths, nothing that could break a url()", () => {
+    expect(isWallpaperSrc("https://example.com/a.jpg")).toBe(true);
+    expect(isWallpaperSrc("/api/icons/wallpaper-sea-1a2b3c4d.jpg")).toBe(true);
+    expect(isWallpaperSrc("//evil.example/x.png")).toBe(false);
+    expect(isWallpaperSrc("javascript:alert(1)")).toBe(false);
+    expect(isWallpaperSrc("https://example.com/a\") b.jpg")).toBe(false);
+    expect(isWallpaperSrc("https://example.com/a'b.jpg")).toBe(false);
+    expect(isWallpaperSrc("https://example.com/a b.jpg")).toBe(false);
+    expect(isWallpaperSrc("")).toBe(false);
+    expect(isWallpaperSrc("https://example.com/" + "a".repeat(2048))).toBe(false);
+  });
+
+  it("sanitizes blur, dim and fit, with defaults for what's missing", () => {
+    expect(sanitizeWallpaper({ src: "https://x.y/a.jpg" })).toEqual({ src: "https://x.y/a.jpg", blur: 0, dim: 0, fit: "cover" });
+    expect(sanitizeWallpaper({ src: "https://x.y/a.jpg", blur: 99, dim: -5, fit: "tile" })).toEqual({
+      src: "https://x.y/a.jpg",
+      blur: 40,
+      dim: 0,
+      fit: "tile",
+    });
+    expect(sanitizeWallpaper({ src: "https://x.y/a.jpg", blur: 12.4, dim: 30.6, fit: "stretch" })).toEqual({
+      src: "https://x.y/a.jpg",
+      blur: 12,
+      dim: 31,
+      fit: "cover",
+    });
+    expect(sanitizeWallpaper({ src: "" })).toBeNull();
+    expect(sanitizeWallpaper({ src: "ftp://x/a.jpg" })).toBeNull();
+    expect(sanitizeWallpaper("https://x.y/a.jpg")).toBeNull();
+    expect(sanitizeWallpaper(null)).toBeNull();
+  });
+
+  it("compares field by field and treats absent as absent", () => {
+    const a = { src: "https://x.y/a.jpg", blur: 4, dim: 20, fit: "cover" as const };
+    expect(wallpaperEqual(a, { ...a })).toBe(true);
+    expect(wallpaperEqual(a, { ...a, dim: 25 })).toBe(false);
+    expect(wallpaperEqual(a, null)).toBe(false);
+    expect(wallpaperEqual(undefined, null)).toBe(true);
   });
 });

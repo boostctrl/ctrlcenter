@@ -181,7 +181,7 @@ export default function ThemeBuilder({
       {tab === "colors" && <ColorsTab d={draft} />}
       {tab === "design" && <DesignTab d={draft} />}
       {tab === "tune" && <TuneTab d={draft} />}
-      {tab === "scene" && <SceneTab d={draft} />}
+      {tab === "scene" && <SceneTab d={draft} canUpload={!!promote} />}
       {tab === "font" && <FontTab d={draft} />}
       </div>
       </div>
