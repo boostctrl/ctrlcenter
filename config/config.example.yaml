@@ -63,7 +63,7 @@ apps:
     icon: vaultwarden
   - id: a3632b22-c60b-4651-9854-6e80842da9a2
     name: Media Requests
-    subtitle: Jellyseerr
+    subtitle: Seerr
     url: https://requests.example.com
     icon: jellyseerr
   - id: 8fc903c5-aab5-436b-8bf2-4235f38475bd

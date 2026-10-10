@@ -1,4 +1,4 @@
-// Inbound webhook payload parsers (#204). Sonarr/Radarr/Overseerr(Seerr) POST an
+// Inbound webhook payload parsers (#204). Sonarr/Radarr/Seerr POST an
 // event to /api/hooks/<service>; these pure functions fold each app's payload
 // into a short { title, body } the alert channels relay (lib/alerts.ts
 // sendNotification). Parsing is lenient — the apps let the admin choose which
@@ -120,7 +120,7 @@ export function parseArrWebhook(
   }
 }
 
-// --- Overseerr / Jellyseerr (Seerr), keyed by `notification_type` ---
+// --- Seerr (the merged Overseerr / Jellyseerr), keyed by `notification_type` ---
 
 const SEERR_LABELS: Record<string, string> = {
   TEST_NOTIFICATION: "webhook test",

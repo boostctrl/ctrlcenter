@@ -7,7 +7,7 @@ import { sendNotification, anyChannelReady } from "@/lib/alerts";
 import { rateLimit, pruneRateLimit, clientKey } from "@/lib/rate-limit";
 import { log } from "@/lib/log";
 
-// Inbound webhooks (#204): Sonarr/Radarr/Overseerr POST an event here and we
+// Inbound webhooks (#204): Sonarr/Radarr/Seerr POST an event here and we
 // relay it out through the configured alert channels. Public by design — this
 // path sits outside the proxy's admin gate so an external app can reach it — but
 // gated by a per-service token, so it's never an open relay. Runs on Node (it

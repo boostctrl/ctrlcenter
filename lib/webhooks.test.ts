@@ -59,7 +59,7 @@ describe("parseArrWebhook (Sonarr/Radarr)", () => {
   });
 });
 
-describe("parseSeerrWebhook (Overseerr/Jellyseerr)", () => {
+describe("parseSeerrWebhook", () => {
   it("labels a pending request with its subject", () => {
     const n = parseSeerrWebhook({
       notification_type: "MEDIA_PENDING",

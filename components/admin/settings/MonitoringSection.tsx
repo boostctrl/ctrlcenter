@@ -145,7 +145,7 @@ export default function MonitoringSection({
 
       <Card
         title="Inbound webhooks"
-        intro="Let Sonarr, Radarr, and Overseerr push events — a grab, an import, a request needing approval, a health issue — to CtrlCenter, relayed out through the alert channels above. Each service has its own URL; paste it into that app's webhook connection."
+        intro="Let Sonarr, Radarr, and Seerr push events — a grab, an import, a request needing approval, a health issue — to CtrlCenter, relayed out through the alert channels above. Each service has its own URL; paste it into that app's webhook connection."
         toggle={{
           checked: webhooks.enabled,
           onChange: (enabled) => updateWebhooks({ enabled }),

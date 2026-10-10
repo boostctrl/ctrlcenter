@@ -647,9 +647,11 @@ export default async function HelpPage() {
           <P>
             The Monitor <em>polls</em> your services; inbound webhooks let{" "}
             <strong>Sonarr</strong>, <strong>Radarr</strong>, and{" "}
-            <strong>Overseerr / Jellyseerr</strong> push events the moment they
-            happen — a grab, an import, a request awaiting approval, a health
-            issue — relayed straight out through the alert channels above.
+            <strong>Seerr</strong> push events the moment they happen — a
+            grab, an import, a request awaiting approval, a health issue —
+            relayed straight out through the alert channels above. An
+            Overseerr or Jellyseerr install from before they merged into
+            Seerr sends the same events.
           </P>
           <P>
             Turn on <strong>Settings → Alerts → Inbound webhooks</strong>,

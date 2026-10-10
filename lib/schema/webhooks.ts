@@ -2,7 +2,7 @@
 import { z } from "zod";
 import { patchOf } from "./input";
 
-// Inbound webhooks (#204): Sonarr/Radarr/Overseerr(Seerr) POST an event to us
+// Inbound webhooks (#204): Sonarr/Radarr/Seerr POST an event to us
 // ("download complete", "request needs approval", "health issue") and we relay
 // it out through the same alert channels as uptime alerts (settings.alerts).
 // Polling answers "what's the state now"; this answers "something just

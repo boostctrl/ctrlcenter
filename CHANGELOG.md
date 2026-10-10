@@ -12,6 +12,13 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **Seerr, by its new name.** Overseerr and Jellyseerr merged into Seerr, and
+  the inbound-webhook settings, the help page and the example config now
+  call it that. An Overseerr or Jellyseerr install from before the merge
+  keeps working with the same webhook URL. (#342)
+
 ### Fixed
 
 - **Resizing a widget no longer scrolls the page to the top.** In edit
