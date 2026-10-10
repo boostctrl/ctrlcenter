@@ -68,12 +68,18 @@ const SCENE_SWATCHES: Record<SceneId, (s: Swatch) => string> = {
     `linear-gradient(115deg, transparent 18%, ${mix(from, 45)} 22% 30%, transparent 34% 48%, ${mix(to, 35)} 52% 58%, transparent 62% 76%, ${mix(from, 30)} 80% 84%, transparent 88%), ${bg}`,
   bubbles: ({ from, to, bg, mix }) =>
     `radial-gradient(circle at 30% 60%, transparent 6px, ${mix(from, 70)} 6.5px 7.5px, transparent 8px), radial-gradient(circle at 60% 34%, transparent 4px, ${mix(to, 60)} 4.5px 5.5px, transparent 6px), radial-gradient(circle at 80% 68%, transparent 5px, ${mix(from, 55)} 5.5px 6.5px, transparent 7px), radial-gradient(circle at 46% 78%, transparent 3px, ${mix(to, 50)} 3.5px 4.5px, transparent 5px), ${bg}`,
+  // Four columns of dashes falling from the top to different depths, each
+  // capped by a solid lit head at its lower end (the scene's signature).
   glyphs: ({ from, to, bg, mix }) =>
     [
+      `linear-gradient(${to}, ${to}) 10% 60% / 2px 4px no-repeat`,
+      `linear-gradient(${to}, ${to}) 34% 85% / 2px 4px no-repeat`,
+      `linear-gradient(${to}, ${to}) 58% 45% / 2px 4px no-repeat`,
+      `linear-gradient(${to}, ${to}) 82% 72% / 2px 4px no-repeat`,
       `repeating-linear-gradient(0deg, ${mix(from, 70)} 0 2px, transparent 2px 5px) 10% 0 / 2px 60% no-repeat`,
-      `repeating-linear-gradient(0deg, ${mix(from, 50)} 0 2px, transparent 2px 5px) 34% 100% / 2px 75% no-repeat`,
-      `repeating-linear-gradient(0deg, ${mix(to, 60)} 0 2px, transparent 2px 5px) 58% 0 / 2px 45% no-repeat`,
-      `repeating-linear-gradient(0deg, ${mix(from, 60)} 0 2px, transparent 2px 5px) 82% 100% / 2px 65% no-repeat`,
+      `repeating-linear-gradient(0deg, ${mix(from, 50)} 0 2px, transparent 2px 5px) 34% 0 / 2px 85% no-repeat`,
+      `repeating-linear-gradient(0deg, ${mix(from, 60)} 0 2px, transparent 2px 5px) 58% 0 / 2px 45% no-repeat`,
+      `repeating-linear-gradient(0deg, ${mix(from, 55)} 0 2px, transparent 2px 5px) 82% 0 / 2px 72% no-repeat`,
       bg,
     ].join(", "),
 };
