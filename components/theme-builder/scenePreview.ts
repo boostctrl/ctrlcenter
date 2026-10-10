@@ -58,8 +58,8 @@ const SCENE_SWATCHES: Record<SceneId, (s: Swatch) => string> = {
     `radial-gradient(2.5px 2.5px at 30% 38%, ${from}, transparent), linear-gradient(150deg, transparent 30%, ${mix(from, 65)} 36%, transparent 39%) no-repeat 0 0 / 62% 76%, radial-gradient(2px 2px at 72% 64%, ${to}, transparent), linear-gradient(150deg, transparent 56%, ${mix(to, 50)} 62%, transparent 65%) no-repeat 40% 100% / 60% 100%, ${bg}`,
   topography: ({ from, to, bg, mix }) =>
     `repeating-radial-gradient(circle at 30% 45%, ${mix(from, 55)} 0 1px, transparent 1px 7px), repeating-radial-gradient(circle at 80% 70%, ${mix(to, 45)} 0 1px, transparent 1px 7px), ${bg}`,
-  snow: ({ from, bg, mix }) =>
-    `radial-gradient(2.5px 2.5px at 18% 24%, ${mix(from, 85)}, transparent), radial-gradient(2px 2px at 42% 56%, ${mix(from, 70)}, transparent), radial-gradient(3px 3px at 66% 32%, ${mix(from, 90)}, transparent), radial-gradient(2px 2px at 84% 72%, ${mix(from, 65)}, transparent), radial-gradient(2.5px 2.5px at 30% 80%, ${mix(from, 75)}, transparent), radial-gradient(2px 2px at 58% 12%, ${mix(from, 60)}, transparent), ${bg}`,
+  snow: ({ from, to, bg, mix }) =>
+    `radial-gradient(2.5px 2.5px at 18% 24%, ${mix(from, 85)}, transparent), radial-gradient(2px 2px at 42% 56%, ${mix(to, 70)}, transparent), radial-gradient(3px 3px at 66% 32%, ${mix(from, 90)}, transparent), radial-gradient(2px 2px at 84% 72%, ${mix(from, 65)}, transparent), radial-gradient(2.5px 2.5px at 30% 80%, ${mix(from, 75)}, transparent), radial-gradient(2px 2px at 58% 12%, ${mix(to, 60)}, transparent), ${bg}`,
   embers: ({ from, to, bg, mix }) =>
     `radial-gradient(4px 4px at 24% 70%, ${from} 35%, ${mix(from, 40)} 55%, transparent), radial-gradient(3.5px 3.5px at 62% 58%, ${from} 35%, ${mix(from, 40)} 55%, transparent), radial-gradient(3px 3px at 44% 40%, ${mix(to, 85)} 35%, ${mix(to, 35)} 55%, transparent), radial-gradient(2.5px 2.5px at 80% 30%, ${mix(to, 70)} 35%, transparent), radial-gradient(2px 2px at 34% 16%, ${mix(to, 50)} 35%, transparent), linear-gradient(to top, ${mix(from, 55)}, transparent 55%), ${bg}`,
   bokeh: ({ from, to, bg, mix }) =>
