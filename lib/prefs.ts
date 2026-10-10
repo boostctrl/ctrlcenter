@@ -800,6 +800,18 @@ export function saveDensity(pair: ModePair<Density | null> | null): void {
   saveModePair(DENSITY_KEY, pair);
 }
 
+// Under the "themes only" policy (#335), the visitor's choice is a pack's
+// name per mode; the no-flash script resolves it against the site's themes.
+export const PACK_KEY = "ctrlcenter:pack";
+
+export function loadPackChoice(): ModePair<string | null> {
+  return loadModePair(PACK_KEY, (v): v is string => typeof v === "string" && v.length > 0 && v.length <= 80);
+}
+
+export function savePackChoice(pair: ModePair<string | null> | null): void {
+  saveModePair(PACK_KEY, pair);
+}
+
 // The UI typeface (Plus Jakarta Sans, Inter, …), per mode. Applied as a
 // `font-<id>` class on <html>. See lib/fonts.ts for the catalog.
 export const FONT_KEY = "ctrlcenter:font";

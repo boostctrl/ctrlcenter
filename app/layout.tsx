@@ -15,10 +15,11 @@ import {
   Quicksand,
 } from "next/font/google";
 import { getSettings } from "@/lib/config";
+import { readPublicConfig } from "@/lib/api-auth";
 import { DEFAULT_UI_SCALE } from "@/lib/layout";
 import { resolveIconUrl } from "@/lib/icons";
 import { serializeForScript } from "@/lib/serialize";
-import { DENSITY_IDS, DESIGN_IDS, SCENE_IDS } from "@/lib/theme";
+import { DENSITY_IDS, DESIGN_IDS, SCENE_IDS, packFields, resolveThemePacks, type VisitorTheming } from "@/lib/theme";
 import { inlineThemeScript } from "@/lib/theme-paint";
 import { FONT_IDS } from "@/lib/fonts";
 import { PrefsProvider } from "@/components/PrefsProvider";
@@ -100,9 +101,15 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const settings = await getSettings();
+  // The settings and, for the theming policy (#335), whether this is an
+  // admin: admins are never limited, so the policy the page carries is the
+  // effective one for this visitor.
+  const { config, isAdmin } = await readPublicConfig();
+  const settings = config.settings;
   const weather = settings.weather;
   const defaultTheme = settings.theme;
+  const visitorTheming: VisitorTheming = isAdmin ? "all" : settings.visitorTheming;
+  const packs = resolveThemePacks(config.themes);
   // Per-request CSP nonce from the proxy, so our inline theme script is allowed
   // without script-src 'unsafe-inline'. Reading headers() also opts pages into
   // dynamic rendering, which is required for a per-request nonce to match.
@@ -119,12 +126,21 @@ export default async function RootLayout({
   // serializeForScript (not raw JSON.stringify) escapes `<`/`>`/`&` so a config
   // string value like a `preset` of `</script>…` can't break out of this inline
   // script and inject HTML into the page served to every visitor.
-  const themeScript = inlineThemeScript(serializeForScript(defaultTheme), {
+  // Under "themes only" the script needs the site's themes, since what's
+  // stored is a chosen pack's name; otherwise just the policy rides along.
+  const themeScript = inlineThemeScript(
+    serializeForScript({
+      ...defaultTheme,
+      policy: visitorTheming,
+      ...(visitorTheming === "packs" ? { packs: packs.map(packFields) } : {}),
+    }),
+    {
     design: DESIGN_IDS,
     scene: SCENE_IDS,
     font: FONT_IDS,
     density: DENSITY_IDS,
-  });
+    }
+  );
 
   // suppressHydrationWarning on <html>: the inline theme script below mutates its
   // classes/inline styles (theme-light, design-*, scene-*, font-*, color vars)
@@ -157,6 +173,8 @@ export default async function RootLayout({
         <PrefsProvider
           weatherEnabled={weather.enabled}
           defaultTheme={defaultTheme}
+          visitorTheming={visitorTheming}
+          packs={packs}
           defaults={{
             timezone: settings.timezone || "UTC",
             latitude: weather.latitude,

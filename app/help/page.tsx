@@ -325,7 +325,9 @@ export default async function HelpPage() {
           <P>
             Light and dark can carry wholly independent looks. Like the rest of
             your preferences, everything stays on your device, so each visitor
-            gets their own. To carry a look elsewhere, <em>Copy as code</em>{" "}
+            gets their own. A site&apos;s admin may limit this to picking one
+            of the site&apos;s themes, or lock the theme altogether; the
+            Settings page says so when they have. To carry a look elsewhere, <em>Copy as code</em>{" "}
             puts it on the clipboard as a short code; <em>Paste a code</em> in
             another browser&apos;s builder applies and saves it, and a link of
             the form <Code>/settings#theme=&lt;code&gt;</Code> does the same on
@@ -884,7 +886,11 @@ export default async function HelpPage() {
             duplicate one as a starting point, hide any from visitors, and
             drag or use the arrows to reorder. Each card previews the theme as
             visitors will see it. In your own theme builder, a saved theme
-            can be added to the gallery from its card.
+            can be added to the gallery from its card. <em>Visitors can
+            change</em> in Settings → General decides how much of this
+            visitors get: the whole builder, the gallery and the light/dark
+            mode only, or nothing at all (for kiosks and shared screens);
+            signed-in admins are never limited.
           </P>
         </Card>
 

@@ -300,6 +300,71 @@ describe("wallpaper (#333)", () => {
   });
 });
 
+describe("visitor theming policy (#335)", () => {
+  const customized = {
+    "ctrlcenter:theme": "light",
+    "ctrlcenter:activeTheme": {
+      dark: { background: "#111111", foreground: "#eeeeee", accentFrom: "#ff0000", accentTo: "#00ff00" },
+      light: { background: "#fafafa", foreground: "#101010", accentFrom: "#ff0000", accentTo: "#00ff00" },
+    },
+    "ctrlcenter:design": { dark: "paper", light: "paper" },
+    "ctrlcenter:motion": "reduce",
+    "ctrlcenter:pack": { dark: "Shore", light: "Mariana" },
+  };
+  const pack = {
+    name: "Shore",
+    design: "flat",
+    scene: "rain",
+    sceneLight: "none",
+    dark: { background: "#000011", foreground: "#ffffff", accentFrom: "#123456", accentTo: "#654321" },
+    light: { background: "#ffffff", foreground: "#000000", accentFrom: "#123456", accentTo: "#654321" },
+    tune: { radius: 50 },
+    headingFont: "lora",
+    status: { up: "#00ff00", down: "#ff0000", warning: "#ffaa00", info: "#00aaff" },
+  };
+
+  it("reads everything with no policy, as before", () => {
+    const input = themePaint.readStored(storage(customized), DT, IDS, true);
+    expect(input.dark).toBe(false);
+    expect(input.background).toBe("#fafafa");
+    expect(input.design).toBe("paper");
+  });
+
+  it("reads nothing but the Reduce motion switch under \"none\"", () => {
+    const input = themePaint.readStored(storage(customized), { ...DT, policy: "none" }, IDS, true);
+    expect(input.dark).toBe(true); // the site's mode, not the stored one
+    expect(input.background).toBeNull();
+    expect(input.design).toBe("glass");
+    expect(input.reduceMotion).toBe(true);
+  });
+
+  it("reads the mode and the chosen pack under \"packs\", resolving it against the site's themes", () => {
+    const dt = { ...DT, policy: "packs", packs: [pack], headingFont: "inter", wallpaper: { src: "https://x.y/w.jpg", blur: 0, dim: 0, fit: "cover" } };
+    const dark = themePaint.readStored(storage({ ...customized, "ctrlcenter:theme": "dark" }), dt, IDS, true);
+    expect(dark.background).toBe("#000011");
+    expect(dark.accentFrom).toBe("#123456");
+    expect(dark.design).toBe("flat");
+    expect(dark.scene).toBe("rain");
+    expect(dark.tune).toEqual({ radius: 50 });
+    expect(dark.headingFont).toBe("lora");
+    expect(dark.status?.down).toBe("#ff0000");
+    // A pack without a wallpaper means none, even over the site's.
+    expect(dark.wallpaper).toBeNull();
+    expect(dark.reduceMotion).toBe(true);
+    // Light: the stored mode is honored, but its pack ("Mariana") isn't in
+    // the site's themes, so the site default applies — not the stored look.
+    const light = themePaint.readStored(storage(customized), dt, IDS, true);
+    expect(light.dark).toBe(false);
+    expect(light.background).toBeNull();
+    expect(light.design).toBe("glass");
+    expect(light.headingFont).toBe("inter");
+    // The light pack's own scene.
+    const lightPack = themePaint.readStored(storage({ ...customized, "ctrlcenter:pack": { light: "Shore" } }), dt, IDS, true);
+    expect(lightPack.scene).toBe("none");
+    expect(lightPack.background).toBe("#ffffff");
+  });
+});
+
 describe("readStored (the no-flash path)", () => {
   it("reads the stored scene effects and the Reduce motion key", () => {
     const s = storage({

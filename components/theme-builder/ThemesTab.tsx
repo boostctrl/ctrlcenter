@@ -12,10 +12,13 @@ export default function ThemesTab({
   d,
   packs,
   promote,
+  packsOnly = false,
 }: {
   d: ThemeDraft;
   packs: ThemePack[];
   promote?: { siteMode: "system" | "light" | "dark" };
+  // Under the "themes only" policy (#335): just the site's themes.
+  packsOnly?: boolean;
 }) {
   const {
     customThemes,
@@ -58,7 +61,7 @@ export default function ThemesTab({
       <p className="text-xs text-ink-40">
         Curated looks — one tap sets the design, scene &amp; colors of your{" "}
         {editMode} theme.{" "}
-        Tweak it in the other tabs, then name &amp; save your own below.
+        {!packsOnly && "Tweak it in the other tabs, then name & save your own below."}
       </p>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
         {packs.map((p, i) => (
@@ -79,6 +82,7 @@ export default function ThemesTab({
           </OptionCard>
         ))}
       </div>
+      {!packsOnly && (
       <div className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-[10px] font-semibold tracking-[0.15em] text-ink-45 uppercase">
@@ -308,6 +312,7 @@ export default function ThemesTab({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

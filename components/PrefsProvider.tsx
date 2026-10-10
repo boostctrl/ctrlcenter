@@ -22,6 +22,7 @@ import {
 import type { Mode, Theme } from "./prefs/themeApply";
 import { useLocationDetect } from "./prefs/useLocationDetect";
 import { useLook, type DefaultTheme, type LookValue } from "./prefs/useLook";
+import type { ThemePack, VisitorTheming } from "@/lib/theme";
 
 // Per-visitor preferences, client-only (localStorage), in three contexts so a
 // change re-renders only what reads it (#290): the locale (time zone, units,
@@ -110,11 +111,17 @@ export function PrefsProvider({
   defaults,
   weatherEnabled,
   defaultTheme,
+  visitorTheming = "all",
+  packs = [],
   children,
 }: {
   defaults: Defaults;
   weatherEnabled: boolean;
   defaultTheme: DefaultTheme;
+  // What this visitor may change about the theme (#335), and the site's
+  // themes a "packs" choice resolves against.
+  visitorTheming?: VisitorTheming;
+  packs?: ThemePack[];
   children: ReactNode;
 }) {
   // Start empty so the first client render matches the server (which only knows
@@ -123,7 +130,7 @@ export function PrefsProvider({
   const [detectedTz, setDetectedTz] = useState<string | undefined>();
   // Pinned app IDs (starts empty to match SSR; hydrated from localStorage on mount).
   const [favorites, setFavorites] = useState<string[]>([]);
-  const { look, resetLook } = useLook(defaultTheme);
+  const { look, resetLook } = useLook(defaultTheme, { policy: visitorTheming, packs });
 
   const persist = useCallback((next: VisitorPrefs) => {
     setPrefs(next);

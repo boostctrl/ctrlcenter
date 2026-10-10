@@ -19,6 +19,8 @@ export default async function SettingsPage() {
   } = await readPublicConfig();
   const { settings, themes } = site;
   const packs = resolveThemePacks(themes);
+  // What this visitor may change (#335); an admin, everything.
+  const policy = isAdmin ? "all" : settings.visitorTheming;
   return (
     <>
       <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 pt-12 pb-24 sm:px-10 lg:pt-16">
@@ -71,10 +73,20 @@ export default async function SettingsPage() {
             {/* The admin session unlocks "set as site theme" on saved themes;
                 the current default's mode rides along so promotion preserves
                 it (the settings API replaces the theme object wholesale). */}
-            <ThemeBuilder
-              packs={packs}
-              promote={isAdmin ? { siteMode: settings.theme.mode } : undefined}
-            />
+            {policy === "none" ? (
+              <div className="space-y-1 text-sm">
+                <h2 className="font-semibold">Theme</h2>
+                <p className="text-xs text-ink-50">
+                  The look of this site is set by its admin and can&apos;t be changed here.
+                </p>
+              </div>
+            ) : (
+              <ThemeBuilder
+                packs={packs}
+                policy={policy}
+                promote={isAdmin ? { siteMode: settings.theme.mode } : undefined}
+              />
+            )}
           </div>
         </div>
       </ConfirmProvider>

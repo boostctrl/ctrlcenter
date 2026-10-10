@@ -194,6 +194,13 @@ describe("configSchema defaults", () => {
 });
 
 describe("settingsSchema", () => {
+  it("defaults the visitor theming policy to everything, and takes the others (#335)", () => {
+    expect(settingsSchema.parse({}).visitorTheming).toBe("all");
+    expect(settingsSchema.parse({ visitorTheming: "packs" }).visitorTheming).toBe("packs");
+    expect(settingsInputSchema.safeParse({ visitorTheming: "none" }).success).toBe(true);
+    expect(settingsInputSchema.safeParse({ visitorTheming: "some" }).success).toBe(false);
+  });
+
   it("nests weather defaults", () => {
     const settings = settingsSchema.parse({});
     expect(settings.weather).toMatchObject({

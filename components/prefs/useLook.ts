@@ -32,6 +32,8 @@ import {
   saveStatusColors,
   loadWallpaper,
   saveWallpaper,
+  loadPackChoice,
+  savePackChoice,
   NO_ACCENT_OVERRIDES,
   type HeadingChoice,
   type WallpaperChoice,
@@ -52,6 +54,7 @@ import type {
   SemanticColors,
   ThemePack,
   Tune,
+  VisitorTheming,
   Wallpaper,
 } from "@/lib/theme";
 import type { FontId } from "@/lib/fonts";
@@ -152,6 +155,8 @@ export type LookValue = {
   statusFor: (mode: Mode) => SemanticColors | null;
   // The effective wallpaper for a mode, or null for none (#333).
   wallpaperFor: (mode: Mode) => Wallpaper | null;
+  // What this visitor may change (#335): "all" for an admin.
+  visitorTheming: VisitorTheming;
   // The visitor's Reduce motion switch, and the motion level the scenes run
   // at now: "off" when the switch is on, else the displayed mode's effects.
   reduceMotion: boolean;
@@ -224,10 +229,16 @@ export type LookValue = {
 
 // All look state for `defaultTheme`. `resetLook` drops every customization,
 // mode included (the theme half of the global reset).
-export function useLook(defaultTheme: DefaultTheme): {
+export function useLook(
+  defaultTheme: DefaultTheme,
+  // What this visitor may change (#335), and the site's themes a "packs"
+  // choice resolves against. An admin gets "all" whatever the site says.
+  gate: { policy: VisitorTheming; packs: ThemePack[] } = { policy: "all", packs: [] }
+): {
   look: LookValue;
   resetLook: () => void;
 } {
+  const policy = gate.policy;
   // The admin default accent, and the admin custom default colors (a baseline
   // theme applied when the visitor hasn't customized colors or picked a mode).
   const defaultAccent: Accent = useMemo(
@@ -767,8 +778,12 @@ export function useLook(defaultTheme: DefaultTheme): {
       // default wallpaper doesn't show through one.
       setWallpaper((mode === "dark" ? pack.wallpaper : pack.wallpaperLight ?? pack.wallpaper) ?? "none", mode);
       applyThemeColors({ dark: pack.dark, light: pack.light }, mode);
+      // Under "themes only" (#335) the choice is the pack's name: the parts
+      // above are what this visit paints, but the next page load resolves
+      // the name against the site's themes and reads nothing else.
+      if (policy === "packs") savePackChoice({ ...loadPackChoice(), [mode]: pack.name });
     },
-    [setDesign, setScene, setTune, setSceneFx, setFont, setHeadingFont, setStatusColors, setWallpaper, applyThemeColors]
+    [policy, setDesign, setScene, setTune, setSceneFx, setFont, setHeadingFont, setStatusColors, setWallpaper, applyThemeColors]
   );
 
   // Update only the background/foreground for the CURRENT mode's variant,
@@ -895,6 +910,7 @@ export function useLook(defaultTheme: DefaultTheme): {
     saveDensity(null);
     saveStatusColors(null);
     saveWallpaper(null);
+    savePackChoice(null);
     setDesigns({ dark: null, light: null });
     setScenes({ dark: null, light: null });
     setFonts({ dark: null, light: null });
@@ -956,6 +972,7 @@ export function useLook(defaultTheme: DefaultTheme): {
     saveDensity(null);
     saveStatusColors(null);
     saveWallpaper(null);
+    savePackChoice(null);
     setActiveLook(null);
     setAccentOverrideState(NO_ACCENT_OVERRIDES);
     setThemeState(defaultTheme.mode);
@@ -1005,27 +1022,54 @@ export function useLook(defaultTheme: DefaultTheme): {
   // with OS changes. Anything the visitor hasn't set falls back to the admin
   // default theme.
   useEffect(() => {
+    // What this visitor may change (#335): under "packs" the stored look is
+    // the chosen pack per mode, resolved against the site's themes, and the
+    // mode; under "none" nothing but the Reduce motion switch. The rest of
+    // what's stored is left unread, so a browser customized before the
+    // policy changed falls back at once — as the no-flash script did.
+    const gated = policy !== "all";
     let stored: Theme = defaultTheme.mode;
-    try {
-      const raw = window.localStorage.getItem(THEME_KEY);
-      if (raw === "light" || raw === "dark" || raw === "system") {
-        stored = raw;
+    if (policy !== "none") {
+      try {
+        const raw = window.localStorage.getItem(THEME_KEY);
+        if (raw === "light" || raw === "dark" || raw === "system") {
+          stored = raw;
+        }
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
     }
-    const active = loadActiveTheme();
-    const overrideAccent = loadAccentOverride();
-    const storedDesigns = loadDesign();
-    const storedScenes = loadScene();
-    const storedFonts = loadFont();
-    const storedTunes = loadTune();
-    const storedFx = loadSceneFx();
+    const choice = policy === "packs" ? loadPackChoice() : { dark: null, light: null };
+    const packOf = (dark: boolean): ThemePack | null => {
+      const name = dark ? choice.dark : choice.light;
+      return name ? (gate.packs.find((p) => p.name === name) ?? null) : null;
+    };
+    const dp = packOf(true);
+    const lp = packOf(false);
+    const fromPacks = <T,>(f: (p: ThemePack, dark: boolean) => T | null): ModePair<T | null> => ({
+      dark: dp ? f(dp, true) : null,
+      light: lp ? f(lp, false) : null,
+    });
+    const active = gated
+      ? dp || lp
+        ? { dark: dp ? dp.dark : seedColorSet(true), light: lp ? lp.light : seedColorSet(false) }
+        : null
+      : loadActiveTheme();
+    const overrideAccent = gated ? NO_ACCENT_OVERRIDES : loadAccentOverride();
+    const storedDesigns = gated ? fromPacks(packDesign) : loadDesign();
+    const storedScenes = gated ? fromPacks(packScene) : loadScene();
+    const storedFonts = gated ? fromPacks((p) => p.font ?? null) : loadFont();
+    const storedTunes = gated ? fromPacks((p) => p.tune ?? null) : loadTune();
+    const storedFx: ModePair<SceneFx | null> = gated ? { dark: null, light: null } : loadSceneFx();
     const storedReduce = loadReduceMotion();
-    const storedHeadings = loadHeadingFont();
-    const storedDensities = loadDensity();
-    const storedStatuses = loadStatusColors();
-    const storedWallpapers = loadWallpaper();
+    const storedHeadings: ModePair<HeadingChoice | null> = gated ? fromPacks((p) => p.headingFont ?? null) : loadHeadingFont();
+    const storedDensities: ModePair<Density | null> = gated ? { dark: null, light: null } : loadDensity();
+    const storedStatuses = gated
+      ? fromPacks((p, dark) => (dark ? p.status : p.statusLight ?? p.status) ?? null)
+      : loadStatusColors();
+    const storedWallpapers: ModePair<WallpaperChoice | null> = gated
+      ? fromPacks((p, dark) => (dark ? p.wallpaper : p.wallpaperLight ?? p.wallpaper) ?? "none")
+      : loadWallpaper();
     const wallpaperOf = (dark: boolean): Wallpaper | null => {
       const v = dark ? storedWallpapers.dark : storedWallpapers.light;
       if (v === "none") return null;
@@ -1064,7 +1108,7 @@ export function useLook(defaultTheme: DefaultTheme): {
     setWallpapers(storedWallpapers);
     setActiveLook(active);
     setAccentOverrideState(overrideAccent);
-    setCustomThemes(loadThemes());
+    setCustomThemes(gated ? [] : loadThemes());
     setSystemDark(
       window.matchMedia("(prefers-color-scheme: dark)").matches
     );
@@ -1102,14 +1146,14 @@ export function useLook(defaultTheme: DefaultTheme): {
         // ignore
       }
       const isMode = raw === "light" || raw === "dark" || raw === "system";
-      const mode: Theme = isMode ? (raw as Theme) : defaultTheme.mode;
+      const mode: Theme = isMode && policy !== "none" ? (raw as Theme) : defaultTheme.mode;
       if (mode !== "system") return;
-      const look = resolveLook(loadActiveTheme());
+      const look = resolveLook(gated ? active : loadActiveTheme());
       const next = chromeFor(mq.matches);
       paintAll({
         theme: "system",
         look,
-        accentOverride: loadAccentOverride(),
+        accentOverride: gated ? NO_ACCENT_OVERRIDES : loadAccentOverride(),
         defaultAccent,
         tune: next.tune,
         sceneFx: next.sceneFx,
@@ -1162,6 +1206,7 @@ export function useLook(defaultTheme: DefaultTheme): {
       densityFor: (mode: Mode) => resolveDensity(mode === "dark"),
       statusFor: (mode: Mode) => resolveStatus(mode === "dark"),
       wallpaperFor: (mode: Mode) => resolveWallpaper(mode === "dark"),
+      visitorTheming: policy,
       colorsFor: (mode: Mode) => {
         const dark = mode === "dark";
         const cs = variantFor(effectiveLook, dark) ?? seedColorSet(dark);
@@ -1222,6 +1267,7 @@ export function useLook(defaultTheme: DefaultTheme): {
     resolveDensity,
     resolveStatus,
     resolveWallpaper,
+    policy,
     hydrated,
     seedColorSet,
     systemDark,

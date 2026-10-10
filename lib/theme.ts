@@ -497,6 +497,19 @@ export type ThemePack = {
   builtin?: string;
 } & ModeColors;
 
+// What visitors may change about the theme (#335): everything, the gallery's
+// themes and the light/dark mode only, or nothing (the site theme is final:
+// kiosks, wall tablets, shared screens). Signed-in admins are never limited.
+export type VisitorTheming = "all" | "packs" | "none";
+
+export const VISITOR_THEMING: { id: VisitorTheming; name: string; description: string }[] = [
+  { id: "all", name: "Everything", description: "The whole theme builder: themes, colors, design, scene, fonts." },
+  { id: "packs", name: "Themes only", description: "Pick from the site's themes and the light/dark mode." },
+  { id: "none", name: "Nothing", description: "The site theme is final — for kiosks and shared screens." },
+];
+
+export const VISITOR_THEMING_IDS = VISITOR_THEMING.map((v) => v.id) as [VisitorTheming, ...VisitorTheming[]];
+
 // The pack's design and scene for a mode (#334).
 export function packDesign(pack: ThemePack, dark: boolean): DesignId {
   return dark ? pack.design : pack.designLight ?? pack.design;

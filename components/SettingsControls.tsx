@@ -16,6 +16,7 @@ export default function SettingsControls() {
     setTheme,
     reduceMotion,
     setReduceMotion,
+    visitorTheming,
     timezone,
     units,
     location,
@@ -59,6 +60,8 @@ export default function SettingsControls() {
       </div>
 
       <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+        {/* Under the "nothing" theming policy (#335) the mode is the site's too. */}
+        {visitorTheming !== "none" && (
         <div className="space-y-1.5">
           <span className="text-ink-50">Appearance mode</span>
           <ChipGroup
@@ -77,6 +80,7 @@ export default function SettingsControls() {
             Light, dark, or follow your device.
           </p>
         </div>
+        )}
 
         <div className="space-y-1.5">
           <span className="text-ink-50">Motion</span>

@@ -58,6 +58,31 @@ export type PaintDefaults = {
   // A wallpaper (#333), per mode.
   wallpaper?: PaintWallpaper;
   wallpaperLight?: PaintWallpaper;
+  // What this visitor may change (#335): "all" (or unset), "packs" or
+  // "none". Under "packs" the site's themes come along, since a stored theme
+  // choice is then a pack's name, resolved here.
+  policy?: string;
+  packs?: PaintPack[];
+};
+
+export type PaintColorSet = { background: string; foreground: string; accentFrom: string; accentTo: string };
+
+// A gallery pack as the no-flash script needs it (#335).
+export type PaintPack = {
+  name: string;
+  design: string;
+  scene: string;
+  designLight?: string;
+  sceneLight?: string;
+  dark: PaintColorSet;
+  light: PaintColorSet;
+  tune?: PaintTune;
+  font?: string;
+  headingFont?: string;
+  status?: PaintSemantic;
+  statusLight?: PaintSemantic;
+  wallpaper?: PaintWallpaper;
+  wallpaperLight?: PaintWallpaper;
 };
 
 export type PaintWallpaper = { src: string; blur: number; dim: number; fit: string };
@@ -370,11 +395,21 @@ export function makeThemePaint() {
   // Precedence, part by part: the visitor's stored value wins, then the admin
   // default. Tolerant of garbage: anything unparsable is ignored.
   function readStored(
-    storage: { getItem(key: string): string | null },
+    source: { getItem(key: string): string | null },
     dt: PaintDefaults,
     ids: PaintIds,
     prefersDark: boolean
   ): PaintInput {
+    // What this visitor may change (#335): under "packs" only the mode, the
+    // Reduce motion switch and the chosen pack's name are read; under "none"
+    // only the switch. Everything else stored is left be, unread — so a
+    // browser customized before the policy changed falls back at once.
+    const policy = dt.policy === "packs" || dt.policy === "none" ? dt.policy : "all";
+    const allowed =
+      policy === "all" ? null : policy === "packs" ? ["ctrlcenter:theme", "ctrlcenter:motion", "ctrlcenter:pack"] : ["ctrlcenter:motion"];
+    const storage = allowed
+      ? { getItem: (key: string) => (allowed.indexOf(key) >= 0 ? source.getItem(key) : null) }
+      : source;
     const get = (key: string): unknown => {
       try {
         const raw = storage.getItem(key);
@@ -394,6 +429,38 @@ export function makeThemePaint() {
       // ignore
     }
     const dark = mode === "dark" || (mode === "system" && prefersDark);
+
+    // Under "packs", the chosen pack for this mode stands in for the site
+    // default: its design, scene, colors, tune and the parts it carries, the
+    // way applying it in the builder sets them (a pack without a font or
+    // heading font leaves the default's; without a wallpaper, none).
+    if (policy === "packs" && dt.packs) {
+      const choice = get("ctrlcenter:pack");
+      const name = isObj(choice) ? (dark ? choice.dark : choice.light) : null;
+      let pack: PaintPack | null = null;
+      for (let i = 0; i < dt.packs.length; i++) if (dt.packs[i].name === name) pack = dt.packs[i];
+      if (pack) {
+        const pcs = dark ? pack.dark : pack.light;
+        const pd: PaintDefaults = {
+          mode: dt.mode,
+          design: dark ? pack.design : pack.designLight || pack.design,
+          scene: dark ? pack.scene : pack.sceneLight || pack.scene,
+          font: pack.font || (dark ? dt.font : dt.fontLight || dt.font),
+          accentFrom: pcs.accentFrom,
+          accentTo: pcs.accentTo,
+          background: pcs.background,
+          foreground: pcs.foreground,
+          tune: pack.tune,
+          sceneIntensity: dark ? dt.sceneIntensity : dt.sceneIntensityLight === undefined ? dt.sceneIntensity : dt.sceneIntensityLight,
+          sceneMotion: dark ? dt.sceneMotion : dt.sceneMotionLight === undefined ? dt.sceneMotion : dt.sceneMotionLight,
+          headingFont: pack.headingFont || (dark ? dt.headingFont : dt.headingFontLight || dt.headingFont),
+          density: dark ? dt.density : dt.densityLight || dt.density,
+          status: (dark ? pack.status : pack.statusLight || pack.status) || (dark ? dt.status : dt.statusLight || dt.status),
+          wallpaper: dark ? pack.wallpaper : pack.wallpaperLight || pack.wallpaper,
+        };
+        dt = pd;
+      }
+    }
 
     // The active look: a {dark,light} pair, a flat pre-mode color set (both
     // modes), else the admin custom default colors, else none.

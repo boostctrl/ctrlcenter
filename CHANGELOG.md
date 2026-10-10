@@ -14,6 +14,12 @@ here.
 
 ### Added
 
+- **Decide how much visitors can theme (3.0).** *Visitors can change* in
+  Settings → General: everything (as before), the site's themes and the
+  light/dark mode only, or nothing — the site theme is final, for kiosks,
+  wall tablets and shared screens. A browser customized before the policy
+  changed falls back at once, before the first paint. Signed-in admins are
+  never limited. (#335)
 - **A theme gallery you curate (3.0).** The admin Themes tab now holds the
   whole list visitors pick from: add themes of your own, duplicate one as a
   starting point, hide any built-in from visitors, and drag (or use the

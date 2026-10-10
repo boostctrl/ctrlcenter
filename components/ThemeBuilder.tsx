@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ChipGroup } from "./ChipGroup";
 import { useEdgeFade } from "./useEdgeFade";
-import type { ThemePack } from "@/lib/theme";
+import type { ThemePack, VisitorTheming } from "@/lib/theme";
 import { buttonClasses } from "@/lib/buttons";
 import { TABS, type TabId } from "./theme-builder/constants";
 import { useThemeDraft } from "./theme-builder/useThemeDraft";
@@ -25,13 +25,19 @@ import { PreviewCard } from "./theme-builder/PreviewCard";
 // which promotion must preserve (the settings API replaces the whole theme
 // object). Promotion is a snapshot — later edits to the saved theme don't
 // follow it.
+// `policy` (#335): under "packs" only the site's themes and the mode are
+// offered — no tabs, no saved themes, no codes — and Reset returns to the
+// site default.
 export default function ThemeBuilder({
   packs,
+  policy = "all",
   promote,
 }: {
   packs: ThemePack[];
+  policy?: Exclude<VisitorTheming, "none">;
   promote?: { siteMode: "system" | "light" | "dark" };
 }) {
+  const packsOnly = policy === "packs";
   const draft = useThemeDraft(promote);
   const {
     setPreviewMode,
@@ -61,10 +67,11 @@ export default function ThemeBuilder({
     <div className="space-y-4 text-sm">
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
         <div>
-          <h2 className="font-semibold">Theme builder</h2>
+          <h2 className="font-semibold">{packsOnly ? "Theme" : "Theme builder"}</h2>
           <p className="text-xs text-ink-50">
-            Light and dark are two independent themes — design each with its own
-            style, scene, font &amp; colors. Everything applies live.
+            {packsOnly
+              ? "Pick one of the site's themes for light and for dark. Everything applies live."
+              : "Light and dark are two independent themes — design each with its own style, scene, font & colors. Everything applies live."}
           </p>
         </div>
         <div className="flex flex-col items-end gap-1">
@@ -138,6 +145,7 @@ export default function ThemeBuilder({
         <PreviewCard mode={editMode} />
       </div>
       <div className="min-w-0 space-y-4">
+      {!packsOnly && (
       <div
         ref={tablistRef}
         role="tablist"
@@ -176,8 +184,9 @@ export default function ThemeBuilder({
           );
         })}
       </div>
+      )}
 
-      {tab === "themes" && <ThemesTab d={draft} packs={packs} promote={promote} />}
+      {tab === "themes" && <ThemesTab d={draft} packs={packs} promote={promote} packsOnly={packsOnly} />}
       {tab === "colors" && <ColorsTab d={draft} />}
       {tab === "design" && <DesignTab d={draft} />}
       {tab === "tune" && <TuneTab d={draft} />}
@@ -187,6 +196,8 @@ export default function ThemeBuilder({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 border-t border-fg/10 pt-4">
+        {!packsOnly && (
+        <>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -204,6 +215,8 @@ export default function ThemeBuilder({
         >
           Save theme
         </button>
+        </>
+        )}
         <button
           type="button"
           onClick={async () => {

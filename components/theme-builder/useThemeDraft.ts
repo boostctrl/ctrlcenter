@@ -80,6 +80,7 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     resolvedMode,
     setPreviewMode,
     hydrated,
+    visitorTheming,
   } = useLookPrefs();
   const confirm = useConfirm();
 
@@ -272,7 +273,7 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
   });
   const linkTaken = useRef(false);
   useEffect(() => {
-    if (!hydrated || linkTaken.current) return;
+    if (!hydrated || linkTaken.current || visitorTheming !== "all") return;
     const hash = window.location.hash;
     if (!hash.startsWith("#theme=")) return;
     linkTaken.current = true;
@@ -280,7 +281,7 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     // outcome of reading it, once.
     takeCodeRef.current(hash);
     window.history.replaceState(null, "", window.location.pathname + window.location.search);
-  }, [hydrated]);
+  }, [hydrated, visitorTheming]);
 
   // A palette or saved theme can bring in a two-color accent the Solid editor
   // can't represent — flip back to the gradient editor when that happens.

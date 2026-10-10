@@ -4,6 +4,7 @@ import { STATUS_RANGE_KEYS } from "../status";
 import { lenientArray } from "./shared";
 import { mergeRules, secretFields } from "./meta";
 import { themeSchema, themeInputSchema } from "./theme";
+import { VISITOR_THEMING_IDS } from "../theme";
 import { searchSchema, searchUpdateSchema } from "./search";
 import { alertsSchema, alertsUpdateSchema } from "./alerts";
 import { webhooksSchema, webhooksUpdateSchema } from "./webhooks";
@@ -22,6 +23,8 @@ export const settingsSchema = z.object({
   timezone: z.string().default("UTC"),
   // Replaced whole on save: omitting an optional custom color clears it.
   theme: themeSchema.default(themeSchema.parse({})).register(mergeRules, { merge: "replace" }),
+  // What visitors may change about the theme (#335); admins always may.
+  visitorTheming: z.enum(VISITOR_THEMING_IDS).default("all"),
   // When on, the dashboard polls /api/status to show per-app online/offline
   // dots. Off by default since it makes the server ping every app URL.
   statusChecks: z.boolean().default(false),
@@ -59,6 +62,7 @@ export const settingsInputSchema = z.object({
   favicon: z.string().optional(),
   timezone: z.string().optional(),
   theme: themeInputSchema.optional(),
+  visitorTheming: z.enum(VISITOR_THEMING_IDS).optional(),
   statusChecks: z.boolean().optional(),
   statusInterval: z.number().int().min(1).max(60).optional(),
   statusDefaultRange: z.enum(STATUS_RANGE_KEYS).optional(),

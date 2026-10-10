@@ -2,7 +2,7 @@
 
 import type { ThemePack } from "@/lib/theme";
 import { FONTS, fontVar, type FontId } from "@/lib/fonts";
-import { DENSITIES, type Density } from "@/lib/theme";
+import { DENSITIES, VISITOR_THEMING, type Density } from "@/lib/theme";
 import { Card, ControlRow, SelectField, TextField, controlClasses, fieldLabelClasses } from "../ui";
 import { ChipGroup } from "@/components/ChipGroup";
 import IconField from "../IconField";
@@ -73,6 +73,20 @@ export default function GeneralSection({
             }))}
             value={theme.mode}
             onChange={(mode) => updateTheme({ mode })}
+          />
+        </ControlRow>
+
+        {/* What visitors may change (#335); signed-in admins always may. */}
+        <ControlRow
+          label="Visitors can change"
+          hint={VISITOR_THEMING.find((v) => v.id === settings.visitorTheming)?.description}
+        >
+          <ChipGroup
+            label="What visitors can change about the theme"
+            shrink
+            options={VISITOR_THEMING.map((v) => ({ value: v.id, label: v.name }))}
+            value={settings.visitorTheming}
+            onChange={(visitorTheming) => setSettings({ ...settings, visitorTheming })}
           />
         </ControlRow>
 
