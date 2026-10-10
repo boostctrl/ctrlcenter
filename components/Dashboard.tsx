@@ -342,6 +342,35 @@ export default function Dashboard({
     );
   }
 
+  // Show and Hide move a widget somewhere else on the page (#315): a shown
+  // one goes back to its place in the grid, often far above the tray, and a
+  // hidden one into the tray. Scroll to where it landed, outline it for a
+  // moment and move focus there, rather than leave focus on a button that
+  // just went away. A widget shown while still empty stays in the tray.
+  const trayRef = useRef<HTMLDivElement>(null);
+  // `seq` makes a repeat on the same widget a new landing.
+  const landingSeq = useRef(0);
+  const [landed, setLanded] = useState<{ id: string; seq: number } | null>(null);
+  function showOrHide(id: string) {
+    toggleWidgetHidden(id);
+    landingSeq.current += 1;
+    setLanded({ id, seq: landingSeq.current });
+  }
+  useEffect(() => {
+    if (!landed) return;
+    const selector = `[data-widget-id="${CSS.escape(landed.id)}"]`;
+    const target =
+      gridRef.current?.querySelector<HTMLElement>(selector) ??
+      trayRef.current?.querySelector<HTMLElement>(selector);
+    if (target) {
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      target.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
+      target.focus({ preventScroll: true });
+    }
+    const timer = window.setTimeout(() => setLanded(null), 1600);
+    return () => window.clearTimeout(timer);
+  }, [landed]);
+
   return (
     <UndoGestureContext.Provider value={gesture}>
       {/* Vertical layout (row-gap, per-cell row-span and margins) is driven by
@@ -414,8 +443,9 @@ export default function Dashboard({
               onCards={setWidgetCards}
               onHeight={setWidgetHeight}
               onSpace={setWidgetSpace}
-              onToggleHidden={toggleWidgetHidden}
+              onToggleHidden={showOrHide}
               onToggleLabel={toggleWidgetLabel}
+              landed={landed?.id === widget.id}
               gripHandlers={gripHandlers(vIndex)}
               dropHandlers={dropHandlers(vIndex)}
               dragging={dragIndex === vIndex}
@@ -433,7 +463,7 @@ export default function Dashboard({
           hidden ones can be shown (then placed in the grid above), empty ones
           say what would give them content. */}
       {editing && trayCells.length > 0 && (
-        <div className="rounded-2xl border border-dashed border-fg/15 p-4">
+        <div ref={trayRef} className="rounded-2xl border border-dashed border-fg/15 p-4">
           <p className="text-xs font-medium text-ink-70">Not on the live page</p>
           <p className="mt-0.5 max-w-prose text-xs text-ink-55">
             These widgets don&apos;t render for visitors right now — hidden ones
@@ -441,34 +471,41 @@ export default function Dashboard({
             above packs exactly like the live page. Show a hidden widget to
             place it.
           </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {trayCells.map(({ widget, node }) => (
-              <div
-                key={widget.id}
-                title={node === null ? emptyReason(widget.type) : undefined}
-                className="flex max-w-full min-w-0 items-center gap-2 rounded-lg border border-fg/10 bg-fg/5 px-2.5 py-1.5 text-xs text-ink-60"
-              >
-                <span className="shrink-0 font-medium">{labelFor(widget)}</span>
-                <span className="shrink-0 rounded bg-fg/10 px-1.5 py-0.5 text-[10px] tracking-wide text-ink-60 uppercase">
-                  {widget.hidden ? "Hidden" : "Empty"}
-                </span>
-                {widget.hidden ? (
+          <div className="mt-3 flex flex-wrap items-start gap-2">
+            {trayCells.map(({ widget }) => {
+              const label = labelFor(widget);
+              return (
+                <div
+                  key={widget.id}
+                  data-widget-id={widget.id}
+                  tabIndex={-1}
+                  className={`flex max-w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border bg-fg/5 px-2.5 py-1.5 text-xs text-ink-60 outline-none transition-colors sm:max-w-md ${
+                    landed?.id === widget.id ? "border-violet-400 ring-2 ring-violet-400/60" : "border-fg/10"
+                  }`}
+                >
+                  <span className="font-medium">{label}</span>
+                  <span className="rounded bg-fg/10 px-1.5 py-0.5 text-[10px] tracking-wide text-ink-60 uppercase">
+                    {widget.hidden ? "Hidden" : "Empty"}
+                  </span>
                   <button
                     type="button"
-                    onClick={() => toggleWidgetHidden(widget.id)}
-                    className="rounded-md border border-fg/10 px-2 py-0.5 text-ink-70 transition-colors hover:bg-fg/10 hover:text-fg"
+                    onClick={() => showOrHide(widget.id)}
+                    aria-label={`${widget.hidden ? "Show" : "Hide"} ${label}`}
+                    className="ml-auto rounded-md border border-fg/10 px-2 py-0.5 text-ink-70 transition-colors hover:bg-fg/10 hover:text-fg"
                   >
-                    Show
+                    {widget.hidden ? "Show" : "Hide"}
                   </button>
-                ) : (
-                  // min-w-0 so the reason truncates inside a phone-width
-                  // chip instead of widening the page (#271).
-                  <span className="max-w-72 min-w-0 truncate text-ink-55">
-                    {emptyReason(widget.type)}
-                  </span>
-                )}
-              </div>
-            ))}
+                  {/* An empty widget that's set to show appears once it has
+                      content; say so, and what would give it some. Wraps
+                      rather than truncating, so the hint stays readable. */}
+                  {!widget.hidden && (
+                    <span className="basis-full text-ink-55">
+                      Shown when it has content. {emptyReason(widget.type)}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

@@ -159,10 +159,14 @@ try {
       ["/admin/monitor/sonarr-4k", "monitor-detail"],
       ["/b/infra", "board-private"],
       ["/admin/monitor", "admin-monitor"],
+      ["/?edit=1", "editor"],
     ]) {
       await run(ctx, p, `${shot}-${scheme}`);
     }
-    if (scheme === "light") await apiWidgetTest(ctx);
+    if (scheme === "light") {
+      await apiWidgetTest(ctx);
+      await editorTray(ctx);
+    }
     await ctx.close();
   }
 
@@ -358,6 +362,33 @@ async function apiWidgetTest(ctx) {
     console.log("ok    the API widget's Test shows the mapped value");
   } catch (e) {
     failures.push(`API widget Test: ${e instanceof Error ? e.message.split("\n")[0] : e}`);
+  } finally {
+    await page.close();
+  }
+}
+
+// The layout editor's tray (#315): an empty widget shown from it can be
+// hidden again, and Show moves focus to where the widget landed. Undone at
+// the end, so the later phases see the stock board.
+async function editorTray(ctx) {
+  const page = await ctx.newPage();
+  try {
+    await page.goto(`${base}/?edit=1`);
+    await page.getByRole("button", { name: "Show Notes" }).click();
+    await page.getByText("Shown when it has content").first().waitFor({ timeout: 5_000 });
+    await page.getByRole("button", { name: "Hide Notes" }).click();
+    await page.getByRole("button", { name: "Show Clock" }).click();
+    await page.waitForFunction(() => document.activeElement?.getAttribute("data-widget-id") === "clock", null, {
+      timeout: 5_000,
+    });
+    for (let i = 0; i < 3; i++) await page.keyboard.press("Control+z");
+    await page.getByRole("button", { name: "Show Clock" }).waitFor({ timeout: 5_000 });
+    // Past the autosave's debounce, then its save.
+    await page.waitForTimeout(1_500);
+    await page.getByText("Saved").first().waitFor({ timeout: 10_000 });
+    console.log("ok    the editor tray hides empty widgets and shows where a widget landed");
+  } catch (e) {
+    failures.push(`editor tray: ${e instanceof Error ? e.message.split("\n")[0] : e}`);
   } finally {
     await page.close();
   }

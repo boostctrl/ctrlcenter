@@ -81,6 +81,11 @@ here.
   resize drag or a held − / + button is one step however long it takes, and
   showing a widget and then resizing it are two. **Redo** is new: the Redo
   button, Ctrl+Shift+Z or Ctrl+Y. (#314)
+- **Layout editor tray.** *Show* now scrolls to the widget, outlines it
+  for a moment and moves focus there, instead of seeming to do nothing when
+  the widget lands far up the page. A widget that's empty can be hidden again
+  from the tray (it used to have no button), says it will appear once it has
+  content, and its hint about what to add is no longer cut off. (#315)
 
 ## [2.13.0] - 2026-10-09
 

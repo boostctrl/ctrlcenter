@@ -340,6 +340,7 @@ export function WidgetFrame({
   dropHandlers,
   dragging,
   drop,
+  landed = false,
 }: {
   widget: LayoutWidget;
   // Display name for this entry — the instance's title, else its type's
@@ -373,6 +374,9 @@ export function WidgetFrame({
   dropHandlers: React.HTMLAttributes<HTMLDivElement>;
   dragging: boolean;
   drop: DropTarget | null;
+  // Just shown from the tray (#315): outlined for a moment, and focusable so
+  // focus can land here.
+  landed?: boolean;
 }) {
   const key = widget.id;
   const { frameRef, previewRef, drag, widthHandle, heightHandle } = useDragResize(
@@ -433,13 +437,15 @@ export function WidgetFrame({
     <div
       ref={frameRef}
       {...dropHandlers}
+      data-widget-id={key}
+      tabIndex={-1}
       data-space-top={space.top || undefined}
       data-space-right={space.right || undefined}
       data-space-bottom={space.bottom || undefined}
       data-space-left={space.left || undefined}
-      className={`relative flex flex-col gap-2 rounded-2xl p-2 outline-2 outline-dashed outline-fg/15 transition-opacity select-none ${
-        dragging ? "opacity-40" : ""
-      } ${cellClass}`}
+      className={`relative flex flex-col gap-2 rounded-2xl p-2 outline-2 transition-[opacity,outline-color] select-none ${
+        landed ? "outline-solid outline-violet-400" : "outline-dashed outline-fg/15"
+      } ${dragging ? "opacity-40" : ""} ${cellClass}`}
     >
       {drop && (
         <span className={DROP_BAR[`${drop.side}:${drop.axis}`]} aria-hidden />
