@@ -34,6 +34,31 @@ here.
   inbound webhooks gets a *Send sample* button, like the uptime *Send
   test*. (#347)
 
+- **Seven new scenes.** Topography, a still map of nested contour lines;
+  Snow, round flakes drifting down in three depths on a shared gust; Embers,
+  sparks lifting off the base and fading as they climb; Bokeh, out-of-focus
+  discs of light drifting by; Beams, diagonal bars of light sweeping slowly;
+  Bubbles, rings rising, wobbling and popping; and Glyphs, terminal glyphs
+  raining down and catching the accent as they fall. Each recolours with
+  your palette and follows the intensity and motion controls, and the
+  scenes that never move (Peaks, Blueprint, Topography) now say *Still* in
+  the picker. (#348)
+- **Bundled backgrounds.** Five patterns ship with the app and sit in a
+  *Bundled* row wherever a wallpaper is chosen (the builder's Scene tab,
+  Settings → General and the Themes tab): Linen, Hatch, Honeycomb, Grain
+  and a Vignette that darkens the corners. Pick one and it is there, with
+  no address or upload needed; blur, dim and fit still apply, and it is
+  saved in themes and share codes like any wallpaper. They are not uploads,
+  so *Uploaded wallpapers* does not list them. (#348)
+- **Four new themes.** *Hearth*, amber to ember over rising sparks on the
+  Emboss surface; *Alpine*, frost and pine under falling snow, pressed into
+  the page by Carve; *Atelier*, a studio's paper, graphite, ochre and
+  vermilion with hand-drawn Sketch outlines over still contour lines on the
+  bundled Linen background, the first built-in theme with a wallpaper; and
+  *Terminal*, green-on-black phosphor, the Console panel over glyph rain in
+  JetBrains Mono. Each reads in light and dark and clears the same contrast
+  checks as every other built-in. (#348)
+
 ### Changed
 
 - **Seerr, by its new name.** Overseerr and Jellyseerr merged into Seerr, and

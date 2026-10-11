@@ -220,43 +220,97 @@ try {
 // no-flash script — which also proves that script runs in the production
 // build: it marks <html data-theme-boot>, and a serialization slip in
 // lib/theme-paint.ts would otherwise die silently in its try/catch (#325).
+// A pack's wallpaper and font are seeded the way applying the pack stores
+// them, so a bundled background is fetched and audited and a pack's font is
+// the one on the page (#348). Then every scene no pack showcases is rendered
+// once, and every canvas scene runs once at full motion, since the matrix
+// stills everything and the animation loops would otherwise never run in CI.
 // lib/theme.ts imports nothing, so Node loads it as-is (type stripping).
 async function themeMatrixPhase(run) {
-  const { THEME_PACKS, BASE_THEMES } = await import("../lib/theme.ts");
+  const { THEME_PACKS, BASE_THEMES, SCENES } = await import("../lib/theme.ts");
   const looks = [
     ...THEME_PACKS.map((p) => ({ ...p, kind: "theme" })),
     ...BASE_THEMES.map((p) => ({ ...p, design: "glass", scene: "aurora", kind: "palette" })),
   ];
-  for (const look of looks) {
-    for (const scheme of ["dark", "light"]) {
-      const ctx = await browser.newContext({
-        viewport: { width: 1280, height: 800 },
-        colorScheme: scheme,
-        reducedMotion: "reduce",
+  // One look on the home page, stored as a visitor's choice of it would be.
+  const render = async (look, scheme, shot, { motion = "reduce", before } = {}) => {
+    const ctx = await browser.newContext({
+      viewport: { width: 1280, height: 800 },
+      colorScheme: scheme,
+      reducedMotion: motion,
+    });
+    const entries = {
+      "ctrlcenter:theme": scheme,
+      "ctrlcenter:activeTheme": JSON.stringify({ dark: look.dark, light: look.light }),
+      "ctrlcenter:design": JSON.stringify({ dark: look.design, light: look.designLight ?? look.design }),
+      "ctrlcenter:scene": JSON.stringify({ dark: look.scene, light: look.sceneLight ?? look.scene }),
+    };
+    if (look.wallpaper || look.wallpaperLight) {
+      entries["ctrlcenter:wallpaper"] = JSON.stringify({
+        dark: look.wallpaper ?? null,
+        light: look.wallpaperLight ?? look.wallpaper ?? null,
       });
-      await ctx.addInitScript(
-        (entries) => {
-          for (const [k, v] of Object.entries(entries)) localStorage.setItem(k, v);
-        },
-        {
-          "ctrlcenter:theme": scheme,
-          "ctrlcenter:activeTheme": JSON.stringify({ dark: look.dark, light: look.light }),
-          "ctrlcenter:design": JSON.stringify({ dark: look.design, light: look.design }),
-          "ctrlcenter:scene": JSON.stringify({ dark: look.scene, light: look.scene }),
-        }
+    }
+    if (look.font) entries["ctrlcenter:font"] = JSON.stringify({ dark: look.font, light: look.font });
+    await ctx.addInitScript((entries) => {
+      for (const [k, v] of Object.entries(entries)) localStorage.setItem(k, v);
+    }, entries);
+    let booted = false;
+    await run(ctx, "/", shot, async (page) => {
+      if (before) await before(page);
+      booted = await page.evaluate(
+        () => document.documentElement.getAttribute("data-theme-boot") === "1"
       );
-      let booted = false;
-      const slug = look.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-      await run(ctx, "/", `${look.kind}-${slug}-${scheme}`, async (page) => {
-        booted = await page.evaluate(
-          () => document.documentElement.getAttribute("data-theme-boot") === "1"
-        );
-      });
-      if (!booted) failures.push(`/ (${look.name}, ${scheme}): the no-flash theme script didn't run`);
-      await ctx.close();
+    });
+    if (!booted) failures.push(`/ (${shot}): the no-flash theme script didn't run`);
+    await ctx.close();
+  };
+
+  for (const look of looks) {
+    const slug = look.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    for (const scheme of ["dark", "light"]) {
+      await render(look, scheme, `${look.kind}-${slug}-${scheme}`);
     }
   }
   console.log(`ok    ${looks.length} built-in looks audited in both schemes`);
+
+  // The scenes no theme showcases, once each on the stock look (dark), so a
+  // scene that throws in its effect or breaks the page is seen by CI.
+  const shown = new Set(THEME_PACKS.flatMap((p) => [p.scene, p.sceneLight ?? p.scene]));
+  const unshown = SCENES.filter((s) => !shown.has(s.id));
+  for (const s of unshown) {
+    await render({ ...THEME_PACKS[0], scene: s.id }, "dark", `scene-${s.id}-dark`);
+  }
+  console.log(`ok    ${unshown.length} scenes no theme uses rendered`);
+
+  // Every canvas scene at full motion on the stock look, each left to draw
+  // for a moment, so a throw inside its requestAnimationFrame loop surfaces
+  // as a page error — the renders above still every scene, so this is the
+  // only place those loops run in CI. The list comes from the components
+  // themselves: every scene file that calls requestAnimationFrame, named
+  // after its id, so a new canvas scene is covered without being listed
+  // anywhere (about two seconds each).
+  const scenesDir = path.join(ROOT, "components", "scenes");
+  const canvas = fs
+    .readdirSync(scenesDir)
+    .filter((f) => f.endsWith(".tsx"))
+    .filter((f) => fs.readFileSync(path.join(scenesDir, f), "utf8").includes("requestAnimationFrame"))
+    .map((f) => ({ file: f, id: f.slice(0, -".tsx".length).toLowerCase() }));
+  const ids = new Set(SCENES.map((s) => s.id));
+  let moved = 0;
+  for (const { file, id } of canvas) {
+    if (!ids.has(id)) {
+      failures.push(`components/scenes/${file}: calls requestAnimationFrame but is not named after a scene id, so its loop can't be rendered at full motion`);
+      continue;
+    }
+    await render({ ...THEME_PACKS[0], scene: id }, "dark", `motion-${id}-dark`, {
+      motion: "no-preference",
+      before: (page) => page.waitForTimeout(400),
+    });
+    moved++;
+  }
+  if (moved === 0) failures.push("no canvas scene was rendered at full motion");
+  console.log(`ok    ${moved} canvas scenes rendered at full motion`);
 }
 
 // The first-run setup (#304): with a fresh install's config swapped in, /admin

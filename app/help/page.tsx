@@ -7,6 +7,7 @@ import PageNav from "@/components/PageNav";
 import FloatingNav from "@/components/FloatingNav";
 import { navPages } from "@/lib/nav";
 import { WIDGET_DEFS } from "@/lib/widgets/defs";
+import { SCENES } from "@/lib/theme";
 import { P } from "./ui";
 import { WIDGET_HELP } from "./widget-help";
 
@@ -303,11 +304,13 @@ export default async function HelpPage() {
             </li>
             <li>
               <strong>Scene.</strong> The animated backdrop: Aurora,
-              Starfield, Petals, Comets, and more (18 in all), or none. Set
+              Starfield, Petals, Comets, and more ({SCENES.length - 1} in all), or none. Set
               how strongly it shows and whether it moves at full speed, calmly
               or not at all; a <em>Reduced</em> motion preference stills every
-              scene whatever the theme says. Put a photo behind it as a
-              wallpaper, blurred and dimmed to taste.
+              scene whatever the theme says. Put a wallpaper behind it,
+              blurred and dimmed to taste: one of the bundled patterns
+              (linen, hatch, honeycomb, grain or a vignette), a photo by its
+              web address, or an upload if you are the admin.
             </li>
             <li>
               <strong>Accent and colors.</strong> The accent gradient, custom
@@ -932,7 +935,8 @@ export default async function HelpPage() {
             page switches on time without a reload; visitors&apos; own
             choices still win, and they can turn the schedule off. <em>Uploaded
             wallpapers</em> lists every wallpaper uploaded to the site, says
-            which theme uses it, and deletes the ones you no longer need.
+            which theme uses it, and deletes the ones you no longer need; the
+            bundled patterns ship with the app, so they are not listed there.
           </P>
         </Card>
 
