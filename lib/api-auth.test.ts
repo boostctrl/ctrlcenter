@@ -47,9 +47,10 @@ const PUBLIC_ROUTES = [
   "app/api/status/badge/[id]/route.ts",
 ];
 
-// The session checks a handler may use: the plain one, or the integration
-// action guard (lib/services/guard.ts), which runs it first.
-const GUARDS = ["isAdminRequest(", "requireAction("];
+// The session checks a handler may use: the plain one, the id-returning form
+// of the same check (the session routes, #365), or the integration action
+// guard (lib/services/guard.ts), which runs it first.
+const GUARDS = ["isAdminRequest(", "adminSessionId(", "requireAction("];
 
 describe("admin authorization doesn't rely on the proxy alone", () => {
   it("every non-public route handler checks the session itself", async () => {

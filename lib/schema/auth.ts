@@ -37,3 +37,13 @@ export const passwordChangeSchema = z.object({
   current: z.string(),
   next: z.string().min(8, "New password must be at least 8 characters"),
 });
+
+// The idle timeout (PATCH /api/sessions, #365): a session unused for this
+// many hours ends. Bounds mirror lib/sessions.ts.
+export const sessionSettingsSchema = z.object({
+  idleHours: z
+    .number()
+    .int()
+    .min(1, "Idle timeout must be at least 1 hour")
+    .max(24 * 7, "Idle timeout can be at most 7 days"),
+});

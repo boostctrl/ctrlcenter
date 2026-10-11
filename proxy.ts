@@ -33,6 +33,8 @@ const ADMIN_PREFIXES = [
   // Sending a test alert or a sample event (#347) through the saved
   // channels is admin-only; the one route under it re-checks too.
   "/api/alerts",
+  // The active sessions and the idle timeout (#365).
+  "/api/sessions",
 ];
 
 function needsAuth(pathname: string): boolean {

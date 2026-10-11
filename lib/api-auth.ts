@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { SESSION_COOKIE_NAME, verifySessionToken } from "./auth";
+import { SESSION_COOKIE_NAME, verifySessionId, verifySessionToken } from "./auth";
 import { readConfigInternal, stripAuth, stripSecrets } from "./config";
 import type { Config } from "./schema";
 
@@ -23,12 +23,22 @@ export async function isAdminRequest(
   request: NextRequest,
   passwordHash?: string
 ): Promise<boolean> {
+  return (await adminSessionId(request, passwordHash)) !== null;
+}
+
+// The same check, answering with the session's id (null when not an admin
+// request) for the routes that act on the current session: logout, the
+// active-sessions list, "sign out everywhere else" (#365).
+export async function adminSessionId(
+  request: NextRequest,
+  passwordHash?: string
+): Promise<string | null> {
   if (!isSafeMethod(request.method) && !isSameOriginRequest(request)) {
-    return false;
+    return null;
   }
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   const hash = passwordHash ?? (await readConfigInternal()).auth.passwordHash;
-  return verifySessionToken(token, hash);
+  return verifySessionId(token, hash);
 }
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);

@@ -1008,6 +1008,14 @@ export default async function HelpPage() {
             variable. Changing the password signs out every other session.
           </P>
           <P>
+            <strong>Sessions</strong>, in <strong>Settings → Security</strong>,
+            lists every browser the portal is signed in on and lets you end
+            any of them, or sign out everywhere else after using a shared
+            device. A session unused for a day ends on its own (<em>Sign out
+            after</em> sets how long), and every session ends seven days after
+            it signed in.
+          </P>
+          <P>
             <strong>Two-factor authentication</strong>, in{" "}
             <strong>Settings → Security</strong>, adds a time-based code from
             an authenticator app to sign-in. Turning it on shows one-time

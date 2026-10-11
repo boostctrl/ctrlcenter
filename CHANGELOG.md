@@ -12,6 +12,26 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Sessions you can see and end.** Settings → Security lists every browser
+  the portal is signed in on — which device, from where, when it signed in
+  and was last seen — with a way to end any one of them, and a *Sign out
+  everywhere else* button for after using a shared device. (#365)
+- **An idle timeout for admin sessions.** A session unused for a day ends on
+  its own; *Sign out after* in Settings → Security sets it anywhere from an
+  hour to a week. Every session still ends seven days after it signed in.
+  (#365)
+
+### Security
+
+- **Signing out now ends the session.** Signing out used to only clear the
+  cookie: a copy of it taken beforehand kept working for up to seven days.
+  The server now keeps a record of each session, kept in `sessions.json`
+  beside `config.yaml`, and a session that was signed out, ended from the
+  list or left idle stops working at once. Sessions signed in before this
+  release sign in again once. (#365)
+
 ## [3.0.0-rc.3] - 2026-10-11
 
 ### Added

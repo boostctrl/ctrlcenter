@@ -4,7 +4,7 @@ import {
   NO_PASSWORD_MESSAGE,
   verifyEnvPassword,
   verifyPasswordHash,
-  createSessionToken,
+  issueSession,
   sessionCookieOptions,
   SESSION_COOKIE_NAME,
 } from "@/lib/auth";
@@ -123,8 +123,9 @@ export async function POST(request: NextRequest) {
   refundRateLimit(throttleKey);
 
   // Bind the token to the current password hash so a later password change
-  // revokes it (see proxy.ts / verifySessionToken).
-  const token = await createSessionToken(auth.passwordHash);
+  // revokes it (see proxy.ts / verifySessionToken), and record the session
+  // so logout, the idle timeout and "sign out everywhere" can end it (#365).
+  const { token } = await issueSession(request, auth.passwordHash);
   const response = NextResponse.json({ ok: true });
   response.cookies.set(
     SESSION_COOKIE_NAME,

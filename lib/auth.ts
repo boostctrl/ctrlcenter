@@ -1,6 +1,8 @@
 import { SignJWT, jwtVerify } from "jose";
 import type { NextRequest } from "next/server";
 import { persistedSessionSecret } from "./session-secret";
+import { createSession, touchSession } from "./sessions";
+import { clientIp } from "./rate-limit";
 
 export const SESSION_COOKIE_NAME = "homepage_admin_session";
 const SESSION_DURATION = "7d";
@@ -142,25 +144,58 @@ export async function verifyPasswordHash(
   }
 }
 
-export async function createSessionToken(extra = ""): Promise<string> {
+// Sign a token for an existing session record (lib/sessions.ts): the record's
+// id rides in `jti`, and verification requires the record to still exist, so
+// a revoked or idle-expired session's token stops working at once (#365).
+export async function createSessionToken(
+  extra = "",
+  sessionId: string
+): Promise<string> {
   const key = await getSecretKey(extra);
   return new SignJWT({ role: "admin" })
     .setProtectedHeader({ alg: "HS256" })
+    .setJti(sessionId)
     .setIssuedAt()
     .setExpirationTime(SESSION_DURATION)
     .sign(key);
+}
+
+// Start a session for this request — the record (with the client address
+// and browser, for the active-sessions list) and the token for the cookie.
+export async function issueSession(
+  request: NextRequest,
+  extra = ""
+): Promise<{ token: string; id: string }> {
+  const id = await createSession({
+    ip: clientIp(request),
+    userAgent: request.headers.get("user-agent") ?? "",
+  });
+  return { token: await createSessionToken(extra, id), id };
+}
+
+// The id of the live session a token names, or null: a bad signature, an
+// expired token, a token without a session id (issued before 3.0.0 — those
+// sign in again once), or a session that was revoked or idled out. A live
+// session is marked seen.
+export async function verifySessionId(
+  token: string | undefined,
+  extra = ""
+): Promise<string | null> {
+  if (!token) return null;
+  let jti: string | undefined;
+  try {
+    const key = await getSecretKey(extra);
+    jti = (await jwtVerify(token, key)).payload.jti;
+  } catch {
+    return null;
+  }
+  if (!jti) return null;
+  return (await touchSession(jti)) ? jti : null;
 }
 
 export async function verifySessionToken(
   token: string | undefined,
   extra = ""
 ): Promise<boolean> {
-  if (!token) return false;
-  try {
-    const key = await getSecretKey(extra);
-    await jwtVerify(token, key);
-    return true;
-  } catch {
-    return false;
-  }
+  return (await verifySessionId(token, extra)) !== null;
 }

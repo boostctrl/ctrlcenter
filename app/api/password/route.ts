@@ -4,12 +4,13 @@ import {
   verifyEnvPassword,
   verifyPasswordHash,
   hashPassword,
-  createSessionToken,
+  issueSession,
   sessionCookieOptions,
   SESSION_COOKIE_NAME,
 } from "@/lib/auth";
 import { readConfigInternal, setPasswordHash } from "@/lib/config";
 import { passwordChangeSchema } from "@/lib/schema";
+import { revokeSessions } from "@/lib/sessions";
 
 // Admin-only (gated by the proxy matcher and re-checked here). Changing the
 // password still requires the current one as defense-in-depth, even with a
@@ -42,9 +43,11 @@ export async function POST(request: NextRequest) {
   await setPasswordHash(hash, salt);
 
   // Changing the password revokes every existing session (the key mixes in the
-  // hash). Reissue this admin a fresh cookie bound to the new hash so they stay
-  // signed in while any other sessions are invalidated.
-  const token = await createSessionToken(hash);
+  // hash, and the records go too). Reissue this admin a fresh cookie bound to
+  // the new hash so they stay signed in while any other sessions are
+  // invalidated.
+  await revokeSessions();
+  const { token } = await issueSession(request, hash);
   const response = NextResponse.json({ ok: true });
   response.cookies.set(
     SESSION_COOKIE_NAME,
