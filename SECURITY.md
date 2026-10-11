@@ -34,13 +34,21 @@ unless you'd prefer to stay anonymous.
 ctrlcenter is designed to run **behind a reverse proxy** that terminates TLS and
 is the public entry point. A couple of settings matter for a safe deployment:
 
-- Set a strong `ADMIN_PASSWORD` (or configure a password in the admin portal).
+- Set a strong `ADMIN_PASSWORD` (or configure a password in the admin portal;
+  one set there must be at least 12 characters).
+- Terminate TLS at the proxy. Over HTTPS the session cookie carries the
+  `__Host-` prefix, and `HSTS=1` has the app add `Strict-Transport-Security`
+  if the proxy doesn't.
 - Set `TRUSTED_PROXY_HOPS` to match your proxy chain — in particular, set it to
   `0` if you expose ctrlcenter directly with no proxy, so a client can't spoof
   `X-Forwarded-For` to bypass the per-IP login throttle. With `0`, the Docker
   image throttles each client by its real connection address.
 - Consider turning on **two-factor authentication** (Settings → Security),
   especially if the portal is reachable beyond a network you fully trust.
+- Point an alert channel at somewhere you'll see it and leave its
+  **Security** events on: a sign-in from a new address, a lockout, the second
+  factor or password changing and dashboard actions turned on are sent
+  there, and Settings → Security keeps the recent activity.
 
 See the [README](README.md) for the full configuration reference. Findings that
 require an already-compromised host, or a configuration the docs explicitly warn
@@ -68,14 +76,16 @@ deployment safe.
   ctrlcenter cannot narrow. Treat every configured credential as full access to
   that service, and give the integration the least privilege the service itself
   allows (a read-only or limited role where one exists, e.g. UniFi or Portainer).
-- **Write actions are opt-in and off by default.** qBittorrent, Seerr, and
-  Portainer can act from the Monitor page (pause/resume/delete torrents,
-  approve/deny requests, start/stop/restart containers, and a read-only log
-  tail), but only after you turn on "Allow actions from the dashboard" for that
-  integration — until then it stays read-only. Every action passes four gates
-  (the admin-only proxy prefix, a route session re-check, the integration being
-  configured, and the opt-in flag), is confirmed before anything destructive,
-  and is logged on the server. Leave the opt-in off for any integration you only
+- **Write actions are opt-in, off by default, and need two-factor
+  authentication.** qBittorrent, Seerr, and Portainer can act from the Monitor
+  page (pause/resume/delete torrents, approve/deny requests, start/stop/restart
+  containers, and a read-only log tail), but only after you turn on "Allow
+  actions from the dashboard" for that integration — which itself needs
+  two-factor authentication on — until then it stays read-only. Every action
+  passes five gates (the admin-only proxy prefix, a route session re-check,
+  the integration being configured, the opt-in flag, and the second factor
+  being on), is confirmed before anything destructive, and is logged on the
+  server. Turning two-factor authentication off turns actions off with it. Leave the opt-in off for any integration you only
   want to observe, and remember that an action-enabled key needs write access to
   its service, not just read.
 - **Firewall the container to just the services it monitors.** ctrlcenter
@@ -84,18 +94,27 @@ deployment safe.
   enters. Restrict the container's egress to the specific service addresses it
   needs rather than the whole LAN/VLAN, so a mistaken or malicious URL can't be
   turned into a way to probe the rest of your network.
-- **Don't expose a dashboard with integrations to the internet.** The routes are
-  admin-only, but the blast radius of a stolen admin session grows once
-  integrations are configured (and more so with write actions enabled, above).
-  Reach the portal over a VPN or tunnel (Tailscale, WireGuard,
-  Cloudflare Tunnel) rather than a public port. If it must be publicly
-  reachable, turn on two-factor authentication and keep it behind the reverse
-  proxy with a strong password.
-- **Exported backups contain your secrets.** `Export` (and `config.yaml`
-  itself) includes integration credentials and the other settings secrets in
-  plaintext, so a backup can be restored. Store exported files as you would any
-  secret. The admin password hash and the two-factor secret are **not**
-  exported.
+- **Exposing the portal to the internet.** A VPN or tunnel (Tailscale,
+  WireGuard, Cloudflare Tunnel) is still the smallest attack surface, but a
+  public port is a supported deployment: open **Settings → Security** and
+  clear every red row of the checklist first — two-factor authentication on,
+  a password set in the portal, HTTPS, `TRUSTED_PROXY_HOPS` matching your
+  proxy, a persisted session secret — and keep a Security alert channel
+  pointed somewhere you'll see it. With those in place a stolen admin session
+  ends when you sign it out (or on its own after the idle timeout), can't
+  change the password, turn the second factor off, reach the stored
+  credentials or run a destructive action without the password again, and
+  announces itself when it comes from a new address. The remaining exposure
+  is what a session can read in its window: the Monitor page and the
+  integrations' addresses — so still give each integration the least
+  privilege its service allows (above).
+- **Exports leave secrets out unless you ask.** `Export` writes a backup
+  without integration credentials, calendar and email credentials or webhook
+  tokens; restoring it onto the same instance keeps the ones stored there.
+  Ticking **Include secrets** writes them in plaintext (after confirming your
+  password), so a full backup can be restored elsewhere — store that file, and
+  `config.yaml` itself, as you would any secret. The admin password hash and
+  the two-factor secret are **never** exported.
 - **Keep credential managers out of the dashboard.** Don't point ctrlcenter at a
   secrets or password manager (e.g. Vaultwarden/Bitwarden); aggregating that
   behind one admin session is exactly the concentration of risk to avoid, and

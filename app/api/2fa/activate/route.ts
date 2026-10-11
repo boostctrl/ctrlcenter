@@ -5,6 +5,7 @@ import { rateLimit, pruneRateLimit, clientKey } from "@/lib/rate-limit";
 import { verifyTotp, generateRecoveryCodes } from "@/lib/totp";
 import { hashRecoveryCodes } from "@/lib/recovery-codes";
 import { totpActivateSchema } from "@/lib/schema";
+import { eventMeta, recordSecurityEvent } from "@/lib/security-events";
 
 // Admin-only. Confirms a pending TOTP secret with a live code, then activates
 // 2FA and returns freshly generated recovery codes — shown to the admin once,
@@ -44,5 +45,6 @@ export async function POST(request: NextRequest) {
   }
   const recoveryCodes = generateRecoveryCodes(10);
   await activateTotp(auth.totp.pendingSecret, await hashRecoveryCodes(recoveryCodes));
+  await recordSecurityEvent("totp.enabled", eventMeta(request));
   return NextResponse.json({ ok: true, recoveryCodes });
 }

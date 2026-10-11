@@ -64,4 +64,39 @@ describe("POST /api/login", () => {
     expect(res.status).toBe(503);
     expect((await res.json()).error).toMatch(/No admin password is set/);
   });
+
+  it("records sign-ins and failed attempts in the security log (#368)", async () => {
+    const { listSecurityEvents } = await import("@/lib/security-events");
+    const before = (await listSecurityEvents(200)).length;
+    expect((await login("wrong")).status).toBe(401);
+    expect((await login("wrong")).status).toBe(401);
+    expect((await login("correct horse")).status).toBe(200);
+    const events = (await listSecurityEvents(200)).slice(0, (await listSecurityEvents(200)).length - before);
+    expect(events.map((e) => e.kind)).toEqual(["signin.ok", "signin.fail"]);
+    // The two failures folded into one entry; the address is the throttle's.
+    expect(events[1]).toMatchObject({ count: 2, ip: `10.0.0.${ip}` });
+    expect(events[0]).toMatchObject({ ip: `10.0.0.${ip}`, newAddress: true });
+  });
+
+  it("names the cookie __Host- over HTTPS, so another host or path can't plant one (#369)", async () => {
+    const res = await login("correct horse", { "x-forwarded-proto": "https" });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("set-cookie")).toMatch(/^__Host-homepage_admin_session=.*Secure/);
+  });
+
+  it("locks a client out for longer each time it trips the throttle (#369)", async () => {
+    for (let i = 0; i < 5; i++) expect((await login("wrong")).status).toBe(401);
+    const first = Number((await login("wrong")).headers.get("retry-after"));
+    expect(first).toBeGreaterThan(0);
+    expect(first).toBeLessThanOrEqual(5 * 60);
+    vi.useFakeTimers({ now: Date.now() + first * 1000 + 1000 });
+    try {
+      for (let i = 0; i < 5; i++) expect((await login("wrong")).status).toBe(401);
+      const second = Number((await login("wrong")).headers.get("retry-after"));
+      expect(second).toBeGreaterThan(5 * 60);
+      expect(second).toBeLessThanOrEqual(10 * 60);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

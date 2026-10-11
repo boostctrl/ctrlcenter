@@ -19,6 +19,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   return NextResponse.json(
-    await getMonitorSnapshot(config.integrations)
+    await getMonitorSnapshot(config.integrations, config.auth.totp.enabled)
   );
 }

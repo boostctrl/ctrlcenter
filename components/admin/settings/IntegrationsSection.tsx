@@ -10,7 +10,15 @@ import type { SettingsDraft } from "./useSettingsDraft";
 // number of each type (a 4K Sonarr beside an HD one), each its own card with
 // a name, its credentials, the type's opt-ins, a Test button, and Remove.
 // The cards read each type's copy and credential shape from SERVICE_META.
-export default function IntegrationsSection({ d }: { d: SettingsDraft }) {
+export default function IntegrationsSection({
+  d,
+  twoFactorEnabled,
+}: {
+  d: SettingsDraft;
+  // Write actions need the second factor (#367); without it the opt-in is
+  // shown off and can't be turned on.
+  twoFactorEnabled: boolean;
+}) {
   const { integrations, updateIntegration, addIntegration, moveIntegration, removeIntegration } = d;
   const [type, setType] = useState<ServiceId>("sonarr");
   const labels = integrationLabels(integrations);
@@ -127,8 +135,13 @@ export default function IntegrationsSection({ d }: { d: SettingsDraft }) {
                 {meta.actions && (
                   <ToggleRow
                     label="Allow actions from the dashboard"
-                    hint="Off by default — the card stays read-only. When on, admins can act on this service from the Monitor page. Every action is logged."
-                    checked={i.allowActions}
+                    hint={
+                      twoFactorEnabled
+                        ? "Off by default — the card stays read-only. When on, admins can act on this service from the Monitor page. Every action is logged."
+                        : "Needs two-factor authentication: turn it on in Settings → Security first. Until then the card stays read-only."
+                    }
+                    checked={twoFactorEnabled && i.allowActions}
+                    disabled={!twoFactorEnabled}
                     onChange={(allowActions) => update({ allowActions })}
                   />
                 )}

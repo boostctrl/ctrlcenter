@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import QRCode from "qrcode";
 import { isAdminRequest } from "@/lib/api-auth";
+import { requireRecentAuth } from "@/lib/reauth";
 import { setTotpPendingSecret } from "@/lib/config";
 import { generateTotpSecret, otpauthUri } from "@/lib/totp";
 
@@ -16,6 +17,10 @@ export async function POST(request: NextRequest) {
   if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  // Step-up (#366): a stolen session enrolling its own device would lock
+  // the owner out.
+  const recent = await requireRecentAuth(request);
+  if (!recent.ok) return recent.response;
   const secret = generateTotpSecret();
   await setTotpPendingSecret(secret);
   const uri = otpauthUri(secret, ACCOUNT, ISSUER);

@@ -17,12 +17,15 @@ import {
 } from "../ui";
 import AlertTest from "../AlertTest";
 
-type Event = "onDown" | "onRecovery" | "onWarning" | "onWebhooks";
+type Event = "onDown" | "onRecovery" | "onWarning" | "onWebhooks" | "onSecurity";
 const EVENTS: { value: Event; label: string }[] = [
   { value: "onDown", label: "Down" },
   { value: "onRecovery", label: "Recovered" },
   { value: "onWarning", label: "Warnings" },
   { value: "onWebhooks", label: "Inbound webhooks" },
+  // Sign-ins from a new address, lockouts, the second factor or password
+  // changing, actions turned on (#368).
+  { value: "onSecurity", label: "Security" },
 ];
 
 // One entry of the alert channel list (#291): its type, the fields that type

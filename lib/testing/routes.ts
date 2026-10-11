@@ -55,7 +55,9 @@ export function request(pathname: string, init: RequestInit = {}): NextRequest {
 // password comes from ADMIN_PASSWORD).
 export async function adminSession(passwordHash = ""): Promise<string> {
   const { createSessionToken } = await import("../auth");
-  return createSessionToken(passwordHash);
+  const { createSession } = await import("../sessions");
+  // A token only verifies while its session record exists (#365).
+  return createSessionToken(passwordHash, await createSession({ ip: "127.0.0.1", userAgent: "test" }));
 }
 
 // The `{ params }` second argument dynamic route handlers receive.

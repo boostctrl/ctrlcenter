@@ -35,4 +35,15 @@ describe("PUT /api/integrations", () => {
     const { readConfigInternal } = await import("@/lib/config");
     expect((await readConfigInternal()).integrations.map((i) => i.id)).toEqual(["sonarr", "sonarr-4k"]);
   });
+
+  it("stores the actions opt-in off while two-factor authentication is off (#367)", async () => {
+    const qb = integrationSchema.parse({ id: "qb", type: "qbittorrent", url: "http://q", username: "u", password: "p", allowActions: true });
+    expect((await put([qb])).status).toBe(200);
+    const { readConfigInternal, activateTotp } = await import("@/lib/config");
+    expect((await readConfigInternal()).integrations[0].allowActions).toBe(false);
+    // With the factor on, the opt-in is kept.
+    await activateTotp("JBSWY3DPEHPK3PXP", []);
+    expect((await put([qb])).status).toBe(200);
+    expect((await readConfigInternal()).integrations[0].allowActions).toBe(true);
+  });
 });

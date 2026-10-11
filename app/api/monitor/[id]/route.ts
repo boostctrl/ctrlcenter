@@ -16,7 +16,7 @@ export async function GET(
   if (!(await isAdminRequest(request, config.auth.passwordHash))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const result = await getServiceDetail(id, config.integrations);
+  const result = await getServiceDetail(id, config.integrations, config.auth.totp.enabled);
   // No such integration, or not configured — nothing to show.
   if (!result) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

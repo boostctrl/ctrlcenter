@@ -137,7 +137,7 @@ async function serviceStatus<T>(
 }
 
 // One integration's status via its type's registry entry.
-function statusFor(integration: Integration): Promise<ServiceStatus<unknown>> {
+function statusFor(integration: Integration, actionsEnabled: boolean): Promise<ServiceStatus<unknown>> {
   const configured = isServiceConfigured(integration);
   return serviceStatus(
     integration.id,
@@ -148,8 +148,9 @@ function statusFor(integration: Integration): Promise<ServiceStatus<unknown>> {
     integration.enabled === true,
     integration.url.trim() !== "",
     // Actions are live only when the integration is both configured and opted
-    // in; the types without action support never render a control for it.
-    configured && integration.allowActions === true,
+    // in, and the site has two-factor authentication on (#367); the types
+    // without action support never render a control for it.
+    configured && integration.allowActions === true && actionsEnabled,
     serviceFingerprint(integration),
     (): Promise<unknown> => SERVICES[integration.type].snapshot(resolveIntegration(integration))
   );
@@ -163,14 +164,20 @@ export function invalidateService(id: string): void {
   forgetService(id);
 }
 
-export async function getMonitorSnapshot(integrations: Integration[]): Promise<MonitorSnapshot> {
+// `actionsEnabled` is whether the site lets dashboard actions run at all
+// (two-factor authentication on, #367); the guard enforces it, this only
+// decides whether the cards offer the controls.
+export async function getMonitorSnapshot(
+  integrations: Integration[],
+  actionsEnabled: boolean
+): Promise<MonitorSnapshot> {
   const labels = integrationLabels(integrations);
   // The type and its status are correlated by construction (statusFor runs
   // the integration's own type's snapshot); the cast restores the union.
   return Promise.all(
     integrations.map(
       async (i) =>
-        ({ id: i.id, type: i.type, label: labels[i.id], ...(await statusFor(i)) }) as MonitorEntry
+        ({ id: i.id, type: i.type, label: labels[i.id], ...(await statusFor(i, actionsEnabled)) }) as MonitorEntry
     )
   );
 }

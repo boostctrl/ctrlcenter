@@ -7,6 +7,7 @@ import type {
 import type { WidgetInstance } from "@/lib/schema";
 import type { WidgetEditContext } from "@/lib/config/widgets";
 import { apiErrorMessage } from "./apiError";
+import { fetchWithReauth } from "./reauth";
 
 // Save a partial settings update. /api/settings merges it key by key, so a
 // caller sends only the sections it owns (the bookmarks tab its category
@@ -22,7 +23,7 @@ async function putJson(
 ): Promise<void> {
   let res: Response;
   try {
-    res = await fetch(url, {
+    res = await fetchWithReauth(url, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

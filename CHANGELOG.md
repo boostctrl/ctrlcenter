@@ -12,6 +12,79 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **A record of sign-ins and security changes.** Settings → Security lists
+  recent activity — sign-ins and failed attempts, sign-outs, sessions
+  ended, password and two-factor changes, confirmations, exports with
+  secrets, credential edits and dashboard actions — with when, from which
+  address and which browser. Kept for 90 days in `security-events.jsonl`
+  beside `config.yaml`; never a password or code. (#368)
+- **Security notifications through your alert channels.** A sign-in from
+  an address not seen in a month, the login throttle locking an address
+  out, two-factor authentication turned off, the password changed, and
+  dashboard actions turned on now go out through every alert channel with
+  *Security* on (on for every channel; turn it off per channel in
+  Settings → Monitoring). (#368)
+- **Export without secrets.** *Export* now asks what to include: by default
+  the file leaves out integration passwords and keys, calendar and email
+  credentials and webhook tokens, and restoring it onto this instance keeps
+  the credentials already stored. Tick *Include secrets* for a full backup;
+  that asks for your password first. (#366)
+- **A security checklist.** Settings → Security opens with what the app can
+  see of your deployment — two-factor authentication, where the password
+  comes from, whether sign-ins arrive over HTTPS and through the proxy you
+  configured, the session secret, dashboard actions, the idle timeout —
+  each row green, amber or red with the fix. The red rows are also logged
+  when the server starts. The first-run setup gains a step that offers
+  two-factor authentication. (#367)
+- **Sessions you can see and end.** Settings → Security lists every browser
+  the portal is signed in on — which device, from where, when it signed in
+  and was last seen — with a way to end any one of them, and a *Sign out
+  everywhere else* button for after using a shared device. (#365)
+- **An idle timeout for admin sessions.** A session unused for a day ends on
+  its own; *Sign out after* in Settings → Security sets it anywhere from an
+  hour to a week. Every session still ends seven days after it signed in.
+  (#365)
+
+### Security
+
+- **Longer lockouts for repeated wrong passwords.** Five wrong attempts
+  from one address still lock it out for five minutes; each further
+  lockout lasts twice as long, up to an hour, until a sign-in succeeds.
+  Confirming your password for a sensitive change is throttled the same
+  way. (#369)
+- **A new password must be at least 12 characters**, and can't be the
+  current one or the container's `ADMIN_PASSWORD`. Existing passwords are
+  not affected. (#369)
+- **The session cookie is bound to the host over HTTPS.** It now carries
+  the `__Host-` prefix when the portal is reached over HTTPS, so a cookie
+  set by another host, path or over plain HTTP can't stand in for it.
+  Plain-HTTP deployments keep working with the bare name. Sessions signed
+  in before this release sign in again once. (#369)
+- **Opt-in HSTS.** Set `HSTS=1` to have the app send
+  `Strict-Transport-Security` on HTTPS responses, for a reverse proxy that
+  doesn't add it itself. (#369)
+- **Sensitive changes ask for your password again.** Changing the password,
+  turning two-factor authentication on or off, editing an integration's
+  address or credentials or turning its actions on, exporting with secrets,
+  restoring a backup, and the destructive dashboard actions (delete, stop,
+  restart, decline) now need the password — and the authenticator code when
+  the second factor is on — to have been confirmed in the last ten minutes.
+  Signing in counts; after that a *Confirm it's you* dialog asks once and
+  the change goes through. A session someone else got hold of can no longer
+  lock you out or walk off with the credentials on its own. (#366)
+- **Dashboard actions need two-factor authentication.** *Allow actions from
+  the dashboard* can only be turned on once the second factor is, every
+  action checks it again on the server, and turning two-factor
+  authentication off turns actions off with it. (#367)
+- **Signing out now ends the session.** Signing out used to only clear the
+  cookie: a copy of it taken beforehand kept working for up to seven days.
+  The server now keeps a record of each session, kept in `sessions.json`
+  beside `config.yaml`, and a session that was signed out, ended from the
+  list or left idle stops working at once. Sessions signed in before this
+  release sign in again once. (#365)
+
 ## [3.0.0-rc.3] - 2026-10-11
 
 ### Added

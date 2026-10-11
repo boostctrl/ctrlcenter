@@ -202,18 +202,21 @@ export function Switch({
   checked,
   onChange,
   label,
+  disabled,
 }: {
   checked: boolean;
   onChange: (checked: boolean) => void;
   label: string;
+  disabled?: boolean;
 }) {
   return (
-    <span className="relative inline-flex shrink-0 items-center">
+    <span className={`relative inline-flex shrink-0 items-center ${disabled ? "opacity-50" : ""}`}>
       <input
         type="checkbox"
         role="switch"
         aria-label={label}
         checked={checked}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
         className="peer sr-only"
       />
@@ -235,19 +238,22 @@ export function ToggleRow({
   hint,
   checked,
   onChange,
+  disabled,
 }: {
   label: string;
   hint?: ReactNode;
   checked: boolean;
   onChange: (checked: boolean) => void;
+  // A switch that can't be flipped right now; the hint says what unlocks it.
+  disabled?: boolean;
 }) {
   return (
-    <label className="flex cursor-pointer items-center justify-between gap-4 text-sm">
+    <label className={`flex items-center justify-between gap-4 text-sm ${disabled ? "cursor-not-allowed" : "cursor-pointer"}`}>
       <span className="text-ink-70">
         {label}
         {hint && <span className="block text-xs text-ink-45">{hint}</span>}
       </span>
-      <Switch checked={checked} onChange={onChange} label={label} />
+      <Switch checked={checked} onChange={onChange} label={label} disabled={disabled} />
     </label>
   );
 }

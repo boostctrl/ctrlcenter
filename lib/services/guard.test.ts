@@ -16,9 +16,9 @@ const req = {} as NextRequest;
 
 // One config with a single qBittorrent integration (#300), so a test dials
 // just the fields the gate under test cares about.
-function withQbit(over: Record<string, unknown> = {}) {
+function withQbit(over: Record<string, unknown> = {}, totpEnabled = true) {
   readConfigInternal.mockResolvedValue({
-    auth: { passwordHash: "hash" },
+    auth: { passwordHash: "hash", totp: { enabled: totpEnabled } },
     integrations: [
       {
         id: "qbit",
@@ -42,7 +42,7 @@ afterEach(() => {
 });
 
 describe("requireAction", () => {
-  it("passes all four gates and returns the integration and its resolved credentials", async () => {
+  it("passes all five gates and returns the integration and its resolved credentials", async () => {
     isAdminRequest.mockResolvedValue(true);
     withQbit({ password: "${QBIT_PW}" });
     vi.stubEnv("QBIT_PW", "from-env");
@@ -54,6 +54,13 @@ describe("requireAction", () => {
       expect(result.integration.id).toBe("qbit");
     }
     vi.unstubAllEnvs();
+  });
+
+  it("refuses an opted-in integration while two-factor authentication is off (#367)", async () => {
+    isAdminRequest.mockResolvedValue(true);
+    withQbit({}, false);
+    const result = await requireAction(req, "qbit", "qbittorrent");
+    expect(result).toMatchObject({ ok: false, status: 403, error: expect.stringContaining("two-factor") });
   });
 
   it("rejects a non-admin session with 401, before any config gate", async () => {

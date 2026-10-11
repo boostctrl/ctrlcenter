@@ -5,6 +5,8 @@ import {
   settingsSchema,
   widgetInstanceSchema,
   redactSecrets,
+  redactForExport,
+  restoreSecrets,
   type AppItem,
   type Config,
   type Integration,
@@ -54,5 +56,51 @@ export function stripSecrets<
     ...(config.widgets
       ? { widgets: config.widgets.map((w) => redactSecrets(widgetInstanceSchema, w)) }
       : {}),
+  };
+}
+
+
+// The integration fields that are secrets (#300): the whole list is admin-only
+// on public surfaces, but a backup keeps the list and loses just these.
+const INTEGRATION_SECRETS = ["password", "apiKey"] as const;
+const isEnvRef = (v: string) => /^\$\{[A-Za-z_][A-Za-z0-9_]*\}$/.test(v.trim());
+
+// A config for a backup without secrets (#366): every credential blanked
+// (environment references kept), the rest as stored, so the file imports
+// cleanly and restoreImportSecrets fills the blanks from the instance.
+export function stripExportSecrets<T extends Omit<Config, "auth">>(config: T): T {
+  return {
+    ...config,
+    settings: redactForExport(settingsSchema, config.settings),
+    apps: config.apps.map((a) => redactForExport(appItemSchema, a)),
+    widgets: config.widgets.map((w) => redactForExport(widgetInstanceSchema, w)),
+    integrations: config.integrations.map((i) => ({
+      ...i,
+      ...Object.fromEntries(INTEGRATION_SECRETS.map((k) => [k, isEnvRef(i[k]) ? i[k] : ""])),
+    })),
+  };
+}
+
+// A backup being restored with every blank secret filled from what the
+// instance holds (#366), matched by id, so a secret-less export restores
+// without wiping credentials. A file carrying its own secrets keeps them.
+export function restoreImportSecrets(incoming: Config, stored: Config): Config {
+  return {
+    ...incoming,
+    settings: restoreSecrets(settingsSchema, incoming.settings, stored.settings),
+    apps: incoming.apps.map((a) =>
+      restoreSecrets(appItemSchema, a, stored.apps.find((o) => o.id === a.id))
+    ),
+    widgets: incoming.widgets.map((w) =>
+      restoreSecrets(widgetInstanceSchema, w, stored.widgets.find((o) => o.id === w.id))
+    ),
+    integrations: incoming.integrations.map((i) => {
+      const was = stored.integrations.find((o) => o.id === i.id);
+      if (!was) return i;
+      return {
+        ...i,
+        ...Object.fromEntries(INTEGRATION_SECRETS.map((k) => [k, i[k] === "" ? was[k] : i[k]])),
+      };
+    }),
   };
 }

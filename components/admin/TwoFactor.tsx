@@ -5,6 +5,7 @@ import { TextField, Button } from "./ui";
 import { useToast } from "./Toast";
 import { useFocusTrap } from "./useFocusTrap";
 import { apiErrorMessage } from "./apiError";
+import { fetchWithReauth } from "./reauth";
 
 // The admin Security section's two-factor card (#198). Opt-in TOTP: enroll by
 // scanning a QR (or entering the secret) and confirming a code, which then
@@ -21,8 +22,20 @@ type Step = "enroll" | "recovery" | "disable";
 const formatSecret = (secret: string) =>
   secret.match(/.{1,4}/g)?.join(" ") ?? secret;
 
-export default function TwoFactor({ initialEnabled }: { initialEnabled: boolean }) {
-  const [enabled, setEnabled] = useState(initialEnabled);
+export default function TwoFactor({
+  initialEnabled,
+  onChange,
+}: {
+  initialEnabled: boolean;
+  // Told when the factor turns on or off, so the security checklist beside
+  // this card can re-read (#367).
+  onChange?: (enabled: boolean) => void;
+}) {
+  const [enabled, setEnabledState] = useState(initialEnabled);
+  const setEnabled = (next: boolean) => {
+    setEnabledState(next);
+    onChange?.(next);
+  };
   const [step, setStep] = useState<Step | null>(null);
   const [setup, setSetup] = useState<SetupData | null>(null);
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
@@ -58,7 +71,7 @@ export default function TwoFactor({ initialEnabled }: { initialEnabled: boolean 
     setError(null);
     setStep("enroll");
     try {
-      const res = await fetch("/api/2fa/setup", { method: "POST" });
+      const res = await fetchWithReauth("/api/2fa/setup", { method: "POST" });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         toast(apiErrorMessage(data, "Couldn't start setup"), "error");
@@ -104,7 +117,7 @@ export default function TwoFactor({ initialEnabled }: { initialEnabled: boolean 
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/2fa/disable", {
+      const res = await fetchWithReauth("/api/2fa/disable", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code }),
@@ -115,7 +128,14 @@ export default function TwoFactor({ initialEnabled }: { initialEnabled: boolean 
         return;
       }
       setEnabled(false);
-      toast("Two-factor authentication disabled");
+      // Write actions need the second factor (#367): the server turned them
+      // off with it.
+      const n = typeof data?.actionsDisabled === "number" ? data.actionsDisabled : 0;
+      toast(
+        n > 0
+          ? `Two-factor authentication disabled; dashboard actions turned off for ${n} integration${n === 1 ? "" : "s"}`
+          : "Two-factor authentication disabled"
+      );
       close();
     } catch {
       setError("Couldn't disable");

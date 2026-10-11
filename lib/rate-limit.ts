@@ -10,6 +10,15 @@ type Window = { count: number; resetAt: number };
 
 const windows = new Map<string, Window>();
 
+// Escalating lockouts (#369): each time a key fills its window, the next
+// lockout lasts twice as long — 5, 10, 20, 40 minutes — up to an hour, so a
+// guessing run slows to a crawl. The strikes clear on a refund (a
+// successful sign-in) or once nothing has tripped for a day.
+type Lockout = { strikes: number; at: number };
+const lockouts = new Map<string, Lockout>();
+export const MAX_LOCKOUT_MS = 60 * 60 * 1000;
+const STRIKES_KEEP_MS = 24 * 60 * 60 * 1000;
+
 export type RateLimitResult = {
   allowed: boolean;
   remaining: number;
@@ -19,7 +28,10 @@ export type RateLimitResult = {
 export function rateLimit(
   key: string,
   limit: number,
-  windowMs: number
+  windowMs: number,
+  // With `escalate`, each lockout of this key lengthens the next (see
+  // Lockout above); the login and step-up routes set it.
+  opts: { escalate?: boolean } = {}
 ): RateLimitResult {
   const now = Date.now();
   const existing = windows.get(key);
@@ -38,6 +50,14 @@ export function rateLimit(
   }
 
   existing.count += 1;
+  if (opts.escalate && existing.count >= limit) {
+    // This attempt filled the window: the lockout starts now, for longer
+    // each time this key trips.
+    const prior = lockouts.get(key);
+    const strikes = prior && now - prior.at < STRIKES_KEEP_MS ? prior.strikes : 0;
+    lockouts.set(key, { strikes: strikes + 1, at: now });
+    existing.resetAt = now + Math.min(windowMs * 2 ** strikes, MAX_LOCKOUT_MS);
+  }
   return {
     allowed: true,
     remaining: limit - existing.count,
@@ -54,6 +74,8 @@ export function refundRateLimit(key: string): void {
   if (existing && existing.count > 0 && Date.now() < existing.resetAt) {
     existing.count -= 1;
   }
+  // The real admin got in: their earlier lockouts stop counting against them.
+  lockouts.delete(key);
 }
 
 // Opportunistically drop expired windows so the Map can't grow unbounded from
@@ -62,6 +84,9 @@ export function pruneRateLimit(now = Date.now()): void {
   for (const [key, window] of windows) {
     if (now >= window.resetAt) windows.delete(key);
   }
+  for (const [key, lockout] of lockouts) {
+    if (now - lockout.at >= STRIKES_KEEP_MS) lockouts.delete(key);
+  }
 }
 
 // Number of trusted reverse proxies in front of the app (each appends to
@@ -69,7 +94,7 @@ export function pruneRateLimit(now = Date.now()): void {
 // entries to the left are client-supplied and must not be trusted for
 // throttling. Default 1 (the documented "behind a reverse proxy" setup). Set
 // to 0 when exposing the app directly so a forged header can't mint fresh keys.
-const TRUSTED_PROXY_HOPS = Math.max(
+export const TRUSTED_PROXY_HOPS = Math.max(
   0,
   Math.trunc(Number(process.env.TRUSTED_PROXY_HOPS ?? "1")) || 0
 );

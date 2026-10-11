@@ -53,6 +53,8 @@ next-env.d.ts
 /config/uploads/
 /config/icons/
 /config/session-secret
+/config/sessions.json
+/config/security-events.jsonl
 
 # browser smoke-test screenshots (npm run smoke)
 /smoke-screenshots/

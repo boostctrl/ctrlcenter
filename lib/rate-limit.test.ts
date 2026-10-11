@@ -82,6 +82,44 @@ describe("rateLimit", () => {
     pruneRateLimit(Date.now() + 2000);
     expect(rateLimit(key, 1, 1000).allowed).toBe(true);
   });
+
+  it("lengthens each lockout of an escalating key, and forgets them on a refund (#369)", () => {
+    const key = `k-${Math.random()}`;
+    const fill = () => {
+      for (let i = 0; i < 3; i++) rateLimit(key, 3, 1000, { escalate: true });
+      return rateLimit(key, 3, 1000, { escalate: true });
+    };
+    // First lockout: the plain window. Second: twice as long. Third: four times.
+    expect(fill().retryAfterSeconds).toBe(1);
+    vi.advanceTimersByTime(1000);
+    expect(fill().retryAfterSeconds).toBe(2);
+    vi.advanceTimersByTime(2000);
+    expect(fill().retryAfterSeconds).toBe(4);
+    vi.advanceTimersByTime(4000);
+    // A refund (the real admin signed in) resets the escalation.
+    refundRateLimit(key);
+    expect(fill().retryAfterSeconds).toBe(1);
+  });
+
+  it("caps an escalating lockout at an hour", () => {
+    const key = `k-${Math.random()}`;
+    const windowMs = 20 * 60 * 1000;
+    for (let round = 0; round < 5; round++) {
+      for (let i = 0; i < 2; i++) rateLimit(key, 2, windowMs, { escalate: true });
+      const blocked = rateLimit(key, 2, windowMs, { escalate: true });
+      expect(blocked.retryAfterSeconds).toBeLessThanOrEqual(3600);
+      vi.advanceTimersByTime(blocked.retryAfterSeconds * 1000);
+    }
+  });
+
+  it("never escalates a key that doesn't ask for it", () => {
+    const key = `k-${Math.random()}`;
+    for (let round = 0; round < 3; round++) {
+      for (let i = 0; i < 3; i++) rateLimit(key, 3, 1000);
+      expect(rateLimit(key, 3, 1000).retryAfterSeconds).toBe(1);
+      vi.advanceTimersByTime(1000);
+    }
+  });
 });
 
 describe("clientIp", () => {

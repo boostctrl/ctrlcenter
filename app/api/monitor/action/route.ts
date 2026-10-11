@@ -8,6 +8,10 @@ import { approveRequest, declineRequest } from "@/lib/services/seerr";
 import { startContainer, stopContainer, restartContainer } from "@/lib/services/portainer";
 import { ServiceError } from "@/lib/services/http";
 import { log, hostOf, errorReason } from "@/lib/log";
+import { requireRecentAuth } from "@/lib/reauth";
+import { eventMeta, recordSecurityEvent } from "@/lib/security-events";
+
+const DESTRUCTIVE = new Set(["delete", "decline", "stop", "restart"]);
 
 // The write-action data plane for the Monitor page (#201/#202/#203): one POST
 // dispatcher for every state-changing integration action. Admin-only twice over
@@ -83,6 +87,12 @@ export async function POST(request: NextRequest) {
   if (!guard.ok) {
     return NextResponse.json({ error: guard.error }, { status: guard.status });
   }
+  // The destructive verbs also take a recent step-up confirmation (#366);
+  // pause/resume, approve and start are reversible and pass on the session.
+  if (DESTRUCTIVE.has(body.action)) {
+    const recent = await requireRecentAuth(request);
+    if (!recent.ok) return recent.response;
+  }
 
   try {
     await perform(body, guard.cfg);
@@ -111,5 +121,6 @@ export async function POST(request: NextRequest) {
     action: body.action,
     host: hostOf(guard.cfg.url),
   });
+  await recordSecurityEvent("action", eventMeta(request), `${body.service} ${body.action} (${body.integration})`);
   return NextResponse.json({ ok: true });
 }

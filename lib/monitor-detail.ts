@@ -48,7 +48,10 @@ export type DetailResult = {
 // never throws.
 export async function getServiceDetail(
   id: string,
-  integrations: Integration[]
+  integrations: Integration[],
+  // Whether the site lets dashboard actions run at all (two-factor
+  // authentication on, #367).
+  actionsEnabled: boolean
 ): Promise<DetailResult | null> {
   const integration = integrations.find((i) => i.id === id);
   if (!integration || !isServiceConfigured(integration)) return null;
@@ -56,7 +59,7 @@ export async function getServiceDetail(
     id,
     service: integration.type,
     label: integrationLabels(integrations)[id],
-    actionsAllowed: integration.allowActions === true,
+    actionsAllowed: integration.allowActions === true && actionsEnabled,
   };
   try {
     const data = await SERVICES[integration.type].detail(resolveIntegration(integration));

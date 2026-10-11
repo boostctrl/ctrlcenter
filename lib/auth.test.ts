@@ -8,8 +8,16 @@ import {
   hashPassword,
   verifyPasswordHash,
   createSessionToken,
+  verifySessionId,
   verifySessionToken,
+  sessionCookieName,
+  sessionTokenFrom,
+  SESSION_COOKIE_NAME,
+  SECURE_SESSION_COOKIE_NAME,
 } from "./auth";
+import { NextRequest } from "next/server";
+import { createSession, revokeSession, revokeSessions } from "./sessions";
+import { SignJWT } from "jose";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -89,11 +97,59 @@ function noVolume() {
   vi.stubEnv("CONFIG_PATH", "/dev/null/config.yaml");
 }
 
+// A token for a fresh session record (#365): tokens only verify while their
+// record exists, so every signed token here starts one.
+const meta = { ip: "203.0.113.9", userAgent: "test" };
+async function signedToken(extra = ""): Promise<string> {
+  return createSessionToken(extra, await createSession(meta));
+}
+
 describe("session tokens", () => {
   it("round-trips a token signed and verified with the same secret", async () => {
     useVolume();
-    const token = await createSessionToken();
+    const token = await signedToken();
     expect(await verifySessionToken(token)).toBe(true);
+  });
+
+  it("names the session the token belongs to", async () => {
+    useVolume();
+    const id = await createSession(meta);
+    const token = await createSessionToken("", id);
+    expect(await verifySessionId(token)).toBe(id);
+    expect(await verifySessionId("not-a-jwt")).toBeNull();
+  });
+
+  it("stops verifying once the session is revoked (#365)", async () => {
+    useVolume();
+    const id = await createSession(meta);
+    const token = await createSessionToken("", id);
+    expect(await verifySessionToken(token)).toBe(true);
+    await revokeSession(id);
+    expect(await verifySessionToken(token)).toBe(false);
+  });
+
+  it("stops verifying after sign-out-everywhere (#365)", async () => {
+    useVolume();
+    const token = await signedToken();
+    await revokeSessions();
+    expect(await verifySessionToken(token)).toBe(false);
+  });
+
+  it("rejects a token without a session id, however well signed", async () => {
+    useVolume();
+    vi.stubEnv("SESSION_SECRET", "dedicated-secret");
+    // The pre-3.0 token shape: same claims, no jti.
+    const key = new Uint8Array(
+      await crypto.subtle.digest("SHA-256", new TextEncoder().encode("dedicated-secret\0"))
+    );
+    const legacy = await new SignJWT({ role: "admin" })
+      .setProtectedHeader({ alg: "HS256" })
+      .setIssuedAt()
+      .setExpirationTime("7d")
+      .sign(key);
+    expect(await verifySessionToken(legacy)).toBe(false);
+    // The same key does sign a current token, so it was the missing id.
+    expect(await verifySessionToken(await signedToken())).toBe(true);
   });
 
   it("rejects an undefined or garbage token", async () => {
@@ -106,7 +162,7 @@ describe("session tokens", () => {
     vi.stubEnv("SESSION_SECRET", "");
     vi.stubEnv("ADMIN_PASSWORD", "old-password");
     const dir = useVolume();
-    const token = await createSessionToken();
+    const token = await signedToken();
     const secret = fs.readFileSync(path.join(dir, "session-secret"), "utf8").trim();
     expect(secret.length).toBeGreaterThanOrEqual(40);
     expect(fs.statSync(path.join(dir, "session-secret")).mode & 0o777).toBe(0o600);
@@ -119,23 +175,25 @@ describe("session tokens", () => {
     vi.stubEnv("SESSION_SECRET", "");
     noVolume();
     vi.stubEnv("ADMIN_PASSWORD", "old-password");
-    const token = await createSessionToken();
+    const token = await signedToken();
     vi.stubEnv("ADMIN_PASSWORD", "new-password");
     expect(await verifySessionToken(token)).toBe(false);
   });
 
   it("keeps tokens valid across password changes when SESSION_SECRET is set", async () => {
+    useVolume();
     vi.stubEnv("SESSION_SECRET", "dedicated-secret");
     vi.stubEnv("ADMIN_PASSWORD", "old-password");
-    const token = await createSessionToken();
+    const token = await signedToken();
 
     vi.stubEnv("ADMIN_PASSWORD", "new-password");
     expect(await verifySessionToken(token)).toBe(true);
   });
 
   it("invalidates a token when the mixed-in key material (password hash) changes", async () => {
+    useVolume();
     vi.stubEnv("SESSION_SECRET", "dedicated-secret");
-    const token = await createSessionToken("password-hash-A");
+    const token = await signedToken("password-hash-A");
     // Same material still verifies...
     expect(await verifySessionToken(token, "password-hash-A")).toBe(true);
     // ...but a changed password hash (e.g. after a password change) does not,
@@ -148,7 +206,7 @@ describe("session tokens", () => {
     vi.stubEnv("ADMIN_PASSWORD", "");
     noVolume();
     // Signing must refuse rather than derive a guessable empty-string key...
-    await expect(createSessionToken()).rejects.toThrow();
+    await expect(createSessionToken("", "some-session")).rejects.toThrow();
     // ...and verification of any token returns false (never accepts a forgery).
     expect(await verifySessionToken("anything")).toBe(false);
   });
@@ -157,11 +215,32 @@ describe("session tokens", () => {
     // Sign with a SESSION_SECRET in place...
     useVolume();
     vi.stubEnv("SESSION_SECRET", "the-real-secret");
-    const token = await createSessionToken();
+    const token = await signedToken();
 
     // ...then drop SESSION_SECRET so the persisted secret signs instead. The
     // key now differs, so the previously issued token must no longer verify.
     vi.stubEnv("SESSION_SECRET", "");
     expect(await verifySessionToken(token)).toBe(false);
+  });
+});
+
+describe("session cookie name (#369)", () => {
+  const req = (headers: Record<string, string> = {}, url = "http://dash.lan/") =>
+    new NextRequest(url, { headers });
+
+  it("carries the __Host- prefix over HTTPS and the bare name over HTTP", () => {
+    expect(sessionCookieName(req())).toBe(SESSION_COOKIE_NAME);
+    expect(sessionCookieName(req({}, "https://dash.lan/"))).toBe(SECURE_SESSION_COOKIE_NAME);
+    expect(sessionCookieName(req({ "x-forwarded-proto": "https" }))).toBe(SECURE_SESSION_COOKIE_NAME);
+    expect(SECURE_SESSION_COOKIE_NAME.startsWith("__Host-")).toBe(true);
+  });
+
+  it("reads the token under either name, preferring the secure one", () => {
+    const jar = (entries: Record<string, string>) => ({
+      get: (name: string) => (name in entries ? { value: entries[name] } : undefined),
+    });
+    expect(sessionTokenFrom(jar({}))).toBeUndefined();
+    expect(sessionTokenFrom(jar({ [SESSION_COOKIE_NAME]: "plain" }))).toBe("plain");
+    expect(sessionTokenFrom(jar({ [SECURE_SESSION_COOKIE_NAME]: "secure", [SESSION_COOKIE_NAME]: "plain" }))).toBe("secure");
   });
 });

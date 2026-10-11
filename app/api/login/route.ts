@@ -2,22 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   adminPasswordConfigured,
   NO_PASSWORD_MESSAGE,
-  verifyEnvPassword,
-  verifyPasswordHash,
-  createSessionToken,
-  sessionCookieOptions,
-  SESSION_COOKIE_NAME,
+  issueSession,
+  setSessionCookie,
 } from "@/lib/auth";
-import { readConfigInternal, spendTotpRecoveryCode } from "@/lib/config";
+import { readConfigInternal } from "@/lib/config";
+import { verifyCredentials } from "@/lib/credentials";
 import {
   rateLimit,
   refundRateLimit,
   pruneRateLimit,
   clientKey,
 } from "@/lib/rate-limit";
-import { verifyTotpOnce } from "@/lib/totp";
-import { verifyRecoveryCode } from "@/lib/recovery-codes";
 import { isSameOriginRequest } from "@/lib/api-auth";
+import { eventMeta, recordSecurityEvent } from "@/lib/security-events";
+import { notifySecurityEvent } from "@/lib/security-alerts";
 
 // Allow a small burst of attempts per client, then lock that source out for the
 // window — the primary gate, checked before any password hashing. A separate,
@@ -28,6 +26,8 @@ import { isSameOriginRequest } from "@/lib/api-auth";
 const MAX_ATTEMPTS = 5;
 const GLOBAL_MAX_ATTEMPTS = 50;
 const WINDOW_MS = 5 * 60 * 1000;
+// Clients whose lockout was already logged this window (#368).
+const lockedKeys = new Set<string>();
 
 export async function POST(request: NextRequest) {
   // A cross-site page must not be able to sign the browser in (login CSRF) —
@@ -42,8 +42,14 @@ export async function POST(request: NextRequest) {
   // prefix). This is the gate that stops a single attacker; the global backstop
   // below only counts failures so it can't lock the real admin out.
   const throttleKey = clientKey(request, "login");
-  const perClient = rateLimit(throttleKey, MAX_ATTEMPTS, WINDOW_MS);
+  const perClient = rateLimit(throttleKey, MAX_ATTEMPTS, WINDOW_MS, { escalate: true });
   if (!perClient.allowed) {
+    // Once per lockout, not per refused request: the first refusal tips it.
+    if (perClient.retryAfterSeconds > 0 && !lockedKeys.has(throttleKey)) {
+      lockedKeys.add(throttleKey);
+      setTimeout(() => lockedKeys.delete(throttleKey), WINDOW_MS).unref?.();
+      notifySecurityEvent(await recordSecurityEvent("signin.locked", eventMeta(request)));
+    }
     return NextResponse.json(
       { error: "Too many attempts. Try again later." },
       {
@@ -54,10 +60,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => null);
-  const password = body?.password;
-  const totpCode = typeof body?.totp === "string" ? body.totp : "";
-
-  if (typeof password !== "string") {
+  if (typeof body?.password !== "string") {
     return NextResponse.json({ error: "Invalid password" }, { status: 401 });
   }
 
@@ -67,11 +70,15 @@ export async function POST(request: NextRequest) {
   if (!adminPasswordConfigured(auth)) {
     return NextResponse.json({ error: NO_PASSWORD_MESSAGE }, { status: 503 });
   }
-  const ok = auth.passwordHash
-    ? await verifyPasswordHash(password, auth.passwordHash, auth.passwordSalt)
-    : verifyEnvPassword(password);
-
-  if (!ok) {
+  // The password, and the code when the second factor is on (#198), through
+  // the one credential check the step-up confirmation shares (#366).
+  const result = await verifyCredentials(auth, body?.password, body?.totp);
+  if (!result.ok && result.reason !== "totp-required") {
+    // A wrong password or code, in the audit log (#368); a missing code is
+    // the form's second step, not a failure.
+    await recordSecurityEvent("signin.fail", eventMeta(request));
+  }
+  if (!result.ok && result.reason === "password") {
     // Charge the global backstop only on a wrong password, and enforce it only
     // here — a correct password never reaches this branch, so the shared budget
     // can't be used to deny the legitimate admin. The cap still bounds a
@@ -89,33 +96,20 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json({ error: "Invalid password" }, { status: 401 });
   }
-
-  // Password is correct. If the second factor is on, the code must also check
-  // out before a session is issued (#198). The per-client throttle above
-  // already bounds guesses of the 6-digit code — a wrong code doesn't touch
-  // the global backstop, so someone who has the password but not the device
-  // can't lock the real admin out by spamming codes.
-  if (auth.totp.enabled) {
-    if (totpCode.trim() === "") {
-      // Signal the client to collect the code, without revealing whether the
-      // password was right vs wrong to a caller who never sends a code.
-      return NextResponse.json(
-        { error: "Enter your authentication code", totpRequired: true },
-        { status: 401 }
-      );
-    }
-    const codeOk = await verifyTotpOnce(auth.totp.secret, totpCode);
-    if (!codeOk) {
-      // Not a valid time code — try it as a one-time recovery code, spending
-      // it on success so it can't be reused.
-      const match = await verifyRecoveryCode(totpCode, auth.totp.recoveryCodes);
-      if (!match.matched || !(await spendTotpRecoveryCode(match.matched.hash))) {
-        return NextResponse.json(
-          { error: "Invalid authentication code", totpRequired: true },
-          { status: 401 }
-        );
-      }
-    }
+  if (!result.ok) {
+    // Password right, code missing or wrong. The per-client throttle above
+    // already bounds guesses of the 6-digit code — a wrong code doesn't touch
+    // the global backstop, so someone who has the password but not the device
+    // can't lock the real admin out by spamming codes. A missing code signals
+    // the client to collect one, without revealing whether the password was
+    // right vs wrong to a caller who never sends a code.
+    return NextResponse.json(
+      {
+        error: result.reason === "totp-required" ? "Enter your authentication code" : "Invalid authentication code",
+        totpRequired: true,
+      },
+      { status: 401 }
+    );
   }
 
   // Fully signed in (password, and code when 2FA is on): refund this attempt's
@@ -123,13 +117,12 @@ export async function POST(request: NextRequest) {
   refundRateLimit(throttleKey);
 
   // Bind the token to the current password hash so a later password change
-  // revokes it (see proxy.ts / verifySessionToken).
-  const token = await createSessionToken(auth.passwordHash);
+  // revokes it (see proxy.ts / verifySessionToken), and record the session
+  // so logout, the idle timeout and "sign out everywhere" can end it (#365).
+  const { token } = await issueSession(request, auth.passwordHash);
+  // In the audit log, and out through the channels when the address is new.
+  notifySecurityEvent(await recordSecurityEvent("signin.ok", eventMeta(request)));
   const response = NextResponse.json({ ok: true });
-  response.cookies.set(
-    SESSION_COOKIE_NAME,
-    token,
-    sessionCookieOptions(request)
-  );
+  setSessionCookie(response, request, token);
   return response;
 }

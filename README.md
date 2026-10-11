@@ -145,8 +145,9 @@ Built with Next.js 16, React 19, and Tailwind v4.
   for **qBittorrent, Seerr, and Portainer** you can opt in per integration
   ("Allow actions from the dashboard") to act from the page — pause/resume/delete
   torrents, approve/deny requests, and start/stop/restart containers with a
-  read-only log tail. Actions stay **off until you turn them on**, are admin-only,
-  ask before anything destructive, and are logged on the server. Strictly
+  read-only log tail. Actions stay **off until you turn them on**, need
+  two-factor authentication to be on, are admin-only, ask before anything
+  destructive, and are logged on the server. Strictly
   admin-only throughout — the page, its API, and the stored credentials are all
   behind the admin session, any credential can be a `${ENV_VAR}` reference
   instead of a value in the config file, and nothing integration-related ever
@@ -448,7 +449,7 @@ for reuse. You can also paste a direct image URL or a `data:` URI.
 | --- | --- | --- |
 | `ADMIN_PASSWORD` | yes | Bootstrap password for `/admin`. After you set one in **Settings → Reset password**, login uses that. **Special characters:** quote the value in `.env` and double any literal `$` as `$$` (docker compose interpolates `$`), or a complex password can be mangled before the app sees it. |
 | `SESSION_SECRET` | no | Secret used to sign session cookies. If unset, a random one is generated on first start and kept in the config volume (`session-secret`); only if that volume isn't writable does it fall back to deriving one from `ADMIN_PASSWORD`. Set it yourself to manage the secret explicitly (e.g. `openssl rand -base64 32`). |
-| `CONFIG_PATH` | no | Path to the config file (default `./config/config.yaml`; the container sets `/config/config.yaml`). The uptime history (`status-history.db`, a SQLite database) and uploaded custom icons (`uploads/`) are written beside it. |
+| `CONFIG_PATH` | no | Path to the config file (default `./config/config.yaml`; the container sets `/config/config.yaml`). The uptime history (`status-history.db`, a SQLite database), the admin session list (`sessions.json`), the security log (`security-events.jsonl`) and uploaded custom icons (`uploads/`) are written beside it. |
 | `CTRLCENTER_SMTP_PASS` | no | Overrides the email-alert SMTP password, so the secret can stay out of `config.yaml`. |
 | `CTRLCENTER_CALDAV_PASS` | no | Overrides the private-calendar (CalDAV/WebDAV) password of the calendar widget with id `calendar` (the one a 2.x config migrates to), so that secret can stay out of `config.yaml` too. Other calendar widgets use only their own stored credentials. |
 | *any name* | no | Referenced from an integration as `${NAME}`: any of its fields (URL, username, password, API key) can name an environment variable instead of holding the value, e.g. `apiKey: "${SONARR_4K_KEY}"`. Read on the server at use time; never shown in the admin or sent to a browser. |
@@ -457,6 +458,7 @@ for reuse. You can also paste a direct image URL or a `data:` URI.
 | `CTRLCENTER_HOST_PROC` | no | Where the System stats widget looks for a host-mode `/proc` mount (default `/host/proc`). In a container the widget normally reports the *container's* cgroup-scoped CPU/memory; to show the host machine instead, bind-mount the host's `/proc` read-only — `-v /proc:/host/proc:ro` (compose: `- /proc:/host/proc:ro`) — and the widget switches to host mode automatically, no privileges needed. Disks are separate: a path must be mounted into the container to be measured. |
 | `CTRLCENTER_ICON_CACHE_MAX_BYTES` | no | Cap, in bytes, on the on-disk cache of icons fetched from the icon CDN (stored beside your config). Default `67108864` (64 MB) — far more than any real dashboard uses. When the cap is exceeded, the least-recently-served icons are evicted (and simply re-fetched next time they're needed). Lower it on a very small data volume. |
 | `LOG_LEVEL` | no | Server log verbosity: `debug`, `info` (default), `warn`, or `error`. Diagnostics — a timed-out weather/feed/calendar fetch, a rejected alert — are logged to the container's stdout/stderr. |
+| `HSTS` | no | Set `1` to send `Strict-Transport-Security: max-age=31536000; includeSubDomains` on responses that arrived over HTTPS, for a reverse proxy that doesn't add the header itself. Never sent on plain HTTP. |
 | `TRUSTED_PROXY_HOPS` | no | Number of trusted reverse proxies in front of the app, used to find the real client IP in `X-Forwarded-For` for login throttling. Default `1` (the app sits behind one reverse proxy). **Set `0` if the app is exposed directly** — the Docker image then throttles each client by its actual connection address; otherwise a client can spoof `X-Forwarded-For` to forge a fresh source IP per request and slip past the per-IP login throttle. A global attempt cap still applies as a backstop, but the per-IP limit is your first line of defense. (Run outside the image — `next start` — the app can't see connection addresses, so with `0` every client shares one limit.) |
 
 ## Development

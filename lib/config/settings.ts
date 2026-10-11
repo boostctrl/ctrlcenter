@@ -24,10 +24,13 @@ export type SiteConfig = {
   widgets: WidgetInstance[];
   // Admin-only pages (Monitor) read these; never pass them to a client.
   integrations: Integration[];
+  // Whether the second factor is on — only the boolean, never the secret —
+  // which decides whether dashboard actions are offered (#367).
+  twoFactorEnabled: boolean;
 };
 export async function getSiteConfig(): Promise<SiteConfig> {
-  const { settings, boards, widgets, integrations } = await readConfigInternal();
-  return { settings, boards, widgets, integrations };
+  const { settings, boards, widgets, integrations, auth } = await readConfigInternal();
+  return { settings, boards, widgets, integrations, twoFactorEnabled: auth.totp.enabled };
 }
 
 // Server-only accessor for the calendar Basic-auth credentials. readPublicConfig

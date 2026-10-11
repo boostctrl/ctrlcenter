@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useState } from "react";
 import type { PortainerContainer } from "@/lib/services/portainer";
+import { fetchWithReauth } from "@/components/admin/reauth";
 
 // Client helper for the Monitor cards' write actions (#201/#202/#203): POST the
 // action to the admin-gated /api/monitor/action dispatcher and surface the
@@ -39,7 +40,7 @@ export async function runMonitorAction(
   body: MonitorActionBody & { integration: string }
 ): Promise<ActionResult> {
   try {
-    const res = await fetch("/api/monitor/action", {
+    const res = await fetchWithReauth("/api/monitor/action", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

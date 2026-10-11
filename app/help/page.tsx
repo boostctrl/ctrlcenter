@@ -1008,13 +1008,49 @@ export default async function HelpPage() {
             variable. Changing the password signs out every other session.
           </P>
           <P>
+            <strong>Sessions</strong>, in <strong>Settings → Security</strong>,
+            lists every browser the portal is signed in on and lets you end
+            any of them, or sign out everywhere else after using a shared
+            device. A session unused for a day ends on its own (<em>Sign out
+            after</em> sets how long), and every session ends seven days after
+            it signed in.
+          </P>
+          <P>
             <strong>Two-factor authentication</strong>, in{" "}
             <strong>Settings → Security</strong>, adds a time-based code from
             an authenticator app to sign-in. Turning it on shows one-time
             recovery codes — keep them somewhere safe, they are the way back
             in without the app — and turning it off asks for a current code.
-            It is optional; leave it off to keep signing in with the password
-            alone.
+            It is optional for signing in, but dashboard actions on
+            integrations need it: the opt-in can only be turned on once it
+            is, and turning it off turns actions off too.
+          </P>
+          <P>
+            Some changes ask for your password again, and the authenticator
+            code when the second factor is on: changing the password, turning
+            two-factor authentication on or off, editing an integration&apos;s
+            address or credentials or turning its actions on, exporting with
+            secrets, restoring a backup, and the destructive dashboard
+            actions. Signing in counts for ten minutes; after that a{" "}
+            <strong>Confirm it&apos;s you</strong> dialog asks once.
+          </P>
+          <P>
+            <strong>Recent activity</strong>, in Settings → Security, lists
+            sign-ins and failed attempts, sign-outs, sessions ended, password
+            and two-factor changes, confirmations, exports with secrets,
+            credential edits and dashboard actions, each with where it came
+            from. Alert channels with <em>Security</em> on are told about a
+            sign-in from a new address, a lockout, the second factor or
+            password changing, and actions turned on.
+          </P>
+          <P>
+            Settings → Security opens with a <strong>checklist</strong> of
+            what the app can see of your deployment — the second factor,
+            where the password comes from, whether sign-ins arrive over
+            HTTPS and through the proxy you configured, the session secret,
+            dashboard actions and the idle timeout — each green, amber or red
+            with the fix. Clear the red rows before putting the portal on a
+            public port; they are also logged when the server starts.
           </P>
         </Card>
 

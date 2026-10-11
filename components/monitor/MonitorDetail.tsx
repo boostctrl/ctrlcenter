@@ -7,6 +7,7 @@ import type { DetailResult } from "@/lib/monitor-detail";
 import type { ServiceStatus } from "@/lib/monitor";
 import { MonitorIntegrationContext } from "./actions";
 import { ConfirmProvider } from "@/components/admin/Confirm";
+import ReauthDialog from "@/components/admin/ReauthDialog";
 import PageNav from "@/components/PageNav";
 import { usePolling } from "@/components/usePolling";
 import { useNow } from "@/components/useNow";
@@ -171,6 +172,8 @@ export default function MonitorDetail({
 
   return (
     <ConfirmProvider>
+      {/* "Confirm it's you" for the destructive actions (#366). */}
+      <ReauthDialog />
       <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-6 px-6 pt-12 pb-24 sm:px-10 lg:pt-16">
         {/* The detail masthead: breadcrumb, then the service name paired with a
             live status pill, so every service opens on the same designed header

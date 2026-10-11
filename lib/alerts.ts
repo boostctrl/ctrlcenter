@@ -495,9 +495,12 @@ async function deliverLogged(ch: AlertChannel, out: Outgoing): Promise<void> {
 export async function sendNotification(
   config: AlertConfig,
   c: NotificationContent,
-  ctx: NotificationContext = { at: Date.now(), timeZone: "UTC", siteTitle: "CtrlCenter" }
+  ctx: NotificationContext = { at: Date.now(), timeZone: "UTC", siteTitle: "CtrlCenter" },
+  // Which active channels take it: inbound webhook events by default; the
+  // security notifications (#368) pick by the channel's own switch.
+  takes: (ch: AlertChannel) => boolean = (ch) => ch.onWebhooks
 ): Promise<void> {
-  const channels = activeChannels(config).filter((ch) => ch.onWebhooks);
+  const channels = activeChannels(config).filter(takes);
   await Promise.all(
     channels.map((ch) => deliverLogged(ch, { kind: "notification", content: c, ctx }))
   );

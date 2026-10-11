@@ -53,6 +53,10 @@ export const alertChannelSchema = z.object({
   onRecovery: z.boolean().catch(true).default(true),
   onWarning: z.boolean().catch(true).default(true),
   onWebhooks: z.boolean().catch(true).default(true),
+  // Security notifications (#368): a sign-in from a new address, the login
+  // throttle tripping, the second factor turned off, the password changed,
+  // dashboard actions turned on.
+  onSecurity: z.boolean().catch(true).default(true),
   // Only alert for these app ids; empty means every monitored app.
   apps: z.array(z.string()).catch([]).default([]),
   // Webhook: which service's payload to send.

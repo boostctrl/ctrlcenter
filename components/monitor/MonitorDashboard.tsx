@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { MonitorEntry, MonitorSnapshot } from "@/lib/monitor";
 import { MONITOR_GROUPS, SERVICE_IDS, SERVICE_META, type ServiceId } from "@/lib/services/ids";
 import PageNav from "@/components/PageNav";
+import ReauthDialog from "@/components/admin/ReauthDialog";
 import SystemHealthBar from "./SystemHealthBar";
 import Complication from "./Complication";
 import { sinceLabel, type ServiceState } from "./MonitorCard";
@@ -106,6 +107,8 @@ export default function MonitorDashboard({
 
   return (
     <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-6 px-6 pt-12 pb-24 sm:px-10 lg:pt-16">
+      {/* "Confirm it's you" for the destructive actions (#366). */}
+      <ReauthDialog />
       <div>
         <PageNav current={null} {...nav} />
         <div className="mt-3 flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
