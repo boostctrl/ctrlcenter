@@ -15,6 +15,8 @@ import {
   clientKey,
 } from "@/lib/rate-limit";
 import { isSameOriginRequest } from "@/lib/api-auth";
+import { eventMeta, recordSecurityEvent } from "@/lib/security-events";
+import { notifySecurityEvent } from "@/lib/security-alerts";
 
 // Allow a small burst of attempts per client, then lock that source out for the
 // window — the primary gate, checked before any password hashing. A separate,
@@ -25,6 +27,8 @@ import { isSameOriginRequest } from "@/lib/api-auth";
 const MAX_ATTEMPTS = 5;
 const GLOBAL_MAX_ATTEMPTS = 50;
 const WINDOW_MS = 5 * 60 * 1000;
+// Clients whose lockout was already logged this window (#368).
+const lockedKeys = new Set<string>();
 
 export async function POST(request: NextRequest) {
   // A cross-site page must not be able to sign the browser in (login CSRF) —
@@ -41,6 +45,12 @@ export async function POST(request: NextRequest) {
   const throttleKey = clientKey(request, "login");
   const perClient = rateLimit(throttleKey, MAX_ATTEMPTS, WINDOW_MS);
   if (!perClient.allowed) {
+    // Once per lockout, not per refused request: the first refusal tips it.
+    if (perClient.retryAfterSeconds > 0 && !lockedKeys.has(throttleKey)) {
+      lockedKeys.add(throttleKey);
+      setTimeout(() => lockedKeys.delete(throttleKey), WINDOW_MS).unref?.();
+      notifySecurityEvent(await recordSecurityEvent("signin.locked", eventMeta(request)));
+    }
     return NextResponse.json(
       { error: "Too many attempts. Try again later." },
       {
@@ -64,6 +74,11 @@ export async function POST(request: NextRequest) {
   // The password, and the code when the second factor is on (#198), through
   // the one credential check the step-up confirmation shares (#366).
   const result = await verifyCredentials(auth, body?.password, body?.totp);
+  if (!result.ok && result.reason !== "totp-required") {
+    // A wrong password or code, in the audit log (#368); a missing code is
+    // the form's second step, not a failure.
+    await recordSecurityEvent("signin.fail", eventMeta(request));
+  }
   if (!result.ok && result.reason === "password") {
     // Charge the global backstop only on a wrong password, and enforce it only
     // here — a correct password never reaches this branch, so the shared budget
@@ -106,6 +121,8 @@ export async function POST(request: NextRequest) {
   // revokes it (see proxy.ts / verifySessionToken), and record the session
   // so logout, the idle timeout and "sign out everywhere" can end it (#365).
   const { token } = await issueSession(request, auth.passwordHash);
+  // In the audit log, and out through the channels when the address is new.
+  notifySecurityEvent(await recordSecurityEvent("signin.ok", eventMeta(request)));
   const response = NextResponse.json({ ok: true });
   response.cookies.set(
     SESSION_COOKIE_NAME,

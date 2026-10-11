@@ -1035,6 +1035,15 @@ export default async function HelpPage() {
             <strong>Confirm it&apos;s you</strong> dialog asks once.
           </P>
           <P>
+            <strong>Recent activity</strong>, in Settings → Security, lists
+            sign-ins and failed attempts, sign-outs, sessions ended, password
+            and two-factor changes, confirmations, exports with secrets,
+            credential edits and dashboard actions, each with where it came
+            from. Alert channels with <em>Security</em> on are told about a
+            sign-in from a new address, a lockout, the second factor or
+            password changing, and actions turned on.
+          </P>
+          <P>
             Settings → Security opens with a <strong>checklist</strong> of
             what the app can see of your deployment — the second factor,
             where the password comes from, whether sign-ins arrive over

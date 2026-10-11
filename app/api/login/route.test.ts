@@ -64,4 +64,17 @@ describe("POST /api/login", () => {
     expect(res.status).toBe(503);
     expect((await res.json()).error).toMatch(/No admin password is set/);
   });
+
+  it("records sign-ins and failed attempts in the security log (#368)", async () => {
+    const { listSecurityEvents } = await import("@/lib/security-events");
+    const before = (await listSecurityEvents(200)).length;
+    expect((await login("wrong")).status).toBe(401);
+    expect((await login("wrong")).status).toBe(401);
+    expect((await login("correct horse")).status).toBe(200);
+    const events = (await listSecurityEvents(200)).slice(0, (await listSecurityEvents(200)).length - before);
+    expect(events.map((e) => e.kind)).toEqual(["signin.ok", "signin.fail"]);
+    // The two failures folded into one entry; the address is the throttle's.
+    expect(events[1]).toMatchObject({ count: 2, ip: `10.0.0.${ip}` });
+    expect(events[0]).toMatchObject({ ip: `10.0.0.${ip}`, newAddress: true });
+  });
 });

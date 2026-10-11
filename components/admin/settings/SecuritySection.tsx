@@ -6,6 +6,7 @@ import ChangePassword from "../ChangePassword";
 import TwoFactor from "../TwoFactor";
 import Sessions from "../Sessions";
 import SecurityChecklist from "../SecurityChecklist";
+import SecurityActivity from "../SecurityActivity";
 
 export default function SecuritySection({
   initialTwoFactorEnabled,
@@ -42,6 +43,13 @@ export default function SecuritySection({
         intro="Where this portal is signed in. End a session you don't recognise, or sign out everywhere else after using a shared device."
       >
         <Sessions />
+      </Card>
+
+      <Card
+        title="Recent activity"
+        intro="Sign-ins and the changes that matter, with where they came from. Channels with Security on are told about a sign-in from a new address, a lockout, the second factor or password changing, and actions turned on."
+      >
+        <SecurityActivity version={version} />
       </Card>
     </>
   );

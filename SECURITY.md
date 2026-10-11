@@ -41,6 +41,10 @@ is the public entry point. A couple of settings matter for a safe deployment:
   image throttles each client by its real connection address.
 - Consider turning on **two-factor authentication** (Settings → Security),
   especially if the portal is reachable beyond a network you fully trust.
+- Point an alert channel at somewhere you'll see it and leave its
+  **Security** events on: a sign-in from a new address, a lockout, the second
+  factor or password changing and dashboard actions turned on are sent
+  there, and Settings → Security keeps the recent activity.
 
 See the [README](README.md) for the full configuration reference. Findings that
 require an already-compromised host, or a configuration the docs explicitly warn

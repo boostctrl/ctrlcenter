@@ -9,6 +9,7 @@ import { startContainer, stopContainer, restartContainer } from "@/lib/services/
 import { ServiceError } from "@/lib/services/http";
 import { log, hostOf, errorReason } from "@/lib/log";
 import { requireRecentAuth } from "@/lib/reauth";
+import { eventMeta, recordSecurityEvent } from "@/lib/security-events";
 
 const DESTRUCTIVE = new Set(["delete", "decline", "stop", "restart"]);
 
@@ -120,5 +121,6 @@ export async function POST(request: NextRequest) {
     action: body.action,
     host: hostOf(guard.cfg.url),
   });
+  await recordSecurityEvent("action", eventMeta(request), `${body.service} ${body.action} (${body.integration})`);
   return NextResponse.json({ ok: true });
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminSessionId } from "@/lib/api-auth";
 import { SESSION_COOKIE_NAME } from "@/lib/auth";
 import { revokeSession } from "@/lib/sessions";
+import { eventMeta, recordSecurityEvent } from "@/lib/security-events";
 
 // Admin-only. End one session (#365): its token stops verifying on the next
 // request. Ending the caller's own session also clears their cookie, so the
@@ -15,6 +16,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   }
   const { id } = await params;
   const ended = await revokeSession(id);
+  if (ended) await recordSecurityEvent("session.ended", eventMeta(request), id === current ? "this session" : "another session");
   const response = NextResponse.json({ ok: true, ended, current: id === current });
   if (id === current) response.cookies.delete(SESSION_COOKIE_NAME);
   return response;

@@ -14,6 +14,18 @@ here.
 
 ### Added
 
+- **A record of sign-ins and security changes.** Settings → Security lists
+  recent activity — sign-ins and failed attempts, sign-outs, sessions
+  ended, password and two-factor changes, confirmations, exports with
+  secrets, credential edits and dashboard actions — with when, from which
+  address and which browser. Kept for 90 days in `security-events.jsonl`
+  beside `config.yaml`; never a password or code. (#368)
+- **Security notifications through your alert channels.** A sign-in from
+  an address not seen in a month, the login throttle locking an address
+  out, two-factor authentication turned off, the password changed, and
+  dashboard actions turned on now go out through every alert channel with
+  *Security* on (on for every channel; turn it off per channel in
+  Settings → Monitoring). (#368)
 - **Export without secrets.** *Export* now asks what to include: by default
   the file leaves out integration passwords and keys, calendar and email
   credentials and webhook tokens, and restoring it onto this instance keeps

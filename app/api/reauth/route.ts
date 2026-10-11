@@ -4,6 +4,7 @@ import { readConfigInternal } from "@/lib/config";
 import { verifyCredentials } from "@/lib/credentials";
 import { clientKey, pruneRateLimit, rateLimit, refundRateLimit } from "@/lib/rate-limit";
 import { markReauth } from "@/lib/sessions";
+import { eventMeta, recordSecurityEvent } from "@/lib/security-events";
 
 // Step-up confirmation (#366): a signed-in admin re-proves the password (and
 // the second factor when on) so the sensitive routes behind
@@ -31,6 +32,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const result = await verifyCredentials(config.auth, body?.password, body?.totp);
   if (!result.ok) {
+    if (result.reason !== "totp-required") await recordSecurityEvent("reauth.fail", eventMeta(request));
     if (result.reason === "totp-required") {
       return NextResponse.json(
         { error: "Enter your authentication code", totpRequired: true },
@@ -47,5 +49,6 @@ export async function POST(request: NextRequest) {
   }
   refundRateLimit(throttleKey);
   await markReauth(sessionId);
+  await recordSecurityEvent("reauth.ok", eventMeta(request));
   return NextResponse.json({ ok: true });
 }

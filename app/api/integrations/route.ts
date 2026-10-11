@@ -3,6 +3,9 @@ import { isAdminRequest } from "@/lib/api-auth";
 import { readConfigInternal, replaceIntegrations } from "@/lib/config";
 import { integrationsUpdateSchema, type Integration } from "@/lib/schema";
 import { requireRecentAuth } from "@/lib/reauth";
+import { eventMeta, recordSecurityEvent } from "@/lib/security-events";
+import { notifySecurityEvent } from "@/lib/security-alerts";
+import { integrationLabels } from "@/lib/services/ids";
 
 const TARGET_FIELDS = ["url", "username", "password", "apiKey", "allowInsecureTls"] as const;
 
@@ -35,7 +38,8 @@ export async function PUT(request: NextRequest) {
   // password or key, or the opt-in flipping on. Renames, reorders, removals
   // and the enable toggle pass on the session alone, so the autosave only
   // asks when it matters.
-  if (changesTarget(parsed.data, stored)) {
+  const targetChanged = changesTarget(parsed.data, stored);
+  if (targetChanged) {
     const recent = await requireRecentAuth(request, auth.passwordHash);
     if (!recent.ok) return recent.response;
   }
@@ -45,5 +49,16 @@ export async function PUT(request: NextRequest) {
     ? parsed.data
     : parsed.data.map((i) => (i.allowActions ? { ...i, allowActions: false } : i));
   await replaceIntegrations(integrations);
+  // The audit log (#368): credential or address edits, and actions turned
+  // on (which also goes out through the channels).
+  const labels = integrationLabels(integrations);
+  const turnedOn = integrations
+    .filter((i) => i.allowActions && !stored.find((o) => o.id === i.id)?.allowActions)
+    .map((i) => labels[i.id]);
+  if (turnedOn.length > 0) {
+    notifySecurityEvent(await recordSecurityEvent("actions.enabled", eventMeta(request), turnedOn.join(", ")));
+  } else if (targetChanged) {
+    await recordSecurityEvent("integration.changed", eventMeta(request));
+  }
   return NextResponse.json({ ok: true });
 }

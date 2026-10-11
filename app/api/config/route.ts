@@ -10,6 +10,7 @@ import {
   sanitizeBundledIcons,
   writeBundledIcons,
 } from "@/lib/uploads";
+import { eventMeta, recordSecurityEvent } from "@/lib/security-events";
 
 // Admin-only: gated by the proxy matcher AND re-checked here, so a proxy
 // bypass can't reach the export or the import on its own. GET exports the
@@ -41,6 +42,7 @@ export async function GET(request: NextRequest) {
   if (withSecrets) {
     const recent = await requireRecentAuth(request, config.auth.passwordHash);
     if (!recent.ok) return recent.response;
+    await recordSecurityEvent("export.secrets", eventMeta(request));
   }
   const uploads = await exportIcons();
   await loadHistory();

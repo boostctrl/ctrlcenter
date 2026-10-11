@@ -3,6 +3,7 @@ import { SESSION_COOKIE_NAME, verifySessionId } from "@/lib/auth";
 import { isSameOriginRequest } from "@/lib/api-auth";
 import { readConfigInternal } from "@/lib/config";
 import { revokeSession } from "@/lib/sessions";
+import { eventMeta, recordSecurityEvent } from "@/lib/security-events";
 
 export async function POST(request: NextRequest) {
   // Same-origin only, so a cross-site page can't sign the admin out.
@@ -15,7 +16,10 @@ export async function POST(request: NextRequest) {
   if (token) {
     const { auth } = await readConfigInternal();
     const id = await verifySessionId(token, auth.passwordHash);
-    if (id) await revokeSession(id);
+    if (id) {
+      await revokeSession(id);
+      await recordSecurityEvent("signout", eventMeta(request));
+    }
   }
   const response = NextResponse.json({ ok: true });
   response.cookies.delete(SESSION_COOKIE_NAME);

@@ -12,6 +12,8 @@ import { readConfigInternal, setPasswordHash } from "@/lib/config";
 import { passwordChangeSchema } from "@/lib/schema";
 import { revokeSessions } from "@/lib/sessions";
 import { requireRecentAuth } from "@/lib/reauth";
+import { eventMeta, recordSecurityEvent } from "@/lib/security-events";
+import { notifySecurityEvent } from "@/lib/security-alerts";
 
 // Admin-only (gated by the proxy matcher and re-checked here). Changing the
 // password still requires the current one as defense-in-depth, even with a
@@ -53,6 +55,7 @@ export async function POST(request: NextRequest) {
   // invalidated.
   await revokeSessions();
   const { token } = await issueSession(request, hash);
+  notifySecurityEvent(await recordSecurityEvent("password.changed", eventMeta(request)));
   const response = NextResponse.json({ ok: true });
   response.cookies.set(
     SESSION_COOKIE_NAME,

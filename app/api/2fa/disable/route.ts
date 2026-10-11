@@ -6,6 +6,8 @@ import { rateLimit, pruneRateLimit, clientKey } from "@/lib/rate-limit";
 import { verifyTotpOnce } from "@/lib/totp";
 import { verifyRecoveryCode } from "@/lib/recovery-codes";
 import { totpDisableSchema } from "@/lib/schema";
+import { eventMeta, recordSecurityEvent } from "@/lib/security-events";
+import { notifySecurityEvent } from "@/lib/security-alerts";
 
 // Admin-only. Turning 2FA off requires a current authenticator code (or a
 // recovery code), like changing the password requires the current one — so a
@@ -51,5 +53,6 @@ export async function POST(request: NextRequest) {
   await disableTotp();
   // Write actions need the second factor (#367): off with it, and said so.
   const actionsDisabled = await clearAllowActions();
+  notifySecurityEvent(await recordSecurityEvent("totp.disabled", eventMeta(request)));
   return NextResponse.json({ ok: true, actionsDisabled });
 }
