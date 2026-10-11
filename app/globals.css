@@ -804,11 +804,22 @@ select optgroup {
     padding: var(--bleed-top) var(--bleed-x) var(--bleed-bottom);
     scroll-padding: var(--bleed-top) var(--bleed-x) var(--bleed-bottom);
   }
-  /* The fade, only while the rows actually overflow (TilesBox measures): a
-     masked box is a backdrop root, so under a mask the frosted designs' tiles
-     lose their blur — a grid whose rows fit has nothing to fade and keeps it.
-     Eased, so the cut-off row dissolves rather than stops. */
-  .widget-sized > section > .widget-tiles[data-overflow] {
+  /* An overflowing card or tile box made a Tab stop (widgets/SizedCell.tsx,
+     #355) shows where the keyboard is. */
+  .widget-sized > section > .glass-card:focus-visible,
+  .widget-sized > section > .widget-tiles:focus-visible {
+    outline: 2px solid var(--accent-to);
+    outline-offset: 2px;
+  }
+  /* The fade, only while the rows actually overflow (TilesBox measures), and
+     never on the frosted designs: a masked box is a backdrop root, so under a
+     mask the tiles inside sample nothing behind them and lose their blur
+     (#356). Glass is the stock look (no design-* class on <html>) and Aero,
+     Frost and Gradient blur too; on those four the cut-off row stops at the
+     padded edge instead. A grid whose rows fit has nothing to fade on any
+     design. Eased, so the cut-off row dissolves rather than stops. */
+  :root[class*="design-"]:not(.design-aero):not(.design-frost):not(.design-gradient)
+    .widget-sized > section > .widget-tiles[data-overflow] {
     -webkit-mask-image: linear-gradient(
       to bottom,
       transparent,
@@ -842,6 +853,28 @@ select optgroup {
     .widget-sized {
       overflow: clip;
       overflow-clip-margin: 40px;
+    }
+  }
+  /* A centred widget at an explicit height (the greeting, header card, clock,
+     weather, status; widgets/sizing.ts `clip`, #354): on lg+ the cell is
+     exactly that tall and its content sits in a box that stands off the cell
+     by the row gap above and below (--cell-bleed) and half the column gap
+     beside, with matching negative margins so the cell's own box is unmoved,
+     and clips there. The card's shadow survives past the cell edge in every
+     engine — Safari has overflow: clip but not overflow-clip-margin, which is
+     why the clip is an inner box and not a margin on the cell. Below lg the
+     cell has no height and the box is a plain wrapper. */
+  @media (width >= 64rem) {
+    .widget-centered > .widget-clip {
+      box-sizing: border-box;
+      display: flex;
+      height: calc(100% + 2 * var(--cell-bleed, 2rem));
+      flex-direction: column;
+      justify-content: center;
+      margin: calc(-1 * var(--cell-bleed, 2rem)) -1rem;
+      padding: var(--cell-bleed, 2rem) 1rem;
+      overflow: hidden;
+      overflow: clip;
     }
   }
   /* Drawn from the scene colors rather than the raw accent: on the light

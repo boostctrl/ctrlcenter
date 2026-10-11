@@ -14,10 +14,12 @@ import { SIZED_WIDGET_TYPES } from "@/lib/layout";
 // only, like spans: below lg cells stack full-width, contents grow taller
 // (the header card's rows stack), and a height tuned against the desktop
 // row would silently crop them (#105) — auto height is what a phone wants
-// there. Their clip stands off the cell by --cell-bleed so the card's shadow
-// isn't cut flat at the cell edge; a browser without overflow-clip-margin
-// (Safari) clips at the edge as before.
-export type CellSizing = { className: string; style?: CSSProperties };
+// there. Their content sits in a clip box (`clip`: the caller wraps the node
+// in .widget-clip) that stands off the cell by --cell-bleed above and below
+// and half the column gap beside, so the card's shadow isn't cut flat at the
+// cell edge in any engine — an inner box, not overflow-clip-margin, which
+// Safari lacks (#354).
+export type CellSizing = { className: string; style?: CSSProperties; clip?: boolean };
 
 export function cellSizing(widget: Pick<LayoutWidget, "type" | "height">): CellSizing {
   if (!widget.height) return { className: "" };
@@ -25,9 +27,9 @@ export function cellSizing(widget: Pick<LayoutWidget, "type" | "height">): CellS
     return { className: "widget-sized", style: { height: widget.height } };
   }
   return {
-    className:
-      "lg:flex lg:h-[var(--widget-height)] lg:flex-col lg:justify-center lg:overflow-clip lg:[overflow-clip-margin:var(--cell-bleed)]",
+    className: "widget-centered lg:flex lg:h-[var(--widget-height)] lg:flex-col lg:justify-center",
     style: { "--widget-height": `${widget.height}px` } as CSSProperties,
+    clip: true,
   };
 }
 
@@ -38,7 +40,8 @@ export const MAX_CELL_BLEED = 40;
 
 // The --cell-bleed value for a grid with this row gap (px): the gap, capped.
 // A plain length, never calc()/min() — Chromium rejects those in
-// overflow-clip-margin, and a rejected value clips at the edge again.
+// overflow-clip-margin (the safety net in globals.css), and a rejected value
+// clips at the edge again.
 export function cellBleed(gap: number): string {
   return `${Math.max(0, Math.min(Math.round(gap), MAX_CELL_BLEED))}px`;
 }

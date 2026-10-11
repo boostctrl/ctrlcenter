@@ -50,6 +50,23 @@ here.
   there the script failed silently and the page flashed the default theme
   before settling. The value now lives inside the script, and a test runs
   the script's own source alone so a slip like it can't come back. (#349)
+- **Sized header cards keep their shadow in Safari.** A greeting, header
+  card, clock, weather or status widget at an explicit height clips inside a
+  box that stands a gap's width off the cell, in every browser; Safari,
+  which has no clip margin, had cut the card's shadow flat at the cell's
+  bottom edge. (#354)
+- **Scroll a sized card from the keyboard.** A Notes, System stats or
+  Countdown card cut short of its content can now be reached with Tab and
+  scrolled with the arrow keys in every browser, Safari included: while it
+  overflows, the card is a named region in the Tab order, with a visible
+  focus ring. A card whose content fits, or one with links inside, gains no
+  extra stop. (#355)
+- **Frosted tiles stay frosted in a sized grid.** On Glass, Aero, Frost and
+  Gradient, the tiles of an app, favorite or bookmark grid cut short of its
+  rows had lost their blur while the grid overflowed, because the fade at
+  the cut-off row took it away. Those designs now cut the row at the
+  padded edge instead and keep their blur; the fade stays on every other
+  design. (#356)
 - **Card shadows in sized widgets.** A widget given an explicit height
   clipped everything to its square cell, cutting its cards' shadows flat — a
   hard line under the last row of apps, a header card with its drop shadow

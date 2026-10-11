@@ -541,12 +541,21 @@ async function addBoards() {
         thresholds: { warn: null, critical: null, direction: "above" },
       },
       // A second notes card with content, for the sized cells below (#353);
-      // the stock one stays empty for the tray check.
+      // the stock one stays empty for the tray check. Long enough to overflow
+      // its 200px cell, so the card has to become a Tab stop (#355) — axe
+      // flags an overflowing scroller nothing can focus.
       {
         id: "rules",
         type: "notes",
         title: "House rules",
-        content: "- Renew the TLS certificates before the 20th.\n- Back up the photo library to the second pool.",
+        content: [
+          "- Renew the TLS certificates before the 20th.",
+          "- Back up the photo library to the second pool.",
+          "- Rotate the offsite drive on the first Friday.",
+          "- Patch the hypervisor after the backup completes.",
+          "- Check the UPS battery every quarter.",
+          "- Keep the spare NVMe in the drawer labelled.",
+        ].join("\n"),
       },
     ],
   });
@@ -696,10 +705,12 @@ async function editorScroll(ctx) {
 }
 
 // A widget at an explicit height (#353): its cell is exactly that tall but
-// no longer clips what's inside — the single card scrolls itself, the tile
+// no longer clips what's inside — the single card scrolls itself (and, as it
+// overflows and holds nothing focusable, is a named Tab stop, #355), the tile
 // grid scrolls in a box padded out past the cell by its shadows' allowance
-// and marked while it overflows (its fade), and the centered card's clip
-// stands off the cell. The editor's preview measures the same height.
+// and marked while it overflows (its fade), and the centered card's content
+// sits in a clip box that stands off the cell (#354). The editor's preview
+// measures the same height.
 async function sizedCells(ctx) {
   const page = await ctx.newPage();
   try {
@@ -717,6 +728,7 @@ async function sizedCells(ctx) {
         const cs = getComputedStyle(cell);
         const card = cell.querySelector(":scope > section > .glass-card");
         const tiles = cell.querySelector(":scope > section > .widget-tiles");
+        const clip = cell.querySelector(":scope > .widget-clip");
         const heading = tiles?.previousElementSibling;
         return {
           bleed,
@@ -724,15 +736,25 @@ async function sizedCells(ctx) {
           ...rect(cell),
           headingBottom: heading ? rect(heading).bottom : null,
           overflow: cs.overflowY,
-          clipMargin: cs.overflowClipMargin,
-          card: card ? { overflow: getComputedStyle(card).overflowY } : null,
+          clip: clip ? { ...rect(clip), overflow: getComputedStyle(clip).overflowY } : null,
+          card: card
+            ? {
+                overflow: getComputedStyle(card).overflowY,
+                scrolls: card.scrollHeight > card.clientHeight,
+                tabindex: card.getAttribute("tabindex"),
+                role: card.getAttribute("role"),
+                label: card.getAttribute("aria-label"),
+              }
+            : null,
           tiles: tiles
             ? {
                 ...rect(tiles),
                 overflow: getComputedStyle(tiles).overflowY,
                 scrolls: tiles.scrollHeight > tiles.clientHeight,
                 marked: tiles.hasAttribute("data-overflow"),
+                tabindex: tiles.getAttribute("tabindex"),
                 mask: getComputedStyle(tiles).maskImage,
+                frosted: !document.documentElement.className.match(/\bdesign-(?!aero|frost|gradient)/),
               }
             : null,
         };
@@ -742,10 +764,19 @@ async function sizedCells(ctx) {
     if (cells.length !== 3) throw new Error(`${cells.length} cells on the board, not 3`);
     if (header.height !== 160 || notes.height !== 200 || apps.height !== 220)
       throw new Error(`cells ${header.height}, ${notes.height} and ${apps.height}px tall, not 160, 200 and 220`);
-    if (header.sized || header.overflow !== "clip" || header.clipMargin !== header.bleed)
-      throw new Error(`the header card's cell is ${header.overflow} with a clip margin of ${header.clipMargin}, not clip at ${header.bleed}`);
+    // The header card's cell never clips; the box inside it does, standing
+    // off the cell by the bleed above and below and 16px beside.
+    if (header.sized || header.overflow !== "visible" || !header.clip || header.clip.overflow !== "clip")
+      throw new Error(`the header card's cell is ${header.overflow} with clip box ${JSON.stringify(header.clip)}`);
+    const hb = parseInt(header.bleed, 10);
+    const clipWant = { top: header.top - hb, bottom: header.bottom + hb, left: header.left - 16, right: header.right + 16 };
+    for (const [side, want] of Object.entries(clipWant))
+      if (Math.abs(header.clip[side] - want) > 1) throw new Error(`the clip box's ${side} is ${header.clip[side]}, not ${want}`);
     if (!notes.sized || notes.card?.overflow !== "auto" || notes.tiles)
       throw new Error(`the notes cell doesn't scroll its card: ${JSON.stringify(notes)}`);
+    if (!notes.card.scrolls || notes.card.tabindex !== "0" || notes.card.role !== "region" || notes.card.label !== "House rules")
+      throw new Error(`the overflowing notes card isn't a named Tab stop: ${JSON.stringify(notes.card)}`);
+    if (apps.tiles?.tabindex) throw new Error("the tile box took a Tab stop although its tiles are focusable");
     if (!apps.sized || !apps.tiles) throw new Error(`the apps cell has no tile box: ${JSON.stringify(apps)}`);
     // The box reaches into the heading's bottom margin (so its top is the
     // heading's bottom edge), half a column gap past each side, and the row
@@ -754,8 +785,10 @@ async function sizedCells(ctx) {
     const expected = { top: apps.headingBottom, left: apps.left - 16, right: apps.right + 16, bottom: apps.bottom + parseInt(apps.bleed, 10) };
     for (const [side, want] of Object.entries(expected))
       if (Math.abs(t[side] - want) > 1) throw new Error(`the tile box's ${side} is ${t[side]}, not ${want} (cell ${apps[side]}, bleed ${apps.bleed})`);
-    if (t.overflow !== "auto" || !t.scrolls || !t.marked || t.mask === "none")
-      throw new Error(`the tile box doesn't scroll and fade: ${JSON.stringify(t)}`);
+    // The fade is a mask, and a mask costs the frosted designs their blur, so
+    // on those (the stock Glass among them) the box is marked but unmasked (#356).
+    if (t.overflow !== "auto" || !t.scrolls || !t.marked || (t.mask === "none") !== t.frosted)
+      throw new Error(`the tile box doesn't scroll and fade as its design should: ${JSON.stringify(t)}`);
     // The editor's preview of the apps card is the same 220px.
     await page.goto(`${base}/b/infra?edit=1`);
     const frame = page.locator('main .grid > [data-widget-id="apps"]');
