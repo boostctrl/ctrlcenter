@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { SAMPLE_AT, SAMPLE_IDS, SAMPLE_LABELS, sampleNotification, type SampleId } from "./notification-samples";
+import { SAMPLE_AT, SAMPLE_IDS, SAMPLE_LABELS, sampleAvailable, sampleNotification, type SampleId } from "./notification-samples";
 import { buildNotificationEmail } from "./webhook-email";
 import type { NotificationContext, ReportOptions } from "./webhooks";
 
@@ -53,8 +53,30 @@ describe("sampleNotification", () => {
     expect(sampleNotification("sonarr-health").report?.image).toBeUndefined();
   });
 
+  it("shows a busy minute as one digest of the app's bursts, or of every service's, by the scope (#359)", () => {
+    const app = sampleNotification("busy-minute", { digest: true, scope: "app" });
+    expect(app.title).toBe("Sonarr: 2 updates");
+    expect(app.body).toBe("Sonarr imported 8 episodes of The Bear (S04E01-E08)\nSonarr grabbed 2 episodes of Silo (S03E01-E02)");
+    expect(app.report?.facts.map((f) => f.label)).toEqual(["Imported", "Grabbed"]);
+    expect(buildNotificationEmail(app, ctx).subject).toBe("[Sonarr] Digest: 2 updates");
+    const all = sampleNotification("busy-minute", { digest: true, scope: "all" });
+    expect(all.title).toBe("Sonarr, Radarr and Seerr: 4 updates");
+    expect(all.report?.facts.map((f) => f.label)).toEqual([
+      "Sonarr · Imported",
+      "Sonarr · Grabbed",
+      "Radarr · Grabbed",
+      "Seerr · New request",
+    ]);
+    expect(buildNotificationEmail(all, ctx).subject).toBe("[Media] Digest: 4 updates from Sonarr, Radarr and Seerr");
+    // Offered only while bursts of different kinds are grouped.
+    expect(sampleAvailable("busy-minute", { digest: true, scope: "all" })).toBe(true);
+    expect(sampleAvailable("busy-minute", { digest: true, scope: "event" })).toBe(false);
+    expect(sampleAvailable("busy-minute", { digest: false, scope: "all" })).toBe(false);
+    expect(sampleAvailable("sonarr-import", { digest: false, scope: "event" })).toBe(true);
+  });
+
   it("shows the poster it is given, none by default, and never the stand-in", () => {
-    for (const id of ["sonarr-import", "radarr-grab", "seerr-request"] as const) {
+    for (const id of ["sonarr-import", "radarr-grab", "seerr-request", "busy-minute"] as const) {
       expect(JSON.stringify(sampleNotification(id, { digest: true }))).not.toContain("preview.invalid");
       expect(buildNotificationEmail(sampleNotification(id, { digest: true }), ctx).html).not.toContain("<img");
       const withPoster = render(id);

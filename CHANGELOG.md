@@ -12,6 +12,18 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Group a busy minute into one notification.** Inbound webhooks grouped
+  only like events: a season import was one message, but the grab before
+  it, the files it replaced and a Radarr grab in the same minute each
+  arrived on their own. *Group together*, beside *Group bursts for* in
+  Settings → Monitoring → Inbound webhooks, now chooses what a burst holds:
+  like events, as before; everything one app posts in the window — "Sonarr:
+  3 updates", each on its own line with its own facts in the email; or
+  everything every service posts — "Sonarr and Radarr: 4 updates". The
+  preview gains *A busy minute* to show what that looks like. (#359)
+
 ### Changed
 
 - **A tidier Scene tab.** The theme builder's Scene tab opens on the scene

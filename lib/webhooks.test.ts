@@ -5,6 +5,7 @@ import {
   parseWebhook,
   toContent,
   mergeDigest,
+  mergeDigests,
   fmtBytes,
   episodeCodes,
   clamp,
@@ -671,6 +672,16 @@ const groupOf = (ns: WebhookNotification[], dropped = 0): DigestGroup => {
   return { first: ns[0], last: ns[ns.length - 1], events: ns.length, items: [...items.values()], dropped };
 };
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
+// A Sonarr grab of an episode of Silo: another key from the same sender.
+const grabbed = (ep: number) =>
+  parseArrWebhook("sonarr", {
+    eventType: "Grab",
+    instanceName: "Sonarr",
+    applicationUrl: "https://sonarr.lan",
+    series: { id: 2, title: "Silo" },
+    episodes: [{ id: 200 + ep, seasonNumber: 3, episodeNumber: ep, title: `Silo ${ep}` }],
+    release: { quality: "WEBDL-1080p", indexer: "NZBgeek", size: 1024 ** 3 },
+  })!;
 
 describe("digest membership (#346)", () => {
   it("files a Sonarr import under its series with one item per episode and what the event knew", () => {
@@ -968,5 +979,74 @@ describe("mergeDigest (#346)", () => {
       episodeFiles: [{ size: 1 }, { size: 1 }, { size: 1 }],
     })!;
     expect(mergeDigest(groupOf([pack]))).toBe(pack);
+  });
+});
+
+describe("mergeDigests (#359)", () => {
+  it("is mergeDigest's own for a single burst", () => {
+    const burst = range(1, 3).map((e) => imported(e));
+    expect(mergeDigests([groupOf(burst)])).toEqual(mergeDigest(groupOf(burst)));
+    expect(mergeDigests([groupOf([burst[0]])])).toBe(burst[0]);
+  });
+
+  it("folds one app's bursts into a count of updates, one line and one fact per burst", () => {
+    const m = mergeDigests([groupOf(range(1, 8).map((e) => imported(e))), groupOf([grabbed(1), grabbed(2)])]);
+    expect(m.title).toBe("Sonarr: 2 updates");
+    expect(m.body).toBe("Sonarr imported 8 episodes of The Bear (S04E01-E08)\nSonarr grabbed 2 episodes of Silo (S03E01-E02)");
+    expect(m.url).toBe("https://sonarr.lan");
+    expect(m.digest).toBeUndefined();
+    expect(m.report).toMatchObject({
+      service: "sonarr",
+      app: "Sonarr",
+      instance: "Sonarr",
+      eventType: "Digest",
+      event: "Digest",
+      level: "success",
+      headline: "Sonarr",
+      subtitle: "2 updates · 10 events",
+      summary: "2 updates",
+      chips: ["Imported", "Grabbed"],
+      image: { url: POSTER, alt: "The Bear poster" },
+      link: { label: "Open in Sonarr", url: "https://sonarr.lan" },
+    });
+    expect(labels(m.report)).toEqual(["Imported", "Grabbed"]);
+    expect(fact(m.report, "Imported")?.value.split("\n")).toHaveLength(9);
+    expect(fact(m.report, "Imported")?.value.split("\n")[0]).toBe("The Bear S04E01-E08");
+    expect(fact(m.report, "Grabbed")?.value).toBe('Silo S03E01-E02\nS03E01 "Silo 1"\nS03E02 "Silo 2"');
+    expect(buildSubject(m)).toBe("[Sonarr] Digest: 2 updates");
+    expect(/^[\x20-\x7E]*$/.test(m.title)).toBe(true);
+  });
+
+  it("names every app when several share the digest, carries the worst level, and never a message", () => {
+    const m = mergeDigests([
+      groupOf(range(1, 2).map((e) => imported(e))),
+      groupOf([movieImported(1)]),
+      groupOf([requested(1, "Sam")]),
+    ]);
+    expect(m.title).toBe("Sonarr, Radarr and Seerr: 3 updates");
+    expect(m.body).toBe(
+      "Sonarr imported 2 episodes of The Bear (S04E01-E02)\nRadarr imported: Movie 1 (2001)\nSeerr new request: Title 1 (2024) by Sam"
+    );
+    expect(m.report).toMatchObject({
+      app: "Media",
+      instance: "Sonarr, Radarr and Seerr",
+      level: "warning",
+      headline: "Sonarr, Radarr and Seerr",
+      subtitle: "3 updates · 4 events",
+      summary: "3 updates from Sonarr, Radarr and Seerr",
+      chips: ["Imported", "New request"],
+    });
+    expect(labels(m.report)).toEqual(["Sonarr · Imported", "Radarr · Imported", "Seerr · New request"]);
+    // A single event's row carries its chips, not its overview.
+    const single = parseArrWebhook("radarr", {
+      eventType: "Grab",
+      movie: { id: 9, title: "Dune", year: 2026, overview: "Spoilers here." },
+      release: { quality: "Bluray-2160p", indexer: "HDBits", size: 50 * 1024 ** 3 },
+    })!;
+    const mixed = mergeDigests([groupOf([imported(1)]), groupOf([single])]);
+    expect(fact(mixed.report, "Radarr · Grabbed")?.value).toBe("Dune (2026)\nBluray-2160p · 50 GB · HDBits");
+    expect(JSON.stringify(mixed)).not.toContain("Spoilers");
+    expect(buildSubject(m)).toBe("[Media] Digest: 3 updates from Sonarr, Radarr and Seerr");
+    expect(buildSubject(m).length).toBeLessThanOrEqual(78);
   });
 });

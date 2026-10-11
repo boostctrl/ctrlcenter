@@ -7,9 +7,10 @@
 // becomes. Client-safe (imports only lib/webhooks.ts) so the settings form
 // renders it in the browser on every keystroke.
 
-import { mergeDigest, parseWebhook, type WebhookNotification } from "./webhooks";
+import type { DigestScope } from "./schema";
+import { mergeDigest, mergeDigests, parseWebhook, type DigestGroup, type WebhookNotification } from "./webhooks";
 
-export const SAMPLE_IDS = ["sonarr-import", "radarr-grab", "seerr-request", "sonarr-health"] as const;
+export const SAMPLE_IDS = ["sonarr-import", "radarr-grab", "seerr-request", "sonarr-health", "busy-minute"] as const;
 export type SampleId = (typeof SAMPLE_IDS)[number];
 
 export const SAMPLE_LABELS: Record<SampleId, string> = {
@@ -17,7 +18,15 @@ export const SAMPLE_LABELS: Record<SampleId, string> = {
   "radarr-grab": "Movie grab (Radarr)",
   "seerr-request": "Request awaiting approval (Seerr)",
   "sonarr-health": "Health warning (Sonarr)",
+  "busy-minute": "A busy minute (several events)",
 };
+
+// The busy-minute sample (#359) only reads as one when bursts of different
+// kinds are grouped together; under "like events" each of its parts would
+// go out on its own, as the other samples show.
+export function sampleAvailable(id: SampleId, o: { digest: boolean; scope: DigestScope }): boolean {
+  return id !== "busy-minute" || (o.digest && o.scope !== "event");
+}
 
 // A fixed instant for the preview's time line, so the rendered page is the
 // same bytes on every render (a Send sample is dated when it goes).
@@ -71,6 +80,25 @@ function sonarrImport(n: number): unknown {
     downloadClient: "SABnzbd",
     downloadClientType: "Sabnzbd",
     customFormatInfo: { customFormats: [{ id: 3, name: "WEB Tier 01" }], customFormatScore: 1500 },
+  };
+}
+
+// A Sonarr grab of two Silo episodes, the other burst of the busy minute.
+function sonarrGrab(n: number): unknown {
+  return {
+    eventType: "Grab",
+    instanceName: "Sonarr",
+    applicationUrl: "https://sonarr.example.com",
+    series: { id: 31, title: "Silo", year: 2023, type: "standard" },
+    episodes: [{ id: 300 + n, seasonNumber: 3, episodeNumber: n, title: n === 1 ? "The Engineer" : "Order", airDate: "2026-10-09" }],
+    release: {
+      quality: "WEBDL-1080p",
+      releaseGroup: "NTb",
+      releaseTitle: `Silo.S03E0${n}.1080p.WEB.H264-NTb`,
+      indexer: "NZBgeek",
+      size: 1610612736,
+    },
+    downloadClient: "SABnzbd",
   };
 }
 
@@ -137,21 +165,36 @@ function finish(n: WebhookNotification, posterUrl: string | undefined): WebhookN
   return { title: n.title, body: n.body, url: n.url, ...(report ? { report } : {}) };
 }
 
+// A burst as the store hands it to the merger: the events of one key.
+function burstOf(ns: WebhookNotification[]): DigestGroup {
+  const items = new Map(ns.flatMap((n) => n.digest?.items ?? []).map((it) => [it.id, it]));
+  return { first: ns[0], last: ns[ns.length - 1], events: ns.length, items: [...items.values()], dropped: 0 };
+}
+
 // A sample event as the channels would get it. `digest` renders the season
 // import as the burst store sends it — eight episode events merged into one —
-// else as the single event an Off window relays; `posterUrl` is the image
-// the report shows, none by default.
+// else as the single event an Off window relays; `scope` decides what the
+// busy minute holds — Sonarr's own two bursts, or every service's (#359);
+// `posterUrl` is the image the report shows, none by default.
 export function sampleNotification(
   id: SampleId,
-  { digest = false, posterUrl }: { digest?: boolean; posterUrl?: string } = {}
+  { digest = false, scope = "all", posterUrl }: { digest?: boolean; scope?: DigestScope; posterUrl?: string } = {}
 ): WebhookNotification {
   switch (id) {
     case "sonarr-import": {
       const first = parseWebhook("sonarr", sonarrImport(1))!;
       if (!digest) return finish(first, posterUrl);
-      const burst = BEAR.map((_, i) => parseWebhook("sonarr", sonarrImport(i + 1))!);
-      const items = burst.flatMap((n) => n.digest?.items ?? []);
-      return finish(mergeDigest({ first, events: burst.length, items, dropped: 0 }), posterUrl);
+      return finish(mergeDigest(burstOf(BEAR.map((_, i) => parseWebhook("sonarr", sonarrImport(i + 1))!))), posterUrl);
+    }
+    case "busy-minute": {
+      const bursts = [
+        burstOf(BEAR.map((_, i) => parseWebhook("sonarr", sonarrImport(i + 1))!)),
+        burstOf([1, 2].map((n) => parseWebhook("sonarr", sonarrGrab(n))!)),
+      ];
+      if (scope !== "app") {
+        bursts.push(burstOf([parseWebhook("radarr", RADARR_GRAB)!]), burstOf([parseWebhook("seerr", SEERR_REQUEST)!]));
+      }
+      return finish(mergeDigests(bursts), posterUrl);
     }
     case "radarr-grab":
       return finish(parseWebhook("radarr", RADARR_GRAB)!, posterUrl);

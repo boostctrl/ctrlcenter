@@ -69,6 +69,25 @@ describe("WebhookPreview (#347)", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it("offers the busy-minute sample only while bursts of different kinds are grouped (#359)", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<WebhookPreview {...props} />);
+    const options = () => Array.from(screen.getByLabelText("Sample event").querySelectorAll("option")).map((o) => o.value);
+    expect(options()).not.toContain("busy-minute");
+    rerender(<WebhookPreview {...props} webhooks={{ ...props.webhooks, digestScope: "all" }} />);
+    expect(options()).toContain("busy-minute");
+    await user.selectOptions(screen.getByLabelText("Sample event"), "busy-minute");
+    expect(screen.getByText("[Media] Digest: 4 updates from Sonarr, Radarr and Seerr")).toBeTruthy();
+    expect(screen.getByText("Sonarr, Radarr and Seerr: 4 updates")).toBeTruthy();
+    rerender(<WebhookPreview {...props} webhooks={{ ...props.webhooks, digestScope: "app" }} />);
+    expect(screen.getByText("[Sonarr] Digest: 2 updates")).toBeTruthy();
+    // Narrowed back to like events, the pick falls back to the season import.
+    rerender(<WebhookPreview {...props} webhooks={{ ...props.webhooks, digestScope: "event" }} />);
+    expect(options()).not.toContain("busy-minute");
+    expect(screen.getByText("[Sonarr] Imported: The Bear S04E01-E08")).toBeTruthy();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("flags a subject shortened by dropping the year, not only one cut at a word", async () => {
     const user = userEvent.setup();
     const { rerender } = render(<WebhookPreview {...props} />);

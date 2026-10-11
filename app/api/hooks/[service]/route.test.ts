@@ -11,14 +11,21 @@ import { log } from "@/lib/log";
 let POST: typeof import("./route").POST;
 let configPath: string;
 
-// The scratch config, with the given alert channels.
-const seed = (channels: unknown[]) =>
+// The scratch config, with the given alert channels (and webhook settings
+// over the defaults: the window on, Sonarr and Radarr enabled).
+const seed = (channels: unknown[], webhooks: Record<string, unknown> = {}) =>
   fs.writeFile(
     configPath,
     YAML.dump({
       settings: {
         alerts: { channels },
-        webhooks: { enabled: true, digestSeconds: 60, sonarr: { enabled: true, token: "s3cret-token" } },
+        webhooks: {
+          enabled: true,
+          digestSeconds: 60,
+          sonarr: { enabled: true, token: "s3cret-token" },
+          radarr: { enabled: true, token: "r4darr-token" },
+          ...webhooks,
+        },
       },
     }),
     "utf8"
@@ -62,6 +69,33 @@ describe("POST /api/hooks/[service]", () => {
   it("gives one uniform 401 for a wrong token or a disabled service", async () => {
     expect((await hook("sonarr", "wrong")).status).toBe(401);
     expect((await hook("radarr", "s3cret-token")).status).toBe(401);
+    expect((await hook("seerr", "s3cret-token")).status).toBe(401);
+  });
+
+  it("groups by the saved scope: everything from an app, or everything (#359)", async () => {
+    const episode = {
+      eventType: "Download",
+      series: { id: 1, title: "The Bear" },
+      episodes: [{ id: 101, seasonNumber: 4, episodeNumber: 1, title: "Ep 1" }],
+      episodeFile: { quality: "WEBDL-1080p", size: 1024 ** 3 },
+    };
+    const grab = { eventType: "Grab", series: { id: 2, title: "Silo" }, episodes: [{ id: 201, seasonNumber: 3, episodeNumber: 1 }], release: {} };
+    const movie = { eventType: "Grab", movie: { id: 9, title: "Dune", year: 2026 }, release: {} };
+    await seed(CHANNELS, { digestScope: "app" });
+    expect(await (await hook("sonarr", "s3cret-token", episode)).json()).toEqual({ ok: true, queued: true });
+    expect(await (await hook("sonarr", "s3cret-token", grab)).json()).toEqual({ ok: true, queued: true });
+    expect(await (await hook("radarr", "r4darr-token", movie)).json()).toEqual({ ok: true, queued: true });
+    expect(pendingWebhookDigests()).toEqual([
+      { key: "sonarr|", count: 2 },
+      { key: "radarr|", count: 1 },
+    ]);
+    resetWebhookDigest();
+    await seed(CHANNELS, { digestScope: "all" });
+    await hook("sonarr", "s3cret-token", episode);
+    await hook("radarr", "r4darr-token", movie);
+    expect(pendingWebhookDigests()).toEqual([{ key: "*", count: 2 }]);
+    expect(fetchMock).not.toHaveBeenCalled();
+    await seed(CHANNELS);
   });
 
   it("accepts the right token from another origin (no session, no CSRF gate)", async () => {

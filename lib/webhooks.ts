@@ -92,6 +92,9 @@ export type DigestNoun = "episodes" | "movies" | "requests" | "series";
 // never held (a Test, a health issue, anything without a subject).
 export type WebhookDigest = {
   key: string;
+  // The sender alone — the service and its instance, "sonarr|Sonarr 4K" —
+  // for a burst scope that holds everything one app posts together (#359).
+  sender: string;
   lead: string;
   headline: string;
   // The merged report's event label — the group's, not the opening event's:
@@ -589,6 +592,7 @@ function arrDigest(
     const sid = num(series.id) ?? num(series.tvdbId) ?? media.title;
     return digestOf({
       key: `sonarr|${instanceKey(r)}|${keyPart(r.eventType)}|${keyPart(String(sid))}`,
+      sender: `sonarr|${instanceKey(r)}`,
       lead: digestLead(r.app, r.event, "episodes", ` of ${media.title}`),
       headline: media.title,
       event: r.event,
@@ -612,6 +616,7 @@ function arrDigest(
   const subject = asRecord(movie ? p.movie : p.series);
   return digestOf({
     key: `${service}|${instanceKey(r)}|${keyPart(r.eventType)}`,
+    sender: `${service}|${instanceKey(r)}`,
     lead: digestLead(r.app, r.event, movie ? "movies" : "series"),
     headline: r.app,
     event: r.event,
@@ -1026,6 +1031,7 @@ export function parseSeerrWebhook(payload: unknown): WebhookNotification | null 
     nt.startsWith("MEDIA_") && subject
       ? digestOf({
           key: `seerr|${keyPart(nt)}`,
+          sender: "seerr",
           lead: SEERR_DIGEST_LEADS[nt] ?? `Seerr ${lowerFirst(event)}: {n} requests`,
           headline: "Seerr",
           event,
@@ -1170,6 +1176,80 @@ export function mergeDigest(g: DigestGroup): WebhookNotification {
       chips: [quality, size, indexer].filter(Boolean),
       facts,
       image: items.find((it) => it.image)?.image ?? r.image,
+      link,
+    },
+  };
+}
+
+// --- Merging a mixed burst (#359) ---
+
+const LEVEL_RANK: Record<NotificationLevel, number> = { info: 0, success: 1, warning: 2, error: 3 };
+
+// "Sonarr", "Sonarr and Radarr", "Sonarr, Radarr and Seerr".
+function joinNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+// Fold several bursts that shared a window into one notification: a title
+// counting the groups — "Sonarr: 3 updates", "Sonarr and Radarr: 4 updates"
+// — over a body with each group's own merged line, and a report whose facts
+// carry each group's event, summary and list, so an email reads as a short
+// report of the burst. A single burst is mergeDigest's own. The level is
+// the most serious of the groups'; the poster and the button are the first
+// group's that has one. Pure, like mergeDigest.
+export function mergeDigests(groups: DigestGroup[]): WebhookNotification {
+  if (groups.length === 1) return mergeDigest(groups[0]);
+  const subs = groups.map(mergeDigest);
+  const reports = subs.flatMap((s) => (s.report ? [s.report] : []));
+  const apps = unique(reports.map((r) => r.app));
+  const names = joinNames(apps);
+  const n = subs.length;
+  const title = `${names || "Webhooks"}: ${n} updates`;
+  const body = lineList(
+    subs.map((s) => s.title),
+    n,
+    BODY_LINES
+  );
+  const link = subs.find((s) => s.report?.link)?.report?.link;
+  const first = reports[0];
+  if (!first) return { title, body, url: subs.find((s) => s.url)?.url };
+  const several = apps.length > 1;
+  // One row per group: its event as the label (with its app when several
+  // apps share the digest), its summary over its list of items — or, for a
+  // single event, its chips; never its message, which the synopsis switch
+  // (#347) may be hiding.
+  const nouns = new Set(Object.values(NOUN_LABELS));
+  const facts: ReportFact[] = subs.map((s) => {
+    const r = s.report;
+    const head = r?.summary ?? s.title;
+    const rest = r?.facts.find((f) => nouns.has(f.label))?.value ?? r?.chips?.join(" · ") ?? "";
+    const value = rest && rest !== head ? `${head}\n${rest}` : head;
+    const event = r?.event ?? "Event";
+    return { label: clamp(several && r ? `${r.app} · ${event}` : event, MAX_LABEL), value: clamp(value, MAX_FACT) };
+  });
+  const level = reports.reduce<NotificationLevel>(
+    (worst, r) => (LEVEL_RANK[r.level] > LEVEL_RANK[worst] ? r.level : worst),
+    "info"
+  );
+  const events = groups.reduce((sum, g) => sum + g.events, 0);
+  return {
+    title,
+    body,
+    url: link?.url ?? subs.find((s) => s.url)?.url,
+    report: {
+      service: first.service,
+      app: several ? "Media" : first.app,
+      instance: several ? names : first.instance,
+      eventType: "Digest",
+      event: "Digest",
+      level,
+      headline: clamp(names || "Webhooks", MAX_HEAD),
+      subtitle: `${n} updates · ${events} events`,
+      summary: clamp(several ? `${n} updates from ${names}` : `${n} updates`, MAX_HEAD),
+      chips: unique(reports.map((r) => r.event)),
+      facts,
+      image: reports.find((r) => r.image)?.image,
       link,
     },
   };

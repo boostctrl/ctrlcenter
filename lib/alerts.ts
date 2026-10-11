@@ -575,7 +575,7 @@ export async function sendSampleNotification(
       : alerts.channels.filter((ch) => ch.id === channelId && channelReady(ch));
   const out: Outgoing = {
     kind: "notification",
-    content: sampleNotification(sample, { digest: webhooks.digestSeconds > 0 }),
+    content: sampleNotification(sample, { digest: webhooks.digestSeconds > 0, scope: webhooks.digestScope }),
     ctx: {
       at: Date.now(),
       timeZone: settings.timezone,

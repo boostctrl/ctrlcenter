@@ -136,6 +136,7 @@ describe("configSchema defaults", () => {
     expect(config.settings.weather.enabled).toBe(true);
     expect(config.settings.weather.units).toBe("imperial");
     expect(config.settings.webhooks.digestSeconds).toBe(60);
+    expect(config.settings.webhooks.digestScope).toBe("event");
     // The email report shows everything unless switched off (#347).
     expect(config.settings.webhooks).toMatchObject({ poster: true, facts: true, synopsis: true, subjectPrefix: "" });
   });
@@ -385,6 +386,9 @@ describe("settingsInputSchema partial merge semantics", () => {
     expect(settingsInputSchema.safeParse({ webhooks: { digestSeconds: 301 } }).success).toBe(false);
     expect(settingsInputSchema.safeParse({ webhooks: { digestSeconds: 1.5 } }).success).toBe(false);
     expect(settingsInputSchema.safeParse({ webhooks: { digestSeconds: -1 } }).success).toBe(false);
+    // The burst scope (#359): one of the three, nothing else.
+    expect(settingsInputSchema.parse({ webhooks: { digestScope: "app" } })).toEqual({ webhooks: { digestScope: "app" } });
+    expect(settingsInputSchema.safeParse({ webhooks: { digestScope: "everything" } }).success).toBe(false);
   });
 
   it("takes the email report options one at a time, the prefix capped (#347)", () => {

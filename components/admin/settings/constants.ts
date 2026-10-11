@@ -1,3 +1,4 @@
+import type { DigestScope } from "@/lib/schema";
 import { announcementState } from "@/lib/status-announcements";
 
 // One nav entry per settings group; a single group shows at a time. The
@@ -58,6 +59,25 @@ export const INTERVAL_PRESETS: readonly number[] = [1, 5, 15];
 // notification (seconds; #346). 0 is Off. The schema accepts 0–300, so a
 // hand-edited value can fall outside this list too.
 export const DIGEST_PRESETS: readonly number[] = [0, 30, 60, 120, 300];
+
+// What a burst holds together (#359), in the order the chips show.
+export const DIGEST_SCOPE_OPTIONS: { id: DigestScope; name: string; hint: string }[] = [
+  {
+    id: "event",
+    name: "Like events",
+    hint: "Events of one kind — a season's episodes, a batch of movies, a run of requests — go out together; a grab and an import stay apart.",
+  },
+  {
+    id: "app",
+    name: "Everything from an app",
+    hint: "Everything one app posts in the window goes out as one notification — an import, the grab before it and the files it replaced — listed by kind.",
+  },
+  {
+    id: "all",
+    name: "Everything",
+    hint: "Everything every service posts in the window goes out as one notification, listed by app and kind.",
+  },
+];
 
 // "Off", "30 s", "1 min".
 export function digestPresetLabel(seconds: number): string {

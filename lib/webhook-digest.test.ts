@@ -17,6 +17,16 @@ const imported = (ep: number, sid = 1) =>
   })!;
 
 const sent = () => vi.fn<(c: unknown) => Promise<void>>().mockResolvedValue(undefined);
+// A Sonarr grab of an episode of Silo, and a Radarr grab: other keys.
+const grabbed = (ep: number) =>
+  parseArrWebhook("sonarr", {
+    eventType: "Grab",
+    series: { id: 2, title: "Silo" },
+    episodes: [{ id: 2000 + ep, seasonNumber: 3, episodeNumber: ep, title: `Silo ${ep}` }],
+    release: { quality: "WEBDL-1080p" },
+  })!;
+const movie = (id: number) =>
+  parseArrWebhook("radarr", { eventType: "Grab", movie: { id, title: `Movie ${id}`, year: 2026 }, release: {} })!;
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -266,5 +276,76 @@ describe("holdForDigest", () => {
     expect(vi.getTimerCount()).toBe(0);
     await vi.advanceTimersByTimeAsync(10 * MIN);
     expect(send).not.toHaveBeenCalled();
+  });
+});
+
+describe("holdForDigest scopes (#359)", () => {
+  it("holds everything one app posts in one group under the app scope, each key still its own burst", async () => {
+    const send = sent();
+    const o = { windowMs: MIN, send, scope: "app" as const };
+    holdForDigest(imported(1), o);
+    holdForDigest(imported(2), o);
+    holdForDigest(imported(1, 2), o);
+    holdForDigest(grabbed(1), o);
+    // Another service is another group.
+    const only = movie(1);
+    holdForDigest(only, o);
+    expect(pendingWebhookDigests()).toEqual([
+      { key: "sonarr|", count: 4 },
+      { key: "radarr|", count: 1 },
+    ]);
+    await vi.advanceTimersByTimeAsync(MIN);
+    expect(send).toHaveBeenCalledTimes(2);
+    const titles = send.mock.calls.map((c) => (c[0] as { title: string; body?: string }));
+    expect(titles[0]).toMatchObject({
+      title: "Sonarr: 3 updates",
+      body: "Sonarr imported 2 episodes of The Bear (S04E01-E02)\nSonarr imported: Silo S04E01\nSonarr grabbed: Silo S03E01",
+    });
+    // A group of one burst goes out as that burst alone.
+    expect(titles[1]).toBe(only);
+    expect(pendingWebhookDigests()).toEqual([]);
+  });
+
+  it("holds everything in the one group under the all scope", async () => {
+    const send = sent();
+    const o = { windowMs: MIN, send, scope: "all" as const };
+    holdForDigest(imported(1), o);
+    holdForDigest(movie(1), o);
+    holdForDigest(movie(2), o);
+    expect(pendingWebhookDigests()).toEqual([{ key: "*", count: 3 }]);
+    await vi.advanceTimersByTimeAsync(MIN);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0][0]).toMatchObject({
+      title: "Sonarr and Radarr: 2 updates",
+      body: "Sonarr imported: The Bear S04E01\nRadarr grabbed 2 movies",
+    });
+  });
+
+  it("slides the window on any event of the group and caps it from the group's first", async () => {
+    const send = sent();
+    const o = { windowMs: MIN, send, scope: "app" as const };
+    holdForDigest(imported(1), o);
+    await vi.advanceTimersByTimeAsync(MIN - 1);
+    holdForDigest(grabbed(1), o);
+    await vi.advanceTimersByTimeAsync(MIN - 1);
+    expect(send).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(send).toHaveBeenCalledTimes(1);
+    // A trickle of new keys every 30 s: the cap at five windows still fires.
+    for (let t = 0; t < 7 * MIN; t += 30_000) {
+      holdForDigest(grabbed(t / 30_000 + 2), o);
+      await vi.advanceTimersByTimeAsync(30_000);
+    }
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
+  it("holds 32 bursts per group at most: a 33rd key is not held", () => {
+    const send = sent();
+    const o = { windowMs: MIN, send, scope: "app" as const };
+    for (let sid = 1; sid <= 32; sid += 1) expect(holdForDigest(imported(1, sid), o)).toBe(true);
+    expect(holdForDigest(imported(1, 33), o)).toBe(false);
+    // A key already in the group still takes its event.
+    expect(holdForDigest(imported(2, 32), o)).toBe(true);
+    expect(pendingWebhookDigests()).toEqual([{ key: "sonarr|", count: 33 }]);
   });
 });
