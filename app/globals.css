@@ -767,6 +767,83 @@ select optgroup {
     background-color: var(--surface-bg-hover);
     box-shadow: var(--surface-shadow-hover);
   }
+  /* A content widget at an explicit height (#353). The cell is exactly that
+     tall but no longer clips: a scroll box clips to its square padding box,
+     and the cell's cut every card shadow inside it flat. Instead the heading
+     stays put and what's under it scrolls — the card itself for the
+     single-card widgets (its rounded padding box is the right clip, and an
+     element's own overflow never cuts its own shadow), and for the tile
+     grids (`widget-tiles`, see widgets/TilesBox.tsx) a scroll box padded out
+     by the shadows' reach. Matching negative margins keep the cell's
+     measured box unchanged (useGridLayout, the editor's natural height),
+     scroll-padding keeps a focused tile out of that margin, and a fade
+     dissolves the rows cut off at either end into it instead of stopping
+     them dead at the cell edge. The allowance above is the heading's own
+     margin (SectionTitle's mb-5), the one below the grid's row gap, capped
+     (--cell-bleed, set on the grid by Dashboard), and the sides half the
+     column gap. */
+  .widget-sized > section {
+    display: flex;
+    height: 100%;
+    flex-direction: column;
+  }
+  .widget-sized > section > .glass-card,
+  .widget-sized > section > .widget-tiles {
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+  .widget-sized > section > .glass-card {
+    scroll-padding-block: 1.5rem;
+  }
+  .widget-sized > section > .widget-tiles {
+    --bleed-x: 1rem;
+    --bleed-top: 1.25rem;
+    --bleed-bottom: var(--cell-bleed, 2rem);
+    margin: calc(-1 * var(--bleed-top)) calc(-1 * var(--bleed-x)) calc(-1 * var(--bleed-bottom));
+    padding: var(--bleed-top) var(--bleed-x) var(--bleed-bottom);
+    scroll-padding: var(--bleed-top) var(--bleed-x) var(--bleed-bottom);
+  }
+  /* The fade, only while the rows actually overflow (TilesBox measures): a
+     masked box is a backdrop root, so under a mask the frosted designs' tiles
+     lose their blur — a grid whose rows fit has nothing to fade and keeps it.
+     Eased, so the cut-off row dissolves rather than stops. */
+  .widget-sized > section > .widget-tiles[data-overflow] {
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(0 0 0 / 0.15) calc(var(--bleed-top) * 0.4),
+      rgb(0 0 0 / 0.5) calc(var(--bleed-top) * 0.7),
+      #000 var(--bleed-top),
+      #000 calc(100% - var(--bleed-bottom)),
+      rgb(0 0 0 / 0.5) calc(100% - var(--bleed-bottom) * 0.7),
+      rgb(0 0 0 / 0.15) calc(100% - var(--bleed-bottom) * 0.4),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(0 0 0 / 0.15) calc(var(--bleed-top) * 0.4),
+      rgb(0 0 0 / 0.5) calc(var(--bleed-top) * 0.7),
+      #000 var(--bleed-top),
+      #000 calc(100% - var(--bleed-bottom)),
+      rgb(0 0 0 / 0.5) calc(100% - var(--bleed-bottom) * 0.7),
+      rgb(0 0 0 / 0.15) calc(100% - var(--bleed-bottom) * 0.4),
+      transparent
+    );
+  }
+  /* The safety net: a sized widget that doesn't follow the
+     section > (.glass-card | .widget-tiles) contract above would spill over
+     the page. Where the browser can clip outside the cell (every engine but
+     Safari), it's cropped at the allowance's cap instead (MAX_CELL_BLEED in
+     widgets/sizing.ts) — past the tile box's overhang at any gap and scale,
+     so the fix above is untouched. */
+  @supports (overflow-clip-margin: 1px) {
+    .widget-sized {
+      overflow: clip;
+      overflow-clip-margin: 40px;
+    }
+  }
   /* Drawn from the scene colors rather than the raw accent: on the light
      surface those are the accent deepened and saturated (lib/theme-paint.ts),
      so the greeting's mark keeps reading instead of washing to 1.6:1 (#321);

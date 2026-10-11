@@ -164,4 +164,11 @@ describe("WidgetFrame", () => {
     fireEvent.keyDown(card, { key: "ArrowDown" });
     expect(props.onMove).not.toHaveBeenCalled();
   });
+
+  it("sizes the preview exactly like the live cell (#353)", () => {
+    frame({ previewClass: "widget-sized", previewStyle: { height: 220 } });
+    const preview = screen.getByText("a link").closest("[inert]") as HTMLElement;
+    expect(preview.classList.contains("widget-sized")).toBe(true);
+    expect(preview.style.height).toBe("220px");
+  });
 });
