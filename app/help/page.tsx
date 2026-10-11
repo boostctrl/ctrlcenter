@@ -7,6 +7,7 @@ import PageNav from "@/components/PageNav";
 import FloatingNav from "@/components/FloatingNav";
 import { navPages } from "@/lib/nav";
 import { WIDGET_DEFS } from "@/lib/widgets/defs";
+import { SCENES } from "@/lib/theme";
 import { P } from "./ui";
 import { WIDGET_HELP } from "./widget-help";
 
@@ -303,11 +304,13 @@ export default async function HelpPage() {
             </li>
             <li>
               <strong>Scene.</strong> The animated backdrop: Aurora,
-              Starfield, Petals, Comets, and more (18 in all), or none. Set
+              Starfield, Petals, Comets, and more ({SCENES.length - 1} in all), or none. Set
               how strongly it shows and whether it moves at full speed, calmly
               or not at all; a <em>Reduced</em> motion preference stills every
-              scene whatever the theme says. Put a photo behind it as a
-              wallpaper, blurred and dimmed to taste.
+              scene whatever the theme says. Put a wallpaper behind it,
+              blurred and dimmed to taste: one of the bundled patterns
+              (linen, hatch, honeycomb, grain or a vignette), a photo by its
+              web address, or an upload if you are the admin.
             </li>
             <li>
               <strong>Accent and colors.</strong> The accent gradient, custom
@@ -647,18 +650,47 @@ export default async function HelpPage() {
           <P>
             The Monitor <em>polls</em> your services; inbound webhooks let{" "}
             <strong>Sonarr</strong>, <strong>Radarr</strong>, and{" "}
-            <strong>Overseerr / Jellyseerr</strong> push events the moment they
-            happen — a grab, an import, a request awaiting approval, a health
-            issue — relayed straight out through the alert channels above.
+            <strong>Seerr</strong> push events the moment they happen — a
+            grab, an import, a request awaiting approval, a health issue —
+            relayed straight out through the alert channels above. An
+            Overseerr or Jellyseerr install from before they merged into
+            Seerr sends the same events. An email channel gets the event as
+            a short report — subject <code>[App] Event: Title</code>, with
+            the poster, the key facts and a link back into the app; every
+            other channel gets a one-line summary.
           </P>
           <P>
-            Turn on <strong>Settings → Alerts → Inbound webhooks</strong>,
+            Turn on <strong>Settings → Monitoring → Inbound webhooks</strong>,
             enable a service, and copy its URL. In that app&apos;s{" "}
             <strong>Connect → Webhook</strong> settings paste the URL, set the
             method to <strong>POST</strong>, and pick which events to send. Each
             service has its own token in the URL — <strong>Regenerate</strong>{" "}
             rotates it if one leaks — and events need an alert channel that
             sends inbound webhooks to land anywhere.
+          </P>
+          <P>
+            A season import arrives as one event per episode. CtrlCenter waits
+            for the burst to go quiet — <strong>Group bursts for</strong>, a
+            minute by default; a burst that never goes quiet is sent after
+            five windows, ten minutes at most — and sends one notification:
+            &ldquo;Sonarr imported 8 episodes of The Bear (S04E01-E08)&rdquo;
+            with the episodes listed. A batch of movies in Radarr and a run of
+            Seerr requests merge the same way. Set it to <strong>Off</strong>{" "}
+            for one message per event. Health issues, updates, failed
+            downloads and a sender&apos;s Test are never held. Events still
+            waiting when CtrlCenter restarts are dropped.
+          </P>
+          <P>
+            <strong>Email report</strong> chooses what an email channel
+            shows: the poster, the facts table and the synopsis can each be
+            switched off, and a <strong>Subject prefix</strong> goes in front
+            of every subject for a mail rule to file on. The{" "}
+            <strong>Preview</strong> at the foot of the card renders a sample event —
+            a season import, a movie grab, a request, a health warning — as
+            the email and as the one-liner the push channels get, in light
+            and dark mode, changing as you type. <strong>Send sample</strong>{" "}
+            delivers that event through a channel for real, with the options
+            as saved.
           </P>
         </Card>
 
@@ -819,7 +851,7 @@ export default async function HelpPage() {
             <li>
               <strong>Resize.</strong> Drag a card&apos;s right edge to set its{" "}
               <strong>width</strong> in columns (the columns show while you
-              drag), its bottom edge to set its <strong>height</strong>, or the
+              drag), its bottom edge to set its <strong>height</strong>, or any
               corner for both. Heights snap to 20px steps, and back to
               automatic when you drag near the content&apos;s own height. The
               steppers do the same in exact steps,
@@ -903,7 +935,8 @@ export default async function HelpPage() {
             page switches on time without a reload; visitors&apos; own
             choices still win, and they can turn the schedule off. <em>Uploaded
             wallpapers</em> lists every wallpaper uploaded to the site, says
-            which theme uses it, and deletes the ones you no longer need.
+            which theme uses it, and deletes the ones you no longer need; the
+            bundled patterns ship with the app, so they are not listed there.
           </P>
         </Card>
 

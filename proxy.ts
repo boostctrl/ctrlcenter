@@ -30,6 +30,9 @@ const ADMIN_PREFIXES = [
   // Integration snapshots + test probes (#189): infrastructure internals,
   // never served anonymously. The routes re-check the session themselves too.
   "/api/monitor",
+  // Sending a test alert or a sample event (#347) through the saved
+  // channels is admin-only; the one route under it re-checks too.
+  "/api/alerts",
 ];
 
 function needsAuth(pathname: string): boolean {

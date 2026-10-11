@@ -29,8 +29,10 @@ function render(meta?: Record<string, unknown>): string {
         str = String(value);
       }
     }
-    // Keep each pair on one line so a log line stays greppable.
-    parts.push(`${key}=${str.replace(/\s+/g, " ")}`);
+    // Keep each pair on one line so a log line stays greppable, and free of
+    // control characters: a logged string may be a sender's (a webhook's
+    // event type), and an escape sequence would reach the terminal as is.
+    parts.push(`${key}=${str.replace(/[\p{Cc}\s]+/gu, " ")}`);
   }
   return parts.length ? " " + parts.join(" ") : "";
 }

@@ -54,6 +54,17 @@ export type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]["id"];
 // extra read-only chip rather than pretending nothing is selected.
 export const INTERVAL_PRESETS: readonly number[] = [1, 5, 15];
 
+// Offered waits before a burst of inbound webhooks goes out as one
+// notification (seconds; #346). 0 is Off. The schema accepts 0–300, so a
+// hand-edited value can fall outside this list too.
+export const DIGEST_PRESETS: readonly number[] = [0, 30, 60, 120, 300];
+
+// "Off", "30 s", "1 min".
+export function digestPresetLabel(seconds: number): string {
+  if (seconds === 0) return "Off";
+  return seconds < 60 ? `${seconds} s` : `${seconds / 60} min`;
+}
+
 export const TONE_LABELS: Record<string, string> = {
   info: "Info",
   warning: "Warning",

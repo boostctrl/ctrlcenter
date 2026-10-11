@@ -64,12 +64,14 @@ Built with Next.js 16, React 19, and Tailwind v4.
     `aura`, `emboss`, `carve`, `stripe`, `sketch`, `console` — each with a
     **Tune** tab of sliders over it (corner radius, border, blur, shadow, fill,
     glow).
-  - **Scenes** (18, or none) — an animated backdrop: `aurora`, `abyss`,
+  - **Scenes** (25, or none) — an animated backdrop: `aurora`, `abyss`,
     `nebula`, `grid`, `starfield`, `waves`, `rays`, `traces`, `dots`,
     `horizon`, `orbit`, `peaks`, `rain`, `fireflies`, `blueprint`, `prisms`,
-    `petals`, `comets`, with intensity and motion controls (and a Reduce-motion
-    switch that stills them all). A **wallpaper** can sit behind the scene,
-    blurred and dimmed.
+    `petals`, `comets`, `topography`, `snow`, `embers`, `bokeh`, `beams`,
+    `bubbles`, `glyphs`, with intensity and motion controls (and a
+    Reduce-motion switch that stills them all). A **wallpaper** can sit behind
+    the scene, blurred and dimmed: one of five bundled patterns (linen, hatch,
+    honeycomb, grain, vignette), a web address, or an upload.
   - **Colors & type** — a palette plus an accent gradient, or your own colors,
     including the status colors (up, down, warning, info); or pick one accent
     and let the builder derive a whole palette with contrast guaranteed. A body
@@ -232,7 +234,7 @@ settings:
   theme:                    # site-wide default (visitors can override in /settings)
     mode: system            # system | light | dark
     design: glass           # glass aero flat soft minimal bold cyber clay frost outline paper gradient aura emboss carve stripe sketch console
-    scene: aurora           # aurora abyss nebula grid starfield waves rays traces dots horizon orbit peaks rain fireflies blueprint prisms petals comets none
+    scene: aurora           # aurora abyss nebula grid starfield waves rays traces dots horizon orbit peaks rain fireflies blueprint prisms petals comets topography snow embers bokeh beams bubbles glyphs none
     font: jakarta           # jakarta inter poppins nunito lora jetbrains outfit grotesk manrope rubik playfair quicksand
     accentFrom: '#a78bfa'   # accent gradient start (#rrggbb)
     accentTo: '#22d3ee'     # accent gradient end (same as start = solid)
@@ -249,6 +251,7 @@ settings:
     # headingFont: lora           # titles in their own face; density: compact | comfortable | spacious
     # status: { up: '#22c55e', down: '#ef4444', warning: '#f59e0b', info: '#38bdf8' }
     # wallpaper: { src: "https://…/photo.jpg", blur: 8, dim: 40, fit: cover }  # fit: cover | contain | tile
+    #   or a bundled pattern: { src: /backgrounds/linen.svg, fit: tile }   # linen hatch honeycomb grain vignette
   visitorTheming: all       # what visitors may change: all | packs (the gallery
                             # and light/dark only) | none (kiosks); admins always may
   themeSchedule:            # a day and a night theme by time of day
@@ -301,7 +304,9 @@ settings:
   settingsButton: true      # the floating corner navigation menu
   # Further sections mirror the admin UI one-to-one and are easiest to edit
   # there: favicon, announcement (the site-wide banner), statusAnnouncements,
-  # and webhooks (inbound service events).
+  # and webhooks (inbound service events: enabled, digestSeconds, the email
+  # report's poster / facts / synopsis switches and subjectPrefix, and a
+  # sonarr / radarr / seerr block each with enabled and token).
   layout:                   # shared by every board:
     scale: 100              # UI scale, percent
     gap: 32                 # space between cards (px)

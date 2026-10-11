@@ -60,6 +60,13 @@ export function useGridLayout(
     const layout = () => {
       const pack = mq.matches;
       const list = cells();
+      // Hold the grid at its current height for the duration of the pass.
+      // Clearing the spans below collapses the grid to a handful of pixels
+      // until the new spans are written, and the measurement in between
+      // forces a layout in that state: the document shrinks, the browser
+      // clamps the scroll position to fit, and a visitor editing a card
+      // below the fold finds the page scrolled to the top (#341).
+      grid.style.minHeight = `${grid.getBoundingClientRect().height}px`;
       // Reset per-cell props first so a mode/space change never leaves a stale
       // margin or span behind (and heights measure unconstrained).
       for (const cell of list) clearCell(cell);
@@ -92,6 +99,7 @@ export function useGridLayout(
           if (s.left) cell.style.marginLeft = `${s.left}px`;
         }
       }
+      grid.style.removeProperty("min-height");
     };
 
     const schedule = () => {
@@ -112,14 +120,28 @@ export function useGridLayout(
     mo.observe(grid, { childList: true });
     mq.addEventListener("change", observe);
 
+    // Only the observers stop here. The inline styles stay until the next
+    // pass rewrites them (a signature change re-runs this effect, and its
+    // layout() resets every one of them): stripping them between the two
+    // would collapse the grid exactly as described above, before the lock
+    // in layout() is in place. The unmount effect below takes them off.
     return () => {
       mq.removeEventListener("change", observe);
       ro?.disconnect();
       mo?.disconnect();
       cancelAnimationFrame(frame);
-      grid.style.removeProperty("grid-auto-rows");
-      grid.style.removeProperty("row-gap");
-      for (const cell of cells()) clearCell(cell);
     };
   }, [ref, gap, signature]);
+
+  // Leave the grid as React rendered it once this hook is gone.
+  useEffect(() => {
+    const grid = ref.current;
+    if (!grid) return;
+    return () => {
+      for (const prop of ["grid-auto-rows", "row-gap", "min-height"]) grid.style.removeProperty(prop);
+      for (const cell of Array.from(grid.children) as HTMLElement[])
+        for (const prop of ["margin-top", "margin-right", "margin-bottom", "margin-left", "grid-row-end"])
+          cell.style.removeProperty(prop);
+    };
+  }, [ref]);
 }

@@ -12,6 +12,73 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Resize from any corner.** In edit mode every corner of a card takes a
+  diagonal drag for width and height together, not just the bottom-right
+  one. Pull a corner away from the card to grow it. (#343)
+- **One notification for a whole season.** Inbound webhooks that arrive in a
+  burst — Sonarr importing a season, Radarr grabbing several movies, a run
+  of Seerr requests — now go out as one message once the burst goes quiet,
+  with the episodes listed and the title carrying a range like
+  `S04E01-E08`. *Settings → Monitoring → Inbound webhooks → Group bursts
+  for* sets the wait (a minute by default); Off keeps one message per
+  event. Health issues, updates, failed downloads and a sender's Test are
+  never held, and the relay now accepts larger bursts. (#346)
+- **See webhook notifications before they arrive.** *Settings → Monitoring
+  → Inbound webhooks* now has an *Email report* block — switch the poster,
+  the facts table and the synopsis on or off, and set a subject prefix for
+  your mail rules — and a live preview that renders a sample Sonarr, Radarr
+  or Seerr event as the email, in light and dark mode, and as the one-liner
+  the push channels get, updating as you type. Each channel that takes
+  inbound webhooks gets a *Send sample* button, like the uptime *Send
+  test*. (#347)
+
+- **Seven new scenes.** Topography, a still map of nested contour lines;
+  Snow, round flakes drifting down in three depths on a shared gust; Embers,
+  sparks lifting off the base and fading as they climb; Bokeh, out-of-focus
+  discs of light drifting by; Beams, diagonal bars of light sweeping slowly;
+  Bubbles, rings rising, wobbling and popping; and Glyphs, terminal glyphs
+  raining down and catching the accent as they fall. Each recolours with
+  your palette and follows the intensity and motion controls, and the
+  scenes that never move (Peaks, Blueprint, Topography) now say *Still* in
+  the picker. (#348)
+- **Bundled backgrounds.** Five patterns ship with the app and sit in a
+  *Bundled* row wherever a wallpaper is chosen (the builder's Scene tab,
+  Settings → General and the Themes tab): Linen, Hatch, Honeycomb, Grain
+  and a Vignette that darkens the corners. Pick one and it is there, with
+  no address or upload needed; blur, dim and fit still apply, and it is
+  saved in themes and share codes like any wallpaper. They are not uploads,
+  so *Uploaded wallpapers* does not list them. (#348)
+- **Four new themes.** *Hearth*, amber to ember over rising sparks on the
+  Emboss surface; *Alpine*, frost and pine under falling snow, pressed into
+  the page by Carve; *Atelier*, a studio's paper, graphite, ochre and
+  vermilion with hand-drawn Sketch outlines over still contour lines on the
+  bundled Linen background, the first built-in theme with a wallpaper; and
+  *Terminal*, green-on-black phosphor, the Console panel over glyph rain in
+  JetBrains Mono. Each reads in light and dark and clears the same contrast
+  checks as every other built-in. (#348)
+
+### Changed
+
+- **Seerr, by its new name.** Overseerr and Jellyseerr merged into Seerr, and
+  the inbound-webhook settings, the help page and the example config now
+  call it that. An Overseerr or Jellyseerr install from before the merge
+  keeps working with the same webhook URL. (#342)
+- **Webhook emails are now a report.** An event relayed from Sonarr, Radarr
+  or Seerr arrives with a short subject — `[Sonarr] Imported: The Bear
+  S04E03-E04` — and a body that shows the title, the poster, the facts
+  (quality, size, release group, indexer, requester…), the message and a
+  button back into the app, in light and dark mode. Other alert channels
+  keep their one-line summary. (#345)
+
+### Fixed
+
+- **Resizing a widget no longer scrolls the page to the top.** In edit
+  mode, selecting or resizing a card below the fold — with the steppers,
+  the arrow keys or a drag of an edge — jumped the page to the top on every
+  step. The page now stays where it is. (#341)
+
 ## [3.0.0-rc.1] - 2026-10-10
 
 ### Added

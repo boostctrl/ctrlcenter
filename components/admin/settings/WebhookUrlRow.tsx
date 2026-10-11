@@ -5,11 +5,12 @@ import { Button } from "../ui";
 import { CopyUrlField, useOrigin } from "../CopyUrlField";
 
 // How each inbound-webhook service is named in its own app's UI, for the toggle
-// and the "paste into …" hint (Seerr's payload comes from Overseerr/Jellyseerr).
+// and the "paste into …" hint. (Seerr is what Overseerr and Jellyseerr merged
+// into; an install from before the merge sends the same payload.)
 export const WEBHOOK_LABELS: Record<WebhookService, string> = {
   sonarr: "Sonarr",
   radarr: "Radarr",
-  seerr: "Overseerr / Jellyseerr",
+  seerr: "Seerr",
 };
 
 // The read-only inbound-webhook URL for one service, with copy + regenerate.

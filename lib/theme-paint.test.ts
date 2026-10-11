@@ -280,6 +280,17 @@ describe("wallpaper (#333)", () => {
     expect(none.vars["--wallpaper-blur"]).toBeNull();
   });
 
+  it("paints a bundled background's same-origin path, tiled (#348)", () => {
+    const linen = { src: "/backgrounds/linen.svg", blur: 0, dim: 0, fit: "tile" };
+    const paint = themePaint.computePaint({ ...base, wallpaper: linen });
+    expect(paint.vars["--wallpaper-image"]).toBe('url("/backgrounds/linen.svg")');
+    expect(paint.vars["--wallpaper-size"]).toBe("auto");
+    expect(paint.vars["--wallpaper-repeat"]).toBe("repeat");
+    // And through the no-flash path, as a pack's wallpaper stored by a visitor.
+    const stored = storage({ "ctrlcenter:wallpaper": { dark: linen, light: null } });
+    expect(themePaint.readStored(stored, DT, IDS, true).wallpaper).toEqual(linen);
+  });
+
   it("refuses a source that could escape the url(), and clamps blur and dim", () => {
     const bad = themePaint.computePaint({ ...base, wallpaper: { ...wp, src: 'https://x.y/a")b.jpg' } });
     expect(bad.vars["--wallpaper-image"]).toBeNull();

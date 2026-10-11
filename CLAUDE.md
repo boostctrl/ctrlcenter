@@ -16,6 +16,9 @@ Step-by-step recipes for this repo's mistake-prone workflows live in
   Chromium; required for anything user-visible.
 - **new-widget** — every touchpoint for adding a widget type to the dashboard
   grid, including the config-migration traps.
+- **new-scene** — every touchpoint for adding a scene (backdrop) to the theme
+  builder: the motion and colour contracts, the CSS stilling lists, the typed
+  registries and the hard-coded counts.
 - **release** — cut a release with `scripts/release.sh` and keep hands off the
   tag-driven pipeline.
 

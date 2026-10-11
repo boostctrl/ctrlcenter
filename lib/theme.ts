@@ -88,9 +88,18 @@ export type SceneId =
   | "blueprint"
   | "prisms"
   | "petals"
-  | "comets";
+  | "comets"
+  | "topography"
+  | "snow"
+  | "embers"
+  | "bokeh"
+  | "beams"
+  | "bubbles"
+  | "glyphs";
 
-export const SCENES: { id: SceneId; name: string; description: string }[] = [
+// `still` marks a scene that never moves (badged "Still" in the pickers; the
+// motion controls have nothing to do for it).
+export const SCENES: { id: SceneId; name: string; description: string; still?: true }[] = [
   { id: "none", name: "None", description: "A plain surface, no backdrop" },
   { id: "aurora", name: "Aurora", description: "Floating accent glow (default)" },
   { id: "abyss", name: "Abyss", description: "Deep sea — drifting marine snow" },
@@ -103,13 +112,20 @@ export const SCENES: { id: SceneId; name: string; description: string }[] = [
   { id: "dots", name: "Dots", description: "Drifting halftone dot field" },
   { id: "horizon", name: "Horizon", description: "Retro sun sinking to a glowing horizon" },
   { id: "orbit", name: "Orbit", description: "Orbital rings with wandering planets" },
-  { id: "peaks", name: "Peaks", description: "Layered mountain ridgelines in haze" },
+  { id: "peaks", name: "Peaks", description: "Layered mountain ridgelines in haze", still: true },
   { id: "rain", name: "Rain", description: "Gentle streaks of falling accent rain" },
   { id: "fireflies", name: "Fireflies", description: "Wandering, softly pulsing lights" },
-  { id: "blueprint", name: "Blueprint", description: "Drafting-paper grid with construction marks" },
+  { id: "blueprint", name: "Blueprint", description: "Drafting-paper grid with construction marks", still: true },
   { id: "prisms", name: "Prisms", description: "Drifting translucent geometric shards" },
   { id: "petals", name: "Petals", description: "Cherry-blossom petals on the breeze" },
   { id: "comets", name: "Comets", description: "Shooting stars with fading trails" },
+  { id: "topography", name: "Topography", description: "Nested contour lines, a map's relief", still: true },
+  { id: "snow", name: "Snow", description: "Round flakes drifting down on a shared gust" },
+  { id: "embers", name: "Embers", description: "Sparks lifting off the base, fading as they climb" },
+  { id: "bokeh", name: "Bokeh", description: "Out-of-focus discs of light, drifting" },
+  { id: "beams", name: "Beams", description: "Diagonal bars of light sweeping slowly" },
+  { id: "bubbles", name: "Bubbles", description: "Rings rising, wobbling and popping" },
+  { id: "glyphs", name: "Glyphs", description: "Terminal glyphs raining down, lit by the accent" },
 ];
 
 export const SCENE_IDS = SCENES.map((s) => s.id) as [SceneId, ...SceneId[]];
@@ -298,6 +314,41 @@ export function sanitizeWallpaper(input: unknown): Wallpaper | null {
 export function wallpaperEqual(a: Wallpaper | null | undefined, b: Wallpaper | null | undefined): boolean {
   if (!a || !b) return !a && !b;
   return a.src === b.src && a.blur === b.blur && a.dim === b.dim && a.fit === b.fit;
+}
+
+// The bundled backgrounds (#348): small SVG patterns shipped under
+// public/backgrounds/, offered as a "Bundled" row wherever a wallpaper is
+// chosen. Each is a plain same-origin path, so it passes isWallpaperSrc and
+// goes through the resolver, themes, share codes and config like any other
+// wallpaper; `fit` is how the pattern was drawn to be shown. The paths are
+// API: a visitor's theme or a config may name one, so retiring a file needs
+// a migration step, not a delete. Neutral grey at low opacity, so each reads
+// on both light and dark surfaces.
+export type BundledBackground = {
+  id: string;
+  name: string;
+  description: string;
+  src: string;
+  fit: WallpaperFit;
+};
+
+export const BUNDLED_BACKGROUNDS: BundledBackground[] = [
+  { id: "linen", name: "Linen", description: "Fine woven threads", src: "/backgrounds/linen.svg", fit: "tile" },
+  { id: "hatch", name: "Hatch", description: "Fine diagonal hairlines", src: "/backgrounds/hatch.svg", fit: "tile" },
+  { id: "honeycomb", name: "Honeycomb", description: "A hex lattice", src: "/backgrounds/honeycomb.svg", fit: "tile" },
+  { id: "grain", name: "Grain", description: "Soft film grain", src: "/backgrounds/grain.svg", fit: "tile" },
+  { id: "vignette", name: "Vignette", description: "Corners darken softly", src: "/backgrounds/vignette.svg", fit: "cover" },
+];
+
+// The fit to keep when the wallpaper's source moves from a bundled background
+// to a typed address or an upload. Picking a pattern sets the fit it was
+// drawn for without the user touching the Fit chips, and a photo should not
+// inherit a pattern's tiling, so that imposed fit goes back to the default;
+// a fit the user chose since survives, as does one on any other wallpaper.
+export function fitAfterLeavingBundled(current: Wallpaper | null): WallpaperFit {
+  if (!current) return "cover";
+  const bundled = BUNDLED_BACKGROUNDS.find((b) => b.src === current.src);
+  return bundled && current.fit === bundled.fit ? "cover" : current.fit;
 }
 
 // Semantic colors (#331): up, down, warning and info, as a theme's own per
@@ -625,6 +676,47 @@ export const THEME_PACKS: ThemePack[] = [
     scene: "horizon",
     light: { background: "#fdeee6", foreground: "#3a1d12", accentFrom: "#fb923c", accentTo: "#f43f5e" },
     dark: { background: "#160d0a", foreground: "#f5e7e0", accentFrom: "#fb923c", accentTo: "#fb7185" },
+  },
+  // The 3.0 theming bundle's showcase packs (#348), appended so a gallery
+  // materialised before them keeps its order.
+  {
+    // Firelight: amber to ember over rising sparks, with the soft-raised
+    // Emboss surface.
+    name: "Hearth",
+    design: "emboss",
+    scene: "embers",
+    dark: { background: "#170d08", foreground: "#f6ebe2", accentFrom: "#f59e0b", accentTo: "#ea580c" },
+    light: { background: "#f8efe6", foreground: "#2b1a10", accentFrom: "#c2410c", accentTo: "#b45309" },
+  },
+  {
+    // Frost and pine under falling snow, pressed into the page by Carve.
+    name: "Alpine",
+    design: "carve",
+    scene: "snow",
+    dark: { background: "#07120f", foreground: "#e3efe9", accentFrom: "#a5f3fc", accentTo: "#4ade80" },
+    light: { background: "#eef5f1", foreground: "#10281f", accentFrom: "#0f766e", accentTo: "#166534" },
+  },
+  {
+    // A studio's paper and graphite with ochre and vermilion: hand-drawn
+    // Sketch outlines over still contour lines, on the bundled Linen
+    // background in both modes — the first built-in with a wallpaper.
+    name: "Atelier",
+    design: "sketch",
+    scene: "topography",
+    wallpaper: { src: "/backgrounds/linen.svg", blur: 0, dim: 0, fit: "tile" },
+    wallpaperLight: { src: "/backgrounds/linen.svg", blur: 0, dim: 0, fit: "tile" },
+    dark: { background: "#171512", foreground: "#ebe5d8", accentFrom: "#e8b04b", accentTo: "#d9674f" },
+    light: { background: "#f4efe4", foreground: "#2a2521", accentFrom: "#b7791f", accentTo: "#b4473a" },
+  },
+  {
+    // Green-on-black phosphor: the Console panel over glyph rain, set in
+    // JetBrains Mono.
+    name: "Terminal",
+    design: "console",
+    scene: "glyphs",
+    font: "jetbrains",
+    dark: { background: "#030805", foreground: "#c8f5d0", accentFrom: "#22c55e", accentTo: "#4ade80" },
+    light: { background: "#e9f5ec", foreground: "#0b2a16", accentFrom: "#15803d", accentTo: "#166534" },
   },
 ];
 

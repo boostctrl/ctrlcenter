@@ -35,7 +35,16 @@ import {
 import { MoveButtons } from "./admin/ui";
 import { useConfirm } from "./admin/Confirm";
 import { SaveStatus, type SaveState } from "./admin/useAutosave";
-import { useDragResize, type ResizeDrag } from "./useDragResize";
+import { useDragResize, CORNERS, type Corner, type ResizeDrag } from "./useDragResize";
+
+// Where each diagonal handle sits, just off the card's corner, with the
+// cursor for its diagonal.
+const CORNER_CLASSES: Record<Corner, string> = {
+  "top-left": "-top-[13px] -left-[13px] cursor-nwse-resize",
+  "top-right": "-top-[13px] -right-[13px] cursor-nesw-resize",
+  "bottom-left": "-bottom-[13px] -left-[13px] cursor-nesw-resize",
+  "bottom-right": "-right-[13px] -bottom-[13px] cursor-nwse-resize",
+};
 import type { CardDrag } from "./usePointerReorder";
 import { useUndoGesture } from "./useUndoHistory";
 
@@ -605,7 +614,7 @@ export function WidgetFrame({
       </span>
       {selected && !moving && !placeholder && controls}
       {/* Drag-to-resize (#312): the right edge sets the width (lg+, where
-          spans apply), the bottom edge the height, the corner both. Shown on
+          spans apply), the bottom edge the height, any corner both (#343). Shown on
           hover and on the selected card; the edges are focusable (as
           sliders) only on the selected one, so Tab still walks card to card.
           Up/Right increases per the ARIA convention, Home/End jump the range,
@@ -677,16 +686,18 @@ export function WidgetFrame({
       >
         <span className={`${grip} h-1.5 w-10 pointer-coarse:h-2`} />
       </span>
-      {isLarge && (
-        <span
-          {...cornerHandle}
-          data-frame-chrome
-          aria-hidden
-          className={`${handleClass} -right-[13px] -bottom-[13px] size-5 cursor-nwse-resize`}
-        >
-          <span className={`${grip} size-2.5`} />
-        </span>
-      )}
+      {isLarge &&
+        CORNERS.map((corner) => (
+          <span
+            key={corner}
+            {...cornerHandle(corner)}
+            data-frame-chrome
+            aria-hidden
+            className={`${handleClass} size-5 ${CORNER_CLASSES[corner]}`}
+          >
+            <span className={`${grip} size-2.5`} />
+          </span>
+        ))}
       {drag && <ResizeFeedback drag={drag} />}
     </div>
   );

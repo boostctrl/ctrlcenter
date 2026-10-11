@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 import {
+  BUNDLED_BACKGROUNDS,
   resolveThemePacks,
   sanitizeTune,
   isDefaultTune,
@@ -13,6 +16,7 @@ import {
   sanitizeWallpaper,
   wallpaperEqual,
   isWallpaperSrc,
+  fitAfterLeavingBundled,
   DEFAULT_SCENE_FX,
   DEFAULT_TUNE,
   THEME_PACKS,
@@ -28,12 +32,13 @@ import {
 } from "./theme";
 
 describe("catalog sizes", () => {
-  it("ships 18 designs, 18 scenes plus None, 21 palettes, 12 themes", () => {
+  it("ships 18 designs, 25 scenes plus None, 21 palettes, 16 themes", () => {
     expect(DESIGNS).toHaveLength(18);
-    expect(SCENES).toHaveLength(19);
+    expect(SCENES).toHaveLength(26);
     expect(SCENES[0].id).toBe("none");
     expect(BASE_THEMES).toHaveLength(21);
-    expect(THEME_PACKS).toHaveLength(12);
+    expect(THEME_PACKS).toHaveLength(16);
+    expect(THEME_PACKS[0].name).toBe("Default");
   });
 
   it("no pack references a retired scene id", () => {
@@ -42,6 +47,50 @@ describe("catalog sizes", () => {
     for (const retired of ["glow", "vortex", "mesh"]) {
       expect(ids).not.toContain(retired);
     }
+  });
+});
+
+describe("bundled backgrounds (#348)", () => {
+  it("ships five, each a shipped file at a same-origin path every wallpaper check accepts", () => {
+    expect(BUNDLED_BACKGROUNDS.map((b) => b.id)).toEqual(["linen", "hatch", "honeycomb", "grain", "vignette"]);
+    for (const b of BUNDLED_BACKGROUNDS) {
+      expect(b.src).toBe(`/backgrounds/${b.id}.svg`);
+      expect(isWallpaperSrc(b.src)).toBe(true);
+      const wp = { src: b.src, blur: 0, dim: 0, fit: b.fit };
+      expect(sanitizeWallpaper(wp)).toEqual(wp);
+      // The path is API (a theme or config may name it), so the file must
+      // exist in public/, which the image and the smoke run both ship.
+      const file = path.join(process.cwd(), "public", b.src);
+      expect(fs.existsSync(file), `${b.src} is missing under public/`).toBe(true);
+      // Small enough to inline-fetch without thought: the five together
+      // stay under 3 KB.
+      expect(fs.statSync(file).size).toBeLessThan(1024);
+      // proxy.ts skips paths with a file extension, so the file is served
+      // straight from public/ with no session check in the way.
+      expect(b.src).toMatch(/\.\w+$/);
+    }
+  });
+
+  it("a pack's bundled wallpaper names a shipped background", () => {
+    for (const p of THEME_PACKS) {
+      for (const wp of [p.wallpaper, p.wallpaperLight]) {
+        if (wp && wp.src.startsWith("/backgrounds/")) {
+          expect(BUNDLED_BACKGROUNDS.some((b) => b.src === wp.src)).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("leaving a bundled background drops the fit it imposed, not one the user chose", () => {
+    const linen = BUNDLED_BACKGROUNDS[0];
+    expect(linen.fit).toBe("tile");
+    // The pattern's own fit goes back to the default for the next source.
+    expect(fitAfterLeavingBundled({ src: linen.src, blur: 0, dim: 0, fit: "tile" })).toBe("cover");
+    // A fit changed since the pick is the user's and survives.
+    expect(fitAfterLeavingBundled({ src: linen.src, blur: 0, dim: 0, fit: "contain" })).toBe("contain");
+    // Any other wallpaper keeps its fit, as it always did; none means the default.
+    expect(fitAfterLeavingBundled({ src: "https://example.com/a.jpg", blur: 0, dim: 0, fit: "tile" })).toBe("tile");
+    expect(fitAfterLeavingBundled(null)).toBe("cover");
   });
 });
 

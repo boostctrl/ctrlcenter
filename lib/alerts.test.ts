@@ -5,6 +5,7 @@ import {
   buildEmailMessage,
   renderSubject,
   sendTestAlert,
+  sendSampleNotification,
   buildServiceRequest,
   plainAlert,
   plainNotification,
@@ -16,7 +17,8 @@ import {
   type AppAlertState,
   type AlertEvent,
 } from "./alerts";
-import { alertChannelSchema, alertsSchema } from "./schema";
+import { alertChannelSchema, alertsSchema, settingsSchema } from "./schema";
+import { parseArrWebhook } from "./webhooks";
 
 // Stub nodemailer's transport so the email path is exercised without SMTP.
 // sendMail is reconfigured per test (resolve = delivered, reject = failure).
@@ -454,6 +456,107 @@ describe("sendTestAlert", () => {
   });
 });
 
+describe("sendSampleNotification", () => {
+  // Settings as the route reads them: the channels, the saved report options
+  // and the site's footer line.
+  const settings = (over: { alerts?: unknown; webhooks?: unknown } = {}) =>
+    settingsSchema.parse({ title: "Lab", timezone: "UTC", ...over });
+  const smtp = { host: "smtp.example.com", from: "a@x", to: "b@y" };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    sendMailMock.mockReset();
+  });
+
+  it("relays the sample to the active channels that take inbound webhooks", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const config = settings({
+      alerts: {
+        enabled: false,
+        channels: [
+          channel({ id: "hook" }),
+          channel({ id: "no", url: "https://no.test", onWebhooks: false }),
+          channel({ id: "off", url: "https://off.test", enabled: false }),
+          channel({ id: "tg", type: "telegram", token: "t", chatId: "1" }),
+        ],
+      },
+    });
+    const { results } = await sendSampleNotification(config, "sonarr-import");
+    expect(results.map((r) => [r.id, r.ok, r.detail])).toEqual([
+      ["hook", true, "HTTP 204"],
+      ["tg", true, "HTTP 204"],
+    ]);
+    expect(fetchMock.mock.calls[0][0]).toBe("https://hook.example.com/x");
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    // The default burst window is on, so the season goes merged.
+    expect(body.title).toBe("Sonarr imported 8 episodes of The Bear (S04E01-E08)");
+    expect(body.message).toContain('S04E01 "Groundhogs"');
+  });
+
+  it("emails the report with the saved options, and one episode when the window is off", async () => {
+    sendMailMock.mockResolvedValue({});
+    const config = settings({
+      alerts: { channels: [channel({ id: "mail", type: "email", smtp })] },
+      webhooks: { subjectPrefix: "[Lab]", poster: false, facts: false },
+    });
+    const { results } = await sendSampleNotification(config, "radarr-grab");
+    expect(results).toEqual([{ id: "mail", label: "Email (SMTP)", ok: true, detail: "sent" }]);
+    const mail = sendMailMock.mock.calls[0][0];
+    expect(mail.subject).toBe("[Lab] [Radarr] Grabbed: Dune: Part Three (2026)");
+    expect(mail.html).not.toContain("<img");
+    expect(mail.html).not.toContain('role="table"');
+    expect(mail.html).toContain("Overview");
+    expect(mail.html).toContain("CtrlCenter</span> · Lab");
+    sendMailMock.mockClear();
+    await sendSampleNotification(
+      settings({ alerts: { channels: [channel({ type: "email", smtp })] }, webhooks: { digestSeconds: 0 } }),
+      "sonarr-import"
+    );
+    expect(sendMailMock.mock.calls[0][0].subject).toBe("[Sonarr] Imported: The Bear S04E01");
+  });
+
+  it("sends to one channel by id, even while it's switched off or not taking webhooks", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const config = settings({
+      alerts: {
+        channels: [
+          channel({ id: "a" }),
+          channel({ id: "b", enabled: false, name: "Mine", url: "https://b.test", onWebhooks: false }),
+        ],
+      },
+    });
+    expect(await sendSampleNotification(config, "seerr-request", "b")).toEqual({
+      results: [{ id: "b", label: "Mine", ok: true, detail: "HTTP 200" }],
+    });
+    expect(fetchMock.mock.calls.map((c) => c[0])).toEqual(["https://b.test"]);
+    // A channel missing a field is skipped, as the test skips it.
+    expect(await sendSampleNotification(settings({ alerts: { channels: [channel({ id: "c", url: "" })] } }), "sonarr-health", "c")).toEqual({ results: [] });
+  });
+
+  it("attempts nothing when no channel takes inbound webhooks", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await sendSampleNotification(settings({ alerts: { channels: [channel({ onWebhooks: false })] } }), "sonarr-import")).toEqual({ results: [] });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(sendMailMock).not.toHaveBeenCalled();
+  });
+
+  it("reports a failed delivery as ok:false with the reason, without throwing", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("connect ECONNREFUSED")));
+    sendMailMock.mockRejectedValue(new Error("SMTP auth failed"));
+    const config = settings({
+      alerts: { channels: [channel({ id: "hook" }), channel({ id: "mail", type: "email", smtp })] },
+    });
+    const { results } = await sendSampleNotification(config, "sonarr-health");
+    expect(results).toEqual([
+      { id: "hook", label: "Webhook", ok: false, detail: "connect ECONNREFUSED" },
+      { id: "mail", label: "Email (SMTP)", ok: false, detail: "SMTP auth failed" },
+    ]);
+  });
+});
+
 describe("processAlerts", () => {
   const apps = [
     { id: "a", name: "Alpha", url: "" },
@@ -528,7 +631,10 @@ describe("processAlerts", () => {
 });
 
 describe("sendNotification", () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    sendMailMock.mockReset();
+  });
 
   it("relays to the active channels that take inbound webhooks", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
@@ -548,5 +654,23 @@ describe("sendNotification", () => {
   it("reports no channel when none takes inbound webhooks", () => {
     const config = alertsSchema.parse({ channels: [channel({ onWebhooks: false })] });
     expect(anyChannelReady(config)).toBe(false);
+  });
+
+  it("emails the event as a report with its [App] Event subject (#345)", async () => {
+    sendMailMock.mockResolvedValue({});
+    const config = alertsSchema.parse({
+      channels: [channel({ type: "email", smtp: { host: "smtp.example.com", from: "a@x", to: "b@y" } })],
+    });
+    const n = parseArrWebhook("sonarr", {
+      eventType: "Grab",
+      series: { title: "The Bear" },
+      episodes: [{ seasonNumber: 4, episodeNumber: 3 }],
+    });
+    await sendNotification(config, n!, { at: 0, timeZone: "UTC", siteTitle: "Home" });
+    expect(sendMailMock).toHaveBeenCalledTimes(1);
+    const mail = sendMailMock.mock.calls[0][0];
+    expect(mail).toMatchObject({ from: "a@x", to: "b@y", subject: "[Sonarr] Grabbed: The Bear S04E03" });
+    expect(mail.html).toContain("CtrlCenter</span> · Home");
+    expect(mail.text).toContain("SONARR · GRABBED");
   });
 });

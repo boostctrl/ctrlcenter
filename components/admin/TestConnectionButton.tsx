@@ -18,6 +18,7 @@ export default function TestConnectionButton<T>({
   endpoint,
   body,
   label,
+  ariaLabel,
   pendingLabel,
   disabled = false,
   renderResult,
@@ -27,6 +28,9 @@ export default function TestConnectionButton<T>({
   // Omit for a bodyless POST (the alert test fires through the saved config).
   body?: unknown;
   label: string;
+  // An accessible name beyond the visible label, for a row of like buttons
+  // ("Send sample to Chat"); the label stays its visible prefix.
+  ariaLabel?: string;
   pendingLabel: string;
   disabled?: boolean;
   renderResult: (data: T) => ReactNode;
@@ -72,6 +76,7 @@ export default function TestConnectionButton<T>({
           type="button"
           onClick={run}
           disabled={loading || disabled}
+          aria-label={ariaLabel}
           className={buttonClasses("ghost", "sm")}
         >
           {loading ? pendingLabel : label}

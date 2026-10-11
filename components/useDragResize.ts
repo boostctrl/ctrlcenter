@@ -10,8 +10,8 @@ import {
 } from "@/lib/layout";
 
 // Direct-manipulation resize for a widget cell in the layout editor (#312):
-// the right edge drags the column span, the bottom edge the height, and the
-// bottom-right corner both. Pointer-based (mouse/pen/touch); the steppers and
+// the right edge drags the column span, the bottom edge the height, and any
+// of the four corners both (#343). Pointer-based (mouse/pen/touch); the steppers and
 // the arrow keys remain the keyboard/precise path. Start values are captured
 // on pointerdown and the pointer is captured, so a re-render mid-drag (each
 // onSpan/onHeight fires one) never drops the gesture. One drag is one undo
@@ -22,6 +22,11 @@ import {
 // that used to need the Auto button.
 
 export type ResizeKind = "width" | "height" | "corner";
+// Which corner a diagonal drag holds. Pulling a corner away from the card
+// grows it, so the left corners read the pointer's x mirrored and the top
+// corners its y — the card itself still grows from its place in the grid.
+export type Corner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
+export const CORNERS: Corner[] = ["top-left", "top-right", "bottom-left", "bottom-right"];
 export type ResizeDrag = {
   kind: ResizeKind;
   span: number;
@@ -79,7 +84,7 @@ export function useDragResize({
   const [drag, setDrag] = useState<ResizeDrag>(null);
   const gesture = useUndoGesture();
 
-  function begin(kind: ResizeKind, e: React.PointerEvent<HTMLElement>) {
+  function begin(kind: ResizeKind, e: React.PointerEvent<HTMLElement>, corner: Corner = "bottom-right") {
     const frame = frameRef.current;
     const grid = frame?.parentElement;
     const preview = previewRef.current;
@@ -98,19 +103,21 @@ export function useDragResize({
     const gridBox = { left: gridRect.left, width: gridRect.width, gap: colGap };
     const startX = e.clientX;
     const startY = e.clientY;
+    const signX = corner.endsWith("left") ? -1 : 1;
+    const signY = corner.startsWith("top") ? -1 : 1;
     let curSpan = span;
     let curHeight = height;
 
     const move = (ev: PointerEvent) => {
       if (kind !== "height") {
-        const next = clamp(span + Math.round((ev.clientX - startX) / stride), 1, GRID_COLUMNS);
+        const next = clamp(span + Math.round((signX * (ev.clientX - startX)) / stride), 1, GRID_COLUMNS);
         if (next !== curSpan) {
           curSpan = next;
           onSpan(next);
         }
       }
       if (kind !== "width") {
-        const next = snapHeight(startHeight + (ev.clientY - startY), natural);
+        const next = snapHeight(startHeight + signY * (ev.clientY - startY), natural);
         if (next !== curHeight) {
           curHeight = next;
           onHeight(next);
@@ -140,6 +147,8 @@ export function useDragResize({
     drag,
     widthHandle: { onPointerDown: (e: React.PointerEvent<HTMLElement>) => begin("width", e) },
     heightHandle: { onPointerDown: (e: React.PointerEvent<HTMLElement>) => begin("height", e) },
-    cornerHandle: { onPointerDown: (e: React.PointerEvent<HTMLElement>) => begin("corner", e) },
+    cornerHandle: (corner: Corner) => ({
+      onPointerDown: (e: React.PointerEvent<HTMLElement>) => begin("corner", e, corner),
+    }),
   };
 }

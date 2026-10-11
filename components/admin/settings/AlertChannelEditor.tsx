@@ -292,8 +292,9 @@ function ChannelFields({
             onChange={(e) => smtp({ subject: e.target.value })}
             hint={
               <>
-                Variables: <code>{"{service}"}</code> and <code>{"{status}"}</code> (down/up).
-                Blank uses the default.
+                For uptime alerts. Variables: <code>{"{service}"}</code> and{" "}
+                <code>{"{status}"}</code> (down/up). Blank uses the default. Relayed
+                webhook events are titled <code>[App] Event: Title</code>.
               </>
             }
           />
