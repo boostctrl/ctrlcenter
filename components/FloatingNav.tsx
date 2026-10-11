@@ -48,10 +48,11 @@ export default function FloatingNav({ boards, weather, status, calendar }: NavPa
       calendar ? { href: "/calendar", label: "Calendar" } : null,
       { href: "/help", label: "Help" },
       { href: "/settings", label: "Settings" },
-      // Always listed, like on the Settings page — both live under /admin and
-      // gate themselves behind its login.
-      { href: "/admin/monitor", label: "Monitor" },
+      // The admin's pages last, together: both live under /admin and gate
+      // themselves behind its login, and are always listed, like on the
+      // Settings page (#374).
       { href: "/admin", label: "Admin portal" },
+      { href: "/admin/monitor", label: "Monitor" },
     ].filter(Boolean) as { href: string; label: string }[]
   ).filter((l) => l.href !== pathname);
 
