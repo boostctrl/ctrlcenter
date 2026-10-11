@@ -44,6 +44,12 @@ here.
 
 ### Fixed
 
+- **No flash of the default look in development.** The script that paints
+  the theme before the page loads read one value from outside itself, which
+  the production build happened to inline but a development server did not:
+  there the script failed silently and the page flashed the default theme
+  before settling. The value now lives inside the script, and a test runs
+  the script's own source alone so a slip like it can't come back. (#349)
 - **Card shadows in sized widgets.** A widget given an explicit height
   clipped everything to its square cell, cutting its cards' shadows flat — a
   hard line under the last row of apps, a header card with its drop shadow
