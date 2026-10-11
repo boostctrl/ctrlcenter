@@ -588,8 +588,12 @@ export function useLook(
   // how a preset fills just the mode being edited. Without a `mode`, both modes
   // are replaced (restoring a complete saved theme). The colorset carries its own
   // accent, so any standalone accent override is dropped in favor of it.
+  // `paint` carries parts to paint alongside the colors (the tune, effects,
+  // status colors and wallpaper a pack just set): applyAll would otherwise
+  // fill them from this render's state, which the setters called a moment
+  // earlier haven't committed yet (#363).
   const applyThemeColors = useCallback(
-    (colors: ModeColors, mode?: Mode) => {
+    (colors: ModeColors, mode?: Mode, paint?: Partial<Parameters<typeof paintAll>[0]>) => {
       let look: ModeColors;
       if (mode) {
         const base =
@@ -607,6 +611,7 @@ export function useLook(
         look,
         accentOverride: NO_ACCENT_OVERRIDES,
         defaultAccent,
+        ...paint,
       });
     },
     [displayTheme, defaultAccent, activeLook, seedColorSet, applyAll]
@@ -765,25 +770,60 @@ export function useLook(
   // font is left as-is.
   const applyPack = useCallback(
     (pack: ThemePack, mode: Mode) => {
-      setDesign(packDesign(pack, mode === "dark"), mode);
-      setScene(packScene(pack, mode === "dark"), mode);
+      const dark = mode === "dark";
+      const status = (dark ? pack.status : pack.statusLight ?? pack.status) ?? null;
+      const wallpaper = (dark ? pack.wallpaper : pack.wallpaperLight ?? pack.wallpaper) ?? null;
+      setDesign(packDesign(pack, dark), mode);
+      setScene(packScene(pack, dark), mode);
       setTune(pack.tune ?? null, mode);
       setSceneFx(null, mode);
       // Fonts only when the pack carries them (#330); else the mode keeps its own.
       if (pack.font) setFont(pack.font, mode);
       if (pack.headingFont) setHeadingFont(pack.headingFont, mode);
       // Its semantic colors for the mode, or the stylesheet's (#331).
-      setStatusColors((mode === "dark" ? pack.status : pack.statusLight ?? pack.status) ?? null, mode);
+      setStatusColors(status, mode);
       // Its wallpaper (#333), or none — a pack is a whole look, so an admin
       // default wallpaper doesn't show through one.
-      setWallpaper((mode === "dark" ? pack.wallpaper : pack.wallpaperLight ?? pack.wallpaper) ?? "none", mode);
-      applyThemeColors({ dark: pack.dark, light: pack.light }, mode);
+      setWallpaper(wallpaper ?? "none", mode);
+      // Each setter above painted its part, but the colors paint last and
+      // would read the tune, effects, status colors and wallpaper from this
+      // render's state — the values from before the click — and paint those
+      // back over them (#363). Hand it the pack's own parts when the mode
+      // it applies to is the one on screen.
+      const onScreen = dark === resolveDark(displayTheme);
+      applyThemeColors(
+        { dark: pack.dark, light: pack.light },
+        mode,
+        onScreen
+          ? {
+              tune: pack.tune ?? defTune(dark),
+              sceneFx: defSceneFx(dark),
+              status: status ?? defStatus(dark),
+              wallpaper,
+            }
+          : undefined
+      );
       // Under "themes only" (#335) the choice is the pack's name: the parts
       // above are what this visit paints, but the next page load resolves
       // the name against the site's themes and reads nothing else.
       if (policy === "packs") savePackChoice({ ...loadPackChoice(), [mode]: pack.name });
     },
-    [policy, setDesign, setScene, setTune, setSceneFx, setFont, setHeadingFont, setStatusColors, setWallpaper, applyThemeColors]
+    [
+      policy,
+      displayTheme,
+      setDesign,
+      setScene,
+      setTune,
+      setSceneFx,
+      setFont,
+      setHeadingFont,
+      setStatusColors,
+      setWallpaper,
+      applyThemeColors,
+      defTune,
+      defSceneFx,
+      defStatus,
+    ]
   );
 
   // Update only the background/foreground for the CURRENT mode's variant,
