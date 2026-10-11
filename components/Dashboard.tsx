@@ -20,7 +20,6 @@ import {
   DEFAULT_TOP_GAP,
   CARD_WIDGET_TYPES,
   TITLED_WIDGET_TYPES,
-  SIZED_WIDGET_TYPES,
   WIDGET_LABELS,
   fillSpan,
   type LayoutWidget,
@@ -44,6 +43,7 @@ import { UndoGestureContext } from "./useUndoHistory";
 import { emptyReason as widgetEmptyReason, widgetDef } from "@/lib/widgets/defs";
 import type { HomeData } from "@/lib/widgets/data";
 import { WIDGET_RENDERERS, cardsFor, type WidgetRenderContext } from "./widgets/registry";
+import { cellBleed, cellSizing } from "./widgets/sizing";
 
 
 
@@ -577,30 +577,16 @@ export default function Dashboard({
       <div
         ref={gridRef}
         className="grid grid-cols-1 gap-x-8 gap-y-8 lg:grid-cols-24 lg:items-start"
+        // How far a sized cell may let its cards' shadows (and a cut-off row's
+        // fade) reach past its edge: the row gap, capped (#353).
+        style={{ "--cell-bleed": cellBleed(layout.gap) } as React.CSSProperties}
       >
         {displayCells.map(({ widget, node }, vIndex) => {
           const cellClass = `${COL_SPAN[widget.span]} ${widgetDef(widget.type).align ?? ""}`;
-          // An explicit height sizes the cell exactly: content widgets scroll
-          // their overflow, the others center their content (so a sized greeting
-          // sits centered beside the header card, restoring the classic header).
-          // Scrolling widgets keep their height at every size — they can't clip.
-          // The centering ones take it on lg+ only, like spans: below lg cells
-          // stack full-width, contents grow taller (the header card's rows
-          // stack), and a height tuned against the desktop row would silently
-          // crop them (#105) — auto height is what a phone wants there.
-          const scrolls = SIZED_WIDGET_TYPES.includes(widget.type);
-          const heightStyle = widget.height
-            ? scrolls
-              ? { height: widget.height }
-              : ({
-                  "--widget-height": `${widget.height}px`,
-                } as React.CSSProperties)
-            : undefined;
-          const heightClass = widget.height
-            ? scrolls
-              ? "overflow-y-auto"
-              : "lg:flex lg:h-[var(--widget-height)] lg:flex-col lg:justify-center lg:overflow-hidden"
-            : "";
+          // An explicit height sizes the cell exactly (widgets/sizing.ts, #353):
+          // the content widgets keep their heading and scroll the rest, the
+          // others center their content in it.
+          const { className: heightClass, style: heightStyle } = cellSizing(widget);
           if (!editing) {
             return (
               <div

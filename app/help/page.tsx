@@ -863,7 +863,8 @@ export default async function HelpPage() {
               <strong>Explicit height.</strong> Making a card taller than its
               content gives it presence — the greeting and header card center
               in it, restoring the classic header — while a shorter height
-              scrolls a long list inside.
+              keeps the heading in place and scrolls the content inside the
+              card or the app grid.
             </li>
             <li>
               <strong>The More menu</strong> in a card&apos;s toolbar adds{" "}

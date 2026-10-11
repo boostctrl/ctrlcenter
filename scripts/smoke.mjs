@@ -198,6 +198,7 @@ try {
       await apiWidgetTest(ctx);
       await editorTray(ctx);
       await editorScroll(ctx);
+      await sizedCells(ctx);
     }
     await ctx.close();
   }
@@ -539,6 +540,14 @@ async function addBoards() {
         visibility: "public",
         thresholds: { warn: null, critical: null, direction: "above" },
       },
+      // A second notes card with content, for the sized cells below (#353);
+      // the stock one stays empty for the tray check.
+      {
+        id: "rules",
+        type: "notes",
+        title: "House rules",
+        content: "- Renew the TLS certificates before the 20th.\n- Back up the photo library to the second pool.",
+      },
     ],
   });
   if (!widgets.ok()) throw new Error(`adding the board widgets failed: HTTP ${widgets.status()} ${await widgets.text()}`);
@@ -547,6 +556,19 @@ async function addBoards() {
     data: { sections: [{ widget: "search" }, { widget: "sonarr-tile", span: 8 }, { widget: "health-api", span: 8 }, { widget: "bookmarks" }] },
   });
   if (!media.ok()) throw new Error(`placing the integration tile failed: HTTP ${media.status()}`);
+  // Widgets at explicit heights on the private board (#353): a centered one,
+  // a single card and a tile grid, each cut short of its content.
+  const infra = await ctx.request.put(`${base}/api/boards/infra/layout`, {
+    headers: { Origin: base },
+    data: {
+      sections: [
+        { widget: "headerCard", span: 8, height: 160 },
+        { widget: "rules", span: 16, height: 200 },
+        { widget: "apps", span: 24, height: 220 },
+      ],
+    },
+  });
+  if (!infra.ok()) throw new Error(`sizing the infra board's widgets failed: HTTP ${infra.status()}`);
   await ctx.close();
 }
 
@@ -668,6 +690,84 @@ async function editorScroll(ctx) {
     console.log("ok    resizing a card below the fold keeps the page where it is");
   } catch (e) {
     failures.push(`editor scroll: ${e instanceof Error ? e.message.split("\n")[0] : e}`);
+  } finally {
+    await page.close();
+  }
+}
+
+// A widget at an explicit height (#353): its cell is exactly that tall but
+// no longer clips what's inside — the single card scrolls itself, the tile
+// grid scrolls in a box padded out past the cell by its shadows' allowance
+// and marked while it overflows (its fade), and the centered card's clip
+// stands off the cell. The editor's preview measures the same height.
+async function sizedCells(ctx) {
+  const page = await ctx.newPage();
+  try {
+    await page.goto(`${base}/b/infra`);
+    await page.locator("main .grid > .widget-sized").first().waitFor({ timeout: 10_000 });
+    await page.waitForTimeout(500);
+    const cells = await page.evaluate(() => {
+      const grid = document.querySelector("main .grid");
+      const bleed = getComputedStyle(grid).getPropertyValue("--cell-bleed").trim();
+      const rect = (el) => {
+        const r = el.getBoundingClientRect();
+        return { top: Math.round(r.top), right: Math.round(r.right), bottom: Math.round(r.bottom), left: Math.round(r.left), height: Math.round(r.height) };
+      };
+      return Array.from(grid.children).map((cell) => {
+        const cs = getComputedStyle(cell);
+        const card = cell.querySelector(":scope > section > .glass-card");
+        const tiles = cell.querySelector(":scope > section > .widget-tiles");
+        const heading = tiles?.previousElementSibling;
+        return {
+          bleed,
+          sized: cell.classList.contains("widget-sized"),
+          ...rect(cell),
+          headingBottom: heading ? rect(heading).bottom : null,
+          overflow: cs.overflowY,
+          clipMargin: cs.overflowClipMargin,
+          card: card ? { overflow: getComputedStyle(card).overflowY } : null,
+          tiles: tiles
+            ? {
+                ...rect(tiles),
+                overflow: getComputedStyle(tiles).overflowY,
+                scrolls: tiles.scrollHeight > tiles.clientHeight,
+                marked: tiles.hasAttribute("data-overflow"),
+                mask: getComputedStyle(tiles).maskImage,
+              }
+            : null,
+        };
+      });
+    });
+    const [header, notes, apps] = cells;
+    if (cells.length !== 3) throw new Error(`${cells.length} cells on the board, not 3`);
+    if (header.height !== 160 || notes.height !== 200 || apps.height !== 220)
+      throw new Error(`cells ${header.height}, ${notes.height} and ${apps.height}px tall, not 160, 200 and 220`);
+    if (header.sized || header.overflow !== "clip" || header.clipMargin !== header.bleed)
+      throw new Error(`the header card's cell is ${header.overflow} with a clip margin of ${header.clipMargin}, not clip at ${header.bleed}`);
+    if (!notes.sized || notes.card?.overflow !== "auto" || notes.tiles)
+      throw new Error(`the notes cell doesn't scroll its card: ${JSON.stringify(notes)}`);
+    if (!apps.sized || !apps.tiles) throw new Error(`the apps cell has no tile box: ${JSON.stringify(apps)}`);
+    // The box reaches into the heading's bottom margin (so its top is the
+    // heading's bottom edge), half a column gap past each side, and the row
+    // gap (--cell-bleed) below the cell.
+    const t = apps.tiles;
+    const expected = { top: apps.headingBottom, left: apps.left - 16, right: apps.right + 16, bottom: apps.bottom + parseInt(apps.bleed, 10) };
+    for (const [side, want] of Object.entries(expected))
+      if (Math.abs(t[side] - want) > 1) throw new Error(`the tile box's ${side} is ${t[side]}, not ${want} (cell ${apps[side]}, bleed ${apps.bleed})`);
+    if (t.overflow !== "auto" || !t.scrolls || !t.marked || t.mask === "none")
+      throw new Error(`the tile box doesn't scroll and fade: ${JSON.stringify(t)}`);
+    // The editor's preview of the apps card is the same 220px.
+    await page.goto(`${base}/b/infra?edit=1`);
+    const frame = page.locator('main .grid > [data-widget-id="apps"]');
+    await frame.waitFor({ timeout: 10_000 });
+    await page.waitForTimeout(500);
+    await frame.click({ position: { x: 40, y: 10 } });
+    await page.getByRole("toolbar", { name: /controls$/ }).waitFor({ timeout: 5_000 });
+    const preview = await frame.locator("[inert]").evaluate((el) => Math.round(el.getBoundingClientRect().height));
+    if (preview !== 220) throw new Error(`the editor's preview of the apps card is ${preview}px tall, not 220`);
+    console.log("ok    sized cells keep their height, scroll inside the card or tile box, and preview the same in the editor");
+  } catch (e) {
+    failures.push(`sized cells: ${e instanceof Error ? e.message.split("\n")[0] : e}`);
   } finally {
     await page.close();
   }
