@@ -302,12 +302,16 @@ commit per item, each with its changelog entry, tests and a Chromium
 render. Follow-ups filed along the way: #338 (a CDN flake in the smoke
 run) and #339 (no way to delete an uploaded wallpaper from the admin UI).
 
+**Landed (2026-10-11): the theming bundle (#348)** — seven scenes, five
+bundled backgrounds, four showcase themes, and the `new-scene` skill promised
+below, beside `new-widget` in `CLAUDE.md`.
+
 **Principles.**
 - Nothing here changes an existing visitor's or admin's look. New knobs
   default to the current behavior.
 - Every built-in look passes the axe audit in both modes, enforced by T2.
-- A new design, scene or font stays a one-registry addition; a `new-scene`
-  skill joins `new-widget` once T6 lands.
+- A new design, scene or font stays a one-registry addition; the `new-scene`
+  skill (landed with #348) walks every touchpoint, as `new-widget` does.
 
 ---
 

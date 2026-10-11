@@ -219,11 +219,11 @@ try {
 // no-flash script — which also proves that script runs in the production
 // build: it marks <html data-theme-boot>, and a serialization slip in
 // lib/theme-paint.ts would otherwise die silently in its try/catch (#325).
-// A pack's wallpaper is seeded the way applying the pack stores it, so a
-// bundled background is fetched and audited (#348). Then every scene no pack
-// showcases is rendered once, and one look runs at full motion, since the
-// matrix stills everything and a canvas scene's animation loop would
-// otherwise never run in CI.
+// A pack's wallpaper and font are seeded the way applying the pack stores
+// them, so a bundled background is fetched and audited and a pack's font is
+// the one on the page (#348). Then every scene no pack showcases is rendered
+// once, and every canvas scene runs once at full motion, since the matrix
+// stills everything and the animation loops would otherwise never run in CI.
 // lib/theme.ts imports nothing, so Node loads it as-is (type stripping).
 async function themeMatrixPhase(run) {
   const { THEME_PACKS, BASE_THEMES, SCENES } = await import("../lib/theme.ts");
@@ -250,6 +250,7 @@ async function themeMatrixPhase(run) {
         light: look.wallpaperLight ?? look.wallpaper ?? null,
       });
     }
+    if (look.font) entries["ctrlcenter:font"] = JSON.stringify({ dark: look.font, light: look.font });
     await ctx.addInitScript((entries) => {
       for (const [k, v] of Object.entries(entries)) localStorage.setItem(k, v);
     }, entries);
@@ -281,14 +282,34 @@ async function themeMatrixPhase(run) {
   }
   console.log(`ok    ${unshown.length} scenes no theme uses rendered`);
 
-  // One canvas scene at full motion, left to draw for a moment, so a throw
-  // inside its requestAnimationFrame loop surfaces as a page error.
-  const moving = looks.find((l) => l.scene === "petals") ?? looks[0];
-  await render(moving, "dark", "motion-full-dark", {
-    motion: "no-preference",
-    before: (page) => page.waitForTimeout(400),
-  });
-  console.log(`ok    ${moving.name} rendered at full motion`);
+  // Every canvas scene at full motion on the stock look, each left to draw
+  // for a moment, so a throw inside its requestAnimationFrame loop surfaces
+  // as a page error — the renders above still every scene, so this is the
+  // only place those loops run in CI. The list comes from the components
+  // themselves: every scene file that calls requestAnimationFrame, named
+  // after its id, so a new canvas scene is covered without being listed
+  // anywhere (about two seconds each).
+  const scenesDir = path.join(ROOT, "components", "scenes");
+  const canvas = fs
+    .readdirSync(scenesDir)
+    .filter((f) => f.endsWith(".tsx"))
+    .filter((f) => fs.readFileSync(path.join(scenesDir, f), "utf8").includes("requestAnimationFrame"))
+    .map((f) => ({ file: f, id: f.slice(0, -".tsx".length).toLowerCase() }));
+  const ids = new Set(SCENES.map((s) => s.id));
+  let moved = 0;
+  for (const { file, id } of canvas) {
+    if (!ids.has(id)) {
+      failures.push(`components/scenes/${file}: calls requestAnimationFrame but is not named after a scene id, so its loop can't be rendered at full motion`);
+      continue;
+    }
+    await render({ ...THEME_PACKS[0], scene: id }, "dark", `motion-${id}-dark`, {
+      motion: "no-preference",
+      before: (page) => page.waitForTimeout(400),
+    });
+    moved++;
+  }
+  if (moved === 0) failures.push("no canvas scene was rendered at full motion");
+  console.log(`ok    ${moved} canvas scenes rendered at full motion`);
 }
 
 // The first-run setup (#304): with a fresh install's config swapped in, /admin

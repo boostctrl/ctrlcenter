@@ -85,8 +85,9 @@ export default function Embers({ light, motion }: SceneProps) {
       // reach the top third before they go out.
       s.step = 1 / (360 + Math.random() * 360);
       s.flick = Math.random() * Math.PI * 2;
-      // 0.3–0.8 Hz at 60 fps; still under 2 Hz on a 120 Hz display.
-      s.rate = 0.03 + Math.random() * 0.05;
+      // 0.2–0.5 Hz at 60 fps; the rate is per drawn frame, so it scales
+      // with the refresh rate — under 2 Hz up to 240 Hz displays.
+      s.rate = 0.02 + Math.random() * 0.03;
       s.depth = 0.2 + Math.random() * 0.3;
       s.glow = 0.7 + Math.random() * 0.3;
       return s;
@@ -206,7 +207,7 @@ export default function Embers({ light, motion }: SceneProps) {
       <div
         className="absolute inset-x-0 bottom-0 h-2/5"
         style={{
-          background: `linear-gradient(to top, color-mix(in srgb, var(--scene-from) ${light ? 16 : 18}%, transparent), transparent)`,
+          background: `linear-gradient(to top, color-mix(in srgb, var(--scene-from) ${light ? 22 : 18}%, transparent), transparent)`,
         }}
       />
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />

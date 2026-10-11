@@ -340,6 +340,17 @@ export const BUNDLED_BACKGROUNDS: BundledBackground[] = [
   { id: "vignette", name: "Vignette", description: "Corners darken softly", src: "/backgrounds/vignette.svg", fit: "cover" },
 ];
 
+// The fit to keep when the wallpaper's source moves from a bundled background
+// to a typed address or an upload. Picking a pattern sets the fit it was
+// drawn for without the user touching the Fit chips, and a photo should not
+// inherit a pattern's tiling, so that imposed fit goes back to the default;
+// a fit the user chose since survives, as does one on any other wallpaper.
+export function fitAfterLeavingBundled(current: Wallpaper | null): WallpaperFit {
+  if (!current) return "cover";
+  const bundled = BUNDLED_BACKGROUNDS.find((b) => b.src === current.src);
+  return bundled && current.fit === bundled.fit ? "cover" : current.fit;
+}
+
 // Semantic colors (#331): up, down, warning and info, as a theme's own per
 // mode. Absent, the stylesheet's defaults apply (pale on dark, deep on light).
 export type SemanticKey = "up" | "down" | "warning" | "info";

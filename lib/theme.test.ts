@@ -16,6 +16,7 @@ import {
   sanitizeWallpaper,
   wallpaperEqual,
   isWallpaperSrc,
+  fitAfterLeavingBundled,
   DEFAULT_SCENE_FX,
   DEFAULT_TUNE,
   THEME_PACKS,
@@ -78,6 +79,18 @@ describe("bundled backgrounds (#348)", () => {
         }
       }
     }
+  });
+
+  it("leaving a bundled background drops the fit it imposed, not one the user chose", () => {
+    const linen = BUNDLED_BACKGROUNDS[0];
+    expect(linen.fit).toBe("tile");
+    // The pattern's own fit goes back to the default for the next source.
+    expect(fitAfterLeavingBundled({ src: linen.src, blur: 0, dim: 0, fit: "tile" })).toBe("cover");
+    // A fit changed since the pick is the user's and survives.
+    expect(fitAfterLeavingBundled({ src: linen.src, blur: 0, dim: 0, fit: "contain" })).toBe("contain");
+    // Any other wallpaper keeps its fit, as it always did; none means the default.
+    expect(fitAfterLeavingBundled({ src: "https://example.com/a.jpg", blur: 0, dim: 0, fit: "tile" })).toBe("tile");
+    expect(fitAfterLeavingBundled(null)).toBe("cover");
   });
 });
 

@@ -5,8 +5,10 @@ import type { SceneProps } from "./index";
 // slope is steeper. Each summit is one layer: a pair of repeating-radial-
 // gradients on the same centre — the fine lines and, at five times their
 // spacing, the heavier index lines, so an index line always lands on a fine
-// one — over a whisper of hypsometric tint, masked to the summit's own hollow
-// so the ring sets fade out before they would cross. A line drawing rather
+// one — over a whisper of hypsometric tint, masked to the summit's own hollow.
+// The hollow reaches about zero before the next summit's rings begin, so
+// the sets do not cross and weave a moiré lattice between them; where two
+// hollows brush, both are faint and it reads as a fade. A line drawing rather
 // than a glow, so it is not gated by --glow-opacity (Flat keeps it); fully
 // still (`still: true` in SCENES), so nothing to quiet under reduced motion.
 // Recolors from the scene vars; stronger on light, where hairlines must
@@ -19,6 +21,9 @@ export default function Topography({ light }: SceneProps) {
     `color-mix(in srgb, ${c} ${op * 100}%, transparent)`;
   // Ring shapes are in px so a summit keeps its aspect on any viewport; the
   // mask is in percentages so each hollow stays proportional to the page.
+  // The hollow ramp (solid to 25%, gone by 62% of the mask's radius) is what
+  // keeps the sets apart: the full-radius ramp let two and three ring sets
+  // overlap at half strength across the middle of the page.
   const summits = [
     { color: "var(--scene-from)", at: "22% 40%", shape: "520px 400px", gap: 26, mask: "58% 66%" },
     { color: "var(--scene-to)", at: "80% 66%", shape: "440px 480px", gap: 20, mask: "50% 62%" },
@@ -31,7 +36,7 @@ export default function Topography({ light }: SceneProps) {
   return (
     <div aria-hidden className="scene-root pointer-events-none fixed inset-0 -z-10 overflow-hidden">
       {summits.map((s, i) => {
-        const hollow = `radial-gradient(${s.mask} at ${s.at}, #000 28%, transparent 100%)`;
+        const hollow = `radial-gradient(${s.mask} at ${s.at}, #000 25%, transparent 62%)`;
         return (
           <div
             key={i}

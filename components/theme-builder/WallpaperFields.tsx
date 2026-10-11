@@ -5,6 +5,7 @@ import {
   BUNDLED_BACKGROUNDS,
   MAX_WALLPAPER_BLUR,
   WALLPAPER_FITS,
+  fitAfterLeavingBundled,
   isWallpaperSrc,
   type BundledBackground,
   type Wallpaper,
@@ -37,6 +38,13 @@ export function WallpaperFields({
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  // Both messages go whenever the source changes, whichever way: a failed
+  // upload's error has nothing to say about the bundled pattern or address
+  // picked after it.
+  const clearErrors = () => {
+    setSrcError(null);
+    setUploadError(null);
+  };
   // Follow an outside change (a theme restored, a pack applied) into the box.
   const outside = value?.src ?? "";
   const lastOutside = useRef(outside);
@@ -45,6 +53,7 @@ export function WallpaperFields({
       lastOutside.current = outside;
       setSrc(outside);
       setSrcError(null);
+      setUploadError(null);
     }
   }, [outside]);
 
@@ -53,25 +62,32 @@ export function WallpaperFields({
     const next = src.trim();
     if (!next) {
       setSrcError(null);
-      if (value) onChange(null);
+      if (value) {
+        clearErrors();
+        onChange(null);
+      }
       return;
     }
     if (!isWallpaperSrc(next)) {
-      setSrcError("Use an https:// image address or an upload.");
+      setSrcError(`Use an https:// image address${canUpload ? ", an upload" : ""} or a bundled pattern below.`);
       return;
     }
     setSrcError(null);
-    if (next !== value?.src) onChange({ ...wp, src: next });
+    if (next !== value?.src) {
+      clearErrors();
+      onChange({ ...wp, src: next, fit: fitAfterLeavingBundled(value) });
+    }
   };
   const patch = (p: Partial<Wallpaper>) => {
     if (!value) return;
     onChange({ ...value, ...p });
   };
   // A bundled background keeps the blur and dim and takes the fit it was
-  // drawn for; the address box follows it like an upload.
+  // drawn for; the address box follows it like an upload. Moving on to an
+  // address or an upload gives that fit back (fitAfterLeavingBundled).
   const pickBundled = (b: BundledBackground) => {
     setSrc(b.src);
-    setSrcError(null);
+    clearErrors();
     if (b.src !== value?.src) onChange({ ...wp, src: b.src, fit: b.fit });
   };
 
@@ -86,7 +102,7 @@ export function WallpaperFields({
       if (!res.ok) throw new Error(data?.error || "Upload failed");
       setSrc(data.url);
       setSrcError(null);
-      onChange({ ...wp, src: data.url });
+      onChange({ ...wp, src: data.url, fit: fitAfterLeavingBundled(value) });
     } catch (e) {
       setUploadError(e instanceof Error ? e.message : "Upload failed");
     } finally {
@@ -164,10 +180,21 @@ export function WallpaperFields({
         )}
       </div>
       {/* The bundled backgrounds (#348): patterns shipped with the app, so a
-          wallpaper needs no address or upload. */}
-      <div className={compact ? "space-y-1" : "space-y-1 sm:col-span-2"}>
-        <span className={`block ${labelClass}`}>Bundled</span>
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+          wallpaper needs no address or upload. The row is sized by its own
+          width, not the viewport: the tile's name is its only visible
+          identifier in compact mode, and five across needs about 32rem for
+          the names to fit, three across about 18rem, so inside a narrower
+          box — a pack card in the Themes tab — the five wrap as three and
+          two (or two, two and one) instead of truncating. */}
+      <div className={`@container ${compact ? "space-y-1" : "space-y-1 sm:col-span-2"}`}>
+        <span id={`${idPrefix}-bundled`} className={`block ${labelClass}`}>
+          Bundled
+        </span>
+        <div
+          role="group"
+          aria-labelledby={`${idPrefix}-bundled`}
+          className="grid grid-cols-2 gap-2 @2xs:grid-cols-3 @lg:grid-cols-5"
+        >
           {BUNDLED_BACKGROUNDS.map((b) => (
             <OptionCard
               key={b.id}
@@ -249,7 +276,7 @@ export function WallpaperFields({
               type="button"
               onClick={() => {
                 setSrc("");
-                setSrcError(null);
+                clearErrors();
                 onChange(null);
               }}
               className={buttonClasses("ghost", "sm")}

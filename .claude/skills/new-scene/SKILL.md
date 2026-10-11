@@ -18,7 +18,8 @@ in order.
 - Add the id to the `SceneId` union and a row to `SCENES`: `id`, `name`, a
   one-line `description` (the picker's subtitle and tooltip), and
   `still: true` if the scene never moves (it gets a "Still" badge in the
-  pickers and is exempt from the motion contract below). `none` stays first.
+  builder's Scene tab — the admin pack editor's scene select shows bare
+  names — and is exempt from the motion contract below). `none` stays first.
 - Never reuse a retired id (`glow`, `vortex`, `mesh`): the 3.0 migration maps
   them to Aurora.
 
@@ -80,8 +81,9 @@ at (`"normal"` as designed, `"calm"` at half speed, `"off"` a still frame).
   `@media (prefers-reduced-motion: reduce)` list and the
   `[data-motion="off"]` list. A class missing from either keeps moving for
   visitors who asked it not to.
-- Any `.scene-<id>` rule (a class the resolver sets on `<html>`) goes beside
-  the other per-scene rules.
+- If the scene needs a page-level rule, the resolver sets `scene-<id>` on
+  `<html>` (`components/prefs/themeApply.ts`, `lib/theme-paint.ts`); no scene
+  has one today, so add the first `.scene-<id>` rule next to `.scene-root`.
 
 ## 5. Counts and lists
 
@@ -91,22 +93,28 @@ at (`"normal"` as designed, `"calm"` at half speed, `"off"` a still frame).
   `scene:` comment in the config reference.
 - `app/help/page.tsx` "Themes & looks": the scene examples; the count is
   derived from `SCENES.length - 1`, so leave the number alone.
-- `docs/ROADMAP_3.0.md` if it quotes the catalog size.
+- `docs/ROADMAP_3.0.md` quotes catalog sizes only inside dated audit text;
+  leave those numbers as they were on the audit date.
 
 ## 6. A showcase theme (optional)
 
 A pack is one row appended at the **end** of `THEME_PACKS` in `lib/theme.ts`
 (gallery order; materialised galleries append new built-ins). Its colours
 must pass `lib/theme-paint.test.ts` (button ink 4.5:1, ink on a 10% card
-fill 4.5:1, both modes); bump the pack count in `lib/theme.test.ts`, the
-README and the help page.
+fill 4.5:1, both modes); bump the `THEME_PACKS` length and the theme count
+in the test title of `lib/theme.test.ts` "catalog sizes" (neither the README
+nor the help page states a pack count).
 
 ## 7. Verify
 
 - `npm run lint && npm run typecheck && npm test && npm run build && npm run smoke`.
   The smoke run renders every scene no pack uses once (dark, reduced
-  motion), every pack's scene in both schemes, and one full-motion render,
-  so a scene that throws in `requestAnimationFrame` fails CI.
+  motion) and every pack's scene in both schemes, so a scene that throws in
+  its effect or its still frame fails CI; then it renders every canvas scene
+  once at full motion — each `components/scenes/*.tsx` that calls
+  `requestAnimationFrame`, found by file name, so the file must be named
+  after the scene id — so a throw inside the animation loop fails CI too.
+  CSS scenes have no loop to exercise; a keyframe cannot throw.
 - The **visual-verify** skill on `/` with the new scene applied: dark and
   light × motion normal, calm and off, and `ctrlcenter:motion=reduce`, on
   Glass (glow 1) and Flat (glow 0). Expect one still frame under off, no
