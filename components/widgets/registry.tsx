@@ -37,6 +37,7 @@ import type { AppItem, InstanceOf } from "@/lib/schema";
 import type { HomeData } from "@/lib/widgets/data";
 import Complication from "@/components/monitor/Complication";
 import ApiWidget from "./ApiWidget";
+import TilesBox from "./TilesBox";
 
 // What a renderer can read: the server-built data, plus Dashboard's live
 // state (edit mode, the search box and what it currently matches).
@@ -114,7 +115,6 @@ export const cardsFor = (widget: LayoutWidget): number =>
   widget.cards ?? (widget.span >= 18 ? 3 : widget.span >= 10 ? 2 : 1);
 const cardGridClass = (widget: LayoutWidget, gap: string): string =>
   `grid ${gap} ${CARD_COLS[cardsFor(widget)] ?? CARD_COLS[1]}`;
-
 export const WIDGET_RENDERERS: Record<WidgetType, Renderer> = {
   greeting: (_, { data }) => <Greeting initialGreeting={data.initialGreeting} />,
 
@@ -239,11 +239,13 @@ export const WIDGET_RENDERERS: Record<WidgetType, Renderer> = {
     (!q || editing) && favoriteApps.length > 0 ? (
       <section className="@container">
         {!widget.hideLabel && <SectionTitle>Favorites</SectionTitle>}
-        <div className={cardGridClass(widget, "gap-4")}>
-          {favoriteApps.map((app) => (
-            <AppCard key={app.id} app={app} />
-          ))}
-        </div>
+        <TilesBox>
+          <div className={cardGridClass(widget, "gap-4")}>
+            {favoriteApps.map((app) => (
+              <AppCard key={app.id} app={app} />
+            ))}
+          </div>
+        </TilesBox>
       </section>
     ) : null,
 
@@ -257,11 +259,13 @@ export const WIDGET_RENDERERS: Record<WidgetType, Renderer> = {
     return (
       <section className="@container">
         {!widget.hideLabel && <SectionTitle>{w.title.trim() || "Applications"}</SectionTitle>}
-        <div className={cardGridClass(widget, "gap-4")}>
-          {list.map((app) => (
-            <AppCard key={app.id} app={app} top={app.id === topMatchId} />
-          ))}
-        </div>
+        <TilesBox>
+          <div className={cardGridClass(widget, "gap-4")}>
+            {list.map((app) => (
+              <AppCard key={app.id} app={app} top={app.id === topMatchId} />
+            ))}
+          </div>
+        </TilesBox>
       </section>
     );
   },
@@ -275,11 +279,13 @@ export const WIDGET_RENDERERS: Record<WidgetType, Renderer> = {
     return groups.length > 0 ? (
       <section className="@container">
         {!widget.hideLabel && <SectionTitle>{w.title.trim() || "Bookmarks"}</SectionTitle>}
-        <div className={cardGridClass(widget, "gap-6")}>
-          {groups.map((g) => (
-            <BookmarkGroup key={g.id} name={g.name} icon={g.icon} color={g.color} items={g.items} topId={topMatchId} />
-          ))}
-        </div>
+        <TilesBox>
+          <div className={cardGridClass(widget, "gap-6")}>
+            {groups.map((g) => (
+              <BookmarkGroup key={g.id} name={g.name} icon={g.icon} color={g.color} items={g.items} topId={topMatchId} />
+            ))}
+          </div>
+        </TilesBox>
       </section>
     ) : null;
   },

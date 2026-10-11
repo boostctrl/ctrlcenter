@@ -42,6 +42,16 @@ here.
   Settings → General and the Themes tab. Each group of tiles is named for
   assistive tech. (#358)
 
+### Fixed
+
+- **Card shadows in sized widgets.** A widget given an explicit height
+  clipped everything to its square cell, cutting its cards' shadows flat — a
+  hard line under the last row of apps, a header card with its drop shadow
+  sliced off. The heading now stays put and the content scrolls inside the
+  card itself; app, favorite and bookmark grids scroll in a box with room
+  for their shadows and a soft fade where a row is cut off; centered widgets
+  clip a gap's width outside the cell. (#353)
+
 ## [3.0.0-rc.2] - 2026-10-11
 
 ### Added
