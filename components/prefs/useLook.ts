@@ -136,6 +136,10 @@ export type LookValue = {
   designFor: (mode: Mode) => DesignId;
   sceneFor: (mode: Mode) => SceneId;
   fontFor: (mode: Mode) => FontId;
+  // The site default font and heading font for a mode: what a theme without
+  // its own falls back to (#373).
+  defaultFontFor: (mode: Mode) => FontId;
+  defaultHeadingFontFor: (mode: Mode) => FontId | null;
   // The effective fine-tune for a mode (visitor's, else the admin default),
   // or null when the design is untouched (#326).
   tuneFor: (mode: Mode) => Tune | null;
@@ -573,14 +577,18 @@ export function useLook(
     [scenes, displayTheme]
   );
 
+  // Set one mode's font, or null to fall back to the site default (a theme
+  // without a font of its own); the class swaps only when that mode is on
+  // screen.
   const setFont = useCallback(
-    (next: FontId, mode: Mode) => {
+    (next: FontId | null, mode: Mode) => {
       const updated = { ...fonts, [mode]: next };
       setFonts(updated);
       saveFont(updated);
-      if ((mode === "dark") === resolveDark(displayTheme)) applyFont(next);
+      const dark = resolveDark(displayTheme);
+      if ((mode === "dark") === dark) applyFont(next ?? defFont(dark));
     },
-    [fonts, displayTheme]
+    [fonts, displayTheme, defFont]
   );
 
   // Apply (and persist) custom colors. With a `mode`, only that mode's colorset
@@ -777,9 +785,10 @@ export function useLook(
       setScene(packScene(pack, dark), mode);
       setTune(pack.tune ?? null, mode);
       setSceneFx(null, mode);
-      // Fonts only when the pack carries them (#330); else the mode keeps its own.
-      if (pack.font) setFont(pack.font, mode);
-      if (pack.headingFont) setHeadingFont(pack.headingFont, mode);
+      // Its fonts (#330), or the site default's — a pack is a whole look, so
+      // the previous theme's font doesn't stay on under it (#373).
+      setFont(pack.font ?? null, mode);
+      setHeadingFont(pack.headingFont ?? null, mode);
       // Its semantic colors for the mode, or the stylesheet's (#331).
       setStatusColors(status, mode);
       // Its wallpaper (#333), or none — a pack is a whole look, so an admin
@@ -1275,6 +1284,8 @@ export function useLook(
       designFor: (mode: Mode) => resolveDesign(mode === "dark"),
       sceneFor: (mode: Mode) => resolveScene(mode === "dark"),
       fontFor: (mode: Mode) => resolveFont(mode === "dark"),
+      defaultFontFor: (mode: Mode) => defFont(mode === "dark"),
+      defaultHeadingFontFor: (mode: Mode) => defHeading(mode === "dark"),
       tuneFor: (mode: Mode) => resolveTune(mode === "dark"),
       sceneFxFor: (mode: Mode) => resolveSceneFx(mode === "dark"),
       headingFontFor: (mode: Mode) => resolveHeading(mode === "dark"),
@@ -1335,10 +1346,12 @@ export function useLook(
     resolveDesign,
     resolveScene,
     resolveFont,
+    defFont,
     resolveTune,
     resolveSceneFx,
     reduceMotion,
     resolveHeading,
+    defHeading,
     resolveDensity,
     resolveStatus,
     resolveWallpaper,

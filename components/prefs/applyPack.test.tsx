@@ -32,6 +32,7 @@ const WITH_WALLPAPER: ThemePack = {
   ...colors,
 };
 const WITHOUT: ThemePack = { name: "Plain", design: "flat", scene: "none", ...colors };
+const WITH_FONT: ThemePack = { name: "Terminal", design: "console", scene: "glyphs", font: "jetbrains", headingFont: "jetbrains", ...colors };
 
 function Picker() {
   const { applyPack } = useLookPrefs();
@@ -39,6 +40,7 @@ function Picker() {
     <>
       <button onClick={() => applyPack(WITH_WALLPAPER, "dark")}>wallpaper</button>
       <button onClick={() => applyPack(WITHOUT, "dark")}>plain</button>
+      <button onClick={() => applyPack(WITH_FONT, "dark")}>mono</button>
     </>
   );
 }
@@ -48,6 +50,7 @@ const html = () => document.documentElement.style;
 beforeEach(() => {
   window.localStorage.clear();
   document.documentElement.removeAttribute("style");
+  document.documentElement.className = "";
   // jsdom has no matchMedia; "dark" mode never consults it, but the
   // provider's mount listener does.
   window.matchMedia = () =>
@@ -70,6 +73,15 @@ describe("applying a theme pack (#363)", () => {
     expect(html().getPropertyValue("--wallpaper-image")).toContain("linen.svg");
     act(() => screen.getByText("plain").click());
     expect(html().getPropertyValue("--wallpaper-image")).toBe("");
+  });
+
+  it("restores the site default font and heading font for a pack without its own (#373)", () => {
+    const classes = () => [...document.documentElement.classList].filter((c) => /^(font|heading)-/.test(c));
+    act(() => screen.getByText("mono").click());
+    expect(classes()).toEqual(["font-jetbrains", "heading-jetbrains"]);
+    // Jakarta is the site default here and carries no class.
+    act(() => screen.getByText("plain").click());
+    expect(classes()).toEqual([]);
   });
 
   it("paints the pack's tune and status colors in the same click", () => {

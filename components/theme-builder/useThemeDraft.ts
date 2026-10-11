@@ -48,6 +48,8 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     sceneFor,
     setScene,
     fontFor,
+    defaultFontFor,
+    defaultHeadingFontFor,
     setFont,
     tuneFor,
     setTune,
@@ -121,8 +123,8 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     colorSetsEqual(colorsFor(mode), p[mode]) &&
     tunesEqual(tuneFor(mode), p.tune ?? null) &&
     sceneFxEqual(sceneFxFor(mode), null) &&
-    (!p.font || fontFor(mode) === p.font) &&
-    (!p.headingFont || headingFontFor(mode) === p.headingFont) &&
+    fontFor(mode) === (p.font ?? defaultFontFor(mode)) &&
+    headingFontFor(mode) === (p.headingFont ?? defaultHeadingFontFor(mode)) &&
     semanticEqual(statusFor(mode), (mode === "dark" ? p.status : p.statusLight ?? p.status) ?? null) &&
     wallpaperEqual(wallpaperFor(mode), (mode === "dark" ? p.wallpaper : p.wallpaperLight ?? p.wallpaper) ?? null);
   const savedActive = (t: CustomTheme) =>
