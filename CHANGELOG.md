@@ -49,6 +49,22 @@ here.
 
 ### Security
 
+- **Longer lockouts for repeated wrong passwords.** Five wrong attempts
+  from one address still lock it out for five minutes; each further
+  lockout lasts twice as long, up to an hour, until a sign-in succeeds.
+  Confirming your password for a sensitive change is throttled the same
+  way. (#369)
+- **A new password must be at least 12 characters**, and can't be the
+  current one or the container's `ADMIN_PASSWORD`. Existing passwords are
+  not affected. (#369)
+- **The session cookie is bound to the host over HTTPS.** It now carries
+  the `__Host-` prefix when the portal is reached over HTTPS, so a cookie
+  set by another host, path or over plain HTTP can't stand in for it.
+  Plain-HTTP deployments keep working with the bare name. Sessions signed
+  in before this release sign in again once. (#369)
+- **Opt-in HSTS.** Set `HSTS=1` to have the app send
+  `Strict-Transport-Security` on HTTPS responses, for a reverse proxy that
+  doesn't add it itself. (#369)
 - **Sensitive changes ask for your password again.** Changing the password,
   turning two-factor authentication on or off, editing an integration's
   address or credentials or turning its actions on, exporting with secrets,

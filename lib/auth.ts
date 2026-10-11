@@ -5,6 +5,12 @@ import { createSession, touchSession } from "./sessions";
 import { clientIp } from "./rate-limit";
 
 export const SESSION_COOKIE_NAME = "homepage_admin_session";
+// Over HTTPS the cookie carries the __Host- prefix (#369): a browser then
+// refuses it from any other host, path or a Domain attribute, so a cookie
+// planted by a sibling subdomain or over plain HTTP can't stand in for it.
+// Plain-HTTP deployments (a LAN without TLS) keep the bare name, which the
+// prefix's Secure requirement would otherwise make unusable.
+export const SECURE_SESSION_COOKIE_NAME = `__Host-${SESSION_COOKIE_NAME}`;
 const SESSION_DURATION = "7d";
 export const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
 
@@ -57,6 +63,35 @@ export function sessionCookieOptions(request: NextRequest) {
     path: "/",
     maxAge: SESSION_MAX_AGE,
   };
+}
+
+// The cookie name for this request: the __Host- one over HTTPS, else the
+// bare one.
+export function sessionCookieName(request: NextRequest): string {
+  return isHttps(request) ? SECURE_SESSION_COOKIE_NAME : SESSION_COOKIE_NAME;
+}
+
+// The token a request carries, under either name (a deployment can move
+// between HTTP and HTTPS; the stale one is cleared on sign-out).
+export function sessionTokenFrom(cookies: {
+  get: (name: string) => { value: string } | undefined;
+}): string | undefined {
+  return cookies.get(SECURE_SESSION_COOKIE_NAME)?.value ?? cookies.get(SESSION_COOKIE_NAME)?.value;
+}
+
+type CookieJar = {
+  set: (name: string, value: string, options: ReturnType<typeof sessionCookieOptions>) => unknown;
+  delete: (name: string) => unknown;
+};
+
+// Set the session cookie on a response under the name the request calls
+// for, and clear it under both.
+export function setSessionCookie(response: { cookies: CookieJar }, request: NextRequest, token: string): void {
+  response.cookies.set(sessionCookieName(request), token, sessionCookieOptions(request));
+}
+export function clearSessionCookie(response: { cookies: CookieJar }): void {
+  response.cookies.delete(SECURE_SESSION_COOKIE_NAME);
+  response.cookies.delete(SESSION_COOKIE_NAME);
 }
 
 // Whether any admin credential exists: a password set through the UI (stored

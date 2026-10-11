@@ -101,7 +101,7 @@ export default function ChangePassword() {
               onChange={(e) => setCurrent(e.target.value)}
             />
             <TextField
-              label="New password (min 8 characters)"
+              label="New password (min 12 characters)"
               type="password"
               autoComplete="new-password"
               required

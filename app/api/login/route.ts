@@ -3,8 +3,7 @@ import {
   adminPasswordConfigured,
   NO_PASSWORD_MESSAGE,
   issueSession,
-  sessionCookieOptions,
-  SESSION_COOKIE_NAME,
+  setSessionCookie,
 } from "@/lib/auth";
 import { readConfigInternal } from "@/lib/config";
 import { verifyCredentials } from "@/lib/credentials";
@@ -43,7 +42,7 @@ export async function POST(request: NextRequest) {
   // prefix). This is the gate that stops a single attacker; the global backstop
   // below only counts failures so it can't lock the real admin out.
   const throttleKey = clientKey(request, "login");
-  const perClient = rateLimit(throttleKey, MAX_ATTEMPTS, WINDOW_MS);
+  const perClient = rateLimit(throttleKey, MAX_ATTEMPTS, WINDOW_MS, { escalate: true });
   if (!perClient.allowed) {
     // Once per lockout, not per refused request: the first refusal tips it.
     if (perClient.retryAfterSeconds > 0 && !lockedKeys.has(throttleKey)) {
@@ -124,10 +123,6 @@ export async function POST(request: NextRequest) {
   // In the audit log, and out through the channels when the address is new.
   notifySecurityEvent(await recordSecurityEvent("signin.ok", eventMeta(request)));
   const response = NextResponse.json({ ok: true });
-  response.cookies.set(
-    SESSION_COOKIE_NAME,
-    token,
-    sessionCookieOptions(request)
-  );
+  setSessionCookie(response, request, token);
   return response;
 }

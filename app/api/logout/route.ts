@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SESSION_COOKIE_NAME, verifySessionId } from "@/lib/auth";
+import { clearSessionCookie, sessionTokenFrom, verifySessionId } from "@/lib/auth";
 import { isSameOriginRequest } from "@/lib/api-auth";
 import { readConfigInternal } from "@/lib/config";
 import { revokeSession } from "@/lib/sessions";
@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
   }
   // End the session itself, not just the cookie: a copy of the token taken
   // before logout must not keep working (#365).
-  const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+  const token = sessionTokenFrom(request.cookies);
   if (token) {
     const { auth } = await readConfigInternal();
     const id = await verifySessionId(token, auth.passwordHash);
@@ -22,6 +22,6 @@ export async function POST(request: NextRequest) {
     }
   }
   const response = NextResponse.json({ ok: true });
-  response.cookies.delete(SESSION_COOKIE_NAME);
+  clearSessionCookie(response);
   return response;
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifySessionToken, SESSION_COOKIE_NAME } from "@/lib/auth";
+import { isHttps, sessionTokenFrom, verifySessionToken } from "@/lib/auth";
 import { readConfigInternal } from "@/lib/config";
 import { contentSecurityPolicy } from "@/lib/csp";
 
@@ -60,8 +60,14 @@ export async function proxy(request: NextRequest) {
   // The path, for the root layout: a board's own theme (#337) paints from
   // the first byte when the layout knows which board the request shows.
   requestHeaders.set("x-pathname", request.nextUrl.pathname);
+  // HSTS (#369) is opt-in — HSTS=1 — and only on responses that arrived over
+  // HTTPS: TLS normally terminates at the reverse proxy, which usually adds
+  // the header itself; this is for the ones that don't. Never on plain HTTP,
+  // where the header would be ignored at best.
+  const hsts = process.env.HSTS === "1" && isHttps(request);
   const withCsp = (res: NextResponse) => {
     res.headers.set("content-security-policy", csp);
+    if (hsts) res.headers.set("strict-transport-security", "max-age=31536000; includeSubDomains");
     return res;
   };
   const pass = () =>
@@ -70,7 +76,7 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (!needsAuth(pathname)) return pass();
 
-  const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+  const token = sessionTokenFrom(request.cookies);
   // Verify against the current password hash so a password change revokes the
   // session (the proxy runs in the Node runtime, so it can read config).
   const { auth } = await readConfigInternal();

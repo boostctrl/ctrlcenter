@@ -10,7 +10,12 @@ import {
   createSessionToken,
   verifySessionId,
   verifySessionToken,
+  sessionCookieName,
+  sessionTokenFrom,
+  SESSION_COOKIE_NAME,
+  SECURE_SESSION_COOKIE_NAME,
 } from "./auth";
+import { NextRequest } from "next/server";
 import { createSession, revokeSession, revokeSessions } from "./sessions";
 import { SignJWT } from "jose";
 
@@ -216,5 +221,26 @@ describe("session tokens", () => {
     // key now differs, so the previously issued token must no longer verify.
     vi.stubEnv("SESSION_SECRET", "");
     expect(await verifySessionToken(token)).toBe(false);
+  });
+});
+
+describe("session cookie name (#369)", () => {
+  const req = (headers: Record<string, string> = {}, url = "http://dash.lan/") =>
+    new NextRequest(url, { headers });
+
+  it("carries the __Host- prefix over HTTPS and the bare name over HTTP", () => {
+    expect(sessionCookieName(req())).toBe(SESSION_COOKIE_NAME);
+    expect(sessionCookieName(req({}, "https://dash.lan/"))).toBe(SECURE_SESSION_COOKIE_NAME);
+    expect(sessionCookieName(req({ "x-forwarded-proto": "https" }))).toBe(SECURE_SESSION_COOKIE_NAME);
+    expect(SECURE_SESSION_COOKIE_NAME.startsWith("__Host-")).toBe(true);
+  });
+
+  it("reads the token under either name, preferring the secure one", () => {
+    const jar = (entries: Record<string, string>) => ({
+      get: (name: string) => (name in entries ? { value: entries[name] } : undefined),
+    });
+    expect(sessionTokenFrom(jar({}))).toBeUndefined();
+    expect(sessionTokenFrom(jar({ [SESSION_COOKIE_NAME]: "plain" }))).toBe("plain");
+    expect(sessionTokenFrom(jar({ [SECURE_SESSION_COOKIE_NAME]: "secure", [SESSION_COOKIE_NAME]: "plain" }))).toBe("secure");
   });
 });

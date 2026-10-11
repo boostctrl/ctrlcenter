@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { SESSION_COOKIE_NAME, verifySessionId, verifySessionToken } from "./auth";
+import { sessionTokenFrom, verifySessionId, verifySessionToken } from "./auth";
 import { readConfigInternal, stripAuth, stripSecrets } from "./config";
 import type { Config } from "./schema";
 
@@ -36,7 +36,7 @@ export async function adminSessionId(
   if (!isSafeMethod(request.method) && !isSameOriginRequest(request)) {
     return null;
   }
-  const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+  const token = sessionTokenFrom(request.cookies);
   const hash = passwordHash ?? (await readConfigInternal()).auth.passwordHash;
   return verifySessionId(token, hash);
 }
@@ -85,7 +85,7 @@ export function isSameOriginRequest(request: NextRequest): boolean {
 // the session themselves, so this is presentation-only trust. Same optional
 // `passwordHash` fast path as isAdminRequest.
 export async function isAdminSession(passwordHash?: string): Promise<boolean> {
-  const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
+  const token = sessionTokenFrom(await cookies());
   const hash = passwordHash ?? (await readConfigInternal()).auth.passwordHash;
   return verifySessionToken(token, hash);
 }

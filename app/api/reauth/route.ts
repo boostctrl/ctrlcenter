@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   }
   pruneRateLimit();
   const throttleKey = clientKey(request, "reauth");
-  const limited = rateLimit(throttleKey, MAX_ATTEMPTS, WINDOW_MS);
+  const limited = rateLimit(throttleKey, MAX_ATTEMPTS, WINDOW_MS, { escalate: true });
   if (!limited.allowed) {
     return NextResponse.json(
       { error: "Too many attempts. Try again later." },

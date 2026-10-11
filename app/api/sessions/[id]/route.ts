@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminSessionId } from "@/lib/api-auth";
-import { SESSION_COOKIE_NAME } from "@/lib/auth";
+import { clearSessionCookie } from "@/lib/auth";
 import { revokeSession } from "@/lib/sessions";
 import { eventMeta, recordSecurityEvent } from "@/lib/security-events";
 
@@ -18,6 +18,6 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   const ended = await revokeSession(id);
   if (ended) await recordSecurityEvent("session.ended", eventMeta(request), id === current ? "this session" : "another session");
   const response = NextResponse.json({ ok: true, ended, current: id === current });
-  if (id === current) response.cookies.delete(SESSION_COOKIE_NAME);
+  if (id === current) clearSessionCookie(response);
   return response;
 }

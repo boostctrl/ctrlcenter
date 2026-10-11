@@ -34,7 +34,11 @@ unless you'd prefer to stay anonymous.
 ctrlcenter is designed to run **behind a reverse proxy** that terminates TLS and
 is the public entry point. A couple of settings matter for a safe deployment:
 
-- Set a strong `ADMIN_PASSWORD` (or configure a password in the admin portal).
+- Set a strong `ADMIN_PASSWORD` (or configure a password in the admin portal;
+  one set there must be at least 12 characters).
+- Terminate TLS at the proxy. Over HTTPS the session cookie carries the
+  `__Host-` prefix, and `HSTS=1` has the app add `Strict-Transport-Security`
+  if the proxy doesn't.
 - Set `TRUSTED_PROXY_HOPS` to match your proxy chain — in particular, set it to
   `0` if you expose ctrlcenter directly with no proxy, so a client can't spoof
   `X-Forwarded-For` to bypass the per-IP login throttle. With `0`, the Docker

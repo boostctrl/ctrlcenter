@@ -5,8 +5,7 @@ import {
   verifyPasswordHash,
   hashPassword,
   issueSession,
-  sessionCookieOptions,
-  SESSION_COOKIE_NAME,
+  setSessionCookie,
 } from "@/lib/auth";
 import { readConfigInternal, setPasswordHash } from "@/lib/config";
 import { passwordChangeSchema } from "@/lib/schema";
@@ -46,6 +45,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Not the one just typed, and not the container's ADMIN_PASSWORD either:
+  // a stored password that equals the env one changes nothing (#369).
+  if (next === current || verifyEnvPassword(next)) {
+    return NextResponse.json(
+      { error: "Choose a password you haven't used here before" },
+      { status: 400 }
+    );
+  }
   const { hash, salt } = await hashPassword(next);
   await setPasswordHash(hash, salt);
 
@@ -57,10 +64,6 @@ export async function POST(request: NextRequest) {
   const { token } = await issueSession(request, hash);
   notifySecurityEvent(await recordSecurityEvent("password.changed", eventMeta(request)));
   const response = NextResponse.json({ ok: true });
-  response.cookies.set(
-    SESSION_COOKIE_NAME,
-    token,
-    sessionCookieOptions(request)
-  );
+  setSessionCookie(response, request, token);
   return response;
 }

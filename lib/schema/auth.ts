@@ -35,7 +35,7 @@ export const totpDisableSchema = z.object({ code: z.string() });
 // Change-password (POST /api/password).
 export const passwordChangeSchema = z.object({
   current: z.string(),
-  next: z.string().min(8, "New password must be at least 8 characters"),
+  next: z.string().min(12, "New password must be at least 12 characters"),
 });
 
 // The idle timeout (PATCH /api/sessions, #365): a session unused for this
