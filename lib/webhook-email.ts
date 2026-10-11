@@ -3,8 +3,10 @@
 // produce. Pure string building — no templating library — and client-safe (no
 // lib/log.ts, no node:*, no process.env) so an admin preview can run it in the
 // browser later. Every payload-derived string passes escapeHtml; only http(s)
-// URLs become an href and only https ones an image, so a hostile payload can
-// print text but never a link.
+// URLs become an href, and only https URLs — plus the inline data:image/*
+// tile the admin preview (#347) hands in — an image. The parsers
+// (lib/webhooks.ts httpsUrl) never emit data:, so a hostile payload can
+// print text but never a link or an image.
 
 import { formatInZone, normalizeIntlSpaces } from "./datetime";
 import {
@@ -282,6 +284,12 @@ function relayOf(r: WebhookReport): string {
 // that carries none.
 type Sheet = Omit<WebhookReport, "service" | "eventType">;
 
+// What the synopsis switch hides: the plot overview, the one message that
+// can spoil (the parsers label only that "Overview"). A failure reason, a
+// health message, update notes, an issue's description or comment stay —
+// they are the point of their event.
+const spoiler = (r: Sheet, o: ReportOptions) => o.synopsis === false && r.messageLabel === "Overview";
+
 function sheetOf(c: WebhookNotification): Sheet {
   if (c.report) return c.report;
   return {
@@ -335,7 +343,7 @@ ${styleBlock()}
 ${bandHtml(r.app, r.event, r.level)}
 ${headlineHtml(r, poster)}
 ${o.facts === false ? "" : factsHtml(r.facts)}
-${o.synopsis === false ? "" : messageHtml(r.messageLabel ?? "Message", r.message)}
+${spoiler(r, o) ? "" : messageHtml(r.messageLabel ?? "Message", r.message)}
 ${buttonHtml(r.link)}
 <tr><td height="32" style="height:32px;font-size:0;line-height:0">&nbsp;</td></tr>
 </table>
@@ -400,7 +408,7 @@ function renderText(c: WebhookNotification, ctx: NotificationContext): string {
       wrap(shown, TEXT_WIDTH - LABEL_COL).forEach((line, i) => out.push(`${i === 0 ? label : pad}${line}`));
     }
   }
-  if (o.synopsis !== false && r.message) {
+  if (!spoiler(r, o) && r.message) {
     out.push("-".repeat(RULE), (r.messageLabel ?? "Message").toUpperCase());
     out.push(...wrap(clamp(r.message, 600), TEXT_WIDTH));
   }

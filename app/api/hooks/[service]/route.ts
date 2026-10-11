@@ -124,7 +124,9 @@ export async function POST(
       windowMs,
       send: async (merged) => {
         // Read the config afresh: a channel added or edited while the burst
-        // was pending is honoured, and one removed meanwhile isn't sent to.
+        // was pending is honoured, one removed meanwhile isn't sent to, and
+        // a report-option toggle (#347) flipped meanwhile applies when it
+        // goes out.
         const { settings } = await readConfigInternal();
         if (!anyChannelReady(settings.alerts)) {
           log.info("webhook digest dropped: no alert channel configured", { service });
@@ -145,8 +147,6 @@ export async function POST(
     log.debug("webhook digest store full, relaying at once", { service, key });
   }
 
-  // The report options (#347) are read with the rest of the settings, so a
-  // toggle flipped while a burst was pending applies when it goes out.
   await sendNotification(settings.alerts, notification, {
     at: Date.now(),
     timeZone: settings.timezone,

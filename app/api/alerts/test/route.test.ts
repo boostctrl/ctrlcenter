@@ -4,10 +4,18 @@ import * as YAML from "js-yaml";
 import { useScratchConfig, request, adminSession } from "@/lib/testing/routes";
 
 // Send test / Send sample (#291, #347): admin-only, through the saved
-// channels. One webhook channel is seeded, and a subject prefix so a sample
-// shows the saved options applying.
+// channels. A webhook channel and an email channel are seeded, and a subject
+// prefix: it reaches only an email's subject, so the sample test reads the
+// saved options applying off the mail (the renderer's options are covered in
+// lib/alerts.test.ts).
 let POST: typeof import("./route").POST;
 let session: string;
+
+// Stub nodemailer's transport so the email path runs without SMTP.
+const { sendMailMock } = vi.hoisted(() => ({ sendMailMock: vi.fn() }));
+vi.mock("nodemailer", () => ({
+  default: { createTransport: () => ({ sendMail: sendMailMock }) },
+}));
 
 beforeAll(async () => {
   const configPath = await useScratchConfig();
@@ -15,7 +23,12 @@ beforeAll(async () => {
     configPath,
     YAML.dump({
       settings: {
-        alerts: { channels: [{ id: "c1", type: "webhook", url: "https://hook.test" }] },
+        alerts: {
+          channels: [
+            { id: "c1", type: "webhook", url: "https://hook.test" },
+            { id: "mail", type: "email", smtp: { host: "smtp.test", from: "a@x", to: "b@y" } },
+          ],
+        },
         webhooks: { subjectPrefix: "[Lab]" },
       },
     }),
@@ -30,6 +43,7 @@ let fetchMock: ReturnType<typeof vi.fn>;
 beforeEach(() => {
   fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
   vi.stubGlobal("fetch", fetchMock);
+  sendMailMock.mockReset().mockResolvedValue({});
 });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -49,6 +63,7 @@ describe("POST /api/alerts/test", () => {
     expect(res.status).toBe(400);
     expect(typeof (await res.json()).error).toBe("string");
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(sendMailMock).not.toHaveBeenCalled();
   });
 
   it("sends the synthetic down alert for a channel, or bodyless to every active one", async () => {
@@ -57,20 +72,31 @@ describe("POST /api/alerts/test", () => {
       results: [{ id: "c1", label: "Webhook", ok: true, detail: "HTTP 204" }],
     });
     expect(posted().status).toBe("down");
+    expect(sendMailMock).not.toHaveBeenCalled();
     fetchMock.mockClear();
     expect(await (await post()).json()).toEqual({
-      results: [{ id: "c1", label: "Webhook", ok: true, detail: "HTTP 204" }],
+      results: [
+        { id: "c1", label: "Webhook", ok: true, detail: "HTTP 204" },
+        { id: "mail", label: "Email (SMTP)", ok: true, detail: "sent" },
+      ],
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(sendMailMock).toHaveBeenCalledTimes(1);
   });
 
   it("sends a sample event through the channels that take inbound webhooks, with the saved options (#347)", async () => {
     const res = await post({ sample: "sonarr-import" });
     expect(await res.json()).toEqual({
-      results: [{ id: "c1", label: "Webhook", ok: true, detail: "HTTP 204" }],
+      results: [
+        { id: "c1", label: "Webhook", ok: true, detail: "HTTP 204" },
+        { id: "mail", label: "Email (SMTP)", ok: true, detail: "sent" },
+      ],
     });
     expect(fetchMock.mock.calls[0][0]).toBe("https://hook.test");
     // The default burst window is on, so the season goes merged.
     expect(posted().title).toBe("Sonarr imported 8 episodes of The Bear (S04E01-E08)");
+    // The saved subject prefix leads the email's subject.
+    expect(sendMailMock).toHaveBeenCalledTimes(1);
+    expect(sendMailMock.mock.calls[0][0].subject).toBe("[Lab] [Sonarr] Imported: The Bear S04E01-E08");
   });
 });

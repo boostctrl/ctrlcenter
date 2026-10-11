@@ -13,6 +13,7 @@ import {
   type WebhookReport,
 } from "./webhooks";
 import { buildNotificationRequest } from "./alerts";
+import { buildSubject } from "./webhook-email";
 
 const POSTER = "https://artworks.thetvdb.com/banners/posters/the-bear.jpg";
 const series = {
@@ -112,6 +113,17 @@ describe("parseArrWebhook (Sonarr/Radarr)", () => {
     expect(fact(n?.report, "Quality")?.value).toBe("WEBDL-1080p · 1920×1080 h264 · EAC3 5.1");
     expect(fact(n?.report, "Replaced")?.value).toBe("HDTV-720p");
     expect(fact(n?.report, "Download client")?.value).toBe("SABnzbd");
+  });
+
+  it("shows an air date only when every episode carries the same one", () => {
+    const subtitle = (eps: Record<string, unknown>[]) =>
+      parseArrWebhook("sonarr", { eventType: "Grab", series, episodes: eps })?.report?.subtitle;
+    const dated = { seasonNumber: 4, episodeNumber: 1, airDate: "2025-06-25" };
+    // One episode TBA, or a template placeholder left in: no shared date.
+    expect(subtitle([dated, { seasonNumber: 4, episodeNumber: 2 }])).toBe("Season 4 · Episodes 1–2");
+    expect(subtitle([dated, { seasonNumber: 4, episodeNumber: 2, airDate: "{{AirDate}}" }])).toBe("Season 4 · Episodes 1–2");
+    expect(subtitle([dated, { seasonNumber: 4, episodeNumber: 2, airDate: "2025-07-02" }])).toBe("Season 4 · Episodes 1–2");
+    expect(subtitle(episodes)).toBe("Season 4 · Episodes 3–4 · Aired Jun 25, 2025");
   });
 
   it("folds a season pack's episodeFiles[] into counts and a summed size", () => {
@@ -227,7 +239,9 @@ describe("parseArrWebhook (Sonarr/Radarr)", () => {
       newVersion: "5.0.2",
       message: "Radarr updated from 5.0.1 to 5.0.2",
     });
-    expect(updated?.title).toBe("Radarr updated: 5.0.1 → 5.0.2");
+    expect(updated?.title).toBe("Radarr updated: 5.0.1 to 5.0.2");
+    // The title heads ntfy's Title header, which goes only when ASCII.
+    expect(/^[\x20-\x7E]*$/.test(updated!.title)).toBe(true);
     expect(updated?.report?.headline).toBe("Version 5.0.2");
     const deleted = parseArrWebhook("radarr", {
       eventType: "MovieFileDelete",
@@ -249,6 +263,19 @@ describe("parseArrWebhook (Sonarr/Radarr)", () => {
     expect(attention?.report?.message).toBe("The.Bear.S04E03.mkv: No files found; Sample");
     const unknown = parseArrWebhook("sonarr", { eventType: "SomethingNew", series: { title: "Silo" } });
     expect(unknown?.title).toBe("Sonarr something new: Silo");
+  });
+
+  it("names a download no series matched by the download itself, not \"Untitled\"", () => {
+    const n = parseArrWebhook("sonarr", {
+      eventType: "ManualInteractionRequired",
+      series: null,
+      episodes: [],
+      downloadInfo: { title: "Some.Show.S01E01.1080p.WEB-GRP" },
+      downloadStatusMessages: [{ title: "Some.Show.S01E01.1080p.WEB-GRP", messages: ["Series title mismatch"] }],
+    });
+    expect(n?.title).toBe("Sonarr needs attention: Some.Show.S01E01.1080p.WEB-GRP");
+    expect(n?.report?.headline).toBe("Some.Show.S01E01.1080p.WEB-GRP");
+    expect(buildSubject(n!)).toBe("[Sonarr] Needs attention: Some.Show.S01E01.1080p.WEB-GRP");
   });
 
   it("takes only https artwork, never the app-local url, and drops a null-suffixed one", () => {
@@ -425,6 +452,12 @@ describe("report helpers", () => {
     expect(fmtBytes(851443712)).toBe("812 MB");
     expect(fmtBytes(62599148339)).toBe("58.3 GB");
     expect(fmtBytes(512)).toBe("512 B");
+    // A value that rounds to 1024 of a unit rolls over to the next.
+    expect(fmtBytes(1048575)).toBe("1 MB");
+    expect(fmtBytes(1073741823)).toBe("1 GB");
+    expect(fmtBytes(1073741824)).toBe("1 GB");
+    expect(fmtBytes(1099468678103)).toBe("1 TB");
+    expect(fmtBytes(1023 * 1024 ** 3)).toBe("1023 GB");
     expect(fmtBytes(0)).toBe("");
     expect(fmtBytes("1")).toBe("");
   });
@@ -635,7 +668,7 @@ const requested = (id: number, by: string, subject = `Title ${id} (2024)`) =>
 // arrival order.
 const groupOf = (ns: WebhookNotification[], dropped = 0): DigestGroup => {
   const items = new Map(ns.flatMap((n) => n.digest?.items ?? []).map((it) => [it.id, it]));
-  return { first: ns[0], events: ns.length, items: [...items.values()], dropped };
+  return { first: ns[0], last: ns[ns.length - 1], events: ns.length, items: [...items.values()], dropped };
 };
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
 
@@ -646,6 +679,7 @@ describe("digest membership (#346)", () => {
       key: "sonarr|Sonarr|Download|1",
       lead: "Sonarr imported {n} episodes of The Bear",
       headline: "The Bear",
+      event: "Imported",
       noun: "episodes",
     });
     expect(n.digest?.items).toEqual([
@@ -662,7 +696,11 @@ describe("digest membership (#346)", () => {
         link: { label: "Open in Sonarr", url: "https://sonarr.lan" },
       },
     ]);
-    expect(imported(3, { isUpgrade: true }).digest?.lead).toBe("Sonarr upgraded {n} episodes of The Bear");
+    // An upgrade joins the series' import group under the group's own label;
+    // sent alone it keeps its own verb.
+    const upgrade = imported(3, { isUpgrade: true });
+    expect(upgrade.digest).toMatchObject({ lead: "Sonarr imported {n} episodes of The Bear", event: "Imported" });
+    expect(upgrade.title).toBe("Sonarr upgraded: The Bear S04E03");
     const grab = parseArrWebhook("sonarr", {
       eventType: "Grab",
       series,
@@ -812,6 +850,8 @@ describe("digest membership (#346)", () => {
     expect(n.digest?.headline.length).toBeLessThanOrEqual(120);
     const long = parseSeerrWebhook({ notification_type: "MEDIA_PENDING", subject: "S".repeat(500) });
     expect(long?.digest?.items[0].label.length).toBeLessThanOrEqual(120);
+    const odd = parseArrWebhook("sonarr", { eventType: "X".repeat(300), series: { title: "Silo" } });
+    expect(odd?.digest?.event.length).toBeLessThanOrEqual(120);
   });
 });
 
@@ -900,11 +940,27 @@ describe("mergeDigest (#346)", () => {
     expect(fact(one.report, "Requested by")?.value).toBe("Sam");
   });
 
-  it("sends a group of one event, or one item, unchanged", () => {
+  it("labels a burst mixing imports and upgrades by the group, not by whichever event opened it", () => {
+    const fresh = range(1, 2).map((e) => imported(e));
+    const upgraded = range(3, 8).map((e) => imported(e, { isUpgrade: true, deletedFiles: [{ quality: "HDTV-720p" }] }));
+    const m = mergeDigest(groupOf([...fresh, ...upgraded]));
+    expect(m.title).toBe("Sonarr imported 8 episodes of The Bear (S04E01-E08)");
+    expect(m.report).toMatchObject({ event: "Imported", level: "success" });
+    const reversed = mergeDigest(groupOf([...upgraded, ...fresh]));
+    expect(reversed.title).toBe("Sonarr imported 8 episodes of The Bear (S04E01-E08)");
+    expect(reversed.report).toMatchObject({ event: "Imported", level: "success" });
+    // A lone upgrade keeps its own verb.
+    expect(mergeDigest(groupOf([upgraded[0]])).title).toBe("Sonarr upgraded: The Bear S04E03");
+  });
+
+  it("sends a group of one event unchanged, and the latest event when every one was about one item", () => {
     const only = imported(3);
     expect(mergeDigest(groupOf([only]))).toBe(only);
-    const twice = [imported(3), imported(3)];
-    expect(mergeDigest(groupOf(twice))).toBe(twice[0]);
+    // A resend, or an upgrade of the episode just imported: the later event
+    // supersedes the first, which would describe a file already replaced.
+    const twice = [imported(3), imported(3, { isUpgrade: true, episodeFile: { quality: "Bluray-1080p" } })];
+    expect(mergeDigest(groupOf(twice))).toBe(twice[1]);
+    expect(mergeDigest({ ...groupOf(twice), last: undefined })).toBe(twice[0]);
     const pack = parseArrWebhook("sonarr", {
       eventType: "Download",
       series,

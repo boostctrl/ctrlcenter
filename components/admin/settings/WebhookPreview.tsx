@@ -3,7 +3,7 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import type { AlertConfig, WebhooksConfig } from "@/lib/schema";
 import { CHANNEL_LABELS, activeChannels, channelLabel } from "@/lib/alert-channels";
-import { buildNotificationEmail, buildPreheader } from "@/lib/webhook-email";
+import { buildNotificationEmail, buildPreheader, cleanHeader } from "@/lib/webhook-email";
 import {
   SAMPLE_AT,
   SAMPLE_IDS,
@@ -83,8 +83,12 @@ export default function WebhookPreview({
   // The frame trails typing by a beat while the subject row keeps up.
   const deferredHtml = useDeferredValue(html);
   const preheader = buildPreheader(notification);
-  // A word-cut summary ends in the renderer's ellipsis.
-  const cut = email.subject.endsWith("…");
+  // Whatever buildSubject took off the summary counts as shortened: a
+  // trailing year goes first, silently, then words with an ellipsis — so the
+  // subject is checked against the summary itself. Without a report only the
+  // ellipsis can tell.
+  const summary = notification.report ? cleanHeader(notification.report.summary) : "";
+  const cut = email.subject.endsWith("…") || (!!notification.report && !email.subject.endsWith(summary));
   const receivers = activeChannels(alerts).filter((ch) => ch.onWebhooks);
   const label = SAMPLE_LABELS[sample];
 
@@ -177,7 +181,15 @@ export default function WebhookPreview({
                     <span className="ml-2 text-xs text-ink-45">{CHANNEL_LABELS[ch.type]}</span>
                   )}
                 </span>
-                <AlertTest channel={ch.id} sample={sample} ready saving={saving} />
+                {/* Named per channel for assistive tech: the row's channel
+                    name is a sibling, not part of the button's name. */}
+                <AlertTest
+                  channel={ch.id}
+                  sample={sample}
+                  ready
+                  saving={saving}
+                  ariaLabel={`Send sample to ${channelLabel(ch)}`}
+                />
               </div>
             ))}
           </div>

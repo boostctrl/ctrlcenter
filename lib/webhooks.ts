@@ -94,6 +94,11 @@ export type WebhookDigest = {
   key: string;
   lead: string;
   headline: string;
+  // The merged report's event label — the group's, not the opening event's:
+  // a Download burst says "Imported" whether its files were new or upgrades
+  // (the key doesn't tell them apart), so a burst mixing both is never
+  // mislabelled. Its level is the opener's; labels sharing a key share one.
+  event: string;
   noun: DigestNoun;
   items: DigestItem[];
 };
@@ -110,11 +115,14 @@ export type WebhookNotification = {
 };
 
 // A burst as the digest store hands it to mergeDigest(): the first event
-// whole (sent unchanged when it stayed alone), how many events joined, the
-// items kept (deduped by id, in arrival order) and how many were dropped past
-// the store's cap — counted so the merged title stays honest.
+// whole (sent unchanged when it stayed alone), the last one (sent when every
+// event was about the one item — an upgrade re-import supersedes the import
+// it replaced), how many events joined, the items kept (deduped by id, in
+// arrival order) and how many were dropped past the store's cap — counted so
+// the merged title stays honest.
 export type DigestGroup = {
   first: WebhookNotification;
+  last?: WebhookNotification;
   events: number;
   items: DigestItem[];
   dropped: number;
@@ -122,8 +130,8 @@ export type DigestGroup = {
 
 // What a renderer needs beyond the notification: when it happened, the site's
 // zone for the local-time line, the site title for the footer, and the admin's
-// report options — every field defaults to the full report; the settings that
-// feed them come later (#347).
+// report options, taken from settings.webhooks through reportOptions() below
+// (#347) — every field defaults to the full report.
 export type ReportOptions = {
   poster?: boolean;
   facts?: boolean;
@@ -220,7 +228,13 @@ export function fmtBytes(n: unknown): string {
     v /= 1024;
     i += 1;
   }
-  const s = i < 3 ? String(Math.round(v)) : v.toFixed(1).replace(/\.0$/, "");
+  let s = i < 3 ? String(Math.round(v)) : v.toFixed(1).replace(/\.0$/, "");
+  // The unit is picked before rounding, so 1023.6 MB would print as "1024
+  // MB": a rounded 1024 rolls over to one of the next unit (never past TB).
+  if (Number(s) >= 1024 && i < units.length - 1) {
+    i += 1;
+    s = "1";
+  }
   return `${s} ${units[i]}`;
 }
 
@@ -395,8 +409,10 @@ function episodeSubtitle(eps: Episode[]): string {
   } else {
     parts.push(`Seasons ${runs(seasons, String)}`, `${eps.length} episodes`);
   }
-  const dates = unique(eps.map((e) => e.airDate));
-  const aired = dates.length === 1 ? fmtDate(dates[0]) : "";
+  // Every episode, not every episode with a date: unique() drops an empty
+  // one, and a pair with one TBA episode would read as aired together.
+  const dates = eps.map((e) => e.airDate);
+  const aired = dates[0] && dates.every((d) => d === dates[0]) ? fmtDate(dates[0]) : "";
   if (aired) parts.push(`Aired ${aired}`);
   return parts.join(" · ");
 }
@@ -526,6 +542,7 @@ function digestOf(d: WebhookDigest): WebhookDigest {
     ...d,
     lead: clamp(d.lead, MAX_LEAD),
     headline: clamp(d.headline, MAX_LABEL),
+    event: clamp(d.event, MAX_LABEL),
     items: d.items.map((it) => ({ ...it, label: clamp(it.label, MAX_LABEL) })),
   };
 }
@@ -574,6 +591,7 @@ function arrDigest(
       key: `sonarr|${instanceKey(r)}|${keyPart(r.eventType)}|${keyPart(String(sid))}`,
       lead: digestLead(r.app, r.event, "episodes", ` of ${media.title}`),
       headline: media.title,
+      event: r.event,
       noun: "episodes",
       // A multi-episode event's quality, indexer and client hold for each of
       // its episodes; its size belongs to the event (one file can span two
@@ -596,6 +614,7 @@ function arrDigest(
     key: `${service}|${instanceKey(r)}|${keyPart(r.eventType)}`,
     lead: digestLead(r.app, r.event, movie ? "movies" : "series"),
     headline: r.app,
+    event: r.event,
     noun: movie ? "movies" : "series",
     items: [
       {
@@ -733,7 +752,11 @@ export function parseArrWebhook(service: ArrService, payload: unknown): WebhookN
       push(facts, "Release", str(release.releaseTitle) || str(file.sceneName), { mono: true });
       const upgrade = p.isUpgrade === true;
       const event = upgrade ? "Upgraded" : "Imported";
-      const digest = arrDigest(service, p, { ...base, event }, media, {
+      // The digest takes `base` — "Imported" — not the event's own verb: a
+      // burst groups by eventType, so a season pack filling some gaps and
+      // replacing other files joins one group, and "imported" is true of
+      // every file in it. A lone upgrade still goes out as "upgraded".
+      const digest = arrDigest(service, p, base, media, {
         quality: plain || undefined,
         sizeBytes: bytes || undefined,
         indexer: indexer || undefined,
@@ -776,8 +799,13 @@ export function parseArrWebhook(service: ArrService, payload: unknown): WebhookN
         .filter(Boolean)
         .join("\n");
       const message = clamp(status, MAX_MESSAGE);
+      // The usual trigger is a download Sonarr can't match to a series (or
+      // Radarr to a movie): the payload names no media, so the download's
+      // own name heads the report rather than "Untitled".
       return toContent({
         ...base,
+        headline: media.title || str(info.title) || event,
+        summary: media.summary || str(info.title) || "Untitled",
         facts,
         message: message || undefined,
         messageLabel: message ? "Message" : undefined,
@@ -820,7 +848,9 @@ export function parseArrWebhook(service: ArrService, payload: unknown): WebhookN
         ...base,
         headline: next ? `Version ${next}` : event,
         subtitle: undefined,
-        summary: prev && next ? `${prev} → ${next}` : next || message || event,
+        // Joined in ASCII, not with an arrow: the summary heads the title,
+        // and ntfy's Title header goes only when that is ASCII-safe.
+        summary: prev && next ? `${prev} to ${next}` : next || message || event,
         image: undefined,
         facts,
         message: message || undefined,
@@ -998,6 +1028,7 @@ export function parseSeerrWebhook(payload: unknown): WebhookNotification | null 
           key: `seerr|${keyPart(nt)}`,
           lead: SEERR_DIGEST_LEADS[nt] ?? `Seerr ${lowerFirst(event)}: {n} requests`,
           headline: "Seerr",
+          event,
           noun: "requests",
           items: [
             {
@@ -1080,14 +1111,16 @@ function uniform(items: DigestItem[], pick: (it: DigestItem) => string | undefin
 // episodes of The Bear (S04E01-E08)" — over a body listing up to eight items,
 // and a report whose facts list the items and carry a quality, indexer,
 // client or requester only when the items agree, and a size only when every
-// item had one (their sum). A group that saw one event, or holds one item,
-// sends that event unchanged: its own wording and facts say more than a
-// count of one. Pure, so it is unit-tested apart from the timers that decide
-// when it runs.
+// item had one (their sum). A group that saw one event sends it unchanged,
+// and one that holds one item sends the latest event about it unchanged (a
+// re-import or an upgrade of the same episode supersedes what it replaced):
+// their own wording and facts say more than a count of one. Pure, so it is
+// unit-tested apart from the timers that decide when it runs.
 export function mergeDigest(g: DigestGroup): WebhookNotification {
   const d = g.first.digest;
   const n = g.items.length + g.dropped;
-  if (!d || g.events === 1 || n === 1) return g.first;
+  if (!d || g.events === 1) return g.first;
+  if (n === 1) return g.last ?? g.first;
   const coded = g.items.every((it) => it.season !== undefined && it.episode !== undefined);
   const items = coded
     ? [...g.items].sort((a, b) => (a.season ?? 0) - (b.season ?? 0) || (a.episode ?? 0) - (b.episode ?? 0))
@@ -1129,7 +1162,7 @@ export function mergeDigest(g: DigestGroup): WebhookNotification {
       app: r.app,
       instance: r.instance,
       eventType: r.eventType,
-      event: r.event,
+      event: d.event,
       level: r.level,
       headline: d.headline,
       subtitle,

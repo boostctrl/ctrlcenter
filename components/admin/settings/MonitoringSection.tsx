@@ -162,16 +162,17 @@ export default function MonitoringSection({
                 above. Events have nowhere to go until then.
               </p>
             )}
-            {/* A hand-edited value outside the presets (the schema allows
+            {/* Stacked, not a ControlRow: five chips beside a label don't
+                fit a phone-width card, and a ChipGroup never wraps. A
+                hand-edited value outside the presets (the schema allows
                 0–300) shows as a read-only chip, as the uptime interval
                 does, so the control never reads as "nothing selected". */}
-            <ControlRow
-              label="Group bursts for"
-              hint="Events of one kind — a season's episodes, a batch of movies, a run of requests — that arrive within this long of each other go out as one notification. Off sends each as it arrives. Health issues, updates and a sender's Test are never held."
-            >
+            <div className="flex flex-col gap-1.5">
+              <span className={fieldLabelClasses}>Group bursts for</span>
               <ChipGroup
                 label="Group bursts for"
-                shrink
+                size="xs"
+                fit
                 options={DIGEST_PRESETS.map((s) => ({
                   value: s,
                   label: digestPresetLabel(s),
@@ -180,7 +181,14 @@ export default function MonitoringSection({
                 onChange={(digestSeconds) => updateWebhooks({ digestSeconds })}
                 offLabel={(s) => `${s} s`}
               />
-            </ControlRow>
+              <Hint>
+                Events of one kind — a season&apos;s episodes, a batch of
+                movies, a run of requests — that arrive within this long of
+                each other go out as one notification. Off sends each as it
+                arrives. Health issues, updates, failed downloads and a
+                sender&apos;s Test are never held.
+              </Hint>
+            </div>
             {WEBHOOK_SERVICES.map((svc) => {
               const w = webhooks[svc];
               return (
@@ -231,7 +239,7 @@ export default function MonitoringSection({
               />
               <ToggleRow
                 label="Synopsis"
-                hint="The overview Radarr and Seerr send, or Sonarr's episode summary, which can spoil an episode."
+                hint="The overview Radarr and Seerr send with a movie or a request, which can spoil it. A failure reason, a health message or an issue comment always shows."
                 checked={webhooks.synopsis}
                 onChange={(synopsis) => updateWebhooks({ synopsis })}
               />

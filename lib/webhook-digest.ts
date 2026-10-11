@@ -22,15 +22,19 @@ import { keyForLog, mergeDigest, type DigestItem, type WebhookNotification } fro
 export type DigestSend = (c: WebhookNotification) => Promise<void>;
 
 // Bounds. A whole-series import can run to hundreds of events; past the kept
-// cap the rest are counted, not kept, so the merged title stays honest ("and
-// 40 more") without the group growing with the burst. The hard cap keeps a
-// steady drip from sliding the window forever. The group cap bounds the
-// store itself: a key is the sender's text (an event type, a title), so one
-// sender could open a group per event; past this many pending, a new key is
-// not held and the caller relays its event at once. Sixty-four is far past
-// the honest case — a few series importing at once, each its own group.
+// cap the rest are counted, not kept — by id, so a repeat of one counts once
+// (the ids kept for that are bounded too, far past any honest burst; past
+// them a repeat counts again) — and so are the items past the per-event
+// read cap, so the merged title stays honest ("and 40 more") without the
+// group growing with the burst. The hard cap keeps a steady drip from
+// sliding the window forever. The group cap bounds the store itself: a key
+// is the sender's text (an event type, a title), so one sender could open a
+// group per event; past this many pending, a new key is not held and the
+// caller relays its event at once. Sixty-four is far past the honest case —
+// a few series importing at once, each its own group.
 const MAX_EVENT_ITEMS = 200;
 const MAX_ITEMS = 100;
+const MAX_DROPPED_IDS = 10 * MAX_ITEMS;
 const MAX_GROUPS = 64;
 const CAP_WINDOWS = 5;
 const MAX_CAP_MS = 10 * 60 * 1000;
@@ -38,10 +42,14 @@ const MAX_CAP_MS = 10 * 60 * 1000;
 type Group = {
   key: string;
   first: WebhookNotification;
+  // The latest event: what goes out when every event was about one item.
+  last: WebhookNotification;
   events: number;
   firstAt: number;
   items: Map<string, DigestItem>;
   dropped: number;
+  // The ids counted past the kept cap, so a repeat of one counts once.
+  droppedIds: Set<string>;
   // Unset only between opening the group and arming it, a few lines apart.
   timer?: ReturnType<typeof setTimeout>;
   send: DigestSend;
@@ -54,7 +62,9 @@ const state = globalSingleton("__ctrlcenterWebhookDigest", () => ({
 // Add an event to its group, opening one when none is pending, and (re)arm
 // the group's timer: one window from now, but never past the cap counted
 // from the group's first event. The group keeps the delivery callback it was
-// opened with. A resent item (same id) replaces the kept one in place.
+// opened with. A later event about a kept item (same id — an upgrade of an
+// episode just imported, a resend) replaces it in place and, when it stays
+// the group's only item, is what goes out in place of the first.
 // Returns whether the event is held: not when it names no digest, nor when
 // its key is new and MAX_GROUPS groups are pending — the caller then relays
 // it at once, as with the window off.
@@ -69,15 +79,32 @@ export function holdForDigest(
   if (g) {
     clearTimeout(g.timer);
     g.events += 1;
+    g.last = n;
   } else {
     if (state.groups.size >= MAX_GROUPS) return false;
-    g = { key: d.key, first: n, events: 1, firstAt: now, items: new Map(), dropped: 0, send: o.send };
+    g = {
+      key: d.key,
+      first: n,
+      last: n,
+      events: 1,
+      firstAt: now,
+      items: new Map(),
+      dropped: 0,
+      droppedIds: new Set(),
+      send: o.send,
+    };
     state.groups.set(d.key, g);
   }
   for (const it of d.items.slice(0, MAX_EVENT_ITEMS)) {
     if (g.items.has(it.id) || g.items.size < MAX_ITEMS) g.items.set(it.id, it);
-    else g.dropped += 1;
+    else if (!g.droppedIds.has(it.id)) {
+      if (g.droppedIds.size < MAX_DROPPED_IDS) g.droppedIds.add(it.id);
+      g.dropped += 1;
+    }
   }
+  // Items past the per-event read cap were never looked at, so they can't
+  // be deduped, but they count: the merged title says how many there were.
+  if (d.items.length > MAX_EVENT_ITEMS) g.dropped += d.items.length - MAX_EVENT_ITEMS;
   const capMs = Math.min(o.windowMs * CAP_WINDOWS, MAX_CAP_MS);
   const due = Math.min(now + o.windowMs, g.firstAt + capMs);
   const key = d.key;
@@ -98,6 +125,7 @@ async function flush(key: string): Promise<void> {
   state.groups.delete(key);
   const merged = mergeDigest({
     first: g.first,
+    last: g.last,
     events: g.events,
     items: [...g.items.values()],
     dropped: g.dropped,

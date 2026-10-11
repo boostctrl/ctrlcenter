@@ -196,7 +196,7 @@ describe("buildNotificationEmail", () => {
     expect(html).toContain("see here");
   });
 
-  it("links http(s) and shows an image only for https", () => {
+  it("links http(s) and shows an image only for https, or the preview's inline data: poster", () => {
     const ok = buildNotificationEmail(withReport({ link: { label: "Open", url: "https://sonarr.lan/x" } }), ctx);
     expect(ok.html).toContain('href="https://sonarr.lan/x"');
     const plain = buildNotificationEmail(
@@ -210,6 +210,12 @@ describe("buildNotificationEmail", () => {
     );
     expect(secure.html).toContain('<img src="https://artworks.thetvdb.com/p.jpg"');
     expect(secure.html).not.toContain("data:");
+    // The admin preview's placeholder tile: an inline image, fetching nothing.
+    const inline = buildNotificationEmail(
+      withReport({ image: { url: "data:image/svg+xml,%3Csvg%2F%3E", alt: "Poster" } }),
+      ctx
+    );
+    expect(inline.html).toContain('<img src="data:image/svg+xml,%3Csvg%2F%3E"');
   });
 
   it("escapes every payload string: headline, subtitle, alt, facts, message, preheader", () => {
@@ -260,6 +266,31 @@ describe("buildNotificationEmail", () => {
     const prefixed = buildNotificationEmail(n, { ...ctx, options: { subjectPrefix: "[Home]" } });
     expect(prefixed.subject).toBe("[Home] [Sonarr] Grabbed: The Bear S04E03");
     expect(prefixed.html).toContain("<title>[Home] [Sonarr] Grabbed: The Bear S04E03</title>");
+  });
+
+  it("hides only the overview when the synopsis is off; a failure reason, a health message or a comment stays", () => {
+    const off = { ...ctx, options: { synopsis: false } };
+    const failed = parseArrWebhook("sonarr", {
+      eventType: "DownloadFailed",
+      series: { title: "The Bear" },
+      episodes: [{ seasonNumber: 4, episodeNumber: 3 }],
+      message: "Download failed: torrent stalled",
+    })!;
+    const failure = buildNotificationEmail(failed, off);
+    expect(failure.html).toContain("Download failed: torrent stalled");
+    expect(failure.text).toContain("MESSAGE\nDownload failed: torrent stalled");
+    const health = buildNotificationEmail(withReport({ message: "Indexers unavailable", messageLabel: "Message" }), off);
+    expect(health.html).toContain("Indexers unavailable");
+    expect(health.text).toContain("MESSAGE\nIndexers unavailable");
+    const comment = buildNotificationEmail(withReport({ message: "Fixed now", messageLabel: "Comment" }), off);
+    expect(comment.html).toContain(">Comment<");
+    expect(comment.html).toContain("Fixed now");
+    const overview = buildNotificationEmail(
+      withReport({ message: "Paul Atreides unites with the Fremen.", messageLabel: "Overview" }),
+      off
+    );
+    expect(overview.html).not.toContain("Paul Atreides");
+    expect(overview.text).not.toContain("OVERVIEW");
   });
 
   it("renders a merged burst as one report listing every episode (#346)", () => {

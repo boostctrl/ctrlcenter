@@ -17,17 +17,20 @@ export default function AlertTest({
   sample,
   ready,
   saving,
+  ariaLabel,
 }: {
   channel: string;
   sample?: SampleId;
   ready: boolean;
   saving: boolean;
+  ariaLabel?: string;
 }) {
   return (
     <TestConnectionButton<Result>
       endpoint="/api/alerts/test"
       body={sample ? { channel, sample } : { channel }}
       label={sample ? "Send sample" : "Send test"}
+      ariaLabel={ariaLabel}
       pendingLabel="Sending…"
       disabled={!ready || saving}
       renderResult={(data) => {

@@ -95,15 +95,77 @@ describe("holdForDigest", () => {
     expect(send.mock.calls[0][0]).toBe(only);
   });
 
-  it("keeps a hundred items, counts the rest, and counts a resent item once", async () => {
+  it("keeps a hundred items, counts the rest, and counts a resent item once, kept or not", async () => {
     const send = sent();
     for (let e = 1; e <= 101; e += 1) holdForDigest(imported(e), { windowMs: MIN, send });
+    // A kept item resent, and a resend of one that was only counted.
     holdForDigest(imported(50), { windowMs: MIN, send });
+    holdForDigest(imported(101), { windowMs: MIN, send });
     expect(pendingWebhookDigests()).toEqual([{ key: "sonarr||Download|1", count: 101 }]);
     await vi.advanceTimersByTimeAsync(MIN);
     const merged = send.mock.calls[0][0] as { title: string; body: string };
     expect(merged.title).toMatch(/^Sonarr imported 101 episodes of The Bear \(S04E01-E100\)$/);
     expect(merged.body.endsWith("\nand 93 more")).toBe(true);
+  });
+
+  it("counts the items past the per-event read cap, which it never keeps", async () => {
+    const send = sent();
+    // An event listing 250 items (the parsers cap a list at 200 themselves,
+    // so this is the store's own contract): 100 kept, 150 counted, and the
+    // one more event that makes it a burst.
+    const pack = imported(1);
+    const item = pack.digest!.items[0];
+    const big = {
+      ...pack,
+      digest: {
+        ...pack.digest!,
+        items: Array.from({ length: 250 }, (_, i) => ({ ...item, id: `ep:${i + 1}`, episode: i + 1 })),
+      },
+    };
+    holdForDigest(big, { windowMs: MIN, send });
+    holdForDigest(imported(251), { windowMs: MIN, send });
+    expect(pendingWebhookDigests()).toEqual([{ key: "sonarr||Download|1", count: 251 }]);
+    await vi.advanceTimersByTimeAsync(MIN);
+    const merged = send.mock.calls[0][0] as { title: string; body: string };
+    expect(merged.title).toMatch(/^Sonarr imported 251 episodes of The Bear \(S04E01-E100\)$/);
+    expect(merged.body.endsWith("\nand 243 more")).toBe(true);
+  });
+
+  it("sends the latest event when every event in the window was about the one item", async () => {
+    const send = sent();
+    // A Radarr grab, its download failing (relayed at once, never held) and
+    // the re-grab of the same movie inside the window: what goes out names
+    // the release that replaced the failed one, not the one that failed.
+    const grab = (release: string) =>
+      parseArrWebhook("radarr", {
+        eventType: "Grab",
+        movie: { id: 1, title: "Dune: Part Three", year: 2026 },
+        release: { releaseTitle: release, quality: "WEBDL-1080p" },
+      })!;
+    const a = grab("Dune.2026.720p.A");
+    const b = grab("Dune.2026.1080p.B");
+    holdForDigest(a, { windowMs: MIN, send });
+    await vi.advanceTimersByTimeAsync(20_000);
+    holdForDigest(b, { windowMs: MIN, send });
+    expect(pendingWebhookDigests()).toEqual([{ key: "radarr||Grab", count: 1 }]);
+    await vi.advanceTimersByTimeAsync(MIN);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0][0]).toBe(b);
+    // An episode imported and then upgraded inside the window: the upgrade.
+    const upgrade = parseArrWebhook("sonarr", {
+      eventType: "Download",
+      series: { id: 1, title: "The Bear" },
+      episodes: [{ id: 1003, seasonNumber: 4, episodeNumber: 3, title: "Ep 3" }],
+      episodeFile: { quality: "Bluray-1080p", size: 2 * 1024 ** 3 },
+      isUpgrade: true,
+    })!;
+    holdForDigest(imported(3), { windowMs: MIN, send });
+    await vi.advanceTimersByTimeAsync(20_000);
+    holdForDigest(upgrade, { windowMs: MIN, send });
+    await vi.advanceTimersByTimeAsync(MIN);
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send.mock.calls[1][0]).toBe(upgrade);
+    expect(send.mock.calls[1][0]).toMatchObject({ title: "Sonarr upgraded: The Bear S04E03" });
   });
 
   it("holds 64 groups at most: a 65th key is not held, the rest still flush, then a key is held again", async () => {

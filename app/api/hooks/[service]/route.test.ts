@@ -3,24 +3,31 @@ import fs from "node:fs/promises";
 import * as YAML from "js-yaml";
 import { useScratchConfig, request, params } from "@/lib/testing/routes";
 import { pendingWebhookDigests, resetWebhookDigest } from "@/lib/webhook-digest";
+import { log } from "@/lib/log";
 
 // Inbound webhooks (#204, #289): a public route gated only by its token. One
 // webhook channel is seeded so a relayed event has somewhere to go, and the
 // burst window is on (#346) so an episode import is held while a Test is not.
 let POST: typeof import("./route").POST;
+let configPath: string;
 
-beforeAll(async () => {
-  const configPath = await useScratchConfig();
-  await fs.writeFile(
+// The scratch config, with the given alert channels.
+const seed = (channels: unknown[]) =>
+  fs.writeFile(
     configPath,
     YAML.dump({
       settings: {
-        alerts: { channels: [{ id: "c1", type: "webhook", url: "https://hook.test" }] },
+        alerts: { channels },
         webhooks: { enabled: true, digestSeconds: 60, sonarr: { enabled: true, token: "s3cret-token" } },
       },
     }),
     "utf8"
   );
+const CHANNELS = [{ id: "c1", type: "webhook", url: "https://hook.test" }];
+
+beforeAll(async () => {
+  configPath = await useScratchConfig();
+  await seed(CHANNELS);
   ({ POST } = await import("./route"));
 });
 
@@ -32,7 +39,9 @@ beforeEach(() => {
 
 afterEach(() => {
   resetWebhookDigest();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 const hook = (service: string, token: string, body: unknown = { eventType: "Test" }) =>
@@ -78,6 +87,38 @@ describe("POST /api/hooks/[service]", () => {
     expect(await res.json()).toEqual({ ok: true, queued: true });
     expect(fetchMock).not.toHaveBeenCalled();
     expect(pendingWebhookDigests()).toEqual([{ key: "sonarr||Download|1", count: 1 }]);
+  });
+
+  it("sends a held burst merged once its window passes, through the channels as saved then (#346)", async () => {
+    vi.useFakeTimers();
+    const episode = (n: number) => ({
+      eventType: "Download",
+      series: { id: 1, title: "The Bear" },
+      episodes: [{ id: 100 + n, seasonNumber: 4, episodeNumber: n, title: `Ep ${n}` }],
+      episodeFile: { quality: "WEBDL-1080p", size: 1024 ** 3 },
+    });
+    expect(await (await hook("sonarr", "s3cret-token", episode(1))).json()).toEqual({ ok: true, queued: true });
+    expect(await (await hook("sonarr", "s3cret-token", episode(2))).json()).toEqual({ ok: true, queued: true });
+    expect(pendingWebhookDigests()).toEqual([{ key: "sonarr||Download|1", count: 2 }]);
+    await vi.advanceTimersByTimeAsync(60_000);
+    // The delivery re-reads the config (real file I/O) before it posts.
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(fetchMock.mock.calls[0][0]).toBe("https://hook.test");
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(body.title).toBe("Sonarr imported 2 episodes of The Bear (S04E01-E02)");
+    expect(pendingWebhookDigests()).toEqual([]);
+
+    // The channel removed while the burst was pending: nothing goes out.
+    const info = vi.spyOn(log, "info").mockImplementation(() => undefined);
+    fetchMock.mockClear();
+    expect(await (await hook("sonarr", "s3cret-token", episode(3))).json()).toEqual({ ok: true, queued: true });
+    await seed([]);
+    await vi.advanceTimersByTimeAsync(60_000);
+    await vi.waitFor(() =>
+      expect(info).toHaveBeenCalledWith("webhook digest dropped: no alert channel configured", { service: "sonarr" })
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    await seed(CHANNELS);
   });
 
   it("relays an event at once when the digest store is full (its 64 groups pending)", async () => {
