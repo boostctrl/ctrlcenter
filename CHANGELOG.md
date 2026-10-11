@@ -23,6 +23,10 @@ here.
   3 updates", each on its own line with its own facts in the email; or
   everything every service posts — "Sonarr and Radarr: 4 updates". The
   preview gains *A busy minute* to show what that looks like. (#359)
+- **An upgrade note in the help.** The help page explains what the 3.0
+  upgrade did with a 2.x config, where the backup is and how to roll back,
+  and now also covers two-factor authentication, the Reduced motion
+  preference and what a backup carries. (#360)
 
 ### Changed
 
