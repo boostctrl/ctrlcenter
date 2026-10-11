@@ -27,6 +27,9 @@ here.
   upgrade did with a 2.x config, where the backup is and how to roll back,
   and now also covers two-factor authentication, the Reduced motion
   preference and what a backup carries. (#360)
+- **Screenshots in the README.** The dashboard, the theme builder, the
+  layout editor, the status and weather pages and the admin portal, with
+  the feature list brought up to date for 3.0. (#361)
 
 ### Changed
 
