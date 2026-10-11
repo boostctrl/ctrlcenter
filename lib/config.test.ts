@@ -889,6 +889,11 @@ describe("readConfigInternal stays off public surfaces", () => {
     // (logout reads `auth` only to verify the token it revokes, #365).
     "app/api/login/route.ts",
     "app/api/logout/route.ts",
+    // Admin-only security checklist (#367): reads once, then gates on the hash.
+    "app/api/security/route.ts",
+    // Admin-only integrations save: reads `auth` only to tie the actions
+    // opt-in to the second factor (#367). Answers with nothing but ok.
+    "app/api/integrations/route.ts",
     // Public login page: reads `auth` only to pass one boolean (is any admin
     // password configured, #275) to the form. Nothing else reaches the client.
     "app/admin/login/page.tsx",

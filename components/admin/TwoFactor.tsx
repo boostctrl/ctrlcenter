@@ -21,8 +21,20 @@ type Step = "enroll" | "recovery" | "disable";
 const formatSecret = (secret: string) =>
   secret.match(/.{1,4}/g)?.join(" ") ?? secret;
 
-export default function TwoFactor({ initialEnabled }: { initialEnabled: boolean }) {
-  const [enabled, setEnabled] = useState(initialEnabled);
+export default function TwoFactor({
+  initialEnabled,
+  onChange,
+}: {
+  initialEnabled: boolean;
+  // Told when the factor turns on or off, so the security checklist beside
+  // this card can re-read (#367).
+  onChange?: (enabled: boolean) => void;
+}) {
+  const [enabled, setEnabledState] = useState(initialEnabled);
+  const setEnabled = (next: boolean) => {
+    setEnabledState(next);
+    onChange?.(next);
+  };
   const [step, setStep] = useState<Step | null>(null);
   const [setup, setSetup] = useState<SetupData | null>(null);
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
@@ -115,7 +127,14 @@ export default function TwoFactor({ initialEnabled }: { initialEnabled: boolean 
         return;
       }
       setEnabled(false);
-      toast("Two-factor authentication disabled");
+      // Write actions need the second factor (#367): the server turned them
+      // off with it.
+      const n = typeof data?.actionsDisabled === "number" ? data.actionsDisabled : 0;
+      toast(
+        n > 0
+          ? `Two-factor authentication disabled; dashboard actions turned off for ${n} integration${n === 1 ? "" : "s"}`
+          : "Two-factor authentication disabled"
+      );
       close();
     } catch {
       setError("Couldn't disable");

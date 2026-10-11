@@ -84,7 +84,8 @@ describe("getMonitorSnapshot", () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     const snap = await getMonitorSnapshot(
-      integrations({ radarr: { enabled: true, url: "   ", apiKey: "k", allowInsecureTls: false, allowActions: false } })
+      integrations({ radarr: { enabled: true, url: "   ", apiKey: "k", allowInsecureTls: false, allowActions: false } }),
+      true
     );
     expect(at(snap, "qbittorrent")).toMatchObject({
       configured: false,
@@ -116,7 +117,8 @@ describe("getMonitorSnapshot", () => {
         radarr: { enabled: true, url: "", apiKey: "", allowInsecureTls: false, allowActions: false },
         // Fully configured — polls and reports data.
         sonarr: { enabled: true, url: "http://sonarr.local:8989", apiKey: "k", allowInsecureTls: false, allowActions: false },
-      })
+      }),
+      true
     );
 
     expect(at(snap, "qbittorrent").configured).toBe(false);
@@ -140,21 +142,21 @@ describe("getMonitorSnapshot", () => {
 
   it("re-fetches after invalidateService drops the cached snapshot", async () => {
     const fetchMock = stubSonarr(() => 3);
-    await getMonitorSnapshot(sonarrOn());
+    await getMonitorSnapshot(sonarrOn(), true);
     const afterFirst = fetchMock.mock.calls.length;
     // Within the TTL a second read is served from cache — no new fetch.
-    await getMonitorSnapshot(sonarrOn());
+    await getMonitorSnapshot(sonarrOn(), true);
     expect(fetchMock.mock.calls.length).toBe(afterFirst);
     // Invalidating forces the next read to fetch fresh (as a write action does).
     invalidateService("sonarr");
-    await getMonitorSnapshot(sonarrOn());
+    await getMonitorSnapshot(sonarrOn(), true);
     expect(fetchMock.mock.calls.length).toBeGreaterThan(afterFirst);
   });
 
   it("marks actionsAllowed only when the integration is configured and opted in", async () => {
     stubSonarr(() => 1);
     // Configured but actions off (the default posture) — read-only.
-    const readOnly = await getMonitorSnapshot(sonarrOn());
+    const readOnly = await getMonitorSnapshot(sonarrOn(), true);
     expect(at(readOnly, "sonarr").configured).toBe(true);
     expect(at(readOnly, "sonarr").actionsAllowed).toBe(false);
 
@@ -162,15 +164,25 @@ describe("getMonitorSnapshot", () => {
     const opted = await getMonitorSnapshot(
       integrations({
         sonarr: { enabled: true, url: "http://sonarr.local:8989", apiKey: "k", allowInsecureTls: false, allowActions: true },
-      })
+      }),
+      true
     );
     expect(at(opted, "sonarr").actionsAllowed).toBe(true);
+
+    // Opted in but the site has no second factor (#367) — read-only again.
+    const noTotp = await getMonitorSnapshot(
+      integrations({
+        sonarr: { enabled: true, url: "http://sonarr.local:8989", apiKey: "k", allowInsecureTls: false, allowActions: true },
+      }),
+      false
+    );
+    expect(at(noTotp, "sonarr").actionsAllowed).toBe(false);
   });
 
   it("blocks only on a cold cache, then serves the cache within the TTL", async () => {
     const fetchMock = stubSonarr(() => 5);
-    const first = await getMonitorSnapshot(sonarrOn());
-    const second = await getMonitorSnapshot(sonarrOn());
+    const first = await getMonitorSnapshot(sonarrOn(), true);
+    const second = await getMonitorSnapshot(sonarrOn(), true);
 
     expect(at(first, "sonarr").configured).toBe(true);
     expect(upcoming(first)).toHaveLength(5);
@@ -184,16 +196,16 @@ describe("getMonitorSnapshot", () => {
     stubSonarr(() => total);
     const base = Date.now();
     const now = vi.spyOn(Date, "now").mockReturnValue(base);
-    await getMonitorSnapshot(sonarrOn());
+    await getMonitorSnapshot(sonarrOn(), true);
 
     total = 2;
     now.mockReturnValue(base + TTL + 1);
     // The stale snapshot comes back without waiting on the refresh.
-    const stale = await getMonitorSnapshot(sonarrOn());
+    const stale = await getMonitorSnapshot(sonarrOn(), true);
     expect(upcoming(stale)).toHaveLength(1);
 
     await settle();
-    const fresh = await getMonitorSnapshot(sonarrOn());
+    const fresh = await getMonitorSnapshot(sonarrOn(), true);
     expect(upcoming(fresh)).toHaveLength(2);
   });
 
@@ -202,25 +214,25 @@ describe("getMonitorSnapshot", () => {
     stubSonarr(() => 4, () => status);
     const base = Date.now();
     const now = vi.spyOn(Date, "now").mockReturnValue(base);
-    await getMonitorSnapshot(sonarrOn());
+    await getMonitorSnapshot(sonarrOn(), true);
 
     status = 500;
     now.mockReturnValue(base + TTL + 1);
-    await getMonitorSnapshot(sonarrOn());
+    await getMonitorSnapshot(sonarrOn(), true);
     await settle();
 
-    const after = await getMonitorSnapshot(sonarrOn());
+    const after = await getMonitorSnapshot(sonarrOn(), true);
     expect(upcoming(after)).toHaveLength(4); // stale-on-failure
     expect(at(after, "sonarr").error).toBe("HTTP 500");
   });
 
   it("treats a config edit as a cold cache instead of serving the old target", async () => {
     const fetchMock = stubSonarr(() => 3);
-    await getMonitorSnapshot(sonarrOn("http://sonarr-a.local"));
+    await getMonitorSnapshot(sonarrOn("http://sonarr-a.local"), true);
     expect(fetchMock).toHaveBeenCalledTimes(3);
 
     // Same service, new URL, well within the TTL: must refetch, not reuse.
-    await getMonitorSnapshot(sonarrOn("http://sonarr-b.local"));
+    await getMonitorSnapshot(sonarrOn("http://sonarr-b.local"), true);
     expect(fetchMock).toHaveBeenCalledTimes(6);
     expect(
       fetchMock.mock.calls.some(([input]) =>
@@ -255,14 +267,14 @@ describe("getMonitorSnapshot", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const pA = getMonitorSnapshot(sonarrOn("http://a.local"));
-    const pB = getMonitorSnapshot(sonarrOn("http://b.local"));
+    const pA = getMonitorSnapshot(sonarrOn("http://a.local"), true);
+    const pB = getMonitorSnapshot(sonarrOn("http://b.local"), true);
     await pB; // B (ungated) resolves first and caches
     gate.resolve(); // release A, whose write should now be dropped
     await pA;
 
     const callsAfterRace = fetchMock.mock.calls.length; // A(3) + B(3)
-    const readB = await getMonitorSnapshot(sonarrOn("http://b.local"));
+    const readB = await getMonitorSnapshot(sonarrOn("http://b.local"), true);
     expect(upcoming(readB)).toHaveLength(3); // still B's data
     // Served from cache: no redundant blocking refetch was triggered.
     expect(fetchMock.mock.calls.length).toBe(callsAfterRace);
@@ -276,7 +288,7 @@ describe("integration instances (#300)", () => {
       integrationSchema.parse({ id: "sonarr", type: "sonarr", url: "http://hd.local:8989", apiKey: "a" }),
       integrationSchema.parse({ id: "sonarr-4k", type: "sonarr", name: "Sonarr 4K", url: "http://uhd.local:8989", apiKey: "b" }),
       integrationSchema.parse({ id: "sonarr-3", type: "sonarr", url: "http://x.local:8989", apiKey: "c", enabled: false }),
-    ]);
+    ], true);
     expect(snap.map((e) => [e.id, e.label, e.configured])).toEqual([
       ["sonarr", "Sonarr", true],
       ["sonarr-4k", "Sonarr 4K", true],
@@ -294,7 +306,7 @@ describe("integration instances (#300)", () => {
       integrationSchema.parse({ id: "sonarr", type: "sonarr", url: "http://hd.local:8989", apiKey: "stored" }),
       integrationSchema.parse({ id: "uhd", type: "sonarr", url: "http://uhd.local:8989", apiKey: "${SONARR_4K_KEY}" }),
       integrationSchema.parse({ id: "other", type: "sonarr", url: "http://other.local:8989", apiKey: "own" }),
-    ]);
+    ], true);
     const keyFor = (host: string) =>
       fetchMock.mock.calls
         .filter(([u]) => new URL(String(u)).host === host)

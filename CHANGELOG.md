@@ -14,6 +14,13 @@ here.
 
 ### Added
 
+- **A security checklist.** Settings → Security opens with what the app can
+  see of your deployment — two-factor authentication, where the password
+  comes from, whether sign-ins arrive over HTTPS and through the proxy you
+  configured, the session secret, dashboard actions, the idle timeout —
+  each row green, amber or red with the fix. The red rows are also logged
+  when the server starts. The first-run setup gains a step that offers
+  two-factor authentication. (#367)
 - **Sessions you can see and end.** Settings → Security lists every browser
   the portal is signed in on — which device, from where, when it signed in
   and was last seen — with a way to end any one of them, and a *Sign out
@@ -25,6 +32,10 @@ here.
 
 ### Security
 
+- **Dashboard actions need two-factor authentication.** *Allow actions from
+  the dashboard* can only be turned on once the second factor is, every
+  action checks it again on the server, and turning two-factor
+  authentication off turns actions off with it. (#367)
 - **Signing out now ends the session.** Signing out used to only clear the
   cookie: a copy of it taken beforehand kept working for up to seven days.
   The server now keeps a record of each session, kept in `sessions.json`

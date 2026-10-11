@@ -53,4 +53,11 @@ describe("POST /api/monitor/action", () => {
     expect(res.status).toBe(403);
     expect((await res.json()).error).toMatch(/not enabled/);
   });
+
+  it("refuses actions while two-factor authentication is off, even opted in (#367)", async () => {
+    await writeIntegrations({ enabled: true, url: "http://qb.lan", allowActions: true });
+    const res = await act(pause);
+    expect(res.status).toBe(403);
+    expect((await res.json()).error).toMatch(/two-factor/);
+  });
 });

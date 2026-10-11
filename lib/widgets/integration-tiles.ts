@@ -30,7 +30,8 @@ export async function integrationTiles(
   // Through the Monitor's shared cache, so a board and the Monitor cost the
   // service one fetch per window between them. Labels come from the whole
   // list, so "Sonarr 2" reads the same here as on the Monitor.
-  const entries = await getMonitorSnapshot(targets);
+  // Home-grid tiles are read-only: no action controls, whatever the opt-in.
+  const entries = await getMonitorSnapshot(targets, false);
   const labels = integrationLabels(integrations);
   const out: Record<string, IntegrationTile> = {};
   for (const w of visible) {

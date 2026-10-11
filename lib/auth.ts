@@ -169,6 +169,8 @@ export async function issueSession(
   const id = await createSession({
     ip: clientIp(request),
     userAgent: request.headers.get("user-agent") ?? "",
+    https: isHttps(request),
+    forwarded: request.headers.has("x-forwarded-for"),
   });
   return { token: await createSessionToken(extra, id), id };
 }

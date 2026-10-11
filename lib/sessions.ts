@@ -25,6 +25,18 @@ export type SessionRecord = {
   // the browser's User-Agent, for the active-sessions list only.
   ip: string | null;
   userAgent: string;
+  // How the sign-in arrived, for the security checklist (#367): over HTTPS
+  // (directly or via a TLS-terminating proxy), and with an X-Forwarded-For
+  // header (so through a proxy).
+  https: boolean;
+  forwarded: boolean;
+};
+
+export type SessionMeta = {
+  ip: string | null;
+  userAgent: string;
+  https?: boolean;
+  forwarded?: boolean;
 };
 
 // Defaults and bounds for the idle timeout: a session unused for this long
@@ -89,6 +101,11 @@ function isRecord(v: unknown): v is SessionRecord {
   );
 }
 
+// A stored record, with the fields a pre-3.0.0 file lacks defaulted.
+function normalize(r: SessionRecord): SessionRecord {
+  return { ...r, https: r.https === true, forwarded: r.forwarded === true };
+}
+
 async function load(store: Store): Promise<void> {
   let raw: string;
   try {
@@ -105,7 +122,7 @@ async function load(store: Store): Promise<void> {
     const parsed = JSON.parse(raw) as Partial<StoreFile>;
     store.idleHours = clampIdleHours(parsed.idleHours);
     for (const s of Array.isArray(parsed.sessions) ? parsed.sessions : []) {
-      if (isRecord(s)) store.sessions.set(s.id, s);
+      if (isRecord(s)) store.sessions.set(s.id, normalize(s));
     }
   } catch (e) {
     log.warn(`sessions file unparseable, starting empty: ${errorReason(e)}`);
@@ -184,10 +201,7 @@ function prune(store: Store, now: number): boolean {
 
 // Start a session: a fresh random id for the token's `jti`, and the record
 // behind it.
-export async function createSession(
-  meta: { ip: string | null; userAgent: string },
-  now = Date.now()
-): Promise<string> {
+export async function createSession(meta: SessionMeta, now = Date.now()): Promise<string> {
   const store = await ready();
   const id = randomBytes(18).toString("base64url");
   store.sessions.set(id, {
@@ -197,6 +211,8 @@ export async function createSession(
     ip: meta.ip,
     // Bounded: the header is client-chosen and the list renders it.
     userAgent: meta.userAgent.slice(0, 300),
+    https: meta.https === true,
+    forwarded: meta.forwarded === true,
   });
   prune(store, now);
   await persist(store);

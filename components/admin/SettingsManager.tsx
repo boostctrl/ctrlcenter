@@ -163,7 +163,7 @@ export default function SettingsManager({
           <WidgetsSection d={draft} groups={groupsState.groups} tags={allTags(items.apps)} />
         )}
         {section === "monitoring" && <MonitoringSection d={draft} apps={apps} />}
-        {section === "integrations" && <IntegrationsSection d={draft} />}
+        {section === "integrations" && <IntegrationsSection d={draft} twoFactorEnabled={initialTwoFactorEnabled} />}
         {section === "announcements" && <AnnouncementsSection d={draft} apps={apps} />}
         {section === "security" && (
           <SecuritySection initialTwoFactorEnabled={initialTwoFactorEnabled} />

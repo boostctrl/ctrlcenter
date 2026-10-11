@@ -69,7 +69,7 @@ export function pruneRateLimit(now = Date.now()): void {
 // entries to the left are client-supplied and must not be trusted for
 // throttling. Default 1 (the documented "behind a reverse proxy" setup). Set
 // to 0 when exposing the app directly so a forged header can't mint fresh keys.
-const TRUSTED_PROXY_HOPS = Math.max(
+export const TRUSTED_PROXY_HOPS = Math.max(
   0,
   Math.trunc(Number(process.env.TRUSTED_PROXY_HOPS ?? "1")) || 0
 );

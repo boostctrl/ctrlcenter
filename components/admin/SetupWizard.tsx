@@ -1,8 +1,8 @@
 "use client";
 
-// The first-run setup (#304): four short, skippable steps after the first
+// The first-run setup (#304): five short, skippable steps after the first
 // admin sign-in on a fresh install — where you are, your first apps, status
-// checks and alerts, a theme. Each step saves ordinary config through the
+// checks and alerts, two-factor authentication (#367), a theme. Each step saves ordinary config through the
 // usual admin APIs, so everything stays editable in admin Settings (or
 // config.yaml) afterwards. Finishing or skipping records settings.setupComplete
 // and the setup never shows again.
@@ -13,13 +13,14 @@ import { alertChannelSchema, ALERT_TYPES, type AlertType } from "@/lib/schema";
 import type { ThemePack } from "@/lib/theme";
 import { appNameFromUrl, parsePastedUrls } from "@/lib/setup";
 import CitySearch from "./CitySearch";
+import TwoFactor from "./TwoFactor";
 import { Button, Hint, SelectField, TextArea, TextField, ToggleRow, fieldLabelClasses } from "./ui";
 import { saveSettingsPatch } from "./settingsApi";
 import { NO_ZONES, getBrowserZones, subscribeZonesNever } from "./settings/zones";
 
 const browserZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-const STEPS = ["Location and time", "Your first apps", "Status and alerts", "A theme"] as const;
+const STEPS = ["Location and time", "Your first apps", "Status and alerts", "Protect the portal", "A theme"] as const;
 
 // The example config's apps, for "start from a few examples": placeholders to
 // point at your own services later, unmonitored until you do.
@@ -134,7 +135,8 @@ export default function SetupWizard({ settings, packs }: { settings: Settings; p
         {step === 0 && <LocationStep {...props} />}
         {step === 1 && <AppsStep {...props} />}
         {step === 2 && <AlertsStep {...props} />}
-        {step === 3 && <ThemeStep {...props} packs={packs} />}
+        {step === 3 && <SecurityStep {...props} />}
+        {step === 4 && <ThemeStep {...props} packs={packs} />}
         {error && (
           <p role="alert" className="text-sm text-status-down">
             {error}
@@ -369,6 +371,25 @@ function AlertsStep({ settings, onSave }: StepProps) {
           />
         </div>
       )}
+    </StepForm>
+  );
+}
+
+// Two-factor authentication, offered right after the first sign-in (#367):
+// the one thing that makes a public port defensible. Enrolment runs through
+// the same card as Settings → Security; the step itself saves nothing.
+function SecurityStep({ onSave }: StepProps) {
+  const [enabled, setEnabled] = useState(false);
+  return (
+    <StepForm onSubmit={() => onSave(async () => undefined)}>
+      <p className="text-sm text-ink-70">
+        If this portal will be reachable from the internet, add a second factor
+        now: a code from an authenticator app at sign-in, so the password
+        alone isn&apos;t enough. Dashboard actions on integrations need it too.
+        You can do this later in Settings → Security.
+      </p>
+      <TwoFactor initialEnabled={false} onChange={setEnabled} />
+      {enabled && <Hint>Done — keep the recovery codes somewhere safe.</Hint>}
     </StepForm>
   );
 }

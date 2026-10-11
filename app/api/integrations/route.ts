@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/lib/api-auth";
-import { replaceIntegrations } from "@/lib/config";
+import { readConfigInternal, replaceIntegrations } from "@/lib/config";
 import { integrationsUpdateSchema } from "@/lib/schema";
 
 // Admin-only: replace the integrations (#300) — the list admin Settings →
@@ -18,6 +18,12 @@ export async function PUT(request: NextRequest) {
       { status: 400 }
     );
   }
-  await replaceIntegrations(parsed.data);
+  // Write actions need two-factor authentication on (#367): without it the
+  // opt-in is stored off, whatever the list said, and the form says why.
+  const { auth } = await readConfigInternal();
+  const integrations = auth.totp.enabled
+    ? parsed.data
+    : parsed.data.map((i) => (i.allowActions ? { ...i, allowActions: false } : i));
+  await replaceIntegrations(integrations);
   return NextResponse.json({ ok: true });
 }

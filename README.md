@@ -145,8 +145,9 @@ Built with Next.js 16, React 19, and Tailwind v4.
   for **qBittorrent, Seerr, and Portainer** you can opt in per integration
   ("Allow actions from the dashboard") to act from the page — pause/resume/delete
   torrents, approve/deny requests, and start/stop/restart containers with a
-  read-only log tail. Actions stay **off until you turn them on**, are admin-only,
-  ask before anything destructive, and are logged on the server. Strictly
+  read-only log tail. Actions stay **off until you turn them on**, need
+  two-factor authentication to be on, are admin-only, ask before anything
+  destructive, and are logged on the server. Strictly
   admin-only throughout — the page, its API, and the stored credentials are all
   behind the admin session, any credential can be a `${ENV_VAR}` reference
   instead of a value in the config file, and nothing integration-related ever

@@ -68,14 +68,16 @@ deployment safe.
   ctrlcenter cannot narrow. Treat every configured credential as full access to
   that service, and give the integration the least privilege the service itself
   allows (a read-only or limited role where one exists, e.g. UniFi or Portainer).
-- **Write actions are opt-in and off by default.** qBittorrent, Seerr, and
-  Portainer can act from the Monitor page (pause/resume/delete torrents,
-  approve/deny requests, start/stop/restart containers, and a read-only log
-  tail), but only after you turn on "Allow actions from the dashboard" for that
-  integration — until then it stays read-only. Every action passes four gates
-  (the admin-only proxy prefix, a route session re-check, the integration being
-  configured, and the opt-in flag), is confirmed before anything destructive,
-  and is logged on the server. Leave the opt-in off for any integration you only
+- **Write actions are opt-in, off by default, and need two-factor
+  authentication.** qBittorrent, Seerr, and Portainer can act from the Monitor
+  page (pause/resume/delete torrents, approve/deny requests, start/stop/restart
+  containers, and a read-only log tail), but only after you turn on "Allow
+  actions from the dashboard" for that integration — which itself needs
+  two-factor authentication on — until then it stays read-only. Every action
+  passes five gates (the admin-only proxy prefix, a route session re-check,
+  the integration being configured, the opt-in flag, and the second factor
+  being on), is confirmed before anything destructive, and is logged on the
+  server. Turning two-factor authentication off turns actions off with it. Leave the opt-in off for any integration you only
   want to observe, and remember that an action-enabled key needs write access to
   its service, not just read.
 - **Firewall the container to just the services it monitors.** ctrlcenter

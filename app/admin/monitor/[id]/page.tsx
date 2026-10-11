@@ -29,7 +29,7 @@ export default async function MonitorDetailPage({ params }: Params) {
   // Admin-only (the proxy gates /admin), so every board is listed.
   const site = await getSiteConfig();
   // An unknown id 404s the same way an unconfigured integration does.
-  const result = await getServiceDetail(id, site.integrations);
+  const result = await getServiceDetail(id, site.integrations, site.twoFactorEnabled);
   if (!result) notFound();
 
   return (

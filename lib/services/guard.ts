@@ -8,8 +8,10 @@
 //   2. Route session re-check — isAdminRequest, mirroring app/api/monitor/route.
 //   3. Integration configured — enabled with a URL set (isServiceConfigured).
 //   4. allowActions opt-in — the per-integration write flag, default off.
+//   5. Two-factor authentication on (#367) — a write action is the most a
+//      stolen session could do, so it takes the second factor being in place.
 //
-// requireAction runs gates 2–4 (gate 1 is the proxy's) and hands the route the
+// requireAction runs gates 2–5 (gate 1 is the proxy's) and hands the route the
 // resolved config, or a typed failure it maps straight to a status + message.
 // Server-side only — the credentials in the returned config never leave here.
 
@@ -55,6 +57,13 @@ export async function requireAction(
       ok: false,
       status: 403,
       error: "Actions are not enabled for this integration",
+    };
+  }
+  if (!config.auth.totp.enabled) {
+    return {
+      ok: false,
+      status: 403,
+      error: "Actions need two-factor authentication to be on",
     };
   }
   return { ok: true, integration, cfg: resolveIntegration(integration) };

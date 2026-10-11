@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/lib/api-auth";
-import { readConfigInternal, disableTotp } from "@/lib/config";
+import { readConfigInternal, disableTotp, clearAllowActions } from "@/lib/config";
 import { rateLimit, pruneRateLimit, clientKey } from "@/lib/rate-limit";
 import { verifyTotpOnce } from "@/lib/totp";
 import { verifyRecoveryCode } from "@/lib/recovery-codes";
@@ -44,5 +44,7 @@ export async function POST(request: NextRequest) {
     );
   }
   await disableTotp();
-  return NextResponse.json({ ok: true });
+  // Write actions need the second factor (#367): off with it, and said so.
+  const actionsDisabled = await clearAllowActions();
+  return NextResponse.json({ ok: true, actionsDisabled });
 }
