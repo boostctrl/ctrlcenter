@@ -14,6 +14,14 @@ here.
 
 ### Fixed
 
+- **A theme's font no longer sticks.** Applying Terminal set its JetBrains
+  Mono, and every theme applied after it kept that font (and a heading font,
+  likewise). A theme without a font of its own now restores the site
+  default font, as it already did for the wallpaper, fine-tune and status
+  colors. (#373)
+
+### Fixed
+
 - **Wallpapers now follow the theme you pick.** Applying a site theme from
   the theme builder's Themes tab painted its wallpaper, fine-tune, scene
   effects and status colors and then painted the previous look's back over
