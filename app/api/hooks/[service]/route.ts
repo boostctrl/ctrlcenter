@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { readConfigInternal } from "@/lib/config";
 import { WEBHOOK_SERVICES, type WebhookService } from "@/lib/schema";
-import { parseWebhook, reportOptions } from "@/lib/webhooks";
+import { keyForLog, parseWebhook, reportOptions } from "@/lib/webhooks";
 import { holdForDigest } from "@/lib/webhook-digest";
 import { sendNotification, anyChannelReady } from "@/lib/alerts";
 import { rateLimit, pruneRateLimit, clientKey } from "@/lib/rate-limit";
@@ -136,7 +136,7 @@ export async function POST(
         });
       },
     });
-    log.debug("webhook held for digest", { service, key: notification.digest.key });
+    log.debug("webhook held for digest", { service, key: keyForLog(notification.digest.key) });
     return NextResponse.json({ ok: true, queued: true });
   }
 

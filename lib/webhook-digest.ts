@@ -17,7 +17,7 @@
 // and the push pings, and the help page says so.
 import { globalSingleton } from "./singleton";
 import { log, errorReason } from "./log";
-import { mergeDigest, type DigestItem, type WebhookNotification } from "./webhooks";
+import { keyForLog, mergeDigest, type DigestItem, type WebhookNotification } from "./webhooks";
 
 export type DigestSend = (c: WebhookNotification) => Promise<void>;
 
@@ -92,11 +92,13 @@ async function flush(key: string): Promise<void> {
     items: [...g.items.values()],
     dropped: g.dropped,
   });
+  // The key's segments are payload text: a log line gets its short form.
+  const logged = keyForLog(key);
   try {
     await g.send(merged);
-    log.info("webhook digest relayed", { key, events: g.events, items: g.items.size + g.dropped });
+    log.info("webhook digest relayed", { key: logged, events: g.events, items: g.items.size + g.dropped });
   } catch (e) {
-    log.warn("webhook digest failed", { key, reason: errorReason(e) });
+    log.warn("webhook digest failed", { key: logged, reason: errorReason(e) });
   }
 }
 

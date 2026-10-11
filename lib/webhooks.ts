@@ -497,12 +497,28 @@ function digestOf(d: WebhookDigest): WebhookDigest {
   };
 }
 
-// The sender's instanceName as a key part, control characters and runs of
-// whitespace collapsed and clamped like every other kept string: two Sonarr
-// (or Radarr) instances posting to the same relay URL never share a group,
-// and their ids — series 12 on each — never collide.
-const instanceKey = (r: Pick<WebhookReport, "instance">) =>
-  clamp((r.instance ?? "").replace(/[\p{Cc}\s]+/gu, " ").trim(), MAX_LABEL);
+// A payload string as one segment of a digest key — the sender's instance,
+// the event type, a title standing in for a series id. Control characters
+// and runs of whitespace collapse to one space, and the rest is trimmed and
+// cut at 64: a key is held for the burst and logged at every flush, so it
+// must carry neither an escape sequence (lib/log.ts collapses whitespace
+// only) nor a body-sized string. 64 holds any real event type or name.
+const MAX_KEY_PART = 64;
+const cleanText = (s: string) => s.replace(/[\p{Cc}\s]+/gu, " ").trim();
+const keyPart = (s: string) => clamp(cleanText(s), MAX_KEY_PART);
+
+// The sender's instanceName as a key part: two Sonarr (or Radarr) instances
+// posting to the same relay URL never share a group, and their ids — series
+// 12 on each — never collide.
+const instanceKey = (r: Pick<WebhookReport, "instance">) => keyPart(r.instance ?? "");
+
+// A key as a log line may carry it: cleaned once more and cut at 80, so a
+// log never holds more of a sender's text than that, whatever a key segment
+// lets through. The digest store and the hook route log keys only this way.
+const MAX_KEY_LOG = 80;
+export function keyForLog(key: string): string {
+  return clamp(cleanText(key), MAX_KEY_LOG);
+}
 
 // Which burst an arr event joins. A Sonarr event about episodes groups by
 // instance and series, one item per episode, so a season import reads "8
@@ -522,7 +538,7 @@ function arrDigest(
     const series = asRecord(p.series);
     const sid = num(series.id) ?? num(series.tvdbId) ?? media.title;
     return digestOf({
-      key: `sonarr|${instanceKey(r)}|${r.eventType}|${sid}`,
+      key: `sonarr|${instanceKey(r)}|${keyPart(r.eventType)}|${keyPart(String(sid))}`,
       lead: digestLead(r.app, r.event, "episodes", ` of ${media.title}`),
       headline: media.title,
       noun: "episodes",
@@ -544,7 +560,7 @@ function arrDigest(
   const movie = service === "radarr";
   const subject = asRecord(movie ? p.movie : p.series);
   return digestOf({
-    key: `${service}|${instanceKey(r)}|${r.eventType}`,
+    key: `${service}|${instanceKey(r)}|${keyPart(r.eventType)}`,
     lead: digestLead(r.app, r.event, movie ? "movies" : "series"),
     headline: r.app,
     noun: movie ? "movies" : "series",
@@ -866,6 +882,16 @@ const SEERR_DIGEST_LEADS: Record<string, string> = {
   MEDIA_FAILED: "Seerr: {n} requests failed",
 };
 
+// Seerr's extra[] rows are a handful — "Requested Seasons", "Affected
+// Season/Episode" — so the report takes the first dozen and keeps each label
+// and value short. The array and its strings are the sender's, and where
+// every other list the parsers emit is capped (24 episodes, 3 renames, 3
+// genres), a body-sized payload of thousands of rows would otherwise become
+// an email megabytes long.
+const EXTRA_ROWS = 12;
+const EXTRA_LABEL = 40;
+const EXTRA_VALUE = 300;
+
 export function parseSeerrWebhook(payload: unknown): WebhookNotification | null {
   const p = asRecord(payload);
   const nt = str(p.notification_type);
@@ -911,11 +937,12 @@ export function parseSeerrWebhook(payload: unknown): WebhookNotification | null 
   else push(facts, "Requested by", requester);
   push(facts, "Type", type);
   push(facts, "Status", status);
-  // "Requested Seasons", "Affected Season/Episode" — whatever Seerr adds.
-  for (const x of list(p.extra)) {
+  // "Requested Seasons", "Affected Season/Episode" — whatever Seerr adds,
+  // the first dozen rows, each kept short (EXTRA_ROWS above).
+  for (const x of list(p.extra).slice(0, EXTRA_ROWS)) {
     const row = asRecord(x);
     const name = str(row.name);
-    if (name) push(facts, factLabel(name), str(row.value));
+    if (name) push(facts, clamp(factLabel(name), EXTRA_LABEL), clamp(str(row.value), EXTRA_VALUE));
   }
   // A comment's message is the issue's description; the new comment is the
   // message of the report.
@@ -934,7 +961,7 @@ export function parseSeerrWebhook(payload: unknown): WebhookNotification | null 
   const digest =
     nt.startsWith("MEDIA_") && subject
       ? digestOf({
-          key: `seerr|${nt}`,
+          key: `seerr|${keyPart(nt)}`,
           lead: SEERR_DIGEST_LEADS[nt] ?? `Seerr ${lowerFirst(event)}: {n} requests`,
           headline: "Seerr",
           noun: "requests",
@@ -965,11 +992,16 @@ export function parseSeerrWebhook(payload: unknown): WebhookNotification | null 
   );
 }
 
+// The headline is the sheet's <h1>, and the parsers take it from a subject
+// or a title the sender sized: a body-long one would be a page of heading.
+// 200 holds any real title; the subject line cuts it further on its own.
+const MAX_HEADLINE = 200;
+
 // Flatten a report to what the chat and push channels relay — one line, a
 // short detail, a link — and carry the report along for the email, and the
 // digest for the burst store when the event may be one of a burst. Payload
 // text can hold newlines; the title becomes an ntfy header, so it gets one
-// line.
+// line, and the headline is cut at MAX_HEADLINE.
 export function toContent(r: WebhookReport, digest?: WebhookDigest): WebhookNotification {
   const summary = r.summary.replace(/\s+/g, " ").trim();
   const chips = (r.chips ?? []).filter(Boolean);
@@ -978,7 +1010,7 @@ export function toContent(r: WebhookReport, digest?: WebhookDigest): WebhookNoti
     title: `${r.app} ${lowerFirst(r.event)}: ${summary}`,
     body,
     url: r.link?.url,
-    report: { ...r, summary },
+    report: { ...r, summary, headline: clamp(r.headline, MAX_HEADLINE) },
     ...(digest ? { digest } : {}),
   };
 }

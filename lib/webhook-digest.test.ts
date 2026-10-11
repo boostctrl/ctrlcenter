@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { holdForDigest, pendingWebhookDigests, resetWebhookDigest } from "./webhook-digest";
-import { parseArrWebhook } from "./webhooks";
+import { keyForLog, parseArrWebhook } from "./webhooks";
 import { log } from "./log";
 
 // The burst store (#346) on fake timers: when a group goes out, what it
@@ -131,6 +131,39 @@ describe("holdForDigest", () => {
     expect(pendingWebhookDigests()).toEqual([]);
     await vi.advanceTimersByTimeAsync(10 * MIN);
     expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it("logs a short, clean form of the key, never the raw one", async () => {
+    const info = vi.spyOn(log, "info").mockImplementation(() => undefined);
+    const warn = vi.spyOn(log, "warn").mockImplementation(() => undefined);
+    // A key whose every segment the sender sized — instance, event type and
+    // a title standing in for a series id — each already cut at parse time,
+    // and together still longer than a log line should carry.
+    const hostile = parseArrWebhook("sonarr", {
+      eventType: "Download\u001b[31m\u0007" + "x".repeat(200_000),
+      instanceName: "I".repeat(500),
+      series: { title: "T".repeat(500) },
+      episodes: [{ id: 1, seasonNumber: 1, episodeNumber: 1 }],
+    })!;
+    const key = hostile.digest!.key;
+    expect(key.length).toBeGreaterThan(80);
+    holdForDigest(hostile, { windowMs: MIN, send: sent() });
+    await vi.advanceTimersByTimeAsync(MIN);
+    expect(info).toHaveBeenCalledWith("webhook digest relayed", { key: keyForLog(key), events: 1, items: 1 });
+    const failing = vi.fn<(c: unknown) => Promise<void>>().mockRejectedValue(new Error("SMTP down"));
+    holdForDigest(hostile, { windowMs: MIN, send: failing });
+    await vi.advanceTimersByTimeAsync(MIN);
+    expect(warn).toHaveBeenCalledWith("webhook digest failed", { key: keyForLog(key), reason: "SMTP down" });
+    for (const call of [...info.mock.calls, ...warn.mock.calls]) {
+      const logged = (call[1] as { key: string }).key;
+      expect(logged).not.toBe(key);
+      expect(logged.length).toBeLessThanOrEqual(80);
+      expect(logged).not.toMatch(/\p{Cc}/u);
+      expect(key.startsWith(logged.slice(0, -1))).toBe(true);
+    }
+    // The helper itself: controls and whitespace runs become one space.
+    expect(keyForLog("a\u001b[31m\u0007 \r\n b")).toBe("a [31m b");
+    expect(keyForLog("sonarr||Download|1")).toBe("sonarr||Download|1");
   });
 
   it("ignores an event with no digest", () => {

@@ -173,6 +173,18 @@ describe("buildNotificationEmail", () => {
     expect(text).toContain("OVERVIEW\nElphaba & Glinda meet at Shiz.");
   });
 
+  it("keeps the sheet small under a Seerr payload of thousands of extra rows", () => {
+    const n = parseSeerrWebhook({
+      notification_type: "MEDIA_PENDING",
+      subject: "Wicked (2024)",
+      extra: Array.from({ length: 10_000 }, (_, i) => ({ name: `Row ${i}`, value: "v".repeat(1_000) })),
+    })!;
+    const { html, text } = buildNotificationEmail(n, ctx);
+    expect(html.length).toBeLessThan(60_000);
+    expect((html.match(/<th scope="row"/g) ?? []).length).toBe(12);
+    expect(text.length).toBeLessThan(10_000);
+  });
+
   it("never links a javascript: URL — the button and a fact become text", () => {
     const n = withReport({
       link: { label: "Open", url: "javascript:alert(1)" },

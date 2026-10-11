@@ -378,6 +378,37 @@ describe("parseSeerrWebhook", () => {
     expect(labels(n?.report)).toEqual(["Type", "Status"]);
   });
 
+  it("takes a dozen extra rows at most, each clamped, from a payload of thousands", () => {
+    const extra = Array.from({ length: 10_000 }, (_, i) => ({
+      name: `Row ${i} ${"n".repeat(100)}`,
+      value: "v".repeat(1_000),
+    }));
+    const n = parseSeerrWebhook({ ...pending, extra });
+    const rows = n?.report?.facts.filter((f) => f.label.startsWith("Row")) ?? [];
+    expect(rows).toHaveLength(12);
+    for (const f of rows) {
+      expect(f.label.length).toBeLessThanOrEqual(40);
+      expect(f.label.endsWith("…")).toBe(true);
+      expect(f.value.length).toBeLessThanOrEqual(300);
+      expect(f.value.endsWith("…")).toBe(true);
+    }
+    // The rows sit between the fixed facts and the TMDB link, as before.
+    expect(labels(n?.report)?.slice(0, 3)).toEqual(["Requested by", "Type", "Status"]);
+    expect(labels(n?.report)?.slice(-1)).toEqual(["TMDB"]);
+    expect(n?.report?.facts).toHaveLength(16);
+  });
+
+  it("clamps a body-sized subject or title before it becomes the headline", () => {
+    const seerr = parseSeerrWebhook({ ...pending, subject: "S".repeat(256 * 1024) });
+    expect(seerr?.report?.headline.length).toBeLessThanOrEqual(200);
+    expect(seerr?.report?.headline.endsWith("…")).toBe(true);
+    const arr = parseArrWebhook("sonarr", { eventType: "Grab", series: { title: "T".repeat(5_000) } });
+    expect(arr?.report?.headline.length).toBeLessThanOrEqual(200);
+    expect(arr?.report?.headline.endsWith("…")).toBe(true);
+    // A real title is untouched.
+    expect(parseSeerrWebhook(pending)?.report?.headline).toBe("Wicked (2024)");
+  });
+
   it("labels a test notification", () => {
     const n = parseSeerrWebhook({ notification_type: "TEST_NOTIFICATION", subject: "Test Notification" });
     expect(n?.title).toBe("Seerr test: Webhook connected");
@@ -634,6 +665,40 @@ describe("digest membership (#346)", () => {
     // Cleaned and clamped like every other kept string.
     expect(key("Sonarr\r\n  4K\u0000")).toBe("sonarr|Sonarr 4K|Download|1");
     expect(key("S".repeat(500))?.length).toBeLessThanOrEqual("sonarr||Download|1".length + 120);
+  });
+
+  it("keeps every key segment free of control characters and short, whatever the sender sends", () => {
+    const key = (over: Record<string, unknown>) =>
+      parseArrWebhook("sonarr", {
+        eventType: "Download",
+        series: { title: "The Bear" },
+        episodes: [{ id: 1, seasonNumber: 4, episodeNumber: 1 }],
+        ...over,
+      })?.digest?.key;
+    // An escape sequence or a bell in the event type — the key reaches a log
+    // line, which only collapses whitespace — becomes a space.
+    expect(key({ eventType: "Down\u001b[31mload\u0007" })).toBe("sonarr||Down [31mload|The Bear");
+    const long = key({ eventType: "x".repeat(200_000) });
+    expect(long).not.toMatch(/\p{Cc}/u);
+    expect(long?.length).toBeLessThanOrEqual("sonarr||".length + 64 + "|The Bear".length);
+    // Every segment the sender sizes at once: instance, event type and a
+    // title standing in for a series id. Three segments of 64 at most.
+    const worst = key({
+      instanceName: "I".repeat(500),
+      eventType: "\u001b[31m" + "x".repeat(200_000) + "\u0007",
+      series: { title: "T".repeat(500) },
+    });
+    expect(worst).not.toMatch(/\p{Cc}/u);
+    expect(worst?.length).toBeLessThanOrEqual("sonarr|||".length + 3 * 64);
+    expect(worst?.startsWith(`sonarr|${"I".repeat(63)}…|[31m`)).toBe(true);
+    // The event-only keys and Seerr's type go through the same cleaning.
+    const movie = parseArrWebhook("radarr", { eventType: "Down\u0007load" + "x".repeat(200), movie: { title: "Flow" } });
+    expect(movie?.digest?.key).not.toMatch(/\p{Cc}/u);
+    expect(movie?.digest?.key.length).toBeLessThanOrEqual("radarr||".length + 64);
+    const seerr = parseSeerrWebhook({ notification_type: "MEDIA_\u001b[31m" + "X".repeat(200_000), subject: "Flow" });
+    expect(seerr?.digest?.key).not.toMatch(/\p{Cc}/u);
+    expect(seerr?.digest?.key.length).toBeLessThanOrEqual("seerr|".length + 64);
+    expect(seerr?.digest?.key.startsWith("seerr|MEDIA_ [31mXXX")).toBe(true);
   });
 
   it("bounds what the store keeps: labels and the lead are clamped", () => {
