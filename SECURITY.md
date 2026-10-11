@@ -94,13 +94,20 @@ deployment safe.
   enters. Restrict the container's egress to the specific service addresses it
   needs rather than the whole LAN/VLAN, so a mistaken or malicious URL can't be
   turned into a way to probe the rest of your network.
-- **Don't expose a dashboard with integrations to the internet.** The routes are
-  admin-only, but the blast radius of a stolen admin session grows once
-  integrations are configured (and more so with write actions enabled, above).
-  Reach the portal over a VPN or tunnel (Tailscale, WireGuard,
-  Cloudflare Tunnel) rather than a public port. If it must be publicly
-  reachable, turn on two-factor authentication and keep it behind the reverse
-  proxy with a strong password.
+- **Exposing the portal to the internet.** A VPN or tunnel (Tailscale,
+  WireGuard, Cloudflare Tunnel) is still the smallest attack surface, but a
+  public port is a supported deployment: open **Settings → Security** and
+  clear every red row of the checklist first — two-factor authentication on,
+  a password set in the portal, HTTPS, `TRUSTED_PROXY_HOPS` matching your
+  proxy, a persisted session secret — and keep a Security alert channel
+  pointed somewhere you'll see it. With those in place a stolen admin session
+  ends when you sign it out (or on its own after the idle timeout), can't
+  change the password, turn the second factor off, reach the stored
+  credentials or run a destructive action without the password again, and
+  announces itself when it comes from a new address. The remaining exposure
+  is what a session can read in its window: the Monitor page and the
+  integrations' addresses — so still give each integration the least
+  privilege its service allows (above).
 - **Exports leave secrets out unless you ask.** `Export` writes a backup
   without integration credentials, calendar and email credentials or webhook
   tokens; restoring it onto the same instance keeps the ones stored there.
