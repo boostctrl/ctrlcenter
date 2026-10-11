@@ -11,6 +11,7 @@ import {
 import { readConfigInternal, setPasswordHash } from "@/lib/config";
 import { passwordChangeSchema } from "@/lib/schema";
 import { revokeSessions } from "@/lib/sessions";
+import { requireRecentAuth } from "@/lib/reauth";
 
 // Admin-only (gated by the proxy matcher and re-checked here). Changing the
 // password still requires the current one as defense-in-depth, even with a
@@ -19,6 +20,10 @@ export async function POST(request: NextRequest) {
   if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  // Step-up (#366): the current password below proves the password; with a
+  // second factor on, a recent confirmation proves the device too.
+  const recent = await requireRecentAuth(request);
+  if (!recent.ok) return recent.response;
   const body = await request.json().catch(() => null);
   const parsed = passwordChangeSchema.safeParse(body);
   if (!parsed.success) {

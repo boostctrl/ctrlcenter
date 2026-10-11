@@ -44,6 +44,46 @@ describe("/api/config", () => {
     expect(body.auth).toBeUndefined();
   });
 
+  it("leaves secrets out of the export unless asked (#366)", async () => {
+    await fs.writeFile(
+      configPath,
+      YAML.dump({
+        settings: { title: "Before" },
+        integrations: [
+          { id: "qb", type: "qbittorrent", url: "http://qb", username: "admin", password: "hunter2" },
+          { id: "sonarr", type: "sonarr", url: "http://s", apiKey: "${SONARR_KEY}" },
+        ],
+        apps: [{ id: "nas", name: "NAS", url: "http://nas", checkMethod: "push", pushToken: "tok-123" }],
+      }),
+      "utf8"
+    );
+    const plain = await (await route.GET(request("/api/config", { session }))).json();
+    expect(plain.integrations.map((i: { id: string; url: string; password: string; apiKey: string }) => [i.id, i.url, i.password, i.apiKey])).toEqual([
+      ["qb", "http://qb", "", ""],
+      // An environment reference names no secret, so it stays.
+      ["sonarr", "http://s", "", "${SONARR_KEY}"],
+    ]);
+    expect(plain.apps[0].pushToken).toBe("");
+    expect(JSON.stringify(plain)).not.toContain("hunter2");
+
+    const full = await (await route.GET(request("/api/config?secrets=1", { session }))).json();
+    expect(full.integrations[0].password).toBe("hunter2");
+    expect(full.apps[0].pushToken).toBe("tok-123");
+
+    // Restoring the secret-less file keeps what the instance holds.
+    plain.settings.title = "Restored";
+    expect((await importConfig(plain)).status).toBe(200);
+    const onDisk = YAML.load(await fs.readFile(configPath, "utf8")) as {
+      settings: { title: string };
+      integrations: { id: string; password: string; apiKey: string }[];
+      apps: { pushToken: string }[];
+    };
+    expect(onDisk.settings.title).toBe("Restored");
+    expect(onDisk.integrations[0].password).toBe("hunter2");
+    expect(onDisk.integrations[1].apiKey).toBe("${SONARR_KEY}");
+    expect(onDisk.apps[0].pushToken).toBe("tok-123");
+  });
+
   it("imports a valid file, replacing the config", async () => {
     const res = await importConfig({ settings: { title: "After" }, apps: [], bookmarks: [] });
     expect(res.status).toBe(200);

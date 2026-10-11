@@ -74,3 +74,84 @@ export function redactSecrets<T>(schema: z.ZodType, value: T): T {
   }
   return value;
 }
+
+// A `${NAME}` environment reference (#300): names a variable rather than
+// holding a secret, so it may stay in an export.
+const isEnvRef = (v: unknown): boolean => typeof v === "string" && /^\$\{[A-Za-z_][A-Za-z0-9_]*\}$/.test(v.trim());
+
+// `value` for a backup without secrets (#366): every field secretFields
+// marks is blanked — an environment reference is kept, it names no secret —
+// and an "all" section keeps everything but its plain string fields (its
+// switches and choices survive, its tokens don't). The shape is otherwise
+// the stored one, so the file imports cleanly and restoreSecrets can fill
+// the blanks back from what the instance holds. `all` is set while inside
+// such a section.
+export function redactForExport<T>(schema: z.ZodType, value: T, all = false): T {
+  const stack = layers(schema);
+  for (const s of stack) {
+    const rule = secretFields.get(s);
+    if (rule?.redact === "all") all = true;
+    if (rule?.redact === "blank") return (typeof value === "string" && !isEnvRef(value) ? "" : value) as T;
+  }
+  const base = stack[stack.length - 1];
+  if (all && base instanceof z.ZodString) {
+    return (typeof value === "string" && !isEnvRef(value) ? "" : value) as T;
+  }
+  if (base instanceof z.ZodUnion) {
+    const option = (base.options as z.ZodType[]).find((o) => o.safeParse(value).success);
+    return option ? redactForExport(option, value, all) : value;
+  }
+  const item = lenientItems.get(base) ?? (base instanceof z.ZodArray ? (base.element as z.ZodType) : null);
+  if (item && Array.isArray(value)) return value.map((v) => redactForExport(item, v, all)) as T;
+  if (base instanceof z.ZodObject && isPlainObject(value)) {
+    const shape = base.shape as Record<string, z.ZodType>;
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [k, shape[k] ? redactForExport(shape[k], v, all) : v])
+    ) as T;
+  }
+  return value;
+}
+
+// The counterpart of an item in the other list: by `id` when both carry
+// one, else the same position.
+function counterpart(list: unknown[], item: unknown, index: number): unknown {
+  if (isPlainObject(item) && typeof item.id === "string") {
+    return list.find((o) => isPlainObject(o) && o.id === item.id);
+  }
+  return list[index];
+}
+
+// `incoming` (a backup being restored, #366) with every secret field that is
+// blank in it taken from `stored` (what the instance already holds), matched
+// by id through the lists. A secret-less export then restores without
+// wiping the credentials the instance has; a file that carries its own
+// secrets keeps them. `all` is set inside an "all" section, where every
+// plain string field counts.
+export function restoreSecrets<T>(schema: z.ZodType, incoming: T, stored: unknown, all = false): T {
+  const stack = layers(schema);
+  const fill = () => (incoming === "" && typeof stored === "string" ? stored : incoming) as T;
+  for (const s of stack) {
+    const rule = secretFields.get(s);
+    if (rule?.redact === "all") all = true;
+    if (rule?.redact === "blank") return fill();
+  }
+  const base = stack[stack.length - 1];
+  if (all && base instanceof z.ZodString) return fill();
+  if (base instanceof z.ZodUnion) {
+    const option = (base.options as z.ZodType[]).find((o) => o.safeParse(incoming).success);
+    return option ? restoreSecrets(option, incoming, stored, all) : incoming;
+  }
+  const item = lenientItems.get(base) ?? (base instanceof z.ZodArray ? (base.element as z.ZodType) : null);
+  if (item && Array.isArray(incoming)) {
+    const from = Array.isArray(stored) ? stored : [];
+    return incoming.map((v, i) => restoreSecrets(item, v, counterpart(from, v, i), all)) as T;
+  }
+  if (base instanceof z.ZodObject && isPlainObject(incoming)) {
+    const shape = base.shape as Record<string, z.ZodType>;
+    const from = isPlainObject(stored) ? stored : {};
+    return Object.fromEntries(
+      Object.entries(incoming).map(([k, v]) => [k, shape[k] ? restoreSecrets(shape[k], v, from[k], all) : v])
+    ) as T;
+  }
+  return incoming;
+}

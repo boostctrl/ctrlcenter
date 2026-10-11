@@ -1026,6 +1026,15 @@ export default async function HelpPage() {
             is, and turning it off turns actions off too.
           </P>
           <P>
+            Some changes ask for your password again, and the authenticator
+            code when the second factor is on: changing the password, turning
+            two-factor authentication on or off, editing an integration&apos;s
+            address or credentials or turning its actions on, exporting with
+            secrets, restoring a backup, and the destructive dashboard
+            actions. Signing in counts for ten minutes; after that a{" "}
+            <strong>Confirm it&apos;s you</strong> dialog asks once.
+          </P>
+          <P>
             Settings → Security opens with a <strong>checklist</strong> of
             what the app can see of your deployment — the second factor,
             where the password comes from, whether sign-ins arrive over

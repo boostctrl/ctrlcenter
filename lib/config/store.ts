@@ -10,6 +10,7 @@ import { migrateConfig } from "../config-migrate";
 import { updateYamlText } from "../config-yaml";
 import { log, errorReason } from "../log";
 import { recordUpgrade } from "./upgrade";
+import { restoreImportSecrets } from "./redact";
 import { globalSingleton } from "../singleton";
 import { CONFIG_SCHEMA_VERSION, configSchema, configReadSchema, type Config } from "../schema";
 
@@ -293,8 +294,12 @@ export async function replaceConfig(input: unknown): Promise<Config> {
     // mid-write must not leave it torn.
     await writeFileAtomic(CONFIG_BAK, raw);
     validated.auth = current.auth;
-    await writeConfig(validated);
-    return validated;
+    // A backup exported without secrets (#366) carries blanks where the
+    // credentials were; fill them from what this instance holds, by id, so
+    // restoring it doesn't wipe them. A file with its own secrets keeps them.
+    const restored = restoreImportSecrets(validated, current);
+    await writeConfig(restored);
+    return restored;
   });
   writes.queue = result.catch(() => undefined);
   return result;

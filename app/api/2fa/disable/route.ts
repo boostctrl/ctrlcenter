@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/lib/api-auth";
+import { requireRecentAuth } from "@/lib/reauth";
 import { readConfigInternal, disableTotp, clearAllowActions } from "@/lib/config";
 import { rateLimit, pruneRateLimit, clientKey } from "@/lib/rate-limit";
 import { verifyTotpOnce } from "@/lib/totp";
@@ -17,6 +18,10 @@ export async function POST(request: NextRequest) {
   if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  // Step-up (#366): the code below proves the device; a recent confirmation
+  // proves the password too.
+  const recent = await requireRecentAuth(request);
+  if (!recent.ok) return recent.response;
   pruneRateLimit();
   const limited = rateLimit(clientKey(request, "2fa"), MAX_ATTEMPTS, WINDOW_MS);
   if (!limited.allowed) {

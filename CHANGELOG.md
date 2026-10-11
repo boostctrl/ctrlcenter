@@ -14,6 +14,11 @@ here.
 
 ### Added
 
+- **Export without secrets.** *Export* now asks what to include: by default
+  the file leaves out integration passwords and keys, calendar and email
+  credentials and webhook tokens, and restoring it onto this instance keeps
+  the credentials already stored. Tick *Include secrets* for a full backup;
+  that asks for your password first. (#366)
 - **A security checklist.** Settings → Security opens with what the app can
   see of your deployment — two-factor authentication, where the password
   comes from, whether sign-ins arrive over HTTPS and through the proxy you
@@ -32,6 +37,15 @@ here.
 
 ### Security
 
+- **Sensitive changes ask for your password again.** Changing the password,
+  turning two-factor authentication on or off, editing an integration's
+  address or credentials or turning its actions on, exporting with secrets,
+  restoring a backup, and the destructive dashboard actions (delete, stop,
+  restart, decline) now need the password — and the authenticator code when
+  the second factor is on — to have been confirmed in the last ten minutes.
+  Signing in counts; after that a *Confirm it's you* dialog asks once and
+  the change goes through. A session someone else got hold of can no longer
+  lock you out or walk off with the credentials on its own. (#366)
 - **Dashboard actions need two-factor authentication.** *Allow actions from
   the dashboard* can only be turned on once the second factor is, every
   action checks it again on the server, and turning two-factor

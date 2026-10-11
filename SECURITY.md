@@ -93,11 +93,13 @@ deployment safe.
   Cloudflare Tunnel) rather than a public port. If it must be publicly
   reachable, turn on two-factor authentication and keep it behind the reverse
   proxy with a strong password.
-- **Exported backups contain your secrets.** `Export` (and `config.yaml`
-  itself) includes integration credentials and the other settings secrets in
-  plaintext, so a backup can be restored. Store exported files as you would any
-  secret. The admin password hash and the two-factor secret are **not**
-  exported.
+- **Exports leave secrets out unless you ask.** `Export` writes a backup
+  without integration credentials, calendar and email credentials or webhook
+  tokens; restoring it onto the same instance keeps the ones stored there.
+  Ticking **Include secrets** writes them in plaintext (after confirming your
+  password), so a full backup can be restored elsewhere — store that file, and
+  `config.yaml` itself, as you would any secret. The admin password hash and
+  the two-factor secret are **never** exported.
 - **Keep credential managers out of the dashboard.** Don't point ctrlcenter at a
   secrets or password manager (e.g. Vaultwarden/Bitwarden); aggregating that
   behind one admin session is exactly the concentration of risk to avoid, and

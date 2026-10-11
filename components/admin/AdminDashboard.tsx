@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import type {
   AppItem,
   BookmarkItem,
@@ -30,6 +30,9 @@ import { ConfirmProvider, useConfirm } from "./Confirm";
 import { replaceUrlParams } from "./urlState";
 import { apiErrorMessage } from "./apiError";
 import UpgradeBanner from "./UpgradeBanner";
+import ReauthDialog from "./ReauthDialog";
+import { fetchWithReauth } from "./reauth";
+import { useFocusTrap } from "./useFocusTrap";
 import type { UpgradeSummary } from "@/lib/config/upgrade";
 
 type Tab = "apps" | "bookmarks" | "themes" | "settings";
@@ -68,6 +71,8 @@ export default function AdminDashboard(props: Props) {
     <ToastProvider>
       <ConfirmProvider>
         <AdminBody {...props} />
+        {/* "Confirm it's you" for the sensitive saves (#366). */}
+        <ReauthDialog />
       </ConfirmProvider>
     </ToastProvider>
   );
@@ -111,6 +116,17 @@ function AdminBody({
   const fileRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
   const confirm = useConfirm();
+  // The export dialog (#366): a backup leaves secrets out unless asked.
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportSecrets, setExportSecrets] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const exportTrapRef = useFocusTrap<HTMLFormElement>(exportOpen);
+  useEffect(() => {
+    if (!exportOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setExportOpen(false);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [exportOpen]);
   const {
     ref: tabFadeRef,
     onScroll: onTabScroll,
@@ -148,13 +164,25 @@ function AdminBody({
     window.location.href = "/";
   }
 
-  async function handleExport() {
+  async function handleExport(e: FormEvent) {
+    e.preventDefault();
+    setExporting(true);
     try {
-      const res = await fetch("/api/config");
-      if (!res.ok) throw new Error();
+      // With secrets takes a recent confirmation (#366); fetchWithReauth
+      // collects it and retries.
+      const res = await fetchWithReauth(exportSecrets ? "/api/config?secrets=1" : "/api/config");
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        toast(apiErrorMessage(data, "Export failed"), "error");
+        return;
+      }
       downloadJson("ctrlcenter-config.json", await res.json());
+      setExportOpen(false);
+      setExportSecrets(false);
     } catch {
       toast("Export failed", "error");
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -201,7 +229,7 @@ function AdminBody({
     if (!ok) return;
 
     try {
-      const res = await fetch("/api/config", {
+      const res = await fetchWithReauth("/api/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(config),
@@ -247,11 +275,60 @@ function AdminBody({
             <Button
               variant="ghost"
               type="button"
-              onClick={handleExport}
+              onClick={() => setExportOpen(true)}
               title="Downloads the configuration — uploaded icons included — as a single JSON file."
             >
               Export
             </Button>
+            {exportOpen && (
+              <div
+                className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 pt-[10vh] backdrop-blur-sm"
+                onMouseDown={() => setExportOpen(false)}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="export-title"
+              >
+                <form
+                  ref={exportTrapRef}
+                  onSubmit={handleExport}
+                  onMouseDown={(ev) => ev.stopPropagation()}
+                  className="glass-card flex w-full max-w-md flex-col gap-4 p-6 text-left"
+                >
+                  <h3 id="export-title" className="font-semibold">
+                    Export the configuration
+                  </h3>
+                  <p className="text-sm text-ink-60">
+                    Apps, bookmarks, settings, layout, themes and uploaded icons, as one JSON
+                    file. Passwords and keys are left out unless you include them; a file
+                    without them restores onto this instance with its stored credentials kept.
+                  </p>
+                  <label className="flex cursor-pointer items-start gap-3 text-sm">
+                    <input
+                      type="checkbox"
+                      className="accent-focus mt-0.5"
+                      checked={exportSecrets}
+                      onChange={(ev) => setExportSecrets(ev.target.checked)}
+                    />
+                    <span className="text-ink-70">
+                      Include secrets
+                      <span className="block text-xs text-ink-45">
+                        Integration passwords and keys, calendar and email credentials, webhook
+                        tokens. Asks you to confirm your password. Store the file as you would any
+                        secret.
+                      </span>
+                    </span>
+                  </label>
+                  <div className="flex gap-2">
+                    <Button type="submit" disabled={exporting}>
+                      {exporting ? "Exporting…" : "Export"}
+                    </Button>
+                    <Button type="button" variant="ghost" onClick={() => setExportOpen(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            )}
             <Button
               variant="ghost"
               type="button"

@@ -37,6 +37,8 @@ const ADMIN_PREFIXES = [
   // checklist (#367).
   "/api/sessions",
   "/api/security",
+  // Step-up confirmation (#366).
+  "/api/reauth",
 ];
 
 function needsAuth(pathname: string): boolean {

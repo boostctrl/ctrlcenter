@@ -5,6 +5,7 @@ import { TextField, Button } from "./ui";
 import { useToast } from "./Toast";
 import { useFocusTrap } from "./useFocusTrap";
 import { apiErrorMessage } from "./apiError";
+import { fetchWithReauth } from "./reauth";
 
 // The admin Security section's two-factor card (#198). Opt-in TOTP: enroll by
 // scanning a QR (or entering the secret) and confirming a code, which then
@@ -70,7 +71,7 @@ export default function TwoFactor({
     setError(null);
     setStep("enroll");
     try {
-      const res = await fetch("/api/2fa/setup", { method: "POST" });
+      const res = await fetchWithReauth("/api/2fa/setup", { method: "POST" });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         toast(apiErrorMessage(data, "Couldn't start setup"), "error");
@@ -116,7 +117,7 @@ export default function TwoFactor({
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/2fa/disable", {
+      const res = await fetchWithReauth("/api/2fa/disable", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code }),

@@ -891,6 +891,8 @@ describe("readConfigInternal stays off public surfaces", () => {
     "app/api/logout/route.ts",
     // Admin-only security checklist (#367): reads once, then gates on the hash.
     "app/api/security/route.ts",
+    // Admin-only step-up confirmation (#366): verifies the credentials.
+    "app/api/reauth/route.ts",
     // Admin-only integrations save: reads `auth` only to tie the actions
     // opt-in to the second factor (#367). Answers with nothing but ok.
     "app/api/integrations/route.ts",

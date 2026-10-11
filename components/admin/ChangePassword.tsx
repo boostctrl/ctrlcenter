@@ -5,6 +5,7 @@ import { TextField, Button } from "./ui";
 import { useToast } from "./Toast";
 import { useFocusTrap } from "./useFocusTrap";
 import { apiErrorMessage } from "./apiError";
+import { fetchWithReauth } from "./reauth";
 
 export default function ChangePassword() {
   const [open, setOpen] = useState(false);
@@ -37,7 +38,7 @@ export default function ChangePassword() {
     }
     setSaving(true);
     try {
-      const res = await fetch("/api/password", {
+      const res = await fetchWithReauth("/api/password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ current, next }),

@@ -30,6 +30,9 @@ export type SessionRecord = {
   // header (so through a proxy).
   https: boolean;
   forwarded: boolean;
+  // When the session last proved the password (and the second factor when
+  // on): at sign-in, then each step-up confirmation (#366).
+  reauthAt: number;
 };
 
 export type SessionMeta = {
@@ -103,7 +106,12 @@ function isRecord(v: unknown): v is SessionRecord {
 
 // A stored record, with the fields a pre-3.0.0 file lacks defaulted.
 function normalize(r: SessionRecord): SessionRecord {
-  return { ...r, https: r.https === true, forwarded: r.forwarded === true };
+  return {
+    ...r,
+    https: r.https === true,
+    forwarded: r.forwarded === true,
+    reauthAt: typeof r.reauthAt === "number" ? r.reauthAt : r.createdAt,
+  };
 }
 
 async function load(store: Store): Promise<void> {
@@ -213,6 +221,7 @@ export async function createSession(meta: SessionMeta, now = Date.now()): Promis
     userAgent: meta.userAgent.slice(0, 300),
     https: meta.https === true,
     forwarded: meta.forwarded === true,
+    reauthAt: now,
   });
   prune(store, now);
   await persist(store);
@@ -279,6 +288,17 @@ export async function revokeSessions(keep?: string): Promise<number> {
   }
   if (count > 0) await persist(store);
   return count;
+}
+
+// Record that a live session just re-proved its credentials (#366), so the
+// step-up gate lets sensitive actions through for a while.
+export async function markReauth(id: string, now = Date.now()): Promise<boolean> {
+  const store = await ready();
+  const s = store.sessions.get(id);
+  if (!s || expired(store, s, now)) return false;
+  s.reauthAt = now;
+  await persist(store);
+  return true;
 }
 
 // The idle timeout, in hours.

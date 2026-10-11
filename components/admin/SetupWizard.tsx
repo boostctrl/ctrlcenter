@@ -14,6 +14,7 @@ import type { ThemePack } from "@/lib/theme";
 import { appNameFromUrl, parsePastedUrls } from "@/lib/setup";
 import CitySearch from "./CitySearch";
 import TwoFactor from "./TwoFactor";
+import ReauthDialog from "./ReauthDialog";
 import { Button, Hint, SelectField, TextArea, TextField, ToggleRow, fieldLabelClasses } from "./ui";
 import { saveSettingsPatch } from "./settingsApi";
 import { NO_ZONES, getBrowserZones, subscribeZonesNever } from "./settings/zones";
@@ -96,6 +97,7 @@ export default function SetupWizard({ settings, packs }: { settings: Settings; p
 
   return (
     <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-6 px-6 pt-12 pb-24">
+      <ReauthDialog />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold">Set up CtrlCenter</h1>

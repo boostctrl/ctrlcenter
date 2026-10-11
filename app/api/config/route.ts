@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/lib/api-auth";
-import { readConfigInternal, replaceConfig, stripAuth } from "@/lib/config";
+import { readConfigInternal, replaceConfig, stripAuth, stripExportSecrets } from "@/lib/config";
+import { requireRecentAuth } from "@/lib/reauth";
 import { migrateConfig, NewerConfigError } from "@/lib/config-migrate";
 import { bundledOutageNotesSchema, configSchema } from "@/lib/schema";
 import { exportOutageNotes, flush, importOutageNotes, loadHistory } from "@/lib/status-history";
@@ -33,11 +34,19 @@ export async function GET(request: NextRequest) {
   if (!(await isAdminRequest(request, config.auth.passwordHash))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  // Secrets stay out of a backup unless asked for (#366): `?secrets=1`
+  // includes the integration credentials and the other stored secrets, and
+  // takes a recent step-up confirmation.
+  const withSecrets = request.nextUrl.searchParams.get("secrets") === "1";
+  if (withSecrets) {
+    const recent = await requireRecentAuth(request, config.auth.passwordHash);
+    if (!recent.ok) return recent.response;
+  }
   const uploads = await exportIcons();
   await loadHistory();
   const outageNotes = exportOutageNotes();
   const body = {
-    ...stripAuth(config),
+    ...(withSecrets ? stripAuth(config) : stripExportSecrets(stripAuth(config))),
     ...(uploads.length > 0 ? { uploads } : {}),
     ...(outageNotes.length > 0 ? { outageNotes } : {}),
   };
@@ -52,6 +61,9 @@ export async function POST(request: NextRequest) {
   if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  // Step-up (#366): a restore replaces everything, credentials included.
+  const recent = await requireRecentAuth(request);
+  if (!recent.ok) return recent.response;
   const body = await request.json().catch(() => null);
   // Upgrade a pre-2.0 backup BEFORE validating: zod strips keys it doesn't
   // know, so parsing the raw body first would silently launder the legacy
