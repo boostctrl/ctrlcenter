@@ -115,10 +115,12 @@ export async function POST(
   // An event that may be one of a burst waits for the burst to go quiet and
   // goes out merged with its fellows (#346, lib/webhook-digest.ts); a Test, a
   // health issue or anything else the parser left out of a digest, and every
-  // event while the window is off, is relayed at once as before.
+  // event while the window is off, is relayed at once as before — as is one
+  // the store has no room to hold.
   const windowMs = settings.webhooks.digestSeconds * 1000;
   if (windowMs > 0 && notification.digest) {
-    holdForDigest(notification, {
+    const key = keyForLog(notification.digest.key);
+    const held = holdForDigest(notification, {
       windowMs,
       send: async (merged) => {
         // Read the config afresh: a channel added or edited while the burst
@@ -136,8 +138,11 @@ export async function POST(
         });
       },
     });
-    log.debug("webhook held for digest", { service, key: keyForLog(notification.digest.key) });
-    return NextResponse.json({ ok: true, queued: true });
+    if (held) {
+      log.debug("webhook held for digest", { service, key });
+      return NextResponse.json({ ok: true, queued: true });
+    }
+    log.debug("webhook digest store full, relaying at once", { service, key });
   }
 
   // The report options (#347) are read with the rest of the settings, so a

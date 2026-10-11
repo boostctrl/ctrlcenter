@@ -79,4 +79,22 @@ describe("POST /api/hooks/[service]", () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect(pendingWebhookDigests()).toEqual([{ key: "sonarr||Download|1", count: 1 }]);
   });
+
+  it("relays an event at once when the digest store is full (its 64 groups pending)", async () => {
+    const episode = (sid: number) => ({
+      eventType: "Download",
+      series: { id: sid, title: `Series ${sid}` },
+      episodes: [{ id: sid * 10, seasonNumber: 1, episodeNumber: 1 }],
+      episodeFile: { quality: "WEBDL-1080p", size: 1 },
+    });
+    for (let sid = 1; sid <= 64; sid += 1) {
+      expect(await (await hook("sonarr", "s3cret-token", episode(sid))).json()).toEqual({ ok: true, queued: true });
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+    const res = await hook("sonarr", "s3cret-token", episode(65));
+    expect(await res.json()).toEqual({ ok: true, delivered: true });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe("https://hook.test");
+    expect(pendingWebhookDigests()).toHaveLength(64);
+  });
 });

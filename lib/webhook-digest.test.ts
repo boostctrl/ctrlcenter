@@ -106,6 +106,26 @@ describe("holdForDigest", () => {
     expect(merged.body.endsWith("\nand 93 more")).toBe(true);
   });
 
+  it("holds 64 groups at most: a 65th key is not held, the rest still flush, then a key is held again", async () => {
+    vi.spyOn(log, "info").mockImplementation(() => undefined);
+    const send = sent();
+    // One series per event: a new key each time, up to the cap.
+    for (let sid = 1; sid <= 64; sid += 1) expect(holdForDigest(imported(1, sid), { windowMs: MIN, send })).toBe(true);
+    expect(pendingWebhookDigests()).toHaveLength(64);
+    expect(holdForDigest(imported(1, 65), { windowMs: MIN, send })).toBe(false);
+    expect(pendingWebhookDigests()).toHaveLength(64);
+    expect(pendingWebhookDigests().some((g) => g.key === "sonarr||Download|65")).toBe(false);
+    expect(send).not.toHaveBeenCalled();
+    // A key already pending still takes its event.
+    expect(holdForDigest(imported(2, 64), { windowMs: MIN, send })).toBe(true);
+    expect(pendingWebhookDigests().find((g) => g.key === "sonarr||Download|64")?.count).toBe(2);
+    await vi.advanceTimersByTimeAsync(MIN);
+    expect(send).toHaveBeenCalledTimes(64);
+    expect(pendingWebhookDigests()).toEqual([]);
+    expect(holdForDigest(imported(1, 65), { windowMs: MIN, send })).toBe(true);
+    expect(pendingWebhookDigests()).toEqual([{ key: "sonarr||Download|65", count: 1 }]);
+  });
+
   it("opens a fresh group for an event arriving after the send", async () => {
     const send = sent();
     holdForDigest(imported(1), { windowMs: MIN, send });
@@ -169,7 +189,7 @@ describe("holdForDigest", () => {
   it("ignores an event with no digest", () => {
     const send = sent();
     const test = parseArrWebhook("sonarr", { eventType: "Test" })!;
-    holdForDigest(test, { windowMs: MIN, send });
+    expect(holdForDigest(test, { windowMs: MIN, send })).toBe(false);
     expect(pendingWebhookDigests()).toEqual([]);
     expect(vi.getTimerCount()).toBe(0);
   });

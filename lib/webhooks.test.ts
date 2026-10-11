@@ -469,6 +469,97 @@ describe("report helpers", () => {
   });
 });
 
+// Every string a parser reads is the sender's, from a body of up to 256 KB;
+// what leaves the parser — the flat title and body every channel posts, the
+// report, the digest — is cut to a readable length where it is read.
+describe("parse-time bounds", () => {
+  const big = "x".repeat(256 * 1024);
+  const many = <T,>(n: number, of: (i: number) => T) => Array.from({ length: n }, (_, i) => of(i));
+
+  it("bounds the flat title and body, and every report string, under a body-sized Seerr subject and message", () => {
+    const n = parseSeerrWebhook({
+      notification_type: "MEDIA_PENDING",
+      subject: big,
+      message: big,
+      image: "https://image.tmdb.org/t/p/w600_and_h900_bestv2/wicked.jpg",
+      media: { media_type: "movie", tmdbId: "1", status: big },
+      request: { request_id: "1", requestedBy_username: big },
+    })!;
+    expect(n.title.length).toBeLessThanOrEqual("Seerr new request: ".length + 200);
+    expect(n.body?.length).toBeLessThanOrEqual(200);
+    const r = n.report!;
+    expect(r.headline.length).toBeLessThanOrEqual(200);
+    expect(r.summary.length).toBeLessThanOrEqual(200);
+    expect(r.subtitle?.length).toBeLessThanOrEqual(200);
+    expect(r.message?.length).toBeLessThanOrEqual(2000);
+    expect(r.message?.endsWith("…")).toBe(true);
+    expect(r.image?.alt.length).toBeLessThanOrEqual(200);
+    for (const f of r.facts) expect(f.value.length).toBeLessThanOrEqual(300);
+    expect(n.digest?.items[0].label.length).toBeLessThanOrEqual(120);
+    // The whole of what leaves the parser, from a 256 KB body.
+    expect(JSON.stringify(n).length).toBeLessThan(8_000);
+  });
+
+  it("bounds an arr event's label, instance, subtitle, link and message", () => {
+    const odd = parseArrWebhook("sonarr", {
+      eventType: big,
+      instanceName: big,
+      applicationUrl: `https://sonarr.lan/?q=${big}`,
+      series: { title: big, year: 2022, genres: many(50, (i) => `Genre ${i} ${"g".repeat(500)}`) },
+    })!;
+    expect(odd.report?.event.length).toBeLessThanOrEqual(200);
+    expect(odd.report?.instance?.length).toBeLessThanOrEqual(200);
+    expect(odd.report?.subtitle?.length).toBeLessThanOrEqual(200);
+    expect(odd.title.length).toBeLessThanOrEqual("Sonarr ".length + 200 + ": ".length + 200);
+    // A URL longer than browsers take is no URL to link; one within is.
+    expect(odd.report?.link).toBeUndefined();
+    expect(
+      parseArrWebhook("sonarr", { eventType: "Test", applicationUrl: `https://sonarr.lan/${"p".repeat(2_000)}` })?.report
+        ?.link
+    ).toBeDefined();
+    const health = parseArrWebhook("sonarr", { eventType: "Health", level: "warning", message: big })!;
+    expect(health.report?.headline.length).toBeLessThanOrEqual(120);
+    expect(health.report?.message?.length).toBeLessThanOrEqual(2000);
+    expect(health.body?.length).toBeLessThanOrEqual(200);
+    const stuck = parseArrWebhook("sonarr", {
+      eventType: "ManualInteractionRequired",
+      series,
+      downloadStatusMessages: many(300, (i) => ({ title: `File ${i}`, messages: many(20, (j) => `Reason ${j} ${"r".repeat(300)}`) })),
+    })!;
+    expect(stuck.report?.message?.length).toBeLessThanOrEqual(2000);
+  });
+
+  it("bounds a fact to a line, or to the list its builder cut", () => {
+    const n = parseArrWebhook("sonarr", {
+      eventType: "Grab",
+      series,
+      episodes: many(5_000, (i) => ({ seasonNumber: 1, episodeNumber: i + 1, title: "t".repeat(500) })),
+      release: {
+        releaseTitle: big,
+        languages: many(5_000, (i) => ({ name: `Language ${i} ${"l".repeat(50)}` })),
+        indexerFlags: many(5_000, (i) => `Flag ${i} ${"f".repeat(50)}`),
+      },
+      customFormatInfo: { customFormats: many(5_000, (i) => ({ name: `Format ${i} ${"c".repeat(50)}` })), customFormatScore: 1 },
+    })!;
+    // A line of 300; a list of 24 lines of 120 and the "and N more" line.
+    const maxFact = (24 + 1) * (120 + 1);
+    expect(fact(n.report, "Release")?.value.length).toBe(300);
+    for (const label of ["Languages", "Flags", "Custom formats"]) {
+      const v = fact(n.report, label)?.value ?? "";
+      expect(v.length).toBeLessThanOrEqual(maxFact);
+      expect(v.endsWith("…")).toBe(true);
+    }
+    const lines = fact(n.report, "Episodes")?.value.split("\n") ?? [];
+    expect(lines).toHaveLength(25);
+    for (const l of lines) expect(l.length).toBeLessThanOrEqual(120);
+    // A list is walked 200 deep, as far as the digest store keeps items.
+    expect(lines[24]).toBe("and 176 more");
+    expect(n.report?.subtitle).toBe("Season 1 · Episodes 1–200");
+    expect(n.report?.summary).toBe("The Bear S01E01-E200");
+    expect(n.digest?.items).toHaveLength(200);
+  });
+});
+
 describe("parseWebhook dispatch", () => {
   it("routes seerr to the Seerr parser", () => {
     expect(
@@ -699,6 +790,20 @@ describe("digest membership (#346)", () => {
     expect(seerr?.digest?.key).not.toMatch(/\p{Cc}/u);
     expect(seerr?.digest?.key.length).toBeLessThanOrEqual("seerr|".length + 64);
     expect(seerr?.digest?.key.startsWith("seerr|MEDIA_ [31mXXX")).toBe(true);
+  });
+
+  it("cuts a title standing in for an item id like a key segment", () => {
+    const added = parseArrWebhook("sonarr", { eventType: "SeriesAdd", series: { title: "Silo\u0007 " + "s".repeat(500) } });
+    const id = added?.digest?.items[0].id ?? "";
+    expect(id.startsWith("series:Silo sss")).toBe(true);
+    expect(id).not.toMatch(/\p{Cc}/u);
+    expect(id.length).toBeLessThanOrEqual("series:".length + 64);
+    const movie = parseArrWebhook("radarr", { eventType: "Download", movie: { title: "M".repeat(500) }, movieFile: {} });
+    expect(movie?.digest?.items[0].id.length).toBeLessThanOrEqual("movie:".length + 64);
+    const req = parseSeerrWebhook({ notification_type: "MEDIA_PENDING", subject: "R".repeat(500) });
+    expect(req?.digest?.items[0].id).toBe(`req:${"R".repeat(63)}…`);
+    // A numeric id is taken as is.
+    expect(movieImported(7).digest?.items[0].id).toBe("movie:7");
   });
 
   it("bounds what the store keeps: labels and the lead are clamped", () => {

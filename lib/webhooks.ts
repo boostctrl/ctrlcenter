@@ -28,7 +28,8 @@ export type ReportFact = {
 
 // Everything a channel might show about one event. The email renders it all;
 // toContent() flattens it to the one-liner the chat and push channels get.
-// Every string here is raw payload text — the renderer escapes.
+// Every string here is payload text, cut to a readable length as it is read
+// (the bounds below) but never escaped — the renderer escapes.
 export type WebhookReport = {
   service: WebhookService;
   // The sender's instanceName when it is short, else the fixed app name.
@@ -37,7 +38,8 @@ export type WebhookReport = {
   instance?: string;
   // The upstream event id ("Download", "MEDIA_PENDING").
   eventType: string;
-  // A fixed label for the event ("Imported") — never payload text.
+  // A short label for the event: a fixed one ("Imported") for the types we
+  // know, the humanized event type for the rest.
   event: string;
   level: NotificationLevel;
   // The series or movie title; the event's own line when there is no media.
@@ -51,7 +53,8 @@ export type WebhookReport = {
   chips?: string[];
   facts: ReportFact[];
   messageLabel?: "Overview" | "Message" | "Description" | "Comment";
-  // Free text (an overview, a health message); clamped at render.
+  // Free text (an overview, a health message), at most MAX_MESSAGE; the
+  // email shows 600 of it.
   message?: string;
   // https only — a plain-http poster would be blocked or mixed-content.
   image?: { url: string; alt: string };
@@ -141,6 +144,32 @@ export function reportOptions(w: ReportOptions): ReportOptions {
   return { poster: w.poster, facts: w.facts, synopsis: w.synopsis, subjectPrefix: w.subjectPrefix };
 }
 
+// --- Bounds ---
+
+// Every string the parsers read is the sender's, from a body of up to 256 KB
+// (the route's MAX_BYTES), and what leaves here is held as is — by the
+// report, by the flat title and body every channel posts, by the digest
+// store. So each kind of text is cut where it is read, to what it can be
+// read as, and no renderer is trusted to: a name, a title or a fact value
+// is a line or three; a message or an overview a few paragraphs (the email
+// shows 600 of it); a URL is taken whole, as browsers do, or not at all; a
+// list is walked only as far as the digest store keeps items per event.
+// What heads the report — headline, summary, subtitle, event label,
+// instance, the poster's alt — is composed of those and could outgrow them,
+// so toContent() cuts it once more. What the digest store keeps per item
+// and per group is cut where it is made (digestOf). A fact holds at most a
+// lineList — FACT_LINES lines of MAX_LABEL and the "and N more" line — and
+// a joined list of names (languages, custom formats) is cut to that.
+const MAX_TEXT = 300;
+const MAX_MESSAGE = 2000;
+const MAX_URL = 2048;
+const MAX_LIST = 200;
+const MAX_HEAD = 200;
+const MAX_LABEL = 120;
+const MAX_LEAD = 200;
+const FACT_LINES = 24;
+const MAX_FACT = (FACT_LINES + 1) * (MAX_LABEL + 1);
+
 // --- Small value helpers ---
 
 const asRecord = (v: unknown): Record<string, unknown> =>
@@ -148,15 +177,18 @@ const asRecord = (v: unknown): Record<string, unknown> =>
 
 // A trimmed string, or "" for anything else — including Seerr's "{{var}}"
 // placeholders, which its default JSON template leaves in a field it has no
-// value for.
-const str = (v: unknown): string => {
+// value for. `text` is the whole of it, for a URL; `str` is a line of it,
+// and `prose` a message.
+const text = (v: unknown): string => {
   if (typeof v !== "string") return "";
   const s = v.trim();
   return /^\{\{\w+\}\}$/.test(s) ? "" : s;
 };
+const str = (v: unknown): string => clamp(text(v), MAX_TEXT);
+const prose = (v: unknown): string => clamp(text(v), MAX_MESSAGE);
 const num = (v: unknown): number | undefined =>
   typeof v === "number" && Number.isFinite(v) ? v : undefined;
-const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+const list = (v: unknown): unknown[] => (Array.isArray(v) ? v.slice(0, MAX_LIST) : []);
 const strs = (v: unknown): string[] => list(v).map(str).filter(Boolean);
 // An id Seerr sends as a number or a numeric string.
 const idOf = (v: unknown): string => {
@@ -218,14 +250,15 @@ export function displayUrl(url: string): string {
 }
 
 // Only https: a plain-http poster is blocked by most mail clients, and Seerr's
-// template yields ".../bestv2null" when it has no image to offer.
+// template yields ".../bestv2null" when it has no image to offer. A URL past
+// MAX_URL is no URL at all — cut, it would link nowhere.
 function httpsUrl(v: unknown): string | undefined {
-  const s = str(v);
-  return /^https:\/\//i.test(s) && !/(null|undefined)$/i.test(s) ? s : undefined;
+  const s = text(v);
+  return s.length <= MAX_URL && /^https:\/\//i.test(s) && !/(null|undefined)$/i.test(s) ? s : undefined;
 }
 function httpUrl(v: unknown): string | undefined {
-  const s = str(v);
-  return /^https?:\/\//i.test(s) ? s : undefined;
+  const s = text(v);
+  return s.length <= MAX_URL && /^https?:\/\//i.test(s) ? s : undefined;
 }
 
 // "3–5, 7" from sorted numbers, with the caller's own label for each. The
@@ -272,8 +305,11 @@ function appOf(p: Record<string, unknown>, fixed: string): string {
   return name && name.length <= 20 ? name : fixed;
 }
 
+// A fact's value is a line (str) or a list its builder cut (lineList, the
+// renames) — but a joined list of names runs as long as the sender's list,
+// so every value is cut at MAX_FACT here.
 function push(facts: ReportFact[], label: string, value: string, extra?: Partial<ReportFact>) {
-  if (value) facts.push({ label, value, ...extra });
+  if (value) facts.push({ label, value: clamp(value, MAX_FACT), ...extra });
 }
 
 const unique = (xs: string[]) => [...new Set(xs.filter(Boolean))];
@@ -332,10 +368,10 @@ const episodeLine = (e: Episode) =>
   `S${pad2(e.season)}E${pad2(e.episode)}${e.title ? ` "${e.title}"` : ""}`;
 
 // `lines` one per line, stopping at `max` and saying how many of `total`
-// remain — a season pack's episodes, a burst's items.
-const FACT_LINES = 24;
+// remain — a season pack's episodes, a burst's items. Each line is cut at
+// MAX_LABEL, so a fact of FACT_LINES lines never passes MAX_FACT.
 function lineList(lines: string[], total: number, max: number): string {
-  const kept = lines.slice(0, max);
+  const kept = lines.slice(0, max).map((l) => clamp(l, MAX_LABEL));
   if (total > max) kept.push(`and ${total - max} more`);
   return kept.join("\n");
 }
@@ -485,9 +521,6 @@ function digestLead(app: string, event: string, noun: DigestNoun, of = ""): stri
 
 // What the digest store keeps per item and per group is payload text, so it
 // is bounded here, where it is made, rather than trusted to stay short.
-const MAX_LABEL = 120;
-const MAX_LEAD = 200;
-
 function digestOf(d: WebhookDigest): WebhookDigest {
   return {
     ...d,
@@ -566,7 +599,7 @@ function arrDigest(
     noun: movie ? "movies" : "series",
     items: [
       {
-        id: `${movie ? "movie" : "series"}:${num(subject.id) ?? media.title}`,
+        id: `${movie ? "movie" : "series"}:${num(subject.id) ?? keyPart(media.title)}`,
         label: media.summary,
         ...file,
         ...shared,
@@ -599,7 +632,7 @@ export function parseArrWebhook(service: ArrService, payload: unknown): WebhookN
   };
   const facts: ReportFact[] = [];
   const release = asRecord(p.release);
-  const overview = service === "radarr" ? str(asRecord(p.movie).overview) : "";
+  const overview = service === "radarr" ? prose(asRecord(p.movie).overview) : "";
 
   switch (eventType) {
     case "Test":
@@ -723,8 +756,8 @@ export function parseArrWebhook(service: ArrService, payload: unknown): WebhookN
       return toContent({
         ...base,
         facts,
-        message: str(p.message) || undefined,
-        messageLabel: str(p.message) ? "Message" : undefined,
+        message: prose(p.message) || undefined,
+        messageLabel: prose(p.message) ? "Message" : undefined,
       });
 
     case "ManualInteractionRequired": {
@@ -733,7 +766,7 @@ export function parseArrWebhook(service: ArrService, payload: unknown): WebhookN
       push(facts, "Status", str(p.downloadStatus));
       push(facts, "Size", fmtBytes(info.size));
       push(facts, "Download client", clientOf(p));
-      const message = list(p.downloadStatusMessages)
+      const status = list(p.downloadStatusMessages)
         .map((m) => {
           const r = asRecord(m);
           const title = str(r.title);
@@ -742,6 +775,7 @@ export function parseArrWebhook(service: ArrService, payload: unknown): WebhookN
         })
         .filter(Boolean)
         .join("\n");
+      const message = clamp(status, MAX_MESSAGE);
       return toContent({
         ...base,
         facts,
@@ -753,7 +787,7 @@ export function parseArrWebhook(service: ArrService, payload: unknown): WebhookN
     case "Health":
     case "HealthIssue":
     case "HealthRestored": {
-      const message = str(p.message);
+      const message = prose(p.message);
       const restored = eventType === "HealthRestored";
       const severe = str(p.level).toLowerCase() === "error";
       const headline = message ? clamp(message, 120) : event;
@@ -779,7 +813,7 @@ export function parseArrWebhook(service: ArrService, payload: unknown): WebhookN
     case "ApplicationUpdate": {
       const prev = str(p.previousVersion);
       const next = str(p.newVersion);
-      const message = str(p.message);
+      const message = prose(p.message);
       push(facts, "Previous version", prev);
       push(facts, "New version", next);
       return toContent({
@@ -922,7 +956,7 @@ export function parseSeerrWebhook(payload: unknown): WebhookNotification | null 
     if (kind) event = `${kind} issue`;
   }
   const subject = str(p.subject);
-  const message = str(p.message);
+  const message = prose(p.message);
   const mediaType = str(media.media_type).toLowerCase();
   const type = mediaType === "movie" ? "Movie" : mediaType === "tv" ? "Series" : "";
   const status = humanize(str(isIssue ? issue.issue_status : media.status));
@@ -953,7 +987,7 @@ export function parseSeerrWebhook(payload: unknown): WebhookNotification | null 
     push(facts, "TMDB", displayUrl(href), { href });
   }
 
-  const text = nt === "ISSUE_COMMENT" ? str(comment.comment_message) : message;
+  const text = nt === "ISSUE_COMMENT" ? prose(comment.comment_message) : message;
   const url = httpsUrl(p.image);
   const image = url ? { url, alt: `${subject || "Media"} poster` } : undefined;
   // A request event with a subject may be one of a run; the item names the
@@ -967,7 +1001,7 @@ export function parseSeerrWebhook(payload: unknown): WebhookNotification | null 
           noun: "requests",
           items: [
             {
-              id: `req:${idOf(request.request_id) || subject}`,
+              id: `req:${idOf(request.request_id) || keyPart(subject)}`,
               label: subject + by,
               requester: requester || undefined,
               image,
@@ -992,25 +1026,34 @@ export function parseSeerrWebhook(payload: unknown): WebhookNotification | null 
   );
 }
 
-// The headline is the sheet's <h1>, and the parsers take it from a subject
-// or a title the sender sized: a body-long one would be a page of heading.
-// 200 holds any real title; the subject line cuts it further on its own.
-const MAX_HEADLINE = 200;
-
 // Flatten a report to what the chat and push channels relay — one line, a
 // short detail, a link — and carry the report along for the email, and the
 // digest for the burst store when the event may be one of a burst. Payload
 // text can hold newlines; the title becomes an ntfy header, so it gets one
-// line, and the headline is cut at MAX_HEADLINE.
+// line. What heads the report is composed of bounded strings but can
+// outgrow them — a title and its episode codes, a humanized event type — so
+// it is cut once more here, to MAX_HEAD (the <h1>, the subject line's tail,
+// the band), and the message to MAX_MESSAGE.
 export function toContent(r: WebhookReport, digest?: WebhookDigest): WebhookNotification {
-  const summary = r.summary.replace(/\s+/g, " ").trim();
+  const event = clamp(r.event, MAX_HEAD);
+  const summary = clamp(r.summary.replace(/\s+/g, " ").trim(), MAX_HEAD);
+  const message = r.message ? clamp(r.message, MAX_MESSAGE) : undefined;
   const chips = (r.chips ?? []).filter(Boolean);
-  const body = chips.length ? chips.join(" · ") : r.message ? clamp(r.message, 200) : undefined;
+  const body = chips.length ? clamp(chips.join(" · "), MAX_TEXT) : message ? clamp(message, 200) : undefined;
   return {
-    title: `${r.app} ${lowerFirst(r.event)}: ${summary}`,
+    title: `${r.app} ${lowerFirst(event)}: ${summary}`,
     body,
     url: r.link?.url,
-    report: { ...r, summary, headline: clamp(r.headline, MAX_HEADLINE) },
+    report: {
+      ...r,
+      event,
+      instance: r.instance ? clamp(r.instance, MAX_HEAD) : undefined,
+      headline: clamp(r.headline, MAX_HEAD),
+      subtitle: r.subtitle ? clamp(r.subtitle, MAX_HEAD) : undefined,
+      summary,
+      message,
+      image: r.image ? { ...r.image, alt: clamp(r.image.alt, MAX_HEAD) } : undefined,
+    },
     ...(digest ? { digest } : {}),
   };
 }

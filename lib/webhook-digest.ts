@@ -24,9 +24,14 @@ export type DigestSend = (c: WebhookNotification) => Promise<void>;
 // Bounds. A whole-series import can run to hundreds of events; past the kept
 // cap the rest are counted, not kept, so the merged title stays honest ("and
 // 40 more") without the group growing with the burst. The hard cap keeps a
-// steady drip from sliding the window forever.
+// steady drip from sliding the window forever. The group cap bounds the
+// store itself: a key is the sender's text (an event type, a title), so one
+// sender could open a group per event; past this many pending, a new key is
+// not held and the caller relays its event at once. Sixty-four is far past
+// the honest case — a few series importing at once, each its own group.
 const MAX_EVENT_ITEMS = 200;
 const MAX_ITEMS = 100;
+const MAX_GROUPS = 64;
 const CAP_WINDOWS = 5;
 const MAX_CAP_MS = 10 * 60 * 1000;
 
@@ -50,18 +55,22 @@ const state = globalSingleton("__ctrlcenterWebhookDigest", () => ({
 // the group's timer: one window from now, but never past the cap counted
 // from the group's first event. The group keeps the delivery callback it was
 // opened with. A resent item (same id) replaces the kept one in place.
+// Returns whether the event is held: not when it names no digest, nor when
+// its key is new and MAX_GROUPS groups are pending — the caller then relays
+// it at once, as with the window off.
 export function holdForDigest(
   n: WebhookNotification,
   o: { windowMs: number; send: DigestSend }
-): void {
+): boolean {
   const d = n.digest;
-  if (!d) return;
+  if (!d) return false;
   const now = Date.now();
   let g = state.groups.get(d.key);
   if (g) {
     clearTimeout(g.timer);
     g.events += 1;
   } else {
+    if (state.groups.size >= MAX_GROUPS) return false;
     g = { key: d.key, first: n, events: 1, firstAt: now, items: new Map(), dropped: 0, send: o.send };
     state.groups.set(d.key, g);
   }
@@ -76,6 +85,7 @@ export function holdForDigest(
   // Never hold the process open for a pending digest (lib/fetch-body.ts does
   // the same for its timeouts); a shutdown drops it, as documented above.
   g.timer.unref?.();
+  return true;
 }
 
 // Send a group and forget it. The group leaves the map before the send, so
