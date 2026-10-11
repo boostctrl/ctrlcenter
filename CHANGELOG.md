@@ -19,9 +19,9 @@ here.
   likewise). A theme without a font of its own now restores the site
   default font, as it already did for the wallpaper, fine-tune and status
   colors. (#373)
-- **The corner menu lists the admin's pages together.** Monitor sat between
-  Settings and Admin portal; the menu now ends with Admin portal and Monitor,
-  after the visitor's pages. (#374)
+- **The corner menu is in a sensible order.** Monitor sat between Settings
+  and Admin portal; it now sits with the pages (after Calendar), and the
+  menu ends with Help, Settings and Admin portal. (#374)
 
 ### Fixed
 

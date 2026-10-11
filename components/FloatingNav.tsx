@@ -46,13 +46,14 @@ export default function FloatingNav({ boards, weather, status, calendar }: NavPa
       weather ? { href: "/weather", label: "Weather" } : null,
       status ? { href: "/status", label: "Status" } : null,
       calendar ? { href: "/calendar", label: "Calendar" } : null,
+      // Monitor is a page to look at, like Status, so it sits with the
+      // pages; the links about the site come after it (#374). Both admin
+      // links live under /admin and gate themselves behind its login, and
+      // are always listed, like on the Settings page.
+      { href: "/admin/monitor", label: "Monitor" },
       { href: "/help", label: "Help" },
       { href: "/settings", label: "Settings" },
-      // The admin's pages last, together: both live under /admin and gate
-      // themselves behind its login, and are always listed, like on the
-      // Settings page (#374).
       { href: "/admin", label: "Admin portal" },
-      { href: "/admin/monitor", label: "Monitor" },
     ].filter(Boolean) as { href: string; label: string }[]
   ).filter((l) => l.href !== pathname);
 
