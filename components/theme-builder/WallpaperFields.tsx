@@ -16,10 +16,12 @@ import { ChipGroup } from "../ChipGroup";
 import { OptionCard } from "./OptionCard";
 
 // The wallpaper controls (#333), shared by the theme builder's Scene tab, the
-// admin pack editor and Settings → General: an image address (typed, or for
-// an admin, uploaded), a row of the bundled backgrounds (#348), blur, dim and
-// fit. `value` null means no wallpaper. The address commits on blur or Enter,
-// not per keystroke, so the page doesn't fetch every partial URL.
+// admin pack editor and Settings → General. In the order a choice is made: a
+// row of tiles — None, then the bundled backgrounds (#348) — an image of your
+// own (an address typed, or for an admin, uploaded), and once there is one,
+// blur, dim and fit. `value` null means no wallpaper; the None tile is how it
+// is removed. The address commits on blur or Enter, not per keystroke, so the
+// page doesn't fetch every partial URL.
 export function WallpaperFields({
   value,
   onChange,
@@ -33,7 +35,12 @@ export function WallpaperFields({
   canUpload?: boolean;
   compact?: boolean;
 }) {
-  const [src, setSrc] = useState(value?.src ?? "");
+  // The address box holds an image of your own — a typed address or an
+  // upload — never a bundled pattern's path: the Pattern row shows that
+  // choice, and typing an address here replaces it.
+  const ownSrc = (v: Wallpaper | null) =>
+    v && !BUNDLED_BACKGROUNDS.some((b) => b.src === v.src) ? v.src : "";
+  const [src, setSrc] = useState(ownSrc(value));
   const [srcError, setSrcError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -46,7 +53,7 @@ export function WallpaperFields({
     setUploadError(null);
   };
   // Follow an outside change (a theme restored, a pack applied) into the box.
-  const outside = value?.src ?? "";
+  const outside = ownSrc(value);
   const lastOutside = useRef(outside);
   useEffect(() => {
     if (lastOutside.current !== outside) {
@@ -62,14 +69,16 @@ export function WallpaperFields({
     const next = src.trim();
     if (!next) {
       setSrcError(null);
-      if (value) {
+      // An emptied box removes an image of your own; a pattern picked in the
+      // row above was never in the box, so it stays.
+      if (value && ownSrc(value)) {
         clearErrors();
         onChange(null);
       }
       return;
     }
     if (!isWallpaperSrc(next)) {
-      setSrcError(`Use an https:// image address${canUpload ? ", an upload" : ""} or a bundled pattern below.`);
+      setSrcError(`Use an https:// image address${canUpload ? ", an upload" : ""} or a bundled pattern above.`);
       return;
     }
     setSrcError(null);
@@ -83,12 +92,17 @@ export function WallpaperFields({
     onChange({ ...value, ...p });
   };
   // A bundled background keeps the blur and dim and takes the fit it was
-  // drawn for; the address box follows it like an upload. Moving on to an
-  // address or an upload gives that fit back (fitAfterLeavingBundled).
+  // drawn for, and empties the address box. Moving on to an address or an
+  // upload gives that fit back (fitAfterLeavingBundled).
   const pickBundled = (b: BundledBackground) => {
-    setSrc(b.src);
+    setSrc("");
     clearErrors();
     if (b.src !== value?.src) onChange({ ...wp, src: b.src, fit: b.fit });
+  };
+  const pickNone = () => {
+    setSrc("");
+    clearErrors();
+    if (value) onChange(null);
   };
 
   async function handleUpload(file: File) {
@@ -111,12 +125,62 @@ export function WallpaperFields({
   }
 
   const labelClass = compact ? "text-xs text-ink-60" : "text-[11px] font-medium text-ink-55";
+  const tileClass = `block w-full overflow-hidden rounded-md ring-1 ring-fg/10 ${compact ? "h-6" : "h-10"}`;
+  const bundled = BUNDLED_BACKGROUNDS.find((b) => b.src === value?.src);
   const srcId = `${idPrefix}-src`;
   return (
     <div className={compact ? "space-y-2" : "grid gap-x-6 gap-y-3 sm:grid-cols-2"}>
+      {/* None and the bundled backgrounds (#348): patterns shipped with the
+          app, so a wallpaper needs no address or upload. The row is sized by
+          its own width, not the viewport: the tile's name is its only
+          visible identifier in compact mode, and six across needs about
+          42rem for the names to fit, three across about 18rem, so inside a
+          narrower box — a pack card in the Themes tab — the six wrap as two
+          rows of three (or three of two) instead of truncating. */}
+      <div className={`@container ${compact ? "space-y-1" : "space-y-1 sm:col-span-2"}`}>
+        <span id={`${idPrefix}-bundled`} className={`block ${labelClass}`}>
+          Pattern
+        </span>
+        <div
+          role="group"
+          aria-labelledby={`${idPrefix}-bundled`}
+          className="grid grid-cols-2 gap-2 @2xs:grid-cols-3 @2xl:grid-cols-6"
+        >
+          <OptionCard
+            selected={!value}
+            onClick={pickNone}
+            name="None"
+            desc={compact ? undefined : "The scene alone"}
+            title="No wallpaper"
+          >
+            <span className={tileClass} style={{ backgroundColor: "var(--background)" }} aria-hidden />
+          </OptionCard>
+          {BUNDLED_BACKGROUNDS.map((b) => (
+            <OptionCard
+              key={b.id}
+              selected={value?.src === b.src}
+              onClick={() => pickBundled(b)}
+              name={b.name}
+              desc={compact ? undefined : b.description}
+              title={b.description}
+            >
+              <span
+                className={tileClass}
+                style={{
+                  backgroundColor: "var(--background)",
+                  backgroundImage: `url("${b.src}")`,
+                  backgroundSize: b.fit === "tile" ? "auto" : "cover",
+                  backgroundRepeat: b.fit === "tile" ? "repeat" : "no-repeat",
+                }}
+                aria-hidden
+              />
+            </OptionCard>
+          ))}
+        </div>
+      </div>
       <div className={compact ? "space-y-1" : "space-y-1 sm:col-span-2"}>
         <label htmlFor={srcId} className={labelClass}>
-          Image
+          Your own image
         </label>
         <div className="flex gap-2">
           <input
@@ -131,7 +195,7 @@ export function WallpaperFields({
                 commitSrc();
               }
             }}
-            placeholder="https://… or none"
+            placeholder="https://…"
             spellCheck={false}
             aria-invalid={srcError ? true : undefined}
             aria-describedby={srcError ? `${srcId}-error` : `${srcId}-desc`}
@@ -174,49 +238,11 @@ export function WallpaperFields({
         ) : (
           !compact && (
             <p id={`${srcId}-desc`} className="text-[10px] text-ink-40">
-              An image behind the scene: a web address{canUpload ? ", a PNG, JPEG or WebP upload up to 4 MB" : ""}, or one of the bundled patterns below.
+              A web address{canUpload ? ", or a PNG, JPEG or WebP upload up to 4 MB" : ""}
+              {bundled ? ` — replaces the ${bundled.name} pattern` : ""}.
             </p>
           )
         )}
-      </div>
-      {/* The bundled backgrounds (#348): patterns shipped with the app, so a
-          wallpaper needs no address or upload. The row is sized by its own
-          width, not the viewport: the tile's name is its only visible
-          identifier in compact mode, and five across needs about 32rem for
-          the names to fit, three across about 18rem, so inside a narrower
-          box — a pack card in the Themes tab — the five wrap as three and
-          two (or two, two and one) instead of truncating. */}
-      <div className={`@container ${compact ? "space-y-1" : "space-y-1 sm:col-span-2"}`}>
-        <span id={`${idPrefix}-bundled`} className={`block ${labelClass}`}>
-          Bundled
-        </span>
-        <div
-          role="group"
-          aria-labelledby={`${idPrefix}-bundled`}
-          className="grid grid-cols-2 gap-2 @2xs:grid-cols-3 @lg:grid-cols-5"
-        >
-          {BUNDLED_BACKGROUNDS.map((b) => (
-            <OptionCard
-              key={b.id}
-              selected={value?.src === b.src}
-              onClick={() => pickBundled(b)}
-              name={b.name}
-              desc={compact ? undefined : b.description}
-              title={b.description}
-            >
-              <span
-                className={`block w-full overflow-hidden rounded-md ring-1 ring-fg/10 ${compact ? "h-6" : "h-10"}`}
-                style={{
-                  backgroundColor: "var(--background)",
-                  backgroundImage: `url("${b.src}")`,
-                  backgroundSize: b.fit === "tile" ? "auto" : "cover",
-                  backgroundRepeat: b.fit === "tile" ? "repeat" : "no-repeat",
-                }}
-                aria-hidden
-              />
-            </OptionCard>
-          ))}
-        </div>
       </div>
       {value && (
         <>
@@ -263,7 +289,10 @@ export function WallpaperFields({
               <p className="text-[10px] text-ink-40">Fades the image toward the page color so cards stay readable.</p>
             )}
           </div>
-          <div className={compact ? "flex flex-wrap items-center gap-2" : "flex flex-wrap items-center gap-3 sm:col-span-2"}>
+          <div className={compact ? "space-y-1" : "space-y-1 sm:col-span-2"}>
+            <span id={`${idPrefix}-fit`} className={`block ${labelClass}`}>
+              Fit
+            </span>
             <ChipGroup
               label="Wallpaper fit"
               size="xs"
@@ -272,17 +301,6 @@ export function WallpaperFields({
               value={wp.fit}
               onChange={(fit: WallpaperFit) => patch({ fit })}
             />
-            <button
-              type="button"
-              onClick={() => {
-                setSrc("");
-                clearErrors();
-                onChange(null);
-              }}
-              className={buttonClasses("ghost", "sm")}
-            >
-              Remove wallpaper
-            </button>
           </div>
         </>
       )}

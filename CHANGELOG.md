@@ -12,6 +12,17 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **A tidier Scene tab.** The theme builder's Scene tab opens on the scene
+  in use — its intensity, motion and a way to turn it off, always in view —
+  then lists the scenes in rows by kind (light, sky, water, land, lines)
+  instead of one long grid, and the wallpaper block leads with *None* and
+  the bundled patterns before the box for an image of your own, with blur,
+  dim and fit below once there is one. The same wallpaper order applies in
+  Settings → General and the Themes tab. Each group of tiles is named for
+  assistive tech. (#358)
+
 ## [3.0.0-rc.2] - 2026-10-11
 
 ### Added
