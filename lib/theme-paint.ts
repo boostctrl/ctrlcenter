@@ -144,12 +144,15 @@ export type Paint = {
   density?: string | null;
 };
 
-// The ids that carry no class (the :root tokens).
-const DEFAULT_DESIGN_ID = "glass";
-const DEFAULT_SCENE_ID = "aurora";
-const DEFAULT_FONT_ID = "jakarta";
-
 export function makeThemePaint() {
+  // The ids that carry no class (the :root tokens). Inside the factory, not
+  // beside it: the inline script is this function's source alone, and a
+  // module-level constant would be a free variable there — a ReferenceError
+  // swallowed by the script's try/catch, and a flash of the default look
+  // before hydration (#349).
+  const DEFAULT_DESIGN_ID = "glass";
+  const DEFAULT_SCENE_ID = "aurora";
+  const DEFAULT_FONT_ID = "jakarta";
   const HEX = /^#?([0-9a-fA-F]{6})$/;
   // The heaviest common card fill (ink over the page), see inkLift.
   const CARD_FILL = 0.1;

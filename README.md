@@ -8,6 +8,8 @@ and shipped as one container.
 
 Built with Next.js 16, React 19, and Tailwind v4.
 
+![The home dashboard: a greeting, the clock and status card, search, app groups with live status dots, a notes card, countdowns and world clocks](docs/screenshots/dashboard.png)
+
 ---
 
 ## Features
@@ -55,7 +57,12 @@ Built with Next.js 16, React 19, and Tailwind v4.
   (generic JSON, Discord, Slack, or ntfy), **email** over SMTP (works with
   SMTP2GO, Gmail, Fastmail, any relay), **Telegram**, **Gotify**, **Pushover**,
   or an **Apprise** API server. Each channel picks its events and apps, and
-  flap-dampening confirmations keep a single blip quiet.
+  flap-dampening confirmations keep a single blip quiet. **Inbound
+  webhooks** let **Sonarr, Radarr and Seerr** push their own events — a
+  grab, an import, a request awaiting approval, a health issue — out through
+  the same channels: email gets a short report with the poster and the key
+  facts, everything else a one-liner, and a burst (a season's episodes, a
+  busy minute across apps) goes out as one notification.
 
 - **Theming.** A builder with a live preview, built on independent axes you
   combine and save:
@@ -151,6 +158,18 @@ Built with Next.js 16, React 19, and Tailwind v4.
   in-app **/help** page that documents every feature where visitors will look
   for it. Every page outside the dashboard opens with the same slim navigation
   strip, so weather, status, calendar, help, and settings stay one click apart.
+
+## Screenshots
+
+| | |
+| --- | --- |
+| **Theme builder** — one-tap themes, then colors, design, scene and font tabs with a live preview. ![The theme builder's Themes tab](docs/screenshots/theme-builder.png) | **Scene tab** — the scene in use with its intensity and motion, the scenes by family, and a wallpaper behind them. ![The theme builder's Scene tab](docs/screenshots/scene-tab.png) |
+| **Layout editor** — drag, resize and arrange every card on the page itself. ![The home page in edit mode](docs/screenshots/layout-editor.png) | **Status page** — uptime, response times and a 90-day timeline per service. ![The status page](docs/screenshots/status.png) |
+| **Weather** — current conditions, hourly and 7-day forecasts, sun and detail tiles. ![The weather page in light mode](docs/screenshots/weather.png) | **Admin: Themes** — the gallery visitors pick from, each card previewed in its own look. ![The admin Themes tab](docs/screenshots/admin-themes.png) |
+| **Admin: Inbound webhooks** — Sonarr, Radarr and Seerr events relayed out, grouped into one notification, previewed as the email before it arrives. ![The inbound webhooks settings with the email preview](docs/screenshots/inbound-webhooks.png) | |
+
+Taken from the production build with the sample configuration, in the
+default theme.
 
 ## AI disclaimer
 
@@ -304,7 +323,8 @@ settings:
   settingsButton: true      # the floating corner navigation menu
   # Further sections mirror the admin UI one-to-one and are easiest to edit
   # there: favicon, announcement (the site-wide banner), statusAnnouncements,
-  # and webhooks (inbound service events: enabled, digestSeconds, the email
+  # and webhooks (inbound service events: enabled, digestSeconds and
+  # digestScope — event | app | all, what a burst holds together — the email
   # report's poster / facts / synopsis switches and subjectPrefix, and a
   # sonarr / radarr / seerr block each with enabled and token).
   layout:                   # shared by every board:

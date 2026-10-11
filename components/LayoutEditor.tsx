@@ -282,6 +282,7 @@ export function WidgetFrame({
   titled,
   previewStyle,
   previewClass,
+  previewClip = false,
   selected,
   onSelect,
   onAnnounce,
@@ -320,6 +321,8 @@ export function WidgetFrame({
   // The live cell's height style and classes, on the content box.
   previewStyle?: React.CSSProperties;
   previewClass: string;
+  // The content goes in a .widget-clip box, as the live cell's does (#354).
+  previewClip?: boolean;
   selected: boolean;
   onSelect: (key: string) => void;
   // Say something through the editor's live region.
@@ -596,7 +599,7 @@ export function WidgetFrame({
         className={`${previewClass} ${placeholder ? "invisible" : ""}`}
         style={previewStyle}
       >
-        {node}
+        {previewClip ? <div className="widget-clip">{node}</div> : node}
       </div>
       {/* The name tag, over the card's top-right corner (section headings
           start at the top left). The group's own label already names the

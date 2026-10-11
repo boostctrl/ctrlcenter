@@ -44,6 +44,7 @@ import { emptyReason as widgetEmptyReason, widgetDef } from "@/lib/widgets/defs"
 import type { HomeData } from "@/lib/widgets/data";
 import { WIDGET_RENDERERS, cardsFor, type WidgetRenderContext } from "./widgets/registry";
 import { cellBleed, cellSizing } from "./widgets/sizing";
+import SizedCell from "./widgets/SizedCell";
 
 
 
@@ -586,10 +587,15 @@ export default function Dashboard({
           // An explicit height sizes the cell exactly (widgets/sizing.ts, #353):
           // the content widgets keep their heading and scroll the rest, the
           // others center their content in it.
-          const { className: heightClass, style: heightStyle } = cellSizing(widget);
+          const { className: heightClass, style: heightStyle, clip } = cellSizing(widget);
+          // A centred widget's content sits in a clip box that stands off the
+          // cell (#354); a scrolling one's cell watches its box for keyboard
+          // reach (#355).
+          const content = clip ? <div className="widget-clip">{node}</div> : node;
           if (!editing) {
+            const Cell = heightClass === "widget-sized" ? SizedCell : "div";
             return (
-              <div
+              <Cell
                 key={widget.id}
                 className={`${cellClass} ${heightClass}`}
                 style={heightStyle}
@@ -598,8 +604,8 @@ export default function Dashboard({
                 data-space-bottom={widget.space?.bottom || undefined}
                 data-space-left={widget.space?.left || undefined}
               >
-                {node}
-              </div>
+                {content}
+              </Cell>
             );
           }
           return (
@@ -620,6 +626,7 @@ export default function Dashboard({
               titled={TITLED_WIDGET_TYPES.includes(widget.type)}
               previewStyle={heightStyle}
               previewClass={heightClass}
+              previewClip={!!clip}
               onMove={moveVisible}
               onSpan={setWidgetSpan}
               onCards={setWidgetCards}

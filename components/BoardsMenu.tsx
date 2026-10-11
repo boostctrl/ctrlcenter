@@ -376,7 +376,7 @@ export default function BoardsMenu({
                 href="/admin?tab=settings&section=layout"
                 className="underline hover:text-ink-80"
               >
-                Settings → Layout
+                Settings → Home layout
               </Link>
               .
             </p>

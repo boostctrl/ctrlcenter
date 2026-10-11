@@ -8,6 +8,7 @@ import {
   SAMPLE_AT,
   SAMPLE_IDS,
   SAMPLE_LABELS,
+  sampleAvailable,
   sampleNotification,
   type SampleId,
 } from "@/lib/notification-samples";
@@ -60,10 +61,17 @@ export default function WebhookPreview({
   const [scheme, setScheme] = useState<Scheme | null>(null);
   const dark = scheme ? scheme === "dark" : !surfaceIsLight;
 
-  const { digestSeconds, poster, facts, synopsis, subjectPrefix } = webhooks;
+  const { digestSeconds, digestScope, poster, facts, synopsis, subjectPrefix } = webhooks;
+  // The busy-minute sample (#359) is offered only while bursts of different
+  // kinds are grouped; narrowing the scope with it selected falls back to
+  // the season import.
+  const grouping = { digest: digestSeconds > 0, scope: digestScope };
+  const offered = SAMPLE_IDS.filter((id) => sampleAvailable(id, grouping));
+  const shown = sampleAvailable(sample, grouping) ? sample : "sonarr-import";
   const notification = useMemo(
-    () => sampleNotification(sample, { digest: digestSeconds > 0, posterUrl: POSTER_URL }),
-    [sample, digestSeconds]
+    () => sampleNotification(shown, { ...grouping, posterUrl: POSTER_URL }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- grouping is rebuilt from these two
+    [shown, digestSeconds, digestScope]
   );
   const email = useMemo(
     () =>
@@ -90,7 +98,7 @@ export default function WebhookPreview({
   const summary = notification.report ? cleanHeader(notification.report.summary) : "";
   const cut = email.subject.endsWith("…") || (!!notification.report && !email.subject.endsWith(summary));
   const receivers = activeChannels(alerts).filter((ch) => ch.onWebhooks);
-  const label = SAMPLE_LABELS[sample];
+  const label = SAMPLE_LABELS[shown];
 
   return (
     <details className="text-xs" open>
@@ -102,10 +110,10 @@ export default function WebhookPreview({
           <div className="min-w-0 grow basis-56">
             <SelectField
               label="Sample event"
-              value={sample}
+              value={shown}
               onChange={(e) => setSample(e.target.value as SampleId)}
             >
-              {SAMPLE_IDS.map((id) => (
+              {offered.map((id) => (
                 <option key={id} value={id}>
                   {SAMPLE_LABELS[id]}
                 </option>
@@ -185,7 +193,7 @@ export default function WebhookPreview({
                     name is a sibling, not part of the button's name. */}
                 <AlertTest
                   channel={ch.id}
-                  sample={sample}
+                  sample={shown}
                   ready
                   saving={saving}
                   ariaLabel={`Send sample to ${channelLabel(ch)}`}

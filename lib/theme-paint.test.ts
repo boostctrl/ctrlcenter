@@ -60,6 +60,34 @@ describe("makeThemePaint is self-contained", () => {
     }
   });
 
+  it("applies from its own source too — the one path the browser runs (#349)", () => {
+    // apply() is what the inline script calls last; a constant it reads from
+    // outside the factory only fails there, so it runs here on a stub <html>.
+    const isolated = new Function(`return (${makeThemePaint.toString()})();`)() as ReturnType<
+      typeof makeThemePaint
+    >;
+    const classes = new Set<string>(["design-cyber", "scene-grid", "font-inter", "heading-lora"]);
+    const vars = new Map<string, string>();
+    const attrs = new Map<string, string>();
+    const el = {
+      classList: {
+        toggle: (c: string, on: boolean) => (on ? classes.add(c) : classes.delete(c)),
+        add: (c: string) => classes.add(c),
+        remove: (c: string) => classes.delete(c),
+      },
+      style: { setProperty: (k: string, v: string) => vars.set(k, v), removeProperty: (k: string) => vars.delete(k) },
+      setAttribute: (k: string, v: string) => attrs.set(k, v),
+      removeAttribute: (k: string) => attrs.delete(k),
+    } as unknown as HTMLElement;
+    const input = isolated.readStored(storage({}), DT, IDS, true);
+    isolated.apply(el, isolated.computePaint(input), IDS);
+    // The defaults carry no class: every design/scene/font class came off.
+    expect([...classes].sort()).toEqual([]);
+    expect(vars.get("--accent-from")).toBe("#a78bfa");
+    isolated.apply(el, isolated.computePaint({ ...input, dark: false, design: "cyber", scene: "grid", font: "inter", headingFont: "lora" }), IDS);
+    expect([...classes].sort()).toEqual(["design-cyber", "font-inter", "heading-lora", "scene-grid", "theme-light"]);
+  });
+
   it("builds an inline script that is one statement, escaped for HTML", () => {
     const script = inlineThemeScript(
       serializeForScript({ ...DT, preset: "</script><b>x" }),

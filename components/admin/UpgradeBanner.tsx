@@ -37,7 +37,7 @@ export default function UpgradeBanner({ notice }: { notice: UpgradeSummary }) {
       <p className="text-sm text-ink-70">Your configuration was upgraded on first start. What changed:</p>
       <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-ink-70">
         <li>
-          Your home page layout is now the <strong>Home</strong> board — add more boards in Settings → Layout.
+          Your home page layout is now the <strong>Home</strong> board — add more boards in Settings → Home layout.
         </li>
         <li>
           Your widgets are now {plural(notice.widgets, "separate widget")} you can add more of, each with its own

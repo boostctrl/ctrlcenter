@@ -17,7 +17,7 @@ import { ChipGroup } from "@/components/ChipGroup";
 import { WEBHOOK_LABELS, WebhookUrlRow } from "./WebhookUrlRow";
 import { AlertChannelEditor } from "./AlertChannelEditor";
 import WebhookPreview from "./WebhookPreview";
-import { DIGEST_PRESETS, INTERVAL_PRESETS, digestPresetLabel } from "./constants";
+import { DIGEST_PRESETS, DIGEST_SCOPE_OPTIONS, INTERVAL_PRESETS, digestPresetLabel } from "./constants";
 import type { SettingsDraft } from "./useSettingsDraft";
 
 export default function MonitoringSection({
@@ -182,13 +182,32 @@ export default function MonitoringSection({
                 offLabel={(s) => `${s} s`}
               />
               <Hint>
-                Events of one kind — a season&apos;s episodes, a batch of
-                movies, a run of requests — that arrive within this long of
-                each other go out as one notification. Off sends each as it
-                arrives. Health issues, updates, failed downloads and a
-                sender&apos;s Test are never held.
+                Events that arrive within this long of each other go out as
+                one notification. Off sends each as it arrives. Health
+                issues, updates, failed downloads and a sender&apos;s Test
+                are never held.
               </Hint>
             </div>
+            {/* What a burst holds together (#359): like events only, or
+                events of different kinds from one app or from every
+                service, as one notification listing each group. Moot while
+                the window is off. */}
+            {webhooks.digestSeconds > 0 && (
+              <div className="flex flex-col gap-1.5">
+                <span className={fieldLabelClasses}>Group together</span>
+                <ChipGroup
+                  label="Group together"
+                  size="xs"
+                  fit
+                  options={DIGEST_SCOPE_OPTIONS.map((o) => ({ value: o.id, label: o.name }))}
+                  value={webhooks.digestScope}
+                  onChange={(digestScope) => updateWebhooks({ digestScope })}
+                />
+                <Hint>
+                  {DIGEST_SCOPE_OPTIONS.find((o) => o.id === webhooks.digestScope)?.hint}
+                </Hint>
+              </div>
+            )}
             {WEBHOOK_SERVICES.map((svc) => {
               const w = webhooks[svc];
               return (

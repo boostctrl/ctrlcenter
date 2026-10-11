@@ -266,6 +266,11 @@ export default async function HelpPage() {
               device.
             </li>
             <li>
+              <strong>Motion.</strong> <em>Reduced</em> stills the scene
+              behind the page and the surface animations, whatever the theme
+              says.
+            </li>
+            <li>
               <strong>Greeting name.</strong> The name shown in &ldquo;Good
               evening, …&rdquo;.
             </li>
@@ -304,13 +309,15 @@ export default async function HelpPage() {
             </li>
             <li>
               <strong>Scene.</strong> The animated backdrop: Aurora,
-              Starfield, Petals, Comets, and more ({SCENES.length - 1} in all), or none. Set
-              how strongly it shows and whether it moves at full speed, calmly
-              or not at all; a <em>Reduced</em> motion preference stills every
-              scene whatever the theme says. Put a wallpaper behind it,
-              blurred and dimmed to taste: one of the bundled patterns
-              (linen, hatch, honeycomb, grain or a vignette), a photo by its
-              web address, or an upload if you are the admin.
+              Starfield, Petals, Comets, and more ({SCENES.length - 1} in all), or none. The
+              tab opens on the scene in use, with how strongly it shows,
+              whether it moves at full speed, calmly or not at all, and a
+              way to turn it off; below it the scenes sit in rows by kind —
+              light, sky, water, land, lines — with the still ones marked.
+              Put a wallpaper behind it, blurred and dimmed to taste: one of
+              the bundled patterns (linen, hatch, honeycomb, grain or a
+              vignette), a photo by its web address, or an upload if you are
+              the admin; <em>None</em> in the same row takes it away again.
             </li>
             <li>
               <strong>Accent and colors.</strong> The accent gradient, custom
@@ -448,7 +455,7 @@ export default async function HelpPage() {
               for signed-out visitors too.
             </li>
             <li>
-              <strong>Settings → Layout → Groups</strong> lists every group
+              <strong>Settings → Home layout → Groups</strong> lists every group
               with what&apos;s in it: rename and reorder them there, give
               one an icon and a color (shown on its bookmark card&apos;s
               heading and its apps&apos; tags), and delete one once nothing
@@ -681,6 +688,17 @@ export default async function HelpPage() {
             waiting when CtrlCenter restarts are dropped.
           </P>
           <P>
+            <strong>Group together</strong> decides what shares a burst.{" "}
+            <em>Like events</em> keeps kinds apart, as above. <em>Everything
+            from an app</em> sends all that one app posted in the window as
+            one notification — &ldquo;Sonarr: 3 updates&rdquo;, listing the
+            import, the grab before it and the files it replaced, each with
+            its own line and facts. <em>Everything</em> does the same across
+            every service: &ldquo;Sonarr and Radarr: 4 updates&rdquo;. The
+            preview offers <em>A busy minute</em> to show what that looks
+            like.
+          </P>
+          <P>
             <strong>Email report</strong> chooses what an email channel
             shows: the poster, the facts table and the synopsis can each be
             switched off, and a <strong>Subject prefix</strong> goes in front
@@ -761,7 +779,7 @@ export default async function HelpPage() {
           <P>
             A board is one dashboard: its own arrangement of widgets. The
             first board is the home page; add more in{" "}
-            <strong>Settings → Layout → Boards</strong> (a Media board, an
+            <strong>Settings → Home layout → Boards</strong> (a Media board, an
             Infra board…), and each gets its own address, /b/ and the
             board&apos;s id. Rename and reorder them there, give one an icon
             to show beside its name in the menus, pin one of the site&apos;s
@@ -955,9 +973,31 @@ export default async function HelpPage() {
             admin password is the one thing left out.
           </P>
           <P>
-            Icons you uploaded are bundled into the export and restored on
-            import, so a backup moved to a new instance keeps its custom
-            icons. Backups made before icon bundling still import fine.
+            Icons and wallpapers you uploaded are bundled into the export
+            and restored on import, so a backup moved to a new instance keeps
+            them. Backups made before bundling still import fine. Incident
+            notes ride along too, with the outages they describe.
+          </P>
+        </Card>
+
+        <Card title="Upgrading from 2.x">
+          <P>
+            3.0 organizes the config differently — boards, widgets with their
+            own content, groups, integrations — and converts a 2.x file by
+            itself on first start. The 2.x file is kept beside it as{" "}
+            <Code>config.v2.bak.yaml</Code>, written once and never
+            overwritten, and the admin portal shows a one-time banner saying
+            what moved where until you dismiss it.
+          </P>
+          <P>
+            To go back, stop the container, copy the backup over the live
+            config and run the <Code>:2.13</Code> image; 2.x refuses a 3.0
+            file rather than guessing at it, and anything changed since the
+            upgrade is lost. The{" "}
+            <A href="https://github.com/boostctrl/ctrlcenter#upgrading-to-30" external>
+              README
+            </A>{" "}
+            has the full table of what moved.
           </P>
         </Card>
 
@@ -966,6 +1006,15 @@ export default async function HelpPage() {
             Set or change the admin password from the portal. If none is set,
             login falls back to the <Code>ADMIN_PASSWORD</Code> environment
             variable. Changing the password signs out every other session.
+          </P>
+          <P>
+            <strong>Two-factor authentication</strong>, in{" "}
+            <strong>Settings → Security</strong>, adds a time-based code from
+            an authenticator app to sign-in. Turning it on shows one-time
+            recovery codes — keep them somewhere safe, they are the way back
+            in without the app — and turning it off asks for a current code.
+            It is optional; leave it off to keep signing in with the password
+            alone.
           </P>
         </Card>
 

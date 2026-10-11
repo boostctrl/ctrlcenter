@@ -11,7 +11,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 // `data-overflow` marks the box only while its rows actually overflow it: the
 // fade that dissolves a cut-off row is a mask, and a masked box is a backdrop
 // root, so the frosted designs' tiles would lose their blur even when every
-// row fits. Measured in an effect (ResizeObserver, like useEdgeFade) — absent
+// row fits (and the stylesheet leaves those designs unmasked altogether,
+// #356). Measured in an effect (ResizeObserver, like useEdgeFade) — absent
 // on the server and at auto height, where nothing scrolls.
 export default function TilesBox({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);

@@ -72,6 +72,11 @@ at (`"normal"` as designed, `"calm"` at half speed, `"off"` a still frame).
   built from `from`, `to`, `bg` and `mix(colour, pct)` that reads as the scene
   at 40 px tall, ending in `${bg}`. It paints the scene tile in the Scene tab
   and every theme tile and pack preview that uses the scene.
+- `components/theme-builder/sceneFamilies.ts`: file the scene under a family
+  in `SCENE_FAMILY` (typed `Record<SceneId, …>`) — light & glow, sky & space,
+  water & weather, land & nature, or lines & geometry — which is the row the
+  Scene tab shows it in (#358). Keep a family at six scenes or fewer so its
+  row stays one line on a wide screen.
 
 ## 4. CSS: `app/globals.css` (CSS-animated scenes only)
 

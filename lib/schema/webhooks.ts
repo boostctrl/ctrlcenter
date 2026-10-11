@@ -22,6 +22,13 @@ export type WebhookServiceConfig = z.infer<typeof webhookServiceSchema>;
 const webhookService = () =>
   webhookServiceSchema.default(webhookServiceSchema.parse({}));
 
+// What a burst may hold together (#359): like events only — a season's
+// episodes, a batch of movies, a run of requests, each its own notification
+// — everything one app (one sender instance) posts in the window, or
+// everything every service posts, as one notification listing each group.
+export const DIGEST_SCOPES = ["event", "app", "all"] as const;
+export type DigestScope = (typeof DIGEST_SCOPES)[number];
+
 export const webhooksSchema = z.object({
   // Master switch for the inbound endpoint. Off = the route rejects everything
   // even if a token matches, so pasting a URL somewhere can't quietly re-open it.
@@ -31,6 +38,9 @@ export const webhooksSchema = z.object({
   // last event, in seconds. 0 relays each event as it arrives. The hard cap
   // on a burst that never goes quiet is five windows, ten minutes at most.
   digestSeconds: z.number().int().min(0).max(300).default(60),
+  // Which events share a burst (#359): like events, everything from one
+  // app, or everything. Nothing when the window is off.
+  digestScope: z.enum(DIGEST_SCOPES).default("event"),
   // What the email report carries (#347; lib/webhook-email.ts): the poster
   // beside the headline, the facts table (quality, size, release group,
   // indexer, requester…) and the synopsis — an overview can spoil an
