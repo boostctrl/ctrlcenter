@@ -12,6 +12,14 @@ here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Wallpapers now follow the theme you pick.** Applying a site theme from
+  the theme builder's Themes tab painted its wallpaper, fine-tune, scene
+  effects and status colors and then painted the previous look's back over
+  them, so a wallpaper only showed (or went away) after the next change to
+  the theme. (#363)
+
 ### Added
 
 - **A record of sign-ins and security changes.** Settings → Security lists
