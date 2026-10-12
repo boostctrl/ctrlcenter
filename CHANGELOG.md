@@ -12,27 +12,95 @@ here.
 
 ## [Unreleased]
 
-### Fixed
-
-- **A theme's font no longer sticks.** Applying Terminal set its JetBrains
-  Mono, and every theme applied after it kept that font (and a heading font,
-  likewise). A theme without a font of its own now restores the site
-  default font, as it already did for the wallpaper, fine-tune and status
-  colors. (#373)
-- **The corner menu is in a sensible order.** Monitor sat between Settings
-  and Admin portal; it now sits with the pages (after Calendar), and the
-  menu ends with Help, Settings and Admin portal. (#374)
-
-### Fixed
-
-- **Wallpapers now follow the theme you pick.** Applying a site theme from
-  the theme builder's Themes tab painted its wallpaper, fine-tune, scene
-  effects and status colors and then painted the previous look's back over
-  them, so a wallpaper only showed (or went away) after the next change to
-  the theme. (#363)
-
 ### Added
 
+- **Boards: more than one dashboard.** Add boards in Settings →
+  Layout (a Media board, an Infra board…), each with its own arrangement of
+  widgets and its own address, `/b/<name>`. The first board is still the
+  home page. Rename, reorder and delete them there, and *Arrange* opens one
+  in the layout editor. A board set to *Only me* is private: signed-out
+  visitors get a "not found" page and never see it in their menu. Switch
+  boards from the floating corner menu, or with the `1`–`9`, `[` and `]`
+  keys. Widgets are shared, so one notes card can sit on two boards. Your
+  current layout becomes the home board on upgrade. (#298)
+- **Groups and tags for apps and bookmarks.** Apps can belong to a
+  group and carry tags, and an Applications widget can show one group or
+  tag, or leave out (or show only) your private apps, so a board can have
+  separate "Media" and "Infra" cards. Bookmark categories are now groups too,
+  shared with apps: rename and reorder them from the Bookmarks tab or
+  Settings → Layout → Groups, and a Bookmarks widget can show one group.
+  Tick several apps to move them to a group or tag them at once. Search also
+  matches app tags. On upgrade your categories become groups in the same
+  order, and "Group private apps separately" becomes a second Applications
+  widget showing only private apps. (#299)
+- **Any number of each integration.** The Monitor's connections are
+  now a list: add a 4K Sonarr beside an HD one, or a Portainer per host, each
+  with its own name, tile and detail page. Any credential can be written as
+  `${ENV_VAR}` to read it from the environment instead of the config file.
+  Your existing integrations come through unchanged (same Monitor addresses),
+  and the old `CTRLCENTER_SONARR_KEY`-style variables keep working for them.
+  (#300)
+- **Integration tiles on boards.** Any service from Settings →
+  Integrations can sit on a board as a tile, the same one the Monitor page
+  shows (Settings → Widgets → Integration tiles). Tiles are yours alone
+  unless you set one to Everyone, and then visitors see only counts and
+  states — never names, titles, hosts, users or error messages. (#301)
+- **API widgets.** Show values from any JSON endpoint — a NAS, a
+  router, a home-automation hub, your own script — as a single stat, a gauge,
+  label/value rows or a list (Settings → Widgets → API widgets). Point each
+  value at its place in the response with a JSONPath such as
+  `$.pool.used_pct`; *Test* shows the raw response beside what the widget
+  would show. Add headers or a POST body, keep tokens in the environment with
+  `${NAME}` references, tint a stat or gauge with warning and critical
+  thresholds, and pick how often it refreshes. Widgets are yours alone unless
+  you set one to Everyone, and then visitors see only the values you picked
+  out — never the URL, headers or the rest of the response. (#302)
+- **Add and set up widgets right on the page.** The layout editor's
+  *Add widget* lists every kind of widget with a line on what it shows; pick
+  one and it lands after the selected card with its settings open beside the
+  page (a sheet from the bottom on a phone), saved as you type, so a new
+  notes card or feed is one step instead of a trip to Settings and back.
+  *Configure* on a selected card, or on its chip in the tray, opens the same
+  settings for a widget already there, and Settings → Widgets gains an *Edit
+  in place* link for each one. *Remove widget* at the foot of those
+  settings deletes a widget for good, off every board, after a confirmation
+  that names the boards it's on. A *Board* menu in the editor switches between
+  boards' editors, renames or reorders the current board, sets who can open
+  it, deletes it, and starts a new one. (#303, #318)
+- **Resize from any corner.** In edit mode every corner of a card takes a
+  diagonal drag for width and height together, not just the bottom-right
+  one. Pull a corner away from the card to grow it. (#343)
+- **Icons for boards, icons and colors for groups.** Give a board an
+  icon in Settings → Layout → Boards and it shows beside the board's name in
+  the corner menu and the page links (on a phone, in place of the name).
+  Give a group an icon and a color in Settings → Layout → Groups and they
+  mark its bookmark card's heading and its apps' group tags. Colors come
+  from a small palette that stays readable in light and dark mode. The icon
+  picker also takes a pasted image address, and offers *No icon* to clear
+  one. (#316)
+- **First-run setup.** A new install now opens on a short guided
+  setup after you first sign in: where you are (search a city or use your
+  browser's location), your time zone and units; your first apps, pasted as a
+  list of addresses, with optional examples; status checks and an alert
+  webhook; and a theme. Skip any step, or the whole thing, and change it all
+  later in Settings. It appears only while the dashboard has no apps and no
+  bookmarks, and never again once finished or skipped — an upgraded install
+  goes straight to the admin page. (#304)
+- **Sessions you can see and end.** Settings → Security lists every browser
+  the portal is signed in on — which device, from where, when it signed in
+  and was last seen — with a way to end any one of them, and a *Sign out
+  everywhere else* button for after using a shared device. (#365)
+- **An idle timeout for admin sessions.** A session unused for a day ends on
+  its own; *Sign out after* in Settings → Security sets it anywhere from an
+  hour to a week. Every session still ends seven days after it signed in.
+  (#365)
+- **A security checklist.** Settings → Security opens with what the app can
+  see of your deployment — two-factor authentication, where the password
+  comes from, whether sign-ins arrive over HTTPS and through the proxy you
+  configured, the session secret, dashboard actions, the idle timeout —
+  each row green, amber or red with the fix. The red rows are also logged
+  when the server starts. The first-run setup gains a step that offers
+  two-factor authentication. (#367)
 - **A record of sign-ins and security changes.** Settings → Security lists
   recent activity — sign-ins and failed attempts, sign-outs, sessions
   ended, password and two-factor changes, confirmations, exports with
@@ -50,64 +118,14 @@ here.
   credentials and webhook tokens, and restoring it onto this instance keeps
   the credentials already stored. Tick *Include secrets* for a full backup;
   that asks for your password first. (#366)
-- **A security checklist.** Settings → Security opens with what the app can
-  see of your deployment — two-factor authentication, where the password
-  comes from, whether sign-ins arrive over HTTPS and through the proxy you
-  configured, the session secret, dashboard actions, the idle timeout —
-  each row green, amber or red with the fix. The red rows are also logged
-  when the server starts. The first-run setup gains a step that offers
-  two-factor authentication. (#367)
-- **Sessions you can see and end.** Settings → Security lists every browser
-  the portal is signed in on — which device, from where, when it signed in
-  and was last seen — with a way to end any one of them, and a *Sign out
-  everywhere else* button for after using a shared device. (#365)
-- **An idle timeout for admin sessions.** A session unused for a day ends on
-  its own; *Sign out after* in Settings → Security sets it anywhere from an
-  hour to a week. Every session still ends seven days after it signed in.
-  (#365)
-
-### Security
-
-- **Longer lockouts for repeated wrong passwords.** Five wrong attempts
-  from one address still lock it out for five minutes; each further
-  lockout lasts twice as long, up to an hour, until a sign-in succeeds.
-  Confirming your password for a sensitive change is throttled the same
-  way. (#369)
-- **A new password must be at least 12 characters**, and can't be the
-  current one or the container's `ADMIN_PASSWORD`. Existing passwords are
-  not affected. (#369)
-- **The session cookie is bound to the host over HTTPS.** It now carries
-  the `__Host-` prefix when the portal is reached over HTTPS, so a cookie
-  set by another host, path or over plain HTTP can't stand in for it.
-  Plain-HTTP deployments keep working with the bare name. Sessions signed
-  in before this release sign in again once. (#369)
-- **Opt-in HSTS.** Set `HSTS=1` to have the app send
-  `Strict-Transport-Security` on HTTPS responses, for a reverse proxy that
-  doesn't add it itself. (#369)
-- **Sensitive changes ask for your password again.** Changing the password,
-  turning two-factor authentication on or off, editing an integration's
-  address or credentials or turning its actions on, exporting with secrets,
-  restoring a backup, and the destructive dashboard actions (delete, stop,
-  restart, decline) now need the password — and the authenticator code when
-  the second factor is on — to have been confirmed in the last ten minutes.
-  Signing in counts; after that a *Confirm it's you* dialog asks once and
-  the change goes through. A session someone else got hold of can no longer
-  lock you out or walk off with the credentials on its own. (#366)
-- **Dashboard actions need two-factor authentication.** *Allow actions from
-  the dashboard* can only be turned on once the second factor is, every
-  action checks it again on the server, and turning two-factor
-  authentication off turns actions off with it. (#367)
-- **Signing out now ends the session.** Signing out used to only clear the
-  cookie: a copy of it taken beforehand kept working for up to seven days.
-  The server now keeps a record of each session, kept in `sessions.json`
-  beside `config.yaml`, and a session that was signed out, ended from the
-  list or left idle stops working at once. Sessions signed in before this
-  release sign in again once. (#365)
-
-## [3.0.0-rc.3] - 2026-10-11
-
-### Added
-
+- **One notification for a whole season.** Inbound webhooks that arrive in a
+  burst — Sonarr importing a season, Radarr grabbing several movies, a run
+  of Seerr requests — now go out as one message once the burst goes quiet,
+  with the episodes listed and the title carrying a range like
+  `S04E01-E08`. *Settings → Monitoring → Inbound webhooks → Group bursts
+  for* sets the wait (a minute by default); Off keeps one message per
+  event. Health issues, updates, failed downloads and a sender's Test are
+  never held, and the relay now accepts larger bursts. (#346)
 - **Group a busy minute into one notification.** Inbound webhooks grouped
   only like events: a season import was one message, but the grab before
   it, the files it replaced and a Radarr grab in the same minute each
@@ -117,6 +135,124 @@ here.
   3 updates", each on its own line with its own facts in the email; or
   everything every service posts — "Sonarr and Radarr: 4 updates". The
   preview gains *A busy minute* to show what that looks like. (#359)
+- **See webhook notifications before they arrive.** *Settings → Monitoring
+  → Inbound webhooks* now has an *Email report* block — switch the poster,
+  the facts table and the synopsis on or off, and set a subject prefix for
+  your mail rules — and a live preview that renders a sample Sonarr, Radarr
+  or Seerr event as the email, in light and dark mode, and as the one-liner
+  the push channels get, updating as you type. Each channel that takes
+  inbound webhooks gets a *Send sample* button, like the uptime *Send
+  test*. (#347)
+- **A theme gallery you curate.** The admin Themes tab now holds the
+  whole list visitors pick from: add themes of your own, duplicate one as a
+  starting point, hide any built-in from visitors, and drag (or use the
+  arrows) to reorder; each card previews the theme as visitors will see it,
+  in its own design, scene, colours and fonts, for light and dark. A theme
+  can give light mode its own design and scene. From the theme builder, an
+  admin can add a saved theme to the gallery in one tap. Existing edits to
+  built-in themes carry over unchanged. (#334)
+- **A theme builder that shows its work.** A live miniature of the
+  dashboard (greeting, an app card, buttons and text at every level) sits
+  beside the builder's tabs, and above them on a phone, where the real page
+  is off-screen while you edit. Theme and palette tiles now mark the one in
+  use, and theme tiles draw their design over their scene instead of a
+  colour bar. Once you tweak a theme, the builder says what it's based on
+  and offers to revert. (#328)
+- **Fine-tune any design.** The theme builder's new *Tune* tab puts
+  six sliders over the design you chose: corner radius, border weight,
+  blur, shadow depth, card opacity and the scene glow, each as a percentage
+  of the design's own value, so 100% everywhere is the design as drawn and
+  any design stays the recipe underneath. Tuned per light and dark theme,
+  saved with your themes, carried by export and import, and promoted with
+  a saved theme to the site default. Admins can also give a built-in theme
+  its own tune in the Themes tab. (#326)
+- **Scene intensity, motion and a None scene.** The theme builder's
+  Scene tab gains an intensity slider (how strongly the backdrop shows) and a
+  motion choice for each theme: full, calm (half speed, half the work) or
+  still. A new *None* scene is a plain surface with no backdrop. Saved with
+  your themes and promoted with them. Preferences gains a *Motion* switch:
+  *Reduced* stills the scene and the surface animations in this browser
+  whatever the theme says, like the system setting does. (#327)
+- **Heading fonts and density.** The theme builder's Font tab gains
+  a separate face for titles and section headings (or the body font), and
+  a density choice: compact, comfortable or spacious, which tightens or
+  loosens every padding and gap without changing text sizes. Both are per
+  light and dark theme, saved with your themes, and promotable to the site
+  default, which also gets a heading font and density in Settings →
+  General. A built-in theme can now carry a body and heading font of its
+  own (Themes tab); the ones that don't leave your choice alone. (#330)
+- **Status colors are part of the theme.** The green, red, amber and
+  blue of status dots, errors, warnings, badges and notices are now theme
+  tokens, so a theme can carry its own up, down, warning and info colours
+  per light and dark mode: pick them in the builder's Colors tab, save them
+  with your themes, share them in codes, and promote them to the site
+  default; built-in themes may carry their own. Nothing changes until you
+  do: the standard colours stay exactly as they were. (#331)
+- **A palette from one colour.** In the builder's Colors tab, *Build
+  a palette from this accent* derives everything else from the accent you
+  chose: surfaces tinted toward its hue, ink, a second accent stop (an
+  analogous hue, or a complementary one) and the four status colours, for
+  both light and dark, each fitted so text reads at 7:1, accents at 3:1 and
+  status colours at 4.5:1 on their surface. Then tweak anything. (#332)
+- **Wallpapers.** A photo can sit behind the scene: in the builder's
+  Scene tab, give it a web address, then blur it, dim it toward the page
+  colour and choose how it fits (fill, fit or tile), per light and dark
+  theme. It is saved with your themes and shared in codes. Admins can
+  upload a wallpaper (PNG, JPEG or WebP, up to 4 MB) there, set one as the
+  site default in Settings → General, and give a built-in theme one in the
+  Themes tab. (#333)
+- **Manage uploaded wallpapers.** Settings → General lists every wallpaper
+  uploaded to the site, says which theme uses it, and deletes the ones you
+  no longer need. (#339)
+- **Bundled backgrounds.** Five patterns ship with the app and sit in a
+  *Bundled* row wherever a wallpaper is chosen (the builder's Scene tab,
+  Settings → General and the Themes tab): Linen, Hatch, Honeycomb, Grain
+  and a Vignette that darkens the corners. Pick one and it is there, with
+  no address or upload needed; blur, dim and fit still apply, and it is
+  saved in themes and share codes like any wallpaper. They are not uploads,
+  so *Uploaded wallpapers* does not list them. (#348)
+- **Seven new scenes.** Topography, a still map of nested contour lines;
+  Snow, round flakes drifting down in three depths on a shared gust; Embers,
+  sparks lifting off the base and fading as they climb; Bokeh, out-of-focus
+  discs of light drifting by; Beams, diagonal bars of light sweeping slowly;
+  Bubbles, rings rising, wobbling and popping; and Glyphs, terminal glyphs
+  raining down and catching the accent as they fall. Each recolours with
+  your palette and follows the intensity and motion controls, and the
+  scenes that never move (Peaks, Blueprint, Topography) now say *Still* in
+  the picker. (#348)
+- **Four new themes.** *Hearth*, amber to ember over rising sparks on the
+  Emboss surface; *Alpine*, frost and pine under falling snow, pressed into
+  the page by Carve; *Atelier*, a studio's paper, graphite, ochre and
+  vermilion with hand-drawn Sketch outlines over still contour lines on the
+  bundled Linen background, the first built-in theme with a wallpaper; and
+  *Terminal*, green-on-black phosphor, the Console panel over glyph rain in
+  JetBrains Mono. Each reads in light and dark and clears the same contrast
+  checks as every other built-in. (#348)
+- **Share a theme as a code.** *Copy as code* in the theme builder
+  puts the current look on the clipboard as a short text code; *Paste a
+  code* in another browser applies it and saves it to that browser's
+  themes. A link of the form `/settings#theme=<code>` does the same when
+  opened. Codes carry both modes, the fine-tune and the scene effects, and
+  a code from a newer version still lands. (#329)
+- **Decide how much visitors can theme.** *Visitors can change* in
+  Settings → General: everything (as before), the site's themes and the
+  light/dark mode only, or nothing — the site theme is final, for kiosks,
+  wall tablets and shared screens. A browser customized before the policy
+  changed falls back at once, before the first paint. Signed-in admins are
+  never limited. (#335)
+- **A day theme and a night theme.** *Day & night schedule* in
+  Settings → General switches the site between two gallery themes by time
+  of day: at sunrise and sunset, worked out for the weather location with
+  no network, or at fixed times in the site's time zone, each with its own
+  appearance mode if you like. The first paint is already right, and an
+  open page switches on time without a reload. Visitors' own choices still
+  win, and a *Day & night theme* switch in their Settings keeps the usual
+  theme instead. (#336)
+- **A theme per board.** Pin one of the site's themes on a board, in
+  Settings → Layout → Boards or from the editor's Board menu, so an Infra
+  board can be Circuit while the home board stays as it is. It paints from
+  the first byte and follows you between boards; visitors' own choices
+  still apply over it. (#337)
 - **An upgrade note in the help.** The help page explains what the 3.0
   upgrade did with a 2.x config, where the backup is and how to roll back,
   and now also covers two-factor authentication, the Reduced motion
@@ -127,290 +263,7 @@ here.
 
 ### Changed
 
-- **A tidier Scene tab.** The theme builder's Scene tab opens on the scene
-  in use — its intensity, motion and a way to turn it off, always in view —
-  then lists the scenes in rows by kind (light, sky, water, land, lines)
-  instead of one long grid, and the wallpaper block leads with *None* and
-  the bundled patterns before the box for an image of your own, with blur,
-  dim and fit below once there is one. The same wallpaper order applies in
-  Settings → General and the Themes tab. Each group of tiles is named for
-  assistive tech. (#358)
-
-### Fixed
-
-- **No flash of the default look in development.** The script that paints
-  the theme before the page loads read one value from outside itself, which
-  the production build happened to inline but a development server did not:
-  there the script failed silently and the page flashed the default theme
-  before settling. The value now lives inside the script, and a test runs
-  the script's own source alone so a slip like it can't come back. (#349)
-- **Sized header cards keep their shadow in Safari.** A greeting, header
-  card, clock, weather or status widget at an explicit height clips inside a
-  box that stands a gap's width off the cell, in every browser; Safari,
-  which has no clip margin, had cut the card's shadow flat at the cell's
-  bottom edge. (#354)
-- **Scroll a sized card from the keyboard.** A Notes, System stats or
-  Countdown card cut short of its content can now be reached with Tab and
-  scrolled with the arrow keys in every browser, Safari included: while it
-  overflows, the card is a named region in the Tab order, with a visible
-  focus ring. A card whose content fits, or one with links inside, gains no
-  extra stop. (#355)
-- **Frosted tiles stay frosted in a sized grid.** On Glass, Aero, Frost and
-  Gradient, the tiles of an app, favorite or bookmark grid cut short of its
-  rows had lost their blur while the grid overflowed, because the fade at
-  the cut-off row took it away. Those designs now cut the row at the
-  padded edge instead and keep their blur; the fade stays on every other
-  design. (#356)
-- **Card shadows in sized widgets.** A widget given an explicit height
-  clipped everything to its square cell, cutting its cards' shadows flat — a
-  hard line under the last row of apps, a header card with its drop shadow
-  sliced off. The heading now stays put and the content scrolls inside the
-  card itself; app, favorite and bookmark grids scroll in a box with room
-  for their shadows and a soft fade where a row is cut off; centered widgets
-  clip a gap's width outside the cell. (#353)
-
-## [3.0.0-rc.2] - 2026-10-11
-
-### Added
-
-- **Resize from any corner.** In edit mode every corner of a card takes a
-  diagonal drag for width and height together, not just the bottom-right
-  one. Pull a corner away from the card to grow it. (#343)
-- **One notification for a whole season.** Inbound webhooks that arrive in a
-  burst — Sonarr importing a season, Radarr grabbing several movies, a run
-  of Seerr requests — now go out as one message once the burst goes quiet,
-  with the episodes listed and the title carrying a range like
-  `S04E01-E08`. *Settings → Monitoring → Inbound webhooks → Group bursts
-  for* sets the wait (a minute by default); Off keeps one message per
-  event. Health issues, updates, failed downloads and a sender's Test are
-  never held, and the relay now accepts larger bursts. (#346)
-- **See webhook notifications before they arrive.** *Settings → Monitoring
-  → Inbound webhooks* now has an *Email report* block — switch the poster,
-  the facts table and the synopsis on or off, and set a subject prefix for
-  your mail rules — and a live preview that renders a sample Sonarr, Radarr
-  or Seerr event as the email, in light and dark mode, and as the one-liner
-  the push channels get, updating as you type. Each channel that takes
-  inbound webhooks gets a *Send sample* button, like the uptime *Send
-  test*. (#347)
-
-- **Seven new scenes.** Topography, a still map of nested contour lines;
-  Snow, round flakes drifting down in three depths on a shared gust; Embers,
-  sparks lifting off the base and fading as they climb; Bokeh, out-of-focus
-  discs of light drifting by; Beams, diagonal bars of light sweeping slowly;
-  Bubbles, rings rising, wobbling and popping; and Glyphs, terminal glyphs
-  raining down and catching the accent as they fall. Each recolours with
-  your palette and follows the intensity and motion controls, and the
-  scenes that never move (Peaks, Blueprint, Topography) now say *Still* in
-  the picker. (#348)
-- **Bundled backgrounds.** Five patterns ship with the app and sit in a
-  *Bundled* row wherever a wallpaper is chosen (the builder's Scene tab,
-  Settings → General and the Themes tab): Linen, Hatch, Honeycomb, Grain
-  and a Vignette that darkens the corners. Pick one and it is there, with
-  no address or upload needed; blur, dim and fit still apply, and it is
-  saved in themes and share codes like any wallpaper. They are not uploads,
-  so *Uploaded wallpapers* does not list them. (#348)
-- **Four new themes.** *Hearth*, amber to ember over rising sparks on the
-  Emboss surface; *Alpine*, frost and pine under falling snow, pressed into
-  the page by Carve; *Atelier*, a studio's paper, graphite, ochre and
-  vermilion with hand-drawn Sketch outlines over still contour lines on the
-  bundled Linen background, the first built-in theme with a wallpaper; and
-  *Terminal*, green-on-black phosphor, the Console panel over glyph rain in
-  JetBrains Mono. Each reads in light and dark and clears the same contrast
-  checks as every other built-in. (#348)
-
-### Changed
-
-- **Seerr, by its new name.** Overseerr and Jellyseerr merged into Seerr, and
-  the inbound-webhook settings, the help page and the example config now
-  call it that. An Overseerr or Jellyseerr install from before the merge
-  keeps working with the same webhook URL. (#342)
-- **Webhook emails are now a report.** An event relayed from Sonarr, Radarr
-  or Seerr arrives with a short subject — `[Sonarr] Imported: The Bear
-  S04E03-E04` — and a body that shows the title, the poster, the facts
-  (quality, size, release group, indexer, requester…), the message and a
-  button back into the app, in light and dark mode. Other alert channels
-  keep their one-line summary. (#345)
-
-### Fixed
-
-- **Resizing a widget no longer scrolls the page to the top.** In edit
-  mode, selecting or resizing a card below the fold — with the steppers,
-  the arrow keys or a drag of an edge — jumped the page to the top on every
-  step. The page now stays where it is. (#341)
-
-## [3.0.0-rc.1] - 2026-10-10
-
-### Added
-
-- **Manage uploaded wallpapers.** Settings → General lists every wallpaper
-  uploaded to the site, says which theme uses it, and deletes the ones you
-  no longer need. (#339)
-- **A theme per board (3.0).** Pin one of the site's themes on a board, in
-  Settings → Layout → Boards or from the editor's Board menu, so an Infra
-  board can be Circuit while the home board stays as it is. It paints from
-  the first byte and follows you between boards; visitors' own choices
-  still apply over it. (#337)
-- **A day theme and a night theme (3.0).** *Day & night schedule* in
-  Settings → General switches the site between two gallery themes by time
-  of day: at sunrise and sunset, worked out for the weather location with
-  no network, or at fixed times in the site's time zone, each with its own
-  appearance mode if you like. The first paint is already right, and an
-  open page switches on time without a reload. Visitors' own choices still
-  win, and a *Day & night theme* switch in their Settings keeps the usual
-  theme instead. (#336)
-- **Decide how much visitors can theme (3.0).** *Visitors can change* in
-  Settings → General: everything (as before), the site's themes and the
-  light/dark mode only, or nothing — the site theme is final, for kiosks,
-  wall tablets and shared screens. A browser customized before the policy
-  changed falls back at once, before the first paint. Signed-in admins are
-  never limited. (#335)
-- **A theme gallery you curate (3.0).** The admin Themes tab now holds the
-  whole list visitors pick from: add themes of your own, duplicate one as a
-  starting point, hide any built-in from visitors, and drag (or use the
-  arrows) to reorder; each card previews the theme as visitors will see it,
-  in its own design, scene, colours and fonts, for light and dark. A theme
-  can give light mode its own design and scene. From the theme builder, an
-  admin can add a saved theme to the gallery in one tap. Existing edits to
-  built-in themes carry over unchanged. (#334)
-- **Wallpapers (3.0).** A photo can sit behind the scene: in the builder's
-  Scene tab, give it a web address, then blur it, dim it toward the page
-  colour and choose how it fits (fill, fit or tile), per light and dark
-  theme. It is saved with your themes and shared in codes. Admins can
-  upload a wallpaper (PNG, JPEG or WebP, up to 4 MB) there, set one as the
-  site default in Settings → General, and give a built-in theme one in the
-  Themes tab. (#333)
-- **A palette from one colour (3.0).** In the builder's Colors tab, *Build
-  a palette from this accent* derives everything else from the accent you
-  chose: surfaces tinted toward its hue, ink, a second accent stop (an
-  analogous hue, or a complementary one) and the four status colours, for
-  both light and dark, each fitted so text reads at 7:1, accents at 3:1 and
-  status colours at 4.5:1 on their surface. Then tweak anything. (#332)
-- **Status colors are part of the theme (3.0).** The green, red, amber and
-  blue of status dots, errors, warnings, badges and notices are now theme
-  tokens, so a theme can carry its own up, down, warning and info colours
-  per light and dark mode: pick them in the builder's Colors tab, save them
-  with your themes, share them in codes, and promote them to the site
-  default; built-in themes may carry their own. Nothing changes until you
-  do: the standard colours stay exactly as they were. (#331)
-- **Heading fonts and density (3.0).** The theme builder's Font tab gains
-  a separate face for titles and section headings (or the body font), and
-  a density choice: compact, comfortable or spacious, which tightens or
-  loosens every padding and gap without changing text sizes. Both are per
-  light and dark theme, saved with your themes, and promotable to the site
-  default, which also gets a heading font and density in Settings →
-  General. A built-in theme can now carry a body and heading font of its
-  own (Themes tab); the ones that don't leave your choice alone. (#330)
-- **Share a theme as a code (3.0).** *Copy as code* in the theme builder
-  puts the current look on the clipboard as a short text code; *Paste a
-  code* in another browser applies it and saves it to that browser's
-  themes. A link of the form `/settings#theme=<code>` does the same when
-  opened. Codes carry both modes, the fine-tune and the scene effects, and
-  a code from a newer version still lands. (#329)
-- **A theme builder that shows its work (3.0).** A live miniature of the
-  dashboard (greeting, an app card, buttons and text at every level) sits
-  beside the builder's tabs, and above them on a phone, where the real page
-  is off-screen while you edit. Theme and palette tiles now mark the one in
-  use, and theme tiles draw their design over their scene instead of a
-  colour bar. Once you tweak a theme, the builder says what it's based on
-  and offers to revert. (#328)
-- **Scene intensity, motion and a None scene (3.0).** The theme builder's
-  Scene tab gains an intensity slider (how strongly the backdrop shows) and a
-  motion choice for each theme: full, calm (half speed, half the work) or
-  still. A new *None* scene is a plain surface with no backdrop. Saved with
-  your themes and promoted with them. Preferences gains a *Motion* switch:
-  *Reduced* stills the scene and the surface animations in this browser
-  whatever the theme says, like the system setting does. (#327)
-- **Fine-tune any design (3.0).** The theme builder's new *Tune* tab puts
-  six sliders over the design you chose: corner radius, border weight,
-  blur, shadow depth, card opacity and the scene glow, each as a percentage
-  of the design's own value, so 100% everywhere is the design as drawn and
-  any design stays the recipe underneath. Tuned per light and dark theme,
-  saved with your themes, carried by export and import, and promoted with
-  a saved theme to the site default. Admins can also give a built-in theme
-  its own tune in the Themes tab. (#326)
-- **Boards: more than one dashboard (3.0).** Add boards in Settings →
-  Layout (a Media board, an Infra board…), each with its own arrangement of
-  widgets and its own address, `/b/<name>`. The first board is still the
-  home page. Rename, reorder and delete them there, and *Arrange* opens one
-  in the layout editor. A board set to *Only me* is private: signed-out
-  visitors get a "not found" page and never see it in their menu. Switch
-  boards from the floating corner menu, or with the `1`–`9`, `[` and `]`
-  keys. Widgets are shared, so one notes card can sit on two boards. Your
-  current layout becomes the home board on upgrade. (#298)
-- **Groups and tags for apps and bookmarks (3.0).** Apps can belong to a
-  group and carry tags, and an Applications widget can show one group or
-  tag, or leave out (or show only) your private apps, so a board can have
-  separate "Media" and "Infra" cards. Bookmark categories are now groups too,
-  shared with apps: rename and reorder them from the Bookmarks tab or
-  Settings → Layout → Groups, and a Bookmarks widget can show one group.
-  Tick several apps to move them to a group or tag them at once. Search also
-  matches app tags. On upgrade your categories become groups in the same
-  order, and "Group private apps separately" becomes a second Applications
-  widget showing only private apps. (#299)
-- **Any number of each integration (3.0).** The Monitor's connections are
-  now a list: add a 4K Sonarr beside an HD one, or a Portainer per host, each
-  with its own name, tile and detail page. Any credential can be written as
-  `${ENV_VAR}` to read it from the environment instead of the config file.
-  Your existing integrations come through unchanged (same Monitor addresses),
-  and the old `CTRLCENTER_SONARR_KEY`-style variables keep working for them.
-  (#300)
-
-- **Integration tiles on boards (3.0).** Any service from Settings →
-  Integrations can sit on a board as a tile, the same one the Monitor page
-  shows (Settings → Widgets → Integration tiles). Tiles are yours alone
-  unless you set one to Everyone, and then visitors see only counts and
-  states — never names, titles, hosts, users or error messages. (#301)
-
-- **Add and set up widgets right on the page (3.0).** The layout editor's
-  *Add widget* lists every kind of widget with a line on what it shows; pick
-  one and it lands after the selected card with its settings open beside the
-  page (a sheet from the bottom on a phone), saved as you type, so a new
-  notes card or feed is one step instead of a trip to Settings and back.
-  *Configure* on a selected card, or on its chip in the tray, opens the same
-  settings for a widget already there, and Settings → Widgets gains an *Edit
-  in place* link for each one. *Remove widget* at the foot of those
-  settings deletes a widget for good, off every board, after a confirmation
-  that names the boards it's on. A *Board* menu in the editor switches between
-  boards' editors, renames or reorders the current board, sets who can open
-  it, deletes it, and starts a new one. (#303, #318)
-- **Icons for boards, icons and colors for groups (3.0).** Give a board an
-  icon in Settings → Layout → Boards and it shows beside the board's name in
-  the corner menu and the page links (on a phone, in place of the name).
-  Give a group an icon and a color in Settings → Layout → Groups and they
-  mark its bookmark card's heading and its apps' group tags. Colors come
-  from a small palette that stays readable in light and dark mode. The icon
-  picker also takes a pasted image address, and offers *No icon* to clear
-  one. (#316)
-- **API widgets (3.0).** Show values from any JSON endpoint — a NAS, a
-  router, a home-automation hub, your own script — as a single stat, a gauge,
-  label/value rows or a list (Settings → Widgets → API widgets). Point each
-  value at its place in the response with a JSONPath such as
-  `$.pool.used_pct`; *Test* shows the raw response beside what the widget
-  would show. Add headers or a POST body, keep tokens in the environment with
-  `${NAME}` references, tint a stat or gauge with warning and critical
-  thresholds, and pick how often it refreshes. Widgets are yours alone unless
-  you set one to Everyone, and then visitors see only the values you picked
-  out — never the URL, headers or the rest of the response. (#302)
-- **First-run setup (3.0).** A new install now opens on a short guided
-  setup after you first sign in: where you are (search a city or use your
-  browser's location), your time zone and units; your first apps, pasted as a
-  list of addresses, with optional examples; status checks and an alert
-  webhook; and a theme. Skip any step, or the whole thing, and change it all
-  later in Settings. It appears only while the dashboard has no apps and no
-  bookmarks, and never again once finished or skipped — an upgraded install
-  goes straight to the admin page. (#304)
-
-### Changed
-
-- **Four designs now look like themselves in light mode.** Console, Sketch,
-  Minimal and Outline were told apart on the dark surface by hairlines,
-  dashes and glows that all but vanished on the pale one. In light mode,
-  Minimal is now a borderless flat slab, Outline draws a heavier outline in
-  the accent, Sketch gets a firmer pencil line with a second offset stroke
-  on a paper-white wash, and Console shows its scanlines and a firmer frame
-  around its accent rule. Sketch's corners are now a little uneven in both
-  modes, like a hand-drawn rectangle. (#308)
-- **Upgrading from 2.x (3.0).** Your `config.yaml` is converted to the 3.0
+- **Upgrading from 2.x.** Your `config.yaml` is converted to the 3.0
   shape on first start, keeping your comments (but those on the settings
   that move, which stay in the backup): the home page layout becomes the
   first board, each widget becomes its own item in `widgets:`, bookmark
@@ -422,24 +275,7 @@ here.
   banner with the same summary. 2.x can't read a 3.0 config — to roll back,
   restore `config.v2.bak.yaml` as `config.yaml` and run the `:2.13` image.
   The README's "Upgrading to 3.0" section has the details. (#306, #320)
-- **Drag cards to move and resize them (3.0).** Grab a card anywhere to move
-  it, with a mouse or by touch (press and hold first, so swiping still
-  scrolls). The page shows where everything will land before you let go,
-  scrolls when you reach the top or bottom, and Esc cancels. Drag a card
-  onto the tray to hide it, or a hidden widget from the tray to exactly
-  where you want it. Resize from the right edge, the bottom edge or the new
-  corner handle: the 24 columns show while you change a width, heights snap
-  to 20px steps and back to automatic near the content's own height, and
-  the size shows beside the pointer instead of over the card. A drag is one
-  undo step, and saving waits until you let go. (#312)
-- **A calmer layout editor (3.0).** The editor now shows the page exactly as
-  visitors see it, each card outlined with its name, instead of a strip of
-  controls on every card that changed their heights. Click a card to select
-  it: its controls appear in one small toolbar above it (on a phone, in the
-  bar at the bottom). With the keyboard, Tab to a card, press Enter, then use
-  the arrow keys to move it and Shift with the arrow keys to resize it; Esc
-  deselects. (#313)
-- **Every widget can appear any number of times (3.0).** Each widget on the
+- **Every widget can appear any number of times.** Each widget on the
   home page is now its own item with its own content: two notes cards, a
   calendar per person, a feed per topic. In Settings → Widgets each kind
   lists its widgets, with *Add*, *Remove*, and an *On the home page* switch
@@ -451,6 +287,49 @@ here.
   The calendar page shows every calendar on a board you can open, merged. The
   `CTRLCENTER_CALDAV_PASS` variable keeps applying to your existing
   calendar, and only to it. (#297)
+- **Drag cards to move and resize them.** Grab a card anywhere to move
+  it, with a mouse or by touch (press and hold first, so swiping still
+  scrolls). The page shows where everything will land before you let go,
+  scrolls when you reach the top or bottom, and Esc cancels. Drag a card
+  onto the tray to hide it, or a hidden widget from the tray to exactly
+  where you want it. Resize from the right edge, the bottom edge or the new
+  corner handle: the 24 columns show while you change a width, heights snap
+  to 20px steps and back to automatic near the content's own height, and
+  the size shows beside the pointer instead of over the card. A drag is one
+  undo step, and saving waits until you let go. (#312)
+- **A calmer layout editor.** The editor now shows the page exactly as
+  visitors see it, each card outlined with its name, instead of a strip of
+  controls on every card that changed their heights. Click a card to select
+  it: its controls appear in one small toolbar above it (on a phone, in the
+  bar at the bottom). With the keyboard, Tab to a card, press Enter, then use
+  the arrow keys to move it and Shift with the arrow keys to resize it; Esc
+  deselects. (#313)
+- **Four designs now look like themselves in light mode.** Console, Sketch,
+  Minimal and Outline were told apart on the dark surface by hairlines,
+  dashes and glows that all but vanished on the pale one. In light mode,
+  Minimal is now a borderless flat slab, Outline draws a heavier outline in
+  the accent, Sketch gets a firmer pencil line with a second offset stroke
+  on a paper-white wash, and Console shows its scanlines and a firmer frame
+  around its accent rule. Sketch's corners are now a little uneven in both
+  modes, like a hand-drawn rectangle. (#308)
+- **A tidier Scene tab.** The theme builder's Scene tab opens on the scene
+  in use — its intensity, motion and a way to turn it off, always in view —
+  then lists the scenes in rows by kind (light, sky, water, land, lines)
+  instead of one long grid, and the wallpaper block leads with *None* and
+  the bundled patterns before the box for an image of your own, with blur,
+  dim and fit below once there is one. The same wallpaper order applies in
+  Settings → General and the Themes tab. Each group of tiles is named for
+  assistive tech. (#358)
+- **Seerr, by its new name.** Overseerr and Jellyseerr merged into Seerr, and
+  the inbound-webhook settings, the help page and the example config now
+  call it that. An Overseerr or Jellyseerr install from before the merge
+  keeps working with the same webhook URL. (#342)
+- **Webhook emails are now a report.** An event relayed from Sonarr, Radarr
+  or Seerr arrives with a short subject — `[Sonarr] Imported: The Bear
+  S04E03-E04` — and a body that shows the title, the poster, the facts
+  (quality, size, release group, indexer, requester…), the message and a
+  button back into the app, in light and dark mode. Other alert channels
+  keep their one-line summary. (#345)
 
 ### Removed
 
@@ -483,6 +362,30 @@ here.
   the widget lands far up the page. A widget that's empty can be hidden again
   from the tray (it used to have no button), says it will appear once it has
   content, and its hint about what to add is no longer cut off. (#315)
+- **Resizing a widget no longer scrolls the page to the top.** In edit
+  mode, selecting or resizing a card below the fold — with the steppers,
+  the arrow keys or a drag of an edge — jumped the page to the top on every
+  step. The page now stays where it is. (#341)
+- **Card shadows in sized widgets.** A widget given an explicit height
+  clipped everything to its square cell, cutting its cards' shadows flat — a
+  hard line under the last row of apps, a header card with its drop shadow
+  sliced off. The heading now stays put and the content scrolls inside the
+  card itself; app, favorite and bookmark grids scroll in a box with room
+  for their shadows and a soft fade where a row is cut off (on Glass, Aero,
+  Frost and Gradient, a clean cut at the padded edge, so their tiles keep
+  their blur); centered widgets clip a gap's width outside the cell.
+  (#353, #356)
+- **Sized header cards keep their shadow in Safari.** A greeting, header
+  card, clock, weather or status widget at an explicit height clips inside a
+  box that stands a gap's width off the cell, in every browser; Safari,
+  which has no clip margin, had cut the card's shadow flat at the cell's
+  bottom edge. (#354)
+- **Scroll a sized card from the keyboard.** A Notes, System stats or
+  Countdown card cut short of its content can now be reached with Tab and
+  scrolled with the arrow keys in every browser, Safari included: while it
+  overflows, the card is a named region in the Tab order, with a visible
+  focus ring. A card whose content fits, or one with links inside, gains no
+  extra stop. (#355)
 - **Accent buttons stay readable with any accent.** The text on an accent
   button (Save theme, the selected option's tick, today in the calendar) is
   now black or white by measured contrast against the colour it sits on.
@@ -498,6 +401,47 @@ here.
   for the same reason. The smoke check in CI renders the home page under
   every built-in theme and palette, in both modes, so a new look can't ship
   under the line. (#322)
+- **The corner menu is in a sensible order.** Monitor sat between Settings
+  and Admin portal; it now sits with the pages (after Calendar), and the
+  menu ends with Help, Settings and Admin portal. (#374)
+
+### Security
+
+- **Sensitive changes ask for your password again.** Changing the password,
+  turning two-factor authentication on or off, editing an integration's
+  address or credentials or turning its actions on, exporting with secrets,
+  restoring a backup, and the destructive dashboard actions (delete, stop,
+  restart, decline) now need the password — and the authenticator code when
+  the second factor is on — to have been confirmed in the last ten minutes.
+  Signing in counts; after that a *Confirm it's you* dialog asks once and
+  the change goes through. A session someone else got hold of can no longer
+  lock you out, or take a backup with your credentials, on its own. (#366)
+- **Dashboard actions need two-factor authentication.** *Allow actions from
+  the dashboard* can only be turned on once the second factor is, every
+  action checks it again on the server, and turning two-factor
+  authentication off turns actions off with it. (#367)
+- **Signing out now ends the session.** Signing out used to only clear the
+  cookie: a copy of it taken beforehand kept working for up to seven days.
+  The server now keeps a record of each session, kept in `sessions.json`
+  beside `config.yaml`, and a session that was signed out, ended from the
+  list or left idle stops working at once. Sessions signed in before this
+  release sign in again once. (#365)
+- **The session cookie is bound to the host over HTTPS.** It now carries
+  the `__Host-` prefix when the portal is reached over HTTPS, so a cookie
+  set by another host, path or over plain HTTP can't stand in for it.
+  Plain-HTTP deployments keep working with the bare name. Sessions signed
+  in before this release sign in again once. (#369)
+- **Opt-in HSTS.** Set `HSTS=1` to have the app send
+  `Strict-Transport-Security` on HTTPS responses, for a reverse proxy that
+  doesn't add it itself. (#369)
+- **Longer lockouts for repeated wrong passwords.** Five wrong attempts
+  from one address still lock it out for five minutes; each further
+  lockout lasts twice as long, up to an hour, until a sign-in succeeds.
+  Confirming your password for a sensitive change is throttled the same
+  way. (#369)
+- **A new password must be at least 12 characters**, and can't be the
+  current one or the container's `ADMIN_PASSWORD`. Existing passwords are
+  not affected. (#369)
 
 ## [2.13.0] - 2026-10-09
 
@@ -3282,10 +3226,7 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v3.0.0-rc.3...HEAD
-[3.0.0-rc.3]: https://github.com/boostctrl/ctrlcenter/compare/v3.0.0-rc.2...v3.0.0-rc.3
-[3.0.0-rc.2]: https://github.com/boostctrl/ctrlcenter/compare/v3.0.0-rc.1...v3.0.0-rc.2
-[3.0.0-rc.1]: https://github.com/boostctrl/ctrlcenter/compare/v2.13.0...v3.0.0-rc.1
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v2.13.0...HEAD
 [2.13.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.12.0...v2.13.0
 [2.12.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.11.0...v2.12.0
 [2.11.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.10.1...v2.11.0

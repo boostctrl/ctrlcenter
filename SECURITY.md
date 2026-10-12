@@ -101,13 +101,16 @@ deployment safe.
   a password set in the portal, HTTPS, `TRUSTED_PROXY_HOPS` matching your
   proxy, a persisted session secret — and keep a Security alert channel
   pointed somewhere you'll see it. With those in place a stolen admin session
-  ends when you sign it out (or on its own after the idle timeout), can't
-  change the password, turn the second factor off, reach the stored
-  credentials or run a destructive action without the password again, and
-  announces itself when it comes from a new address. The remaining exposure
-  is what a session can read in its window: the Monitor page and the
-  integrations' addresses — so still give each integration the least
-  privilege its service allows (above).
+  ends when you sign it out (or on its own after the idle timeout), and
+  can't change the password, turn the second factor off, change where an
+  integration's credentials are sent, export them, restore a backup or run
+  a destructive action without the password again; a sign-in from an
+  address not seen in a month is announced on your Security channels. The
+  remaining exposure is what a session can read in its window: the Monitor
+  page, the integrations' addresses and the credentials stored in
+  `config.yaml`, which the admin's forms show. So keep secrets in
+  environment variables, which the admin never shows, and give each
+  integration the least privilege its service allows (both above).
 - **Exports leave secrets out unless you ask.** `Export` writes a backup
   without integration credentials, calendar and email credentials or webhook
   tokens; restoring it onto the same instance keeps the ones stored there.
