@@ -415,7 +415,7 @@ here.
   the second factor is on — to have been confirmed in the last ten minutes.
   Signing in counts; after that a *Confirm it's you* dialog asks once and
   the change goes through. A session someone else got hold of can no longer
-  lock you out or walk off with the credentials on its own. (#366)
+  lock you out, or take a backup with your credentials, on its own. (#366)
 - **Dashboard actions need two-factor authentication.** *Allow actions from
   the dashboard* can only be turned on once the second factor is, every
   action checks it again on the server, and turning two-factor
