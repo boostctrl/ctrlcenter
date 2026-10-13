@@ -557,6 +557,9 @@ async function addBoards() {
           "- Keep the spare NVMe in the drawer labelled.",
         ].join("\n"),
       },
+      // And a short one, set taller than its content: the card has to fill
+      // the height, not sit at its content's height with a gap below.
+      { id: "parking", type: "notes", title: "Parking", content: "- Bay 3 is ours." },
     ],
   });
   if (!widgets.ok()) throw new Error(`adding the board widgets failed: HTTP ${widgets.status()} ${await widgets.text()}`);
@@ -566,7 +569,8 @@ async function addBoards() {
   });
   if (!media.ok()) throw new Error(`placing the integration tile failed: HTTP ${media.status()}`);
   // Widgets at explicit heights on the private board (#353): a centered one,
-  // a single card and a tile grid, each cut short of its content.
+  // a single card and a tile grid, each cut short of its content, and a
+  // single card made taller than its content.
   const infra = await ctx.request.put(`${base}/api/boards/infra/layout`, {
     headers: { Origin: base },
     data: {
@@ -574,6 +578,7 @@ async function addBoards() {
         { widget: "headerCard", span: 8, height: 160 },
         { widget: "rules", span: 16, height: 200 },
         { widget: "apps", span: 24, height: 220 },
+        { widget: "parking", span: 12, height: 300 },
       ],
     },
   });
@@ -734,6 +739,7 @@ async function sizedCells(ctx) {
           bleed,
           sized: cell.classList.contains("widget-sized"),
           ...rect(cell),
+          cardRect: card ? rect(card) : null,
           headingBottom: heading ? rect(heading).bottom : null,
           overflow: cs.overflowY,
           clip: clip ? { ...rect(clip), overflow: getComputedStyle(clip).overflowY } : null,
@@ -760,10 +766,13 @@ async function sizedCells(ctx) {
         };
       });
     });
-    const [header, notes, apps] = cells;
-    if (cells.length !== 3) throw new Error(`${cells.length} cells on the board, not 3`);
-    if (header.height !== 160 || notes.height !== 200 || apps.height !== 220)
-      throw new Error(`cells ${header.height}, ${notes.height} and ${apps.height}px tall, not 160, 200 and 220`);
+    const [header, notes, apps, parking] = cells;
+    if (cells.length !== 4) throw new Error(`${cells.length} cells on the board, not 4`);
+    if (header.height !== 160 || notes.height !== 200 || apps.height !== 220 || parking.height !== 300)
+      throw new Error(`cells ${header.height}, ${notes.height}, ${apps.height} and ${parking.height}px tall, not 160, 200, 220 and 300`);
+    // A card set taller than its content fills its cell down to the bottom.
+    if (!parking.sized || !parking.cardRect || Math.abs(parking.cardRect.bottom - parking.bottom) > 1 || parking.card.scrolls)
+      throw new Error(`the short notes card doesn't fill its 300px cell: card ${JSON.stringify(parking.cardRect)}, cell bottom ${parking.bottom}`);
     // The header card's cell never clips; the box inside it does, standing
     // off the cell by the bleed above and below and 16px beside.
     if (header.sized || header.overflow !== "visible" || !header.clip || header.clip.overflow !== "clip")
@@ -798,7 +807,7 @@ async function sizedCells(ctx) {
     await page.getByRole("toolbar", { name: /controls$/ }).waitFor({ timeout: 5_000 });
     const preview = await frame.locator("[inert]").evaluate((el) => Math.round(el.getBoundingClientRect().height));
     if (preview !== 220) throw new Error(`the editor's preview of the apps card is ${preview}px tall, not 220`);
-    console.log("ok    sized cells keep their height, scroll inside the card or tile box, and preview the same in the editor");
+    console.log("ok    sized cells keep their height, fill or scroll inside the card or tile box, and preview the same in the editor");
   } catch (e) {
     failures.push(`sized cells: ${e instanceof Error ? e.message.split("\n")[0] : e}`);
   } finally {

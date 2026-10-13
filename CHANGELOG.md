@@ -442,6 +442,12 @@ here.
     read, held its apps' alerts and kept their downtime out of uptime for
     good. It now counts as over, and Settings → Announcements warns about
     it. (#391)
+- **A card made taller than its content now gets taller.** Dragging a
+  Notes, Calendar, RSS feed, Countdown, World clocks or System stats card's
+  bottom edge down only grew its outline in the layout editor, and the card
+  stayed its content's height with empty space below. It now fills the
+  height you set, on the board as in the editor. A card made shorter than
+  its content still scrolls. (#411)
 
 ### Security
 
