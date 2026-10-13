@@ -205,7 +205,9 @@ Your data lives in `./config/config.yaml`, bind-mounted into the container and
 created automatically on first run (see [`config/config.example.yaml`](config/config.example.yaml)
 for a sample). The container fixes ownership of that directory on startup and
 runs as a non-root user, so it works regardless of who owns the host folder — no
-manual `chown`.
+manual `chown`. `config.yaml` and its backups hold your password hash and
+service keys, so they're readable by that user alone (mode `600`): use `sudo`
+to read or copy them on the host.
 
 ## Upgrading to 3.0
 
@@ -215,10 +217,14 @@ keeping your comments — except those on the settings that move (below),
 which stay in the backup.
 
 - **A backup first.** The 2.x file is copied beside the config as
-  `config.v2.bak.yaml`. It's written once and never overwritten, so it stays
-  your way back however many times you restart or import.
-- **A note in the log** says what was converted, and **/admin** shows a
-  one-time banner with the same summary until you dismiss it.
+  `config.v2.bak.yaml`. It's never overwritten, so it stays your way back
+  however many times you restart or import. If one from an earlier upgrade is
+  already there (a release candidate you tried and rolled back from, say) and
+  holds something else, it's left as it is and this upgrade's copy is dated
+  instead: `config.v2.bak.YYYY-MM-DD.yaml`.
+- **A note in the log** says what was converted and names the backup, and
+  **/admin** shows a one-time banner with the same summary until you dismiss
+  it.
 
 What moved where:
 
@@ -238,8 +244,9 @@ integration field.
 the newer config version, rather than silently dropping what it doesn't
 understand. To go back,
 stop the container, restore the backup over the live file
-(`cp config/config.v2.bak.yaml config/config.yaml`), and run the `:2.13`
-image. Anything you changed after upgrading is lost.
+(`sudo cp config/config.v2.bak.yaml config/config.yaml`, or the dated copy if
+the log and the banner named one), and run the `:2.13` image. Anything you
+changed after upgrading is lost.
 
 ## Configuration
 

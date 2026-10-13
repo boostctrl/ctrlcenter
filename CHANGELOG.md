@@ -272,11 +272,14 @@ here.
   categories become groups, connected services become a list under
   `integrations:`, and an alert webhook or email set up before 2.13's
   channel list becomes the list's first entries, sending as before. The
-  2.x file is kept beside it as `config.v2.bak.yaml`, written once and never
-  overwritten; the log says what was converted, and /admin shows a one-time
+  2.x file is kept beside it as `config.v2.bak.yaml` and never overwritten:
+  if a different copy from an earlier upgrade (a release candidate you
+  rolled back from, say) already has that name, it's left alone and this
+  upgrade's copy is saved as `config.v2.bak.YYYY-MM-DD.yaml`. The log says
+  what was converted and which file to restore, and /admin shows a one-time
   banner with the same summary. 2.x can't read a 3.0 config — to roll back,
-  restore `config.v2.bak.yaml` as `config.yaml` and run the `:2.13` image.
-  The README's "Upgrading to 3.0" section has the details. (#306, #320)
+  restore that backup as `config.yaml` and run the `:2.13` image. The
+  README's "Upgrading to 3.0" section has the details. (#306, #320, #386)
 - **Every widget can appear any number of times.** Each widget on the
   home page is now its own item with its own content: two notes cards, a
   calendar per person, a feed per topic. In Settings → Widgets each kind
@@ -467,6 +470,14 @@ here.
   disguised `?next=` address (a hidden tab or line break in it) could take
   you to another website once you'd signed in. Sign-in now continues only
   to a page on your own dashboard, and to the admin portal otherwise. (#23)
+- **Your config files are private to the app.** `config.yaml`,
+  `config.yaml.bak` and the 2.x backup hold your password hash, two-factor
+  secret and service keys. They're now readable only by the account
+  CtrlCenter runs as (mode 600), where before every account on the host
+  could read them and a `chmod` you set was undone by the next save. Saves
+  are also flushed to disk before they replace the file, and an empty
+  `config.yaml` no longer overwrites the last `config.yaml.bak`. Use `sudo`
+  to read them on the host. (#386)
 
 ## [2.13.0] - 2026-10-09
 

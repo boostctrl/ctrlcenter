@@ -985,9 +985,11 @@ export default async function HelpPage() {
             3.0 organizes the config differently — boards, widgets with their
             own content, groups, integrations — and converts a 2.x file by
             itself on first start. The 2.x file is kept beside it as{" "}
-            <Code>config.v2.bak.yaml</Code>, written once and never
-            overwritten, and the admin portal shows a one-time banner saying
-            what moved where until you dismiss it.
+            <Code>config.v2.bak.yaml</Code>, never overwritten: if a different
+            copy from an earlier upgrade already has that name, this one is
+            dated instead (<Code>config.v2.bak.YYYY-MM-DD.yaml</Code>). The admin
+            portal shows a one-time banner saying what moved where, and which
+            file to roll back to, until you dismiss it.
           </P>
           <P>
             To go back, stop the container, copy the backup over the live
