@@ -409,13 +409,18 @@ here.
 
 - **Sensitive changes ask for your password again.** Changing the password,
   turning two-factor authentication on or off, editing an integration's
-  address or credentials or turning its actions on, exporting with secrets,
-  restoring a backup, and the destructive dashboard actions (delete, stop,
-  restart, decline) now need the password — and the authenticator code when
-  the second factor is on — to have been confirmed in the last ten minutes.
-  Signing in counts; after that a *Confirm it's you* dialog asks once and
-  the change goes through. A session someone else got hold of can no longer
-  lock you out, or take a backup with your credentials, on its own. (#366)
+  address or credentials or turning its actions on, changing an API
+  widget's address, headers or body, a calendar's address or sign-in or an
+  email channel's mail server, exporting with secrets, restoring a backup,
+  and the destructive dashboard actions (delete, stop, restart, decline)
+  now need the password — and the authenticator code when the second
+  factor is on — to have been confirmed in the last ten minutes. Signing in
+  counts; after that a *Confirm it's you* dialog asks once (in the layout
+  editor too) and the change goes through. A session someone else got hold
+  of can no longer lock you out, take a backup with your credentials or
+  send a secret from the environment to a server of its own, and
+  `${ADMIN_PASSWORD}` and `${SESSION_SECRET}` can't be referenced from a
+  widget or an integration at all. (#366, #378)
 - **Dashboard actions need two-factor authentication.** *Allow actions from
   the dashboard* can only be turned on once the second factor is, every
   action checks it again on the server, and turning two-factor

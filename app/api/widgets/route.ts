@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/lib/api-auth";
 import { z } from "zod";
-import { InvalidWidgetsError, addWidget, replaceWidgets } from "@/lib/config";
+import { InvalidWidgetsError, addWidget, readConfigInternal, replaceWidgets } from "@/lib/config";
 import { WIDGET_IDS } from "@/lib/widgets/defs";
 import { widgetInstancesUpdateSchema } from "@/lib/schema";
+import { requireRecentAuth } from "@/lib/reauth";
+import { widgetsChangeTarget } from "@/lib/reauth-targets";
 
 // Admin-only: replace the widget instances (#297) — the list the admin
 // Settings → Widgets tab edits and autosaves whole.
@@ -18,6 +20,13 @@ export async function PUT(request: NextRequest) {
       { error: parsed.error.issues[0]?.message ?? "Invalid widgets" },
       { status: 400 }
     );
+  }
+  // Step-up (#378) when the save re-points an API widget's request or a
+  // calendar's address or sign-in — where an env-held secret would go.
+  const { auth, widgets: stored } = await readConfigInternal();
+  if (widgetsChangeTarget(parsed.data, stored)) {
+    const recent = await requireRecentAuth(request, auth.passwordHash);
+    if (!recent.ok) return recent.response;
   }
   return NextResponse.json(await replaceWidgets(parsed.data));
 }

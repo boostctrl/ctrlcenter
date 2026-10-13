@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
-import { useScratchConfig, request, adminSession } from "@/lib/testing/routes";
+import { useScratchConfig, request, adminSession, staleSession } from "@/lib/testing/routes";
 import { newInstance } from "@/lib/schema";
 
 // Widget instances (#297): the admin replaces the whole list.
@@ -61,5 +61,22 @@ describe("POST /api/widgets", () => {
     expect(after).toHaveLength(before + 1);
     expect(after.at(-1)?.id).toBe(created.id);
   });
-});
 
+  it("asks a stale session to confirm before re-pointing an API widget, not for other edits (#378)", async () => {
+    const api = { ...newInstance("api", "api-1"), url: "http://nas.lan/stats" };
+    expect((await put([api])).status).toBe(200);
+    const stale = await adminSession();
+    await staleSession(stale);
+    const putAs = (body: unknown) => route.PUT(request("/api/widgets", { method: "PUT", body, session: stale }));
+    expect((await putAs([{ ...api, title: "NAS" }])).status).toBe(200);
+    const moved = await putAs([{ ...api, url: "https://evil.example/" }]);
+    expect(moved.status).toBe(403);
+    expect(await moved.json()).toMatchObject({ reauthRequired: true });
+    expect((await putAs([{ ...api, headers: [{ name: "X-Leak", value: "${NAS_TOKEN}" }] }])).status).toBe(403);
+    expect((await putAs([api, { ...newInstance("api", "api-2"), url: "http://x.lan" }])).status).toBe(403);
+    const { readConfigInternal } = await import("@/lib/config");
+    expect((await readConfigInternal()).widgets).toEqual([{ ...api, title: "NAS" }]);
+    // A recent confirmation lets it through.
+    expect((await put([{ ...api, url: "https://other.lan/" }])).status).toBe(200);
+  });
+});

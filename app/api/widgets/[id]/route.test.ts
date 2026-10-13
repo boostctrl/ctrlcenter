@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
-import { useScratchConfig, request, adminSession, params } from "@/lib/testing/routes";
+import { useScratchConfig, request, adminSession, params, staleSession } from "@/lib/testing/routes";
 import { newInstance } from "@/lib/schema";
 
 // One widget edited in place from the layout editor (#303).
@@ -85,5 +85,19 @@ describe("/api/widgets/[id]", () => {
       expect(board.layout.sections.map((r) => r.widget), board.id).not.toContain("notes-1");
     expect(config.boards[0].layout.sections.map((r) => r.widget)).toEqual(["notes-2"]);
     expect((await del("notes-1")).status).toBe(404);
+  });
+
+  it("asks a stale session to confirm before re-pointing a calendar, not for other edits (#378)", async () => {
+    const stale = await adminSession();
+    await staleSession(stale);
+    const putAs = (body: unknown) =>
+      route.PUT(request("/api/widgets/cal-1", { method: "PUT", body, session: stale }), params({ id: "cal-1" }));
+    expect((await putAs({ ...calendar, count: 9 })).status).toBe(200);
+    const moved = await putAs({ ...calendar, count: 9, url: "https://evil.example/cal" });
+    expect(moved.status).toBe(403);
+    expect(await moved.json()).toMatchObject({ reauthRequired: true });
+    expect((await putAs({ ...calendar, count: 9, username: "you" })).status).toBe(403);
+    const { readConfigInternal } = await import("@/lib/config");
+    expect((await readConfigInternal()).widgets.find((w) => w.id === "cal-1")).toMatchObject({ url: calendar.url, count: 9 });
   });
 });

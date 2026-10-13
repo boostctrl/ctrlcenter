@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/lib/api-auth";
-import { InvalidWidgetsError, removeWidget, saveWidget, widgetForEditing } from "@/lib/config";
+import { InvalidWidgetsError, readConfigInternal, removeWidget, saveWidget, widgetForEditing } from "@/lib/config";
 import { widgetInstanceUpdateSchema, type WidgetInstance } from "@/lib/schema";
+import { requireRecentAuth } from "@/lib/reauth";
+import { widgetsChangeTarget } from "@/lib/reauth-targets";
 
 // Admin-only: one widget instance, edited in place from the layout editor
 // (#303). GET answers with the instance as stored (secrets included) and what
@@ -30,6 +32,13 @@ export async function PUT(request: NextRequest, { params }: Params) {
   }
   if (parsed.data.id !== id) {
     return NextResponse.json({ error: "The widget id doesn't match the address" }, { status: 400 });
+  }
+  // Step-up (#378) when the save re-points an API widget's request or a
+  // calendar's address or sign-in — where an env-held secret would go.
+  const { auth, widgets: stored } = await readConfigInternal();
+  if (widgetsChangeTarget([parsed.data as WidgetInstance], stored)) {
+    const recent = await requireRecentAuth(request, auth.passwordHash);
+    if (!recent.ok) return recent.response;
   }
   try {
     return NextResponse.json(await saveWidget(parsed.data as WidgetInstance));

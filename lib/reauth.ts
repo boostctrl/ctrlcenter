@@ -4,9 +4,11 @@ import { getSession } from "./sessions";
 
 // Step-up re-authentication (#366). A signed-in session is enough for
 // ordinary admin work, but the actions a stolen session could do the most
-// harm with — changing the password, turning the second factor off, editing
-// integration credentials, exporting secrets, restoring a backup, the
-// destructive dashboard actions — also need the credentials to have been
+// harm with — changing the password, turning the second factor off,
+// re-pointing where a credential is sent (an integration; an API widget, a
+// calendar or an email channel's server, see lib/reauth-targets.ts, #378),
+// exporting secrets, restoring a backup, the destructive dashboard actions —
+// also need the credentials to have been
 // re-proved recently: at sign-in, or through POST /api/reauth since. The
 // admin UI answers the 403 below with a "Confirm it's you" dialog and
 // retries.
