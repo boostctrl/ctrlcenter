@@ -57,14 +57,37 @@ function parseWindow(a: Pick<StatusAnnouncement, "startsAt" | "endsAt">): {
   return { start, end };
 }
 
+// What's wrong with an entry's window, if anything (#391): an end that
+// doesn't parse, or one at or before the start (an overnight window entered
+// as 23:00 → 01:00 on one date). The editor warns about either.
+export type WindowProblem = "unparseable-end" | "end-before-start";
+export function windowProblem(
+  a: Pick<StatusAnnouncement, "startsAt" | "endsAt">
+): WindowProblem | null {
+  const end = parseInstant(a.endsAt);
+  if (a.endsAt.trim() !== "" && end === null) return "unparseable-end";
+  const start = parseInstant(a.startsAt);
+  return start !== null && end !== null && end <= start ? "end-before-start" : null;
+}
+
+// A maintenance window that holds apps (#293) mutes their alerts and keeps
+// their downtime out of uptime, so it fails the other way from a notice: a
+// broken end makes it over, not endless. Otherwise one typo would silence
+// those apps for good, with nothing telling the admin (#391).
+const holdsApps = (a: Partial<Pick<StatusAnnouncement, "kind" | "apps">>) =>
+  a.kind === "maintenance" && (a.apps?.length ?? 0) > 0;
+
 // Derive an entry's state from its window and the current instant. A window is
 // optional: both bounds unset → "active" (shown until removed). Once `endsAt`
 // has passed the entry is "expired"; before `startsAt` it's "scheduled";
-// otherwise "active".
+// otherwise "active". A maintenance window holding apps with a broken end is
+// "expired" (see holdsApps).
 export function announcementState(
-  a: Pick<StatusAnnouncement, "startsAt" | "endsAt">,
+  a: Pick<StatusAnnouncement, "startsAt" | "endsAt"> &
+    Partial<Pick<StatusAnnouncement, "kind" | "apps">>,
   now: number
 ): AnnouncementState {
+  if (holdsApps(a) && windowProblem(a) !== null) return "expired";
   const { start, end } = parseWindow(a);
   if (end !== null && now >= end) return "expired";
   if (start !== null && now < start) return "scheduled";

@@ -14,18 +14,21 @@ let apps: { id: string; interval?: number; monitor?: boolean }[];
 vi.mock("./config", () => ({
   readConfigInternal: vi.fn(async () => ({ settings, apps })),
 }));
+// A check for "slow" waits until the test calls releaseSlow.
+let releaseSlow: () => void = () => {};
 vi.mock("./status-check", () => ({
   CHECK_CONCURRENCY: 4,
   checkSignature: (app: { id: string }) => `sig:${app.id}`,
   checkApp: vi.fn(async (app: { id: string }) => {
     calls.push(`check:${app.id}`);
     if (app.id === "boom") throw new Error("socket hang up");
+    if (app.id === "slow") await new Promise<void>((r) => (releaseSlow = r));
     return { up: true, status: 200, ms: 5 };
   }),
 }));
 vi.mock("./status-history", () => ({
   loadHistory: vi.fn(async () => {}),
-  lastReadings: vi.fn(() => {
+  priorDownStreaks: vi.fn(() => {
     calls.push("prior");
     return new Map();
   }),
@@ -134,6 +137,35 @@ describe("status poller tick", () => {
     vi.advanceTimersByTime(60_000);
     await tick();
     expect(calls).toContain("check:a");
+  });
+
+  it("passes each app's interval to the prior-state read", async () => {
+    const { priorDownStreaks } = await import("./status-history");
+    apps = [{ id: "a" }, { id: "b", interval: 1 }];
+    await tick();
+    expect(vi.mocked(priorDownStreaks).mock.lastCall?.[0]).toEqual([
+      { id: "a", intervalMs: 5 * 60_000 },
+      { id: "b", intervalMs: 60_000 },
+    ]);
+  });
+
+  it("runs one round at a time: a tick during a slow round is skipped (#391)", async () => {
+    apps = [{ id: "slow" }, { id: "b", interval: 1 }];
+    const first = tick();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls.filter((c) => c.startsWith("check:"))).toEqual(["check:slow", "check:b"]);
+    // A minute on, b is due again, but the first round hasn't recorded yet.
+    calls.length = 0;
+    vi.advanceTimersByTime(60_000);
+    await tick();
+    expect(calls).toEqual([]);
+    releaseSlow();
+    await first;
+    expect(calls).toEqual(["prior", "record", "prune:slow,b", "flush", "alerts"]);
+    // Once it's done, the next tick runs.
+    calls.length = 0;
+    await tick();
+    expect(calls).toContain("check:b");
   });
 
   it("logs a failed round instead of throwing, and stops before recording", async () => {

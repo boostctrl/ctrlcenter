@@ -427,6 +427,21 @@ here.
   next page. A countdown date that doesn't exist, like `2026-13-01` in a
   hand-edited config, no longer breaks its board: that row is left out and
   the date is cleared. (#390)
+- **Alerts no longer go missing, fire for an outage that has ended, or stay
+  muted.**
+  - With the default of two failed checks before an alert, a restart
+    between the first failure and the second, such as a container update,
+    used to swallow the down alert. When the app came back, only "recovered"
+    went out. Now a restart picks up the count where it was.
+  - An app with a long timeout and retries could make one round of checks
+    overrun the next. Its late results could then reopen an outage that had
+    already ended, and alert for it. One round now finishes before the next
+    begins.
+  - A maintenance window whose end is before its start, like an overnight
+    window entered as 11 pm to 1 am on the same date, or whose end can't be
+    read, held its apps' alerts and kept their downtime out of uptime for
+    good. It now counts as over, and Settings → Announcements warns about
+    it. (#391)
 
 ### Security
 

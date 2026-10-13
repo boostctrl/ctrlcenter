@@ -15,6 +15,7 @@ import {
   loadHistory,
   flush,
   recordResults,
+  priorDownStreaks,
   pruneHistory,
   PRUNE_GRACE_MS,
   setOutageNote,
@@ -460,6 +461,53 @@ describe("recordResults maintenance (#293)", () => {
       (ms) => String(ms)
     );
     expect(maintOnly[0]).toMatchObject({ uptime: 100, maint: true });
+  });
+});
+
+describe("priorDownStreaks (#391)", () => {
+  beforeEach(resetHistoryState);
+  const down = (id: string) => ({ id, up: false, status: 503, ms: 5000 });
+  const up = (id: string) => ({ id, up: true, status: 200, ms: 100 });
+  const streaks = (ids: string[], intervalMs = MIN) =>
+    Object.fromEntries(priorDownStreaks(ids.map((id) => ({ id, intervalMs }))));
+
+  it("counts the failed checks since the last good one, and leaves out apps with no readings", () => {
+    const t0 = Date.now() - 10 * MIN;
+    recordResults([up("a"), up("b"), up("c")], t0);
+    recordResults([down("a"), down("b"), up("c")], t0 + MIN);
+    recordResults([down("a"), up("b"), up("c")], t0 + 2 * MIN);
+    recordResults([down("a"), down("b"), up("c")], t0 + 3 * MIN);
+    expect(streaks(["a", "b", "c", "never"])).toEqual({ a: 3, b: 1, c: 0 });
+  });
+
+  it("skips maintenance readings, which never reached the alert state", () => {
+    const t0 = Date.now() - 10 * MIN;
+    recordResults([up("m")], t0);
+    recordResults([down("m")], t0 + MIN);
+    recordResults([down("m")], t0 + 2 * MIN, new Set(["m"]));
+    expect(streaks(["m"])).toEqual({ m: 1 });
+  });
+
+  it("counts on from the outage's start when the run fills the 90-minute ring", () => {
+    // An hourly check, down since three hours ago: the ring holds only the
+    // last two checks, but the outage mark says this is the fourth.
+    const now = Date.now();
+    for (let h = 3; h >= 0; h--) recordResults([down("slow")], now - h * HOUR);
+    expect(streaks(["slow"], HOUR)).toEqual({ slow: 4 });
+  });
+});
+
+describe("recordResults keeps readings in order (#391)", () => {
+  beforeEach(resetHistoryState);
+
+  it("drops a reading older than the app's newest one", () => {
+    const t0 = Date.now() - 10 * MIN;
+    recordResults([{ id: "x", up: true, status: 200, ms: 5 }], t0 + MIN);
+    // A slow round's older result for the same app arrives late.
+    recordResults([{ id: "x", up: false, status: 503, ms: 5000 }], t0);
+    const h = getHistory(["x"]).apps[0];
+    expect(h.downSince).toBeNull();
+    expect(h.uptime.h1).toBe(100);
   });
 });
 

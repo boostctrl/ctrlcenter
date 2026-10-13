@@ -4,7 +4,7 @@
 export * from "./aggregate";
 export {
   loadHistory,
-  lastReadings,
+  priorDownStreaks,
   recordResults,
   pruneHistory,
   PRUNE_GRACE_MS,

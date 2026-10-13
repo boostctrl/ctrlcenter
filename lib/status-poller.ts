@@ -4,7 +4,7 @@ import {
   loadHistory,
   recordResults,
   flush,
-  lastReadings,
+  priorDownStreaks,
   pruneHistory,
 } from "./status-history";
 import { mapLimit } from "./concurrency";
@@ -28,9 +28,27 @@ const lastChecked = new Map<string, number>();
 const TICK_MS = 60_000;
 const FIRST_DELAY_MS = 8_000;
 
+// One round at a time (#391). A round lasts as long as its slowest check (an
+// app's timeout times its retries plus one, up to six minutes), and a tick
+// that started another meanwhile re-checked the quick apps and recorded
+// first; the slow round then recorded its older results last, and a
+// recovered app could alert as down. A tick that finds a round running is
+// skipped; the apps it would have checked are due on the next one.
+let running = false;
+
 // Re-reads config every tick so changing an interval (or toggling status
 // checks) takes effect without restarting the timer. Exported for tests.
 export async function tick(): Promise<void> {
+  if (running) return;
+  running = true;
+  try {
+    await round();
+  } finally {
+    running = false;
+  }
+}
+
+async function round(): Promise<void> {
   try {
     // Recording into a store that hasn't loaded yet would let the next flush
     // overwrite the persisted history, so every tick waits for the load.
@@ -56,8 +74,10 @@ export async function tick(): Promise<void> {
       async (app) => ({ id: app.id, ...(await checkApp(app, { intervalMinutes: globalMinutes })) })
     );
     // Capture the prior per-app state before recording this tick, so alert
-    // seeding on first run reflects the previous reading, not the current one.
-    const prior = lastReadings(apps.map((a) => a.id));
+    // seeding on first run reflects the previous readings, not the current one.
+    const prior = priorDownStreaks(
+      apps.map((a) => ({ id: a.id, intervalMs: (a.interval ?? globalMinutes) * 60_000 }))
+    );
     // Apps under an active maintenance window (#293): recorded as maintenance
     // and left out of alerting until the window ends.
     const maintenance = maintenanceApps(settings.statusAnnouncements, now);

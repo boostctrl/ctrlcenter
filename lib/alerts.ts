@@ -519,10 +519,18 @@ const g = globalThis as unknown as {
   __ctrlcenterWarnState?: Map<string, WarnState>;
 };
 
-function seedState(priorReadings: Map<string, boolean>): Map<string, AppAlertState> {
+// The state to resume from after a restart, from each app's run of failed
+// checks before it (#391). A run shorter than `confirmations` is still
+// counting, so the next failure can confirm it; only a run long enough to
+// have alerted counts as down, so a restart doesn't re-alert it.
+export function seedState(
+  priorStreaks: Map<string, number>,
+  confirmations: number
+): Map<string, AppAlertState> {
+  const need = Math.max(1, Math.floor(confirmations));
   const m = new Map<string, AppAlertState>();
-  for (const [id, up] of priorReadings) {
-    m.set(id, { confirmed: up ? "up" : "down", downStreak: 0 });
+  for (const [id, downStreak] of priorStreaks) {
+    m.set(id, { confirmed: downStreak >= need ? "down" : "up", downStreak });
   }
   return m;
 }
@@ -592,21 +600,22 @@ export async function sendSampleNotification(
   return { results };
 }
 
-// Called by the poller each tick. `priorReadings` is the last-known up/down per
-// app from BEFORE this tick (from history), used once to seed the in-memory
-// state so a restart doesn't re-alert an app that was already down. No-op when
+// Called by the poller each tick. `priorStreaks` is each app's run of failed
+// checks from BEFORE this tick (from history), used once to seed the in-memory
+// state so a restart neither re-alerts an app that was already down nor loses
+// a down still being confirmed (#391). No-op when
 // alerts are off or no channel is active. Each transition (and warning) goes
 // to every channel whose event and app filters take it.
 export async function processAlerts(
   results: { id: string; up: boolean; warning?: string }[],
   apps: { id: string; name: string; url: string }[],
   config: AlertConfig,
-  priorReadings: Map<string, boolean>
+  priorStreaks: Map<string, number>
 ): Promise<void> {
   if (!config.enabled) return;
   const channels = activeChannels(config);
   if (channels.length === 0) return;
-  if (!g.__ctrlcenterAlertState) g.__ctrlcenterAlertState = seedState(priorReadings);
+  g.__ctrlcenterAlertState ??= seedState(priorStreaks, config.confirmations);
   // Recoveries are always computed; each channel decides whether it wants them.
   const { next, events } = evaluateTransitions(g.__ctrlcenterAlertState, results, {
     confirmations: config.confirmations,
