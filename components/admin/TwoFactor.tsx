@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { TextField, Button } from "./ui";
 import { useToast } from "./Toast";
 import { useFocusTrap } from "./useFocusTrap";
@@ -165,7 +166,12 @@ export default function TwoFactor({
         {enabled ? "Disable" : "Enable"}
       </Button>
 
-      {open && (
+      {/* The setup, recovery-code and disable dialog goes to <body> (#409):
+          this card is a glass surface (backdrop-filter, a hover lift), which
+          makes it the containing block for anything fixed inside it, so a
+          dialog left here covered only the card and the next card covered its
+          buttons. */}
+      {open && createPortal(
         <div
           className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 pt-[10vh] backdrop-blur-sm"
           onMouseDown={() => step !== "recovery" && close()}
@@ -281,7 +287,8 @@ export default function TwoFactor({
               </form>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

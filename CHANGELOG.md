@@ -416,7 +416,9 @@ here.
   authentication while it's already on is now refused: before, doing that
   quietly replaced your authenticator and recovery codes, so the ones you'd
   saved stopped working. To move to a new authenticator, turn it off first.
-  (#384)
+  Its setup dialog, and the one for a new password, now open over the whole
+  page instead of inside their cards, where the next card could cover
+  their buttons. (#384, #409)
 
 ### Security
 

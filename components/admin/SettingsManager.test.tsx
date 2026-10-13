@@ -94,6 +94,24 @@ describe("Settings and two-factor authentication (#384)", () => {
     screen.getByText(/^On — a code from your authenticator app/);
   });
 
+  it("opens the two-factor and password dialogs over the page, not inside their cards (#409)", async () => {
+    // A glass card is the containing block for anything fixed inside it, so
+    // a dialog left in its card covered only the card and the next card
+    // covered its buttons. They go to <body>.
+    const user = userEvent.setup();
+    renderSettings(false, []);
+    await user.click(screen.getByRole("button", { name: "Enable" }));
+    const twoFactor = await screen.findByRole("dialog", { name: "Two-factor authentication" });
+    expect(twoFactor.parentElement).toBe(document.body);
+    expect(twoFactor.closest("section")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await user.click(screen.getByRole("button", { name: "Reset password" }));
+    const password = await screen.findByRole("dialog", { name: "Reset admin password" });
+    expect(password.parentElement).toBe(document.body);
+    expect(password.closest("section")).toBeNull();
+  });
+
   it("clears the actions opt-in from the draft when it's turned off, so a later save doesn't send it back", async () => {
     const user = userEvent.setup();
     renderSettings(true, [qb({ allowActions: true })]);
