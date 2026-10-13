@@ -498,4 +498,26 @@ describe("countdown date resilience", () => {
       { label: "Junk", date: "" },
     ]);
   });
+
+  it("stores a date that doesn't exist as empty, keeping the row (#390)", () => {
+    const config = configSchema.parse({
+      widgets: [
+        {
+          id: "countdown",
+          type: "countdown",
+          items: [
+            { label: "Month 13", date: "2026-13-01" },
+            { label: "Dec 32", date: "2026-12-32" },
+            { label: "Padded", date: " 2026-10-15 " },
+          ],
+        },
+      ],
+    });
+    const countdown = config.widgets[0];
+    expect(countdown.type === "countdown" && countdown.items).toEqual([
+      { label: "Month 13", date: "" },
+      { label: "Dec 32", date: "" },
+      { label: "Padded", date: "2026-10-15" },
+    ]);
+  });
 });

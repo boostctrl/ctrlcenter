@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isValidTimeZone, hourIn, shortDate, timeString } from "./datetime";
+import { isCalendarDate, isValidTimeZone, hourIn, shortDate, timeString } from "./datetime";
 
 describe("isValidTimeZone", () => {
   it("accepts real IANA zones", () => {
@@ -31,5 +31,19 @@ describe("timezone helpers degrade instead of throwing", () => {
   it("still honors a valid zone", () => {
     // UTC noon is 07:00 in America/Chicago (CDT, UTC-5) on this date.
     expect(hourIn(noon, "America/Chicago")).toBe(7);
+  });
+});
+
+describe("isCalendarDate (#390)", () => {
+  it("accepts a real YYYY-MM-DD day, including a leap day and padding spaces", () => {
+    for (const d of ["2026-01-01", "2026-12-31", "2028-02-29", "2000-02-29", " 2026-10-15 "]) {
+      expect(isCalendarDate(d)).toBe(true);
+    }
+  });
+
+  it("rejects a date shaped right that doesn't exist, and anything else", () => {
+    for (const d of ["2026-13-01", "2026-00-10", "2026-12-32", "2026-02-29", "1900-02-29", "2026-04-31", "2026-1-01", "20261001", "", "soon"]) {
+      expect(isCalendarDate(d)).toBe(false);
+    }
   });
 });

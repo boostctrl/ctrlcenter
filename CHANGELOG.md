@@ -421,6 +421,12 @@ here.
   Its setup dialog, and the one for a new password, now open over the whole
   page instead of inside their cards, where the next card could cover
   their buttons. (#384, #409)
+- **Two ways a single setting could take pages down.** A dismissible
+  announcement no longer sends every page to the error screen for visitors
+  whose browser blocks site data; for them, dismissing it lasts until the
+  next page. A countdown date that doesn't exist, like `2026-13-01` in a
+  hand-edited config, no longer breaks its board: that row is left out and
+  the date is cleared. (#390)
 
 ### Security
 
