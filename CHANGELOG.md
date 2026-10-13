@@ -448,6 +448,12 @@ here.
 - **A new password must be at least 12 characters**, and can't be the
   current one or the container's `ADMIN_PASSWORD`. Existing passwords are
   not affected. (#369)
+- **Monitor actions reach only the container or torrent you picked.** A
+  crafted request could steer a Portainer start, or the log viewer, to
+  other parts of the Docker API — pruning volumes, or reading a container's
+  settings and secrets — or make one qBittorrent pause or delete act on
+  every torrent. Actions and logs now accept only a real container id or
+  torrent hash. (#379)
 
 ## [2.13.0] - 2026-10-09
 
