@@ -488,6 +488,14 @@ here.
   with a private calendar address on a public board, reset that address
   (in Google Calendar, *Reset* the secret address) and paste in the new
   one. (#380)
+- **A calendar event can no longer take the dashboard down.** A recurring
+  event with an absurd repeat interval in a calendar you subscribe to could
+  stall the whole server — pages, status checks and alerts — or make every
+  page showing that calendar fail to load, and long-running series cost
+  seconds of work on every page view. Anyone who can add an event to that
+  calendar could do it. Repeats now stay within sensible bounds, an event
+  that can't be worked out is left off instead of breaking the rest of the
+  calendar, and working out a calendar's repeats takes milliseconds. (#381)
 
 ## [2.13.0] - 2026-10-09
 

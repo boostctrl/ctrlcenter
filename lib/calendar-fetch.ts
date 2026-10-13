@@ -113,6 +113,24 @@ async function loadParsedEvents(
   return events ?? [];
 }
 
+// Expand a parsed feed over a window, or [] if that fails. expandRecurring
+// already drops a series that throws; this is the backstop that keeps the
+// "never throws" below true end to end, since the widget loader and the
+// /calendar page call these without a catch and one bad event in a feed used
+// to break every page showing it (#381).
+function expandSafely(
+  events: CalendarEvent[],
+  from: number,
+  to: number
+): CalendarEvent[] {
+  try {
+    return expandRecurring(events, from, to);
+  } catch (e) {
+    log.warn("calendar expand error", { reason: errorReason(e) });
+    return [];
+  }
+}
+
 // The next `count` upcoming events (recurring series expanded over the near
 // window). Best-effort; never throws.
 export async function fetchCalendar(
@@ -122,7 +140,7 @@ export async function fetchCalendar(
 ): Promise<CalendarEvent[]> {
   const now = Date.now();
   const events = await loadParsedEvents(url, auth);
-  const expanded = expandRecurring(events, now, now + RECUR_WINDOW_MS);
+  const expanded = expandSafely(events, now, now + RECUR_WINDOW_MS);
   return upcomingEvents(expanded, now, count);
 }
 
@@ -136,7 +154,7 @@ export async function fetchCalendarRange(
   auth?: CalendarAuth
 ): Promise<CalendarEvent[]> {
   const events = await loadParsedEvents(url, auth);
-  const expanded = expandRecurring(events, from, to);
+  const expanded = expandSafely(events, from, to);
   return expanded
     .filter(
       (e) => (e.end ?? (e.allDay ? e.start + DAY_MS : e.start)) > from && e.start < to
@@ -157,9 +175,16 @@ export async function probeCalendar(
   }
   const { text, error } = await requestIcs(target, calendarHeaders(auth));
   if (!text) return { ok: false, count: 0, error: error ?? "Fetch failed" };
+  let events: CalendarEvent[];
+  try {
+    events = parseICS(text);
+  } catch (e) {
+    log.warn("calendar parse error", { host: hostOf(target), reason: errorReason(e) });
+    return { ok: false, count: 0, error: "Couldn't read the calendar" };
+  }
   const now = Date.now();
   const upcoming = upcomingEvents(
-    expandRecurring(parseICS(text), now, now + RECUR_WINDOW_MS),
+    expandSafely(events, now, now + RECUR_WINDOW_MS),
     now,
     100
   );
