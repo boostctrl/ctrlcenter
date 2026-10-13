@@ -504,6 +504,13 @@ here.
   calendar could do it. Repeats now stay within sensible bounds, an event
   that can't be worked out is left off instead of breaking the rest of the
   calendar, and working out a calendar's repeats takes milliseconds. (#381)
+- **Integrations no longer follow a redirect to another host.** A service
+  that redirected elsewhere, such as a Sonarr behind a sign-in proxy or a
+  LAN address that forwards to a public name, used to receive the request
+  again at the new host, with its API key, any API widget headers, and a
+  qBittorrent or UniFi sign-in. Now only a redirect on the same host (or an
+  upgrade to https) is followed. Anything else shows "Redirected to another
+  host — check the URL"; save the address the service ends up at. (#389)
 
 ## [2.13.0] - 2026-10-09
 

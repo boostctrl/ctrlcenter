@@ -12,14 +12,13 @@ import {
   ServiceError,
   serviceBase,
   serviceRequest,
+  serviceFetch,
   parseJson,
   throwForStatus,
   runProbe,
-  SERVICE_TIMEOUT_MS,
   type ProbeResult,
 } from "./http";
 import { log, hostOf, errorReason } from "../log";
-import { fetchWithTimeout } from "../fetch-body";
 
 export type PortainerConfig = { url: string; apiKey: string };
 
@@ -265,11 +264,7 @@ export async function containerLogs(
     `${base}/api/endpoints/${endpointId}/docker/containers/${id}` +
     `/logs?stdout=1&stderr=1&timestamps=0&tail=${PORTAINER_LOG_TAIL}`;
   try {
-    const res = await fetchWithTimeout(
-      url,
-      { headers: { "X-API-Key": cfg.apiKey } },
-      SERVICE_TIMEOUT_MS
-    );
+    const res = await serviceFetch(url, { headers: { "X-API-Key": cfg.apiKey } });
     throwForStatus(res, KEY_ERRORS);
     const bytes = Buffer.from(await res.arrayBuffer());
     // Demux the whole framed body first, THEN cap the decoded text. Capping the
