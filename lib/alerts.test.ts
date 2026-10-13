@@ -10,6 +10,7 @@ import {
   plainAlert,
   plainNotification,
   processAlerts,
+  seedState,
   sendNotification,
   evaluateWarnings,
   describeAlert,
@@ -574,9 +575,10 @@ describe("processAlerts", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   const hits = () => fetchMock.mock.calls.map((c) => c[0] as string);
+  // Both apps' last check was good: no failed checks before this tick.
   const prior = new Map([
-    ["a", true],
-    ["b", true],
+    ["a", 0],
+    ["b", 0],
   ]);
 
   it("sends each transition only to the channels whose filters take it", async () => {
@@ -627,6 +629,36 @@ describe("processAlerts", () => {
     const config = alertsSchema.parse({ enabled: false, confirmations: 1, channels: [channel({})] });
     await processAlerts([{ id: "a", up: false }], apps, config, prior);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  // A restart between an app's first failed check and the one that confirms
+  // it used to seed it as already alerted: no down alert, then a lone
+  // "recovered" (#391).
+  it("after a restart, confirms a down that one failed check had started", async () => {
+    const config = alertsSchema.parse({ enabled: true, confirmations: 2, channels: [channel({ url: "https://all.test" })] });
+    await processAlerts([{ id: "a", up: false }], apps, config, new Map([["a", 1]]));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).status).toBe("down");
+  });
+
+  it("after a restart, doesn't re-alert an app already confirmed down, and announces its recovery", async () => {
+    const config = alertsSchema.parse({ enabled: true, confirmations: 2, channels: [channel({ url: "https://all.test" })] });
+    await processAlerts([{ id: "a", up: false }], apps, config, new Map([["a", 2]]));
+    expect(fetchMock).not.toHaveBeenCalled();
+    await processAlerts([{ id: "a", up: true }], apps, config, new Map());
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).status).toBe("up");
+  });
+});
+
+describe("seedState (#391)", () => {
+  it("counts a run as down only once it's as long as the confirmations", () => {
+    const seeded = seedState(new Map([["up", 0], ["one", 1], ["two", 2], ["five", 5]]), 2);
+    expect(Object.fromEntries(seeded)).toEqual({
+      up: { confirmed: "up", downStreak: 0 },
+      one: { confirmed: "up", downStreak: 1 },
+      two: { confirmed: "down", downStreak: 2 },
+      five: { confirmed: "down", downStreak: 5 },
+    });
   });
 });
 

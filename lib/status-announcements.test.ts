@@ -4,6 +4,7 @@ import {
   maintenanceApps,
   visibleAnnouncements,
   announcementWindowLabel,
+  windowProblem,
 } from "./status-announcements";
 import type { StatusAnnouncement } from "./schema";
 
@@ -253,5 +254,43 @@ describe("maintenanceApps (#293)", () => {
       entry({ id: "5", kind: "maintenance", apps: ["b", "f"] }),
     ];
     expect([...maintenanceApps(list, NOW)].sort()).toEqual(["a", "b", "f"]);
+  });
+});
+
+// A maintenance window that holds apps mutes their alerts, so a broken end
+// makes it over rather than endless (#391). A plain notice keeps degrading
+// toward "shown".
+describe("broken windows (#391)", () => {
+  const hour = 3_600_000;
+  const at = (ms: number) => new Date(ms).toISOString();
+  // Entered as 23:00 → 01:00 on the same date: the end is before the start.
+  const overnight = { startsAt: at(NOW - hour), endsAt: at(NOW - 23 * hour) };
+
+  it("names what's wrong with a window", () => {
+    expect(windowProblem(entry(overnight))).toBe("end-before-start");
+    expect(windowProblem(entry({ startsAt: at(NOW), endsAt: at(NOW) }))).toBe("end-before-start");
+    expect(windowProblem(entry({ endsAt: "next tuesday" }))).toBe("unparseable-end");
+    expect(windowProblem(entry({ startsAt: at(NOW), endsAt: at(NOW + hour) }))).toBeNull();
+    expect(windowProblem(entry({ endsAt: "  " }))).toBeNull();
+    expect(windowProblem(entry())).toBeNull();
+  });
+
+  it("ends a maintenance window holding apps when its end is broken", () => {
+    const backwards = entry({ kind: "maintenance", apps: ["a"], ...overnight });
+    const unreadable = entry({ kind: "maintenance", apps: ["b"], endsAt: "soon" });
+    expect(announcementState(backwards, NOW)).toBe("expired");
+    expect(announcementState(unreadable, NOW)).toBe("expired");
+    expect(maintenanceApps([backwards, unreadable], NOW).size).toBe(0);
+    expect(visibleAnnouncements([backwards, unreadable], NOW)).toEqual([]);
+  });
+
+  it("keeps a notice, or a maintenance window without apps, showing", () => {
+    expect(announcementState(entry({ kind: "incident", ...overnight }), NOW)).toBe("active");
+    expect(announcementState(entry({ kind: "maintenance", ...overnight }), NOW)).toBe("active");
+    expect(announcementState(entry({ kind: "info", endsAt: "soon" }), NOW)).toBe("active");
+  });
+
+  it("still holds apps through a window with no end at all", () => {
+    expect(maintenanceApps([entry({ kind: "maintenance", apps: ["a"] })], NOW)).toEqual(new Set(["a"]));
   });
 });

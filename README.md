@@ -357,7 +357,8 @@ boards:                     # the dashboards; the first is the home page, the
                             # in and pick "Edit layout" from the corner menu
   - id: home
     name: Home
-    visibility: public      # public | private (only the signed-in admin)
+    visibility: public      # public | private (only the signed-in admin);
+                            # anything else counts as private
     layout:
       sections:             # order = position; widgets flow row by row
         - { widget: greeting, span: 16 }    # `widget` names an instance below

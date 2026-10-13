@@ -15,6 +15,25 @@ import InlineMarkdown from "./InlineMarkdown";
 
 const DISMISS_KEY = "ctrlcenter:announcement";
 
+// A browser that blocks site data throws on any storage access, and the banner
+// is in the root layout, so an unguarded throw takes every page down (#390).
+// There the dismissal just lasts until the next page load.
+function readDismissed(): string | null {
+  try {
+    return window.localStorage.getItem(DISMISS_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function saveDismissed(text: string): void {
+  try {
+    window.localStorage.setItem(DISMISS_KEY, text);
+  } catch {
+    // Not remembered; it's hidden for this page.
+  }
+}
+
 // Small tone glyphs (lucide paths), colored by the tone.
 const ICON: Record<AnnouncementTone, React.ReactNode> = {
   info: (
@@ -66,7 +85,7 @@ export default function AnnouncementBanner({
     // Syncing from an external store (localStorage) on mount; a one-time set is
     // the intended behavior here, not a cascading render.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (dismissible && localStorage.getItem(DISMISS_KEY) === text) setDismissed(true);
+    if (dismissible && readDismissed() === text) setDismissed(true);
   }, [dismissible, text]);
 
   if (text === "" || dismissed) return null;
@@ -109,7 +128,7 @@ export default function AnnouncementBanner({
           <button
             type="button"
             onClick={() => {
-              localStorage.setItem(DISMISS_KEY, text);
+              saveDismissed(text);
               setDismissed(true);
             }}
             aria-label="Dismiss announcement"

@@ -19,10 +19,12 @@ here.
   widgets and its own address, `/b/<name>`. The first board is still the
   home page. Rename, reorder and delete them there, and *Arrange* opens one
   in the layout editor. A board set to *Only me* is private: signed-out
-  visitors get a "not found" page and never see it in their menu. Switch
-  boards from the floating corner menu, or with the `1`–`9`, `[` and `]`
-  keys. Widgets are shared, so one notes card can sit on two boards. Your
-  current layout becomes the home board on upgrade. (#298)
+  visitors get a "not found" page and never see it in their menu. In a
+  hand-edited config, a visibility other than `public` or `private` keeps
+  the board private. Switch boards from the floating corner menu, or with
+  the `1`–`9`, `[` and `]` keys. Widgets are shared, so one notes card can
+  sit on two boards. Your current layout becomes the home board on upgrade.
+  (#298, #388)
 - **Groups and tags for apps and bookmarks.** Apps can belong to a
   group and carry tags, and an Applications widget can show one group or
   tag, or leave out (or show only) your private apps, so a board can have
@@ -419,6 +421,33 @@ here.
   Its setup dialog, and the one for a new password, now open over the whole
   page instead of inside their cards, where the next card could cover
   their buttons. (#384, #409)
+- **Two ways a single setting could take pages down.** A dismissible
+  announcement no longer sends every page to the error screen for visitors
+  whose browser blocks site data; for them, dismissing it lasts until the
+  next page. A countdown date that doesn't exist, like `2026-13-01` in a
+  hand-edited config, no longer breaks its board: that row is left out and
+  the date is cleared. (#390)
+- **Alerts no longer go missing, fire for an outage that has ended, or stay
+  muted.**
+  - With the default of two failed checks before an alert, a restart
+    between the first failure and the second, such as a container update,
+    used to swallow the down alert. When the app came back, only "recovered"
+    went out. Now a restart picks up the count where it was.
+  - An app with a long timeout and retries could make one round of checks
+    overrun the next. Its late results could then reopen an outage that had
+    already ended, and alert for it. One round now finishes before the next
+    begins.
+  - A maintenance window whose end is before its start, like an overnight
+    window entered as 11 pm to 1 am on the same date, or whose end can't be
+    read, held its apps' alerts and kept their downtime out of uptime for
+    good. It now counts as over, and Settings → Announcements warns about
+    it. (#391)
+- **A card made taller than its content now gets taller.** Dragging a
+  Notes, Calendar, RSS feed, Countdown, World clocks or System stats card's
+  bottom edge down only grew its outline in the layout editor, and the card
+  stayed its content's height with empty space below. It now fills the
+  height you set, on the board as in the editor. A card made shorter than
+  its content still scrolls. (#411)
 
 ### Security
 
@@ -496,6 +525,13 @@ here.
   calendar could do it. Repeats now stay within sensible bounds, an event
   that can't be worked out is left off instead of breaking the rest of the
   calendar, and working out a calendar's repeats takes milliseconds. (#381)
+- **Integrations no longer follow a redirect to another host.** A service
+  that redirected elsewhere, such as a Sonarr behind a sign-in proxy or a
+  LAN address that forwards to a public name, used to receive the request
+  again at the new host, with its API key, any API widget headers, and a
+  qBittorrent or UniFi sign-in. Now only a redirect on the same host (or an
+  upgrade to https) is followed. Anything else shows "Redirected to another
+  host — check the URL"; save the address the service ends up at. (#389)
 
 ## [2.13.0] - 2026-10-09
 

@@ -228,6 +228,15 @@ describe("containerLogs", () => {
       "/api/endpoints/2/docker/containers/abc%2Fjson%3F/logs?"
     );
   });
+
+  it("won't follow a redirect to another host with the API key (#389)", async () => {
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(null, { status: 302, headers: { location: "https://sso.example.com/" } })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(containerLogs(CFG, 2, "cid")).rejects.toThrow("Redirected to another host — check the URL");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("probePortainer", () => {

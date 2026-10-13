@@ -4,6 +4,7 @@
 import { z } from "zod";
 import { secretFields } from "./meta";
 import { patchOf } from "./input";
+import { isCalendarDate } from "../datetime";
 
 export const weatherSchema = z.object({
   enabled: z.boolean().default(true),
@@ -37,8 +38,9 @@ export const calendarSchema = z.object({
 export type CalendarConfig = z.infer<typeof calendarSchema>;
 
 // Countdown widget: labeled dates rendered as "in N days" rows. Stored
-// leniently (a half-typed row never fails the config load); rows without a
-// valid YYYY-MM-DD date are ignored at render time.
+// leniently (a half-typed row never fails the config load): a date that isn't
+// a real YYYY-MM-DD day, like 2026-13-01, is stored empty (#390), and rows
+// without a date are ignored at render time.
 //
 // The date keeps a preprocess from the js-yaml 4 days, when an unquoted
 // `date: 2026-09-01` in a hand-edited file parsed as a JS Date and a plain
@@ -50,7 +52,11 @@ export const countdownItemSchema = z.object({
   label: z.string().default(""),
   date: z.preprocess(
     (v) => (v instanceof Date ? v.toISOString().slice(0, 10) : v),
-    z.string().catch("").default("")
+    z
+      .string()
+      .catch("")
+      .default("")
+      .transform((d) => (isCalendarDate(d) ? d.trim() : ""))
   ),
 });
 export const countdownSchema = z.object({

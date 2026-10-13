@@ -6,7 +6,7 @@
 // ever runs in the browser.
 
 import https from "node:https";
-import { readCapped, fetchWithTimeout } from "../fetch-body";
+import { readCapped, timeoutSignal } from "../fetch-body";
 import { log, hostOf, errorReason } from "../log";
 
 export const SERVICE_TIMEOUT_MS = 6000;
@@ -31,6 +31,64 @@ export function serviceBase(url: string): string {
   return base;
 }
 
+// Redirects (#389). fetch follows them on its own, and on a hop to another
+// host undici drops only Authorization and Cookie: a service's X-Api-Key, an
+// API widget's headers and, on a 307/308, a login body would all go along to
+// wherever the service points (a Sonarr behind an auth proxy that bounces to
+// its sign-in host, a LAN URL that 301s to a public name). So a service
+// request follows a redirect by hand, and only on the same host: a trailing
+// slash, a moved path, or an upgrade to https. Anything else stops with a
+// message for the admin, and the credentials stay where they were saved.
+export const MAX_SERVICE_REDIRECTS = 5;
+export const REDIRECTED_AWAY = "Redirected to another host — check the URL";
+
+const isRedirect = (status: number) => [301, 302, 303, 307, 308].includes(status);
+
+// Whether a redirect from `from` to `to` keeps to the saved service: the same
+// host name (any port), and never from https down to plain http.
+function sameService(from: URL, to: URL): boolean {
+  if (to.protocol !== "http:" && to.protocol !== "https:") return false;
+  if (from.protocol === "https:" && to.protocol === "http:") return false;
+  return to.hostname === from.hostname;
+}
+
+// fetch a service URL, time-boxed to `timeoutMs` (the body read included,
+// as with fetchWithTimeout), following only same-service redirects. A 303,
+// or a 301/302 to a POST, carries on as a body-less GET, as fetch would.
+export async function serviceFetch(
+  url: string,
+  init: RequestInit = {},
+  timeoutMs: number = SERVICE_TIMEOUT_MS
+): Promise<Response> {
+  const timeout = timeoutSignal(timeoutMs);
+  const signal = init.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
+  const saved = new URL(url);
+  let at = saved;
+  let req: RequestInit = { ...init, redirect: "manual", signal };
+  for (let hops = 0; ; hops++) {
+    const res = await fetch(hops === 0 ? url : at.href, req);
+    const location = res.headers.get("location");
+    if (!isRedirect(res.status) || location === null) return res;
+    void res.body?.cancel().catch(() => {});
+    let next: URL;
+    try {
+      next = new URL(location, at);
+    } catch {
+      throw new ServiceError(REDIRECTED_AWAY);
+    }
+    if (!sameService(saved, next)) {
+      log.warn("service redirect refused", { host: hostOf(url), to: next.hostname });
+      throw new ServiceError(REDIRECTED_AWAY);
+    }
+    if (hops >= MAX_SERVICE_REDIRECTS) throw new ServiceError("Too many redirects");
+    const method = (req.method ?? "GET").toUpperCase();
+    if (res.status === 303 || ((res.status === 301 || res.status === 302) && method === "POST")) {
+      req = { ...req, method: method === "HEAD" ? "HEAD" : "GET", body: undefined };
+    }
+    at = next;
+  }
+}
+
 // Fetch a service endpoint and read its body, both inside one timeout window
 // (clearing the timer before the body arrives would let a slow-lorised body
 // hang the caller — the same reason lib/feed.ts reads inside its timer). The
@@ -42,7 +100,7 @@ export async function serviceRequest(
   maxBytes: number = SERVICE_MAX_BYTES
 ): Promise<{ res: Response; text: string }> {
   try {
-    const res = await fetchWithTimeout(url, init, SERVICE_TIMEOUT_MS);
+    const res = await serviceFetch(url, init);
     // Read the actual body and cap on its real size — do NOT reject on a
     // declared Content-Length that may not match (a service or a middlebox in
     // front of it can send a header far larger than the body, which used to

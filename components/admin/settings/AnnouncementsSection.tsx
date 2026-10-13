@@ -2,7 +2,7 @@
 
 import type { Settings } from "@/lib/schema";
 import { ANNOUNCEMENT_TONES, STATUS_ANNOUNCEMENT_KINDS } from "@/lib/schema";
-import { STATUS_ANNOUNCEMENT_KIND_META, announcementState } from "@/lib/status-announcements";
+import { STATUS_ANNOUNCEMENT_KIND_META, announcementState, windowProblem } from "@/lib/status-announcements";
 import { useNow } from "../../useNow";
 import { AddButton, Card, Hint, RemoveButton, SelectField, TextArea, TextField, ToggleRow, controlClasses, fieldLabelClasses, subCardClasses } from "../ui";
 import { ChipGroup, ChipToggles } from "@/components/ChipGroup";
@@ -85,6 +85,7 @@ export default function AnnouncementsSection({
           )}
           {statusAnnouncements.map((a, i) => {
             const state = announcementState(a, now);
+            const problem = windowProblem(a);
             return (
               <div
                 key={a.id}
@@ -182,6 +183,16 @@ export default function AnnouncementsSection({
                     />
                   </label>
                 </div>
+                {problem !== null && (
+                  <p role="status" className="text-xs text-status-warning">
+                    {problem === "end-before-start"
+                      ? "This ends before it starts. "
+                      : "This end time can't be read. "}
+                    {a.kind === "maintenance" && a.apps.length > 0
+                      ? "Until it's fixed the window counts as over, so its apps alert and count toward uptime as usual."
+                      : "Until it's fixed the end is ignored, and it shows until you remove it."}
+                  </p>
+                )}
               </div>
             );
           })}

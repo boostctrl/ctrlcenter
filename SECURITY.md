@@ -73,6 +73,9 @@ deployment safe.
   form, and changing the saved one — or an API widget's request, a
   calendar's address or an email channel's mail server — asks for your
   password again. `${ADMIN_PASSWORD}` and `${SESSION_SECRET}` never expand.
+  A service that redirects to another host gets an error, not the
+  credential: only a redirect on the same host (or an upgrade to https)
+  is followed.
 - **Assume each service key is all-powerful.** Sonarr, Radarr, qBittorrent, and
   most others expose a single unscoped API key or a full-control account, which
   ctrlcenter cannot narrow. Treat every configured credential as full access to

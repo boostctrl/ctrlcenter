@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import SectionTitle from "../SectionTitle";
 import { useLocalePrefs } from "../PrefsProvider";
+import { isCalendarDate } from "@/lib/datetime";
 
 // Admin-authored countdown card: labeled dates rendered as "in N days" rows in
 // the visitor's effective time zone. Day math happens after mount (the server
 // can't know the visitor's zone, and a clock mismatch would break hydration),
-// so the chips fill in on the first client render. Rows without a valid
+// so the chips fill in on the first client render. Rows without a real
 // YYYY-MM-DD date are ignored; Dashboard renders the widget only when at
 // least one valid row exists.
 
@@ -16,8 +17,10 @@ export type CountdownItem = { label: string; date: string };
 const DAY_MS = 86_400_000;
 const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
+// A date that exists, not just one shaped like it (#390): an impossible one
+// would throw in dateLabel and take the whole board down.
 export function isValidCountdownDate(date: string): boolean {
-  return DATE_RE.test(date.trim());
+  return isCalendarDate(date);
 }
 
 // "YYYY-MM-DD" of the instant in the given zone (en-CA formats exactly so);

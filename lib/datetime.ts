@@ -22,6 +22,18 @@ export function isValidTimeZone(timeZone: string): boolean {
   }
 }
 
+// A plain calendar date, "YYYY-MM-DD", that exists: the pattern alone lets
+// 2026-13-01 or 2026-02-30 through, and formatting one throws RangeError
+// (#390). Surrounding spaces are allowed, as a hand-edited config may have them.
+const CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+export function isCalendarDate(date: string): boolean {
+  const m = CALENDAR_DATE.exec(date.trim());
+  if (!m) return false;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const at = new Date(Date.UTC(y, mo - 1, d));
+  return at.getUTCFullYear() === y && at.getUTCMonth() === mo - 1 && at.getUTCDate() === d;
+}
+
 function safeZone(timeZone: string): string {
   return isValidTimeZone(timeZone) ? timeZone : "UTC";
 }

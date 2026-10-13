@@ -324,17 +324,31 @@ export function parseLegacyHistory(data: unknown, now: number): HistoryRows {
   return rows;
 }
 
-// The most recent raw reading (up/down) per id, for ids that have one in the
-// recent ring. The alert poller uses this to seed its state on startup so a
-// restart doesn't re-alert an app that was already down. Call it BEFORE
-// recordResults so it reflects the prior tick, not the one being recorded.
-export function lastReadings(ids: string[]): Map<string, boolean> {
-  const out = new Map<string, boolean>();
-  for (const id of ids) {
-    // The last reading outside maintenance (#293): a maintenance window's
-    // downs never reached the alert state, so they mustn't seed it either.
-    const last = state.recent.get(id)?.findLast((r) => !r.maint);
-    if (last) out.set(id, last.up);
+// How many checks in a row each app had failed as of its latest reading, for
+// ids with one in the recent ring. The alert poller seeds its state from this
+// on startup (#391): seeding from the last reading alone counted a single
+// failed check as an alert already sent, so a restart before the confirming
+// check swallowed the down alert. Call it BEFORE recordResults so it reflects
+// the prior tick, not the one being recorded.
+//
+// Maintenance readings (#293) are skipped: their downs never reached the
+// alert state. The ring keeps 90 minutes, so a run of downs that fills it is
+// counted on from the open outage's start at the app's interval.
+export function priorDownStreaks(
+  apps: readonly { id: string; intervalMs: number }[]
+): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const { id, intervalMs } of apps) {
+    const ring = (state.recent.get(id) ?? []).filter((r) => !r.maint);
+    if (ring.length === 0) continue;
+    let streak = 0;
+    while (streak < ring.length && !ring[ring.length - 1 - streak].up) streak++;
+    const since = state.downSince.get(id);
+    if (streak === ring.length && since !== undefined && since < ring[0].t && intervalMs > 0) {
+      const counted = Math.floor((ring[ring.length - 1].t - since) / intervalMs) + 1;
+      streak = Math.max(streak, counted);
+    }
+    out.set(id, streak);
   }
   return out;
 }
@@ -352,6 +366,11 @@ export function recordResults(
   const cutoff = hour - RETENTION_HOURS;
   const recentCutoff = at - RECENT_KEEP_MS;
   for (const r of results) {
+    // Readings stay in order (#391): one older than the app's newest arrived
+    // late, and recording it would make it the "latest" and reopen an outage
+    // the app has already recovered from.
+    const newest = state.recent.get(r.id)?.at(-1);
+    if (newest !== undefined && at < newest.t) continue;
     let m = state.store.get(r.id);
     if (!m) {
       m = new Map();

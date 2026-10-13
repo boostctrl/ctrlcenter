@@ -23,8 +23,20 @@ describe("boardsSchema", () => {
       ["a", "First"],
       ["b", ""],
     ]);
-    // A bad visibility falls back to public rather than dropping the board.
-    expect(out[1].visibility).toBe("public");
+    // A bad visibility keeps the board, hidden (#388).
+    expect(out[1].visibility).toBe("private");
+  });
+
+  it("fails closed on a visibility it doesn't know, and reads admin as private (#388)", () => {
+    const vis = (visibility: unknown) => boardsSchema.parse([{ id: "b", visibility }])[0].visibility;
+    expect(vis(undefined)).toBe("public");
+    expect(vis("public")).toBe("public");
+    expect(vis(" Public ")).toBe("public");
+    expect(vis("private")).toBe("private");
+    expect(vis("Private")).toBe("private");
+    expect(vis("admin")).toBe("private");
+    expect(vis("ADMIN")).toBe("private");
+    for (const unknown of ["secret", "everyone", "", null, 1, true, {}]) expect(vis(unknown)).toBe("private");
   });
 
   it("falls back to the stock home board when nothing usable is left", () => {

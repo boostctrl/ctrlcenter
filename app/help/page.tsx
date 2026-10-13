@@ -766,7 +766,9 @@ export default async function HelpPage() {
             <em>Under maintenance</em> in blue rather than as an outage: the
             timeline marks the time in blue too, and it doesn&apos;t count
             against uptime. An app still down when the window closes alerts as
-            usual.
+            usual. A window whose end comes before its start, or can&apos;t be
+            read, counts as over, so a typo can&apos;t hold alerts for good; the
+            entry shows a warning until it&apos;s fixed.
           </P>
         </Card>
       </Section>

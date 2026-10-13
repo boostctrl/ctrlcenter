@@ -1,3 +1,5 @@
+import http from "node:http";
+import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { serviceRequest, serviceBase, ServiceError, throwForStatus } from "./http";
 
@@ -81,5 +83,125 @@ describe("throwForStatus", () => {
       "Not a controller"
     );
     expect(() => throwForStatus({ status: 200, ok: true }, login)).not.toThrow();
+  });
+});
+
+// Redirects (#389): a service request follows one only on the same host. fetch's
+// own following kept custom headers (X-Api-Key, an API widget's) and replayed
+// a 307/308 body (a login) on a hop to another host.
+describe("serviceRequest redirects", () => {
+  type Call = { url: string; init: RequestInit };
+  // A fake network: each URL answers from the table; every request is logged.
+  function network(routes: Record<string, () => Response>) {
+    const calls: Call[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init: RequestInit) => {
+        calls.push({ url, init });
+        const route = routes[url];
+        return route ? route() : new Response("missing", { status: 404 });
+      })
+    );
+    return calls;
+  }
+  const redirect = (status: number, location: string) => () =>
+    new Response(null, { status, headers: { location } });
+
+  it("refuses a redirect to another host, so the key and body stay put", async () => {
+    const calls = network({
+      "http://sonarr.lan:8989/api/v3/system/status": redirect(307, "https://auth.example.com/login"),
+    });
+    await expect(
+      serviceRequest("http://sonarr.lan:8989/api/v3/system/status", {
+        method: "POST",
+        headers: { "X-Api-Key": "SECRET" },
+        body: "username=u&password=p",
+      })
+    ).rejects.toThrow("Redirected to another host — check the URL");
+    expect(calls.map((c) => c.url)).toEqual(["http://sonarr.lan:8989/api/v3/system/status"]);
+    expect(calls[0].init.redirect).toBe("manual");
+  });
+
+  it("refuses a downgrade to plain http, even on the same host", async () => {
+    const calls = network({ "https://nas.lan/api": redirect(301, "http://nas.lan/api") });
+    await expect(serviceRequest("https://nas.lan/api")).rejects.toThrow(/another host/);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("follows a same-host redirect with the headers and body intact", async () => {
+    const calls = network({
+      "http://qb.lan:8080/api/v2/auth/login": redirect(308, "/api/v2/auth/login/"),
+      "http://qb.lan:8080/api/v2/auth/login/": () => new Response("Ok."),
+    });
+    const { text } = await serviceRequest("http://qb.lan:8080/api/v2/auth/login", {
+      method: "POST",
+      headers: { "X-Api-Key": "SECRET" },
+      body: "username=u&password=p",
+    });
+    expect(text).toBe("Ok.");
+    expect(calls[1].init).toMatchObject({ method: "POST", body: "username=u&password=p", headers: { "X-Api-Key": "SECRET" } });
+  });
+
+  it("follows an upgrade to https on the same host, on another port", async () => {
+    const calls = network({
+      "http://nas.lan/api": redirect(301, "https://nas.lan:8443/api"),
+      "https://nas.lan:8443/api": () => new Response("{}"),
+    });
+    await serviceRequest("http://nas.lan/api");
+    expect(calls.map((c) => c.url)).toEqual(["http://nas.lan/api", "https://nas.lan:8443/api"]);
+  });
+
+  it("turns a 303, or a 301/302 after a POST, into a body-less GET", async () => {
+    const calls = network({
+      "http://svc.lan/a": redirect(302, "/b"),
+      "http://svc.lan/b": redirect(303, "/c"),
+      "http://svc.lan/c": () => new Response("done"),
+    });
+    await serviceRequest("http://svc.lan/a", { method: "POST", body: "x=1" });
+    expect(calls.map((c) => [c.url, c.init.method, c.init.body])).toEqual([
+      ["http://svc.lan/a", "POST", "x=1"],
+      ["http://svc.lan/b", "GET", undefined],
+      ["http://svc.lan/c", "GET", undefined],
+    ]);
+  });
+
+  it("stops a redirect loop", async () => {
+    network({
+      "http://svc.lan/a": redirect(302, "/b"),
+      "http://svc.lan/b": redirect(302, "/a"),
+    });
+    await expect(serviceRequest("http://svc.lan/a")).rejects.toThrow("Too many redirects");
+  });
+
+  it("hands back a 3xx without a Location, for the caller's status mapping", async () => {
+    network({ "http://svc.lan/a": () => new Response(null, { status: 304 }) });
+    const { res } = await serviceRequest("http://svc.lan/a");
+    expect(res.status).toBe(304);
+  });
+
+  it("keeps an X-Api-Key from a real server on another host (cross-origin 307)", async () => {
+    // Two real servers: A answers 307 to B, which records what it receives.
+    // 127.0.0.1 and localhost are different hosts to the URL rules.
+    const seen: string[] = [];
+    const b = http.createServer((req, res) => {
+      seen.push(String(req.headers["x-api-key"]));
+      res.end("{}");
+    });
+    await new Promise<void>((r) => b.listen(0, "127.0.0.1", r));
+    const bPort = (b.address() as AddressInfo).port;
+    const a = http.createServer((_req, res) => {
+      res.writeHead(307, { location: `http://localhost:${bPort}/` }).end();
+    });
+    await new Promise<void>((r) => a.listen(0, "127.0.0.1", r));
+    const aPort = (a.address() as AddressInfo).port;
+    try {
+      await expect(
+        serviceRequest(`http://127.0.0.1:${aPort}/api`, { headers: { "X-Api-Key": "SECRET" } })
+      ).rejects.toThrow(/another host/);
+      expect(seen).toEqual([]);
+    } finally {
+      a.close();
+      b.close();
+    }
   });
 });

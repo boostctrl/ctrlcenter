@@ -793,7 +793,11 @@ select optgroup {
     overflow-y: auto;
     scrollbar-width: thin;
   }
+  /* The card fills the height under its heading, so a card made taller than
+     its content is that tall (the height handle's whole point), not its
+     content's height with a gap below; shorter, it shrinks and scrolls. */
   .widget-sized > section > .glass-card {
+    flex-grow: 1;
     scroll-padding-block: 1.5rem;
   }
   .widget-sized > section > .widget-tiles {
