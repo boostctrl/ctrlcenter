@@ -454,6 +454,10 @@ here.
   settings and secrets — or make one qBittorrent pause or delete act on
   every torrent. Actions and logs now accept only a real container id or
   torrent hash. (#379)
+- **Signing in can't send you to another site.** A sign-in link with a
+  disguised `?next=` address (a hidden tab or line break in it) could take
+  you to another website once you'd signed in. Sign-in now continues only
+  to a page on your own dashboard, and to the admin portal otherwise. (#23)
 
 ## [2.13.0] - 2026-10-09
 
