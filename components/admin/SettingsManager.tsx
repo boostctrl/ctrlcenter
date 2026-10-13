@@ -78,6 +78,25 @@ export default function SettingsManager({
     replaceUrlParams((params) => params.set("section", next));
   }
 
+  // Whether two-factor authentication is on, kept live here (#384). The
+  // sections unmount on every switch, so the Security card can't hold it —
+  // it came back showing the page-load value and offering to enroll over the
+  // active factor — and Integrations needs it to unlock the actions opt-in
+  // (#367) without a reload.
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(initialTwoFactorEnabled);
+  function changeTwoFactor(enabled: boolean) {
+    setTwoFactorEnabled(enabled);
+    if (enabled) return;
+    // Turning it off turned every integration's actions off on the server;
+    // clear them in the draft too, or its next save would send them back on —
+    // asking to confirm the password for a rename, and re-arming them if the
+    // factor comes back this session. Turning actions off needs no step-up
+    // (app/api/integrations), so the save this sets off goes straight out.
+    for (const i of draft.integrations) {
+      if (i.allowActions) draft.updateIntegration(i.id, { allowActions: false });
+    }
+  }
+
   // Honor a #settings-card-… hash once on mount (the anchors each card
   // carries), so a link can point at one card inside a long section.
   useEffect(() => {
@@ -163,10 +182,10 @@ export default function SettingsManager({
           <WidgetsSection d={draft} groups={groupsState.groups} tags={allTags(items.apps)} />
         )}
         {section === "monitoring" && <MonitoringSection d={draft} apps={apps} />}
-        {section === "integrations" && <IntegrationsSection d={draft} twoFactorEnabled={initialTwoFactorEnabled} />}
+        {section === "integrations" && <IntegrationsSection d={draft} twoFactorEnabled={twoFactorEnabled} />}
         {section === "announcements" && <AnnouncementsSection d={draft} apps={apps} />}
         {section === "security" && (
-          <SecuritySection initialTwoFactorEnabled={initialTwoFactorEnabled} />
+          <SecuritySection twoFactorEnabled={twoFactorEnabled} onTwoFactorChange={changeTwoFactor} />
         )}
         </div>
         </div>

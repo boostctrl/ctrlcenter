@@ -902,6 +902,7 @@ describe("readConfigInternal stays off public surfaces", () => {
     // Admin-only 2FA management: read the current TOTP state before mutating.
     "app/api/2fa/activate/route.ts",
     "app/api/2fa/disable/route.ts",
+    "app/api/2fa/setup/route.ts",
     // Public, but their shared cache must hold every app; each filters per
     // response via visibleItems (the [id] detail route 404s non-visible ids).
     "app/api/status/route.ts",

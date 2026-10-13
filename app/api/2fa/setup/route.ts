@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import QRCode from "qrcode";
 import { isAdminRequest } from "@/lib/api-auth";
 import { requireRecentAuth } from "@/lib/reauth";
-import { setTotpPendingSecret } from "@/lib/config";
+import { readConfigInternal, setTotpPendingSecret } from "@/lib/config";
 import { generateTotpSecret, otpauthUri } from "@/lib/totp";
 
 // Admin-only (gated by the /api/2fa proxy prefix and re-checked here). Begins
@@ -16,6 +16,16 @@ const ACCOUNT = "admin";
 export async function POST(request: NextRequest) {
   if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  // Never over an active factor (#384): activating would replace its secret
+  // and recovery codes, silently breaking the authenticator and the codes the
+  // admin saved. Checked before the step-up, which would only lead here.
+  const { auth } = await readConfigInternal();
+  if (auth.totp.enabled) {
+    return NextResponse.json(
+      { error: "Two-factor authentication is already on — turn it off first to set up a new authenticator." },
+      { status: 409 }
+    );
   }
   // Step-up (#366): a stolen session enrolling its own device would lock
   // the owner out.

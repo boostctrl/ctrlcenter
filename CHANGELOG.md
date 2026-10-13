@@ -405,6 +405,14 @@ here.
 - **The corner menu is in a sensible order.** Monitor sat between Settings
   and Admin portal; it now sits with the pages (after Calendar), and the
   menu ends with Help, Settings and Admin portal. (#374)
+- **Two-factor authentication in Settings stays up to date.** After you
+  turn it on, Settings → Security no longer goes back to offering *Enable*
+  when you switch sections, and *Allow actions from the dashboard* unlocks
+  straight away instead of after a reload. Setting up two-factor
+  authentication while it's already on is now refused: before, doing that
+  quietly replaced your authenticator and recovery codes, so the ones you'd
+  saved stopped working. To move to a new authenticator, turn it off first.
+  (#384)
 
 ### Security
 

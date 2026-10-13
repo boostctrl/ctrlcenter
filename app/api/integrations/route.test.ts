@@ -46,4 +46,23 @@ describe("PUT /api/integrations", () => {
     expect((await put([qb])).status).toBe(200);
     expect((await readConfigInternal()).integrations[0].allowActions).toBe(true);
   });
+
+  it("turns actions off on the session alone, but asks to confirm turning them on (#366)", async () => {
+    // Settings clears the opt-in from its draft when the second factor goes
+    // off (#384); that save must not prompt for the password.
+    const { replaceIntegrations, readConfigInternal } = await import("@/lib/config");
+    const { verifySessionId } = await import("@/lib/auth");
+    const { markReauth } = await import("@/lib/sessions");
+    const { REAUTH_WINDOW_MS } = await import("@/lib/reauth");
+    const qb = integrationSchema.parse({ id: "qb", type: "qbittorrent", url: "http://q", username: "u", password: "p", allowActions: true });
+    await replaceIntegrations([qb]);
+    const stale = await adminSession();
+    const id = await verifySessionId(stale);
+    if (!id) throw new Error("no session");
+    await markReauth(id, Date.now() - REAUTH_WINDOW_MS - 1);
+    const putStale = (body: unknown) => route.PUT(request("/api/integrations", { method: "PUT", body, session: stale }));
+    expect((await putStale([{ ...qb, allowActions: false }])).status).toBe(200);
+    expect((await readConfigInternal()).integrations[0].allowActions).toBe(false);
+    expect((await putStale([qb])).status).toBe(403);
+  });
 });
