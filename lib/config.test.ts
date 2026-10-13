@@ -903,6 +903,12 @@ describe("readConfigInternal stays off public surfaces", () => {
     "app/api/2fa/activate/route.ts",
     "app/api/2fa/disable/route.ts",
     "app/api/2fa/setup/route.ts",
+    // Admin-only widget and settings saves: read the stored widgets, alert
+    // channels and `auth` to tell whether a save re-points where a secret is
+    // sent, which needs a recent confirmation (#378).
+    "app/api/settings/route.ts",
+    "app/api/widgets/route.ts",
+    "app/api/widgets/[id]/route.ts",
     // Public, but their shared cache must hold every app; each filters per
     // response via visibleItems (the [id] detail route 404s non-visible ids).
     "app/api/status/route.ts",
