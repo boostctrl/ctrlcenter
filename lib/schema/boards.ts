@@ -24,10 +24,20 @@ export const BOARD_VISIBILITIES = ["public", "private"] as const;
 export const boardVisibilitySchema = z.enum(BOARD_VISIBILITIES);
 export type BoardVisibility = z.infer<typeof boardVisibilitySchema>;
 
+// Stored visibility fails closed (#388): a value it doesn't know keeps the
+// board but hides it, so a typo in hand-edited YAML can't publish a private
+// board. Case is ignored, and `admin` (the word widget visibility uses) means
+// private. Only a board with no visibility at all is public.
+const storedVisibility = z.preprocess((v) => {
+  if (typeof v !== "string") return v;
+  const word = v.trim().toLowerCase();
+  return word === "admin" ? "private" : word;
+}, boardVisibilitySchema.catch("private"));
+
 export const boardSchema = z.object({
   id: boardId,
   name: z.string().max(MAX_BOARD_NAME).catch("").default(""),
-  visibility: boardVisibilitySchema.catch("public").default("public"),
+  visibility: storedVisibility.default("public"),
   // Shown before its name in the navigation (#316). Optional, so a board
   // without one stores nothing.
   icon: z.string().trim().min(1).max(MAX_ICON_LENGTH).optional().catch(undefined),
