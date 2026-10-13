@@ -78,6 +78,29 @@ describe("POST /api/login", () => {
     expect(events[0]).toMatchObject({ ip: `10.0.0.${ip}`, newAddress: true });
   });
 
+  it("records whether the sign-in came through a proxy only from the production entry (#383)", async () => {
+    const { listSessions } = await import("@/lib/sessions");
+    // The session this sign-in starts.
+    async function signIn(headers: Record<string, string>) {
+      const before = new Set((await listSessions()).map((s) => s.id));
+      expect((await login("correct horse", headers)).status).toBe(200);
+      return (await listSessions()).find((s) => !before.has(s.id));
+    }
+    // Next fills X-Forwarded-For in on every request (each login() here sends
+    // one), so the header itself never counts.
+    expect((await signIn({}))?.forwarded).toBeNull();
+    // Without the entry a client-sent stamp is ignored.
+    expect((await signIn({ "x-ctrlcenter-forwarded": "0" }))?.forwarded).toBeNull();
+    vi.stubEnv("CTRLCENTER_PEER_HEADER", "1");
+    try {
+      const peer = { "x-ctrlcenter-peer": "203.0.113.9" };
+      expect((await signIn({ ...peer, "x-ctrlcenter-forwarded": "0" }))?.forwarded).toBe(false);
+      expect((await signIn({ ...peer, "x-ctrlcenter-forwarded": "1" }))?.forwarded).toBe(true);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("names the cookie __Host- over HTTPS, so another host or path can't plant one (#369)", async () => {
     const res = await login("correct horse", { "x-forwarded-proto": "https" });
     expect(res.status).toBe(200);

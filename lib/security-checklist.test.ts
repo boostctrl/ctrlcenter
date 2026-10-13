@@ -9,6 +9,7 @@ const GREEN: SecurityFacts = {
   sessionSecret: "volume",
   sessionsPersisted: true,
   trustedProxyHops: 1,
+  productionEntry: true,
   sessions: [{ ip: "203.0.113.9", https: true, forwarded: true }],
   actionsOn: [],
   idleHours: 24,
@@ -62,18 +63,68 @@ describe("securityChecklist (#367)", () => {
     expect(ids).toContain("totp");
   });
 
-  it("catches a proxy-hops setting that doesn't match the requests", () => {
-    // Says "behind a proxy" but a sign-in came with no forwarded header: the
-    // throttle can be dodged.
-    expect(row({ trustedProxyHops: 1, sessions: [{ ip: "1.2.3.4", https: true, forwarded: false }] }, "proxy")).toMatchObject({
-      level: "bad",
-      detail: expect.stringContaining("TRUSTED_PROXY_HOPS=0"),
+  describe("reverse proxy (#383)", () => {
+    // The proxy row for sign-ins that arrived with X-Forwarded-For (true),
+    // without it (false), or the app couldn't tell (null).
+    const proxy = (trustedProxyHops: number, forwarded: (boolean | null)[], facts: Partial<SecurityFacts> = {}) =>
+      row(
+        { trustedProxyHops, sessions: forwarded.map((f) => ({ ip: "1.2.3.4", https: true, forwarded: f })), ...facts },
+        "proxy"
+      );
+
+    it("is green when the setting matches how sign-ins arrive", () => {
+      expect(proxy(0, [false])).toMatchObject({ level: "ok", detail: expect.stringContaining("Reached directly") });
+      expect(proxy(1, [true])).toMatchObject({ level: "ok", detail: expect.stringContaining("Behind a reverse proxy") });
+      expect(proxy(2, [true])).toMatchObject({ level: "ok", detail: expect.stringContaining("2 proxies") });
     });
-    // Says "direct" but sign-ins are forwarded: everyone shares one throttle.
-    expect(row({ trustedProxyHops: 0, sessions: [{ ip: "1.2.3.4", https: true, forwarded: true }] }, "proxy").level).toBe("warn");
-    // Consistent either way.
-    expect(row({ trustedProxyHops: 0, sessions: [{ ip: "1.2.3.4", https: true, forwarded: false }] }, "proxy").level).toBe("ok");
-    expect(row({ trustedProxyHops: 2 }, "proxy")).toMatchObject({ level: "ok", detail: expect.stringContaining("2 proxies") });
+
+    it("is red when it trusts a proxy but a sign-in came straight in", () => {
+      // Exposed directly with the default setting: a client can forge
+      // X-Forwarded-For to dodge the throttle.
+      expect(proxy(1, [false])).toMatchObject({ level: "bad", detail: expect.stringContaining("TRUSTED_PROXY_HOPS=0") });
+      expect(proxy(2, [false]).level).toBe("bad");
+    });
+
+    it("is amber when sign-ins come through a proxy it doesn't trust", () => {
+      // Every client behind the proxy shares one throttle.
+      expect(proxy(0, [true])).toMatchObject({
+        level: "warn",
+        detail: expect.stringMatching(/TRUSTED_PROXY_HOPS is 0.*number of proxies in front\.$/),
+      });
+    });
+
+    it("says it can't tell, instead of judging, when no sign-in's arrival is known", () => {
+      for (const hops of [0, 1]) {
+        // Outside the Docker image it never knows.
+        expect(proxy(hops, [null], { productionEntry: false })).toMatchObject({
+          level: "warn",
+          detail: expect.stringMatching(new RegExp(`Can't tell.*Docker image.*TRUSTED_PROXY_HOPS \\(now ${hops}\\)`)),
+        });
+        // In it, only sessions from before it recorded that are unknown.
+        expect(proxy(hops, [null, null])).toMatchObject({
+          level: "warn",
+          detail: expect.stringMatching(/Can't tell yet.*Sign out and back in/),
+        });
+      }
+    });
+
+    it("judges mixed sessions from the known ones", () => {
+      // Unknown sessions neither clear nor raise the verdict.
+      expect(proxy(1, [null, true]).level).toBe("ok");
+      expect(proxy(1, [null, false]).level).toBe("bad");
+      expect(proxy(0, [null, false]).level).toBe("ok");
+      expect(proxy(0, [true, null]).level).toBe("warn");
+      // One direct sign-in among proxied ones leaves the throttle open at
+      // hops=1 ...
+      expect(proxy(1, [true, false]).level).toBe("bad");
+      // ... so at hops=0 the advice to raise it waits for the direct path to
+      // close.
+      expect(proxy(0, [true, false])).toMatchObject({
+        level: "warn",
+        detail: expect.stringContaining("once the portal can be reached only through them"),
+      });
+      expect(proxy(0, [true]).detail).not.toContain("once the portal");
+    });
   });
 
   it("flags a session secret derived from the password", () => {

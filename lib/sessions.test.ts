@@ -149,6 +149,46 @@ describe("session records (#365)", () => {
     warn.mockRestore();
   });
 
+  it("records whether a sign-in came through a proxy, or that it's unknown (#383)", async () => {
+    const direct = await createSession({ ...meta, forwarded: false });
+    const proxied = await createSession({ ...meta, forwarded: true });
+    const unknown = await createSession(meta);
+    forgetStore();
+    expect((await getSession(direct))?.forwarded).toBe(false);
+    expect((await getSession(proxied))?.forwarded).toBe(true);
+    expect((await getSession(unknown))?.forwarded).toBeNull();
+  });
+
+  it("reads an older file, with its always-true forwarded verdict as unknown (#383)", async () => {
+    const now = Date.now();
+    const file = path.join(dir, "sessions.json");
+    const base = { createdAt: now, lastSeenAt: now, ip: "203.0.113.9", userAgent: "Mozilla/5.0 (test)" };
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        version: 1,
+        idleHours: 24,
+        sessions: [
+          // Written by a build that took `forwarded` from the header Next
+          // fills in itself.
+          { ...base, id: "legacy-forwarded", https: true, forwarded: true, reauthAt: now },
+          // And one from before the checklist's fields existed at all.
+          { ...base, id: "legacy-bare" },
+        ],
+      }),
+      "utf8"
+    );
+    expect(await getSession("legacy-forwarded", now)).toMatchObject({ https: true, forwarded: null, reauthAt: now });
+    expect(await getSession("legacy-bare", now)).toMatchObject({ https: false, forwarded: null, reauthAt: now });
+
+    // The next write stores the current version, so the verdict stays unknown
+    // across a restart rather than turning back into the stored true.
+    await createSession({ ...meta, forwarded: false }, now);
+    expect(JSON.parse(fs.readFileSync(file, "utf8")).version).toBe(2);
+    forgetStore();
+    expect((await getSession("legacy-forwarded", now))?.forwarded).toBeNull();
+  });
+
   it("starts empty from an unparseable file rather than failing", async () => {
     fs.writeFileSync(path.join(dir, "sessions.json"), "{not json", "utf8");
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);

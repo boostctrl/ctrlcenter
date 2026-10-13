@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { rateLimit, refundRateLimit, pruneRateLimit } from "./rate-limit";
+import { NextRequest } from "next/server";
+import { arrivedForwarded, rateLimit, refundRateLimit, pruneRateLimit } from "./rate-limit";
 
 describe("rateLimit", () => {
   beforeEach(() => {
@@ -176,5 +177,27 @@ describe("clientIp", () => {
       ).toBe("198.51.100.7");
       expect(await ipFor({ hops: "0" }, { "x-forwarded-for": "198.51.100.7" })).toBeNull();
     });
+  });
+});
+
+describe("arrivedForwarded (#383)", () => {
+  const forwarded = (entry: boolean, headers: Record<string, string>) => {
+    vi.stubEnv("CTRLCENTER_PEER_HEADER", entry ? "1" : "");
+    return arrivedForwarded(new NextRequest("http://dash.lan/api/login", { headers }));
+  };
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("takes the production entry's stamp, not the X-Forwarded-For Next fills in", () => {
+    expect(forwarded(true, { "x-ctrlcenter-forwarded": "1", "x-forwarded-for": "1.2.3.4" })).toBe(true);
+    // Next set X-Forwarded-For from the socket; the entry saw none.
+    expect(forwarded(true, { "x-ctrlcenter-forwarded": "0", "x-forwarded-for": "203.0.113.9" })).toBe(false);
+    expect(forwarded(true, { "x-forwarded-for": "203.0.113.9" })).toBeNull();
+    expect(forwarded(true, { "x-ctrlcenter-forwarded": "yes" })).toBeNull();
+  });
+
+  it("is unknown without the entry, ignoring a client-sent stamp", () => {
+    expect(forwarded(false, { "x-ctrlcenter-forwarded": "1", "x-forwarded-for": "1.2.3.4" })).toBeNull();
+    expect(forwarded(false, { "x-ctrlcenter-forwarded": "0" })).toBeNull();
+    expect(forwarded(false, {})).toBeNull();
   });
 });

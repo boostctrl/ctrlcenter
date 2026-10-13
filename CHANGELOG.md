@@ -97,10 +97,11 @@ here.
 - **A security checklist.** Settings → Security opens with what the app can
   see of your deployment — two-factor authentication, where the password
   comes from, whether sign-ins arrive over HTTPS and through the proxy you
-  configured, the session secret, dashboard actions, the idle timeout —
-  each row green, amber or red with the fix. The red rows are also logged
-  when the server starts. The first-run setup gains a step that offers
-  two-factor authentication. (#367)
+  configured (a direct sign-in can be told from a proxied one when the app
+  runs from the Docker image), the session secret, dashboard actions, the
+  idle timeout — each row green, amber or red with the fix. The red rows
+  are also logged when the server starts. The first-run setup gains a step
+  that offers two-factor authentication. (#367, #383)
 - **A record of sign-ins and security changes.** Settings → Security lists
   recent activity — sign-ins and failed attempts, sign-outs, sessions
   ended, password and two-factor changes, confirmations, exports with
