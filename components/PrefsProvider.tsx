@@ -118,6 +118,7 @@ export function PrefsProvider({
   defaults,
   weatherEnabled,
   defaultTheme,
+  initialBoardTheme = null,
   visitorTheming = "all",
   packs = [],
   schedule = null,
@@ -125,7 +126,15 @@ export function PrefsProvider({
 }: {
   defaults: Defaults;
   weatherEnabled: boolean;
+  // The site's own theme (the current phase's, under a schedule), never a
+  // board's: this provider outlives every page, so a board's theme handed
+  // in here stayed on after the board was left (#385).
   defaultTheme: DefaultTheme;
+  // The theme of the board this page load opened on, when it pins one
+  // (#337): where the board theme below starts, so the first render
+  // matches what the layout painted. BoardTheme takes it back on the way
+  // out, as it does for a board opened later.
+  initialBoardTheme?: DefaultTheme | null;
   // What this visitor may change about the theme (#335), and the site's
   // themes a "packs" choice resolves against.
   visitorTheming?: VisitorTheming;
@@ -144,7 +153,7 @@ export function PrefsProvider({
   // live at each switch; the visitor's own choices still win over it. A
   // board's own theme (#337) comes first, for as long as that board is open.
   const scheduled = useScheduledTheme(schedule ?? null);
-  const [boardTheme, setBoardTheme] = useState<DefaultTheme | null>(null);
+  const [boardTheme, setBoardTheme] = useState<DefaultTheme | null>(initialBoardTheme);
   const { look, resetLook } = useLook(boardTheme ?? scheduled.theme ?? defaultTheme, {
     policy: visitorTheming,
     packs,

@@ -251,8 +251,9 @@ here.
 - **A theme per board.** Pin one of the site's themes on a board, in
   Settings → Layout → Boards or from the editor's Board menu, so an Infra
   board can be Circuit while the home board stays as it is. It paints from
-  the first byte and follows you between boards; visitors' own choices
-  still apply over it. (#337)
+  the first byte, follows you between boards and stays on its board: the
+  rest of the site keeps its own theme and day/night schedule. Visitors'
+  own choices still apply over it. (#337, #385)
 - **An upgrade note in the help.** The help page explains what the 3.0
   upgrade did with a 2.x config, where the backup is and how to roll back,
   and now also covers two-factor authentication, the Reduced motion

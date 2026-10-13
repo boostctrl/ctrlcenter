@@ -142,24 +142,27 @@ export default async function RootLayout({
   const weather = settings.weather;
   const visitorTheming: VisitorTheming = isAdmin ? "all" : settings.visitorTheming;
   const packs = resolveThemePacks(config.themes);
-  // The day/night schedule (#336): the site theme for each phase and the
-  // phase now, so the first paint is right; PrefsProvider flips it live.
   // Per-request CSP nonce from the proxy, so our inline theme script is allowed
   // without script-src 'unsafe-inline'. Reading headers() also opts pages into
   // dynamic rendering, which is required for a per-request nonce to match.
   const requestHeaders = await headers();
   const nonce = requestHeaders.get("x-nonce") ?? undefined;
-  // A board's own theme (#337), when the request shows a board that pins
-  // one: it stands in for the site theme on that page, schedule included
-  // (the pin is the board's whole look). The proxy passes the path along;
-  // BoardPage hands the same theme to PrefsProvider for client-side moves.
-  const gallery = resolveThemeGallery(config.themes).map((r) => r.pack);
-  const board = boardForPath(requestHeaders.get("x-pathname"), config.boards, isAdmin);
-  const pinned = board?.theme ? boardDefaultTheme(settings.theme, board, gallery) : null;
+  // The day/night schedule (#336): the site theme for each phase and the
+  // phase now, so the first paint is right; PrefsProvider flips it live.
   // The schedule may name a pack hidden from visitors (a kiosk's night
   // look), so it resolves against the whole gallery.
-  const schedule = pinned ? null : resolveSchedule(settings, gallery);
-  const defaultTheme = pinned ?? (schedule ? (schedule.phase === "day" ? schedule.day : schedule.night) : settings.theme);
+  const gallery = resolveThemeGallery(config.themes).map((r) => r.pack);
+  const schedule = resolveSchedule(settings, gallery);
+  const siteTheme = schedule ? (schedule.phase === "day" ? schedule.day : schedule.night) : settings.theme;
+  // A board's own theme (#337), when the request shows a board that pins
+  // one: it stands in for the site theme on that page, schedule included
+  // (the pin is the board's whole look). The proxy passes the path along.
+  // It paints the first load and seeds PrefsProvider's board theme, which
+  // BoardTheme clears on the way out — never the site default, since this
+  // layout doesn't re-render on a client-side move and the pin then stayed
+  // on every page after it (#385).
+  const board = boardForPath(requestHeaders.get("x-pathname"), config.boards, isAdmin);
+  const pinned = board?.theme ? boardDefaultTheme(settings.theme, board, gallery) : null;
 
   // Apply the effective theme before first paint — imperatively, so React never
   // controls the <html> color variables (which would otherwise clobber it on
@@ -175,11 +178,14 @@ export default async function RootLayout({
   // Under "themes only" the script needs the site's themes, since what's
   // stored is a chosen pack's name; otherwise just the policy rides along.
   const themeScript = inlineThemeScript(
+    // A pinned board's theme stands in for the site default here, and shows
+    // whatever the visitor's schedule switch says (as in PrefsProvider), so
+    // no unscheduled theme rides along with it.
     serializeForScript({
-      ...defaultTheme,
+      ...(pinned ?? siteTheme),
       policy: visitorTheming,
       ...(visitorTheming === "packs" ? { packs: packs.map(packFields) } : {}),
-      ...(schedule ? { unscheduled: schedule.base } : {}),
+      ...(schedule && !pinned ? { unscheduled: schedule.base } : {}),
     }),
     {
     design: DESIGN_IDS,
@@ -219,7 +225,8 @@ export default async function RootLayout({
         </a>
         <PrefsProvider
           weatherEnabled={weather.enabled}
-          defaultTheme={defaultTheme}
+          defaultTheme={siteTheme}
+          initialBoardTheme={pinned}
           visitorTheming={visitorTheming}
           packs={packs}
           schedule={schedule}
