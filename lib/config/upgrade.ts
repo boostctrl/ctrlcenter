@@ -81,7 +81,9 @@ async function keepV2Backup(dir: string, raw: string, now: Date): Promise<string
   const names = [V2_BACKUP_NAME, `config.v2.bak.${day}.yaml`];
   for (let n = 2; n < 100; n++) names.push(`config.v2.bak.${day}.${n}.yaml`);
   for (const name of names) {
-    const file = path.join(dir, name);
+    // turbopackIgnore: a runtime path, not a build input — without it the
+    // build traces the whole project into the standalone output.
+    const file = path.join(/* turbopackIgnore: true */ dir, name);
     if (await writeFileOnce(file, raw)) return name;
     if ((await fs.readFile(file, "utf8").catch(() => null)) === raw) return name;
   }
