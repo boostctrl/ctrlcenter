@@ -13,7 +13,7 @@ import {
 } from "@/lib/search";
 import { appMatches, groupBookmarks, groupName } from "@/lib/groups";
 import { useFavorites } from "./PrefsProvider";
-import type { AppItem, InstanceOf } from "@/lib/schema";
+import type { AppItem } from "@/lib/schema";
 import {
   DEFAULT_UI_SCALE,
   DEFAULT_GRID_GAP,
@@ -42,6 +42,7 @@ import { useLayoutEditor } from "./useLayoutEditor";
 import { UndoGestureContext } from "./useUndoHistory";
 import { emptyReason as widgetEmptyReason, widgetDef } from "@/lib/widgets/defs";
 import type { HomeData } from "@/lib/widgets/data";
+import type { PublicInstanceOf } from "@/lib/widgets/public";
 import { WIDGET_RENDERERS, cardsFor, type WidgetRenderContext } from "./widgets/registry";
 import { cellBleed, cellSizing } from "./widgets/sizing";
 import SizedCell from "./widgets/SizedCell";
@@ -190,13 +191,13 @@ export default function Dashboard({
   const appsFilters = layout.sections
     .filter((w) => w.type === "apps" && !w.hidden)
     .flatMap((w) => {
-      const inst = data.instances[w.id] as InstanceOf<"apps"> | undefined;
+      const inst = data.instances[w.id] as PublicInstanceOf<"apps"> | undefined;
       return inst ? [inst.filter] : [];
     });
   const bookmarkFilters = layout.sections
     .filter((w) => w.type === "bookmarks" && !w.hidden)
     .flatMap((w) => {
-      const inst = data.instances[w.id] as InstanceOf<"bookmarks"> | undefined;
+      const inst = data.instances[w.id] as PublicInstanceOf<"bookmarks"> | undefined;
       return inst ? [inst.filter] : [];
     });
   const filterKey = JSON.stringify([appsFilters, bookmarkFilters]);

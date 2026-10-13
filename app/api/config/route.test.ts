@@ -54,6 +54,8 @@ describe("/api/config", () => {
           { id: "sonarr", type: "sonarr", url: "http://s", apiKey: "${SONARR_KEY}" },
         ],
         apps: [{ id: "nas", name: "NAS", url: "http://nas", checkMethod: "push", pushToken: "tok-123" }],
+        // A calendar's secret address is a credential too (#380).
+        widgets: [{ id: "cal", type: "calendar", url: "https://cal.test/private-abc/basic.ics" }],
       }),
       "utf8"
     );
@@ -64,11 +66,14 @@ describe("/api/config", () => {
       ["sonarr", "http://s", "", "${SONARR_KEY}"],
     ]);
     expect(plain.apps[0].pushToken).toBe("");
+    expect(plain.widgets.find((w: { id: string }) => w.id === "cal").url).toBe("");
     expect(JSON.stringify(plain)).not.toContain("hunter2");
+    expect(JSON.stringify(plain)).not.toContain("private-abc");
 
     const full = await (await route.GET(request("/api/config?secrets=1", { session }))).json();
     expect(full.integrations[0].password).toBe("hunter2");
     expect(full.apps[0].pushToken).toBe("tok-123");
+    expect(full.widgets.find((w: { id: string }) => w.id === "cal").url).toBe("https://cal.test/private-abc/basic.ics");
 
     // Restoring the secret-less file keeps what the instance holds.
     plain.settings.title = "Restored";
@@ -77,11 +82,13 @@ describe("/api/config", () => {
       settings: { title: string };
       integrations: { id: string; password: string; apiKey: string }[];
       apps: { pushToken: string }[];
+      widgets: { id: string; url?: string }[];
     };
     expect(onDisk.settings.title).toBe("Restored");
     expect(onDisk.integrations[0].password).toBe("hunter2");
     expect(onDisk.integrations[1].apiKey).toBe("${SONARR_KEY}");
     expect(onDisk.apps[0].pushToken).toBe("tok-123");
+    expect(onDisk.widgets.find((w) => w.id === "cal")?.url).toBe("https://cal.test/private-abc/basic.ics");
   });
 
   it("imports a valid file, replacing the config", async () => {

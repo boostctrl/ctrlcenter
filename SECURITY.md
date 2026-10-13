@@ -70,7 +70,9 @@ deployment safe.
   full list is in the environment-variable table in the [README](README.md).
   An env-held credential is only ever sent to the URL saved for that service:
   **Test connection** against a different URL uses just what's typed in the
-  form.
+  form, and changing the saved one — or an API widget's request, a
+  calendar's address or an email channel's mail server — asks for your
+  password again. `${ADMIN_PASSWORD}` and `${SESSION_SECRET}` never expand.
 - **Assume each service key is all-powerful.** Sonarr, Radarr, qBittorrent, and
   most others expose a single unscoped API key or a full-control account, which
   ctrlcenter cannot narrow. Treat every configured credential as full access to

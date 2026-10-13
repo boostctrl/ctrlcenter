@@ -26,10 +26,11 @@ export type SessionRecord = {
   ip: string | null;
   userAgent: string;
   // How the sign-in arrived, for the security checklist (#367): over HTTPS
-  // (directly or via a TLS-terminating proxy), and with an X-Forwarded-For
-  // header (so through a proxy).
+  // (directly or via a TLS-terminating proxy), and whether it reached the
+  // server with an X-Forwarded-For header (so through a proxy) — null when
+  // the app couldn't tell, as outside the Docker image's entry (#383).
   https: boolean;
-  forwarded: boolean;
+  forwarded: boolean | null;
   // When the session last proved the password (and the second factor when
   // on): at sign-in, then each step-up confirmation (#366).
   reauthAt: number;
@@ -39,7 +40,7 @@ export type SessionMeta = {
   ip: string | null;
   userAgent: string;
   https?: boolean;
-  forwarded?: boolean;
+  forwarded?: boolean | null;
 };
 
 // Defaults and bounds for the idle timeout: a session unused for this long
@@ -56,7 +57,12 @@ const TOUCH_INTERVAL_MS = 60 * 1000;
 
 const FILE_NAME = "sessions.json";
 
-type StoreFile = { version: 1; idleHours: number; sessions: SessionRecord[] };
+// Version 2 (#383) records `forwarded` as null when unknown. Version 1 took it
+// from an X-Forwarded-For header Next fills in on every request, so every
+// record said true: those read as unknown rather than keep that verdict.
+const FILE_VERSION = 2;
+
+type StoreFile = { version: number; idleHours: number; sessions: SessionRecord[] };
 
 type Store = {
   file: string;
@@ -104,12 +110,16 @@ function isRecord(v: unknown): v is SessionRecord {
   );
 }
 
-// A stored record, with the fields a pre-3.0.0 file lacks defaulted.
-function normalize(r: SessionRecord): SessionRecord {
+// A stored record, with the fields an older file lacks (or got wrong)
+// defaulted.
+function normalize(r: SessionRecord, version: unknown): SessionRecord {
   return {
     ...r,
     https: r.https === true,
-    forwarded: r.forwarded === true,
+    forwarded:
+      typeof version === "number" && version >= 2 && typeof r.forwarded === "boolean"
+        ? r.forwarded
+        : null,
     reauthAt: typeof r.reauthAt === "number" ? r.reauthAt : r.createdAt,
   };
 }
@@ -130,7 +140,7 @@ async function load(store: Store): Promise<void> {
     const parsed = JSON.parse(raw) as Partial<StoreFile>;
     store.idleHours = clampIdleHours(parsed.idleHours);
     for (const s of Array.isArray(parsed.sessions) ? parsed.sessions : []) {
-      if (isRecord(s)) store.sessions.set(s.id, normalize(s));
+      if (isRecord(s)) store.sessions.set(s.id, normalize(s, parsed.version));
     }
   } catch (e) {
     log.warn(`sessions file unparseable, starting empty: ${errorReason(e)}`);
@@ -165,7 +175,7 @@ async function ready(): Promise<Store> {
 // names open sessions by id, which is what a cookie carries).
 function persist(store: Store): Promise<void> {
   const snapshot: StoreFile = {
-    version: 1,
+    version: FILE_VERSION,
     idleHours: store.idleHours,
     sessions: [...store.sessions.values()],
   };
@@ -220,7 +230,7 @@ export async function createSession(meta: SessionMeta, now = Date.now()): Promis
     // Bounded: the header is client-chosen and the list renders it.
     userAgent: meta.userAgent.slice(0, 300),
     https: meta.https === true,
-    forwarded: meta.forwarded === true,
+    forwarded: meta.forwarded ?? null,
     reauthAt: now,
   });
   prune(store, now);

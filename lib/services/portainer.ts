@@ -146,6 +146,14 @@ export type PortainerContainer = {
   status: string;
 };
 
+// The shape a container id from the browser must have before it goes into a
+// Docker API path (#379): the 64-hex id the container list returns, or the
+// 12-hex short form. Docker would also take a name or any unique prefix, but
+// the card only ever sends the list's own id, and a free-form string here is a
+// path: "x/../../volumes/prune?" turned a start into a volume prune, and the
+// log tail into a GET proxy for the rest of the Docker API.
+export const CONTAINER_ID_PATTERN = /^(?:[0-9a-f]{12}|[0-9a-f]{64})$/;
+
 // The drill-down lists a whole environment, so cap it — a big host can run
 // hundreds of containers, and the card is a control surface, not an inventory.
 export const PORTAINER_CONTAINER_CAP = 100;
@@ -189,7 +197,9 @@ export async function listContainers(
 
 // start / stop / restart, proxied to Docker. Docker answers 204 on success and
 // 304 when the container is already in the target state (start an already-up
-// container) — both are success. 401/403 surface as an invalid key.
+// container) — both are success. 401/403 surface as an invalid key. The id is
+// encoded as well as checked by the routes (CONTAINER_ID_PATTERN, #379), so a
+// "/" or "?" in it can't reshape the request even if a caller skips the check.
 async function containerCommand(
   cfg: PortainerConfig,
   endpointId: number,
@@ -197,8 +207,9 @@ async function containerCommand(
   action: "start" | "stop" | "restart"
 ): Promise<void> {
   const base = serviceBase(cfg.url);
+  const id = encodeURIComponent(containerId);
   const { res } = await serviceRequest(
-    `${base}/api/endpoints/${endpointId}/docker/containers/${containerId}/${action}`,
+    `${base}/api/endpoints/${endpointId}/docker/containers/${id}/${action}`,
     { method: "POST", headers: { "X-API-Key": cfg.apiKey } }
   );
   if (res.status !== 304) throwForStatus(res, KEY_ERRORS);
@@ -241,15 +252,17 @@ export function demuxDockerLog(buf: Buffer): string {
 
 // A read-only tail of one container's logs. Reads raw bytes (not the utf8 text
 // serviceRequest yields) so the multiplexed frame headers survive to be
-// demuxed, timeout-bounded, and capped. No exec, no console — logs only.
+// demuxed, timeout-bounded, and capped. No exec, no console — logs only. The
+// id is encoded for the same reason as containerCommand's (#379).
 export async function containerLogs(
   cfg: PortainerConfig,
   endpointId: number,
   containerId: string
 ): Promise<string> {
   const base = serviceBase(cfg.url);
+  const id = encodeURIComponent(containerId);
   const url =
-    `${base}/api/endpoints/${endpointId}/docker/containers/${containerId}` +
+    `${base}/api/endpoints/${endpointId}/docker/containers/${id}` +
     `/logs?stdout=1&stderr=1&timestamps=0&tail=${PORTAINER_LOG_TAIL}`;
   try {
     const res = await fetchWithTimeout(

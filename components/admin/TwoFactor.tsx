@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { TextField, Button } from "./ui";
 import { useToast } from "./Toast";
 import { useFocusTrap } from "./useFocusTrap";
@@ -23,19 +24,17 @@ const formatSecret = (secret: string) =>
   secret.match(/.{1,4}/g)?.join(" ") ?? secret;
 
 export default function TwoFactor({
-  initialEnabled,
+  enabled,
   onChange,
 }: {
-  initialEnabled: boolean;
-  // Told when the factor turns on or off, so the security checklist beside
-  // this card can re-read (#367).
-  onChange?: (enabled: boolean) => void;
+  // Controlled by the parent (#384): the card unmounts with its settings
+  // section or setup step, and a state of its own came back as the page-load
+  // value — offering "Enable" over an active factor.
+  enabled: boolean;
+  // Told when the factor turns on or off, so the parent can keep what depends
+  // on it in step: the security checklist, the actions opt-in (#367).
+  onChange: (enabled: boolean) => void;
 }) {
-  const [enabled, setEnabledState] = useState(initialEnabled);
-  const setEnabled = (next: boolean) => {
-    setEnabledState(next);
-    onChange?.(next);
-  };
   const [step, setStep] = useState<Step | null>(null);
   const [setup, setSetup] = useState<SetupData | null>(null);
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
@@ -76,6 +75,9 @@ export default function TwoFactor({
       if (!res.ok) {
         toast(apiErrorMessage(data, "Couldn't start setup"), "error");
         close();
+        // 409: the factor is already on (#384) — another tab turned it on, or
+        // this card was out of date. Show it on rather than offer it again.
+        if (res.status === 409) onChange(true);
         return;
       }
       setSetup({ secret: data.secret, qr: data.qr });
@@ -100,6 +102,7 @@ export default function TwoFactor({
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         setError(apiErrorMessage(data, "Couldn't activate"));
+        if (res.status === 409) onChange(true);
         return;
       }
       setRecoveryCodes(data.recoveryCodes ?? []);
@@ -127,7 +130,7 @@ export default function TwoFactor({
         setError(apiErrorMessage(data, "Couldn't disable"));
         return;
       }
-      setEnabled(false);
+      onChange(false);
       // Write actions need the second factor (#367): the server turned them
       // off with it.
       const n = typeof data?.actionsDisabled === "number" ? data.actionsDisabled : 0;
@@ -163,7 +166,12 @@ export default function TwoFactor({
         {enabled ? "Disable" : "Enable"}
       </Button>
 
-      {open && (
+      {/* The setup, recovery-code and disable dialog goes to <body> (#409):
+          this card is a glass surface (backdrop-filter, a hover lift), which
+          makes it the containing block for anything fixed inside it, so a
+          dialog left here covered only the card and the next card covered its
+          buttons. */}
+      {open && createPortal(
         <div
           className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 pt-[10vh] backdrop-blur-sm"
           onMouseDown={() => step !== "recovery" && close()}
@@ -242,7 +250,7 @@ export default function TwoFactor({
                 <Button
                   type="button"
                   onClick={() => {
-                    setEnabled(true);
+                    onChange(true);
                     toast("Two-factor authentication enabled");
                     close();
                   }}
@@ -279,7 +287,8 @@ export default function TwoFactor({
               </form>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -13,5 +13,11 @@ export default async function SetupPage() {
   const config = await readConfigInternal();
   await requireAdminPage("/admin/setup", config.auth.passwordHash);
   if (!needsSetup(config)) redirect("/admin");
-  return <SetupWizard settings={config.settings} packs={resolveThemePacks(config.themes)} />;
+  return (
+    <SetupWizard
+      settings={config.settings}
+      packs={resolveThemePacks(config.themes)}
+      twoFactorEnabled={config.auth.totp.enabled}
+    />
+  );
 }

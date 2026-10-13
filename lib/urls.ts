@@ -29,3 +29,27 @@ export function guessCheckType(input: string): "http" | "tcp" | "dns" {
   if (port !== null && TCP_PORTS.has(port)) return "tcp";
   return "http";
 }
+
+// Where sign-in goes next (#23): the ?next= path the proxy set when it sent a
+// signed-out visit to /admin/login, but only while it stays on this origin, so
+// a crafted link can't turn sign-in into an open redirect. A pattern on the
+// raw string can't promise that: the URL parser drops tabs and newlines, so
+// "/\t/evil.example" passed a "not //" check and still left the site. So the
+// path is resolved against `origin` (the page's location.origin) by that same
+// parser, and only a result on this origin is followed, as its path, query and
+// hash. Backslashes and control characters never appear in a path the proxy
+// sets, so they're refused up front. Anything else lands on /admin.
+export function safeNextPath(next: string | null, origin: string): string {
+  if (!next?.startsWith("/") || /[\\\p{Cc}]/u.test(next)) return "/admin";
+  try {
+    const base = new URL(origin);
+    const url = new URL(next, base);
+    const path = url.pathname + url.search + url.hash;
+    // "/.//evil.example" resolves here to the path "//evil.example", which
+    // the browser would then read as another host.
+    if (url.origin === base.origin && !path.startsWith("//")) return path;
+  } catch {
+    // Unparseable, like "//[" (a host that isn't one): not a path here.
+  }
+  return "/admin";
+}

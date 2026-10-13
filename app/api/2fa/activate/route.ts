@@ -31,6 +31,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
   const { auth } = await readConfigInternal();
+  // Never over an active factor (#384), as /setup refuses too: a pending
+  // secret left beside it (an older version minted one regardless) would
+  // otherwise replace the live secret and recovery codes.
+  if (auth.totp.enabled) {
+    return NextResponse.json(
+      { error: "Two-factor authentication is already on — turn it off first to set up a new authenticator." },
+      { status: 409 }
+    );
+  }
   if (!auth.totp.pendingSecret) {
     return NextResponse.json(
       { error: "Start setup again — no enrollment in progress." },

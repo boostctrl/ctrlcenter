@@ -11,7 +11,7 @@ import type { Config } from "./schema";
 import { integrationLabels } from "./services/ids";
 import { persistedSessionSecret } from "./session-secret";
 import { getIdleHours, listSessions, sessionsPersisted } from "./sessions";
-import { TRUSTED_PROXY_HOPS } from "./rate-limit";
+import { TRUSTED_PROXY_HOPS, productionEntry } from "./rate-limit";
 import { NO_PASSWORD_MESSAGE } from "./auth";
 
 export type ChecklistLevel = "ok" | "warn" | "bad";
@@ -24,7 +24,8 @@ export type ChecklistRow = {
   detail: string;
 };
 
-export type SessionFact = { ip: string | null; https: boolean; forwarded: boolean };
+// `forwarded` is null when the app couldn't tell how the sign-in arrived (#383).
+export type SessionFact = { ip: string | null; https: boolean; forwarded: boolean | null };
 
 export type SecurityFacts = {
   totpEnabled: boolean;
@@ -34,6 +35,10 @@ export type SecurityFacts = {
   sessionSecret: "env" | "volume" | "password";
   sessionsPersisted: boolean;
   trustedProxyHops: number;
+  // Whether the server runs from the Docker image's entry
+  // (scripts/server-entry.mjs), the only place that can tell a proxied
+  // sign-in from a direct one (#383).
+  productionEntry: boolean;
   // The live sessions' sign-in facts; empty at boot, when the rows that
   // need them are left out.
   sessions: SessionFact[];
@@ -115,9 +120,24 @@ export function securityChecklist(f: SecurityFacts): ChecklistRow[] {
           : { id: "https", level: "ok", title: "HTTPS", detail: "Every session signed in over HTTPS." }
     );
 
-    const direct = f.sessions.filter((s) => !s.forwarded);
-    const proxied = f.sessions.filter((s) => s.forwarded);
-    if (f.trustedProxyHops >= 1 && direct.length > 0) {
+    // Judged only from the sign-ins whose arrival is known (#383): Next fills
+    // X-Forwarded-For in on every request, so only the production entry can
+    // tell, and a session from before it recorded that is unknown too.
+    const known = f.sessions.filter((s) => s.forwarded !== null);
+    const direct = known.filter((s) => s.forwarded === false);
+    const proxied = known.filter((s) => s.forwarded === true);
+    if (known.length === 0) {
+      // Not knowing doesn't accuse, but the setting decides whether the
+      // login throttle works, so it's worth a look.
+      rows.push({
+        id: "proxy",
+        level: "warn",
+        title: "Reverse proxy",
+        detail: f.productionEntry
+          ? "Can't tell yet whether sign-ins come through a proxy: the open sessions began before the app recorded that. Sign out and back in to check."
+          : `Can't tell whether sign-ins come through a proxy: the app sees that only when run from the Docker image. Make sure TRUSTED_PROXY_HOPS (now ${f.trustedProxyHops}) is 0 if the portal is reached directly, or the number of proxies in front.`,
+      });
+    } else if (f.trustedProxyHops >= 1 && direct.length > 0) {
       rows.push({
         id: "proxy",
         level: "bad",
@@ -125,11 +145,13 @@ export function securityChecklist(f: SecurityFacts): ChecklistRow[] {
         detail: `TRUSTED_PROXY_HOPS is ${f.trustedProxyHops} but a sign-in arrived with no X-Forwarded-For header, so the app looks directly reachable: a client can forge that header to dodge the login throttle. Set TRUSTED_PROXY_HOPS=0, or put the proxy in front.`,
       });
     } else if (f.trustedProxyHops === 0 && proxied.length > 0) {
+      // Raising the setting while the portal is also reached directly would
+      // let a direct client forge its address, so the advice waits for that.
       rows.push({
         id: "proxy",
         level: "warn",
         title: "Reverse proxy",
-        detail: "Sign-ins arrive with X-Forwarded-For but TRUSTED_PROXY_HOPS is 0, so every client behind the proxy shares one login throttle. Set it to the number of proxies in front.",
+        detail: `Sign-ins arrive with X-Forwarded-For but TRUSTED_PROXY_HOPS is 0, so every client behind the proxy shares one login throttle. Set it to the number of proxies in front${direct.length > 0 ? ", once the portal can be reached only through them" : ""}.`,
       });
     } else {
       rows.push({
@@ -222,6 +244,7 @@ export async function collectSecurityFacts(
     sessionSecret,
     sessionsPersisted: await sessionsPersisted(),
     trustedProxyHops: TRUSTED_PROXY_HOPS,
+    productionEntry: productionEntry(),
     sessions:
       opts.sessions === false
         ? []

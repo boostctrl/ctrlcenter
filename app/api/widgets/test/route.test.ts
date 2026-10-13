@@ -66,6 +66,16 @@ describe("POST /api/widgets/test", () => {
     expect(sent[0]).toBe("Bearer");
   });
 
+  it("expands nothing when the typed request differs from the saved one beyond its URL (#378)", async () => {
+    vi.stubEnv("API_TOKEN", "t0k");
+    let sent = stubFetch();
+    await test({ ...saved, headers: [...saved.headers, { name: "X-Extra", value: "${API_TOKEN}" }] });
+    expect(sent[0]).toBe("Bearer");
+    sent = stubFetch();
+    await test({ ...saved, method: "POST", body: "${API_TOKEN}" });
+    expect(sent[0]).toBe("Bearer");
+  });
+
   it("reports a path that doesn't map, with the raw response", async () => {
     stubFetch({ other: 1 });
     const out = await (await test({ ...saved, fields: [{ label: "x", path: "a[", unit: "" }] })).json();

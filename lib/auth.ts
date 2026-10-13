@@ -2,7 +2,7 @@ import { SignJWT, jwtVerify } from "jose";
 import type { NextRequest } from "next/server";
 import { persistedSessionSecret } from "./session-secret";
 import { createSession, touchSession } from "./sessions";
-import { clientIp } from "./rate-limit";
+import { arrivedForwarded, clientIp } from "./rate-limit";
 
 export const SESSION_COOKIE_NAME = "homepage_admin_session";
 // Over HTTPS the cookie carries the __Host- prefix (#369): a browser then
@@ -205,7 +205,7 @@ export async function issueSession(
     ip: clientIp(request),
     userAgent: request.headers.get("user-agent") ?? "",
     https: isHttps(request),
-    forwarded: request.headers.has("x-forwarded-for"),
+    forwarded: arrivedForwarded(request),
   });
   return { token: await createSessionToken(extra, id), id };
 }

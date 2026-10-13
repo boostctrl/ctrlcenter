@@ -10,6 +10,7 @@ import { migrateConfig } from "../config-migrate";
 import { updateYamlText } from "../config-yaml";
 import { log, errorReason } from "../log";
 import { recordUpgrade } from "./upgrade";
+import { writeFileAtomic } from "./files";
 import { restoreImportSecrets } from "./redact";
 import { globalSingleton } from "../singleton";
 import { CONFIG_SCHEMA_VERSION, configSchema, configReadSchema, type Config } from "../schema";
@@ -29,7 +30,8 @@ export const CONFIG_DIR = path.dirname(CONFIG_PATH);
 // Safety copy of the outgoing config, written just before an import replaces it
 // (see replaceConfig). One file, overwritten each import, sitting beside the
 // live config so a mistaken import is recoverable. Derived from CONFIG_PATH the
-// same way CONFIG_DIR is, so it lands in the same mounted volume.
+// same way CONFIG_DIR is, so it lands in the same mounted volume. Written via
+// snapshotBak, which keeps the previous copy rather than an empty one.
 const CONFIG_BAK = `${CONFIG_PATH}.bak`;
 
 // Serializes read-modify-write operations so concurrent admin requests can't
@@ -57,7 +59,13 @@ async function ensureConfigExists(): Promise<void> {
     await fs.access(CONFIG_PATH);
   } catch {
     await fs.mkdir(path.dirname(CONFIG_PATH), { recursive: true });
-    await fs.writeFile(CONFIG_PATH, dump(configSchema.parse({})), "utf8");
+    // 0600 like every config write (#386; lib/config/files.ts). Not through
+    // writeFileAtomic: this runs outside the write queue, where concurrent
+    // first reads would share its temp file.
+    await fs.writeFile(CONFIG_PATH, dump(configSchema.parse({})), {
+      encoding: "utf8",
+      mode: 0o600,
+    });
   }
 }
 
@@ -74,6 +82,23 @@ export function parseConfigYaml(raw: string): unknown {
     throw new Error("config.yaml must contain a single YAML document");
   }
   return docs[0] ?? {};
+}
+
+// Whether config text holds nothing at all: empty, blank, or only comments.
+// It reads as a blank config (above), so it gets rewritten like any other.
+const isBlankYaml = (raw: string) =>
+  raw.split("\n").every((line) => {
+    const t = line.trim();
+    return t === "" || t.startsWith("#");
+  });
+
+// Snapshot the file a write is about to replace to config.yaml.bak, unless it
+// holds nothing (#386). An empty config.yaml is as likely a crash's leftover
+// as a new install's placeholder, and copying it would overwrite the last
+// real snapshot, the one recovery copy, with nothing: the previous .bak stays.
+async function snapshotBak(raw: string): Promise<void> {
+  if (isBlankYaml(raw)) return;
+  await writeFileAtomic(CONFIG_BAK, raw);
 }
 
 // Read + migrate + leniently parse the on-disk file. The pre-2.0 shape
@@ -161,7 +186,7 @@ function persistShapeMigration(): Promise<void> {
       const before = parseConfigYaml(raw);
       const { value, changed } = migrateConfig(before);
       if (!changed) return;
-      await writeFileAtomic(CONFIG_BAK, raw);
+      await snapshotBak(raw);
       // Out of 2.x (#306): the write-once rollback copy, a summary line, the
       // admin's notice.
       await recordUpgrade(raw, before, value);
@@ -190,17 +215,6 @@ function persistShapeMigration(): Promise<void> {
     );
   }
   return writes.migrationTask;
-}
-
-// Write `text` to `dest` via a temp file renamed into place (atomic on the same
-// filesystem), so a concurrent reader can never observe a torn, half-written
-// file and a crash mid-write can't leave a torn artifact. Mirrors the
-// persistence in lib/status-history/store.ts.
-async function writeFileAtomic(dest: string, text: string): Promise<void> {
-  const tmp = `${dest}.tmp`;
-  await fs.mkdir(CONFIG_DIR, { recursive: true });
-  await fs.writeFile(tmp, text, "utf8");
-  await fs.rename(tmp, dest);
 }
 
 function dump(value: unknown): string {
@@ -256,7 +270,7 @@ export async function mutate<T>(fn: (config: Config) => T): Promise<T> {
     // write before any page read triggered persistShapeMigration), so the
     // backup can't be left only to the read path.
     if (changed) {
-      await writeFileAtomic(CONFIG_BAK, raw);
+      await snapshotBak(raw);
       const original = parseConfigYaml(raw);
       await recordUpgrade(raw, original, migrateConfig(original).value);
     }
@@ -292,7 +306,7 @@ export async function replaceConfig(input: unknown): Promise<Config> {
     // queue, written atomically (tmp+rename) like the live file — this .bak is
     // the only thing standing between a bad import and lost state, so a crash
     // mid-write must not leave it torn.
-    await writeFileAtomic(CONFIG_BAK, raw);
+    await snapshotBak(raw);
     validated.auth = current.auth;
     // A backup exported without secrets (#366) carries blanks where the
     // credentials were; fill them from what this instance holds, by id, so

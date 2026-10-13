@@ -3,12 +3,13 @@
 // (components/widgets/registry.tsx), in place of a prop per widget. Widget
 // content is per instance since 3.0 (#297), keyed by instance id.
 import type { ReactNode } from "react";
-import type { AppItem, BookmarkItem, Group, WidgetInstance } from "../schema";
+import type { AppItem, BookmarkItem, Group } from "../schema";
 import type { SearchConfig } from "../search";
 import type { CurrentWeather } from "../weather";
 import type { SystemStats } from "../system-stats";
 import type { IntegrationTile } from "./integration-tiles";
 import type { ApiResult } from "../api-widget";
+import type { PublicInstance } from "./public";
 
 export type HomeData = {
   apps: AppItem[];
@@ -27,9 +28,11 @@ export type HomeData = {
   initialNow: string;
   weatherEnabled: boolean;
   statusEnabled: boolean;
-  // Every widget instance by id, as safe to send to the browser (secrets
-  // redacted): each renderer reads its own content here.
-  instances: Record<string, WidgetInstance>;
+  // Every widget instance on show by id: each renderer reads its own content
+  // here. A visitor gets each cut down to what its renderer reads
+  // (lib/widgets/public.ts, #380), never the settings behind it; the admin's
+  // are whole.
+  instances: Record<string, PublicInstance>;
   // What the editor calls each instance (lib/widgets/labels.ts).
   labels: Record<string, string>;
   // Widgets rendered server-side (calendar, feed), by instance id. A missing

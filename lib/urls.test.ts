@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { guessCheckType, withHttpScheme } from "./urls";
+import { guessCheckType, safeNextPath, withHttpScheme } from "./urls";
 
 describe("withHttpScheme (#277)", () => {
   it("prefixes bare hosts with http://", () => {
@@ -33,5 +33,48 @@ describe("guessCheckType (#296)", () => {
     expect(guessCheckType("10.0.0.5:5432/")).toBe("tcp");
     expect(guessCheckType("[fd00::1]:3306")).toBe("tcp");
     expect(guessCheckType("10.0.0.1:53")).toBe("dns");
+  });
+});
+
+describe("safeNextPath (#23)", () => {
+  const ORIGIN = "https://dash.example";
+  const next = (value: string | null) => safeNextPath(value, ORIGIN);
+  // What useSearchParams hands the login form: the query, percent-decoded.
+  const fromQuery = (query: string) => next(new URLSearchParams(query).get("next"));
+
+  it("follows a path on this origin, query and hash kept", () => {
+    expect(next("/admin/monitor?x=1#y")).toBe("/admin/monitor?x=1#y");
+    expect(next("/b/media")).toBe("/b/media");
+  });
+
+  it("refuses another origin, however it's spelled", () => {
+    for (const value of [
+      "//evil.example",
+      "/\\evil.example",
+      "/\t/evil.example",
+      "/\n/evil.example",
+      "/\r/evil.example",
+      "///evil.example",
+      "/.//evil.example",
+      "https://evil.example",
+      "javascript:alert(1)",
+      "//[",
+    ]) {
+      expect(next(value), JSON.stringify(value)).toBe("/admin");
+    }
+  });
+
+  it("refuses the encoded forms once the query is decoded", () => {
+    expect(fromQuery("next=/%09/evil.example")).toBe("/admin");
+    expect(fromQuery("next=/%0a/evil.example")).toBe("/admin");
+    expect(fromQuery("next=/%0d/evil.example")).toBe("/admin");
+    expect(fromQuery("next=/%2F%2Fevil.example")).toBe("/admin");
+    expect(fromQuery("next=/%5Cevil.example")).toBe("/admin");
+  });
+
+  it("falls back to /admin with nothing to follow", () => {
+    expect(next(null)).toBe("/admin");
+    expect(next("")).toBe("/admin");
+    expect(fromQuery("")).toBe("/admin");
   });
 });

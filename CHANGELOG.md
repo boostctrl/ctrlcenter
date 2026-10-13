@@ -97,10 +97,11 @@ here.
 - **A security checklist.** Settings → Security opens with what the app can
   see of your deployment — two-factor authentication, where the password
   comes from, whether sign-ins arrive over HTTPS and through the proxy you
-  configured, the session secret, dashboard actions, the idle timeout —
-  each row green, amber or red with the fix. The red rows are also logged
-  when the server starts. The first-run setup gains a step that offers
-  two-factor authentication. (#367)
+  configured (a direct sign-in can be told from a proxied one when the app
+  runs from the Docker image), the session secret, dashboard actions, the
+  idle timeout — each row green, amber or red with the fix. The red rows
+  are also logged when the server starts. The first-run setup gains a step
+  that offers two-factor authentication. (#367, #383)
 - **A record of sign-ins and security changes.** Settings → Security lists
   recent activity — sign-ins and failed attempts, sign-outs, sessions
   ended, password and two-factor changes, confirmations, exports with
@@ -114,10 +115,10 @@ here.
   *Security* on (on for every channel; turn it off per channel in
   Settings → Monitoring). (#368)
 - **Export without secrets.** *Export* now asks what to include: by default
-  the file leaves out integration passwords and keys, calendar and email
-  credentials and webhook tokens, and restoring it onto this instance keeps
-  the credentials already stored. Tick *Include secrets* for a full backup;
-  that asks for your password first. (#366)
+  the file leaves out integration passwords and keys, calendar addresses
+  and credentials, email credentials and webhook tokens, and restoring it
+  onto this instance keeps the ones already stored. Tick *Include secrets*
+  for a full backup; that asks for your password first. (#366, #380)
 - **One notification for a whole season.** Inbound webhooks that arrive in a
   burst — Sonarr importing a season, Radarr grabbing several movies, a run
   of Seerr requests — now go out as one message once the burst goes quiet,
@@ -251,8 +252,9 @@ here.
 - **A theme per board.** Pin one of the site's themes on a board, in
   Settings → Layout → Boards or from the editor's Board menu, so an Infra
   board can be Circuit while the home board stays as it is. It paints from
-  the first byte and follows you between boards; visitors' own choices
-  still apply over it. (#337)
+  the first byte, follows you between boards and stays on its board: the
+  rest of the site keeps its own theme and day/night schedule. Visitors'
+  own choices still apply over it. (#337, #385)
 - **An upgrade note in the help.** The help page explains what the 3.0
   upgrade did with a 2.x config, where the backup is and how to roll back,
   and now also covers two-factor authentication, the Reduced motion
@@ -270,11 +272,14 @@ here.
   categories become groups, connected services become a list under
   `integrations:`, and an alert webhook or email set up before 2.13's
   channel list becomes the list's first entries, sending as before. The
-  2.x file is kept beside it as `config.v2.bak.yaml`, written once and never
-  overwritten; the log says what was converted, and /admin shows a one-time
+  2.x file is kept beside it as `config.v2.bak.yaml` and never overwritten:
+  if a different copy from an earlier upgrade (a release candidate you
+  rolled back from, say) already has that name, it's left alone and this
+  upgrade's copy is saved as `config.v2.bak.YYYY-MM-DD.yaml`. The log says
+  what was converted and which file to restore, and /admin shows a one-time
   banner with the same summary. 2.x can't read a 3.0 config — to roll back,
-  restore `config.v2.bak.yaml` as `config.yaml` and run the `:2.13` image.
-  The README's "Upgrading to 3.0" section has the details. (#306, #320)
+  restore that backup as `config.yaml` and run the `:2.13` image. The
+  README's "Upgrading to 3.0" section has the details. (#306, #320, #386)
 - **Every widget can appear any number of times.** Each widget on the
   home page is now its own item with its own content: two notes cards, a
   calendar per person, a feed per topic. In Settings → Widgets each kind
@@ -404,18 +409,33 @@ here.
 - **The corner menu is in a sensible order.** Monitor sat between Settings
   and Admin portal; it now sits with the pages (after Calendar), and the
   menu ends with Help, Settings and Admin portal. (#374)
+- **Two-factor authentication in Settings stays up to date.** After you
+  turn it on, Settings → Security no longer goes back to offering *Enable*
+  when you switch sections, and *Allow actions from the dashboard* unlocks
+  straight away instead of after a reload. Setting up two-factor
+  authentication while it's already on is now refused: before, doing that
+  quietly replaced your authenticator and recovery codes, so the ones you'd
+  saved stopped working. To move to a new authenticator, turn it off first.
+  Its setup dialog, and the one for a new password, now open over the whole
+  page instead of inside their cards, where the next card could cover
+  their buttons. (#384, #409)
 
 ### Security
 
 - **Sensitive changes ask for your password again.** Changing the password,
   turning two-factor authentication on or off, editing an integration's
-  address or credentials or turning its actions on, exporting with secrets,
-  restoring a backup, and the destructive dashboard actions (delete, stop,
-  restart, decline) now need the password — and the authenticator code when
-  the second factor is on — to have been confirmed in the last ten minutes.
-  Signing in counts; after that a *Confirm it's you* dialog asks once and
-  the change goes through. A session someone else got hold of can no longer
-  lock you out, or take a backup with your credentials, on its own. (#366)
+  address or credentials or turning its actions on, changing an API
+  widget's address, headers or body, a calendar's address or sign-in or an
+  email channel's mail server, exporting with secrets, restoring a backup,
+  and the destructive dashboard actions (delete, stop, restart, decline)
+  now need the password — and the authenticator code when the second
+  factor is on — to have been confirmed in the last ten minutes. Signing in
+  counts; after that a *Confirm it's you* dialog asks once (in the layout
+  editor too) and the change goes through. A session someone else got hold
+  of can no longer lock you out, take a backup with your credentials or
+  send a secret from the environment to a server of its own, and
+  `${ADMIN_PASSWORD}` and `${SESSION_SECRET}` can't be referenced from a
+  widget or an integration at all. (#366, #378)
 - **Dashboard actions need two-factor authentication.** *Allow actions from
   the dashboard* can only be turned on once the second factor is, every
   action checks it again on the server, and turning two-factor
@@ -442,6 +462,40 @@ here.
 - **A new password must be at least 12 characters**, and can't be the
   current one or the container's `ADMIN_PASSWORD`. Existing passwords are
   not affected. (#369)
+- **Monitor actions reach only the container or torrent you picked.** A
+  crafted request could steer a Portainer start, or the log viewer, to
+  other parts of the Docker API — pruning volumes, or reading a container's
+  settings and secrets — or make one qBittorrent pause or delete act on
+  every torrent. Actions and logs now accept only a real container id or
+  torrent hash. (#379)
+- **Signing in can't send you to another site.** A sign-in link with a
+  disguised `?next=` address (a hidden tab or line break in it) could take
+  you to another website once you'd signed in. Sign-in now continues only
+  to a page on your own dashboard, and to the admin portal otherwise. (#23)
+- **Your config files are private to the app.** `config.yaml`,
+  `config.yaml.bak` and the 2.x backup hold your password hash, two-factor
+  secret and service keys. They're now readable only by the account
+  CtrlCenter runs as (mode 600), where before every account on the host
+  could read them and a `chmod` you set was undone by the next save. Saves
+  are also flushed to disk before they replace the file, and an empty
+  `config.yaml` no longer overwrites the last `config.yaml.bak`. Use `sudo`
+  to read them on the host. (#386)
+- **A public board sends visitors only what each widget shows.** In the
+  3.0 release candidates, a public board's page carried each widget's full
+  settings: a calendar's address (such as a Google "secret address" or a
+  share link), feed URLs and the system stats widget's disk paths. 2.x
+  never sent them, and 3.0.0 doesn't either. If you ran a release candidate
+  with a private calendar address on a public board, reset that address
+  (in Google Calendar, *Reset* the secret address) and paste in the new
+  one. (#380)
+- **A calendar event can no longer take the dashboard down.** A recurring
+  event with an absurd repeat interval in a calendar you subscribe to could
+  stall the whole server — pages, status checks and alerts — or make every
+  page showing that calendar fail to load, and long-running series cost
+  seconds of work on every page view. Anyone who can add an event to that
+  calendar could do it. Repeats now stay within sensible bounds, an event
+  that can't be worked out is left off instead of breaking the rest of the
+  calendar, and working out a calendar's repeats takes milliseconds. (#381)
 
 ## [2.13.0] - 2026-10-09
 

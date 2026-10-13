@@ -48,9 +48,20 @@ type StepProps = {
   saving: boolean;
 };
 
-export default function SetupWizard({ settings, packs }: { settings: Settings; packs: ThemePack[] }) {
+export default function SetupWizard({
+  settings,
+  packs,
+  twoFactorEnabled,
+}: {
+  settings: Settings;
+  packs: ThemePack[];
+  twoFactorEnabled: boolean;
+}) {
   const router = useRouter();
   const [step, setStep] = useState(0);
+  // Held here rather than in its step (#384): Back and Next remount the step,
+  // which would forget the factor just turned on and offer it again.
+  const [twoFactor, setTwoFactor] = useState(twoFactorEnabled);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -137,7 +148,7 @@ export default function SetupWizard({ settings, packs }: { settings: Settings; p
         {step === 0 && <LocationStep {...props} />}
         {step === 1 && <AppsStep {...props} />}
         {step === 2 && <AlertsStep {...props} />}
-        {step === 3 && <SecurityStep {...props} />}
+        {step === 3 && <SecurityStep {...props} enabled={twoFactor} onChange={setTwoFactor} />}
         {step === 4 && <ThemeStep {...props} packs={packs} />}
         {error && (
           <p role="alert" className="text-sm text-status-down">
@@ -380,8 +391,11 @@ function AlertsStep({ settings, onSave }: StepProps) {
 // Two-factor authentication, offered right after the first sign-in (#367):
 // the one thing that makes a public port defensible. Enrolment runs through
 // the same card as Settings → Security; the step itself saves nothing.
-function SecurityStep({ onSave }: StepProps) {
-  const [enabled, setEnabled] = useState(false);
+function SecurityStep({
+  onSave,
+  enabled,
+  onChange,
+}: StepProps & { enabled: boolean; onChange: (enabled: boolean) => void }) {
   return (
     <StepForm onSubmit={() => onSave(async () => undefined)}>
       <p className="text-sm text-ink-70">
@@ -390,7 +404,7 @@ function SecurityStep({ onSave }: StepProps) {
         alone isn&apos;t enough. Dashboard actions on integrations need it too.
         You can do this later in Settings → Security.
       </p>
-      <TwoFactor initialEnabled={false} onChange={setEnabled} />
+      <TwoFactor enabled={enabled} onChange={onChange} />
       {enabled && <Hint>Done — keep the recovery codes somewhere safe.</Hint>}
     </StepForm>
   );

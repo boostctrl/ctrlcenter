@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import fs from "fs/promises";
 import os from "os";
 import path from "path";
@@ -13,6 +13,7 @@ import {
   settingsInputSchema,
   newInstance,
 } from "./schema";
+import { log } from "./log";
 
 // config.ts captures CONFIG_PATH at module load, so the env var has to be set
 // before the module is imported — hence the dynamic import in beforeAll.
@@ -38,8 +39,11 @@ beforeEach(async () => {
   // Start each test from a clean slate; readConfigInternal recreates defaults on miss.
   await fs.rm(configPath, { force: true });
   await fs.rm(`${configPath}.bak`, { force: true });
-  await fs.rm(path.join(path.dirname(configPath), "config.v2.bak.yaml"), { force: true });
   await fs.rm(path.join(path.dirname(configPath), "upgrade-notice.json"), { force: true });
+  // The 2.x backups, dated ones included, and any temp file (#386).
+  const dir = path.dirname(configPath);
+  for (const f of await fs.readdir(dir))
+    if (f.startsWith("config.v2.bak.") || f.endsWith(".tmp")) await fs.rm(path.join(dir, f), { force: true });
 });
 
 
@@ -505,12 +509,57 @@ describe("updateSettings partial merge", () => {
       expect(await config.readUpgradeNotice()).toBeNull();
     });
 
-    it("never overwrites an existing v2 backup, and upgrades on a first write too", async () => {
-      await fs.writeFile(v2Backup(), "the first upgrade's copy", "utf8");
-      await fs.writeFile(configPath, v2Text, "utf8");
-      await config.createApp(appInput({ name: "First", url: "https://first.example.com" }));
-      expect(await fs.readFile(v2Backup(), "utf8")).toBe("the first upgrade's copy");
-      expect(await config.readUpgradeNotice()).toMatchObject({ from: 2, to: 3 });
+    describe("with a config.v2.bak.yaml already there (#386)", () => {
+      const day = "2026-10-20";
+      const named = (name: string) => path.join(path.dirname(configPath), name);
+      beforeEach(() => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date(`${day}T12:00:00Z`));
+      });
+      afterEach(() => {
+        vi.useRealTimers();
+        vi.restoreAllMocks();
+      });
+
+      it("names it again when it holds this same file", async () => {
+        await fs.writeFile(v2Backup(), v2Text, "utf8");
+        await fs.writeFile(configPath, v2Text, "utf8");
+        await config.readConfigInternal();
+        expect(await fs.readFile(v2Backup(), "utf8")).toBe(v2Text);
+        await expect(fs.access(named(`config.v2.bak.${day}.yaml`))).rejects.toBeTruthy();
+        expect(await config.readUpgradeNotice()).toMatchObject({ backup: "config.v2.bak.yaml" });
+      });
+
+      it("never overwrites a different one: this file gets a dated name, which the notice and the log give", async () => {
+        const info = vi.spyOn(log, "info").mockImplementation(() => {});
+        // An rc tester's copy: restoring it to roll back left it in place, and
+        // 2.x ran on for weeks after.
+        await fs.writeFile(v2Backup(), "the rc upgrade's copy", "utf8");
+        await fs.writeFile(configPath, v2Text, "utf8");
+        // The upgrade on a first write, not a read.
+        await config.createApp(appInput({ name: "First", url: "https://first.example.com" }));
+        expect(await fs.readFile(v2Backup(), "utf8")).toBe("the rc upgrade's copy");
+        expect(await fs.readFile(named(`config.v2.bak.${day}.yaml`), "utf8")).toBe(v2Text);
+        expect(await config.readUpgradeNotice()).toMatchObject({
+          from: 2,
+          to: 3,
+          backup: `config.v2.bak.${day}.yaml`,
+        });
+        const lines = info.mock.calls.map(([msg]) => msg);
+        expect(lines.find((l) => l.startsWith("upgraded config.yaml to 3.0"))).toContain(
+          `the 2.x file is kept as config.v2.bak.${day}.yaml`
+        );
+      });
+
+      it("counts on when the dated name is taken too", async () => {
+        await fs.writeFile(v2Backup(), "the rc upgrade's copy", "utf8");
+        await fs.writeFile(named(`config.v2.bak.${day}.yaml`), "a torn copy", "utf8");
+        await fs.writeFile(configPath, v2Text, "utf8");
+        await config.readConfigInternal();
+        expect(await fs.readFile(named(`config.v2.bak.${day}.yaml`), "utf8")).toBe("a torn copy");
+        expect(await fs.readFile(named(`config.v2.bak.${day}.2.yaml`), "utf8")).toBe(v2Text);
+        expect(await config.readUpgradeNotice()).toMatchObject({ backup: `config.v2.bak.${day}.2.yaml` });
+      });
     });
 
     it("leaves a 3.0 config alone", async () => {
@@ -577,6 +626,64 @@ describe("updateSettings partial merge", () => {
     });
     expect(replaced.boards[0].layout).not.toHaveProperty("columns");
   });
+});
+
+// config.yaml, its .bak and the 2.x backup hold the password hash, the TOTP
+// secret and integration keys (#386).
+describe("config files on disk (#386)", () => {
+  const dir = () => path.dirname(configPath);
+  const mode = async (file: string) => (await fs.stat(file)).mode & 0o777;
+
+  it("creates a missing config.yaml 0600", async () => {
+    await config.readConfigInternal();
+    expect(await mode(configPath)).toBe(0o600);
+  });
+
+  it("writes config.yaml, its .bak and the 2.x backup 0600, past 0644 files and temp files", async () => {
+    const v2Backup = path.join(dir(), "config.v2.bak.yaml");
+    await fs.writeFile(configPath, "schemaVersion: 2\nsettings:\n  title: Lab\n", "utf8");
+    await fs.writeFile(`${configPath}.bak`, "settings:\n  title: Older\n", "utf8");
+    // What a crash under an older version left: world-readable temp files.
+    for (const f of [`${configPath}.tmp`, `${configPath}.bak.tmp`, `${v2Backup}.tmp`])
+      await fs.writeFile(f, "torn", "utf8");
+    for (const f of [configPath, `${configPath}.bak`, `${configPath}.tmp`, `${configPath}.bak.tmp`, `${v2Backup}.tmp`])
+      await fs.chmod(f, 0o644);
+
+    await config.readConfigInternal();
+    expect(await fs.readFile(v2Backup, "utf8")).toContain("title: Lab");
+    for (const f of [configPath, `${configPath}.bak`, v2Backup]) expect(await mode(f), f).toBe(0o600);
+    expect((await fs.readdir(dir())).filter((f) => f.endsWith(".tmp"))).toEqual([]);
+
+    // And an admin's save keeps it that way.
+    await config.updateSettings(settingsInput({ title: "Saved" }));
+    expect(await mode(configPath)).toBe(0o600);
+  });
+
+  // Empty, blank or comment-only: a crash's leftover as likely as a
+  // placeholder. It's read as a new install and rewritten, but the last real
+  // snapshot stays the .bak.
+  it.each(["", "\n  \n", "# filled in on first start\n"])(
+    "keeps the last .bak when config.yaml is %j",
+    async (blank) => {
+      const lastGood = "settings:\n  title: Last good\n";
+      await fs.writeFile(`${configPath}.bak`, lastGood, "utf8");
+
+      await fs.writeFile(configPath, blank, "utf8");
+      await config.readConfigInternal();
+      expect(YAML.load(await fs.readFile(configPath, "utf8"))).toMatchObject({
+        schemaVersion: CONFIG_SCHEMA_VERSION,
+      });
+      expect(await fs.readFile(`${configPath}.bak`, "utf8")).toBe(lastGood);
+
+      await fs.writeFile(configPath, blank, "utf8");
+      await config.createApp(appInput({ name: "First", url: "https://first.example.com" }));
+      expect(await fs.readFile(`${configPath}.bak`, "utf8")).toBe(lastGood);
+
+      await fs.writeFile(configPath, blank, "utf8");
+      await config.replaceConfig({ settings: { title: "Imported" }, apps: [], bookmarks: [] });
+      expect(await fs.readFile(`${configPath}.bak`, "utf8")).toBe(lastGood);
+    }
+  );
 });
 
 describe("reorderApps", () => {
@@ -902,6 +1009,13 @@ describe("readConfigInternal stays off public surfaces", () => {
     // Admin-only 2FA management: read the current TOTP state before mutating.
     "app/api/2fa/activate/route.ts",
     "app/api/2fa/disable/route.ts",
+    "app/api/2fa/setup/route.ts",
+    // Admin-only widget and settings saves: read the stored widgets, alert
+    // channels and `auth` to tell whether a save re-points where a secret is
+    // sent, which needs a recent confirmation (#378).
+    "app/api/settings/route.ts",
+    "app/api/widgets/route.ts",
+    "app/api/widgets/[id]/route.ts",
     // Public, but their shared cache must hold every app; each filters per
     // response via visibleItems (the [id] detail route 404s non-visible ids).
     "app/api/status/route.ts",

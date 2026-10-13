@@ -567,6 +567,14 @@ export async function probeQbittorrent(
 // Reachable only through the admin-gated /api/monitor/action route, itself
 // behind the allowActions opt-in (lib/services/guard.ts).
 
+// The shape a torrent hash from the browser must have before it reaches an
+// action (#379): an info-hash, 40 hex (v1, and the id qBittorrent keys a
+// v2-only torrent by) or 64 hex (a full v2 hash), either case. The `hashes`
+// field is otherwise a selector — "all" means every torrent and "a|b" several
+// — so a free-form string let one pause, or one confirmed delete, reach them
+// all.
+export const TORRENT_HASH_PATTERN = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
+
 // qBittorrent 5.0 renamed the pause/resume endpoints to stop/start (matching
 // the state rename this client already buckets). Try the 5.x name and fall
 // back to the legacy one on a 404/405, so one client drives both versions.

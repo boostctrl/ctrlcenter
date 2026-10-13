@@ -60,6 +60,17 @@ export async function adminSession(passwordHash = ""): Promise<string> {
   return createSessionToken(passwordHash, await createSession({ ip: "127.0.0.1", userAgent: "test" }));
 }
 
+// Age a session's last confirmation past the step-up window (#366), so a
+// route that needs a recent one answers it with 403 and reauthRequired.
+export async function staleSession(session: string): Promise<void> {
+  const { verifySessionId } = await import("../auth");
+  const { markReauth } = await import("../sessions");
+  const { REAUTH_WINDOW_MS } = await import("../reauth");
+  const id = await verifySessionId(session);
+  if (!id) throw new Error("not a live session");
+  await markReauth(id, Date.now() - REAUTH_WINDOW_MS - 1);
+}
+
 // The `{ params }` second argument dynamic route handlers receive.
 export function params<T extends Record<string, string>>(value: T) {
   return { params: Promise.resolve(value) };

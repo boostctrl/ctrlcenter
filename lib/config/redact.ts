@@ -35,7 +35,9 @@ export function stripAuth(config: Config): Omit<Config, "auth"> {
 // `settings` and the app rows, where they'd otherwise ride along in
 // anything serialized from a public surface. readPublicConfig
 // (lib/api-auth.ts) applies this so its result is genuinely safe to hand to a
-// client component (#157). The server-side consumers that need the real
+// client component (#157), widget instances aside: their content is what the
+// server fetches with, so a board sends each one's public shape instead
+// (lib/widgets/public.ts, #380). The server-side consumers that need the real
 // values read them separately — the calendar fetcher via getCalendarAuth, the
 // alert poller and the monitor snapshot via readConfigInternal-backed
 // accessors.
@@ -66,8 +68,9 @@ const INTEGRATION_SECRETS = ["password", "apiKey"] as const;
 const isEnvRef = (v: string) => /^\$\{[A-Za-z_][A-Za-z0-9_]*\}$/.test(v.trim());
 
 // A config for a backup without secrets (#366): every credential blanked
-// (environment references kept), the rest as stored, so the file imports
-// cleanly and restoreImportSecrets fills the blanks from the instance.
+// (environment references kept), a calendar's address among them (#380),
+// the rest as stored, so the file imports cleanly and restoreImportSecrets
+// fills the blanks from the instance.
 export function stripExportSecrets<T extends Omit<Config, "auth">>(config: T): T {
   return {
     ...config,

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { resolveSecret, withoutEnvSecrets, isSavedUrl } from "./secrets";
+import { resolveSecret, withoutEnvSecrets, isSavedUrl, expandEnvRefs } from "./secrets";
 
 describe("resolveSecret", () => {
   afterEach(() => {
@@ -33,5 +33,39 @@ describe("isSavedUrl", () => {
     expect(isSavedUrl("http://evil.example", "http://sonarr.lan:8989")).toBe(false);
     expect(isSavedUrl("http://sonarr.lan:8989/x", "http://sonarr.lan:8989")).toBe(false);
     expect(isSavedUrl("", "")).toBe(false);
+  });
+});
+
+describe("expandEnvRefs", () => {
+  afterEach(() => {
+    delete process.env.CTRLCENTER_TEST_KEY;
+  });
+
+  it("expands a reference, and an unset one to nothing", () => {
+    process.env.CTRLCENTER_TEST_KEY = "k3y";
+    expect(expandEnvRefs("Bearer ${CTRLCENTER_TEST_KEY}")).toBe("Bearer k3y");
+    expect(expandEnvRefs("${CTRLCENTER_UNSET_KEY}")).toBe("");
+  });
+
+  it("never expands the app's own credentials (#378)", () => {
+    process.env.CTRLCENTER_TEST_KEY = "k3y";
+    const env = { ADMIN_PASSWORD: process.env.ADMIN_PASSWORD, SESSION_SECRET: process.env.SESSION_SECRET };
+    process.env.ADMIN_PASSWORD = "hunter2";
+    process.env.SESSION_SECRET = "signing-key";
+    try {
+      expect(expandEnvRefs("https://x.example/?p=${ADMIN_PASSWORD}&s=${SESSION_SECRET}&k=${CTRLCENTER_TEST_KEY}")).toBe(
+        "https://x.example/?p=&s=&k=k3y"
+      );
+    } finally {
+      for (const [k, v] of Object.entries(env)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+    }
+  });
+
+  it("expands nothing inside withoutEnvSecrets", async () => {
+    process.env.CTRLCENTER_TEST_KEY = "k3y";
+    expect(await withoutEnvSecrets(async () => expandEnvRefs("${CTRLCENTER_TEST_KEY}"))).toBe("");
   });
 });

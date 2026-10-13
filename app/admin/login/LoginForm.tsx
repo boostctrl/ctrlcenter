@@ -3,15 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { TextField, Button } from "@/components/admin/ui";
-
-// Only follow `next` when it's a same-site, same-origin path: a single leading
-// slash, not "//" or "/\" (protocol-relative URLs the browser would treat as
-// external). Anything else falls back to /admin, so a crafted
-// ?next=https://evil.example can't turn login into an open redirect.
-function safeNext(next: string | null): string {
-  if (next && /^\/(?![/\\])/.test(next)) return next;
-  return "/admin";
-}
+import { safeNextPath } from "@/lib/urls";
 
 // `passwordConfigured` is decided on the server (page.tsx): with no stored
 // hash and no ADMIN_PASSWORD nobody can sign in, so explain that instead of
@@ -67,8 +59,11 @@ export default function LoginForm({
     // Hard navigation (not router.push): a full document load re-runs the auth
     // middleware with the freshly-set session cookie, so the protected route
     // loads on the first try. A client navigation can resolve against a stale
-    // Router Cache entry from before login and bounce back here.
-    window.location.assign(safeNext(searchParams.get("next")));
+    // Router Cache entry from before login and bounce back here. Only a path
+    // on this origin is followed (#23).
+    window.location.assign(
+      safeNextPath(searchParams.get("next"), window.location.origin)
+    );
   }
 
   if (!passwordConfigured) {

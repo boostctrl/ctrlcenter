@@ -166,6 +166,14 @@ describe("container actions", () => {
     capture(403);
     await expect(stopContainer(CFG, 1, "cid")).rejects.toThrow("Invalid API key");
   });
+
+  it("keeps the container id inside its path segment (#379)", async () => {
+    const fetchMock = capture();
+    await startContainer(CFG, 2, "x/../../volumes/prune?");
+    expect(String(fetchMock.mock.calls[0][0])).toBe(
+      "http://portainer.local:9443/api/endpoints/2/docker/containers/x%2F..%2F..%2Fvolumes%2Fprune%3F/start"
+    );
+  });
 });
 
 describe("demuxDockerLog", () => {
@@ -209,6 +217,15 @@ describe("containerLogs", () => {
     expect(out).toBe("line one\nline two\n");
     expect(String(fetchMock.mock.calls[0][0])).toContain(
       "/api/endpoints/2/docker/containers/cid/logs?stdout=1&stderr=1&timestamps=0&tail="
+    );
+  });
+
+  it("keeps the container id inside its path segment (#379)", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response(""));
+    vi.stubGlobal("fetch", fetchMock);
+    await containerLogs(CFG, 2, "abc/json?");
+    expect(String(fetchMock.mock.calls[0][0])).toContain(
+      "/api/endpoints/2/docker/containers/abc%2Fjson%3F/logs?"
     );
   });
 });

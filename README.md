@@ -205,7 +205,9 @@ Your data lives in `./config/config.yaml`, bind-mounted into the container and
 created automatically on first run (see [`config/config.example.yaml`](config/config.example.yaml)
 for a sample). The container fixes ownership of that directory on startup and
 runs as a non-root user, so it works regardless of who owns the host folder — no
-manual `chown`.
+manual `chown`. `config.yaml` and its backups hold your password hash and
+service keys, so they're readable by that user alone (mode `600`): use `sudo`
+to read or copy them on the host.
 
 ## Upgrading to 3.0
 
@@ -215,10 +217,14 @@ keeping your comments — except those on the settings that move (below),
 which stay in the backup.
 
 - **A backup first.** The 2.x file is copied beside the config as
-  `config.v2.bak.yaml`. It's written once and never overwritten, so it stays
-  your way back however many times you restart or import.
-- **A note in the log** says what was converted, and **/admin** shows a
-  one-time banner with the same summary until you dismiss it.
+  `config.v2.bak.yaml`. It's never overwritten, so it stays your way back
+  however many times you restart or import. If one from an earlier upgrade is
+  already there (a release candidate you tried and rolled back from, say) and
+  holds something else, it's left as it is and this upgrade's copy is dated
+  instead: `config.v2.bak.YYYY-MM-DD.yaml`.
+- **A note in the log** says what was converted and names the backup, and
+  **/admin** shows a one-time banner with the same summary until you dismiss
+  it.
 
 What moved where:
 
@@ -238,8 +244,9 @@ integration field.
 the newer config version, rather than silently dropping what it doesn't
 understand. To go back,
 stop the container, restore the backup over the live file
-(`cp config/config.v2.bak.yaml config/config.yaml`), and run the `:2.13`
-image. Anything you changed after upgrading is lost.
+(`sudo cp config/config.v2.bak.yaml config/config.yaml`, or the dated copy if
+the log and the banner named one), and run the `:2.13` image. Anything you
+changed after upgrading is lost.
 
 ## Configuration
 
@@ -452,7 +459,7 @@ for reuse. You can also paste a direct image URL or a `data:` URI.
 | `CONFIG_PATH` | no | Path to the config file (default `./config/config.yaml`; the container sets `/config/config.yaml`). The uptime history (`status-history.db`, a SQLite database), the admin session list (`sessions.json`), the security log (`security-events.jsonl`) and uploaded custom icons (`uploads/`) are written beside it. |
 | `CTRLCENTER_SMTP_PASS` | no | Overrides the email-alert SMTP password, so the secret can stay out of `config.yaml`. |
 | `CTRLCENTER_CALDAV_PASS` | no | Overrides the private-calendar (CalDAV/WebDAV) password of the calendar widget with id `calendar` (the one a 2.x config migrates to), so that secret can stay out of `config.yaml` too. Other calendar widgets use only their own stored credentials. |
-| *any name* | no | Referenced from an integration as `${NAME}`: any of its fields (URL, username, password, API key) can name an environment variable instead of holding the value, e.g. `apiKey: "${SONARR_4K_KEY}"`. Read on the server at use time; never shown in the admin or sent to a browser. |
+| *any name* | no | Referenced as `${NAME}` from an integration — any of its fields (URL, username, password, API key) — or from an API widget's address and header values, instead of holding the value, e.g. `apiKey: "${SONARR_4K_KEY}"`. Read on the server at use time; never shown in the admin or sent to a browser. `ADMIN_PASSWORD` and `SESSION_SECRET` can't be referenced. |
 | `CTRLCENTER_QBITTORRENT_PASS`, `CTRLCENTER_SONARR_KEY`, `CTRLCENTER_RADARR_KEY`, `CTRLCENTER_ADGUARD_PASS`, `CTRLCENTER_TAUTULLI_KEY`, `CTRLCENTER_SEERR_KEY`, `CTRLCENTER_PORTAINER_KEY`, `CTRLCENTER_TRUENAS_KEY`, `CTRLCENTER_UNIFI_PASS` | no | The pre-3.0 per-service names. Each still overrides the password or key of the integration whose id is the service's name (the one a 2.x config migrates to, e.g. `sonarr`); further integrations of the type use `${…}` references instead. |
 | `CTRLCENTER_WEATHER_API` | no | Base URL the *server* uses for weather requests (default `https://api.open-meteo.com`). Point it at a [self-hosted Open-Meteo](https://open-meteo.com/en/docs#self-hosting) instance to keep weather traffic on your own network; it must speak the same `/v1/forecast` API. A visitor who sets their own location still fetches from the public API client-side. |
 | `CTRLCENTER_HOST_PROC` | no | Where the System stats widget looks for a host-mode `/proc` mount (default `/host/proc`). In a container the widget normally reports the *container's* cgroup-scoped CPU/memory; to show the host machine instead, bind-mount the host's `/proc` read-only — `-v /proc:/host/proc:ro` (compose: `- /proc:/host/proc:ro`) — and the widget switches to host mode automatically, no privileges needed. Disks are separate: a path must be mounted into the container to be measured. |

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAction } from "@/lib/services/guard";
-import { containerLogs } from "@/lib/services/portainer";
+import { containerLogs, CONTAINER_ID_PATTERN } from "@/lib/services/portainer";
 import { ServiceError } from "@/lib/services/http";
 import { log, errorReason } from "@/lib/log";
 
@@ -16,8 +16,10 @@ export async function GET(request: NextRequest) {
   }
   const params = request.nextUrl.searchParams;
   const endpoint = Number(params.get("endpoint"));
+  // The id goes into the Docker API path, so only a real one passes (#379):
+  // "abc/json?" read the container's inspect output, env secrets and all.
   const container = params.get("container") ?? "";
-  if (!Number.isInteger(endpoint) || endpoint <= 0 || container.trim() === "") {
+  if (!Number.isInteger(endpoint) || endpoint <= 0 || !CONTAINER_ID_PATTERN.test(container)) {
     return NextResponse.json({ error: "Bad request" }, { status: 400 });
   }
   try {

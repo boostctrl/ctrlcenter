@@ -104,6 +104,15 @@ export const TRUSTED_PROXY_HOPS = Math.max(
 // address a client can't forge. Only trusted when that entry is running:
 // under `next start` the flag is absent and a client-sent header is ignored.
 const PEER_HEADER = "x-ctrlcenter-peer";
+// Stamped by the same entry: "1" when the request reached the server carrying
+// X-Forwarded-For, "0" when it didn't (#383). Trusted on the same terms.
+const FORWARDED_HEADER = "x-ctrlcenter-forwarded";
+
+// Whether scripts/server-entry.mjs is running, so the headers it stamps can be
+// trusted.
+export function productionEntry(): boolean {
+  return process.env.CTRLCENTER_PEER_HEADER === "1";
+}
 
 // A rate-limit key for the requesting client under a namespace (e.g. "login",
 // "2fa"). Behind the documented reverse proxy this is the real client IP, not
@@ -134,11 +143,22 @@ function forwardedFor(request: NextRequest): string[] {
 // hops=0 can't identify anyone and the old, spoofable count applies.
 export function clientIp(request: NextRequest): string | null {
   const peer = request.headers.get(PEER_HEADER)?.trim();
-  if (process.env.CTRLCENTER_PEER_HEADER === "1" && peer) {
+  if (productionEntry() && peer) {
     const chain = [...forwardedFor(request), peer];
     return chain[chain.length - 1 - TRUSTED_PROXY_HOPS] ?? null;
   }
   const parts = forwardedFor(request);
   if (parts.length === 0 || TRUSTED_PROXY_HOPS === 0) return null;
   return parts[parts.length - TRUSTED_PROXY_HOPS] ?? null;
+}
+
+// Whether the request came through a proxy — it reached the server with an
+// X-Forwarded-For header — or null when the app can't tell. The header itself
+// says nothing by the time a route reads it: Next fills it in from the socket
+// on every request that lacks one (#383). Only the production entry sees the
+// request first, so only its stamp counts.
+export function arrivedForwarded(request: NextRequest): boolean | null {
+  if (!productionEntry()) return null;
+  const stamp = request.headers.get(FORWARDED_HEADER);
+  return stamp === "1" ? true : stamp === "0" ? false : null;
 }

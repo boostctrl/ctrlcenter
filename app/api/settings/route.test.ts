@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
-import { useScratchConfig, request, adminSession } from "@/lib/testing/routes";
+import { useScratchConfig, request, adminSession, staleSession } from "@/lib/testing/routes";
 
 // Settings read/update (#289): auth, validation, and a partial update that
 // leaves the rest of the settings alone.
@@ -32,5 +32,21 @@ describe("/api/settings", () => {
     const settings = await (await route.GET(request("/api/settings", { session }))).json();
     expect(settings.title).toBe("Home lab");
     expect(settings.statusChecks).toBe(true);
+  });
+
+  it("asks a stale session to confirm before re-pointing an email channel's server (#378)", async () => {
+    const { alertChannelSchema } = await import("@/lib/schema");
+    const channel = alertChannelSchema.parse({ id: "mail", type: "email", smtp: { host: "smtp.lan", user: "me" } });
+    expect((await put({ alerts: { channels: [channel] } })).status).toBe(200);
+    const stale = await adminSession();
+    await staleSession(stale);
+    const putAs = (body: unknown) => route.PUT(request("/api/settings", { method: "PUT", body, session: stale }));
+    expect((await putAs({ title: "Lab" })).status).toBe(200);
+    expect((await putAs({ alerts: { channels: [{ ...channel, name: "Mail" }] } })).status).toBe(200);
+    const moved = await putAs({ alerts: { channels: [{ ...channel, name: "Mail", smtp: { ...channel.smtp, host: "evil.example" } }] } });
+    expect(moved.status).toBe(403);
+    expect(await moved.json()).toMatchObject({ reauthRequired: true });
+    const settings = await (await route.GET(request("/api/settings", { session }))).json();
+    expect(settings.alerts.channels[0].smtp.host).toBe("smtp.lan");
   });
 });

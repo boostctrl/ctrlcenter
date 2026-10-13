@@ -9,6 +9,7 @@ import {
   buildMonthGrid,
   eventDayKey,
   bucketByDay,
+  MAX_INTERVAL,
   type CalendarEvent,
 } from "./calendar";
 import { fetchCalendar, fetchCalendarRange } from "./calendar-fetch";
@@ -331,6 +332,190 @@ describe("expandRecurring", () => {
       out.find((e) => e.start === Date.parse("2026-06-08T17:00:00Z"))?.summary
     ).toBe("Weekly (moved)");
     expect(out).toHaveLength(5);
+  });
+});
+
+// A feed is third-party input: one event used to hang the server, break every
+// page showing the calendar, or cost seconds of CPU per page view (#381).
+describe("recurrence bounds (#381)", () => {
+  const now = Date.parse("2026-10-13T00:00:00Z");
+  const windowEnd = now + 62 * DAY;
+  const vevent = (uid: string, dtstart: string, rrule: string) => [
+    "BEGIN:VEVENT",
+    `UID:${uid}`,
+    `SUMMARY:${uid}`,
+    dtstart,
+    `RRULE:${rrule}`,
+    "END:VEVENT",
+  ];
+  const ics = (...events: string[][]) =>
+    ["BEGIN:VCALENDAR", ...events.flat(), "END:VCALENDAR"].join("\r\n");
+  const timed = (
+    freq: "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY",
+    interval: number,
+    start = Date.parse("2026-10-14T09:00:00Z")
+  ): CalendarEvent => ({
+    summary: freq,
+    start,
+    allDay: false,
+    rrule: { freq, interval },
+    uid: freq,
+  });
+
+  it("clamps a huge INTERVAL when parsing the rule", () => {
+    expect(parseRRule("FREQ=WEEKLY;INTERVAL=999999999")?.interval).toBe(MAX_INTERVAL);
+    expect(parseRRule("FREQ=DAILY;INTERVAL=1000")?.interval).toBe(1000);
+  });
+
+  it("returns a huge-INTERVAL weekly series promptly, with just its first date", () => {
+    const t0 = performance.now();
+    const parsed = expandRecurring(
+      parseICS(
+        ics(vevent("w", "DTSTART:20261014T090000Z", "FREQ=WEEKLY;INTERVAL=999999999"))
+      ),
+      now,
+      windowEnd
+    );
+    // Unclamped too, as a hand-built rule: the stream itself must end.
+    const raw = expandRecurring([timed("WEEKLY", 999_999_999)], now, windowEnd);
+    expect(performance.now() - t0).toBeLessThan(500);
+    const first = [Date.parse("2026-10-14T09:00:00Z")];
+    expect(parsed.map((e) => e.start)).toEqual(first);
+    expect(raw.map((e) => e.start)).toEqual(first);
+  });
+
+  it.each(["DAILY", "MONTHLY", "YEARLY"] as const)(
+    "doesn't throw on a %s series with a huge INTERVAL",
+    (freq) => {
+      const first = [Date.parse("2026-10-14T09:00:00Z")];
+      const parsed = () =>
+        expandRecurring(
+          parseICS(
+            ics(
+              vevent(
+                "x",
+                "DTSTART;TZID=Etc/UTC:20261014T090000",
+                `FREQ=${freq};INTERVAL=999999999`
+              )
+            )
+          ),
+          now,
+          windowEnd
+        );
+      expect(parsed).not.toThrow();
+      expect(parsed().map((e) => e.start)).toEqual(first);
+      const raw = expandRecurring([timed(freq, 999_999_999)], now, windowEnd);
+      expect(raw.map((e) => e.start)).toEqual(first);
+    }
+  );
+
+  it("bounds long COUNT series in a zone, and stays fast across many of them", () => {
+    const series = (i: number, dtstart: string) =>
+      vevent(
+        `s${i}`,
+        `DTSTART;TZID=America/New_York:${dtstart}`,
+        "FREQ=DAILY;COUNT=100000"
+      );
+    // Forty that started years ago (each walks from its start to tally COUNT),
+    // plus one live in the window — the shape of the report, ~4 KB of ICS.
+    const old = Array.from({ length: 40 }, (_, i) => series(i, "20200101T090000"));
+    const live = series(99, "20261010T090000");
+    const events = parseICS(ics(...old, live));
+    const t0 = performance.now();
+    const out = expandRecurring(events, now, windowEnd);
+    expect(performance.now() - t0).toBeLessThan(500);
+    const shown = out.filter((e) => e.summary === "s99");
+    // Daily within the window and no further, each at 09:00 New York.
+    expect(shown.length).toBeGreaterThanOrEqual(61);
+    expect(shown.length).toBeLessThanOrEqual(63);
+    expect(shown.every((e) => e.start > now && e.start <= windowEnd)).toBe(true);
+    const local = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    expect(shown.every((e) => local.format(e.start) === "09:00")).toBe(true);
+
+    // A feed of thousands of them is bounded as a whole, not just per series:
+    // unbounded, these 3000 would take minutes; the budget holds them to a
+    // fraction of a second (the limit leaves room for a slow CI runner).
+    const many = parseICS(
+      ics(...Array.from({ length: 3000 }, (_, i) => series(i, "20200101T090000")))
+    );
+    const t1 = performance.now();
+    expandRecurring(many, now, windowEnd);
+    expect(performance.now() - t1).toBeLessThan(2000);
+  });
+
+  it("drops a series that fails to expand and keeps the rest", () => {
+    const good: CalendarEvent = { ...timed("WEEKLY", 1), summary: "good", uid: "g" };
+    const oneOff: CalendarEvent = { summary: "one-off", start: now + DAY, allDay: false };
+    // An instant past Date's range: reading its wall clock throws.
+    const bad: CalendarEvent = { ...timed("DAILY", 1, 9e15), summary: "bad", uid: "b" };
+    const out = expandRecurring([bad, good, oneOff], now, windowEnd);
+    expect(out.some((e) => e.summary === "bad")).toBe(false);
+    expect(out.filter((e) => e.summary === "good").length).toBeGreaterThanOrEqual(8);
+    expect(out.some((e) => e.summary === "one-off")).toBe(true);
+  });
+
+  it("fetchCalendar still serves the rest of a feed with a hostile series", async () => {
+    const body = ics(
+      vevent("hang", "DTSTART:20261014T090000Z", "FREQ=WEEKLY;INTERVAL=999999999"),
+      vevent("crash", "DTSTART:20261014T090000Z", "FREQ=DAILY;INTERVAL=999999999"),
+      [
+        "BEGIN:VEVENT",
+        "UID:ok",
+        "SUMMARY:Far future",
+        "DTSTART:20990101T120000Z",
+        "END:VEVENT",
+      ]
+    );
+    const orig = globalThis.fetch;
+    globalThis.fetch = (async () => new Response(body, { status: 200 })) as typeof fetch;
+    try {
+      const out = await fetchCalendar(`https://cal.example.test/${Date.now()}-381.ics`, 20);
+      expect(out.some((e) => e.summary === "Far future")).toBe(true);
+    } finally {
+      globalThis.fetch = orig;
+    }
+  });
+
+  it("steps weekly series exactly like a day-by-day walk", () => {
+    // The weekly stream used to test every day; it now steps whole interval
+    // weeks. Check it against that walk: Monday-start weeks, BYDAY incl. Sunday,
+    // fast-forwarded (no COUNT) and tallied from the start (COUNT).
+    const mondayOf = (n: number) => n - ((new Date(n * DAY).getUTCDay() + 6) % 7);
+    const walk = (start: number, interval: number, byDay: number[], count?: number) => {
+      const startDay = Math.floor(start / DAY);
+      const out: number[] = [];
+      for (let n = startDay; n * DAY <= windowEnd; n++) {
+        const week = (mondayOf(n) - mondayOf(startDay)) / 7;
+        if (week % interval === 0 && byDay.includes(new Date(n * DAY).getUTCDay()))
+          out.push(n * DAY + (start % DAY));
+      }
+      return (count ? out.slice(0, count) : out).filter((t) => t > now && t <= windowEnd);
+    };
+    for (const startIso of ["2025-03-02T08:30:00Z", "2025-03-05T17:00:00Z"]) {
+      const start = Date.parse(startIso);
+      for (const interval of [1, 2, 3]) {
+        for (const byDay of [[0, 1], [3], [6, 2, 0]]) {
+          for (const count of [undefined, 90]) {
+            const master: CalendarEvent = {
+              summary: "w",
+              start,
+              allDay: false,
+              rrule: { freq: "WEEKLY", interval, byDay, ...(count ? { count } : {}) },
+              uid: "w",
+            };
+            const got = expandRecurring([master], now, windowEnd).map((e) => e.start);
+            expect(got, `${startIso} /${interval} ${byDay} ${count}`).toEqual(
+              walk(start, interval, byDay, count)
+            );
+          }
+        }
+      }
+    }
   });
 });
 

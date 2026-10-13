@@ -9,9 +9,13 @@ import SecurityChecklist from "../SecurityChecklist";
 import SecurityActivity from "../SecurityActivity";
 
 export default function SecuritySection({
-  initialTwoFactorEnabled,
+  twoFactorEnabled,
+  onTwoFactorChange,
 }: {
-  initialTwoFactorEnabled: boolean;
+  // Held by SettingsManager (#384): this section unmounts on every switch,
+  // and Integrations reads the same value.
+  twoFactorEnabled: boolean;
+  onTwoFactorChange: (enabled: boolean) => void;
 }) {
   // Bumped when the second factor turns on or off, so the checklist re-reads.
   const [version, setVersion] = useState(0);
@@ -35,7 +39,13 @@ export default function SecuritySection({
         title="Two-factor authentication"
         intro="Add a second factor — a time-based code from an authenticator app — to admin sign-in. Optional for signing in; dashboard actions on integrations need it."
       >
-        <TwoFactor initialEnabled={initialTwoFactorEnabled} onChange={() => setVersion((v) => v + 1)} />
+        <TwoFactor
+          enabled={twoFactorEnabled}
+          onChange={(enabled) => {
+            onTwoFactorChange(enabled);
+            setVersion((v) => v + 1);
+          }}
+        />
       </Card>
 
       <Card

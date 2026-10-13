@@ -12,15 +12,22 @@ export function resolveSecret(envName: string, stored: string): string {
 }
 
 // `${NAME}` references in a stored value (#300): an integration's URL,
-// username, password or key can name environment variables instead of
-// holding the secret. Expanded server-side at use time; an unset variable
-// expands to "". Inside withoutEnvSecrets every reference expands to "", so a
-// probe of a typed-in URL can't be handed one.
+// username, password or key, and an API widget's URL and header values
+// (#302), can name environment variables instead of holding the secret.
+// Expanded server-side at use time; an unset variable expands to "". Inside
+// withoutEnvSecrets every reference expands to "", so a probe of a typed-in
+// URL can't be handed one.
 const ENV_REF = /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
+// The app's own credentials are never a service's (#378): the admin password
+// and the cookie-signing secret always expand to "", so no widget or
+// integration can carry them to the host it calls.
+const RESERVED_ENV = new Set(["ADMIN_PASSWORD", "SESSION_SECRET"]);
 export function expandEnvRefs(value: string): string {
   if (!value.includes("${")) return value;
   const off = envSecretsOff.getStore();
-  return value.replace(ENV_REF, (_, name: string) => (off ? "" : (process.env[name] ?? "")));
+  return value.replace(ENV_REF, (_, name: string) =>
+    off || RESERVED_ENV.has(name) ? "" : (process.env[name] ?? "")
+  );
 }
 
 // Env-held secrets belong to the services they were configured for. A "Test

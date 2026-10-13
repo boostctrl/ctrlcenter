@@ -3,9 +3,19 @@ import { z } from "zod";
 import { requireAction } from "@/lib/services/guard";
 import { invalidateService } from "@/lib/monitor";
 import type { ResolvedIntegration } from "@/lib/services/resolve";
-import { pauseTorrent, resumeTorrent, deleteTorrent } from "@/lib/services/qbittorrent";
+import {
+  pauseTorrent,
+  resumeTorrent,
+  deleteTorrent,
+  TORRENT_HASH_PATTERN,
+} from "@/lib/services/qbittorrent";
 import { approveRequest, declineRequest } from "@/lib/services/seerr";
-import { startContainer, stopContainer, restartContainer } from "@/lib/services/portainer";
+import {
+  startContainer,
+  stopContainer,
+  restartContainer,
+  CONTAINER_ID_PATTERN,
+} from "@/lib/services/portainer";
 import { ServiceError } from "@/lib/services/http";
 import { log, hostOf, errorReason } from "@/lib/log";
 import { requireRecentAuth } from "@/lib/reauth";
@@ -23,8 +33,10 @@ const DESTRUCTIVE = new Set(["delete", "decline", "stop", "restart"]);
 // union on `service`: distinct param shapes and verbs, so an explicit switch
 // is clearer and more type-safe than a generic registry (unlike the uniform
 // probes in /api/monitor/test). The guard only resolves an integration of the
-// named type. Each action is logged host-only via lib/log.ts; credentials
-// never appear.
+// named type. The target ids go into the service's request — a Docker API
+// path, qBittorrent's `hashes` selector — so each is held to its real shape
+// (#379). Each action is logged host-only via lib/log.ts; credentials never
+// appear.
 
 const integration = z.string().min(1).max(64);
 const bodySchema = z.discriminatedUnion("service", [
@@ -32,7 +44,7 @@ const bodySchema = z.discriminatedUnion("service", [
     integration,
     service: z.literal("qbittorrent"),
     action: z.enum(["pause", "resume", "delete"]),
-    hash: z.string().min(1),
+    hash: z.string().regex(TORRENT_HASH_PATTERN),
     // Only meaningful for delete; ignored otherwise. Defaults to keeping data.
     deleteFiles: z.boolean().optional(),
   }),
@@ -47,7 +59,7 @@ const bodySchema = z.discriminatedUnion("service", [
     service: z.literal("portainer"),
     action: z.enum(["start", "stop", "restart"]),
     endpoint: z.number().int().positive(),
-    container: z.string().min(1),
+    container: z.string().regex(CONTAINER_ID_PATTERN),
   }),
 ]);
 

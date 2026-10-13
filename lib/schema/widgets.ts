@@ -16,7 +16,10 @@ export const weatherSchema = z.object({
 // validated on the admin path. No `enabled` flag since 3.0 (#297): the widget
 // shows while its layout row does, and an empty URL shows nothing.
 export const calendarSchema = z.object({
-  url: z.string().default(""),
+  // A Google "secret address" or a share link is a credential itself (#380):
+  // a backup without secrets blanks it, and a restore takes it back from the
+  // instance. A visitor's page never carries it (lib/widgets/public.ts).
+  url: z.string().default("").register(secretFields, { redact: "blank", exportOnly: true }),
   count: z.number().int().min(1).max(20).default(5),
   // The home-page widget's default view: the upcoming-events agenda (default) or a
   // compact month grid that links through to /calendar. The /calendar page itself

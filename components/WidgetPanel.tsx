@@ -17,6 +17,7 @@ import type { WidgetEditContext } from "@/lib/config/widgets";
 import { deleteWidget, fetchWidgetForEditing, saveWidget } from "./admin/settingsApi";
 import { buttonClasses } from "@/lib/buttons";
 import { useConfirm } from "./admin/Confirm";
+import ReauthDialog from "./admin/ReauthDialog";
 import { useAutosave, SaveStatus } from "./admin/useAutosave";
 import { useFeedHealth } from "./admin/FeedHealth";
 import { INSTANCE_GROUPS } from "./admin/settings/widgets";
@@ -78,12 +79,15 @@ export default function WidgetPanel({
     };
   }, []);
 
-  // Escape closes it, wherever focus is — unless a menu inside it is open.
+  // Escape closes it, wherever focus is — unless a menu inside it, or a
+  // dialog over it, is open.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (
         e.key !== "Escape" ||
-        document.querySelector("[data-widget-panel] details[open], [role='alertdialog']")
+        document.querySelector(
+          "[data-widget-panel] details[open], [role='alertdialog'], [data-reauth-host] [role='dialog']"
+        )
       )
         return;
       onClose();
@@ -93,43 +97,52 @@ export default function WidgetPanel({
   }, [onClose]);
 
   return (
-    <div
-      data-editor-keep
-      data-widget-panel
-      role="dialog"
-      aria-labelledby="widget-panel-title"
-      className="fixed inset-x-0 bottom-0 z-[48] flex max-h-[80vh] flex-col rounded-t-2xl border-t border-fg/10 bg-[var(--background)] shadow-2xl lg:inset-x-auto lg:top-0 lg:right-0 lg:max-h-none lg:w-[26rem] lg:rounded-none lg:border-t-0 lg:border-l"
-    >
-      <div className="flex items-center gap-3 border-b border-fg/10 px-4 py-3">
-        <h2
-          id="widget-panel-title"
-          ref={headingRef}
-          tabIndex={-1}
-          className="min-w-0 flex-1 truncate text-sm font-semibold outline-none"
-        >
-          {label}
-        </h2>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-full border border-fg/10 bg-fg/5 px-3 py-1 text-sm text-ink-80 transition-colors hover:bg-fg/10"
-        >
-          Done
-        </button>
+    <>
+      <div
+        data-editor-keep
+        data-widget-panel
+        role="dialog"
+        aria-labelledby="widget-panel-title"
+        className="fixed inset-x-0 bottom-0 z-[48] flex max-h-[80vh] flex-col rounded-t-2xl border-t border-fg/10 bg-[var(--background)] shadow-2xl lg:inset-x-auto lg:top-0 lg:right-0 lg:max-h-none lg:w-[26rem] lg:rounded-none lg:border-t-0 lg:border-l"
+      >
+        <div className="flex items-center gap-3 border-b border-fg/10 px-4 py-3">
+          <h2
+            id="widget-panel-title"
+            ref={headingRef}
+            tabIndex={-1}
+            className="min-w-0 flex-1 truncate text-sm font-semibold outline-none"
+          >
+            {label}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-fg/10 bg-fg/5 px-3 py-1 text-sm text-ink-80 transition-colors hover:bg-fg/10"
+          >
+            Done
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 py-4">
+          {error ? (
+            <p className="text-sm text-status-down">{error}</p>
+          ) : !context ? (
+            <p className="text-sm text-ink-55">Loading…</p>
+          ) : (
+            <>
+              <WidgetEditor key={context.widget.id} context={context} label={label} onSaved={onSaved} />
+              <RemoveWidget id={id} label={label} boards={context.boards} onRemoved={onRemoved} />
+            </>
+          )}
+        </div>
       </div>
-      <div className="flex-1 overflow-y-auto px-4 py-4">
-        {error ? (
-          <p className="text-sm text-status-down">{error}</p>
-        ) : !context ? (
-          <p className="text-sm text-ink-55">Loading…</p>
-        ) : (
-          <>
-            <WidgetEditor key={context.widget.id} context={context} label={label} onSaved={onSaved} />
-            <RemoveWidget id={id} label={label} boards={context.boards} onRemoved={onRemoved} />
-          </>
-        )}
+      {/* "Confirm it's you" (#378): re-pointing an API widget's request or a
+          calendar's address asks for the password again, and the board page
+          has no admin dialog of its own. Kept with the editor, so a click in
+          it doesn't deselect the card. */}
+      <div data-editor-keep data-reauth-host>
+        <ReauthDialog />
       </div>
-    </div>
+    </>
   );
 }
 
