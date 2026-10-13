@@ -115,10 +115,10 @@ here.
   *Security* on (on for every channel; turn it off per channel in
   Settings → Monitoring). (#368)
 - **Export without secrets.** *Export* now asks what to include: by default
-  the file leaves out integration passwords and keys, calendar and email
-  credentials and webhook tokens, and restoring it onto this instance keeps
-  the credentials already stored. Tick *Include secrets* for a full backup;
-  that asks for your password first. (#366)
+  the file leaves out integration passwords and keys, calendar addresses
+  and credentials, email credentials and webhook tokens, and restoring it
+  onto this instance keeps the ones already stored. Tick *Include secrets*
+  for a full backup; that asks for your password first. (#366, #380)
 - **One notification for a whole season.** Inbound webhooks that arrive in a
   burst — Sonarr importing a season, Radarr grabbing several movies, a run
   of Seerr requests — now go out as one message once the burst goes quiet,
@@ -478,6 +478,14 @@ here.
   are also flushed to disk before they replace the file, and an empty
   `config.yaml` no longer overwrites the last `config.yaml.bak`. Use `sudo`
   to read them on the host. (#386)
+- **A public board sends visitors only what each widget shows.** In the
+  3.0 release candidates, a public board's page carried each widget's full
+  settings: a calendar's address (such as a Google "secret address" or a
+  share link), feed URLs and the system stats widget's disk paths. 2.x
+  never sent them, and 3.0.0 doesn't either. If you ran a release candidate
+  with a private calendar address on a public board, reset that address
+  (in Google Calendar, *Reset* the secret address) and paste in the new
+  one. (#380)
 
 ## [2.13.0] - 2026-10-09
 

@@ -68,7 +68,8 @@ describe("secret marks", () => {
     const [ch] = redactSecrets(settingsSchema, { ...settings, alerts }).alerts.channels;
     expect(ch).toMatchObject({ type: "telegram", token: "", chatId: "", smtp: { pass: "", port: 25 } });
     // A tagged union by its option (#297): a calendar widget loses its
-    // credentials, a notes widget keeps its content.
+    // credentials, a notes widget keeps its content. The calendar's address
+    // is a secret for exports only (#380), so the public config keeps it.
     const calendar = widgetInstanceSchema.parse({
       id: "c",
       type: "calendar",

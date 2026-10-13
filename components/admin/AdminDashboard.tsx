@@ -312,9 +312,9 @@ function AdminBody({
                     <span className="text-ink-70">
                       Include secrets
                       <span className="block text-xs text-ink-45">
-                        Integration passwords and keys, calendar and email credentials, webhook
-                        tokens. Asks you to confirm your password. Store the file as you would any
-                        secret.
+                        Integration passwords and keys, calendar addresses and credentials, email
+                        credentials, webhook tokens. Asks you to confirm your password. Store the
+                        file as you would any secret.
                       </span>
                     </span>
                   </label>

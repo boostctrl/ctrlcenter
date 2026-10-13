@@ -6,7 +6,8 @@
 // hidden during an active search) — Dashboard then leaves it out of the grid
 // and, in the editor, shows its empty reason in the tray. Typed as a Record
 // over every widget type, so a type without a renderer fails to compile. A
-// renderer reads its own instance's content (#297) through `instanceOf`.
+// renderer reads its own instance's content (#297) through `instanceOf`: only
+// the fields a visitor's page carries (lib/widgets/public.ts, #380).
 //
 // The edit-mode contract: hidden widgets are skipped by Dashboard's render
 // loop in view mode, so a renderer only decides content-existence; in edit
@@ -33,8 +34,9 @@ import WorldClocksWidget from "./WorldClocksWidget";
 import { isValidTimeZone } from "@/lib/datetime";
 import { appMatches, groupBookmarks, type BookmarkGroupView } from "@/lib/groups";
 import type { LayoutWidget, WidgetType } from "@/lib/layout";
-import type { AppItem, InstanceOf } from "@/lib/schema";
+import type { AppItem } from "@/lib/schema";
 import type { HomeData } from "@/lib/widgets/data";
+import type { PublicInstanceOf } from "@/lib/widgets/public";
 import Complication from "@/components/monitor/Complication";
 import ApiWidget from "./ApiWidget";
 import TilesBox from "./TilesBox";
@@ -64,15 +66,16 @@ export type WidgetRenderContext = {
 
 type Renderer = (widget: LayoutWidget, ctx: WidgetRenderContext) => ReactNode;
 
-// The instance a placed widget renders, typed by its type; undefined when the
-// data has no such instance (it was removed since the page loaded).
+// The instance a placed widget renders, typed by its type as a visitor's page
+// carries it; undefined when the data has no such instance (it was removed
+// since the page loaded).
 function instanceOf<T extends WidgetType>(
   type: T,
   widget: LayoutWidget,
   data: HomeData
-): InstanceOf<T> | undefined {
+): PublicInstanceOf<T> | undefined {
   const i = data.instances[widget.id];
-  return i?.type === type ? (i as InstanceOf<T>) : undefined;
+  return i?.type === type ? (i as PublicInstanceOf<T>) : undefined;
 }
 
 // Apply the per-widget label toggle to a widget passed in as a pre-rendered

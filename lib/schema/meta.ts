@@ -14,7 +14,13 @@ export const mergeRules = z.registry<{ merge: "replace" }>();
 // string; "all" neutralizes a whole section — every string blanked, every
 // boolean off — for sections where even which parts are switched on is
 // private (integrations, inbound webhooks). Applied by stripSecrets.
-export const secretFields = z.registry<{ redact: "blank" | "all" }>();
+//
+// `exportOnly` marks a secret the server's own public rendering reads from
+// the public config: a calendar's address (#380), which the board's fetch and
+// the nav's calendar link need. stripSecrets leaves it, and a visitor's page
+// is kept clear of it by sending each widget's public shape instead
+// (lib/widgets/public.ts); a backup without secrets blanks it like any other.
+export const secretFields = z.registry<{ redact: "blank" | "all"; exportOnly?: true }>();
 
 // The schema a wrapper stands for: defaults, .catch fallbacks and optionals
 // peeled off. Metadata can sit on any layer, so walkers check each.
@@ -49,6 +55,7 @@ export function redactSecrets<T>(schema: z.ZodType, value: T): T {
   const stack = layers(schema);
   for (const s of stack) {
     const rule = secretFields.get(s);
+    if (rule?.exportOnly) continue;
     if (rule?.redact === "all") return neutralize(value) as T;
     if (rule?.redact === "blank") return (typeof value === "string" ? "" : value) as T;
   }

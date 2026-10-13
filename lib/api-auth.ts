@@ -122,12 +122,15 @@ export function visibleItems<T extends { private: boolean }>(
 // credential (stripAuth) and the settings-embedded secrets — calendar
 // credentials, alert webhook/SMTP (stripSecrets) — are stripped too. So a new
 // public page or endpoint built on this can't leak any of them by forgetting a
-// filter: the object returned is safe to serialize to a client component. Route
-// handlers pass their NextRequest (the isAdminRequest path); server components
-// omit it (the isAdminSession path). Surfaces that genuinely need the full list
-// or the real secrets — the poller, alerts, the calendar fetch (getCalendarAuth),
-// admin routes — use readConfigInternal, and a test pins which files under app/
-// may do so.
+// filter: the object returned is safe to serialize to a client component —
+// all but the widget instances, whose content is what the server fetches with
+// (a calendar's address, feed URLs, disk paths, an API widget's request): a
+// page hands those over only as each widget's public shape
+// (lib/widgets/public.ts, #380). Route handlers pass their NextRequest (the
+// isAdminRequest path); server components omit it (the isAdminSession path).
+// Surfaces that genuinely need the full list or the real secrets — the poller,
+// alerts, the calendar fetch (getCalendarAuth), admin routes — use
+// readConfigInternal, and a test pins which files under app/ may do so.
 // Whether this request comes from the signed-in admin, for server pages that
 // read the full config themselves (the calendar page needs its credentials).
 export async function viewerIsAdmin(): Promise<boolean> {

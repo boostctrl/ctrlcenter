@@ -16,7 +16,7 @@ import { collectSystemStats, type SystemStats } from "../system-stats";
 import { greetingFor, hourIn, shortDate } from "../datetime";
 import { getCalendarAuth, getSiteConfig } from "../config";
 import { integrationTiles } from "./integration-tiles";
-import { getApiView, publicApiInstance, type ApiResult } from "../api-widget";
+import { getApiView, type ApiResult } from "../api-widget";
 import {
   feedUrls,
   monitoredApps,
@@ -30,12 +30,15 @@ import {
 import type { LayoutWidget } from "../layout";
 import type { HomeData } from "./data";
 import { instanceLabels } from "./labels";
+import { publicInstance } from "./public";
 
 const DAY = 86_400_000;
 
 type LoadContext = {
   settings: Settings;
-  // Every widget instance (public-safe: secrets redacted).
+  // The widget instances on show, as stored but for the schema secrets
+  // (readPublicConfig redacts those): the loaders fetch with the addresses
+  // and paths here. What reaches the page is cut down per type (#380).
   instances: WidgetInstance[];
   apps: AppItem[];
   bookmarks: BookmarkItem[];
@@ -191,10 +194,11 @@ export async function loadHomeData(ctx: LoadContext): Promise<HomeData> {
     // One poller wraps both the status widgets and the per-app dots; only on
     // when status checks are on and there are apps to monitor.
     statusEnabled: settings.statusChecks && monitoredApps(apps).length > 0,
-    // A visitor's page never carries an API widget's request (#302).
-    instances: Object.fromEntries(
-      instances.map((i) => [i.id, i.type === "api" && !ctx.isAdmin ? publicApiInstance(i) : i])
-    ),
+    // A visitor's page carries only what each widget shows (#380), never the
+    // settings behind it: a calendar's address, feed URLs, disk paths, an API
+    // widget's request (#302). The loaders below read ctx.instances, so the
+    // fetches still have them.
+    instances: Object.fromEntries(instances.map((i) => [i.id, ctx.isAdmin ? i : publicInstance(i)])),
     labels: instanceLabels(instances),
     nodes: {},
     systemStats: {},

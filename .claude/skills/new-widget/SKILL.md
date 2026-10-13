@@ -55,7 +55,10 @@ If it has content:
   derived from the stored shape.
 - Mark any credential field with `secretFields` (`lib/schema/meta.ts`); the
   redaction guard test walks the instance union and fails otherwise. Follow
-  the calendar's `username`/`password` as the template.
+  the calendar's `username`/`password` as the template. A credential the
+  server's own fetch reads from the public config (the calendar's `url`) is
+  marked `exportOnly`: blanked in a backup without secrets, kept off the page
+  by the public shape (step 3).
 
 ## 3. Render: `components/widgets/`
 
@@ -66,6 +69,10 @@ If it has content:
     own instance with `instanceOf(type, widget, ctx.data)`, server data from
     `ctx.data` (keyed by instance id), plus the live state (`editing`, `q`,
     search).
+  - List the fields it reads in `PUBLIC_FIELDS` (`lib/widgets/public.ts`):
+    a visitor's page carries only those (#380), and `instanceOf` is typed
+    against them. Never list a URL, path or anything the server fetches with;
+    render that server-side instead (step 4).
   - Mind the edit-mode contract in that file's header: in edit mode, search
     gates are suspended so every widget previews real content.
   - Titled widgets honour `widget.hideLabel`.
@@ -73,7 +80,7 @@ If it has content:
 ## 4. Server data: `lib/widgets/` (only if it needs any)
 
 - Content from config needs nothing: the instance is already in
-  `data.instances`.
+  `data.instances` (for a visitor, just its `PUBLIC_FIELDS`).
 - If it's fetched at request time, add a loader to `LOADERS`
   (`lib/widgets/load.tsx`) that works through `shownOf(ctx, "<type>")`, one
   result per instance id (into `nodes`, or a new per-id map on `HomeData`).

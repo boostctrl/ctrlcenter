@@ -117,20 +117,6 @@ export async function fetchApiJson(w: Pick<ApiWidget, "url" | "method" | "header
   return parseJson(text);
 }
 
-// An API widget as a visitor's page carries it: the title and display, but
-// none of the request (URL, headers, body) or the paths into the response.
-// The server-side fetch reads the stored widget, so nothing it needs is lost.
-export function publicApiInstance(w: ApiWidget): ApiWidget {
-  return {
-    ...w,
-    url: "",
-    headers: [],
-    body: "",
-    fields: w.fields.map((f) => ({ ...f, path: "" })),
-    list: { path: "", label: "", value: "" },
-  };
-}
-
 export type ApiResult = { view: ApiView | null; error: string | null };
 
 // What the fetch depends on: an edited URL or header refetches at once,
