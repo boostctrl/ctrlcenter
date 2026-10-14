@@ -2,7 +2,8 @@ services:
   ctrlcenter:
     # Pull the published image. To build locally from source instead, comment
     # out `image:` and uncomment `build: .`.
-    # Pin a release (e.g. :2.10.0) instead of :latest to upgrade on your terms.
+    # Pin a release line (e.g. :3.0, which takes its patch releases) or an
+    # exact version (:3.0.0) instead of :latest to upgrade on your terms.
     image: ghcr.io/boostctrl/ctrlcenter:latest
     # build: .
     container_name: ctrlcenter
