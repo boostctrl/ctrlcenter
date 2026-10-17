@@ -56,7 +56,10 @@ git merge-base --is-ancestor main HEAD \
   || die "'main' has commits not on 'develop' — reconcile before releasing."
 
 unreleased=$(awk '/^## \[Unreleased\]/{flag=1;next} flag && /^## /{exit} flag{print}' CHANGELOG.md)
-echo "$unreleased" | grep -q '[^[:space:]]' \
+# A shell pattern, not `echo | grep -q`: under pipefail, grep -q exiting at its
+# first match breaks the pipe under an echo still writing notes longer than the
+# pipe buffer (16 KiB on macOS), and the check failed with notes to release (#415).
+[[ $unreleased == *[![:space:]]* ]] \
   || die "CHANGELOG.md has no entries under [Unreleased] — nothing to release."
 
 prev=$(sed -n 's#^\[Unreleased\]: .*/compare/v\(.*\)\.\.\.HEAD$#\1#p' CHANGELOG.md)
@@ -87,8 +90,21 @@ npm run smoke
 
 # --- Finalize the changelog and bump versions -------------------------------
 
-sed -i "s|^## \[Unreleased\]$|## [Unreleased]\n\n## [$version] - $today|" CHANGELOG.md
-sed -i "s|^\[Unreleased\]: .*$|[Unreleased]: $REPO_URL/compare/$tag...HEAD\n[$version]: $REPO_URL/compare/v$prev...$tag|" CHANGELOG.md
+# POSIX awk into a temp file rather than `sed -i`, whose syntax differs between
+# GNU and BSD (macOS) sed, as does a newline in a replacement (#415). Copied
+# back with cat so CHANGELOG.md keeps its own mode.
+changelog_tmp=$(mktemp "${TMPDIR:-/tmp}/changelog.XXXXXX")
+awk -v version="$version" -v today="$today" -v tag="$tag" -v prev="$prev" -v url="$REPO_URL" '
+  $0 == "## [Unreleased]" { print; print ""; print "## [" version "] - " today; next }
+  /^\[Unreleased\]: / {
+    print "[Unreleased]: " url "/compare/" tag "...HEAD"
+    print "[" version "]: " url "/compare/v" prev "..." tag
+    next
+  }
+  { print }
+' CHANGELOG.md > "$changelog_tmp"
+cat "$changelog_tmp" > CHANGELOG.md
+rm -f "$changelog_tmp"
 
 # npm version bumps package.json and package-lock.json together, so the two
 # can't drift the way they did in 1.3.0.
