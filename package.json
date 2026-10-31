@@ -21,7 +21,7 @@
     "jose": "^6.2.12",
     "js-yaml": "^5.4.3",
     "next": "16.4.0",
-    "nodemailer": "^10.0.15",
+    "nodemailer": "^10.1.4",
     "qrcode": "^1.5.4",
     "react": "19.3.0",
     "react-dom": "19.3.0",
