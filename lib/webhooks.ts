@@ -67,12 +67,16 @@ export type WebhookReport = {
 // One thing a burst is made of — an episode, a movie, a request — with what
 // its own event knew about it, so the merged report can show a quality or a
 // size when every item agrees. `id` dedupes a resent event; `season` and
-// `episode` let the merged title carry a range.
+// `episode` let the merged title carry a range — `airDate` ("YYYY-MM-DD")
+// in their place for a daily series' episode, whose code means nothing
+// (#351) — and `upgrade` lets a burst of nothing but upgrades say so.
 export type DigestItem = {
   id: string;
   label: string;
   season?: number;
   episode?: number;
+  airDate?: string;
+  upgrade?: boolean;
   quality?: string;
   sizeBytes?: number;
   indexer?: string;
@@ -100,7 +104,8 @@ export type WebhookDigest = {
   // The merged report's event label — the group's, not the opening event's:
   // a Download burst says "Imported" whether its files were new or upgrades
   // (the key doesn't tell them apart), so a burst mixing both is never
-  // mislabelled. Its level is the opener's; labels sharing a key share one.
+  // mislabelled; one of nothing but upgrades says "Upgraded", read off its
+  // items (#351). Its level is the opener's; labels sharing a key share one.
   event: string;
   noun: DigestNoun;
   items: DigestItem[];
@@ -216,6 +221,7 @@ const idOf = (v: unknown): string => {
 };
 const pad2 = (n: number) => String(n).padStart(2, "0");
 const lowerFirst = (s: string) => (s ? s[0].toLowerCase() + s.slice(1) : s);
+const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
 // "GrabbedFromInteractiveSearch" → "Grabbed from interactive search",
 // "PARTIALLY_AVAILABLE" → "Partially available". A last resort for event
@@ -249,11 +255,15 @@ export function fmtBytes(n: unknown): string {
   return `${s} ${units[i]}`;
 }
 
+// The "YYYY-MM-DD" an air date starts with; "" for anything else.
+const isoDate = (s: string) => (/^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : "");
+
 // A "YYYY-MM-DD" air date as "Jun 25, 2025"; "" for anything else. Formatted
 // in UTC on purpose: an air date is a calendar day, not an instant.
 export function fmtDate(s: string): string {
-  if (!/^\d{4}-\d{2}-\d{2}/.test(s)) return "";
-  const d = new Date(`${s.slice(0, 10)}T00:00:00Z`);
+  const day = isoDate(s);
+  if (!day) return "";
+  const d = new Date(`${day}T00:00:00Z`);
   if (Number.isNaN(d.getTime())) return "";
   return new Intl.DateTimeFormat("en-US", { timeZone: "UTC", dateStyle: "medium" }).format(d);
 }
@@ -297,6 +307,16 @@ function runs(nums: number[], label: (n: number) => string, dash = "–"): strin
     i = j + 1;
   }
   return out.join(", ");
+}
+
+// "2026-10-01 – 2026-10-07" from sorted air dates, or the one date when
+// every episode aired the same day. Spaced, since the dates carry hyphens
+// of their own; the merged title passes "-" (see episodeCodes).
+function dateRange(dates: string[], dash = "–"): string {
+  if (!dates.length) return "";
+  const first = dates[0];
+  const last = dates[dates.length - 1];
+  return first === last ? first : `${first} ${dash} ${last}`;
 }
 
 type Episode = { id?: number; season: number; episode: number; title: string; airDate: string };
@@ -583,21 +603,26 @@ export function keyForLog(key: string): string {
 
 // Which burst an arr event joins. A Sonarr event about episodes groups by
 // instance and series, one item per episode, so a season import reads "8
-// episodes of The Bear (S04E01-E08)"; anything else groups by instance and
-// event alone — Radarr's payload names no collection — with the series or
-// movie as the item. An event with no subject joins nothing.
+// episodes of The Bear (S04E01-E08)" — a daily series' week "7 episodes of
+// The Daily Show (2026-10-01 - 2026-10-07)"; anything else groups by
+// instance and event alone — Radarr's payload names no collection — with
+// the series or movie as the item. An event with no subject joins nothing.
 function arrDigest(
   service: ArrService,
   p: Record<string, unknown>,
   r: Pick<WebhookReport, "app" | "instance" | "eventType" | "event" | "image" | "link">,
   media: Media,
-  file: Pick<DigestItem, "quality" | "sizeBytes" | "indexer" | "client">
+  file: Pick<DigestItem, "quality" | "sizeBytes" | "indexer" | "client" | "upgrade">
 ): WebhookDigest | undefined {
   if (!media.title) return undefined;
   const shared = { image: r.image, link: r.link };
   if (service === "sonarr" && media.episodes.length) {
     const series = asRecord(p.series);
     const sid = num(series.id) ?? num(series.tvdbId) ?? media.title;
+    // A daily series' episodes are numbered by year and order (S2026E274),
+    // a code that means nothing to a reader: its items carry their air date
+    // instead, and the merged title ranges over the dates (#351).
+    const daily = str(series.type).toLowerCase() === "daily";
     return digestOf({
       key: `sonarr|${instanceKey(r)}|${keyPart(r.eventType)}|${keyPart(String(sid))}`,
       sender: `sonarr|${instanceKey(r)}`,
@@ -612,8 +637,7 @@ function arrDigest(
       items: media.episodes.map((e, i) => ({
         id: `ep:${e.id ?? `S${pad2(e.season)}E${pad2(e.episode)}`}`,
         label: episodeLine(e),
-        season: e.season,
-        episode: e.episode,
+        ...(daily ? { airDate: isoDate(e.airDate) || undefined } : { season: e.season, episode: e.episode }),
         ...file,
         sizeBytes: file.sizeBytes === undefined ? undefined : i === 0 ? file.sizeBytes : 0,
         ...shared,
@@ -717,6 +741,7 @@ export function parseArrWebhook(
     }
 
     case "Download": {
+      const upgrade = p.isUpgrade === true;
       const files = list(p.episodeFiles).map(asRecord);
       if (files.length > 1) {
         // A season pack lands as one import-complete event listing every
@@ -748,6 +773,7 @@ export function parseArrWebhook(
             sizeBytes: bytes || undefined,
             indexer: indexer || undefined,
             client: clientOf(p) || undefined,
+            upgrade: upgrade || undefined,
           })
         );
       }
@@ -768,17 +794,19 @@ export function parseArrWebhook(
       push(facts, "Languages", languagesOf(file.languages) || languagesOf(release.languages));
       push(facts, "Custom formats", customFormatsOf(p, release));
       push(facts, "Release", str(release.releaseTitle) || str(file.sceneName), { mono: true });
-      const upgrade = p.isUpgrade === true;
       const event = upgrade ? "Upgraded" : "Imported";
       // The digest takes `base` — "Imported" — not the event's own verb: a
       // burst groups by eventType, so a season pack filling some gaps and
       // replacing other files joins one group, and "imported" is true of
-      // every file in it. A lone upgrade still goes out as "upgraded".
+      // every file in it. Each item says whether it was an upgrade, so a
+      // burst of nothing but upgrades still reads "upgraded" (mergeDigest,
+      // #351), as a lone upgrade does.
       const digest = arrDigest(service, p, base, media, {
         quality: plain || undefined,
         sizeBytes: bytes || undefined,
         indexer: indexer || undefined,
         client: clientOf(p) || undefined,
+        upgrade: upgrade || undefined,
       });
       return toContent(
         {
@@ -1132,28 +1160,48 @@ function uniform(items: DigestItem[], pick: (it: DigestItem) => string | undefin
 
 // Fold a burst into the one notification that goes out: the lead with its
 // count and, when every item is an episode, the range — "Sonarr imported 8
-// episodes of The Bear (S04E01-E08)" — over a body listing up to eight items,
-// and a report whose facts list the items and carry a quality, indexer,
-// client or requester only when the items agree, and a size only when every
-// item had one (their sum). A group that saw one event sends it unchanged,
-// and one that holds one item sends the latest event about it unchanged (a
-// re-import or an upgrade of the same episode supersedes what it replaced):
-// their own wording and facts say more than a count of one. Pure, so it is
-// unit-tested apart from the timers that decide when it runs.
+// episodes of The Bear (S04E01-E08)", or for a daily series the air dates,
+// "(2026-10-01 - 2026-10-07)" — over a body listing up to eight items, and
+// a report whose facts list the items and carry a quality, indexer, client
+// or requester only when the items agree, and a size only when every item
+// had one (their sum). A burst of nothing but upgrades is labelled
+// "Upgraded" in place of its group's "Imported" (#351). A group that saw
+// one event sends it unchanged, and one that holds one item sends the
+// latest event about it unchanged (a re-import or an upgrade of the same
+// episode supersedes what it replaced): their own wording and facts say
+// more than a count of one. Pure, so it is unit-tested apart from the
+// timers that decide when it runs.
 export function mergeDigest(g: DigestGroup): WebhookNotification {
   const d = g.first.digest;
   const n = g.items.length + g.dropped;
   if (!d || g.events === 1) return g.first;
   if (n === 1) return g.last ?? g.first;
-  const coded = g.items.every((it) => it.season !== undefined && it.episode !== undefined);
-  const items = coded
-    ? [...g.items].sort((a, b) => (a.season ?? 0) - (b.season ?? 0) || (a.episode ?? 0) - (b.episode ?? 0))
-    : g.items;
-  const codes = coded
-    ? episodeCodes(items.map((it) => ({ season: it.season ?? 0, episode: it.episode ?? 0 })))
-    : "";
-  const count = d.lead.replace("{n}", String(n));
-  const title = codes ? `${count} (${codes})` : count;
+  // A daily series' episodes range over their air dates, any other's over
+  // their codes; sorted either way, so arrivals out of order read as a run.
+  const dated = g.items.every((it) => it.airDate);
+  const coded = !dated && g.items.every((it) => it.season !== undefined && it.episode !== undefined);
+  const items = dated
+    ? [...g.items].sort((a, b) => cmp(a.airDate ?? "", b.airDate ?? ""))
+    : coded
+      ? [...g.items].sort((a, b) => (a.season ?? 0) - (b.season ?? 0) || (a.episode ?? 0) - (b.episode ?? 0))
+      : g.items;
+  const dates = items.map((it) => it.airDate ?? "");
+  // The title's range is ASCII — an en dash would cost ntfy its Title header
+  // (see episodeCodes) — and the report's reads as prose.
+  const range = dated
+    ? dateRange(dates, "-")
+    : coded
+      ? episodeCodes(items.map((it) => ({ season: it.season ?? 0, episode: it.episode ?? 0 })))
+      : "";
+  const prose = dated ? dateRange(dates) : range;
+  // Only the kept items are known: past the cap the rest could be anything,
+  // and "imported" stays true of an upgrade.
+  const upgraded = !g.dropped && d.event === "Imported" && items.every((it) => it.upgrade);
+  const event = upgraded ? "Upgraded" : d.event;
+  // The lead came from digestLead, its verb between the app and the count.
+  const lead = upgraded ? d.lead.replace(` ${lowerFirst(d.event)} {n} `, ` ${lowerFirst(event)} {n} `) : d.lead;
+  const count = lead.replace("{n}", String(n));
+  const title = range ? `${count} (${range})` : count;
   const labels = items.map((it) => it.label);
   const body = lineList(labels, n, BODY_LINES);
   const r = g.first.report;
@@ -1164,7 +1212,7 @@ export function mergeDigest(g: DigestGroup): WebhookNotification {
   if (coded) {
     const seasons = unique(items.map((it) => String(it.season))).map(Number).sort((a, b) => a - b);
     subtitle += ` · ${seasons.length === 1 ? `Season ${seasons[0]}` : `Seasons ${runs(seasons, String)}`}`;
-  }
+  } else if (dated) subtitle += ` · Aired ${prose}`;
   const quality = uniform(items, (it) => it.quality);
   const size = items.every((it) => typeof it.sizeBytes === "number")
     ? fmtBytes(items.reduce((sum, it) => sum + (it.sizeBytes ?? 0), 0))
@@ -1186,11 +1234,11 @@ export function mergeDigest(g: DigestGroup): WebhookNotification {
       app: r.app,
       instance: r.instance,
       eventType: r.eventType,
-      event: d.event,
+      event,
       level: r.level,
       headline: d.headline,
       subtitle,
-      summary: codes ? `${d.headline} ${codes}` : `${n} ${d.noun}`,
+      summary: range ? `${d.headline} ${prose}` : `${n} ${d.noun}`,
       chips: [quality, size, indexer].filter(Boolean),
       facts,
       image: items.find((it) => it.image)?.image ?? r.image,

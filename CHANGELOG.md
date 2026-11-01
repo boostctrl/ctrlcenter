@@ -26,6 +26,21 @@ here.
 
 ### Fixed
 
+- **A daily series' digest names the days, not episode codes.** Sonarr
+  numbers a daily series' episodes by year and order (S2026E274), so a
+  burst of them was summed up with a code range that means nothing to a
+  reader. The notification and the email now range over the air dates
+  instead — "Sonarr imported 7 episodes of The Daily Show (2026-10-01 -
+  2026-10-07)", or the one date when they all aired the same day — and an
+  episode with no air date yet leaves the range out rather than wrong.
+  (#351)
+
+- **A burst of upgrades says Upgraded.** A run of imports that each
+  replaced an existing file was labelled Imported, as a burst mixing new
+  files and upgrades still is; one made of nothing but upgrades now reads
+  "Sonarr upgraded 6 episodes of The Bear", in the email's subject and
+  label too. (#351)
+
 - **A huge Portainer log tail shows its end instead of "Response too large".**
   A container whose last 200 log lines ran past 4 MB — one writing enormous
   lines — was refused outright since 3.0.1, where it used to show the last

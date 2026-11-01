@@ -757,6 +757,26 @@ const grabbed = (ep: number) =>
     episodes: [{ id: 200 + ep, seasonNumber: 3, episodeNumber: ep, title: `Silo ${ep}` }],
     release: { quality: "WEBDL-1080p", indexer: "NZBgeek", size: 1024 ** 3 },
   })!;
+// One Sonarr import of a daily series' episode, which Sonarr numbers by year
+// and order: the air date is what identifies it (#351).
+const daily = (day: number, over: Record<string, unknown> = {}) =>
+  parseArrWebhook("sonarr", {
+    eventType: "Download",
+    instanceName: "Sonarr",
+    applicationUrl: "https://sonarr.lan",
+    series: { id: 3, title: "The Daily Show", type: "daily" },
+    episodes: [
+      {
+        id: 300 + day,
+        seasonNumber: 2026,
+        episodeNumber: 270 + day,
+        title: `Day ${day}`,
+        airDate: `2026-10-${String(day).padStart(2, "0")}`,
+      },
+    ],
+    episodeFile: { quality: "WEBDL-1080p", size: 1024 ** 3 },
+    ...over,
+  })!;
 
 describe("digest membership (#346)", () => {
   it("files a Sonarr import under its series with one item per episode and what the event knew", () => {
@@ -787,6 +807,9 @@ describe("digest membership (#346)", () => {
     const upgrade = imported(3, { isUpgrade: true });
     expect(upgrade.digest).toMatchObject({ lead: "Sonarr imported {n} episodes of The Bear", event: "Imported" });
     expect(upgrade.title).toBe("Sonarr upgraded: The Bear S04E03");
+    // Its item says it was one, so a burst of nothing else can say so (#351).
+    expect(upgrade.digest?.items[0].upgrade).toBe(true);
+    expect(n.digest?.items[0].upgrade).toBeUndefined();
     const grab = parseArrWebhook("sonarr", {
       eventType: "Grab",
       series,
@@ -795,6 +818,28 @@ describe("digest membership (#346)", () => {
     });
     expect(grab?.digest).toMatchObject({ key: "sonarr||Grab|1", lead: "Sonarr grabbed {n} episodes of The Bear" });
     expect(grab?.digest?.items[0]).toMatchObject({ quality: "WEBDL-1080p", sizeBytes: 2048, indexer: "NZBgeek" });
+  });
+
+  it("files a daily series' episode by its air date, not its code (#351)", () => {
+    const n = daily(1);
+    expect(n.digest).toMatchObject({
+      key: "sonarr|Sonarr|Download|3",
+      lead: "Sonarr imported {n} episodes of The Daily Show",
+      headline: "The Daily Show",
+    });
+    expect(n.digest?.items[0]).toMatchObject({ id: "ep:301", label: 'S2026E271 "Day 1"', airDate: "2026-10-01" });
+    expect(n.digest?.items[0]).not.toHaveProperty("season");
+    expect(n.digest?.items[0]).not.toHaveProperty("episode");
+    // A timestamp is cut to its day, and a date Sonarr doesn't have is none;
+    // a standard series' episode keeps its code and carries no date.
+    const at = (airDate?: string) =>
+      daily(2, { episodes: [{ id: 302, seasonNumber: 2026, episodeNumber: 272, airDate }] });
+    expect(at("2026-10-02T23:30:00Z").digest?.items[0].airDate).toBe("2026-10-02");
+    expect(at("TBA").digest?.items[0].airDate).toBeUndefined();
+    expect(at().digest?.items[0].airDate).toBeUndefined();
+    const coded = imported(3, { episodes: [{ id: 103, seasonNumber: 4, episodeNumber: 3, airDate: "2025-06-25" }] });
+    expect(coded.digest?.items[0]).toMatchObject({ season: 4, episode: 3 });
+    expect(coded.digest?.items[0]).not.toHaveProperty("airDate");
   });
 
   it("gives a season pack's episodeFiles[] shape the same items, the size on the first", () => {
@@ -986,6 +1031,37 @@ describe("mergeDigest (#346)", () => {
     expect(shuffled.body?.split("\n")[0]).toBe('S04E02 "Ep 2"');
   });
 
+  it("ranges a daily series over its air dates: sorted, one date when shared, none when one is missing (#351)", () => {
+    const week = [3, 1, 2, 5, 4].map((d) => daily(d));
+    const m = mergeDigest(groupOf(week));
+    expect(m.title).toBe("Sonarr imported 5 episodes of The Daily Show (2026-10-01 - 2026-10-05)");
+    expect(m.body?.split("\n")[0]).toBe('S2026E271 "Day 1"');
+    expect(m.report).toMatchObject({
+      event: "Imported",
+      headline: "The Daily Show",
+      subtitle: "5 episodes · Aired 2026-10-01 – 2026-10-05",
+      summary: "The Daily Show 2026-10-01 – 2026-10-05",
+    });
+    expect(fact(m.report, "Episodes")?.value.split("\n")[0]).toBe('S2026E271 "Day 1"');
+    // The ntfy Title header takes latin-1 only: the merged title is ASCII.
+    expect(/^[\x20-\x7E]*$/.test(m.title)).toBe(true);
+    // Two episodes that aired one day: the date alone.
+    const twin = daily(1, { episodes: [{ id: 399, seasonNumber: 2026, episodeNumber: 299, airDate: "2026-10-01" }] });
+    const sameDay = mergeDigest(groupOf([daily(1), twin]));
+    expect(sameDay.title).toBe("Sonarr imported 2 episodes of The Daily Show (2026-10-01)");
+    expect(sameDay.report).toMatchObject({ subtitle: "2 episodes · Aired 2026-10-01", summary: "The Daily Show 2026-10-01" });
+    // An episode with no date yet leaves the burst without a range, never
+    // with a range of codes that mean nothing.
+    const tba = daily(2, { episodes: [{ id: 302, seasonNumber: 2026, episodeNumber: 272 }] });
+    const undated = mergeDigest(groupOf([daily(1), tba]));
+    expect(undated.title).toBe("Sonarr imported 2 episodes of The Daily Show");
+    expect(undated.report).toMatchObject({ subtitle: "2 episodes", summary: "2 episodes" });
+    // A mixed digest's line for the burst carries the dates the same way.
+    const mixed = mergeDigests([groupOf(week), groupOf([grabbed(1), grabbed(2)])]);
+    expect(mixed.body?.split("\n")[0]).toBe("Sonarr imported 5 episodes of The Daily Show (2026-10-01 - 2026-10-05)");
+    expect(mixed.report?.facts[0].value.split("\n")[0]).toBe("The Daily Show 2026-10-01 – 2026-10-05");
+  });
+
   it("shows a quality, indexer or size only when the items agree, or every one had a size", () => {
     const mixed = mergeDigest(
       groupOf([imported(1), imported(2, { episodeFile: { quality: "Bluray-1080p", size: 1024 ** 3 } })])
@@ -1037,6 +1113,35 @@ describe("mergeDigest (#346)", () => {
     expect(reversed.report).toMatchObject({ event: "Imported", level: "success" });
     // A lone upgrade keeps its own verb.
     expect(mergeDigest(groupOf([upgraded[0]])).title).toBe("Sonarr upgraded: The Bear S04E03");
+  });
+
+  it("labels a burst of nothing but upgrades Upgraded, and one past the kept cap Imported (#351)", () => {
+    const upgraded = range(3, 8).map((e) => imported(e, { isUpgrade: true, deletedFiles: [{ quality: "HDTV-720p" }] }));
+    const m = mergeDigest(groupOf(upgraded));
+    expect(m.title).toBe("Sonarr upgraded 6 episodes of The Bear (S04E03-E08)");
+    expect(m.report).toMatchObject({ event: "Upgraded", level: "success", summary: "The Bear S04E03-E08" });
+    // An upgrade of an episode imported in the same window replaces its
+    // item, so the burst is all upgrades however it opened.
+    const reimported = mergeDigest(groupOf([imported(3), ...upgraded]));
+    expect(reimported.title).toBe("Sonarr upgraded 6 episodes of The Bear (S04E03-E08)");
+    expect(reimported.report?.event).toBe("Upgraded");
+    // Past the kept cap the rest are unknown, and "imported" is true of an
+    // upgrade too.
+    expect(mergeDigest(groupOf(upgraded, 94)).title).toBe("Sonarr imported 100 episodes of The Bear (S04E03-E08)");
+    // Radarr the same; a mixed digest's labels and chips follow the burst's.
+    const movies = [1, 2].map(
+      (i) =>
+        parseArrWebhook("radarr", {
+          eventType: "Download",
+          isUpgrade: true,
+          movie: { id: i, title: `Movie ${i}` },
+          movieFile: { quality: "Bluray-1080p" },
+        })!
+    );
+    expect(mergeDigest(groupOf(movies)).title).toBe("Radarr upgraded 2 movies");
+    const mixed = mergeDigests([groupOf(upgraded), groupOf([grabbed(1), grabbed(2)])]);
+    expect(mixed.report?.chips).toEqual(["Upgraded", "Grabbed"]);
+    expect(labels(mixed.report)).toEqual(["Upgraded", "Grabbed"]);
   });
 
   it("sends a group of one event unchanged, and the latest event when every one was about one item", () => {
