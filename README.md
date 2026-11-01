@@ -232,7 +232,7 @@ What moved where:
 | --- | --- |
 | `settings.layout.sections` (the home page arrangement) | the first board in `boards:` — the home page. Scale and spacing stay in `settings.layout`. |
 | Each widget's content in `settings.notes`, `.countdown`, `.worldClocks`, `.systemStats`, `.calendar`, `.feeds` | one entry per widget in `widgets:`, each with an `id`. You can now have more than one of any kind. |
-| A bookmark's `category` | `groups:`, which bookmarks (and now apps) name with `group:` |
+| A bookmark's `category` | `groups:`, which bookmarks (and now apps) name with `group:`. A name longer than 60 characters is shortened; past 100 categories, the rest are named in the log and the banner. |
 | `settings.integrations.<service>` | `integrations:`, a list, so you can connect two of a kind. Ones you'd never set up are dropped. |
 | `settings.alerts.webhookUrl`, `.type`, `.email` (the single alert webhook and email from before 2.13) | the first entries of `settings.alerts.channels`, sending as they did |
 

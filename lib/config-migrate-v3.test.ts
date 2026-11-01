@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { migrateV2toV3 } from "./config-migrate-v3";
 import { migrateConfig } from "./config-migrate";
-import { configReadSchema } from "./schema";
+import { configReadSchema, MAX_GROUP_NAME, MAX_GROUPS } from "./schema";
 import { resolveLayout } from "./layout";
 import { THEME_PACKS } from "./theme";
 
@@ -314,6 +314,48 @@ describe("migrateV2toV3: groups (#299)", () => {
       ],
     });
     expect(out.groups.map((g) => g.id)).toEqual(["media", "media-2"]);
+    // By name too: two groups of one name (any case) merge on the next save.
+    expect(out.groups.map((g) => g.name)).toEqual(["Media", "media 2"]);
+  });
+
+  it("cuts a category longer than a group name to fit, keeping two that then read the same apart (#403)", () => {
+    const long = "x".repeat(MAX_GROUP_NAME + 4);
+    const before = {
+      schemaVersion: 2,
+      settings: {},
+      bookmarks: [
+        { id: "1", category: long, name: "A", url: "https://a.com" },
+        { id: "2", category: `${long.slice(0, -1)}y`, name: "B", url: "https://b.com" },
+        { id: "3", category: "Dev", name: "C", url: "https://c.com" },
+      ],
+    };
+    const out = run(before);
+    expect(out.groups.map((g) => g.name)).toEqual([
+      "x".repeat(MAX_GROUP_NAME),
+      `${"x".repeat(MAX_GROUP_NAME - 2)} 2`,
+      "Dev",
+    ]);
+    expect(out.bookmarks.map((b) => b.group)).toEqual(out.groups.map((g) => g.id));
+    // The read keeps every group, so the first save can't lose one.
+    const config = configReadSchema.parse(migrateConfig(before).value);
+    expect(config.groups.map((g) => g.id)).toEqual(out.groups.map((g) => g.id));
+  });
+
+  it("makes groups of the first MAX_GROUPS categories and leaves the rest's bookmarks under the category's id (#403)", () => {
+    const bookmarks = Array.from({ length: MAX_GROUPS + 2 }, (_, n) => ({
+      id: `b${n}`,
+      category: `Category ${n + 1}`,
+      name: `B${n}`,
+      url: "https://x.com",
+    }));
+    const out = run({ schemaVersion: 2, settings: {}, bookmarks });
+    expect(out.groups).toHaveLength(MAX_GROUPS);
+    expect(out.groups[MAX_GROUPS - 1]).toEqual({ id: `category-${MAX_GROUPS}`, name: `Category ${MAX_GROUPS}` });
+    // Every bookmark still names its category; the last two just have no group row.
+    expect(out.bookmarks.map((b) => b.group)).toEqual(bookmarks.map((b, n) => `category-${n + 1}`));
+    const config = configReadSchema.parse(migrateConfig({ schemaVersion: 2, settings: {}, bookmarks }).value);
+    expect(config.groups).toHaveLength(MAX_GROUPS);
+    expect(config.bookmarks.at(-1)?.group).toBe(`category-${MAX_GROUPS + 2}`);
   });
 
   it("makes groupPrivateApps a second apps widget beside each apps row", () => {

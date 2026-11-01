@@ -4,7 +4,8 @@ import os from "os";
 import path from "path";
 import * as YAML from "js-yaml";
 import { migrateConfig } from "./config-migrate";
-import { CONFIG_SCHEMA_VERSION, configSchema } from "./schema";
+import { summarizeUpgrade } from "./config/upgrade";
+import { CONFIG_SCHEMA_VERSION, configSchema, MAX_GROUPS } from "./schema";
 
 // The whole 2.x → 3.0 upgrade (#306) against configs as users of 2.0, 2.5,
 // 2.10 and 2.13 would have them (lib/__fixtures__, each checked against its
@@ -133,6 +134,26 @@ describe.each(FIXTURES)("upgrading a %s config", (version) => {
 
   it("is done once: a second pass changes nothing", () => {
     expect(migrateConfig(after).changed).toBe(false);
+  });
+});
+
+// The banner's and the log line's summary (#306): the categories past the
+// group limit that didn't become groups are named (#403).
+describe("the upgrade summary", () => {
+  it("names the bookmark categories past MAX_GROUPS, and none otherwise", () => {
+    const bookmarks = Array.from({ length: MAX_GROUPS + 2 }, (_, n) => ({
+      id: `b${n}`,
+      category: n === MAX_GROUPS ? " Spaced out " : `Category ${n + 1}`,
+      name: `B${n}`,
+      url: "https://x.com",
+    }));
+    const before = { schemaVersion: 2, settings: {}, bookmarks };
+    const summary = summarizeUpgrade(before, migrateConfig(before).value);
+    expect(summary.groups).toBe(MAX_GROUPS);
+    expect(summary.skippedCategories).toEqual(["Spaced out", `Category ${MAX_GROUPS + 2}`]);
+
+    const few = { schemaVersion: 2, settings: {}, bookmarks: bookmarks.slice(0, 3) };
+    expect(summarizeUpgrade(few, migrateConfig(few).value)).toMatchObject({ groups: 3, skippedCategories: [] });
   });
 });
 

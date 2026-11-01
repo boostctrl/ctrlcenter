@@ -28,6 +28,20 @@ here.
 
 ### Fixed
 
+- **Long bookmark categories survive the upgrade from 2.x.** A bookmark
+  category longer than 60 characters became a group the dashboard then
+  dropped, so its bookmarks appeared under a bare id and the first save of
+  the groups list lost the name for good. The upgrade now shortens such a
+  name to fit, keeping two that then read the same apart. It also makes
+  groups of at most 100 categories: any past that are named in the upgrade
+  banner and the log, and their bookmarks stay listed under the category's
+  id until you move them into a group. (#403)
+- **Import says what it can't keep.** Restoring a backup quietly dropped a
+  board, widget, group or integration whose entry it couldn't read (an
+  integration id with a space in it, say), and accepted more feed cards or
+  API widgets than any save allows, after which every widget save failed
+  until some were deleted. Import now refuses such a file with a message
+  naming the entry or the limit, and changes nothing. (#403)
 - **Number fields keep what you type.** The API widget's thresholds, gauge
   size and refresh interval, the weather coordinates and the other number
   fields in Settings re-read the value on every keystroke, so `0.8` turned

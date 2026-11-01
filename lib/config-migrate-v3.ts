@@ -19,6 +19,7 @@
 // Like the earlier steps it works on the raw YAML object, leaving everything
 // it doesn't migrate untouched.
 
+import { MAX_GROUP_NAME, MAX_GROUPS } from "./schema/groups";
 import { slugId } from "./slug";
 import { THEME_PACKS } from "./theme";
 
@@ -190,11 +191,52 @@ const boardsStep: Step = (raw) => {
   return { value: { ...raw, settings, boards }, changed: true };
 };
 
+// The 2.x bookmark categories of a raw file, in the order the groups step
+// makes groups of them: the saved order (settings.bookmarkCategoryOrder, for
+// the ones a bookmark still uses), then first seen. Exported for the upgrade
+// summary (lib/config/upgrade.ts), which names the ones past MAX_GROUPS that
+// didn't become groups (#403).
+export function v2Categories(raw: unknown): string[] {
+  if (!isRecord(raw)) return [];
+  const bookmarks = Array.isArray(raw.bookmarks) ? raw.bookmarks : [];
+  const present: string[] = [];
+  for (const b of bookmarks) {
+    if (isRecord(b) && typeof b.category === "string" && !present.includes(b.category)) present.push(b.category);
+  }
+  const saved = isRecord(raw.settings) ? raw.settings.bookmarkCategoryOrder : undefined;
+  const order = Array.isArray(saved) ? saved : [];
+  return [
+    ...order.filter((c): c is string => typeof c === "string" && present.includes(c)),
+    ...present,
+  ].filter((c, i, all) => all.indexOf(c) === i);
+}
+
+// A category's name as its group's. 2.x put no limit on a category, so one
+// longer than MAX_GROUP_NAME is cut to fit (the read would drop the whole
+// group otherwise, #403), and one that then reads the same as an earlier
+// group's name — in any case, since two groups of one name merge on the next
+// save (lib/config/groups.ts) — is numbered to stay apart. A category that's
+// only spaces still needs a name.
+function groupNameFor(category: string, id: string, taken: Set<string>): string {
+  const base = category.trim().slice(0, MAX_GROUP_NAME).trimEnd() || id;
+  let name = base;
+  for (let n = 2; taken.has(name.toLowerCase()); n++) {
+    const suffix = ` ${n}`;
+    name = `${base.slice(0, MAX_GROUP_NAME - suffix.length).trimEnd()}${suffix}`;
+  }
+  taken.add(name.toLowerCase());
+  return name;
+}
+
 // Groups (#299): each bookmark category becomes a group, in the saved
 // category order and then first-seen order, and each bookmark names its
-// group by id. `groupPrivateApps` (the apps widget splitting private apps
-// into their own block) becomes a second apps widget: the existing ones hide
-// private apps, and a "Private Applications" one beside each shows only them.
+// group by id. Only the first MAX_GROUPS categories can (#403): the bookmarks
+// of any past that keep the category's id as their group, which lists them
+// under it after the groups (lib/groups.ts), and the upgrade notice names
+// those categories. `groupPrivateApps` (the apps widget splitting private
+// apps into their own block) becomes a second apps widget: the existing ones
+// hide private apps, and a "Private Applications" one beside each shows only
+// them.
 const groupsStep: Step = (raw) => {
   const settings: Record<string, unknown> = isRecord(raw.settings) ? { ...raw.settings } : {};
   const bookmarks = Array.isArray(raw.bookmarks) ? raw.bookmarks : [];
@@ -204,21 +246,13 @@ const groupsStep: Step = (raw) => {
     bookmarks.some((b) => isRecord(b) && "category" in b);
   if (Array.isArray(raw.groups) || !legacy) return { value: raw, changed: false };
 
-  const present: string[] = [];
-  for (const b of bookmarks) {
-    if (isRecord(b) && typeof b.category === "string" && !present.includes(b.category)) present.push(b.category);
-  }
-  const order = Array.isArray(settings.bookmarkCategoryOrder) ? settings.bookmarkCategoryOrder : [];
-  const categories = [
-    ...order.filter((c): c is string => typeof c === "string" && present.includes(c)),
-    ...present,
-  ].filter((c, i, all) => all.indexOf(c) === i);
+  const categories = v2Categories(raw);
   const idOf = new Map<string, string>();
-  const groups = categories.map((name) => {
-    const id = slugId(name, idOf.values(), "group");
-    idOf.set(name, id);
-    // A category that's only spaces still needs a name.
-    return { id, name: name.trim() || id };
+  for (const name of categories) idOf.set(name, slugId(name, idOf.values(), "group"));
+  const names = new Set<string>();
+  const groups = categories.slice(0, MAX_GROUPS).map((name) => {
+    const id = idOf.get(name)!;
+    return { id, name: groupNameFor(name, id, names) };
   });
   const nextBookmarks = bookmarks.map((b) => {
     if (!isRecord(b) || !("category" in b)) return b;

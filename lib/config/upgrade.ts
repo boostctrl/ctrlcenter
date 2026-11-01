@@ -11,7 +11,9 @@
 import fs from "fs/promises";
 import path from "path";
 import { configVersion } from "../config-migrate";
+import { v2Categories } from "../config-migrate-v3";
 import { log } from "../log";
+import { MAX_GROUPS } from "../schema/groups";
 import { writeFileOnce } from "./files";
 
 export const V2_BACKUP_NAME = "config.v2.bak.yaml";
@@ -36,6 +38,10 @@ export type UpgradeSummary = {
   boards: number;
   groups: number;
   integrations: number;
+  // The 2.x bookmark categories past MAX_GROUPS, which didn't become groups
+  // (#403): their bookmarks are listed under the category's id instead.
+  // Absent in a notice 3.0.0 wrote.
+  skippedCategories?: string[];
   // The rollback copy's file name, beside the config: the one this upgrade
   // wrote or found holding the same file (#386).
   backup: string;
@@ -61,6 +67,9 @@ export function summarizeUpgrade(
     boards: count(after, "boards"),
     groups: count(after, "groups"),
     integrations: count(after, "integrations"),
+    skippedCategories: v2Categories(before)
+      .slice(MAX_GROUPS)
+      .map((c) => c.trim()),
     backup,
     at: at.toISOString(),
   };
@@ -108,6 +117,13 @@ export async function recordUpgrade(raw: string, before: unknown, after: unknown
     `upgraded config.yaml to 3.0: ${summary.widgets} widgets, ${summary.boards} board(s), ` +
       `${summary.groups} groups, ${summary.integrations} integrations; the 2.x file is kept as ${backup}`
   );
+  const skipped = summary.skippedCategories ?? [];
+  if (skipped.length > 0) {
+    log.warn(
+      `${skipped.length} bookmark categories past the limit of ${MAX_GROUPS} groups didn't become groups; ` +
+        `their bookmarks are listed under the category's id until moved into a group: ${skipped.join(", ")}`
+    );
+  }
   try {
     await fs.writeFile(path.join(dir, NOTICE_NAME), JSON.stringify(summary, null, 2), "utf8");
   } catch (e) {

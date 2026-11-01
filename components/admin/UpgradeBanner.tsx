@@ -5,6 +5,7 @@
 // a link to the full notes. Shown until dismissed.
 import { useState } from "react";
 import type { UpgradeSummary } from "@/lib/config/upgrade";
+import { MAX_GROUPS } from "@/lib/schema";
 import { Button } from "./ui";
 
 export const UPGRADE_NOTES_URL = "https://github.com/boostctrl/ctrlcenter#upgrading-to-30";
@@ -15,6 +16,8 @@ export default function UpgradeBanner({ notice }: { notice: UpgradeSummary }) {
   const [open, setOpen] = useState(true);
   const [error, setError] = useState<string | null>(null);
   if (!open) return null;
+  // Categories past the group limit (#403); a notice 3.0.0 wrote has none.
+  const skipped = notice.skippedCategories ?? [];
 
   async function dismiss() {
     try {
@@ -45,6 +48,13 @@ export default function UpgradeBanner({ notice }: { notice: UpgradeSummary }) {
         </li>
         {notice.groups > 0 && (
           <li>Your bookmark categories are now {plural(notice.groups, "group")} that apps can join too.</li>
+        )}
+        {skipped.length > 0 && (
+          <li>
+            CtrlCenter holds at most {MAX_GROUPS} groups, so {plural(skipped.length, "category", "categories")}{" "}
+            didn&apos;t fit: <em>{skipped.join(", ")}</em>. Those bookmarks are listed after the groups under
+            the category&apos;s id until you move them into a group (Settings → Bookmarks).
+          </li>
         )}
         {notice.integrations > 0 && (
           <li>

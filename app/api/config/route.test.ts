@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import fs from "node:fs/promises";
+import path from "node:path";
 import * as YAML from "js-yaml";
 import { useScratchConfig, request, adminSession } from "@/lib/testing/routes";
 import {
@@ -104,6 +105,71 @@ describe("/api/config", () => {
     const res = await importConfig({ apps: "not a list" });
     expect(res.status).toBe(400);
     expect(await fs.readFile(configPath, "utf8")).toContain("Before");
+  });
+
+  it("imports a 2.13 backup, upgrading it on the way", async () => {
+    const fixture = path.join(process.cwd(), "lib", "__fixtures__", "config-2.13.yaml");
+    const res = await importConfig(YAML.load(await fs.readFile(fixture, "utf8")));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.schemaVersion).toBe(3);
+    expect(body.groups.length).toBeGreaterThan(0);
+    expect(body.widgets.length).toBeGreaterThan(0);
+  });
+
+  it("names a row it would otherwise lose instead of importing without it (#403)", async () => {
+    const integration = { id: "Sonarr 4K", type: "sonarr", url: "http://sonarr:8989", apiKey: "k" };
+    const res = await importConfig({ settings: {}, integrations: [integration] });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/integration "Sonarr 4K"/);
+    expect(await fs.readFile(configPath, "utf8")).toContain("Before");
+
+    const widget = await importConfig({ settings: {}, widgets: [{ id: "notes", type: "notes" }, { id: "n2", type: "sticky" }] });
+    expect(widget.status).toBe(400);
+    expect((await widget.json()).error).toMatch(/widget "n2"/);
+
+    const twice = await importConfig({ settings: {}, groups: [{ id: "dev", name: "Dev" }, { id: "dev", name: "Dev 2" }] });
+    expect(twice.status).toBe(400);
+    expect((await twice.json()).error).toMatch(/group "dev".*Duplicate/);
+  });
+
+  it("refuses a list past a cap instead of storing one no save would take (#403)", async () => {
+    const feeds = Array.from({ length: 9 }, (_, n) => ({ id: `feed-${n}`, type: "feed", urls: ["https://x.test/rss"] }));
+    const res = await importConfig({ settings: {}, widgets: feeds });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/At most 8 RSS feed cards/);
+    expect(await fs.readFile(configPath, "utf8")).toContain("Before");
+
+    const many = Array.from({ length: 65 }, (_, n) => ({ id: `note-${n}`, type: "notes" }));
+    const big = await importConfig({ settings: {}, widgets: many });
+    expect(big.status).toBe(400);
+    expect((await big.json()).error).toMatch(/65 widgets; CtrlCenter holds at most 64/);
+
+    // Within every cap, a full 3.0 file imports as it did.
+    const ok = await importConfig({
+      settings: {},
+      boards: [
+        {
+          id: "home",
+          name: "Home",
+          visibility: "public",
+          icon: "mdi:home",
+          theme: "Aurora",
+          layout: { sections: [{ widget: "feed-0", span: 12, hidden: false, space: { top: 2 } }, { widget: "api" }] },
+        },
+      ],
+      widgets: [
+        ...feeds.slice(0, 8),
+        { id: "api", type: "api", url: "https://api.test/v1", fields: [{ label: "Up", path: "$.up" }], thresholds: { warn: 1 } },
+        { id: "tile", type: "integration", integration: "sonarr", visibility: "public" },
+      ],
+      groups: [{ id: "dev", name: "Dev", color: "sky" }],
+      integrations: [{ id: "sonarr", type: "sonarr", url: "http://sonarr:8989", apiKey: "k" }],
+    });
+    expect(ok.status).toBe(200);
+    const body = await ok.json();
+    expect(body.widgets.map((w: { id: string }) => w.id)).toContain("tile");
+    expect(body.boards[0].layout.sections).toHaveLength(2);
   });
 
   it("explains a backup from a newer release (#288)", async () => {

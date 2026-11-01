@@ -3,7 +3,7 @@ import { isAdminRequest } from "@/lib/api-auth";
 import { readConfigInternal, replaceConfig, stripAuth, stripExportSecrets } from "@/lib/config";
 import { requireRecentAuth } from "@/lib/reauth";
 import { migrateConfig, NewerConfigError } from "@/lib/config-migrate";
-import { bundledOutageNotesSchema, configSchema } from "@/lib/schema";
+import { bundledOutageNotesSchema, configSchema, importListError } from "@/lib/schema";
 import { exportOutageNotes, flush, importOutageNotes, loadHistory } from "@/lib/status-history";
 import {
   exportIcons,
@@ -87,6 +87,13 @@ export async function POST(request: NextRequest) {
       { error: "That doesn't look like a valid ctrlcenter config file." },
       { status: 400 }
     );
+  }
+  // The lists the schema reads leniently (#403): a row this file would lose,
+  // or a list past a cap, is refused with the reason rather than imported
+  // without it.
+  const listError = importListError(migrated);
+  if (listError) {
+    return NextResponse.json({ error: listError }, { status: 400 });
   }
   // Bundled icons ride beside the config fields (the schema ignores the extra
   // key). Validate them before replacing anything so a bad file is rejected
