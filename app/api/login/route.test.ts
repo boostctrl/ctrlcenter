@@ -123,3 +123,75 @@ describe("POST /api/login", () => {
     }
   });
 });
+
+describe("POST /api/login throttle gaps (#392)", () => {
+  const SECRET = "JBSWY3DPEHPK3PXP";
+  const loginWith = (body: unknown, headers: Record<string, string> = {}) =>
+    POST(
+      request("/api/login", {
+        method: "POST",
+        body,
+        headers: { "x-forwarded-for": `10.0.0.${ip}`, ...headers },
+      })
+    );
+  async function withTotp<T>(fn: () => Promise<T>): Promise<T> {
+    const { activateTotp, disableTotp } = await import("@/lib/config");
+    await activateTotp(SECRET, []);
+    try {
+      return await fn();
+    } finally {
+      await disableTotp();
+    }
+  }
+  const code = async () => (await import("@/lib/totp")).totpCode(SECRET);
+
+  it("keys the throttle on an IPv6 /64, so rotating through one allotment doesn't help", async () => {
+    const block = `2001:db8:${ip}:7`;
+    for (let i = 1; i <= 5; i++) {
+      expect((await login("wrong", { "x-forwarded-for": `${block}::${i}` })).status).toBe(401);
+    }
+    expect(
+      (await login("wrong", { "x-forwarded-for": `${block}:ffff:ffff:ffff:ffff` })).status
+    ).toBe(429);
+    // The next /64 is another client.
+    expect((await login("wrong", { "x-forwarded-for": `2001:db8:${ip}:8::1` })).status).toBe(401);
+  });
+
+  it("charges a two-factor sign-in once, not twice: the password-only step is given back", async () =>
+    withTotp(async () => {
+      for (let i = 0; i < 8; i++) {
+        const step1 = await login("correct horse");
+        expect(step1.status).toBe(401);
+        expect(await step1.json()).toMatchObject({ totpRequired: true });
+      }
+      expect((await loginWith({ password: "correct horse", totp: await code() })).status).toBe(200);
+    }));
+
+  // Last in the file: once tripped, the shared wrong-code budget stays spent
+  // for the rest of this worker's life.
+  it("pauses code checks for everyone once twenty wrong codes came from anywhere", async () =>
+    withTotp(async () => {
+      // Twenty wrong codes, four per address, so no one client trips its own
+      // lockout.
+      for (let i = 0; i < 20; i++) {
+        const res = await loginWith(
+          { password: "correct horse", totp: "000000" },
+          { "x-forwarded-for": `10.1.${ip}.${Math.floor(i / 4) + 1}` }
+        );
+        expect(res.status).toBe(401);
+      }
+      // Now even the right code is refused, with Retry-After, from anywhere.
+      const paused = await loginWith(
+        { password: "correct horse", totp: await code() },
+        { "x-forwarded-for": `10.1.${ip}.200` }
+      );
+      expect(paused.status).toBe(429);
+      expect(Number(paused.headers.get("retry-after"))).toBeGreaterThan(0);
+      // The audit log says so, once, and names the codes rather than an address.
+      const { listSecurityEvents } = await import("@/lib/security-events");
+      const locked = (await listSecurityEvents(200)).filter(
+        (e) => e.kind === "signin.locked" && e.detail === "authentication codes"
+      );
+      expect(locked).toHaveLength(1);
+    }));
+});

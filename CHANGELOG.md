@@ -29,6 +29,22 @@ here.
   minutes. Feeds, and the web pages checked for feed links, are now scanned
   in a single pass, a parse stops after 200 entries, and a feed that fails to
   load isn't fetched again for a minute. (#393)
+- **Sign-in throttling closes the gaps a patient attacker could use.** An
+  IPv6 client is now counted by its /64 block, so rotating through the
+  addresses of one allotment no longer earns a fresh budget each time. Wrong
+  authentication codes are counted across every address, and after twenty in
+  five minutes code checks pause for a while and your Security channels hear
+  about it, since only someone who already has the password can get that
+  far. The current-password check when changing the password is throttled and
+  logged like a confirmation. Repeated notices of one kind go out at most
+  every ten minutes, and a flood of failures from many addresses folds into
+  one audit-log line instead of pushing older entries out. (#392)
+- **Two-factor admins are no longer locked out by their own sign-ins.** A
+  sign-in or confirmation with a code was charged twice against the throttle
+  and refunded once, so four quick sign-ins locked the account for five
+  minutes and raised a false lockout alert. Signing out over HTTPS now also
+  clears the cookie from the browser, not just the session on the server.
+  (#392)
 
 ## [3.0.0] - 2026-10-16
 

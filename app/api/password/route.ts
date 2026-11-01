@@ -11,6 +11,8 @@ import { readConfigInternal, setPasswordHash } from "@/lib/config";
 import { passwordChangeSchema } from "@/lib/schema";
 import { revokeSessions } from "@/lib/sessions";
 import { requireRecentAuth } from "@/lib/reauth";
+import { clientKey, pruneRateLimit, rateLimit, refundRateLimit } from "@/lib/rate-limit";
+import { PER_CLIENT_MAX_ATTEMPTS, WINDOW_MS } from "@/lib/login-throttle";
 import { eventMeta, recordSecurityEvent } from "@/lib/security-events";
 import { notifySecurityEvent } from "@/lib/security-alerts";
 
@@ -34,16 +36,30 @@ export async function POST(request: NextRequest) {
   }
   const { current, next } = parsed.data;
 
+  // The current-password check is a password check: throttled per client on
+  // the confirmation's budget and logged like one (#392), so a session inside
+  // its step-up window isn't a quiet place to guess the password.
+  pruneRateLimit();
+  const throttleKey = clientKey(request, "reauth");
+  const limited = rateLimit(throttleKey, PER_CLIENT_MAX_ATTEMPTS, WINDOW_MS, { escalate: true });
+  if (!limited.allowed) {
+    return NextResponse.json(
+      { error: "Too many attempts. Try again later." },
+      { status: 429, headers: { "Retry-After": String(limited.retryAfterSeconds) } }
+    );
+  }
   const { auth } = await readConfigInternal();
   const ok = auth.passwordHash
     ? await verifyPasswordHash(current, auth.passwordHash, auth.passwordSalt)
     : verifyEnvPassword(current);
   if (!ok) {
+    await recordSecurityEvent("password.fail", eventMeta(request));
     return NextResponse.json(
       { error: "Current password is incorrect" },
       { status: 403 }
     );
   }
+  refundRateLimit(throttleKey);
 
   // Not the one just typed, and not the container's ADMIN_PASSWORD either:
   // a stored password that equals the env one changes nothing (#369).

@@ -23,6 +23,7 @@ const LABEL: Record<SecurityEventKind, string> = {
   "totp.disabled": "Two-factor authentication turned off",
   "reauth.ok": "Confirmed password",
   "reauth.fail": "Failed confirmation",
+  "password.fail": "Wrong current password",
   "export.secrets": "Exported with secrets",
   "integration.changed": "Integration address or credentials changed",
   "actions.enabled": "Dashboard actions turned on",
@@ -34,6 +35,7 @@ const NOTABLE: ReadonlySet<SecurityEventKind> = new Set([
   "signin.fail",
   "signin.locked",
   "reauth.fail",
+  "password.fail",
   "totp.disabled",
   "password.changed",
   "actions.enabled",
@@ -43,9 +45,10 @@ const NOTABLE: ReadonlySet<SecurityEventKind> = new Set([
 export function describeEvent(e: SecurityEvent): string {
   const base = LABEL[e.kind] ?? e.kind;
   const times = e.count && e.count > 1 ? ` × ${e.count}` : "";
+  const spread = e.addresses && e.addresses > 1 ? ` from ${e.addresses} addresses` : "";
   const detail = e.detail ? `: ${e.detail}` : "";
   const fresh = e.kind === "signin.ok" && e.newAddress ? " (new address)" : "";
-  return `${base}${times}${detail}${fresh}`;
+  return `${base}${times}${spread}${detail}${fresh}`;
 }
 
 export default function SecurityActivity({ version }: { version: number }) {

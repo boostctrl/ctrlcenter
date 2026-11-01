@@ -81,7 +81,9 @@ export function sessionTokenFrom(cookies: {
 
 type CookieJar = {
   set: (name: string, value: string, options: ReturnType<typeof sessionCookieOptions>) => unknown;
-  delete: (name: string) => unknown;
+  // Method signatures, so NextResponse's overloaded delete satisfies them.
+  delete(name: string): unknown;
+  delete(options: { name: string; path?: string; secure?: boolean }): unknown;
 };
 
 // Set the session cookie on a response under the name the request calls
@@ -90,7 +92,10 @@ export function setSessionCookie(response: { cookies: CookieJar }, request: Next
   response.cookies.set(sessionCookieName(request), token, sessionCookieOptions(request));
 }
 export function clearSessionCookie(response: { cookies: CookieJar }): void {
-  response.cookies.delete(SECURE_SESSION_COOKIE_NAME);
+  // A browser ignores a __Host- Set-Cookie without Secure, so a bare delete
+  // left the dead cookie in place (#392). The session itself is revoked
+  // server-side either way; this clears the browser's copy too.
+  response.cookies.delete({ name: SECURE_SESSION_COOKIE_NAME, path: "/", secure: true });
   response.cookies.delete(SESSION_COOKIE_NAME);
 }
 

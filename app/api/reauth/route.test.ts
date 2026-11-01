@@ -117,4 +117,22 @@ describe("requireRecentAuth (#366)", () => {
       await disableTotp();
     }
   });
+
+  it("gives the password-only step back, so a two-factor confirmation costs one attempt (#392)", async () => {
+    const session = await adminSession();
+    const { activateTotp, disableTotp } = await import("@/lib/config");
+    await activateTotp("GEZDGNBVGY3TQOJQ", []);
+    try {
+      for (let i = 0; i < 8; i++) {
+        const step = await reauth(session, { password: "correct horse" });
+        expect(step.status).toBe(401);
+        expect(await step.json()).toMatchObject({ totpRequired: true });
+      }
+      const { totpCode } = await import("@/lib/totp");
+      const ok = await reauth(session, { password: "correct horse", totp: await totpCode("GEZDGNBVGY3TQOJQ") });
+      expect(ok.status).toBe(200);
+    } finally {
+      await disableTotp();
+    }
+  });
 });

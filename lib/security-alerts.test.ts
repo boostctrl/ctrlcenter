@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { securityNotification } from "./security-alerts";
+import { CODES_LOCKED, notificationDue, securityNotification } from "./security-alerts";
 import type { SecurityEvent } from "./security-events";
 
 const at = Date.UTC(2026, 9, 11, 12, 0);
@@ -37,5 +37,25 @@ describe("securityNotification (#368)", () => {
     const n = securityNotification(ev({ newAddress: true, ip: null, userAgent: "" }));
     expect(n?.body).toContain("unknown address");
     expect(n?.body).toContain("unknown browser");
+  });
+});
+
+describe("notification pacing (#392)", () => {
+  it("sends one notice of a kind every ten minutes, but every new-address sign-in", () => {
+    const t = Date.now();
+    expect(notificationDue(ev({ kind: "signin.locked" }), t)).toBe(true);
+    expect(notificationDue(ev({ kind: "signin.locked", ip: "198.51.100.4" }), t + 1000)).toBe(false);
+    // The wrong-code pause is its own notice.
+    expect(notificationDue(ev({ kind: "signin.locked", detail: CODES_LOCKED }), t + 2000)).toBe(true);
+    expect(notificationDue(ev({ kind: "signin.locked" }), t + 11 * 60_000)).toBe(true);
+    expect(notificationDue(ev({ newAddress: true }), t + 3000)).toBe(true);
+    expect(notificationDue(ev({ newAddress: true, ip: "198.51.100.4" }), t + 4000)).toBe(true);
+  });
+
+  it("says when it was the codes that ran out, not one address's passwords", () => {
+    const n = securityNotification(ev({ kind: "signin.locked", detail: CODES_LOCKED }));
+    expect(n?.title).toMatch(/codes paused/);
+    expect(n?.body).toMatch(/has the password/);
+    expect(n?.body).toContain("203.0.113.9");
   });
 });

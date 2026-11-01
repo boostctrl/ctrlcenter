@@ -1,6 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { NextRequest } from "next/server";
-import { arrivedForwarded, rateLimit, refundRateLimit, pruneRateLimit } from "./rate-limit";
+import {
+  arrivedForwarded,
+  peekRateLimit,
+  rateLimit,
+  refundRateLimit,
+  pruneRateLimit,
+  throttleBucket,
+} from "./rate-limit";
 
 describe("rateLimit", () => {
   beforeEach(() => {
@@ -199,5 +206,74 @@ describe("arrivedForwarded (#383)", () => {
     expect(forwarded(false, { "x-ctrlcenter-forwarded": "1", "x-forwarded-for": "1.2.3.4" })).toBeNull();
     expect(forwarded(false, { "x-ctrlcenter-forwarded": "0" })).toBeNull();
     expect(forwarded(false, {})).toBeNull();
+  });
+});
+
+describe("throttleBucket (#392)", () => {
+  it("keeps an IPv4 address, and an IPv4-mapped IPv6 address, as the IPv4 address", () => {
+    expect(throttleBucket("203.0.113.9")).toBe("203.0.113.9");
+    expect(throttleBucket("::ffff:203.0.113.9")).toBe("203.0.113.9");
+  });
+
+  it("buckets an IPv6 address by its /64, whatever its spelling", () => {
+    expect(throttleBucket("2001:db8:1:2:3:4:5:6")).toBe("2001:0db8:0001:0002::/64");
+    expect(throttleBucket("2001:DB8:1:2::1")).toBe("2001:0db8:0001:0002::/64");
+    expect(throttleBucket("2001:db8:1:2:ffff:ffff:ffff:ffff")).toBe("2001:0db8:0001:0002::/64");
+    expect(throttleBucket("fe80::1%eth0")).toBe("fe80:0000:0000:0000::/64");
+    expect(throttleBucket("::1")).toBe("0000:0000:0000:0000::/64");
+    expect(throttleBucket("64:ff9b::192.0.2.33")).toBe("0064:ff9b:0000:0000::/64");
+    // Two addresses in one allotment share a bucket; the next /64 is another.
+    expect(throttleBucket("2001:db8:1:2::1")).toBe(throttleBucket("2001:db8:1:2:dead:beef::1"));
+    expect(throttleBucket("2001:db8:1:3::1")).not.toBe(throttleBucket("2001:db8:1:2::1"));
+  });
+
+  it("returns text that isn't an address unchanged", () => {
+    expect(throttleBucket("1:2:3")).toBe("1:2:3");
+    expect(throttleBucket("2001:db8::1::2")).toBe("2001:db8::1::2");
+    expect(throttleBucket("gggg::1")).toBe("gggg::1");
+    expect(throttleBucket("::ffff:300.1.1.1")).toBe("::ffff:300.1.1.1");
+  });
+});
+
+describe("peekRateLimit and strike-keeping refunds (#392)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    pruneRateLimit(Date.now() + 60 * 60 * 1000);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("reports a key's state without charging it", () => {
+    const key = `k-${Math.random()}`;
+    expect(peekRateLimit(key, 2)).toMatchObject({ allowed: true, remaining: 2 });
+    rateLimit(key, 2, 1000);
+    expect(peekRateLimit(key, 2)).toMatchObject({ allowed: true, remaining: 1 });
+    expect(peekRateLimit(key, 2)).toMatchObject({ allowed: true, remaining: 1 });
+    rateLimit(key, 2, 1000);
+    const full = peekRateLimit(key, 2);
+    expect(full.allowed).toBe(false);
+    expect(full.retryAfterSeconds).toBeGreaterThan(0);
+    vi.advanceTimersByTime(1500);
+    expect(peekRateLimit(key, 2).allowed).toBe(true);
+  });
+
+  it("keeps the escalation history on a keepStrikes refund, and clears it on a plain one", () => {
+    const retryAfterSecondTrip = (opts?: { keepStrikes: boolean }) => {
+      const key = `k-${Math.random()}`;
+      // First trip: the lockout lasts the window.
+      rateLimit(key, 2, 1000, { escalate: true });
+      rateLimit(key, 2, 1000, { escalate: true });
+      vi.advanceTimersByTime(1500);
+      // A charge given back the way the two-step form's first step is...
+      rateLimit(key, 2, 1000, { escalate: true });
+      refundRateLimit(key, opts);
+      // ...then the second trip.
+      rateLimit(key, 2, 1000, { escalate: true });
+      rateLimit(key, 2, 1000, { escalate: true });
+      return rateLimit(key, 2, 1000, { escalate: true }).retryAfterSeconds;
+    };
+    expect(retryAfterSecondTrip({ keepStrikes: true })).toBe(2);
+    expect(retryAfterSecondTrip()).toBe(1);
   });
 });

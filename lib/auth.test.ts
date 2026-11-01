@@ -14,8 +14,9 @@ import {
   sessionTokenFrom,
   SESSION_COOKIE_NAME,
   SECURE_SESSION_COOKIE_NAME,
+  clearSessionCookie,
 } from "./auth";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createSession, revokeSession, revokeSessions } from "./sessions";
 import { SignJWT } from "jose";
 
@@ -242,5 +243,18 @@ describe("session cookie name (#369)", () => {
     expect(sessionTokenFrom(jar({}))).toBeUndefined();
     expect(sessionTokenFrom(jar({ [SESSION_COOKIE_NAME]: "plain" }))).toBe("plain");
     expect(sessionTokenFrom(jar({ [SECURE_SESSION_COOKIE_NAME]: "secure", [SESSION_COOKIE_NAME]: "plain" }))).toBe("secure");
+  });
+});
+
+describe("clearSessionCookie (#392)", () => {
+  it("expires the __Host- cookie with Secure, which a browser needs to accept the change", () => {
+    const res = NextResponse.json({ ok: true });
+    clearSessionCookie(res);
+    const set = res.headers.getSetCookie();
+    const secure = set.find((c) => c.startsWith(SECURE_SESSION_COOKIE_NAME + "="));
+    expect(secure).toMatch(/; *Secure/i);
+    expect(secure).toMatch(/Path=\//);
+    expect(secure).toMatch(/Expires=Thu, 01 Jan 1970/);
+    expect(set.find((c) => c.startsWith(SESSION_COOKIE_NAME + "="))).toBeTruthy();
   });
 });

@@ -65,17 +65,39 @@ export function rateLimit(
   };
 }
 
+// Whether `key` would be refused right now, without charging it: the answer
+// a charge would get. Lets a route refuse code checks while the shared
+// wrong-code budget is spent (#392).
+export function peekRateLimit(key: string, limit: number): RateLimitResult {
+  const now = Date.now();
+  const existing = windows.get(key);
+  if (!existing || now >= existing.resetAt) {
+    return { allowed: true, remaining: limit, retryAfterSeconds: 0 };
+  }
+  if (existing.count >= limit) {
+    return {
+      allowed: false,
+      remaining: 0,
+      retryAfterSeconds: Math.ceil((existing.resetAt - now) / 1000),
+    };
+  }
+  return { allowed: true, remaining: limit - existing.count, retryAfterSeconds: 0 };
+}
+
 // Give back one charge to `key` (no-op once its window has expired). Login
 // calls this when a session is actually issued, so signing in successfully a
 // few times in a row can't lock the admin out (#277). One charge, not a reset:
 // a success from a shared address mustn't wipe another client's failures.
-export function refundRateLimit(key: string): void {
+// With `keepStrikes` the key's escalation history stays: the two-step form's
+// password-only step is given back (#392) without counting as the admin
+// having got in.
+export function refundRateLimit(key: string, opts: { keepStrikes?: boolean } = {}): void {
   const existing = windows.get(key);
   if (existing && existing.count > 0 && Date.now() < existing.resetAt) {
     existing.count -= 1;
   }
   // The real admin got in: their earlier lockouts stop counting against them.
-  lockouts.delete(key);
+  if (!opts.keepStrikes) lockouts.delete(key);
 }
 
 // Opportunistically drop expired windows so the Map can't grow unbounded from
@@ -117,9 +139,55 @@ export function productionEntry(): boolean {
 // A rate-limit key for the requesting client under a namespace (e.g. "login",
 // "2fa"). Behind the documented reverse proxy this is the real client IP, not
 // the spoofable X-Forwarded-For prefix. Shared by the login and 2FA routes so
-// the trusted-hops logic lives in one place.
+// the trusted-hops logic lives in one place. An IPv6 client is keyed by its
+// /64 (throttleBucket), so one allotment can't mint a fresh budget per address.
 export function clientKey(request: NextRequest, prefix: string): string {
-  return `${prefix}:${clientIp(request) ?? "unknown"}`;
+  const ip = clientIp(request);
+  return `${prefix}:${ip ? throttleBucket(ip) : "unknown"}`;
+}
+
+// The address a throttle counts. An IPv4 address stands for itself. An IPv6
+// address stands for its /64: the block a provider hands one subscriber or
+// one VPS, which holds 2^64 addresses a client can rotate through at no cost,
+// so keying on the full address gave a single machine a fresh budget per
+// guess (#392). An IPv4-mapped IPv6 address counts as the IPv4 address it
+// carries. Text that isn't an address is returned as given.
+export function throttleBucket(ip: string): string {
+  if (!ip.includes(":")) return ip;
+  const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(ip);
+  if (mapped && mapped[1].split(".").every((octet) => Number(octet) <= 255)) return mapped[1];
+  const groups = ipv6Groups(ip);
+  return groups ? `${groups.slice(0, 4).join(":")}::/64` : ip;
+}
+
+// The eight 16-bit groups of an IPv6 address as four-digit lowercase hex, or
+// null when the text isn't one. Handles "::" compression, a zone id and a
+// dotted IPv4 tail.
+function ipv6Groups(ip: string): string[] | null {
+  let text = ip.split("%")[0];
+  const tail = /:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(text);
+  if (tail) {
+    const octets = tail[1].split(".").map(Number);
+    if (octets.some((n) => n > 255)) return null;
+    text =
+      text.slice(0, tail.index + 1) +
+      ((octets[0] << 8) | octets[1]).toString(16) +
+      ":" +
+      ((octets[2] << 8) | octets[3]).toString(16);
+  }
+  const halves = text.split("::");
+  if (halves.length > 2) return null;
+  const head = halves[0] ? halves[0].split(":") : [];
+  const rest = halves.length === 2 && halves[1] ? halves[1].split(":") : [];
+  const missing = 8 - head.length - rest.length;
+  if (halves.length === 2 ? missing < 1 : missing !== 0) return null;
+  const groups = [
+    ...head,
+    ...Array<string>(halves.length === 2 ? missing : 0).fill("0"),
+    ...rest,
+  ];
+  if (groups.some((g) => !/^[0-9a-f]{1,4}$/i.test(g))) return null;
+  return groups.map((g) => g.toLowerCase().padStart(4, "0"));
 }
 
 function forwardedFor(request: NextRequest): string[] {

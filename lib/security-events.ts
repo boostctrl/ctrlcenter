@@ -3,7 +3,7 @@ import path from "path";
 import type { NextRequest } from "next/server";
 import { log, errorReason } from "./log";
 import { globalSingleton } from "./singleton";
-import { clientIp } from "./rate-limit";
+import { clientIp, throttleBucket } from "./rate-limit";
 
 // The security audit log (#368): sign-ins and failed bursts, sign-outs,
 // sessions ended, password and second-factor changes, step-up
@@ -28,6 +28,7 @@ export const SECURITY_EVENT_KINDS = [
   "totp.disabled",
   "reauth.ok",
   "reauth.fail",
+  "password.fail",
   "export.secrets",
   "integration.changed",
   "actions.enabled",
@@ -45,6 +46,9 @@ export type SecurityEvent = {
   // Repeated failures from one address within a few minutes fold into one
   // entry with a count, so a guessing run is one line, not fifty.
   count?: number;
+  // How many addresses a folded entry covers, when a flood of failures from
+  // many addresses folded into one line (#392). Absent for one address.
+  addresses?: number;
   // A successful sign-in from an address no sign-in used in the last
   // 30 days — the one worth a notification.
   newAddress?: boolean;
@@ -58,7 +62,16 @@ export const MAX_EVENTS = 1000;
 export const KEEP_MS = 90 * 24 * 60 * 60 * 1000;
 const FOLD_MS = 5 * 60 * 1000;
 const NEW_ADDRESS_MS = 30 * 24 * 60 * 60 * 1000;
-const FOLDABLE: ReadonlySet<SecurityEventKind> = new Set(["signin.fail", "reauth.fail"]);
+const FOLDABLE: ReadonlySet<SecurityEventKind> = new Set([
+  "signin.fail",
+  "reauth.fail",
+  "password.fail",
+]);
+// Once this many entries of one foldable kind have landed within FOLD_MS,
+// further ones fold into the last entry whatever their address (#392): a run
+// from many addresses becomes one line that counts them, instead of pushing
+// the rest of the log out past its cap.
+const FLOOD_ENTRIES = 20;
 
 const FILE_NAME = "security-events.jsonl";
 
@@ -162,8 +175,25 @@ export function eventMeta(request: NextRequest): EventMeta {
   };
 }
 
-// Record one event. Repeated failures from the same address fold into the
-// previous entry; a successful sign-in notes whether its address is new.
+// Whether two addresses count as one source: the same, or in the same
+// throttle bucket (an IPv6 /64).
+function sameSource(a: string | null, b: string | null): boolean {
+  if (a === b) return true;
+  return a !== null && b !== null && throttleBucket(a) === throttleBucket(b);
+}
+
+// Whether `kind` already has FLOOD_ENTRIES entries inside the fold window.
+function flooding(events: SecurityEvent[], kind: SecurityEventKind, now: number): boolean {
+  let n = 0;
+  for (let i = events.length - 1; i >= 0 && now - events[i].at < FOLD_MS; i--) {
+    if (events[i].kind === kind && ++n >= FLOOD_ENTRIES) return true;
+  }
+  return false;
+}
+
+// Record one event. Repeated failures from the same source fold into the
+// previous entry (and, during a flood, from any source, counting the
+// addresses); a successful sign-in notes whether its address is new.
 export async function recordSecurityEvent(
   kind: SecurityEventKind,
   meta: EventMeta,
@@ -172,17 +202,15 @@ export async function recordSecurityEvent(
 ): Promise<SecurityEvent> {
   const store = await ready();
   const last = store.events[store.events.length - 1];
-  if (
-    FOLDABLE.has(kind) &&
-    last &&
-    last.kind === kind &&
-    last.ip === meta.ip &&
-    now - last.at < FOLD_MS
-  ) {
-    last.at = now;
-    last.count = (last.count ?? 1) + 1;
-    await persist(store);
-    return last;
+  if (FOLDABLE.has(kind) && last && last.kind === kind && now - last.at < FOLD_MS) {
+    const same = sameSource(last.ip, meta.ip);
+    if (same || flooding(store.events, kind, now)) {
+      last.at = now;
+      last.count = (last.count ?? 1) + 1;
+      if (!same) last.addresses = (last.addresses ?? 1) + 1;
+      await persist(store);
+      return last;
+    }
   }
   const event: SecurityEvent = { at: now, kind, ip: meta.ip, userAgent: meta.userAgent };
   if (detail) event.detail = detail;

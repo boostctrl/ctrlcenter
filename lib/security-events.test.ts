@@ -54,6 +54,40 @@ describe("security events (#368)", () => {
     ]);
   });
 
+  it("folds failures from one IPv6 /64 as one source (#392)", async () => {
+    const t = Date.now();
+    for (let i = 1; i <= 3; i++) {
+      await recordSecurityEvent("signin.fail", { ip: `2001:db8:1:2::${i}`, userAgent: "curl" }, undefined, t + i * 1000);
+    }
+    await recordSecurityEvent("signin.fail", { ip: "2001:db8:1:3::1", userAgent: "curl" }, undefined, t + 5000);
+    const events = await listSecurityEvents(50, t + 6000);
+    expect(events.map((e) => [e.ip, e.count ?? 1])).toEqual([
+      ["2001:db8:1:3::1", 1],
+      ["2001:db8:1:2::1", 3],
+    ]);
+    expect(events[1].addresses).toBeUndefined();
+  });
+
+  it("folds a flood of failures from many addresses into one line that counts them (#392)", async () => {
+    const t = Date.now();
+    // Twenty entries from twenty addresses stand on their own...
+    for (let i = 0; i < 20; i++) {
+      await recordSecurityEvent("signin.fail", { ip: `203.0.113.${i + 1}`, userAgent: "curl" }, undefined, t + i * 1000);
+    }
+    expect(await listSecurityEvents(50, t + 20_000)).toHaveLength(20);
+    // ...and from then on the run folds into the last one, whatever the address.
+    for (let i = 20; i < 40; i++) {
+      await recordSecurityEvent("signin.fail", { ip: `198.51.100.${i}`, userAgent: "curl" }, undefined, t + i * 1000);
+    }
+    const events = await listSecurityEvents(50, t + 40_000);
+    expect(events).toHaveLength(20);
+    expect(events[0]).toMatchObject({ ip: "203.0.113.20", count: 21, addresses: 21 });
+    // Once the window has passed, a failure starts a fresh entry.
+    const later = t + 40_000 + 6 * MIN;
+    await recordSecurityEvent("signin.fail", { ip: "198.51.100.99", userAgent: "curl" }, undefined, later);
+    expect(await listSecurityEvents(50, later)).toHaveLength(21);
+  });
+
   it("flags a sign-in from an address not seen in 30 days", async () => {
     const t = Date.now();
     expect((await recordSecurityEvent("signin.ok", here, undefined, t)).newAddress).toBe(true);

@@ -62,4 +62,31 @@ describe("POST /api/password", () => {
     expect((await LIST(request("/api/sessions", { session: mine }))).status).toBe(401);
     expect((await LIST(request("/api/sessions", { session: token }))).status).toBe(200);
   });
+
+  it("throttles wrong current passwords like a confirmation, and logs them (#392)", async () => {
+    const session = await adminSession();
+    const attempt = (current: string, from: string) =>
+      POST(
+        request("/api/password", {
+          method: "POST",
+          body: { current, next: "a brand new passphrase" },
+          session,
+          headers: { "x-forwarded-for": from },
+        })
+      );
+    for (let i = 0; i < 5; i++) expect((await attempt("wrong", "10.7.0.1")).status).toBe(403);
+    const blocked = await attempt("correct horse", "10.7.0.1");
+    expect(blocked.status).toBe(429);
+    expect(Number(blocked.headers.get("retry-after"))).toBeGreaterThan(0);
+    // Another client is unaffected.
+    expect((await attempt("wrong", "10.7.0.2")).status).toBe(403);
+    const { listSecurityEvents } = await import("@/lib/security-events");
+    const fails = (await listSecurityEvents(50)).filter(
+      (e) => e.kind === "password.fail" && e.ip?.startsWith("10.7.0.")
+    );
+    expect(fails.map((e) => [e.ip, e.count ?? 1])).toEqual([
+      ["10.7.0.2", 1],
+      ["10.7.0.1", 5],
+    ]);
+  });
 });

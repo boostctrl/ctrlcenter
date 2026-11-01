@@ -42,7 +42,9 @@ is the public entry point. A couple of settings matter for a safe deployment:
 - Set `TRUSTED_PROXY_HOPS` to match your proxy chain — in particular, set it to
   `0` if you expose ctrlcenter directly with no proxy, so a client can't spoof
   `X-Forwarded-For` to bypass the per-IP login throttle. With `0`, the Docker
-  image throttles each client by its real connection address.
+  image throttles each client by its real connection address. An IPv6 client
+  counts by its /64 block, and wrong two-factor codes are counted across all
+  addresses.
 - Consider turning on **two-factor authentication** (Settings → Security),
   especially if the portal is reachable beyond a network you fully trust.
 - Point an alert channel at somewhere you'll see it and leave its
