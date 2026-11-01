@@ -63,3 +63,26 @@ describe("/api/groups and /api/apps/bulk", () => {
   });
 });
 
+describe("merges and deletes with widget filters (#398)", () => {
+  it("moves a widget's filter on a merge and reports the merge; a filtered-to group can't be deleted", async () => {
+    const { replaceWidgets, readConfigInternal } = await import("@/lib/config");
+    const { newInstance } = await import("@/lib/schema");
+    const before = await (await get()).json();
+    // Streaming first: a later group given its name merges into it.
+    expect((await put([...before, { id: "streaming", name: "Streaming" }, { id: "media", name: "Media" }])).status).toBe(200);
+    await replaceWidgets([{ ...newInstance("apps", "apps-media"), filter: { ...newInstance("apps", "x").filter, group: "media" } }]);
+    // Renaming Media to Streaming merges it into Streaming.
+    const merged = await put([...before, { id: "streaming", name: "Streaming" }, { id: "media", name: "Streaming" }]);
+    expect(merged.status).toBe(200);
+    const body = await merged.json();
+    expect(body.merged).toEqual({ media: "streaming" });
+    expect(body.widgets.find((w: { id: string }) => w.id === "apps-media").filter.group).toBe("streaming");
+    expect((await readConfigInternal()).widgets[0]).toMatchObject({ filter: { group: "streaming" } });
+    // Streaming is in use by the widget now: deleting it is refused.
+    const refused = await put(before);
+    expect(refused.status).toBe(409);
+    expect((await refused.json()).error).toMatch(/widget/);
+    await replaceWidgets([]);
+    expect((await put(before)).status).toBe(200);
+  });
+});

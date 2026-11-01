@@ -1,6 +1,6 @@
 // Groups (#299): the pure helpers shared by the dashboard, the admin and the
 // server. Items store a group's id; the `groups` list gives names and order.
-import type { AppItem, BookmarkItem, Group, InstanceOf } from "./schema";
+import type { AppItem, BookmarkItem, Group, InstanceOf, WidgetInstance } from "./schema";
 
 // The heading for bookmarks with no (or a since-removed) group.
 export const UNGROUPED_LABEL = "Other";
@@ -83,16 +83,38 @@ export function allTags(apps: readonly Pick<AppItem, "tags">[]): string[] {
 // How many apps and bookmarks each group holds, by id.
 export function groupUsage(
   apps: readonly Pick<AppItem, "group">[],
-  bookmarks: readonly Pick<BookmarkItem, "group">[]
-): Map<string, { apps: number; bookmarks: number }> {
-  const out = new Map<string, { apps: number; bookmarks: number }>();
-  const bump = (id: string, key: "apps" | "bookmarks") => {
+  bookmarks: readonly Pick<BookmarkItem, "group">[],
+  // The apps and bookmarks widgets filtered to a group count as a use too
+  // (#398): deleting the group would leave such a widget empty for good.
+  widgets: readonly WidgetInstance[] = []
+): Map<string, { apps: number; bookmarks: number; widgets: number }> {
+  const out = new Map<string, { apps: number; bookmarks: number; widgets: number }>();
+  const bump = (id: string, key: "apps" | "bookmarks" | "widgets") => {
     if (!id) return;
-    const u = out.get(id) ?? { apps: 0, bookmarks: 0 };
+    const u = out.get(id) ?? { apps: 0, bookmarks: 0, widgets: 0 };
     u[key]++;
     out.set(id, u);
   };
   for (const a of apps) bump(a.group, "apps");
   for (const b of bookmarks) bump(b.group, "bookmarks");
+  for (const w of widgets) bump(widgetGroupFilter(w), "widgets");
   return out;
+}
+
+// The group an apps or bookmarks widget is filtered to, "" for none or for
+// any other widget.
+export function widgetGroupFilter(w: WidgetInstance): string {
+  return (w.type === "apps" || w.type === "bookmarks") && w.filter.group ? w.filter.group : "";
+}
+
+// The widgets with their group filters moved as a merge moved them (#398):
+// `merged` maps each merged-away group id to the one it merged into.
+export function remapWidgetGroups(widgets: WidgetInstance[], merged: Record<string, string>): WidgetInstance[] {
+  if (Object.keys(merged).length === 0) return widgets;
+  return widgets.map((w) => {
+    const from = widgetGroupFilter(w);
+    const to = merged[from];
+    if (!to || !(w.type === "apps" || w.type === "bookmarks")) return w;
+    return { ...w, filter: { ...w.filter, group: to } } as WidgetInstance;
+  });
 }

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { monitoredApps, type Board, type Integration, type Settings, type WidgetInstance } from "@/lib/schema";
 import { allTags } from "@/lib/groups";
-import type { GroupsState } from "./useGroups";
+import type { GroupsState, GroupMerges } from "./useGroups";
 import type { ItemsState } from "./useAdminData";
 import type { ThemePack } from "@/lib/theme";
 import { replaceUrlParams } from "./urlState";
@@ -29,6 +29,7 @@ import SecuritySection from "./settings/SecuritySection";
 export default function SettingsManager({
   initialSettings,
   initialWidgets,
+  groupMerges,
   initialBoards,
   initialIntegrations,
   groupsState,
@@ -38,8 +39,10 @@ export default function SettingsManager({
   initialTwoFactorEnabled,
 }: {
   initialSettings: Settings;
-  // The widget instances (#297), edited in the Widgets section.
+  // The widget instances (#297), edited in the Widgets section, and the
+  // group merges made since (#398), which move their filters.
   initialWidgets: WidgetInstance[];
+  groupMerges: GroupMerges;
   // The boards (#298), managed in the Layout section.
   initialBoards: Board[];
   // The integrations (#300), edited in the Integrations section.
@@ -56,7 +59,7 @@ export default function SettingsManager({
   initialSection?: string;
   initialTwoFactorEnabled: boolean;
 }) {
-  const draft = useSettingsDraft(initialSettings, initialWidgets, initialBoards, initialIntegrations, themePacks);
+  const draft = useSettingsDraft(initialSettings, initialWidgets, initialBoards, initialIntegrations, themePacks, groupMerges);
   const { status, error } = draft;
   const apps = useMemo(
     () => monitoredApps(items.apps).map(({ id, name }) => ({ id, name })),

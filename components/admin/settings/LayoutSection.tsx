@@ -1,5 +1,6 @@
 "use client";
 
+import type { WidgetInstance } from "@/lib/schema";
 import { useState } from "react";
 import Link from "next/link";
 import { buttonClasses } from "@/lib/buttons";
@@ -146,7 +147,16 @@ const COLOR_LABELS: Record<GroupColor, string> = {
 // group's name merges the two), reorder (the bookmarks widgets' order), and
 // delete once nothing uses a group. Groups are made by naming one in an app
 // or bookmark form.
-function GroupsCard({ groupsState, items }: { groupsState: GroupsState; items: ItemsState }) {
+function GroupsCard({
+  groupsState,
+  items,
+  widgets,
+}: {
+  groupsState: GroupsState;
+  items: ItemsState;
+  // For the usage counts: a widget filtered to a group uses it too (#398).
+  widgets: WidgetInstance[];
+}) {
   const { groups, save } = groupsState;
   // Names being typed, by group id, until committed on blur or Enter.
   const [names, setNames] = useState<Record<string, string>>({});
@@ -154,7 +164,7 @@ function GroupsCard({ groupsState, items }: { groupsState: GroupsState; items: I
     setNames((n) => Object.fromEntries(Object.entries(n).filter(([k]) => k !== id)));
   const confirm = useConfirm();
   const toast = useToast();
-  const usage = groupUsage(items.apps, items.bookmarks);
+  const usage = groupUsage(items.apps, items.bookmarks, widgets);
   // The list with one group's icon or color changed; "" or undefined drops it.
   const withStyle = (id: string, patch: { icon?: string; color?: GroupColor }) =>
     groups.map((g) => {
@@ -207,7 +217,11 @@ function GroupsCard({ groupsState, items }: { groupsState: GroupsState; items: I
           {groups.map((g, i) => {
             const u = usage.get(g.id);
             const count = u
-              ? [u.apps && `${u.apps} app${u.apps === 1 ? "" : "s"}`, u.bookmarks && `${u.bookmarks} bookmark${u.bookmarks === 1 ? "" : "s"}`]
+              ? [
+                  u.apps && `${u.apps} app${u.apps === 1 ? "" : "s"}`,
+                  u.bookmarks && `${u.bookmarks} bookmark${u.bookmarks === 1 ? "" : "s"}`,
+                  u.widgets && `${u.widgets} widget${u.widgets === 1 ? "" : "s"}`,
+                ]
                   .filter(Boolean)
                   .join(" · ")
               : "Unused";
@@ -296,7 +310,7 @@ export default function LayoutSection({
   return (
     <>
       <BoardsCard d={d} themePacks={themePacks} />
-      <GroupsCard groupsState={groupsState} items={items} />
+      <GroupsCard groupsState={groupsState} items={items} widgets={d.widgets} />
       <Card
         title="Visible widgets"
         intro="Show or hide widgets on the home page (the first board). The content widgets (calendars, feeds, notes…) each have their own switch under Widgets; the split clock/weather/status widgets are managed in the home-page editor."

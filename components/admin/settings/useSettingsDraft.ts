@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AlertType, Board, BoardVisibility, Integration, Settings, SettingsInput, WidgetInstance } from "@/lib/schema";
 import {
   type WebhookService,
@@ -21,6 +21,8 @@ import { useAutosave, type SaveOptions, type SaveState } from "../useAutosave";
 import { settingsPatch } from "../settingsPatch";
 import { saveBoards, saveIntegrations, saveSettingsPatch, saveWidgets } from "../settingsApi";
 import { diffList } from "@/lib/list-patch";
+import { remapWidgetGroups } from "@/lib/groups";
+import type { GroupMerges } from "../useGroups";
 import type { ServiceId } from "@/lib/services/ids";
 import { reorder } from "../useReorder";
 import { useKeyedRows } from "./useKeyedRows";
@@ -39,7 +41,9 @@ export function useSettingsDraft(
   initialWidgets: WidgetInstance[],
   initialBoards: Board[],
   initialIntegrations: Integration[],
-  themePacks: ThemePack[]
+  themePacks: ThemePack[],
+  // The group merges made since this draft was seeded (#398).
+  groupMerges: GroupMerges = { seq: 0, map: {} }
 ) {
   const [settings, setSettings] = useState<Settings>(initialSettings);
   // The widget instances (#297), with their own autosave to /api/widgets. A
@@ -73,6 +77,17 @@ export function useSettingsDraft(
     await saveWidgets(patch, { keepalive: opts?.keepalive });
     savedWidgets.current = next;
   });
+  // A group merge, here or in another tab, moved the widgets' filters on
+  // the server (#398): move them in this draft and in its saved snapshot
+  // alike, so the Widgets section shows the surviving group and the next
+  // save doesn't send the old id back.
+  const appliedMerge = useRef(groupMerges.seq);
+  useEffect(() => {
+    if (groupMerges.seq === appliedMerge.current) return;
+    appliedMerge.current = groupMerges.seq;
+    savedWidgets.current = remapWidgetGroups(savedWidgets.current, groupMerges.map);
+    setWidgets((ws) => remapWidgetGroups(ws, groupMerges.map));
+  }, [groupMerges]);
   // The boards (#298), with their own autosave to /api/boards. A board's rows
   // go out only when this form changed them since the last save, so it can't
   // overwrite an arrangement the on-page editor saved meanwhile.

@@ -20,7 +20,7 @@ import PageNav from "@/components/PageNav";
 import { useEdgeFade } from "@/components/useEdgeFade";
 import { resolveThemeGallery } from "@/lib/theme";
 import { navPages } from "@/lib/nav";
-import { useGroups } from "./useGroups";
+import { useGroups, type GroupMerges } from "./useGroups";
 import { useItems, useThemeGallery } from "./useAdminData";
 import { downloadJson } from "@/lib/download";
 import { buttonClasses } from "@/lib/buttons";
@@ -94,8 +94,20 @@ function AdminBody({
 }: Props) {
   // The groups (#299) and the apps and bookmarks (#317), shared by the
   // Applications, Bookmarks and Settings tabs.
-  const groupsState = useGroups(initialGroups);
   const items = useItems(initialApps, initialBookmarks);
+  // The widget instances as the Settings tab first sees them, kept current
+  // with what a group merge moved (#398), and the merges themselves for a
+  // Settings tab that's already open.
+  const [widgets, setWidgets] = useState(initialWidgets);
+  const [groupMerges, setGroupMerges] = useState<GroupMerges>({ seq: 0, map: {} });
+  const groupsState = useGroups(initialGroups, (moved) => {
+    items.setApps(moved.apps);
+    items.setBookmarks(moved.bookmarks);
+    setWidgets(moved.widgets);
+    if (Object.keys(moved.merged).length > 0) {
+      setGroupMerges((m) => ({ seq: m.seq + 1, map: moved.merged }));
+    }
+  });
   // Likewise the theme gallery, edited in Themes and offered in Settings —
   // hidden packs included, since the site default may well be one visitors
   // can't pick themselves.
@@ -406,7 +418,8 @@ function AdminBody({
         <div hidden={tab !== "settings"}>
           <SettingsManager
             initialSettings={initialSettings}
-            initialWidgets={initialWidgets}
+            initialWidgets={widgets}
+            groupMerges={groupMerges}
             initialBoards={initialBoards}
             initialIntegrations={initialIntegrations}
             groupsState={groupsState}

@@ -53,6 +53,14 @@ here.
   a board renamed in one tab could delete a board another tab had just
   created or set it back to public. Each form now saves only what it
   changed. (#396)
+- **Merging or deleting a group no longer leaves widgets pointing at it.**
+  After merging two groups, an Applications or Bookmarks widget filtered to
+  the merged-away group kept the old filter in the open Settings tab, so a
+  later edit emptied the card, and a merge made from the Bookmarks tab could
+  recreate the old group as a ghost on the next app save. The merge now moves
+  the widget filters everywhere at once, and a group that a widget is
+  filtered to counts as in use, so it can't be deleted out from under the
+  widget. (#398)
 
 ### Security
 

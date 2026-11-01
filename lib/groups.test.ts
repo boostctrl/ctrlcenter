@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { allTags, appMatches, findGroupByName, groupBookmarks, groupName, groupUsage } from "./groups";
-import { appItemSchema, bookmarkItemSchema } from "./schema";
+import { allTags, appMatches, findGroupByName, groupBookmarks, groupName, groupUsage, remapWidgetGroups, widgetGroupFilter } from "./groups";
+import { appItemSchema, bookmarkItemSchema, newInstance } from "./schema";
 
 // Groups and filters (#299).
 const groups = [
@@ -56,8 +56,24 @@ describe("tags and usage", () => {
 
   it("counts apps and bookmarks per group", () => {
     const usage = groupUsage([app({ group: "dev" }), app({})], [bm("1", "dev"), bm("2", "media")]);
-    expect(usage.get("dev")).toEqual({ apps: 1, bookmarks: 1 });
-    expect(usage.get("media")).toEqual({ apps: 0, bookmarks: 1 });
+    expect(usage.get("dev")).toEqual({ apps: 1, bookmarks: 1, widgets: 0 });
+    expect(usage.get("media")).toEqual({ apps: 0, bookmarks: 1, widgets: 0 });
     expect(usage.has("")).toBe(false);
+  });
+});
+
+describe("widget filters as uses, and a merge's remap (#398)", () => {
+  it("counts the apps and bookmarks widgets filtered to a group", () => {
+    const apps = [{ group: "media" }];
+    const widgets = [
+      { ...newInstance("apps", "a"), filter: { ...newInstance("apps", "a").filter, group: "media" } },
+      { ...newInstance("bookmarks", "b"), filter: { ...newInstance("bookmarks", "b").filter, group: "infra" } },
+      newInstance("notes", "n"),
+    ];
+    const usage = groupUsage(apps, [], widgets);
+    expect(usage.get("media")).toEqual({ apps: 1, bookmarks: 0, widgets: 1 });
+    expect(usage.get("infra")).toEqual({ apps: 0, bookmarks: 0, widgets: 1 });
+    expect(remapWidgetGroups(widgets, { media: "streaming" }).map(widgetGroupFilter)).toEqual(["streaming", "infra", ""]);
+    expect(remapWidgetGroups(widgets, {})).toBe(widgets);
   });
 });
