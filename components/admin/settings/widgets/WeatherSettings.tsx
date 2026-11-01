@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, Hint, SelectField, TextField, fieldLabelClasses } from "../../ui";
+import { Card, Hint, NumberField, SelectField, fieldLabelClasses } from "../../ui";
 import CitySearch from "../../CitySearch";
 import type { SettingsDraft } from "../useSettingsDraft";
 
@@ -34,42 +34,28 @@ export default function WeatherSettings({ d }: { d: SettingsDraft }) {
         </Hint>
       </div>
 
+      {/* Bounded like the settings PUT (weatherUpdateSchema), so a coordinate
+          the server would reject can't be saved in the first place. */}
       <div className="grid grid-cols-2 gap-4">
-        <TextField
+        <NumberField
           label="Latitude"
-          type="number"
-          step="any"
+          decimal
           min={-90}
           max={90}
           value={settings.weather.latitude}
-          onChange={(e) => {
-            const v = parseFloat(e.target.value);
-            setSettings({
-              ...settings,
-              weather: {
-                ...settings.weather,
-                latitude: Number.isNaN(v) ? settings.weather.latitude : v,
-              },
-            });
-          }}
+          onChange={(latitude) =>
+            setSettings({ ...settings, weather: { ...settings.weather, latitude } })
+          }
         />
-        <TextField
+        <NumberField
           label="Longitude"
-          type="number"
-          step="any"
+          decimal
           min={-180}
           max={180}
           value={settings.weather.longitude}
-          onChange={(e) => {
-            const v = parseFloat(e.target.value);
-            setSettings({
-              ...settings,
-              weather: {
-                ...settings.weather,
-                longitude: Number.isNaN(v) ? settings.weather.longitude : v,
-              },
-            });
-          }}
+          onChange={(longitude) =>
+            setSettings({ ...settings, weather: { ...settings.weather, longitude } })
+          }
         />
       </div>
 

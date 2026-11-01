@@ -22,6 +22,14 @@ here.
 
 ### Fixed
 
+- **Number fields keep what you type.** The API widget's thresholds, gauge
+  size and refresh interval, the weather coordinates and the other number
+  fields in Settings re-read the value on every keystroke, so `0.8` turned
+  into 8, `-5` into 5, `30` into 150 in a field whose minimum is 15, and a
+  longitude typed over the old one came out as a number the save then
+  rejected. The fields now leave the text alone while you type, say which
+  range they take when a value falls outside it, and move an out-of-range
+  value to the nearest limit only once you leave the field. (#397)
 - **Escape during a drag no longer closes the layout editor.** Pressing
   Escape while moving a card cancelled the move but also left edit mode and
   threw away the undo history, and during an edge resize it could leave the

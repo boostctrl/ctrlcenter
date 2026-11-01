@@ -15,6 +15,7 @@ import {
   Button,
   Hint,
   ListPanel,
+  NumberField,
   NumberRow,
   RemoveButton,
   SelectField,
@@ -42,10 +43,8 @@ export default function ApiSettings({ w, onChange }: InstanceEditorProps<"api">)
   const fields = api.fields.length > 0 ? api.fields : [{ label: "", path: "", unit: "" }];
   const setField = (i: number, patch: Partial<Field>) =>
     onChange({ fields: fields.map((f, idx) => (idx === i ? { ...f, ...patch } : f)) });
-  const setThreshold = (key: "warn" | "critical", raw: string) =>
-    onChange({
-      thresholds: { ...api.thresholds, [key]: raw.trim() === "" || !Number.isFinite(Number(raw)) ? null : Number(raw) },
-    });
+  const setThreshold = (key: "warn" | "critical", value: number | null) =>
+    onChange({ thresholds: { ...api.thresholds, [key]: value } });
   const single = api.display === "stat" || api.display === "gauge";
   return (
     <>
@@ -199,29 +198,29 @@ export default function ApiSettings({ w, onChange }: InstanceEditorProps<"api">)
       {single && (
         <div className="grid gap-4 sm:grid-cols-3">
           {api.display === "gauge" && (
-            <TextField
+            <NumberField
               label="Full at"
-              inputMode="decimal"
-              value={String(api.max)}
-              onChange={(e) => {
-                const n = Number(e.target.value);
-                if (Number.isFinite(n) && n > 0) onChange({ max: n });
-              }}
+              decimal
+              positive
+              value={api.max}
+              onChange={(max) => onChange({ max })}
             />
           )}
-          <TextField
+          <NumberField
             label="Warn at"
-            inputMode="decimal"
+            decimal
+            optional
             placeholder="None"
-            value={api.thresholds.warn ?? ""}
-            onChange={(e) => setThreshold("warn", e.target.value)}
+            value={api.thresholds.warn}
+            onChange={(warn) => setThreshold("warn", warn)}
           />
-          <TextField
+          <NumberField
             label="Critical at"
-            inputMode="decimal"
+            decimal
+            optional
             placeholder="None"
-            value={api.thresholds.critical ?? ""}
-            onChange={(e) => setThreshold("critical", e.target.value)}
+            value={api.thresholds.critical}
+            onChange={(critical) => setThreshold("critical", critical)}
           />
           <SelectField
             label="Counting"

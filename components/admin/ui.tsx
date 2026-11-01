@@ -1,12 +1,14 @@
 "use client";
 
-import type {
-  InputHTMLAttributes,
-  SelectHTMLAttributes,
-  TextareaHTMLAttributes,
-  ButtonHTMLAttributes,
-  ReactNode,
-  Ref,
+import {
+  useId,
+  useState,
+  type InputHTMLAttributes,
+  type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
+  type ButtonHTMLAttributes,
+  type ReactNode,
+  type Ref,
 } from "react";
 import {
   buttonClasses,
@@ -115,48 +117,154 @@ export function TextArea({
   );
 }
 
-// Clamped integer input: an unparseable keystroke keeps the previous value,
-// anything else clamps into [min, max] — the behavior every hand-rolled
-// number field had copied separately.
-function clampedChange(
-  raw: string,
-  min: number,
-  max: number,
-  onChange: (value: number) => void
-) {
-  const v = parseInt(raw, 10);
-  if (!Number.isNaN(v)) onChange(Math.min(max, Math.max(min, v)));
+// The number fields parse what the admin types only once it reads as a
+// number, never rewriting it under the cursor (#397): the field shows the raw
+// text while it's being edited, so "0.8", "-5" and "30" can be typed in full.
+// A keystroke that leaves a valid number stores it at once; one that leaves
+// the value out of range says what the field takes instead of clamping it.
+// Leaving the field (or Enter) settles it: an out-of-range number moves to
+// the nearest limit, a blank or unreadable one goes back to the stored value.
+type NumberSpec = {
+  min?: number;
+  max?: number;
+  // Fractions allowed (step="any"); whole numbers otherwise.
+  decimal?: boolean;
+  // Greater than 0, with no lower limit to settle on (a gauge's "full").
+  positive?: boolean;
+};
+
+// A required field holds a number; an optional one (an API widget's
+// thresholds) may be blank, which stores null.
+type NumberValue =
+  | { optional?: false; value: number; onChange: (value: number) => void }
+  | { optional: true; value: number | null; onChange: (value: number | null) => void };
+
+type NumberProps = NumberSpec & NumberValue;
+
+function rangeMessage({ min, max, decimal, positive }: NumberSpec): string {
+  const kind = decimal ? "a number" : "a whole number";
+  if (positive) return `Enter ${kind} greater than 0${max === undefined ? "" : `, up to ${max}`}.`;
+  if (min !== undefined && max !== undefined) return `Enter ${kind} from ${min} to ${max}.`;
+  if (min !== undefined) return `Enter ${kind} of ${min} or more.`;
+  if (max !== undefined) return `Enter ${kind} of ${max} or less.`;
+  return `Enter ${kind}.`;
 }
+
+// The number in a field's text: null when blank, NaN when unreadable.
+function readNumber(text: string): number | null {
+  const t = text.trim();
+  if (t === "") return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : NaN;
+}
+
+const accepts = (n: number, { min, max, decimal, positive }: NumberSpec) =>
+  (decimal || Number.isInteger(n)) &&
+  (!positive || n > 0) &&
+  (min === undefined || n >= min) &&
+  (max === undefined || n <= max);
+
+// The nearest value the field takes, or null when there is none (0 or less
+// for a positive-only field).
+function settle(n: number, { min, max, decimal, positive }: NumberSpec): number | null {
+  let v = decimal ? n : Math.round(n);
+  if (positive && v <= 0) return null;
+  if (min !== undefined) v = Math.max(min, v);
+  if (max !== undefined) v = Math.min(max, v);
+  return v;
+}
+
+function useNumberInput(props: NumberProps) {
+  const { value, min, max, decimal = false, positive = false, optional = false } = props;
+  const spec: NumberSpec = { min, max, decimal, positive };
+  // Only an optional field is ever handed null.
+  const emit = props.onChange as (value: number | null) => void;
+  const id = useId();
+  // The raw text while the admin types, with the stored value it belongs to:
+  // when the value changes under it (a city search sets the coordinates), the
+  // text is dropped for the new value.
+  const [draft, setDraft] = useState<{ text: string; value: number | null } | null>(null);
+  const typing = draft !== null && draft.value === value;
+  const text = typing ? draft.text : value === null ? "" : String(value);
+  const typed = typing ? readNumber(draft.text) : null;
+  const error =
+    typed !== null && (Number.isNaN(typed) || !accepts(typed, spec)) ? rangeMessage(spec) : null;
+
+  const onInput = (raw: string) => {
+    const n = readNumber(raw);
+    if (n === null && optional) {
+      setDraft({ text: raw, value: null });
+      if (value !== null) emit(null);
+    } else if (n !== null && !Number.isNaN(n) && accepts(n, spec)) {
+      setDraft({ text: raw, value: n });
+      if (n !== value) emit(n);
+    } else {
+      setDraft({ text: raw, value });
+    }
+  };
+  const commit = () => {
+    if (typing) {
+      const n = readNumber(draft.text);
+      const settled = n === null || Number.isNaN(n) ? null : settle(n, spec);
+      if (settled !== null && settled !== value) emit(settled);
+    }
+    setDraft(null);
+  };
+
+  const input: InputHTMLAttributes<HTMLInputElement> = {
+    id,
+    type: "number",
+    step: decimal ? "any" : undefined,
+    min,
+    max,
+    value: text,
+    onChange: (e) => onInput(e.target.value),
+    onBlur: commit,
+    onKeyDown: (e) => {
+      if (e.key === "Enter") commit();
+    },
+    "aria-invalid": error ? true : undefined,
+  };
+  return { id, errorId: `${id}-error`, hintId: `${id}-hint`, error, input };
+}
+
+const describedBy = (...ids: (string | false | null | undefined)[]) =>
+  ids.filter(Boolean).join(" ") || undefined;
 
 // Stacked (label above) number field, for grid layouts beside text fields.
 export function NumberField({
   label,
   hint,
-  min,
-  max,
-  value,
-  onChange,
-}: {
+  placeholder,
+  ...props
+}: NumberProps & {
   label: string;
   hint?: ReactNode;
-  min: number;
-  max: number;
-  value: number;
-  onChange: (value: number) => void;
+  placeholder?: string;
 }) {
+  const { id, errorId, hintId, error, input } = useNumberInput(props);
   return (
-    <label className="flex flex-col gap-1.5 text-sm">
-      <span className={fieldLabelClasses}>{label}</span>
+    <div className="flex flex-col gap-1.5 text-sm">
+      <label htmlFor={id} className={fieldLabelClasses}>
+        {label}
+      </label>
       <input
-        type="number"
-        min={min}
-        max={max}
-        value={value}
-        onChange={(e) => clampedChange(e.target.value, min, max, onChange)}
+        {...input}
+        placeholder={placeholder}
+        aria-describedby={describedBy(error && errorId, hint ? hintId : null)}
         className={controlClasses}
       />
-      {hint && <span className="text-xs text-ink-40">{hint}</span>}
-    </label>
+      {error && (
+        <p id={errorId} role="alert" className="text-xs text-status-down">
+          {error}
+        </p>
+      )}
+      {hint && (
+        <p id={hintId} className="text-xs text-ink-40">
+          {hint}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -165,33 +273,31 @@ export function NumberField({
 export function NumberRow({
   label,
   hint,
-  min,
-  max,
-  value,
-  onChange,
-}: {
+  ...props
+}: NumberProps & {
   label: ReactNode;
   hint?: ReactNode;
-  min: number;
-  max: number;
-  value: number;
-  onChange: (value: number) => void;
 }) {
+  const { id, errorId, error, input } = useNumberInput(props);
   return (
-    <label className="flex items-center justify-between gap-4 text-sm">
-      <span className="text-ink-70">
-        {label}
-        {hint && <span className="block text-xs text-ink-45">{hint}</span>}
-      </span>
-      <input
-        type="number"
-        min={min}
-        max={max}
-        value={value}
-        onChange={(e) => clampedChange(e.target.value, min, max, onChange)}
-        className={`${controlClasses} w-20 shrink-0 text-center`}
-      />
-    </label>
+    <div className="flex flex-col gap-1 text-sm">
+      <div className="flex items-center justify-between gap-4">
+        <label htmlFor={id} className="text-ink-70">
+          {label}
+          {hint && <span className="block text-xs text-ink-45">{hint}</span>}
+        </label>
+        <input
+          {...input}
+          aria-describedby={describedBy(error && errorId)}
+          className={`${controlClasses} w-20 shrink-0 text-center`}
+        />
+      </div>
+      {error && (
+        <p id={errorId} role="alert" className="text-right text-xs text-status-down">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
 
