@@ -11,6 +11,8 @@ here.
 
 ## [Unreleased]
 
+## [3.1.0-rc.4] - 2026-11-01
+
 ### Changed
 
 - **"Card opacity" runs from clear glass to a solid card.** At 0% a card
@@ -3842,7 +3844,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.0-rc.3...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.0-rc.4...HEAD
+[3.1.0-rc.4]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.0-rc.3...v3.1.0-rc.4
 [3.1.0-rc.3]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.0-rc.2...v3.1.0-rc.3
 [3.1.0-rc.2]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.0-rc.1...v3.1.0-rc.2
 [3.1.0-rc.1]: https://github.com/boostctrl/ctrlcenter/compare/v3.0.1...v3.1.0-rc.1
