@@ -14,11 +14,11 @@
 // dropping under 4.5:1 (#273) or content outside a landmark (#274) can't land.
 import fs from "node:fs";
 import { createRequire } from "node:module";
-import { chromium } from "playwright-core";
+import { chromium, webkit } from "playwright-core";
 
 const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "best-practice"];
 let axeSource;
-function axeScript() {
+export function axeScript() {
   axeSource ??= fs.readFileSync(
     createRequire(import.meta.url).resolve("axe-core/axe.min.js"),
     "utf8"
@@ -28,8 +28,15 @@ function axeScript() {
 
 // Uses Playwright's own Chromium (`npx playwright-core install chromium`), or
 // the binary at CHROMIUM_PATH when that's set — e.g. a preinstalled browser
-// whose revision doesn't match this playwright-core version.
-export function launchBrowser() {
+// whose revision doesn't match this playwright-core version. With "webkit",
+// Playwright's WebKit (`npx playwright-core install webkit`) or WEBKIT_PATH
+// the same way, for the smoke test's Safari pass (#430).
+export function launchBrowser(engine = "chromium") {
+  if (engine === "webkit") {
+    return webkit.launch(
+      process.env.WEBKIT_PATH ? { executablePath: process.env.WEBKIT_PATH } : {}
+    );
+  }
   return chromium.launch(
     process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}
   );

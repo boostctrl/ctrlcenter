@@ -33,3 +33,28 @@ jobs:
           name: smoke-screenshots
           path: smoke-screenshots/
           if-no-files-found: ignore
+
+  # The sized-cell keyboard contract (#355) and clip-box geometry (#354) in
+  # WebKit, Safari's engine, where they differ from Chromium (#430): the same
+  # build, driven by scripts/smoke.mjs with SMOKE_BROWSER=webkit. Its own job,
+  # so the Chromium run above stays as long as it is.
+  smoke-webkit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright-core install --with-deps webkit
+      - run: npm run smoke:webkit
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: smoke-screenshots-webkit
+          path: smoke-screenshots/
+          if-no-files-found: ignore

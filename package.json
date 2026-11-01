@@ -15,7 +15,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "prepare": "git config core.hooksPath .githooks || true",
-    "smoke": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/smoke.mjs"
+    "smoke": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/smoke.mjs",
+    "smoke:webkit": "SMOKE_BROWSER=webkit node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/smoke.mjs"
   },
   "dependencies": {
     "jose": "^6.2.14",

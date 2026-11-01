@@ -11,6 +11,12 @@
 // Screenshots land in $SMOKE_OUT (default smoke-screenshots/) for upload as a
 // CI artifact. Needs a Chromium for playwright-core: `npx playwright-core
 // install chromium`, or CHROMIUM_PATH pointing at one.
+//
+// With SMOKE_BROWSER=webkit (`npm run smoke:webkit`, its own CI job) it
+// launches Playwright's WebKit instead — Safari's engine, `npx playwright-core
+// install webkit` or WEBKIT_PATH — and runs only the sized-cell keyboard
+// contract (#355) and clip-box geometry (#354) on the seeded board, the one
+// place the engines differ (#430); see webkitSizedCells.
 import { execFileSync, spawn } from "node:child_process";
 import tls from "node:tls";
 import * as YAML from "js-yaml";
@@ -18,12 +24,17 @@ import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
-import { launchBrowser, checkPage } from "./page-check.mjs";
+import { launchBrowser, checkPage, axeScript } from "./page-check.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const STANDALONE = path.join(ROOT, ".next", "standalone");
 const OUT = path.resolve(process.env.SMOKE_OUT || path.join(ROOT, "smoke-screenshots"));
 const PASSWORD = "smoke-test-password";
+const BROWSER = process.env.SMOKE_BROWSER || "chromium";
+if (BROWSER !== "chromium" && BROWSER !== "webkit") {
+  console.error(`SMOKE_BROWSER=${BROWSER}: use chromium (the default) or webkit.`);
+  process.exit(2);
+}
 
 if (!fs.existsSync(path.join(STANDALONE, "server.js"))) {
   console.error("No standalone build — run `npm run build` first.");
@@ -108,7 +119,8 @@ try {
     await new Promise((r) => setTimeout(r, 300));
   }
 
-  browser = await launchBrowser();
+  browser = await launchBrowser(BROWSER);
+  if (BROWSER === "webkit") console.log(`ok    WebKit ${browser.version()}`);
   const run = async (context, pathname, shot, before) => {
     const result = await checkPage(context, base + pathname, {
       screenshot: path.join(OUT, `${shot}.png`),
@@ -122,7 +134,20 @@ try {
   };
 
   await addBoards();
+  if (BROWSER === "webkit") await webkitSizedCells();
+  else await chromiumPhases(run);
+} catch (e) {
+  failures.push(`smoke run aborted: ${e instanceof Error ? e.message : e}`);
+} finally {
+  await browser?.close();
+  server.kill();
+  tlsServer?.close();
+}
 
+// The Chromium run: the public pages signed out, every built-in look, the
+// admin pages and editor flows signed in, then the status, setup and upgrade
+// phases — each page audited with axe.
+async function chromiumPhases(run) {
   // Public pages, signed out.
   for (const scheme of ["light", "dark"]) {
     const ctx = await browser.newContext({
@@ -220,12 +245,6 @@ try {
   await statusPhase(run);
   await setupPhase(run);
   await upgradePhase(run);
-} catch (e) {
-  failures.push(`smoke run aborted: ${e instanceof Error ? e.message : e}`);
-} finally {
-  await browser?.close();
-  server.kill();
-  tlsServer?.close();
 }
 
 // Every built-in theme and palette, in both schemes, on the home page (#322):
@@ -829,6 +848,329 @@ async function sizedCells(ctx) {
   }
 }
 
+// The sized-cell contract in WebKit, Safari's engine (#430), on the infra
+// board addBoards seeded, in both schemes. WebKit, unlike Chrome 130+ and
+// Firefox, never puts a plain overflowing scroll box in the Tab order, so the
+// tabindex SizedCell sets (#355) is all that carries the keyboard contract
+// there — a regression in it passes the Chromium run and shows only in
+// Safari. The static contract sizedCells measures, then the keyboard: Tab
+// reaches the cut-off notes card and it shows its ring; the arrow keys, Home
+// and End scroll the card and leave the page where it is; grown to fit, the
+// card drops its stop and a Tab sweep of the page skips it; cut short again,
+// it takes the stop back. axe's scrollable-region-focusable rule, the one the
+// issue cites. And the header card's clip box (#354): it stands off the cell,
+// and the strip below the card looks the same with the clip lifted (nothing
+// is cut) and different with the shadow removed (the shadow is drawn there).
+//
+// Headless WebKit (WPE) runs a rendering update only every second or so, at
+// times only every ten, and ResizeObserver callbacks and keyboard-scroll
+// animation steps run with those updates, so no step sleeps a fixed time:
+// each waits for a frame (nextFrame, untilFrame) or polls for its outcome
+// frame by frame (eventually), with a minute's budget. Keyboard scrolling is
+// animated for as long as the key is held, so an arrow key is held until a
+// frame has run the animation; End chains to the page once the card is at
+// its bottom, so Home goes first. Only page errors count: the browser's
+// first-visit location lookup is rate-limited (429) by repeated runs from
+// one address and merely logs to the console.
+async function webkitSizedCells() {
+  const CARD = "main .grid > .widget-sized > section > .glass-card";
+  for (const scheme of ["dark", "light"]) {
+    const ctx = await browser.newContext({
+      viewport: { width: 1280, height: 900 },
+      colorScheme: scheme,
+      deviceScaleFactor: 2,
+      reducedMotion: "reduce",
+    });
+    await signIn(ctx);
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", (e) => errors.push(String(e)));
+    const external = [];
+    page.on("response", (r) => {
+      if (r.status() >= 400 && !r.url().startsWith(base)) external.push(`HTTP ${r.status()} ${new URL(r.url()).host}`);
+    });
+    // Where the keyboard focus is: on a sized card (and which), or on nothing.
+    const focused = () =>
+      page.evaluate((sel) => {
+        const el = document.activeElement;
+        return { card: !!el?.matches(sel), label: el?.getAttribute("aria-label") ?? null, body: !el || el === document.body };
+      }, CARD);
+    // The focused card's scroll position, and the page's.
+    const scrolled = () =>
+      page.evaluate(() => {
+        const el = document.activeElement;
+        return {
+          label: el?.getAttribute("aria-label") ?? null,
+          scrollTop: el?.scrollTop ?? -1,
+          max: el ? el.scrollHeight - el.clientHeight : -1,
+          pageY: window.scrollY,
+        };
+      });
+    // The notes card's stop, as SizedCell keeps it.
+    const notesCard = () =>
+      page.evaluate(() => {
+        const card = document.querySelectorAll("main .grid > *")[1]?.querySelector(":scope > section > .glass-card");
+        return card
+          ? { scrolls: card.scrollHeight > card.clientHeight, tabindex: card.getAttribute("tabindex"), role: card.getAttribute("role") }
+          : { missing: true };
+      });
+    const resize = (height) =>
+      page.evaluate((height) => {
+        document.querySelectorAll("main .grid > *")[1].style.height = height;
+      }, height);
+    const around = (r, m) => ({ x: Math.max(0, r.x - m), y: Math.max(0, r.y - m), width: r.width + 2 * m, height: r.height + 2 * m });
+    const t0 = Date.now();
+    try {
+      await page.goto(`${base}/b/infra`);
+      await page.locator("main .grid > .widget-sized").first().waitFor({ timeout: 10_000 });
+      // The static contract, once the hydrated cells have measured themselves.
+      const measured = await eventually(page, () => measureCells(page), (cells) => cells[1]?.card?.tabindex === "0");
+      const cells = measured.state;
+      const [header, notes, apps, parking] = cells;
+      if (cells.length !== 4) throw new Error(`${cells.length} cells on the board, not 4`);
+      if (header.height !== 160 || notes.height !== 200 || apps.height !== 220 || parking.height !== 300)
+        throw new Error(`cells ${header.height}, ${notes.height}, ${apps.height} and ${parking.height}px tall, not 160, 200, 220 and 300`);
+      if (!notes.sized || notes.card?.overflow !== "auto" || !notes.card.scrolls || notes.card.tabindex !== "0" || notes.card.role !== "region" || notes.card.label !== "House rules")
+        throw new Error(`the overflowing notes card isn't a named Tab stop: ${JSON.stringify(notes.card)}`);
+      // WebKit has no overflow-clip-margin, so a sized cell leaves the
+      // clipping to the card rather than clip at its own edge.
+      if (notes.overflow !== "visible") throw new Error(`the sized cell clips at its edge (overflow ${notes.overflow}) instead of leaving that to the card`);
+      if (!parking.card || parking.card.scrolls || parking.card.tabindex !== null)
+        throw new Error(`the short notes card took a Tab stop: ${JSON.stringify(parking.card)}`);
+      if (!apps.tiles || apps.tiles.tabindex) throw new Error(`the tile box took a Tab stop although its tiles are focusable: ${JSON.stringify(apps.tiles)}`);
+      // The header card's cell never clips; the box inside it does, standing
+      // off the cell by the bleed above and below and 16px beside (#354).
+      if (header.sized || header.overflow !== "visible" || header.clip?.overflow !== "clip" || !header.innerCard)
+        throw new Error(`the header card's cell is ${header.overflow} with clip box ${JSON.stringify(header.clip)}`);
+      const clipWant = { top: header.top - header.bleed, bottom: header.bottom + header.bleed, left: header.left - 16, right: header.right + 16 };
+      for (const [side, want] of Object.entries(clipWant))
+        if (Math.abs(header.clip[side] - want) > 1) throw new Error(`the clip box's ${side} is ${header.clip[side]}, not ${want}`);
+
+      // axe's rule for an overflowing region nothing can focus, in WebKit.
+      await page.addScriptTag({ content: axeScript() });
+      const violations = await page.evaluate(async () => {
+        const { violations } = await window.axe.run(document, { runOnly: ["scrollable-region-focusable"], resultTypes: ["violations"] });
+        return violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`);
+      });
+      if (violations.length) throw new Error(`axe: ${violations.join(" | ")}`);
+
+      // Tab from the top of the page until the notes card has the focus, and
+      // see its ring.
+      await page.evaluate(() => window.scrollTo(0, 0));
+      let presses = 0;
+      for (;;) {
+        await page.keyboard.press("Tab");
+        presses++;
+        const at = await focused();
+        if (at.card && at.label === "House rules") break;
+        if ((at.body && presses > 1) || presses >= 60)
+          throw new Error(`Tab never reached the notes card (${presses} presses${at.body ? ", back on the body" : ""})`);
+      }
+      const ring = await page.evaluate(() => {
+        const el = document.activeElement;
+        const cs = getComputedStyle(el);
+        const r = el.getBoundingClientRect();
+        return { visible: el.matches(":focus-visible"), style: cs.outlineStyle, width: parseFloat(cs.outlineWidth), rect: { x: r.left, y: r.top, width: r.width, height: r.height } };
+      });
+      if (!ring.visible || ring.style !== "solid" || !(ring.width >= 2))
+        throw new Error(`the focused card shows no ring: outline ${ring.style} ${ring.width}px, focus-visible ${ring.visible}`);
+      await page.screenshot({ path: path.join(OUT, `webkit-notes-focused-${scheme}.png`), clip: around(ring.rect, 24) });
+
+      // Scroll the card with an arrow key held through a frame (up to three
+      // holds), then Home, then End.
+      let down;
+      for (let hold = 0; hold < 3; hold++) {
+        await page.keyboard.down("ArrowDown");
+        await untilFrame(page);
+        await page.keyboard.up("ArrowDown");
+        down = await eventually(page, scrolled, (s) => s.scrollTop > 0, 2_000);
+        if (down.ok) break;
+      }
+      if (!down.ok || down.state.label !== "House rules" || down.state.pageY !== 0)
+        throw new Error(`the arrow keys didn't scroll the card, or scrolled the page: ${JSON.stringify(down.state)}`);
+      await page.keyboard.press("Home");
+      const home = await eventually(page, scrolled, (s) => s.scrollTop === 0);
+      if (!home.ok || home.state.pageY !== 0) throw new Error(`Home didn't take the card back to its top: ${JSON.stringify(home.state)}`);
+      await page.keyboard.press("End");
+      const end = await eventually(page, scrolled, (s) => Math.abs(s.scrollTop - s.max) <= 1);
+      if (!end.ok || end.state.pageY !== 0) throw new Error(`End didn't take the card to its bottom, or moved the page: ${JSON.stringify(end.state)}`);
+      await page.screenshot({ path: path.join(OUT, `webkit-notes-scrolled-${scheme}.png`), clip: around(ring.rect, 24) });
+
+      // Grown to fit its content, the card drops its stop as soon as the
+      // engine delivers the resize, and a Tab sweep of the page then skips
+      // every sized card; cut short again, it takes the stop back.
+      await resize("600px");
+      const grown = await eventually(page, notesCard, (s) => !s.scrolls && s.tabindex === null && s.role === null);
+      if (!grown.ok) throw new Error(`grown to 600px, the card keeps its Tab stop: ${JSON.stringify(grown.state)}`);
+      await page.evaluate(() => {
+        document.querySelector("header a, header button, main a, main button")?.focus();
+        window.scrollTo(0, 0);
+      });
+      let sweep = 0;
+      for (; sweep < 80; sweep++) {
+        await page.keyboard.press("Tab");
+        const at = await focused();
+        if (at.card) throw new Error(`a Tab sweep landed on a card that fits its cell (${at.label}, press ${sweep + 1})`);
+        if (at.body) break;
+      }
+      await resize("200px");
+      const shrunk = await eventually(page, notesCard, (s) => s.scrolls && s.tabindex === "0");
+      if (!shrunk.ok) throw new Error(`cut short again, the card has no Tab stop: ${JSON.stringify(shrunk.state)}`);
+
+      // The header card's shadow below the card (#354): the strip between the
+      // card's bottom and the clip box's bottom, as is, with the clip lifted
+      // and with the shadow removed — each style swap rendered by one frame.
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await untilFrame(page);
+      await page.screenshot({ path: path.join(OUT, `webkit-board-${scheme}.png`), fullPage: true });
+      const strip = {
+        x: header.innerCard.left + 12,
+        y: header.innerCard.bottom + 1,
+        width: header.innerCard.right - header.innerCard.left - 24,
+        height: Math.max(2, header.clip.bottom - header.innerCard.bottom - 2),
+      };
+      const shot = (name) => page.screenshot({ path: path.join(OUT, `webkit-header-strip-${name}-${scheme}.png`), clip: strip });
+      const asIs = await shot("asis");
+      let tag = await page.addStyleTag({ content: ".widget-centered > .widget-clip { overflow: visible !important; }" });
+      await untilFrame(page);
+      const unclipped = await shot("unclipped");
+      await tag.evaluate((el) => el.remove());
+      tag = await page.addStyleTag({ content: ".widget-centered .glass-card { box-shadow: none !important; }" });
+      await untilFrame(page);
+      const noShadow = await shot("noshadow");
+      await tag.evaluate((el) => el.remove());
+      const vsNoShadow = await meanDiff(page, asIs, noShadow);
+      const vsUnclipped = await meanDiff(page, asIs, unclipped);
+      if (!(vsNoShadow > 0.5))
+        throw new Error(`the header card's shadow isn't drawn below the card: mean pixel difference ${vsNoShadow.toFixed(2)} with the shadow removed (strip ${JSON.stringify(strip)})`);
+      if (!(vsUnclipped < 0.05))
+        throw new Error(`the header card's shadow is cut at the cell edge: mean pixel difference ${vsUnclipped.toFixed(3)} with the clip lifted`);
+      console.log(
+        `ok    WebKit (${scheme}): the cut-off card is a named Tab stop (press ${presses}) that scrolls from the keyboard, ` +
+          `drops the stop grown to fit (${grown.ms} ms) and takes it back cut short (${shrunk.ms} ms; sweep of ${sweep} presses); ` +
+          `the header card's shadow survives its clip box (pixel difference ${vsNoShadow.toFixed(2)} without it, ${vsUnclipped.toFixed(3)} unclipped); ` +
+          `${Math.round((Date.now() - t0) / 1000)} s`
+      );
+    } catch (e) {
+      failures.push(`sized cells in WebKit (${scheme}): ${e instanceof Error ? e.message.split("\n")[0] : e}`);
+    } finally {
+      if (errors.length) failures.push(`sized cells in WebKit (${scheme}): page errors: ${errors.join(" | ").slice(0, 300)}`);
+      if (external.length) console.log(`WARN  WebKit (${scheme}): off-origin responses ignored: ${[...new Set(external)].join(", ")}`);
+      await page.close();
+      await ctx.close();
+    }
+  }
+}
+
+// Every cell of the board, as webkitSizedCells checks them: its box, whether
+// it's sized and how it overflows, its clip box and the card inside it (the
+// header), its card's stop (the notes) and its tile box's (the apps).
+function measureCells(page) {
+  return page.evaluate(() => {
+    const grid = document.querySelector("main .grid");
+    const bleed = parseInt(getComputedStyle(grid).getPropertyValue("--cell-bleed"), 10);
+    const rect = (el) => {
+      const r = el.getBoundingClientRect();
+      return { top: Math.round(r.top), right: Math.round(r.right), bottom: Math.round(r.bottom), left: Math.round(r.left), height: Math.round(r.height) };
+    };
+    return Array.from(grid.children).map((cell) => {
+      const card = cell.querySelector(":scope > section > .glass-card");
+      const tiles = cell.querySelector(":scope > section > .widget-tiles");
+      const clip = cell.querySelector(":scope > .widget-clip");
+      const inner = clip?.querySelector(".glass-card");
+      return {
+        bleed,
+        sized: cell.classList.contains("widget-sized"),
+        overflow: getComputedStyle(cell).overflowY,
+        ...rect(cell),
+        clip: clip ? { ...rect(clip), overflow: getComputedStyle(clip).overflowY } : null,
+        innerCard: inner ? rect(inner) : null,
+        card: card
+          ? {
+              overflow: getComputedStyle(card).overflowY,
+              scrolls: card.scrollHeight > card.clientHeight,
+              tabindex: card.getAttribute("tabindex"),
+              role: card.getAttribute("role"),
+              label: card.getAttribute("aria-label"),
+            }
+          : null,
+        tiles: tiles ? { scrolls: tiles.scrollHeight > tiles.clientHeight, tabindex: tiles.getAttribute("tabindex") } : null,
+      };
+    });
+  });
+}
+
+// One chance at headless WebKit's next rendering update — a frame, and with
+// it the ResizeObserver callbacks and keyboard-scroll steps queued behind it:
+// resolves to whether one ran within 800 ms, nudging the engine with a tiny
+// screenshot when none did.
+async function nextFrame(page) {
+  const came = await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        let done = false;
+        requestAnimationFrame(() => {
+          done = true;
+          resolve(true);
+        });
+        setTimeout(() => {
+          if (!done) resolve(false);
+        }, 800);
+      })
+  );
+  if (!came) await page.screenshot({ clip: { x: 0, y: 0, width: 4, height: 4 } });
+  return came;
+}
+
+// Wait for a frame, for up to `budgetMs`: the wait in ms, or -1.
+async function untilFrame(page, budgetMs = 60_000) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < budgetMs) {
+    if (await nextFrame(page)) return Date.now() - t0;
+  }
+  return -1;
+}
+
+// Poll `probe` frame by frame until `ok` holds for what it returns, or
+// `timeoutMs` pass: { ok, state, ms }, with the last state either way.
+async function eventually(page, probe, ok, timeoutMs = 60_000) {
+  const t0 = Date.now();
+  for (;;) {
+    const state = await probe();
+    const ms = Date.now() - t0;
+    if (ok(state)) return { ok: true, state, ms };
+    if (ms > timeoutMs) return { ok: false, state, ms };
+    await nextFrame(page);
+  }
+}
+
+// The mean per-pixel RGB difference between two PNG screenshots of the same
+// size, decoded by the page itself (no PNG library among the dependencies);
+// -1 when their sizes differ.
+function meanDiff(page, a, b) {
+  return page.evaluate(
+    async ([a, b]) => {
+      const pixels = async (base64) => {
+        const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+        const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/png" }));
+        const canvas = document.createElement("canvas");
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        const g = canvas.getContext("2d");
+        g.drawImage(bitmap, 0, 0);
+        return g.getImageData(0, 0, canvas.width, canvas.height).data;
+      };
+      const [pa, pb] = await Promise.all([pixels(a), pixels(b)]);
+      if (pa.length !== pb.length) return -1;
+      let sum = 0;
+      for (let i = 0; i < pa.length; i += 4)
+        sum += Math.abs(pa[i] - pb[i]) + Math.abs(pa[i + 1] - pb[i + 1]) + Math.abs(pa[i + 2] - pb[i + 2]);
+      return sum / (pa.length / 4);
+    },
+    [a.toString("base64"), b.toString("base64")]
+  );
+}
+
 async function signIn(ctx) {
   const login = await ctx.newPage();
   await login.goto(`${base}/admin/login`);
@@ -876,4 +1218,4 @@ if (failures.length) {
   console.error(`\n--- server log (${logPath}) ---\n${fs.readFileSync(logPath, "utf8")}`);
   process.exit(1);
 }
-console.log(`\nSmoke test passed; screenshots in ${path.relative(ROOT, OUT) || OUT}`);
+console.log(`\nSmoke test${BROWSER === "webkit" ? " (WebKit)" : ""} passed; screenshots in ${path.relative(ROOT, OUT) || OUT}`);

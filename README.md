@@ -498,7 +498,12 @@ npm run build
 
 Tests cover the config read/write + merge logic, schema validation, auth and
 login throttling, and the pure helpers behind theming, weather, status, search
-bangs, alerting, and the iCal/recurrence parser.
+bangs, alerting, and the iCal/recurrence parser. After the build, `npm run
+smoke` renders the key pages in Playwright Chromium and audits them with
+axe-core, and `npm run smoke:webkit` repeats the sized-card keyboard checks in
+Playwright WebKit (Safari's engine, `npx playwright-core install webkit`),
+where a scrollable card is only reachable by Tab because the app makes it so;
+CI runs both.
 
 Work lands on `develop`; `main` only advances by fast-forward when a release
 is cut with `scripts/release.sh X.Y.Z`, whose `v*` tag push builds the image

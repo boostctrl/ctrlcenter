@@ -78,6 +78,10 @@ Step-by-step recipes for this repo's mistake-prone workflows live in
   and signs in
   through the real login form (needs `npx playwright-core install
   chromium` once, or `CHROMIUM_PATH` set to a Chromium binary).
+  `npm run smoke:webkit` runs the sized-card keyboard contract (#355) and
+  clip-box geometry (#354) in WebKit, Safari's engine, where they differ from
+  Chromium (#430); CI runs it as its own job (needs `npx playwright-core
+  install webkit` once, or `WEBKIT_PATH`).
 - For visual changes, also look at the pages you changed: copy `.next/static`
   into the standalone output and drive it with Playwright Chromium. HTML-only
   smoke tests pass even when the CSS is missing — actually render the page.
