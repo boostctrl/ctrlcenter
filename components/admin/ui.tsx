@@ -37,6 +37,8 @@ export function Hint({ children }: { children: ReactNode }) {
   return <p className="text-xs text-ink-40">{children}</p>;
 }
 
+// `ref` reaches the input (React 19 passes it as a prop), for a form that
+// decides where focus starts.
 export function TextField({
   label,
   hint,
@@ -44,6 +46,7 @@ export function TextField({
 }: {
   label: string;
   hint?: ReactNode;
+  ref?: Ref<HTMLInputElement>;
 } & InputHTMLAttributes<HTMLInputElement>) {
   return (
     <label className="flex flex-col gap-1.5 text-sm">

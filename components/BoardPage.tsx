@@ -34,7 +34,7 @@ export default async function BoardPage({
   const { settings, apps, bookmarks } = config;
 
   const pick = pickBoard(config.boards, boardId, viewer);
-  if (pick.kind === "signIn") redirect("/admin/login?next=/");
+  if (pick.kind === "signIn") redirect("/login");
   if (pick.kind === "nothing") return <NothingShared nav={navPages(config, viewer)} />;
   if (pick.kind === "notFound") notFound();
   if (pick.kind === "home") redirect(edit && isAdmin ? "/?edit=1" : "/");

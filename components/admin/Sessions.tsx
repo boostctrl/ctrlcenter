@@ -68,7 +68,9 @@ export function describeUserAgent(ua: string): string {
 
 // `idleControl` off hides the site-wide idle timeout (an admin setting) on a
 // member's own account page (#423).
-export default function Sessions({ idleControl = true }: { idleControl?: boolean } = {}) {
+// `signIn` is where ending this very session leads: the admin login from
+// the portal, the plain one from an account's own page (#450).
+export default function Sessions({ idleControl = true, signIn = "/admin/login" }: { idleControl?: boolean; signIn?: string } = {}) {
   const [sessions, setSessions] = useState<Session[] | null>(null);
   const [idleHours, setIdleHours] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -131,7 +133,7 @@ export default function Sessions({ idleControl = true }: { idleControl?: boolean
         return;
       }
       if (session.current) {
-        router.push("/admin/login");
+        router.push(signIn);
         router.refresh();
         return;
       }

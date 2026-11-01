@@ -15,7 +15,7 @@ import Icon from "./Icon";
 // opens with the board switcher: every board the visitor can open, the
 // current one marked; with one, a plain Dashboard link. Closes on outside
 // click or Escape.
-export default function FloatingNav({ boards, weather, status, calendar, member }: NavPages) {
+export default function FloatingNav({ boards, weather, status, calendar, member, visitor }: NavPages) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
@@ -56,6 +56,8 @@ export default function FloatingNav({ boards, weather, status, calendar, member 
       // A member's password, second factor and sessions (#423); an admin
       // has the portal's Security section.
       member ? { href: "/account", label: "Your account" } : null,
+      // A visitor's way in (#450), back to this page afterwards.
+      visitor ? { href: `/login?next=${encodeURIComponent(pathname)}`, label: "Sign in" } : null,
       { href: "/admin", label: "Admin portal" },
     ].filter(Boolean) as { href: string; label: string }[]
   ).filter((l) => l.href !== pathname);

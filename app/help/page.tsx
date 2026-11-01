@@ -1024,7 +1024,9 @@ export default async function HelpPage() {
 
         <Card title="Password & sessions">
           <P>
-            Sign in with the username <strong>admin</strong> and the password.
+            The corner menu&apos;s <strong>Sign in</strong> opens the form (at{" "}
+            <strong>/login</strong>): the username <strong>admin</strong> and
+            the password, or an account&apos;s own name.
             <strong>Settings → Users</strong> adds more accounts: an <em>admin</em>
             runs this portal, a <em>member</em> signs in to see the boards, apps
             and bookmarks shared with them. Every account keeps its own

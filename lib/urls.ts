@@ -39,8 +39,10 @@ export function guessCheckType(input: string): "http" | "tcp" | "dns" {
 // parser, and only a result on this origin is followed, as its path, query and
 // hash. Backslashes and control characters never appear in a path the proxy
 // sets, so they're refused up front. Anything else lands on /admin.
-export function safeNextPath(next: string | null, origin: string): string {
-  if (!next?.startsWith("/") || /[\\\p{Cc}]/u.test(next)) return "/admin";
+// `fallback` is where a sign-in with no (or a bad) `next` lands: the portal
+// from /admin/login, the dashboard from /login (#450).
+export function safeNextPath(next: string | null, origin: string, fallback = "/admin"): string {
+  if (!next?.startsWith("/") || /[\\\p{Cc}]/u.test(next)) return fallback;
   try {
     const base = new URL(origin);
     const url = new URL(next, base);
@@ -51,5 +53,5 @@ export function safeNextPath(next: string | null, origin: string): string {
   } catch {
     // Unparseable, like "//[" (a host that isn't one): not a path here.
   }
-  return "/admin";
+  return fallback;
 }

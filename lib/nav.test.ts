@@ -89,5 +89,9 @@ describe("boards for a member (#423)", () => {
     expect(navPages(source as never, sam).member).toBe(true);
     expect(navPages(source as never, null).member).toBe(false);
     expect(navPages(source as never, ADMIN_VIEW).member).toBe(false);
+    // And who gets a Sign in (#450): nobody signed in.
+    expect(navPages(source as never, null).visitor).toBe(true);
+    expect(navPages(source as never, sam).visitor).toBe(false);
+    expect(navPages(source as never, ADMIN_VIEW).visitor).toBe(false);
   });
 });

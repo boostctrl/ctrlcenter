@@ -1,32 +1,45 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { TextField, Button } from "@/components/admin/ui";
 import { safeNextPath } from "@/lib/urls";
 
 // The sign-in name last used in this browser (#423), so it needn't be
-// retyped; `admin` until one is.
+// retyped; until one is, `admin` while that is the only account (#450),
+// nothing once there are more.
 const NAME_KEY = "ctrlcenter:signin-name";
 const DEFAULT_NAME = "admin";
 
-// `passwordConfigured` is decided on the server (page.tsx): with no stored
-// hash and no ADMIN_PASSWORD nobody can sign in, so explain that instead of
-// showing a form that can only ever answer "Invalid password" (#275).
+// `passwordConfigured` and `singleAccount` are decided on the server
+// (LoginScreen): with no stored hash and no ADMIN_PASSWORD nobody can sign
+// in, so explain that instead of showing a form that can only ever answer
+// "Invalid password" (#275). `fallback` is where a sign-in with no `next`
+// lands.
 export default function LoginForm({
   passwordConfigured,
+  singleAccount,
+  fallback = "/admin",
 }: {
   passwordConfigured: boolean;
+  singleAccount: boolean;
+  fallback?: string;
 }) {
   const searchParams = useSearchParams();
-  const [username, setUsername] = useState(DEFAULT_NAME);
+  const [username, setUsername] = useState(singleAccount ? DEFAULT_NAME : "");
+  // Focus starts in the password field when the name is known (prefilled
+  // or remembered), else in the username field.
+  const passwordRef = useRef<HTMLInputElement>(null);
   // Read after mount, not in the initial state: the server renders the
   // default, and a remembered name would otherwise mismatch at hydration.
   useEffect(() => {
     try {
       const remembered = window.localStorage.getItem(NAME_KEY);
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- one read of browser storage after mount
-      if (remembered) setUsername(remembered);
+      if (remembered) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- one read of browser storage after mount
+        setUsername(remembered);
+        passwordRef.current?.focus();
+      }
     } catch {
       // Private mode / blocked storage — the default stands.
     }
@@ -92,7 +105,7 @@ export default function LoginForm({
     // Router Cache entry from before login and bounce back here. Only a path
     // on this origin is followed (#23).
     window.location.assign(
-      safeNextPath(searchParams.get("next"), window.location.origin)
+      safeNextPath(searchParams.get("next"), window.location.origin, fallback)
     );
   }
 
@@ -121,6 +134,8 @@ export default function LoginForm({
         <>
           <TextField
             label="Username"
+            hint={singleAccount ? undefined : <>The founding account is <strong>admin</strong>.</>}
+            autoFocus={!singleAccount}
             autoComplete="username"
             autoCapitalize="off"
             spellCheck={false}
@@ -129,10 +144,11 @@ export default function LoginForm({
             onChange={(e) => setUsername(e.target.value)}
           />
           <TextField
+            ref={passwordRef}
             label="Password"
             type="password"
             autoComplete="current-password"
-            autoFocus
+            autoFocus={singleAccount}
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}

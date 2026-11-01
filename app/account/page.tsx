@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 // admin. A visitor is sent to sign in and comes back here.
 export default async function AccountPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const [{ config, viewer }, query] = await Promise.all([readPublicConfig(), searchParams]);
-  if (!viewer) redirect("/admin/login?next=/account");
+  if (!viewer) redirect("/login?next=/account");
   const { account } = viewer;
   const nav = navPages(config, viewer);
   return (

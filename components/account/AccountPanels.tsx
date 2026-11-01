@@ -35,7 +35,7 @@ export default function AccountPanels({
             <TwoFactor enabled={twoFactor} onChange={setTwoFactor} />
           </Card>
           <Card title="Sessions" intro="Where your account is signed in. End one you don't recognise, or sign out everywhere else.">
-            <Sessions idleControl={false} />
+            <Sessions idleControl={false} signIn="/login" />
           </Card>
           <div>
             <Button

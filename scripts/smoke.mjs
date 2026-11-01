@@ -154,7 +154,7 @@ async function chromiumPhases(run) {
       viewport: { width: 1440, height: 900 },
       colorScheme: scheme,
     });
-    const pages = ["/", "/b/media", "/status", "/weather", "/calendar", "/help", "/settings", "/admin/login"];
+    const pages = ["/", "/b/media", "/status", "/weather", "/calendar", "/help", "/settings", "/login", "/admin/login"];
     for (const p of pages) {
       await run(ctx, p, `${p === "/" ? "home" : p.slice(1).replace(/\//g, "-")}-${scheme}`);
     }

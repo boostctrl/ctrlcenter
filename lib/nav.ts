@@ -85,6 +85,8 @@ export type NavPages = {
   // A signed-in member (#423), who gets a Sign out in the menu: an admin
   // signs out from the portal.
   member: boolean;
+  // Nobody signed in (#450): the menu offers Sign in.
+  visitor: boolean;
 };
 export function navPages(source: NavSource, viewer: Viewing | null): NavPages {
   return {
@@ -93,6 +95,7 @@ export function navPages(source: NavSource, viewer: Viewing | null): NavPages {
     status: source.settings.statusChecks,
     calendar: activeCalendars(source, viewer).length > 0,
     member: isMember(viewer),
+    visitor: viewer === null,
   };
 }
 

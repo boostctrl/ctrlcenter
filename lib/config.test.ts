@@ -1008,9 +1008,10 @@ describe("readConfigInternal stays off public surfaces", () => {
     // Admin-only integrations save: reads `auth` only to tie the actions
     // opt-in to the second factor (#367). Answers with nothing but ok.
     "app/api/integrations/route.ts",
-    // Public login page: reads `auth` only to pass one boolean (is any admin
-    // password configured, #275) to the form. Nothing else reaches the client.
-    "app/admin/login/page.tsx",
+    // The login pages (/login, /admin/login) render components/login/
+    // LoginScreen.tsx, which reads `auth` only to pass two booleans (is any
+    // admin password configured, #275; is there one account, #450) to the
+    // form. Nothing else reaches the client.
     // Admin-only 2FA management: read the current TOTP state before mutating.
     // Admin-only widget and settings saves: read the stored widgets, alert
     // channels and `auth` to tell whether a save re-points where a secret is

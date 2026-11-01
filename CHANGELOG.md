@@ -12,6 +12,15 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Sign in from the corner menu.** Anyone not signed in finds *Sign in*
+  there, which opens the form at `/login` and brings them back to the board
+  they were on; `/admin/login` still works and still leads to the portal.
+  The username is prefilled with `admin` only while that is the one account;
+  with more, the field starts empty (the browser remembers the last name
+  used here) and says which account is the founding one. (#450)
+
 ### Fixed
 
 - **A private app shared with a member shows on a board upgraded from
