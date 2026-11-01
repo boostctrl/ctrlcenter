@@ -12,6 +12,7 @@ import type { BundledOutageNote } from "../schema";
 import { globalSingleton } from "../singleton";
 import {
   openHistoryDb,
+  openHistoryDbReadOnly,
   readHistoryRows,
   readMeta,
   writeHistoryChanges,
@@ -58,8 +59,9 @@ type HistoryState = {
   // waits PRUNE_GRACE_MS past this, so undoing a delete (#307) finds the
   // app's history still there.
   missingSince: Map<string, number>;
-  // The database's history is in memory (readHistory got it). Until then
-  // nothing is written: see flush.
+  // The database's history is in memory (readHistory got it, through a
+  // writable open or a read-only one — #428). Until then nothing is written:
+  // see flush.
   loaded: boolean;
   // The in-flight (or finished) load, shared by every caller — see loadHistory.
   loading?: Promise<void>;
@@ -67,6 +69,7 @@ type HistoryState = {
   // What changed since the last flush — all flush() writes (#278).
   dirty: Dirty;
   // The open database, with the path it was opened for (CONFIG_PATH decides).
+  // Unset while it can't be opened for writing; each flush tries again.
   db?: { file: string; handle: DatabaseSync };
   // When each warning last went out — see warnThrottled.
   warnedAt: Map<string, number>;
@@ -171,9 +174,17 @@ async function readHistory(): Promise<void> {
     await importLegacyOnce(db);
   } catch (e) {
     if (!isDamaged(e)) {
-      // Unwritable, locked, or from a newer version: run on in memory and say
-      // why — once an hour — rather than touch a file we don't understand.
-      warnThrottled("status history unavailable", { reason: errorReason(e) });
+      // Unwritable, locked, or from a newer version. A file that can still be
+      // read gives the pages its history (#428); otherwise run on in memory
+      // and say why — once an hour — rather than touch a file we don't
+      // understand.
+      if (loadReadOnly()) {
+        log.warn("status history opened read-only; new readings stay in memory", {
+          reason: errorReason(e),
+        });
+      } else {
+        warnThrottled("status history unavailable", { reason: errorReason(e) });
+      }
       return;
     }
     // A damaged file can't be read by anyone: set it aside, start afresh.
@@ -199,6 +210,36 @@ async function readHistory(): Promise<void> {
     })
   );
   state.loaded = true;
+}
+
+// The database can't be opened for writing — it sits on a volume the app
+// can't write to, say — but may still be readable (#428): bring its history
+// in through a read-only open, so the status pages show what it holds rather
+// than nothing older than the process, and run on in memory from there. With
+// the file's history in memory a flush has all it waits for, so each flush
+// then retries the writable open and, once it succeeds, writes the pending
+// changes over what was loaded here: a bucket goes out whole from memory,
+// which already holds the file's count. False when the file can't be read
+// either (missing, from a newer build, no tables yet), which leaves the
+// warning to the caller.
+function loadReadOnly(): boolean {
+  let db: DatabaseSync;
+  try {
+    db = openHistoryDbReadOnly(path.join(historyDir(), HISTORY_DB));
+  } catch {
+    return false;
+  }
+  let rows: HistoryRows;
+  try {
+    rows = readHistoryRows(db, retentionCutoffs(Date.now()));
+  } catch {
+    return false;
+  } finally {
+    db.close();
+  }
+  mergeRows(rows);
+  state.loaded = true;
+  return true;
 }
 
 // Bring the database's rows into memory, under what the poller has recorded
@@ -571,7 +612,9 @@ export function flush(now = Date.now()): Promise<void> {
     // writes. Until then the pending changes stay, kept within their keep
     // windows (see trimDirty). A load that throws is the poller's to report
     // (it awaits one first); here it must not reject the queue, or no flush
-    // would run again.
+    // would run again. After a read-only load (#428) the history is in, and
+    // the historyDb() below is the writable open's retry: it fails, under
+    // the write warning, until the volume can be written.
     if (!state.loaded) await loadHistory().catch(() => undefined);
     if (!state.loaded) {
       state.dirty = trimDirty(state.dirty, now);

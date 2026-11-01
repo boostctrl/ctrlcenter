@@ -28,7 +28,9 @@ import {
 import { log } from "./log";
 
 // The SQLite layer, with a switch to make the database unopenable or
-// unwritable (#401) — a read-only volume, a full disk, a lock held at boot.
+// unwritable (#401) — a full disk, a lock held at boot, a volume not mounted
+// yet. `open` fails the read-only open too (#428): a file that can be read
+// but not written is a real one on an unwritable directory, in its own tests.
 // Off, every call passes straight through.
 const dbFault = vi.hoisted(() => ({ open: null as Error | null, write: null as Error | null }));
 vi.mock("./status-history/db", async (importOriginal) => {
@@ -38,6 +40,10 @@ vi.mock("./status-history/db", async (importOriginal) => {
     openHistoryDb: (file: string) => {
       if (dbFault.open) throw dbFault.open;
       return mod.openHistoryDb(file);
+    },
+    openHistoryDbReadOnly: (file: string) => {
+      if (dbFault.open) throw dbFault.open;
+      return mod.openHistoryDbReadOnly(file);
     },
     writeHistoryChanges: (...args: Parameters<typeof mod.writeHistoryChanges>) => {
       if (dbFault.write) throw dbFault.write;
@@ -1064,6 +1070,88 @@ describe("history while the database is unavailable (#401)", () => {
     await reload();
     expect(getHistory(["b"]).apps[0].downSince).toBeNull();
     expect(getAppDetail("b", "UTC", 5).outages).toHaveLength(1);
+  });
+});
+
+describe("history on a volume the app can't write to (#428)", () => {
+  let dir: string;
+  let warn: ReturnType<typeof vi.spyOn>;
+  const reload = async () => {
+    resetHistoryState();
+    await loadHistory();
+  };
+  const pending = () => g.__ctrlcenterStatusHistory!.dirty;
+  const up = (id: string) => ({ id, up: true, status: 200, ms: 10 });
+  const down = (id: string) => ({ id, up: false, status: null, ms: 5000 });
+  const h = hourOf(Date.now()) * HOUR;
+  // root writes anywhere; the directory can't be made read-only for it.
+  const asRoot = process.getuid?.() === 0;
+
+  beforeEach(async () => {
+    dir = await freshHistoryDir();
+    warn = vi.spyOn(log, "warn").mockImplementation(() => {});
+  });
+  afterEach(async () => {
+    warn.mockRestore();
+    await fs.chmod(dir, 0o755);
+  });
+
+  it.skipIf(asRoot)(
+    "loads the saved history, records on in memory, and writes once the volume can be written",
+    async () => {
+      // Before the restart: 3 up, 1 down this hour, closed cleanly — so no
+      // WAL side files are left, and reading the file means creating them,
+      // which the volume refuses.
+      recordResults([up("a"), up("a"), up("a"), down("a")], h + MIN);
+      await flush(h + MIN);
+      resetHistoryState();
+      await expect(fs.readdir(dir)).resolves.toEqual(["status-history.db"]);
+      await fs.chmod(dir, 0o555);
+      // The restart finds the volume read-only: the file's history shows.
+      await loadHistory();
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(
+        "status history opened read-only; new readings stay in memory",
+        { reason: expect.stringContaining("readonly") }
+      );
+      expect(getHistory(["a"]).apps[0].uptime.d1).toBeCloseTo(75, 6);
+      expect(getHistory(["a"]).apps[0].downSince).toBe(h + MIN);
+      // The poller records on; nothing is written, and the writable open's
+      // retries warn once an hour.
+      recordResults([up("a")], h + 2 * MIN);
+      await flush(h + 2 * MIN);
+      await flush(h + 3 * MIN);
+      expect(pending().readings).toHaveLength(1);
+      expect(warn).toHaveBeenCalledTimes(2);
+      expect(warn).toHaveBeenLastCalledWith("status history write failed", {
+        reason: expect.stringContaining("readonly"),
+      });
+      expect(getHistory(["a"]).apps[0].uptime.h1).toBeCloseTo(80, 6);
+      expect(getHistory(["a"]).apps[0].downSince).toBeNull();
+      // The volume becomes writable: the next flush lands, the hour whole —
+      // the file's count and the run's, not the count since boot.
+      await fs.chmod(dir, 0o755);
+      await flush(h + 4 * MIN);
+      expect(pending().readings).toHaveLength(0);
+      await reload();
+      expect(getHistory(["a"]).apps[0].uptime.d1).toBeCloseTo(80, 6);
+      expect(getHistory(["a"]).apps[0].uptime.h1).toBeCloseTo(80, 6);
+      expect(getAppDetail("a", "UTC", 5).outages).toEqual([
+        { startMs: h + MIN, endMs: h + 2 * MIN, downMs: MIN, exact: true, recorded: true },
+      ]);
+    }
+  );
+
+  it("leaves a newer build's file alone", async () => {
+    const { DatabaseSync } = await import("node:sqlite");
+    const newer = new DatabaseSync(path.join(dir, "status-history.db"));
+    newer.exec("PRAGMA user_version = 2");
+    newer.close();
+    await loadHistory();
+    expect(warn).toHaveBeenCalledWith("status history unavailable", {
+      reason: "status history database is from a newer version (schema 2)",
+    });
+    expect(getHistory(["a"]).apps[0].uptime.d1).toBeNull();
   });
 });
 

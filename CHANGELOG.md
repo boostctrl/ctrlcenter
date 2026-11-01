@@ -11,7 +11,6 @@ The notes published with each GitHub release mirror that version's section
 here.
 
 ## [Unreleased]
-
 ### Added
 
 - **Webhook emails can link back into Seerr.** Each service under
@@ -24,7 +23,17 @@ here.
   link. Empty by default, so existing configs and backups are unaffected.
   (#352)
 
+
 ### Fixed
+
+- **The uptime history still shows from a read-only volume.** With the
+  history database on a volume the app can't write to, the status pages
+  started out empty after every restart: the file held the history, but the
+  app only ever opened it for writing, and when that failed it ran on from
+  memory. It now reads the saved history from the file anyway, keeps new
+  readings in memory and keeps trying to write them, so the pages show the
+  saved history along with what has been checked since, and the log says the
+  history is read-only rather than unavailable. (#428)
 
 - **A screen reader hears which set a theme-builder tile belongs to, and
   which channel a Send test is for.** The design, font, heading-font, palette
@@ -33,11 +42,13 @@ here.
   wallpaper patterns already were. In Settings → Monitoring → Alerts, each
   channel's Send test button is named for its channel ("Send test from
   Chat"), so two channels' buttons never sound alike. (#350)
+
 - **Long relayed notifications reach Discord.** Discord takes at most 2,000
   characters in a message and refuses a longer one, so a relayed notification
   whose text ran past that — a digest of many titles behind a long link, say
   — never arrived at all. The text is now cut to fit, ending in an ellipsis,
   and the link stays whole. (#425)
+
 - **Undo during a drag no longer splits the drag in two.** Pressing Ctrl+Z
   in the layout editor while an edge resize was in progress took back the
   part already dragged, and the rest of the resize then counted as a

@@ -9,6 +9,7 @@
 // file used to. A file from an older build is imported once (see
 // ./store.ts) and left where it is.
 import { DatabaseSync } from "node:sqlite";
+import { pathToFileURL } from "url";
 
 export type { DatabaseSync };
 
@@ -61,14 +62,7 @@ export function openHistoryDb(file: string): DatabaseSync {
     // WAL keeps a crash mid-flush from tearing the file; NORMAL sync is the
     // usual pairing (a power cut can lose the last flush, never corrupt).
     db.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;");
-    const { user_version: version } = db
-      .prepare("PRAGMA user_version")
-      .get() as { user_version: number };
-    if (version > SCHEMA_VERSION) {
-      throw new Error(
-        `status history database is from a newer version (schema ${version})`
-      );
-    }
+    const version = schemaVersion(db);
     if (version < 1) {
       db.exec(`
         BEGIN;
@@ -103,6 +97,41 @@ export function openHistoryDb(file: string): DatabaseSync {
     db.close();
     throw e;
   }
+}
+
+// Open an existing database for reading only (#428): on a volume the app
+// can't write to, the file still holds the history. A WAL-mode database
+// needs its -shm file created beside it even to be read, which is just what
+// such a volume refuses, so the file is opened as immutable — SQLite then
+// reads it with no locks and no side files. A file changing under an
+// immutable read can come back wrong, but this is one read of a file the app
+// itself can't write, and an error falls back to running on from memory
+// (./store.ts, which also closes the handle once the rows are out).
+export function openHistoryDbReadOnly(file: string): DatabaseSync {
+  const url = pathToFileURL(file);
+  url.searchParams.set("immutable", "1");
+  const db = new DatabaseSync(url, { readOnly: true });
+  try {
+    if (schemaVersion(db) < 1) throw new Error("status history database has no tables");
+    return db;
+  } catch (e) {
+    db.close();
+    throw e;
+  }
+}
+
+// The file's schema version — refusing a newer build's, whose tables may not
+// mean what this build's statements assume.
+function schemaVersion(db: DatabaseSync): number {
+  const { user_version: version } = db
+    .prepare("PRAGMA user_version")
+    .get() as { user_version: number };
+  if (version > SCHEMA_VERSION) {
+    throw new Error(
+      `status history database is from a newer version (schema ${version})`
+    );
+  }
+  return version;
 }
 
 // Maintenance tallies (#293) as added columns rather than a schema version:
