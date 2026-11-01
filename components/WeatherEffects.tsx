@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import type { MotionLevel } from "@/lib/theme";
+import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 
 // Animated condition effects for the weather-page hero card: layered rain with
 // gusting wind and bottom-edge splashes, drifting snow, storm lightning,
@@ -9,8 +11,9 @@ import { useEffect, useRef } from "react";
 // day/night flag. Draws on a card-sized canvas layered between the hero's
 // condition wash and its text; colors are muted naturalistic tones tuned per
 // surface (`light`) so they read on both the near-white and dark cards.
-// Honours prefers-reduced-motion by rendering a single still frame, matching
-// the backdrop scenes.
+// Honours prefers-reduced-motion — and the visitor's Reduce motion switch or
+// a theme's Still motion level, which the look resolves to `motion` "off"
+// (#395) — by rendering a single still frame, matching the backdrop scenes.
 //
 // Light direction (#160, #173): every light source anchors to the hero's
 // condition icon — the canvas paints beneath the text layer, so the sun/moon
@@ -106,13 +109,17 @@ export default function WeatherEffects({
   code,
   isDay,
   light,
+  motion,
 }: {
   code: number;
   isDay: boolean;
   light: boolean;
+  // The motion level the look runs at: "off" draws one still frame.
+  motion: MotionLevel;
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const osReduced = usePrefersReducedMotion();
 
   useEffect(() => {
     const effect = effectFor(code, isDay);
@@ -124,7 +131,7 @@ export default function WeatherEffects({
 
     const { kind, intensity } = effect;
     const colors = palette(light);
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reduced = osReduced || motion === "off";
     const dpr = window.devicePixelRatio || 1;
     let w = 0;
     let h = 0;
@@ -689,7 +696,7 @@ export default function WeatherEffects({
       ro.disconnect();
       cancelAnimationFrame(raf);
     };
-  }, [code, isDay, light]);
+  }, [code, isDay, light, motion, osReduced]);
 
   return (
     <div ref={hostRef} aria-hidden className="pointer-events-none absolute inset-0">

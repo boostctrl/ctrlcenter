@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { boardDefaultTheme, boardForPath } from "./board-theme";
-import { THEME_PACKS } from "./theme";
+import { THEME_PACKS, resolveThemeGallery } from "./theme";
 import { settingsSchema } from "./schema";
 import { ADMIN_VIEW } from "./visibility";
 
@@ -42,7 +42,23 @@ describe("boardDefaultTheme (#337)", () => {
     expect(t.mode).toBe(theme.mode);
     expect(boardDefaultTheme(theme, boards[0], THEME_PACKS)).toBe(theme);
     expect(boardDefaultTheme(theme, null, THEME_PACKS)).toBe(theme);
-    // A pack that's gone (renamed, deleted): the site theme.
+    // A pack that's gone (deleted): the site theme.
     expect(boardDefaultTheme(theme, boards[2], THEME_PACKS)).toBe(theme);
+  });
+
+  it("pins by the pack's key, so a rename keeps the pin; a pin by name still resolves (#395)", () => {
+    const colors = {
+      dark: { background: "#000000", foreground: "#ffffff", accentFrom: "#ff0000", accentTo: "#00ff00" },
+      light: { background: "#ffffff", foreground: "#000000", accentFrom: "#ff0000", accentTo: "#00ff00" },
+    };
+    const gallery = resolveThemeGallery([
+      { key: "Circuit", builtin: "Circuit", name: "Wires" },
+      { key: "custom-ab12cd34", name: "Mine", design: "paper", ...colors },
+    ]).map((r) => r.pack);
+    // The built-in renamed: the pin (its key, the shipped name) holds.
+    expect(boardDefaultTheme(theme, { theme: "Circuit" }, gallery).preset).toBe("Wires");
+    // A pack of the admin's own by key, and by its name from an older config.
+    expect(boardDefaultTheme(theme, { theme: "custom-ab12cd34" }, gallery).design).toBe("paper");
+    expect(boardDefaultTheme(theme, { theme: "Mine" }, gallery).design).toBe("paper");
   });
 });

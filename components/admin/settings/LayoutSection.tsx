@@ -4,7 +4,7 @@ import type { WidgetInstance } from "@/lib/schema";
 import { useState } from "react";
 import Link from "next/link";
 import { buttonClasses } from "@/lib/buttons";
-import type { ThemePack } from "@/lib/theme";
+import { packByRef, packKey, type ThemePack } from "@/lib/theme";
 import { boardName, GROUP_COLORS, MAX_BOARD_NAME, MAX_BOARDS, MAX_GROUP_NAME, type GroupColor } from "@/lib/schema";
 import AudiencePicker from "@/components/admin/AudiencePicker";
 import IconChooser from "../IconChooser";
@@ -67,16 +67,21 @@ function BoardsCard({ d, themePacks }: { d: SettingsDraft; themePacks: ThemePack
                   <option value="public">Everyone</option>
                   <option value="private">Private</option>
                 </select>
-                {/* A gallery theme pinned on the board (#337). */}
+                {/* A gallery theme pinned on the board (#337), by its key so
+                    a rename keeps the pin (#395); a pin saved by name still
+                    selects its pack. */}
                 <select
-                  value={b.theme && themePacks.some((p) => p.name === b.theme) ? b.theme : ""}
+                  value={(() => {
+                    const pack = packByRef(themePacks, b.theme);
+                    return pack ? packKey(pack) : "";
+                  })()}
                   onChange={(e) => updateBoard(b.id, { theme: e.target.value })}
                   aria-label={`Theme for the ${label} board`}
                   className={controlClasses}
                 >
                   <option value="">Site theme</option>
                   {themePacks.map((p) => (
-                    <option key={p.name} value={p.name}>
+                    <option key={packKey(p)} value={packKey(p)}>
                       {p.name}
                     </option>
                   ))}

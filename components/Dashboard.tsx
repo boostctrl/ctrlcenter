@@ -32,7 +32,7 @@ import { reorder } from "./admin/useReorder";
 import { WidgetFrame, EditToolbar, DragGhost } from "./LayoutEditor";
 import { usePointerReorder } from "./usePointerReorder";
 import WidgetPalette from "./WidgetPalette";
-import BoardsMenu, { type EditorBoard } from "./BoardsMenu";
+import BoardsMenu, { type EditorBoard, type PackChoice } from "./BoardsMenu";
 import { createWidget } from "./admin/settingsApi";
 
 // The widget settings panel (#303) loads only when the admin opens it, so
@@ -86,7 +86,7 @@ export default function Dashboard({
   boardId,
   isHome,
   boards = [],
-  packNames = [],
+  packs = [],
   widgets,
   scale = DEFAULT_UI_SCALE,
   gap = DEFAULT_GRID_GAP,
@@ -98,8 +98,8 @@ export default function Dashboard({
   isHome: boolean;
   // Every board, for the editor's board menu (#303); empty for visitors.
   boards?: EditorBoard[];
-  // The gallery's pack names, for pinning a theme on the board there (#337).
-  packNames?: string[];
+  // The gallery's packs, for pinning a theme on the board there (#337).
+  packs?: PackChoice[];
   // The board's resolved widget arrangement (order + span + hidden).
   widgets: LayoutWidget[];
   // The saved UI scale (percent); SSR already renders it on <html>, this seeds
@@ -838,7 +838,7 @@ export default function Dashboard({
             onDone={doneEditing}
             leading={
               <>
-                {boards.length > 0 && <BoardsMenu boards={boards} currentId={boardId} packNames={packNames} />}
+                {boards.length > 0 && <BoardsMenu boards={boards} currentId={boardId} packs={packs} />}
                 <WidgetPalette onAdd={addWidget} className="shrink-0" />
               </>
             }

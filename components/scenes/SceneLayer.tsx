@@ -8,7 +8,7 @@ import { SCENE_REGISTRY } from "./index";
 // paint matches the server (canvas scenes just start animating after
 // hydration). Falls back to Aurora for any unknown stored value.
 export default function SceneLayer() {
-  const { scene, surfaceIsLight, motion } = useLookPrefs();
+  const { scene, surfaceIsLight, motion, activeAccent } = useLookPrefs();
   const Backdrop = SCENE_REGISTRY[scene] ?? SCENE_REGISTRY.aurora;
   return (
     <>
@@ -16,7 +16,7 @@ export default function SceneLayer() {
           fit are CSS variables the resolver paints, so it shows before
           hydration and is an empty box when the theme has none. */}
       <div aria-hidden className="wallpaper-layer" />
-      <Backdrop light={surfaceIsLight} motion={motion} />
+      <Backdrop light={surfaceIsLight} motion={motion} accentFrom={activeAccent.from} accentTo={activeAccent.to} />
       {/* Light mode deepens scene colors so they read on the pale page, but
           the bolder shapes (Horizon's sun, Rays, Peaks) then fought the text on
           cards above them. A wash of the page color softens every scene

@@ -71,9 +71,11 @@ export type PaintDefaults = {
 
 export type PaintColorSet = { background: string; foreground: string; accentFrom: string; accentTo: string };
 
-// A gallery pack as the no-flash script needs it (#335).
+// A gallery pack as the no-flash script needs it (#335). A stored choice is
+// its key (#395), or its name for one saved before keys were stored.
 export type PaintPack = {
   name: string;
+  key?: string;
   design: string;
   scene: string;
   designLight?: string;
@@ -454,14 +456,23 @@ export function makeThemePaint() {
     const dark = mode === "dark" || (mode === "system" && prefersDark);
 
     // Under "packs", the chosen pack for this mode stands in for the site
-    // default: its design, scene, colors, tune and the parts it carries, the
-    // way applying it in the builder sets them (a pack without a font or
-    // heading font leaves the default's; without a wallpaper, none).
+    // default: its design, scene, colors and the parts it carries, exactly
+    // the way applying it in the builder sets them (#395): a pack is a whole
+    // look, so without a tune the design is as drawn, without status colors
+    // the stylesheet's apply, the scene runs as designed and there is no
+    // wallpaper. Only what a pack never carries stays the site's: the fonts
+    // (#373) and the density. The choice is the pack's key, or its name for
+    // one saved before keys were stored.
     if (policy === "packs" && dt.packs) {
       const choice = get("ctrlcenter:pack");
-      const name = isObj(choice) ? (dark ? choice.dark : choice.light) : null;
+      const ref = isObj(choice) ? (dark ? choice.dark : choice.light) : null;
       let pack: PaintPack | null = null;
-      for (let i = 0; i < dt.packs.length; i++) if (dt.packs[i].name === name) pack = dt.packs[i];
+      if (typeof ref === "string") {
+        for (let i = 0; i < dt.packs.length && !pack; i++) {
+          if ((dt.packs[i].key === undefined ? dt.packs[i].name : dt.packs[i].key) === ref) pack = dt.packs[i];
+        }
+        for (let i = 0; i < dt.packs.length && !pack; i++) if (dt.packs[i].name === ref) pack = dt.packs[i];
+      }
       if (pack) {
         const pcs = dark ? pack.dark : pack.light;
         const pd: PaintDefaults = {
@@ -474,11 +485,9 @@ export function makeThemePaint() {
           background: pcs.background,
           foreground: pcs.foreground,
           tune: pack.tune,
-          sceneIntensity: dark ? dt.sceneIntensity : dt.sceneIntensityLight === undefined ? dt.sceneIntensity : dt.sceneIntensityLight,
-          sceneMotion: dark ? dt.sceneMotion : dt.sceneMotionLight === undefined ? dt.sceneMotion : dt.sceneMotionLight,
           headingFont: pack.headingFont || (dark ? dt.headingFont : dt.headingFontLight || dt.headingFont),
           density: dark ? dt.density : dt.densityLight || dt.density,
-          status: (dark ? pack.status : pack.statusLight || pack.status) || (dark ? dt.status : dt.statusLight || dt.status),
+          status: dark ? pack.status : pack.statusLight || pack.status,
           wallpaper: dark ? pack.wallpaper : pack.wallpaperLight || pack.wallpaper,
         };
         dt = pd;
@@ -534,8 +543,10 @@ export function makeThemePaint() {
     }
 
     // The tune: the stored per-mode pair, else the admin default for the mode
-    // (light falls back to the dark tune). Knobs are clamped like the app's
-    // sanitizeTune; a value that isn't a finite number is left at 100.
+    // (light falls back to the dark tune). A stored "none" is the visitor's
+    // return to the design as drawn, over any default tune (#395). Knobs are
+    // clamped like the app's sanitizeTune; a value that isn't a finite
+    // number is left at 100.
     const tuneOf = (o: unknown): PaintTune | null => {
       if (!isObj(o)) return null;
       const out: PaintTune = {};
@@ -549,11 +560,16 @@ export function makeThemePaint() {
       return any ? out : null;
     };
     const storedTune = get("ctrlcenter:tune");
-    let tune = isObj(storedTune) ? tuneOf(dark ? storedTune.dark : storedTune.light) : null;
-    if (!tune) tune = tuneOf(dark ? dt.tune : dt.tuneLight || dt.tune);
+    const tuneRaw = isObj(storedTune) ? (dark ? storedTune.dark : storedTune.light) : null;
+    let tune: PaintTune | null = null;
+    if (tuneRaw !== "none") {
+      tune = tuneOf(tuneRaw);
+      if (!tune) tune = tuneOf(dark ? dt.tune : dt.tuneLight || dt.tune);
+    }
 
     // Scene effects: the stored per-mode pair, else the admin default for the
-    // mode (light falls back to dark). The Reduce motion switch is its own key.
+    // mode (light falls back to dark); a stored "none" is the scene as
+    // designed (#395). The Reduce motion switch is its own key.
     const fxOf = (o: unknown): { intensity: number; motion: string } | null => {
       if (!isObj(o)) return null;
       const out = { intensity: 100, motion: "normal" };
@@ -569,16 +585,20 @@ export function makeThemePaint() {
       return any ? out : null;
     };
     const storedFx = get("ctrlcenter:scene-fx");
-    let sceneFx = isObj(storedFx) ? fxOf(dark ? storedFx.dark : storedFx.light) : null;
-    if (!sceneFx) {
-      sceneFx = fxOf(
-        dark
-          ? { intensity: dt.sceneIntensity, motion: dt.sceneMotion }
-          : {
-              intensity: dt.sceneIntensityLight === undefined ? dt.sceneIntensity : dt.sceneIntensityLight,
-              motion: dt.sceneMotionLight === undefined ? dt.sceneMotion : dt.sceneMotionLight,
-            }
-      );
+    const fxRaw = isObj(storedFx) ? (dark ? storedFx.dark : storedFx.light) : null;
+    let sceneFx: { intensity: number; motion: string } | null = null;
+    if (fxRaw !== "none") {
+      sceneFx = fxOf(fxRaw);
+      if (!sceneFx) {
+        sceneFx = fxOf(
+          dark
+            ? { intensity: dt.sceneIntensity, motion: dt.sceneMotion }
+            : {
+                intensity: dt.sceneIntensityLight === undefined ? dt.sceneIntensity : dt.sceneIntensityLight,
+                motion: dt.sceneMotionLight === undefined ? dt.sceneMotion : dt.sceneMotionLight,
+              }
+        );
+      }
     }
     let reduceMotion = false;
     try {
@@ -596,7 +616,8 @@ export function makeThemePaint() {
       return dark ? dd : dl || dd;
     };
     // Semantic colors: the stored per-mode set, else the admin default for
-    // the mode (light falls back to dark); all four must be hex.
+    // the mode (light falls back to dark); all four must be hex. A stored
+    // "none" is the stylesheet's standard colors, over any default (#395).
     const semOf = (o: unknown): PaintSemantic | null => {
       if (!isObj(o)) return null;
       const out: PaintSemantic = {};
@@ -608,8 +629,12 @@ export function makeThemePaint() {
       return out;
     };
     const storedStatus = get("ctrlcenter:status");
-    let status = isObj(storedStatus) ? semOf(dark ? storedStatus.dark : storedStatus.light) : null;
-    if (!status) status = semOf(dark ? dt.status : dt.statusLight || dt.status);
+    const statusRaw = isObj(storedStatus) ? (dark ? storedStatus.dark : storedStatus.light) : null;
+    let status: PaintSemantic | null = null;
+    if (statusRaw !== "none") {
+      status = semOf(statusRaw);
+      if (!status) status = semOf(dark ? dt.status : dt.statusLight || dt.status);
+    }
 
     // The wallpaper: the stored per-mode one (a stored src of "" is the
     // visitor's "none", over an admin default), else the admin default.

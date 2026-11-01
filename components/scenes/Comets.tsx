@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { SceneProps } from "./index";
+import { usePrefersReducedMotion } from "../usePrefersReducedMotion";
 import { effectRgbFor } from "./color";
 
 // Comets — sparse shooting stars: bright heads with long fading tails that
@@ -9,8 +10,9 @@ import { effectRgbFor } from "./color";
 // time. Distinct from Rain (dense, uniform, slow) and Starfield (stationary
 // twinkle): comets are rare, fast and directional. A pair of frozen streaks
 // is drawn under prefers-reduced-motion.
-export default function Comets({ light, motion }: SceneProps) {
+export default function Comets({ light, motion, accentFrom, accentTo }: SceneProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const osReduced = usePrefersReducedMotion();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -18,8 +20,7 @@ export default function Comets({ light, motion }: SceneProps) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const reduced =
-      motion === "off" || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reduced = motion === "off" || osReduced;
     // Calm motion: advance every other frame — half speed, half the work.
     const calm = motion === "calm";
     let tick = 0;
@@ -132,7 +133,9 @@ export default function Comets({ light, motion }: SceneProps) {
       window.removeEventListener("resize", resize);
       cancelAnimationFrame(raf);
     };
-  }, [light, motion]);
+    // The accent pair is a dependency only: the field reads the painted
+    // --accent-* vars in resize(), so a new accent re-seeds it in colour.
+  }, [light, motion, osReduced, accentFrom, accentTo]);
 
   return (
     <div aria-hidden className="scene-root pointer-events-none fixed inset-0 -z-10">

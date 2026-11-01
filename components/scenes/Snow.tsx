@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { SceneProps } from "./index";
+import { usePrefersReducedMotion } from "../usePrefersReducedMotion";
 import { effectRgbFor } from "./color";
 
 // Snow — round flakes falling in three depth bands: the far band is a slow,
@@ -13,8 +14,9 @@ import { effectRgbFor } from "./color";
 // arcs only, batched per band and accent stop, so a frame is six fills rather
 // than a hundred. Distinct from Petals (shaped, turning) and Rain (streaks at
 // one fixed angle). A scattered mid-fall field is drawn under reduced motion.
-export default function Snow({ light, motion }: SceneProps) {
+export default function Snow({ light, motion, accentFrom, accentTo }: SceneProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const osReduced = usePrefersReducedMotion();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -22,8 +24,7 @@ export default function Snow({ light, motion }: SceneProps) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const reduced =
-      motion === "off" || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reduced = motion === "off" || osReduced;
     // Calm motion: advance every other frame — half speed, half the work.
     const calm = motion === "calm";
     let tick = 0;
@@ -156,7 +157,9 @@ export default function Snow({ light, motion }: SceneProps) {
       window.removeEventListener("resize", resize);
       cancelAnimationFrame(raf);
     };
-  }, [light, motion]);
+    // The accent pair is a dependency only: the field reads the painted
+    // --accent-* vars in resize(), so a new accent re-seeds it in colour.
+  }, [light, motion, osReduced, accentFrom, accentTo]);
 
   return (
     <div aria-hidden className="scene-root pointer-events-none fixed inset-0 -z-10 overflow-hidden">

@@ -263,10 +263,12 @@ export default function ColorsTab({ d }: { d: ThemeDraft }) {
               Up, down, warning and info: the dots, errors, badges and notices.
             </p>
           </div>
+          {/* "none": the stylesheet's standard colors, even when the site
+              default carries its own (#395). */}
           {status && (
             <button
               type="button"
-              onClick={() => setStatusColors(null, editMode)}
+              onClick={() => setStatusColors("none", editMode)}
               className={buttonClasses("ghost", "sm")}
             >
               Reset to standard

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { SceneProps } from "./index";
+import { usePrefersReducedMotion } from "../usePrefersReducedMotion";
 import { effectRgb } from "./color";
 
 // Abyss — a deep-sea scene. Dark = the trench: a bioluminescent halo + depth
@@ -9,8 +10,9 @@ import { effectRgb } from "./color";
 // re-themed — a bright wash from above and deeper, contrasting motes. Built from
 // the accent / background CSS vars so it recolors with the active palette, and
 // all motion is disabled under prefers-reduced-motion. Ported from the 404 page.
-export function AbyssBackdrop({ light, motion }: SceneProps) {
+export function AbyssBackdrop({ light, motion, accentFrom, accentTo }: SceneProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const osReduced = usePrefersReducedMotion();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -18,8 +20,7 @@ export function AbyssBackdrop({ light, motion }: SceneProps) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const reduced =
-      motion === "off" || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reduced = motion === "off" || osReduced;
     // Calm motion: advance every other frame — half speed, half the work.
     const calm = motion === "calm";
     let tick = 0;
@@ -100,7 +101,9 @@ export function AbyssBackdrop({ light, motion }: SceneProps) {
       window.removeEventListener("resize", resize);
       cancelAnimationFrame(raf);
     };
-  }, [light, motion]);
+    // The accent pair is a dependency only: the field reads the painted
+    // --accent-* vars in resize(), so a new accent re-seeds it in colour.
+  }, [light, motion, osReduced, accentFrom, accentTo]);
 
   // Depth tint (trench) vs. a sunlight wash from above (shallows).
   const tint = light

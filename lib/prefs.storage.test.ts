@@ -15,6 +15,15 @@ import {
   saveFavorites,
   loadAccentOverride,
   saveAccentOverride,
+  loadTune,
+  saveTune,
+  loadSceneFx,
+  saveSceneFx,
+  loadStatusColors,
+  saveStatusColors,
+  TUNE_KEY,
+  SCENE_FX_KEY,
+  STATUS_KEY,
   THEMES_KEY,
   DESIGN_KEY,
   FAVORITES_KEY,
@@ -125,6 +134,39 @@ describe("accent override storage", () => {
     saveAccentOverride({ dark: violet, light: rose });
     saveAccentOverride({ dark: null, light: null });
     expect(store.raw(ACCENT_KEY)).toBeNull();
+  });
+});
+
+describe("tune, scene effects and status storage with an explicit none (#395)", () => {
+  const tune = { radius: 50, border: 100, blur: 100, shadow: 100, fill: 100, glow: 100 };
+  const fx = { intensity: 60, motion: "calm" as const };
+  const status = { up: "#00ff00", down: "#ff0000", warning: "#ffaa00", info: "#00aaff" };
+
+  it("round-trips a value in one mode and \"none\" in the other", () => {
+    saveTune({ dark: "none", light: tune });
+    expect(loadTune()).toEqual({ dark: "none", light: tune });
+    saveSceneFx({ dark: fx, light: "none" });
+    expect(loadSceneFx()).toEqual({ dark: fx, light: "none" });
+    saveStatusColors({ dark: "none", light: status });
+    expect(loadStatusColors()).toEqual({ dark: "none", light: status });
+  });
+
+  it("stores the sentinel as the string the no-flash script reads", () => {
+    saveTune({ dark: "none", light: null });
+    expect(JSON.parse(store.raw(TUNE_KEY)!)).toEqual({ dark: "none", light: null });
+    saveSceneFx({ dark: "none", light: null });
+    expect(JSON.parse(store.raw(SCENE_FX_KEY)!)).toEqual({ dark: "none", light: null });
+    saveStatusColors({ dark: "none", light: null });
+    expect(JSON.parse(store.raw(STATUS_KEY)!)).toEqual({ dark: "none", light: null });
+  });
+
+  it("drops junk per mode, and an all-null pair clears the key", () => {
+    store.setItem(TUNE_KEY, JSON.stringify({ dark: "nope", light: tune }));
+    expect(loadTune()).toEqual({ dark: null, light: tune });
+    store.setItem(STATUS_KEY, JSON.stringify({ dark: "none", light: { up: "#00ff00" } }));
+    expect(loadStatusColors()).toEqual({ dark: "none", light: null });
+    saveTune({ dark: null, light: null });
+    expect(store.raw(TUNE_KEY)).toBeNull();
   });
 });
 

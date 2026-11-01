@@ -10,7 +10,9 @@ import {
   DENSITY_IDS,
   DESIGN_IDS,
   SCENE_IDS,
+  packByRef,
   packFields,
+  packKey,
   resolveThemeGallery,
   resolveThemePacks,
   type ThemePack,
@@ -152,12 +154,13 @@ function resolveSchedule(settings: Settings, packs: ThemePack[]): ScheduleProps 
   if (!sched.enabled) return null;
   const timeZone = settings.timezone || "UTC";
   const location = { latitude: settings.weather.latitude, longitude: settings.weather.longitude };
-  const byName = (name: string) => packs.find((p) => p.name === name);
+  // Each phase names its pack by gallery key (#395), or by name for a
+  // schedule saved before keys were stored.
   return {
     config: sched,
     base: settings.theme,
-    day: themeWithPack(settings.theme, byName(sched.day), sched.dayMode),
-    night: themeWithPack(settings.theme, byName(sched.night), sched.nightMode),
+    day: themeWithPack(settings.theme, packByRef(packs, sched.day), sched.dayMode),
+    night: themeWithPack(settings.theme, packByRef(packs, sched.night), sched.nightMode),
     phase: scheduleState(sched, location, timeZone, Date.now()).phase,
     location,
     timeZone,
@@ -219,7 +222,7 @@ export default async function RootLayout({
     serializeForScript({
       ...(pinned ?? siteTheme),
       policy: visitorTheming,
-      ...(visitorTheming === "packs" ? { packs: packs.map(packFields) } : {}),
+      ...(visitorTheming === "packs" ? { packs: packs.map((p) => ({ ...packFields(p), key: packKey(p) })) } : {}),
       ...(schedule && !pinned ? { unscheduled: schedule.base } : {}),
     }),
     {

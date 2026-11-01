@@ -94,6 +94,22 @@ describe("themeWithPack (#336)", () => {
     expect(themeWithPack(theme, undefined)).toBe(theme);
     expect(themeWithPack(theme, undefined, "light").mode).toBe("light");
   });
+
+  it("keeps the site's fonts under a pack without its own, as a visitor applying it does (#373, #395)", () => {
+    const fonted = { ...theme, font: "inter" as const, fontLight: "lora" as const, headingFont: "lora" as const, headingFontLight: "inter" as const };
+    const tide = THEME_PACKS.find((p) => p.name === "Tide")!;
+    const plain = themeWithPack(fonted, tide);
+    expect(plain.font).toBe("inter");
+    expect(plain.fontLight).toBe("lora");
+    expect(plain.headingFont).toBe("lora");
+    expect(plain.headingFontLight).toBe("inter");
+    // A pack with fonts of its own brings them for both modes.
+    const own = themeWithPack(fonted, { ...tide, font: "jetbrains", headingFont: "jetbrains" });
+    expect(own.font).toBe("jetbrains");
+    expect(own.fontLight).toBeUndefined();
+    expect(own.headingFont).toBe("jetbrains");
+    expect(own.headingFontLight).toBeUndefined();
+  });
 });
 
 describe("themeSchedule settings (#336)", () => {

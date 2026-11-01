@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { SceneProps } from "./index";
+import { usePrefersReducedMotion } from "../usePrefersReducedMotion";
 import { effectRgbFor } from "./color";
 
 // Fireflies — a small swarm of softly pulsing lights that wander organically
@@ -9,8 +10,9 @@ import { effectRgbFor } from "./color";
 // inside a wide soft halo so they glow rather than twinkle. Distinct from
 // Starfield: far fewer, larger, no links, and they fade in and out completely.
 // A static frame (mid-pulse) is drawn under prefers-reduced-motion.
-export default function Fireflies({ light, motion }: SceneProps) {
+export default function Fireflies({ light, motion, accentFrom, accentTo }: SceneProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const osReduced = usePrefersReducedMotion();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -18,8 +20,7 @@ export default function Fireflies({ light, motion }: SceneProps) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const reduced =
-      motion === "off" || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reduced = motion === "off" || osReduced;
     // Calm motion: advance every other frame — half speed, half the work.
     const calm = motion === "calm";
     let tick = 0;
@@ -114,7 +115,9 @@ export default function Fireflies({ light, motion }: SceneProps) {
       window.removeEventListener("resize", resize);
       cancelAnimationFrame(raf);
     };
-  }, [light, motion]);
+    // The accent pair is a dependency only: the field reads the painted
+    // --accent-* vars in resize(), so a new accent re-seeds it in colour.
+  }, [light, motion, osReduced, accentFrom, accentTo]);
 
   return (
     <div aria-hidden className="scene-root pointer-events-none fixed inset-0 -z-10">

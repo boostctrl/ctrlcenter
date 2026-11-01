@@ -11,7 +11,7 @@ import { boardName, monitoredApps } from "@/lib/schema";
 import { loadHomeData } from "@/lib/widgets/load";
 import { shownToGuests } from "@/lib/widgets/integration-tiles";
 import { boardDefaultTheme } from "@/lib/board-theme";
-import { resolveThemeGallery } from "@/lib/theme";
+import { packKey, resolveThemeGallery } from "@/lib/theme";
 import BoardTheme from "@/components/BoardTheme";
 
 // One board, server-rendered (#298): the home page (`boardId` null, the first
@@ -112,7 +112,7 @@ export default async function BoardPage({
             data={data}
             // The editor's board menu (#303); only the admin edits.
             boards={isAdmin ? config.boards.map(({ id, name, visibility, theme }) => ({ id, name, visibility, theme })) : []}
-            packNames={isAdmin ? gallery.map((p) => p.name) : []}
+            packs={isAdmin ? gallery.map((p) => ({ key: packKey(p), name: p.name })) : []}
           />
           <BoardKeys boards={nav.boards} />
           {settings.settingsButton && <FloatingNav {...nav} />}

@@ -1167,3 +1167,9 @@ select optgroup {
 [data-motion="off"] .animate-beams {
   animation: none;
 }
+/* Tailwind's own animate-ping — the status dots' pulse (StatusProvider,
+   StatusTimeline) — is applied motion-safe:, so the OS preference already
+   stills it; the switch and the Still level must too (#395). */
+[data-motion="off"] .motion-safe\:animate-ping {
+  animation: none;
+}

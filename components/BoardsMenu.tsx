@@ -19,9 +19,20 @@ export type EditorBoard = {
   id: string;
   name: string;
   visibility: "public" | "private";
-  // A gallery pack pinned as the board's theme (#337).
+  // A gallery pack pinned as the board's theme (#337), by its key (#395) —
+  // or by name, for a pin saved before keys were stored.
   theme?: string;
 };
+
+// A gallery pack as the theme picker offers it: its stable key and its name.
+export type PackChoice = { key: string; name: string };
+
+// The option a stored pin selects: its key, whether the pin is the key or
+// the name (#395); "" for none or a pack that's gone.
+export function pinnedPackKey(ref: string | undefined, packs: PackChoice[]): string {
+  if (!ref) return "";
+  return (packs.find((p) => p.key === ref) ?? packs.find((p) => p.name === ref))?.key ?? "";
+}
 
 const MAX_BOARDS = 20;
 const MAX_NAME = 60;
@@ -34,12 +45,12 @@ const editorHref = (boards: EditorBoard[], id: string) =>
 export default function BoardsMenu({
   boards,
   currentId,
-  packNames = [],
+  packs = [],
 }: {
   boards: EditorBoard[];
   currentId: string;
-  // The gallery's pack names, to pin one as this board's theme (#337).
-  packNames?: string[];
+  // The gallery's packs, to pin one as this board's theme (#337).
+  packs?: PackChoice[];
 }) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -124,7 +135,8 @@ export default function BoardsMenu({
     save(boards.map((b) => (b.id === currentId ? { ...b, visibility } : b)));
   }
 
-  // Pin a gallery theme on this board, or "" for the site's (#337).
+  // Pin a gallery theme on this board by its key, or "" for the site's
+  // (#337, #395).
   function setTheme(theme: string) {
     save(boards.map((b) => (b.id === currentId ? { ...b, theme: theme || undefined } : b)));
   }
@@ -310,22 +322,22 @@ export default function BoardsMenu({
                 </p>
               )}
             </div>
-            {packNames.length > 0 && (
+            {packs.length > 0 && (
               <div className="flex flex-col gap-1.5 border-t border-fg/10 pt-3">
                 <label htmlFor="editor-board-theme" className="text-xs text-ink-60">
                   This board&apos;s theme
                 </label>
                 <select
                   id="editor-board-theme"
-                  value={current.theme && packNames.includes(current.theme) ? current.theme : ""}
+                  value={pinnedPackKey(current.theme, packs)}
                   disabled={busy}
                   onChange={(e) => setTheme(e.target.value)}
                   className={field}
                 >
                   <option value="">The site theme</option>
-                  {packNames.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
+                  {packs.map((p) => (
+                    <option key={p.key} value={p.key}>
+                      {p.name}
                     </option>
                   ))}
                 </select>

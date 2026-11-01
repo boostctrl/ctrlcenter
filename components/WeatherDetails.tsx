@@ -164,7 +164,7 @@ export default function WeatherDetails({
   initial: Forecast | null;
 }) {
   const { location, units } = useLocalePrefs();
-  const { surfaceIsLight } = useLookPrefs();
+  const { surfaceIsLight, motion } = useLookPrefs();
   const [fetched, setFetched] = useState<Forecast | null>(null);
   const [nowMin, setNowMin] = useState<number | null>(null);
 
@@ -225,6 +225,7 @@ export default function WeatherDetails({
             code={current.code}
             isDay={current.isDay}
             light={surfaceIsLight}
+            motion={motion}
           />
           <div className="relative flex flex-wrap items-center gap-x-6 gap-y-3">
             <span className="wx-icon text-7xl leading-none" data-weather-fx-anchor aria-hidden>

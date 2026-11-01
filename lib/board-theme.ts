@@ -5,7 +5,7 @@
 // admin editors.
 import type { Viewing } from "./visibility";
 import type { Board } from "./schema";
-import type { ThemePack } from "./theme";
+import { packByRef, type ThemePack } from "./theme";
 import { pickBoard } from "./nav";
 import { themeWithPack } from "./theme-schedule";
 
@@ -41,6 +41,8 @@ export function boardForPath<B extends Pick<Board, "id" | "visibility" | "audien
 
 // The site theme with the board's pinned pack applied, or the site theme
 // itself when the board pins none (or names a pack that no longer exists).
+// The pin is the pack's gallery key (#395), so a rename keeps it; a pin from
+// before keys were stored is its name then.
 export function boardDefaultTheme<
   T extends {
     mode: "system" | "light" | "dark";
@@ -52,6 +54,6 @@ export function boardDefaultTheme<
   },
 >(theme: T, board: Pick<Board, "theme"> | null, gallery: readonly ThemePack[]): T {
   if (!board?.theme) return theme;
-  const pack = gallery.find((p) => p.name === board.theme);
+  const pack = packByRef(gallery, board.theme);
   return pack ? themeWithPack(theme, pack) : theme;
 }

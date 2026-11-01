@@ -655,21 +655,23 @@ export function saveScene(scene: ModePair<SceneId | null> | null): void {
   saveModePair(SCENE_KEY, scene);
 }
 
-// The fine-tune over the design (#326), per mode: a Tune or null (= the
-// design untouched / the admin default). Stored as a `{dark,light}` pair.
+// The fine-tune over the design (#326), per mode: a Tune, "none" (the
+// visitor returned to the design as drawn, even over an admin default tune,
+// #395), or null (not chosen: the admin default). Stored as a `{dark,light}`
+// pair; the no-flash script reads the same "none".
 export const TUNE_KEY = "ctrlcenter:tune";
 
-const isTune = (v: unknown): v is Tune => sanitizeTune(v) !== null;
+export type TuneChoice = Tune | "none";
 
-export function loadTune(): ModePair<Tune | null> {
-  const pair = loadModePair(TUNE_KEY, isTune);
-  return {
-    dark: pair.dark ? sanitizeTune(pair.dark) : null,
-    light: pair.light ? sanitizeTune(pair.light) : null,
-  };
+const isTuneChoice = (v: unknown): v is TuneChoice => v === "none" || sanitizeTune(v) !== null;
+
+export function loadTune(): ModePair<TuneChoice | null> {
+  const pair = loadModePair(TUNE_KEY, isTuneChoice);
+  const read = (v: TuneChoice | null): TuneChoice | null => (v === "none" ? v : v ? sanitizeTune(v) : null);
+  return { dark: read(pair.dark), light: read(pair.light) };
 }
 
-export function saveTune(tune: ModePair<Tune | null> | null): void {
+export function saveTune(tune: ModePair<TuneChoice | null> | null): void {
   if (typeof window === "undefined") return;
   try {
     if (tune && (tune.dark || tune.light)) {
@@ -682,21 +684,22 @@ export function saveTune(tune: ModePair<Tune | null> | null): void {
   }
 }
 
-// Scene effects (#327), per mode: a SceneFx or null (= as designed / the
-// admin default). Stored as a `{dark,light}` pair.
+// Scene effects (#327), per mode: a SceneFx, "none" (the scene as designed,
+// even over admin default effects, #395), or null (not chosen: the admin
+// default). Stored as a `{dark,light}` pair.
 export const SCENE_FX_KEY = "ctrlcenter:scene-fx";
 
-const isSceneFx = (v: unknown): v is SceneFx => sanitizeSceneFx(v) !== null;
+export type SceneFxChoice = SceneFx | "none";
 
-export function loadSceneFx(): ModePair<SceneFx | null> {
-  const pair = loadModePair(SCENE_FX_KEY, isSceneFx);
-  return {
-    dark: pair.dark ? sanitizeSceneFx(pair.dark) : null,
-    light: pair.light ? sanitizeSceneFx(pair.light) : null,
-  };
+const isSceneFxChoice = (v: unknown): v is SceneFxChoice => v === "none" || sanitizeSceneFx(v) !== null;
+
+export function loadSceneFx(): ModePair<SceneFxChoice | null> {
+  const pair = loadModePair(SCENE_FX_KEY, isSceneFxChoice);
+  const read = (v: SceneFxChoice | null): SceneFxChoice | null => (v === "none" ? v : v ? sanitizeSceneFx(v) : null);
+  return { dark: read(pair.dark), light: read(pair.light) };
 }
 
-export function saveSceneFx(fx: ModePair<SceneFx | null> | null): void {
+export function saveSceneFx(fx: ModePair<SceneFxChoice | null> | null): void {
   if (typeof window === "undefined") return;
   try {
     if (fx && (fx.dark || fx.light)) {
@@ -749,17 +752,20 @@ export function saveHeadingFont(pair: ModePair<HeadingChoice | null> | null): vo
   saveModePair(HEADING_KEY, pair);
 }
 
-// Semantic colors (#331), per mode: a set or null (not chosen / the admin
-// default). Stored as a `{dark,light}` pair.
+// Semantic colors (#331), per mode: a set, "none" (the stylesheet's standard
+// colors, even over an admin default set, #395), or null (not chosen: the
+// admin default). Stored as a `{dark,light}` pair.
 export const STATUS_KEY = "ctrlcenter:status";
 
-const isSemantic = (v: unknown): v is SemanticColors => sanitizeSemantic(v) !== null;
+export type StatusChoice = SemanticColors | "none";
 
-export function loadStatusColors(): ModePair<SemanticColors | null> {
-  return loadModePair(STATUS_KEY, isSemantic);
+const isStatusChoice = (v: unknown): v is StatusChoice => v === "none" || sanitizeSemantic(v) !== null;
+
+export function loadStatusColors(): ModePair<StatusChoice | null> {
+  return loadModePair(STATUS_KEY, isStatusChoice);
 }
 
-export function saveStatusColors(pair: ModePair<SemanticColors | null> | null): void {
+export function saveStatusColors(pair: ModePair<StatusChoice | null> | null): void {
   if (typeof window === "undefined") return;
   try {
     if (pair && (pair.dark || pair.light)) {
@@ -846,7 +852,8 @@ export function saveFollowSchedule(follow: boolean): void {
 }
 
 // Under the "themes only" policy (#335), the visitor's choice is a pack's
-// name per mode; the no-flash script resolves it against the site's themes.
+// gallery key per mode (its name, for a choice saved before #395); the
+// no-flash script resolves it against the site's themes the same way.
 export const PACK_KEY = "ctrlcenter:pack";
 
 export function loadPackChoice(): ModePair<string | null> {

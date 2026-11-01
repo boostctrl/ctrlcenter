@@ -402,6 +402,78 @@ describe("visitor theming policy (#335)", () => {
     expect(lightPack.scene).toBe("none");
     expect(lightPack.background).toBe("#ffffff");
   });
+
+  it("lands a chosen pack as applying it does: what it doesn't carry is cleared, not the site's (#395)", () => {
+    const site = {
+      ...DT,
+      policy: "packs",
+      packs: [{ ...pack, tune: undefined, status: undefined }],
+      tune: { radius: 50 },
+      sceneMotion: "calm",
+      sceneIntensity: 40,
+      status: { up: "#00ff00", down: "#ff0000", warning: "#ffaa00", info: "#00aaff" },
+      density: "compact",
+      font: "inter",
+    };
+    const input = themePaint.readStored(storage({ "ctrlcenter:pack": { dark: "Shore" } }), site, IDS, true);
+    expect(input.design).toBe("flat");
+    expect(input.tune).toBeNull();
+    expect(input.status).toBeNull();
+    expect(input.sceneFx).toBeNull();
+    // The fonts and the density are the site's: a pack never carries them.
+    expect(input.font).toBe("inter");
+    expect(input.density).toBe("compact");
+  });
+
+  it("resolves a chosen pack by its key, then by name for a choice saved before keys (#395)", () => {
+    const keyed = { ...pack, key: "custom-ab12cd34", name: "Lagoon" };
+    const dt = { ...DT, policy: "packs", packs: [keyed] };
+    expect(themePaint.readStored(storage({ "ctrlcenter:pack": { dark: "custom-ab12cd34" } }), dt, IDS, true).design).toBe("flat");
+    expect(themePaint.readStored(storage({ "ctrlcenter:pack": { dark: "Lagoon" } }), dt, IDS, true).design).toBe("flat");
+    expect(themePaint.readStored(storage({ "ctrlcenter:pack": { dark: "Shore" } }), dt, IDS, true).design).toBe("glass");
+    // A built-in's key is its shipped name; a renamed one is still found.
+    const renamed = { ...pack, key: "Shore", name: "Beach" };
+    expect(themePaint.readStored(storage({ "ctrlcenter:pack": { dark: "Shore" } }), { ...dt, packs: [renamed] }, IDS, true).design).toBe("flat");
+  });
+});
+
+describe("a stored \"none\" over the site default (#395)", () => {
+  const site = {
+    ...DT,
+    tune: { radius: 50 },
+    sceneMotion: "calm",
+    status: { up: "#00ff00", down: "#ff0000", warning: "#ffaa00", info: "#00aaff" },
+  };
+
+  it("paints the design as drawn, the scene as designed and the standard colors", () => {
+    const stored = storage({
+      "ctrlcenter:tune": { dark: "none" },
+      "ctrlcenter:scene-fx": { dark: "none" },
+      "ctrlcenter:status": { dark: "none" },
+    });
+    const input = themePaint.readStored(stored, site, IDS, true);
+    expect(input.tune).toBeNull();
+    expect(input.sceneFx).toBeNull();
+    expect(input.status).toBeNull();
+    const paint = themePaint.computePaint(input);
+    expect(paint.vars["--tune-radius"]).toBeNull();
+    expect(paint.attrs["data-motion"]).toBeNull();
+    expect(paint.vars["--status-up"]).toBeNull();
+  });
+
+  it("is per mode: nothing stored for the other mode still takes the default", () => {
+    const stored = storage({
+      "ctrlcenter:tune": { dark: "none" },
+      "ctrlcenter:scene-fx": { dark: "none" },
+      "ctrlcenter:status": { dark: "none" },
+    });
+    const light = themePaint.readStored(stored, site, IDS, false);
+    expect(light.tune).toEqual({ radius: 50 });
+    expect(light.sceneFx?.motion).toBe("calm");
+    expect(light.status?.up).toBe("#00ff00");
+    // And nothing stored at all takes the default too.
+    expect(themePaint.readStored(storage({}), site, IDS, true).tune).toEqual({ radius: 50 });
+  });
 });
 
 describe("day/night schedule switch (#336)", () => {

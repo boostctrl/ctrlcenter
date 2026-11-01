@@ -45,8 +45,9 @@ export const boardSchema = z.object({
   // Shown before its name in the navigation (#316). Optional, so a board
   // without one stores nothing.
   icon: z.string().trim().min(1).max(MAX_ICON_LENGTH).optional().catch(undefined),
-  // A gallery pack pinned as this board's theme (#337), by name; absent =
-  // the site theme. Resolved by lib/board-theme.ts.
+  // A gallery pack pinned as this board's theme (#337), by its gallery key
+  // (#395; a name, for a pin saved before keys were stored); absent = the
+  // site theme. Resolved by lib/board-theme.ts.
   theme: z.string().trim().min(1).max(40).optional().catch(undefined),
   layout: boardLayoutSchema.default(boardLayoutSchema.parse({})),
 });

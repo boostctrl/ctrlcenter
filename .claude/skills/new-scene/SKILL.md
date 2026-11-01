@@ -25,9 +25,12 @@ in order.
 
 ## 2. Component: `components/scenes/<Name>.tsx`
 
-The signature is `({ light, motion }: SceneProps)` from `./index`: `light`
-is the resolved surface lightness, `motion` the level the scene should run
-at (`"normal"` as designed, `"calm"` at half speed, `"off"` a still frame).
+The signature is `({ light, motion, accentFrom, accentTo }: SceneProps)`
+from `./index`: `light` is the resolved surface lightness, `motion` the
+level the scene should run at (`"normal"` as designed, `"calm"` at half
+speed, `"off"` a still frame), and `accentFrom`/`accentTo` the accent pair
+on screen — a canvas scene takes them as effect dependencies only, so an
+accent change re-seeds its field in the new colour (#395).
 
 - Root: `<div aria-hidden className="scene-root pointer-events-none fixed inset-0 -z-10 overflow-hidden">`.
   `.scene-root` applies `--scene-opacity` (the Intensity slider). A glow
@@ -50,13 +53,15 @@ at (`"normal"` as designed, `"calm"` at half speed, `"off"` a still frame).
     class declares `animation-duration: calc(<N>s * var(--motion-scale, 1))`;
     the two stilling lists set `animation: none` for `off` and for
     `prefers-reduced-motion`. The component itself needs no motion code.
-  - *Canvas scenes* copy `components/scenes/Petals.tsx`: compute
-    `reduced = motion === "off" || matchMedia("(prefers-reduced-motion: reduce)").matches`
-    and `calm = motion === "calm"`; `resize()` re-seeds the field and, when
-    reduced, draws one still frame; `draw()` skips every other frame under
-    calm; `window.addEventListener("resize", resize)` plus
+  - *Canvas scenes* copy `components/scenes/Petals.tsx`: read
+    `const osReduced = usePrefersReducedMotion()` (`components/usePrefersReducedMotion.ts`,
+    live, so the OS setting changing mid-page re-runs the effect), compute
+    `reduced = motion === "off" || osReduced` and `calm = motion === "calm"`;
+    `resize()` re-seeds the field and, when reduced, draws one still frame;
+    `draw()` skips every other frame under calm;
+    `window.addEventListener("resize", resize)` plus
     `cancelAnimationFrame(raf)` in the effect cleanup; the effect depends on
-    `[light, motion]`. Size the canvas by `devicePixelRatio`, cap the particle
+    `[light, motion, osReduced, accentFrom, accentTo]`. Size the canvas by `devicePixelRatio`, cap the particle
     count by viewport width, and pre-render any expensive sprite once in
     `resize()` rather than per frame.
   - Photosensitivity (WCAG 2.3.1): no field-wide luminance change faster

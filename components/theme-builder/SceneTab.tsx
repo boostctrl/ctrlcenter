@@ -36,9 +36,11 @@ export default function SceneTab({ d, canUpload = false }: { d: ThemeDraft; canU
   const fx = sceneFxFor(editMode) ?? DEFAULT_SCENE_FX;
   const scene = sceneFor(editMode);
   const current = SCENES.find((s) => s.id === scene) ?? SCENES[0];
+  // The scene as designed is an explicit "none", so it holds even when the
+  // site default calms or dims the scene (#395).
   const update = (patch: Partial<typeof fx>) => {
     const next = { ...fx, ...patch };
-    setSceneFx(isDefaultSceneFx(next) ? null : next, editMode);
+    setSceneFx(isDefaultSceneFx(next) ? "none" : next, editMode);
   };
   const swatch = (id: SceneId, tall = false) => (
     <span
@@ -115,7 +117,7 @@ export default function SceneTab({ d, canUpload = false }: { d: ThemeDraft; canU
                   {!isDefaultSceneFx(sceneFxFor(editMode)) && (
                     <button
                       type="button"
-                      onClick={() => setSceneFx(null, editMode)}
+                      onClick={() => setSceneFx("none", editMode)}
                       className="text-[10px] text-ink-50 underline underline-offset-2 transition-colors hover:text-fg"
                     >
                       Reset to the scene

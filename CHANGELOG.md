@@ -45,6 +45,40 @@ here.
 
 ### Fixed
 
+- **The plain design is always one click away in the theme builder.** On a
+  site whose default theme carries a tune, calmer or dimmer scene effects or
+  its own status colors, "Reset to the design", the sliders back at 100%,
+  "Reset to the scene", "Full" motion and "Reset to standard" all snapped
+  back to the site's values, a just-applied theme showed "· modified" at once
+  and Revert did nothing. Each of those now clears the part outright, a
+  site theme or saved theme lands exactly as designed (what it doesn't carry
+  is cleared, not left to the site's), and the page loads the same way it
+  was left, with no flash under "themes only". That includes a theme's
+  scene: one a visitor picks runs its scene as designed rather than under
+  the site's calmer or dimmer setting. Reset theme still returns to the
+  site's. (#395)
+
+- **Renaming a site theme no longer unpins it.** Boards, the day & night
+  schedule and visitors' "themes only" choices used to name the theme, so a
+  rename in Settings → Themes quietly unpinned the boards, turned the
+  schedule phase off and dropped visitors' picks. They now refer to the
+  theme itself, so it can be renamed freely; pins, schedules and choices
+  saved before this keep working as they are. (#395)
+
+- **Turning the day & night schedule off no longer flashes the phase's
+  theme on every load.** The switch is read with the first paint, so the
+  site's usual theme shows from the start; the site's "Nothing" theming
+  policy applies to it too, and Reset all settings clears it. A pinned or
+  scheduled theme without fonts of its own now keeps the site's light-mode
+  and heading fonts, as applying it yourself does. (#395)
+
+- **Changing the accent recolours the animated scenes at once.** Starfield,
+  Rain and the other particle scenes kept the old accent until the window
+  was resized. Reduce motion also reaches further: the storm lightning on
+  the weather page and the pulsing status dots go still under it and under a
+  theme's Still level, and every scene reacts when the system's reduced
+  motion setting changes while the page is open. (#395)
+
 - **A long Telegram message with a long link arrives instead of being
   refused.** The text of a relayed notification was cut to leave room for
   its link, but a link near the 2,048-character bound could still carry the

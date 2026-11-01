@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { loadFollowSchedule, saveFollowSchedule } from "@/lib/prefs";
+import { useEffect, useMemo, useState } from "react";
 import { scheduleState, type SchedulePhase, type ThemeSchedule } from "@/lib/theme-schedule";
 import type { DefaultTheme } from "./useLook";
 
@@ -29,15 +28,16 @@ export type ThemeScheduleValue = {
 
 const MAX_DELAY = 2 ** 31 - 1;
 
-// The effective site default theme under the schedule: the current phase's
-// (re-resolved on a timer at each switch, from the same pure function the
-// server used), or the usual one when the visitor opted out.
+// The current phase's site theme under the schedule, re-resolved on a timer
+// at each switch from the same pure function the server used. The visitor's
+// switch lives in the look state (useLook), which reads it with the first
+// paint and under the theming policy (#395); this hook only tracks the
+// phase. Memoised, so a consumer's own memo over it holds between phases.
 export function useScheduledTheme(props: ScheduleProps | null): {
+  phase: SchedulePhase;
   theme: DefaultTheme | null;
-  value: ThemeScheduleValue | null;
 } {
   const [phase, setPhase] = useState<SchedulePhase>(props?.phase ?? "day");
-  const [follow, setFollowState] = useState(true);
 
   useEffect(() => {
     if (!props) return;
@@ -51,26 +51,13 @@ export function useScheduledTheme(props: ScheduleProps | null): {
     // The first check runs right away but asynchronously: the server's phase
     // is already painted, and this reconciles it with the browser's clock.
     timer = setTimeout(tick, 0);
-    const stored = loadFollowSchedule();
-    if (!stored) {
-      // Hydrate the visitor's switch from storage after mount (SSR can't
-      // know it); the render before it matches the server.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setFollowState(false);
-    }
     return () => {
       if (timer) clearTimeout(timer);
     };
   }, [props]);
 
-  const setFollow = useCallback((next: boolean) => {
-    setFollowState(next);
-    saveFollowSchedule(next);
-  }, []);
-
-  if (!props) return { theme: null, value: null };
-  return {
-    theme: !follow ? props.base : phase === "day" ? props.day : props.night,
-    value: { phase, follow, setFollow },
-  };
+  return useMemo(
+    () => ({ phase, theme: props ? (phase === "day" ? props.day : props.night) : null }),
+    [props, phase]
+  );
 }

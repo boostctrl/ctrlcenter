@@ -12,38 +12,36 @@ import {
   type AccentOverrides,
   type HeadingChoice,
   type ModePair,
+  type SceneFxChoice,
+  type StatusChoice,
+  type TuneChoice,
   type WallpaperChoice,
 } from "@/lib/prefs";
-import type {
-  Density,
-  DesignId,
-  ModeColors,
-  SceneFx,
-  SceneId,
-  SemanticColors,
-  Tune,
-} from "@/lib/theme";
+import type { Density, DesignId, ModeColors, SceneId } from "@/lib/theme";
 import type { FontId } from "@/lib/fonts";
 import type { Mode, Theme } from "./themeApply";
 
 // Everything a paint reads: the saved mode and a builder preview of another,
-// each per-mode part the visitor chose (null = the site default), the custom
-// colors and the standalone accents.
+// each per-mode part the visitor chose (null = the site default; the parts
+// with a "none"/"body" sentinel can also be cleared outright, over the site
+// default, #395), the custom colors, the standalone accents, and whether the
+// site's day/night schedule (#336) is followed.
 export type LookState = {
   theme: Theme;
   previewMode: Mode | null;
   designs: ModePair<DesignId | null>;
   scenes: ModePair<SceneId | null>;
   fonts: ModePair<FontId | null>;
-  tunes: ModePair<Tune | null>;
-  sceneFxs: ModePair<SceneFx | null>;
+  tunes: ModePair<TuneChoice | null>;
+  sceneFxs: ModePair<SceneFxChoice | null>;
   reduceMotion: boolean;
   headings: ModePair<HeadingChoice | null>;
   densities: ModePair<Density | null>;
-  statuses: ModePair<SemanticColors | null>;
+  statuses: ModePair<StatusChoice | null>;
   wallpapers: ModePair<WallpaperChoice | null>;
   activeLook: ModeColors | null;
   accentOverride: AccentOverrides;
+  followSchedule: boolean;
 };
 
 // No visitor choice for either mode.
@@ -66,6 +64,7 @@ export function initialLookState(mode: Theme): LookState {
     wallpapers: NO_CHOICE,
     activeLook: null,
     accentOverride: NO_ACCENT_OVERRIDES,
+    followSchedule: true,
   };
 }
 

@@ -167,11 +167,12 @@ export const themeEntrySchema = z
     }
   });
 
-// A day theme and a night theme by time of day (#336): gallery pack names
-// (empty = the site's usual theme for that phase), by sunrise and sunset at
-// the weather location or at fixed "HH:MM" times in the site's time zone,
-// each with an optional appearance mode. Replaced whole on save, so clearing
-// a mode sticks.
+// A day theme and a night theme by time of day (#336): gallery pack keys
+// (#395; a name, for a schedule saved before keys were stored; empty = the
+// site's usual theme for that phase), by sunrise and sunset at the weather
+// location or at fixed "HH:MM" times in the site's time zone, each with an
+// optional appearance mode. Replaced whole on save, so clearing a mode
+// sticks.
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Use HH:MM");
 export const themeScheduleSchema = z.object({
   enabled: z.boolean().default(false),

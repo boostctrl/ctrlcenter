@@ -6,7 +6,8 @@ import type { ThemeDraft } from "./useThemeDraft";
 
 // Fine-tune (#326): sliders layered over the chosen design. The design stays
 // the recipe; each slider scales one of its tokens, so switching design keeps
-// the tune and "Reset to the design" returns to its own values.
+// the tune and "Reset to the design" returns to its own values — the design
+// as drawn, even when the site default carries a tune ("none", #395).
 export default function TuneTab({ d }: { d: ThemeDraft }) {
   const { designFor, tuneFor, setTune, editMode } = d;
   const design = DESIGN_NAMES[designFor(editMode)];
@@ -18,7 +19,7 @@ export default function TuneTab({ d }: { d: ThemeDraft }) {
       </p>
       <TuneFields
         value={tuneFor(editMode)}
-        onChange={(tune) => setTune(tune, editMode)}
+        onChange={(tune) => setTune(tune ?? "none", editMode)}
         idPrefix={`tb-tune-${editMode}`}
       />
     </div>

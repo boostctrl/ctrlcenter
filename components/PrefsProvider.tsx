@@ -153,14 +153,20 @@ export function PrefsProvider({
   // Pinned app IDs (starts empty to match SSR; hydrated from localStorage on mount).
   const [favorites, setFavorites] = useState<string[]>([]);
   // Under a schedule the site default is the current phase's theme, flipped
-  // live at each switch; the visitor's own choices still win over it. A
-  // board's own theme (#337) comes first, for as long as that board is open.
+  // live at each switch; the visitor's own choices still win over it, and
+  // their switch (held by the look, #395) puts the site's usual theme in its
+  // place. A board's own theme (#337) comes first, for as long as that board
+  // is open — whatever the switch says, as the no-flash script paints it.
   const scheduled = useScheduledTheme(schedule ?? null);
   const [boardTheme, setBoardTheme] = useState<DefaultTheme | null>(initialBoardTheme);
-  const { look, resetLook } = useLook(boardTheme ?? scheduled.theme ?? defaultTheme, {
-    policy: visitorTheming,
-    packs,
-  });
+  const { look, resetLook, followSchedule, setFollowSchedule } = useLook(
+    boardTheme ?? scheduled.theme ?? defaultTheme,
+    {
+      policy: visitorTheming,
+      packs,
+      unscheduled: boardTheme || !schedule ? null : schedule.base,
+    }
+  );
 
   const persist = useCallback((next: VisitorPrefs) => {
     setPrefs(next);
@@ -268,9 +274,15 @@ export function PrefsProvider({
     clearLocation,
   ]);
 
+  // The visitor's schedule switch, as one stable value per phase and
+  // setting, so the look memo below holds across unrelated renders (#290).
+  const themeSchedule = useMemo<ThemeScheduleValue | null>(
+    () => (schedule ? { phase: scheduled.phase, follow: followSchedule, setFollow: setFollowSchedule } : null),
+    [schedule, scheduled.phase, followSchedule, setFollowSchedule]
+  );
   const lookValue = useMemo<LookPrefs>(
-    () => ({ ...look, reset, themeSchedule: scheduled.value }),
-    [look, reset, scheduled.value]
+    () => ({ ...look, reset, themeSchedule }),
+    [look, reset, themeSchedule]
   );
   const favoritesValue = useMemo<FavoritesValue>(
     () => ({ favorites, toggleFavorite }),

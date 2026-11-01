@@ -2,7 +2,7 @@
 
 import type { ThemePack } from "@/lib/theme";
 import { FONTS, fontVar, type FontId } from "@/lib/fonts";
-import { DENSITIES, VISITOR_THEMING, type Density } from "@/lib/theme";
+import { DENSITIES, VISITOR_THEMING, packByRef, packKey, type Density } from "@/lib/theme";
 import { Card, ControlRow, SelectField, TextField, ToggleRow, controlClasses, fieldLabelClasses } from "../ui";
 import { ChipGroup } from "@/components/ChipGroup";
 import IconField from "../IconField";
@@ -28,6 +28,13 @@ export default function GeneralSection({
   const schedule = settings.themeSchedule;
   const updateSchedule = (patch: Partial<typeof schedule>) =>
     setSettings({ ...settings, themeSchedule: { ...schedule, ...patch } });
+  // A phase's pack is stored by its gallery key (#395), so a rename keeps
+  // it; a schedule saved before keys were stored names it, and still
+  // selects it here.
+  const phasePackKey = (ref: string) => {
+    const pack = packByRef(themePacks, ref);
+    return pack ? packKey(pack) : "";
+  };
   const modeOptions = (["system", "light", "dark"] as const).map((m) => ({ value: m, label: m }));
   return (
     <>
@@ -285,24 +292,24 @@ export default function GeneralSection({
                 <div className="grid grid-cols-2 gap-2">
                   <SelectField
                     label="Day theme"
-                    value={schedule.day}
+                    value={phasePackKey(schedule.day)}
                     onChange={(e) => updateSchedule({ day: e.target.value })}
                   >
                     <option value="">The default theme</option>
                     {themePacks.map((p) => (
-                      <option key={p.name} value={p.name}>
+                      <option key={packKey(p)} value={packKey(p)}>
                         {p.name}
                       </option>
                     ))}
                   </SelectField>
                   <SelectField
                     label="Night theme"
-                    value={schedule.night}
+                    value={phasePackKey(schedule.night)}
                     onChange={(e) => updateSchedule({ night: e.target.value })}
                   >
                     <option value="">The default theme</option>
                     {themePacks.map((p) => (
-                      <option key={p.name} value={p.name}>
+                      <option key={packKey(p)} value={packKey(p)}>
                         {p.name}
                       </option>
                     ))}

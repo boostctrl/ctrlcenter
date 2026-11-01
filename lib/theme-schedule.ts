@@ -155,14 +155,19 @@ export function scheduleState(
 
 // The site theme with a gallery pack applied for a phase (#336): the pack's
 // design, scene, colors and parts for both modes, over the rest of the site
-// theme (density, scene effects…), and a mode for the phase when set. An
-// unknown pack leaves the theme as it is.
+// theme (density, scene effects…), and a mode for the phase when set. A pack
+// without fonts keeps the site's body and heading fonts for both modes, as
+// a visitor applying it does (#373, #395). An unknown pack leaves the theme
+// as it is.
 export function themeWithPack<
   T extends {
     mode: "system" | "light" | "dark";
     design: string;
     scene: string;
     font: string;
+    fontLight?: string;
+    headingFont?: string;
+    headingFontLight?: string;
     accentFrom: string;
     accentTo: string;
   },
@@ -189,9 +194,9 @@ export function themeWithPack<
     tune: pack.tune,
     tuneLight: undefined,
     font: pack.font ?? theme.font,
-    fontLight: undefined,
-    headingFont: pack.headingFont,
-    headingFontLight: undefined,
+    fontLight: pack.font ? undefined : theme.fontLight,
+    headingFont: pack.headingFont ?? theme.headingFont,
+    headingFontLight: pack.headingFont ? undefined : theme.headingFontLight,
     status: pack.status,
     statusLight: pack.statusLight,
     wallpaper: pack.wallpaper,

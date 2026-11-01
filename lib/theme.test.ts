@@ -29,6 +29,8 @@ import {
   packDesign,
   packScene,
   type ThemeEntry,
+  packByRef,
+  packKey,
 } from "./theme";
 
 describe("catalog sizes", () => {
@@ -103,8 +105,9 @@ describe("resolveThemePacks", () => {
     dark: { background: "#000000", foreground: "#ffffff", accentFrom: "#ff0000", accentTo: "#00ff00" },
     light: { background: "#ffffff", foreground: "#000000", accentFrom: "#ff0000", accentTo: "#00ff00" },
   };
-  // A resolved pack names its built-in; the shipped list doesn't.
-  const shipped = (i: number) => ({ ...THEME_PACKS[i], builtin: THEME_PACKS[i].name });
+  // A resolved pack names its built-in and carries its key (#395); the
+  // shipped list does neither.
+  const shipped = (i: number) => ({ ...THEME_PACKS[i], builtin: THEME_PACKS[i].name, key: THEME_PACKS[i].name });
 
   it("returns the built-ins unchanged with no overrides", () => {
     expect(resolveThemePacks([])).toBe(THEME_PACKS);
@@ -115,7 +118,7 @@ describe("resolveThemePacks", () => {
     const resolved = resolveThemePacks([override]);
     expect(resolved).toHaveLength(THEME_PACKS.length);
     const idx = THEME_PACKS.findIndex((p) => p.name === "Mariana");
-    expect(resolved[idx]).toEqual({ ...override, key: undefined, builtin: "Mariana" });
+    expect(resolved[idx]).toEqual({ ...override, key: "Mariana", builtin: "Mariana" });
     expect(resolved[idx].design).toBe("flat");
     // Other packs untouched.
     expect(resolved[0]).toEqual(shipped(0));
@@ -168,7 +171,7 @@ describe("the theme gallery (#334)", () => {
     const g = resolveThemeGallery([mine, { key: "Default", builtin: "Default" }]);
     expect(g[0]).toMatchObject({ key: "custom-ab12cd34", hidden: false, edited: true });
     expect(g[0].builtin).toBeUndefined();
-    expect(g[0].pack).toEqual({ name: "Mine", design: "paper", scene: "aurora", ...colors });
+    expect(g[0].pack).toEqual({ name: "Mine", design: "paper", scene: "aurora", key: "custom-ab12cd34", ...colors });
     expect(g[1].key).toBe("Default");
     expect(names([{ key: "custom-x", name: "Half", dark: colors.dark }])).toEqual(THEME_PACKS.map((p) => p.name));
   });
@@ -188,10 +191,10 @@ describe("the theme gallery (#334)", () => {
   it("shows a bare or renamed built-in as shipped, so later tweaks to it still reach the site", () => {
     const tide = THEME_PACKS.find((p) => p.name === "Tide")!;
     const bare = resolveThemeGallery([{ key: "Tide", builtin: "Tide" }])[0];
-    expect(bare.pack).toEqual({ ...tide, builtin: "Tide" });
+    expect(bare.pack).toEqual({ ...tide, builtin: "Tide", key: "Tide" });
     expect(bare.edited).toBe(false);
     const renamed = resolveThemeGallery([{ key: "Tide", builtin: "Tide", name: "Surf" }])[0];
-    expect(renamed.pack).toEqual({ ...tide, name: "Surf", builtin: "Tide" });
+    expect(renamed.pack).toEqual({ ...tide, name: "Surf", builtin: "Tide", key: "Tide" });
     expect(renamed.edited).toBe(false);
   });
 
@@ -337,5 +340,39 @@ describe("wallpaper (#333)", () => {
     expect(wallpaperEqual(a, { ...a, dim: 25 })).toBe(false);
     expect(wallpaperEqual(a, null)).toBe(false);
     expect(wallpaperEqual(undefined, null)).toBe(true);
+  });
+});
+
+describe("packByRef (#395)", () => {
+  const colors = {
+    dark: { background: "#000000", foreground: "#ffffff", accentFrom: "#ff0000", accentTo: "#00ff00" },
+    light: { background: "#ffffff", foreground: "#000000", accentFrom: "#ff0000", accentTo: "#00ff00" },
+  };
+  // A renamed built-in and a theme of the admin's own, as the gallery
+  // resolves them.
+  const packs = resolveThemePacks([
+    { key: "Tide", builtin: "Tide", name: "Surf" },
+    { key: "custom-ab12cd34", name: "Mine", design: "paper", ...colors },
+  ]);
+
+  it("keys a resolved pack by its entry, and a shipped one by its name", () => {
+    expect(packKey(packs.find((p) => p.name === "Surf")!)).toBe("Tide");
+    expect(packKey(packs.find((p) => p.name === "Mine")!)).toBe("custom-ab12cd34");
+    expect(packKey(THEME_PACKS[0])).toBe(THEME_PACKS[0].name);
+  });
+
+  it("finds a pack by its key, so a rename keeps every reference to it", () => {
+    expect(packByRef(packs, "Tide")?.name).toBe("Surf");
+    expect(packByRef(packs, "custom-ab12cd34")?.name).toBe("Mine");
+  });
+
+  it("falls back to the name, for a reference stored before keys were", () => {
+    expect(packByRef(packs, "Mine")?.key).toBe("custom-ab12cd34");
+    expect(packByRef(packs, "Surf")?.key).toBe("Tide");
+    // The shipped list has no keys: a name is the reference.
+    expect(packByRef(THEME_PACKS, "Circuit")?.name).toBe("Circuit");
+    expect(packByRef(packs, "Nope")).toBeUndefined();
+    expect(packByRef(packs, "")).toBeUndefined();
+    expect(packByRef(packs, undefined)).toBeUndefined();
   });
 });

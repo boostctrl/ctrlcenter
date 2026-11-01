@@ -15,6 +15,9 @@ import {
   newThemeId,
   type HeadingChoice,
   type WallpaperChoice,
+  type TuneChoice,
+  type SceneFxChoice,
+  type StatusChoice,
   type CustomTheme,
   type AccentOverrides,
   type ModePair,
@@ -209,16 +212,21 @@ export function useSavedThemes({
   // the look) and the chrome for whichever mode is displayed now. Both paints
   // read the latest state, which the update just made the theme's own — not
   // this render's, which would re-apply the old chrome, tune and effects
-  // until a mode toggle or reload (#120, #329, #429).
+  // until a mode toggle or reload (#120, #329, #429). A theme restores
+  // exactly as it was captured: a part it doesn't carry was the design as
+  // drawn, the scene as designed, the standard status colors, the body font
+  // or no wallpaper when it was saved, so each is cleared outright with its
+  // sentinel rather than left to the site default (#395).
   const applyTheme = useCallback(
     (t: CustomTheme) => {
       const designs = { dark: t.design, light: t.designLight };
       const scenes = { dark: t.scene, light: t.sceneLight };
       const fonts = { dark: t.font, light: t.fontLight };
-      const tunes = { dark: t.tune ?? null, light: t.tuneLight ?? null };
-      const sceneFxs = { dark: t.sceneFx ?? null, light: t.sceneFxLight ?? null };
-      // A saved theme without a heading face means the body font — "body",
-      // so an admin default heading face doesn't show through it.
+      const tunes: ModePair<TuneChoice | null> = { dark: t.tune ?? "none", light: t.tuneLight ?? "none" };
+      const sceneFxs: ModePair<SceneFxChoice | null> = {
+        dark: t.sceneFx ?? "none",
+        light: t.sceneFxLight ?? "none",
+      };
       const headings: ModePair<HeadingChoice | null> = {
         dark: t.headingFont ?? "body",
         light: t.headingFontLight ?? "body",
@@ -227,12 +235,10 @@ export function useSavedThemes({
         dark: t.density ?? "comfortable",
         light: t.densityLight ?? "comfortable",
       };
-      const statuses: ModePair<SemanticColors | null> = {
-        dark: t.status ?? null,
-        light: t.statusLight ?? null,
+      const statuses: ModePair<StatusChoice | null> = {
+        dark: t.status ?? "none",
+        light: t.statusLight ?? "none",
       };
-      // No wallpaper in the theme means none — "none", so an admin default
-      // wallpaper doesn't show through it.
       const wallpapers: ModePair<WallpaperChoice | null> = {
         dark: t.wallpaper ?? "none",
         light: t.wallpaperLight ?? "none",

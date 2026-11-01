@@ -546,7 +546,25 @@ export type ThemePack = {
   // On a resolved gallery pack: the built-in it stands for, if any (#334);
   // the builder badges the stock one by it whatever it's called now.
   builtin?: string;
+  // On a resolved gallery pack: its entry's key (#395), stable across a
+  // rename — what a board pin, the day/night schedule and a visitor's
+  // "themes only" choice refer to. A pack without one (the shipped list) is
+  // keyed by its name, as a built-in's entry is.
+  key?: string;
 } & ModeColors;
+
+// The stable reference to a pack (#395): its gallery key, else its name.
+export function packKey(pack: ThemePack): string {
+  return pack.key ?? pack.name;
+}
+
+// The pack a stored reference names (#395): by key first, so a renamed pack
+// is still found; then by name, for a config or a browser choice from
+// before keys were stored (3.0.x referenced packs by name).
+export function packByRef(packs: readonly ThemePack[], ref: string | null | undefined): ThemePack | undefined {
+  if (!ref) return undefined;
+  return packs.find((p) => packKey(p) === ref) ?? packs.find((p) => p.name === ref);
+}
 
 // What visitors may change about the theme (#335): everything, the gallery's
 // themes and the light/dark mode only, or nothing (the site theme is final:
@@ -724,7 +742,9 @@ export const THEME_PACKS: ThemePack[] = [
 // entry either stands for a built-in pack (`builtin` names it; a `key` that
 // is a built-in's name, or a key-less entry named like one, means the same
 // for files from before 3.0) or is a pack of the admin's own. An entry can
-// hide its pack from visitors, and the list's order is the gallery's.
+// hide its pack from visitors, and the list's order is the gallery's. The
+// key is what boards, the schedule and visitors' choices reference (#395),
+// so the resolved pack carries it.
 //
 // A built-in entry with no pack fields is the built-in as shipped (so it can
 // be hidden or reordered while later versions' tweaks to it still show).
@@ -872,7 +892,7 @@ const shipped = (p: ThemePack): ResolvedThemeEntry => ({
   builtin: p.name,
   hidden: false,
   edited: false,
-  pack: { ...p, builtin: p.name },
+  pack: { ...p, builtin: p.name, key: p.name },
 });
 
 // The whole gallery, hidden packs included, for the admin: the entries in
@@ -896,12 +916,14 @@ export function resolveThemeGallery(entries: ThemeEntry[] | undefined): Resolved
       if (seen.has(base.name)) continue;
       seen.add(base.name);
       const { pack, edited } = resolveBuiltin(base, e);
-      resolved.push({ key: e.key ?? base.name, builtin: base.name, hidden: e.hidden === true, edited, pack, entry: e });
+      const key = e.key ?? base.name;
+      resolved.push({ key, builtin: base.name, hidden: e.hidden === true, edited, pack: { ...pack, key }, entry: e });
     } else {
       const pack = resolveCustom(e);
       if (!pack) continue;
       gallery = true;
-      resolved.push({ key: e.key ?? pack.name, hidden: e.hidden === true, edited: true, pack, entry: e });
+      const key = e.key ?? pack.name;
+      resolved.push({ key, hidden: e.hidden === true, edited: true, pack: { ...pack, key }, entry: e });
     }
   }
   if (!gallery) {

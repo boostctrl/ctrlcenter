@@ -31,8 +31,12 @@ import Glyphs from "./Glyphs";
 // should run at (#327): "normal" as designed, "calm" at half speed, "off" a
 // still frame. Canvas scenes read the prop; CSS-animated ones follow the
 // data-motion attribute the resolver sets on <html>. The OS reduced-motion
-// preference stills everything regardless.
-export type SceneProps = { light: boolean; motion: MotionLevel };
+// preference stills everything regardless — live, through
+// usePrefersReducedMotion in the canvas scenes (#395). The accent pair on
+// screen comes along as a dependency: a canvas scene reads its colors from
+// the painted --accent-* vars when its effect runs, so an accent change
+// re-runs it and recolours the field (#395).
+export type SceneProps = { light: boolean; motion: MotionLevel; accentFrom: string; accentTo: string };
 
 // The None scene: a plain surface, nothing drawn.
 function None() {

@@ -9,7 +9,9 @@
 // Every paint here reads the latest state (./lookState), never the render's:
 // a setter writes its slice, then calls paintLook/paintChrome, so a handler
 // that calls several setters in one click paints each from what the earlier
-// ones just set (#429).
+// ones just set (#429). The site default a paint falls back to is resolved
+// from that state too (the day/night schedule switch), through pure helpers
+// of the theme rather than this render's closures (#395).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   loadActiveTheme,
@@ -39,15 +41,20 @@ import {
   saveWallpaper,
   loadPackChoice,
   savePackChoice,
+  loadFollowSchedule,
+  saveFollowSchedule,
   NO_ACCENT_OVERRIDES,
   type HeadingChoice,
   type WallpaperChoice,
+  type TuneChoice,
+  type SceneFxChoice,
+  type StatusChoice,
   type CustomTheme,
   type AccentColors,
   type AccentOverrides,
   type ModePair,
 } from "@/lib/prefs";
-import { packDesign, packScene } from "@/lib/theme";
+import { packByRef, packDesign, packKey, packScene } from "@/lib/theme";
 import type {
   ColorSet,
   Density,
@@ -79,7 +86,7 @@ import {
   type Theme,
 } from "./themeApply";
 import { useSavedThemes } from "./useSavedThemes";
-import { forMode, initialLookState, NO_CHOICE, useLookState } from "./lookState";
+import { forMode, initialLookState, NO_CHOICE, useLookState, type LookState } from "./lookState";
 
 export const THEME_KEY = "ctrlcenter:theme";
 
@@ -193,15 +200,17 @@ export type LookValue = {
   setDesign: (design: DesignId, mode: Mode) => void;
   setScene: (scene: SceneId, mode: Mode) => void;
   setFont: (font: FontId, mode: Mode) => void;
-  // Set (or, with null, clear back to the admin default) a mode's fine-tune.
-  setTune: (tune: Tune | null, mode: Mode) => void;
-  setSceneFx: (fx: SceneFx | null, mode: Mode) => void;
+  // A mode's fine-tune: a tune, "none" (the design as drawn, even over an
+  // admin default tune, #395), or null (not chosen: the admin default). The
+  // scene effects and the status colors take the same three (#395).
+  setTune: (tune: TuneChoice | null, mode: Mode) => void;
+  setSceneFx: (fx: SceneFxChoice | null, mode: Mode) => void;
   setReduceMotion: (reduce: boolean) => void;
   // A heading font for a mode: a face, "body" (follow the body font, even
   // over an admin default heading face), or null (not chosen).
   setHeadingFont: (font: HeadingChoice | null, mode: Mode) => void;
   setDensity: (density: Density | null, mode: Mode) => void;
-  setStatusColors: (status: SemanticColors | null, mode: Mode) => void;
+  setStatusColors: (status: StatusChoice | null, mode: Mode) => void;
   // A wallpaper for a mode: an image, "none" (no wallpaper, even over an
   // admin default), or null (not chosen).
   setWallpaper: (wallpaper: WallpaperChoice | null, mode: Mode) => void;
@@ -237,55 +246,151 @@ export type LookValue = {
   resetTheme: () => void;
 };
 
-// All look state for `defaultTheme`. `resetLook` drops every customization,
-// mode included (the theme half of the global reset).
+// The admin default parts for a mode, from a site default theme: light
+// falls back to the dark part when the admin hasn't set a separate light
+// value. Pure functions of the theme, so a paint can resolve them for
+// whichever site default the latest state picks (#395).
+function defDesign(dt: DefaultTheme, dark: boolean): DesignId {
+  return dark ? dt.design : dt.designLight ?? dt.design;
+}
+function defScene(dt: DefaultTheme, dark: boolean): SceneId {
+  return dark ? dt.scene : dt.sceneLight ?? dt.scene;
+}
+function defFont(dt: DefaultTheme, dark: boolean): FontId {
+  return dark ? dt.font : dt.fontLight ?? dt.font;
+}
+function defTune(dt: DefaultTheme, dark: boolean): Tune | null {
+  return (dark ? dt.tune : dt.tuneLight ?? dt.tune) ?? null;
+}
+// A heading of null means the body font.
+function defHeading(dt: DefaultTheme, dark: boolean): FontId | null {
+  return (dark ? dt.headingFont : dt.headingFontLight ?? dt.headingFont) ?? null;
+}
+function defDensity(dt: DefaultTheme, dark: boolean): Density {
+  return (dark ? dt.density : dt.densityLight ?? dt.density) ?? "comfortable";
+}
+function defStatus(dt: DefaultTheme, dark: boolean): SemanticColors | null {
+  return (dark ? dt.status : dt.statusLight ?? dt.status) ?? null;
+}
+function defWallpaper(dt: DefaultTheme, dark: boolean): Wallpaper | null {
+  return (dark ? dt.wallpaper : dt.wallpaperLight ?? dt.wallpaper) ?? null;
+}
+// The admin default scene effects for a mode: light falls back to dark per
+// field; null when neither field is set.
+function defSceneFx(dt: DefaultTheme, dark: boolean): SceneFx | null {
+  const intensity = dark ? dt.sceneIntensity : dt.sceneIntensityLight ?? dt.sceneIntensity;
+  const motion = dark ? dt.sceneMotion : dt.sceneMotionLight ?? dt.sceneMotion;
+  if (intensity === undefined && motion === undefined) return null;
+  return { intensity: intensity ?? 100, motion: motion ?? "normal" };
+}
+// The admin default accent, shared across both modes.
+function defAccent(dt: DefaultTheme): Accent {
+  return { from: dt.accentFrom, to: dt.accentTo };
+}
+// The admin custom default colors as a light+dark pair (a baseline look for
+// a visitor who hasn't customized colors), or null without them. Light
+// falls back to the dark surface colors — and to the shared accent, unless
+// the default theme carries its own light accents (a promoted theme does,
+// #142).
+function adminLookOf(dt: DefaultTheme): ModeColors | null {
+  if (!dt.background || !dt.foreground) return null;
+  return {
+    dark: { background: dt.background, foreground: dt.foreground, accentFrom: dt.accentFrom, accentTo: dt.accentTo },
+    light: {
+      background: dt.backgroundLight ?? dt.background,
+      foreground: dt.foregroundLight ?? dt.foreground,
+      accentFrom: dt.accentFromLight ?? dt.accentFrom,
+      accentTo: dt.accentToLight ?? dt.accentTo,
+    },
+  };
+}
+
+// The effective part for a mode, from the visitor's per-mode pair over the
+// site default `dt`: the visitor's choice; their explicit "none" ("body" for
+// the heading) — the design as drawn, the scene as designed, the standard
+// status colors, no wallpaper, the body font — which clears an admin default
+// too (#395); else the admin default. One rule, shared by the render's
+// resolvers and the paints, so "nothing chosen" never stands in for "none".
+function tuneOf(pair: ModePair<TuneChoice | null>, dt: DefaultTheme, dark: boolean): Tune | null {
+  const v = forMode(pair, dark);
+  if (v === "none") return null;
+  return v ?? defTune(dt, dark);
+}
+function sceneFxOf(pair: ModePair<SceneFxChoice | null>, dt: DefaultTheme, dark: boolean): SceneFx | null {
+  const v = forMode(pair, dark);
+  if (v === "none") return null;
+  return v ?? defSceneFx(dt, dark);
+}
+function statusOf(pair: ModePair<StatusChoice | null>, dt: DefaultTheme, dark: boolean): SemanticColors | null {
+  const v = forMode(pair, dark);
+  if (v === "none") return null;
+  return v ?? defStatus(dt, dark);
+}
+function headingOf(pair: ModePair<HeadingChoice | null>, dt: DefaultTheme, dark: boolean): FontId | null {
+  const v = forMode(pair, dark);
+  if (v === "body") return null;
+  return v ?? defHeading(dt, dark);
+}
+function wallpaperOf(pair: ModePair<WallpaperChoice | null>, dt: DefaultTheme, dark: boolean): Wallpaper | null {
+  const v = forMode(pair, dark);
+  if (v === "none") return null;
+  return v ?? defWallpaper(dt, dark);
+}
+
+// A seeded color set for a mode when there's no active custom look yet —
+// the admin default colors, else the CSS :root / .theme-light values, with
+// the accent resolved from `override` — so editing one mode never leaves the
+// other mode's colors null.
+function seedFor(override: AccentOverrides, dt: DefaultTheme, dark: boolean): ColorSet {
+  const adminLook = adminLookOf(dt);
+  const a = resolveAccent(overrideFor(override, dark), variantFor(adminLook, dark), defAccent(dt));
+  const ad = adminLook ? (dark ? adminLook.dark : adminLook.light) : null;
+  return {
+    background: ad?.background ?? (dark ? "#06070d" : "#eceef3"),
+    foreground: ad?.foreground ?? (dark ? "#f4f4f6" : "#181b24"),
+    accentFrom: a.from,
+    accentTo: a.to,
+  };
+}
+
+// Whether the visitor chose an appearance mode of their own, which a site
+// default's mode (a phase's, a pinned board's) then doesn't replace. Under
+// the "none" policy nothing stored is read.
+function hasOwnMode(policy: VisitorTheming): boolean {
+  if (policy === "none") return false;
+  try {
+    const stored = window.localStorage.getItem(THEME_KEY);
+    return stored === "light" || stored === "dark" || stored === "system";
+  } catch {
+    return false;
+  }
+}
+
+// All look state for `defaultTheme` — the site's theme for this page: a
+// pinned board's (#337), else the current phase's under a day/night
+// schedule (#336), else the site's own. `resetLook` drops every
+// customization, mode included (the theme half of the global reset).
 export function useLook(
   defaultTheme: DefaultTheme,
-  // What this visitor may change (#335), and the site's themes a "packs"
-  // choice resolves against. An admin gets "all" whatever the site says.
-  gate: { policy: VisitorTheming; packs: ThemePack[] } = { policy: "all", packs: [] }
+  // What this visitor may change (#335), the site's themes a "packs" choice
+  // resolves against, and — under a schedule, off any pinned board — the
+  // site's usual theme, which stands in for `defaultTheme` for a visitor
+  // who turned the schedule off (#395). An admin gets "all" whatever the
+  // site says.
+  gate: { policy: VisitorTheming; packs: ThemePack[]; unscheduled?: DefaultTheme | null } = {
+    policy: "all",
+    packs: [],
+  }
 ): {
   look: LookValue;
   resetLook: () => void;
+  // The visitor's day/night schedule switch (#336): follow the site's
+  // schedule (the default), or keep its usual theme under their own choices.
+  followSchedule: boolean;
+  setFollowSchedule: (follow: boolean) => void;
 } {
   const policy = gate.policy;
-  // The admin default accent, and the admin custom default colors (a baseline
-  // theme applied when the visitor hasn't customized colors or picked a mode).
-  const defaultAccent: Accent = useMemo(
-    () => ({ from: defaultTheme.accentFrom, to: defaultTheme.accentTo }),
-    [defaultTheme.accentFrom, defaultTheme.accentTo]
-  );
-  // The admin custom default colors as a light+dark pair. Light falls back to
-  // the dark surface colors — and to the shared accent, unless the default
-  // theme carries its own light accents (a promoted theme does, #142).
-  const adminLook: ModeColors | null = useMemo(() => {
-    if (!defaultTheme.background || !defaultTheme.foreground) return null;
-    const accentFrom = defaultTheme.accentFrom;
-    const accentTo = defaultTheme.accentTo;
-    return {
-      dark: {
-        background: defaultTheme.background,
-        foreground: defaultTheme.foreground,
-        accentFrom,
-        accentTo,
-      },
-      light: {
-        background: defaultTheme.backgroundLight ?? defaultTheme.background,
-        foreground: defaultTheme.foregroundLight ?? defaultTheme.foreground,
-        accentFrom: defaultTheme.accentFromLight ?? accentFrom,
-        accentTo: defaultTheme.accentToLight ?? accentTo,
-      },
-    };
-  }, [
-    defaultTheme.background,
-    defaultTheme.foreground,
-    defaultTheme.backgroundLight,
-    defaultTheme.foregroundLight,
-    defaultTheme.accentFrom,
-    defaultTheme.accentTo,
-    defaultTheme.accentFromLight,
-    defaultTheme.accentToLight,
-  ]);
+  const unscheduled = gate.unscheduled ?? null;
   // The look state, with the live mirror the paints read (`latest`) and the
   // one way to write it (`update`). The per-mode parts are visitor overrides:
   // a null per mode means "use the admin default". `previewMode` is a
@@ -307,7 +412,19 @@ export function useLook(
     wallpapers,
     activeLook,
     accentOverride,
+    followSchedule,
   } = state;
+  // The site default in force for a state: the page's, or the site's usual
+  // theme for a visitor who turned the schedule off. The paints take it from
+  // the latest state, so the mount paint already honours the stored switch
+  // and the phase's theme never shows for a paint first (#395).
+  const siteOf = useCallback(
+    (s: LookState): DefaultTheme => (s.followSchedule || !unscheduled ? defaultTheme : unscheduled),
+    [defaultTheme, unscheduled]
+  );
+  const site = siteOf(state);
+  const defaultAccent = useMemo(() => defAccent(site), [site]);
+  const adminLook = useMemo(() => adminLookOf(site), [site]);
   const [hydrated, setHydrated] = useState(false);
   // Tracks the OS color scheme so "system" mode resolves its surface lightness.
   const [systemDark, setSystemDark] = useState(false);
@@ -322,139 +439,40 @@ export function useLook(
   const liveTheme = useCallback((): Theme => latest().previewMode ?? latest().theme, [latest]);
   const onScreen = useCallback((mode: Mode) => (mode === "dark") === resolveDark(liveTheme()), [liveTheme]);
 
-  // The look to apply: a per-visitor custom look wins, otherwise the admin custom
-  // default colors, otherwise null = the built-in light/dark CSS defaults. The
-  // admin default carries BOTH a light and a dark variant, so the resolved mode
-  // just selects the variant — a visitor picking a mode flips the variant rather
-  // than discarding the admin default colors.
-  const resolveLook = useCallback(
-    (active: ModeColors | null): ModeColors | null => active ?? adminLook,
-    [adminLook]
-  );
-
-  // The admin default design/scene/font for a mode: light falls back to the dark
-  // part when the admin hasn't set a separate light value.
-  const defDesign = useCallback(
-    (dark: boolean): DesignId =>
-      dark ? defaultTheme.design : defaultTheme.designLight ?? defaultTheme.design,
-    [defaultTheme.design, defaultTheme.designLight]
-  );
-  const defScene = useCallback(
-    (dark: boolean): SceneId =>
-      dark ? defaultTheme.scene : defaultTheme.sceneLight ?? defaultTheme.scene,
-    [defaultTheme.scene, defaultTheme.sceneLight]
-  );
-  const defFont = useCallback(
-    (dark: boolean): FontId =>
-      dark ? defaultTheme.font : defaultTheme.fontLight ?? defaultTheme.font,
-    [defaultTheme.font, defaultTheme.fontLight]
-  );
-  const defTune = useCallback(
-    (dark: boolean): Tune | null =>
-      (dark ? defaultTheme.tune : defaultTheme.tuneLight ?? defaultTheme.tune) ?? null,
-    [defaultTheme.tune, defaultTheme.tuneLight]
-  );
-  // The admin default heading font / density for a mode (light falls back
-  // to dark). A heading of null means the body font.
-  const defHeading = useCallback(
-    (dark: boolean): FontId | null =>
-      (dark ? defaultTheme.headingFont : defaultTheme.headingFontLight ?? defaultTheme.headingFont) ?? null,
-    [defaultTheme.headingFont, defaultTheme.headingFontLight]
-  );
-  const defDensity = useCallback(
-    (dark: boolean): Density =>
-      (dark ? defaultTheme.density : defaultTheme.densityLight ?? defaultTheme.density) ?? "comfortable",
-    [defaultTheme.density, defaultTheme.densityLight]
-  );
-  const defStatus = useCallback(
-    (dark: boolean): SemanticColors | null =>
-      (dark ? defaultTheme.status : defaultTheme.statusLight ?? defaultTheme.status) ?? null,
-    [defaultTheme.status, defaultTheme.statusLight]
-  );
-  const defWallpaper = useCallback(
-    (dark: boolean): Wallpaper | null =>
-      (dark ? defaultTheme.wallpaper : defaultTheme.wallpaperLight ?? defaultTheme.wallpaper) ?? null,
-    [defaultTheme.wallpaper, defaultTheme.wallpaperLight]
-  );
-  // The admin default scene effects for a mode: light falls back to dark per
-  // field; null when neither field is set.
-  const defSceneFx = useCallback(
-    (dark: boolean): SceneFx | null => {
-      const intensity = dark
-        ? defaultTheme.sceneIntensity
-        : defaultTheme.sceneIntensityLight ?? defaultTheme.sceneIntensity;
-      const motion = dark
-        ? defaultTheme.sceneMotion
-        : defaultTheme.sceneMotionLight ?? defaultTheme.sceneMotion;
-      if (intensity === undefined && motion === undefined) return null;
-      return { intensity: intensity ?? 100, motion: motion ?? "normal" };
-    },
-    [
-      defaultTheme.sceneIntensity,
-      defaultTheme.sceneMotion,
-      defaultTheme.sceneIntensityLight,
-      defaultTheme.sceneMotionLight,
-    ]
-  );
-
-  // The heading font from a per-mode pair: the visitor's choice ("body" =
-  // none, over the admin default), else the admin default. The wallpaper the
-  // same ("none" = cleared). Shared by the resolvers below (this render's
-  // state) and the paints (the latest).
-  const headingOf = useCallback(
-    (pair: ModePair<HeadingChoice | null>, dark: boolean): FontId | null => {
-      const v = forMode(pair, dark);
-      if (v === "body") return null;
-      return v ?? defHeading(dark);
-    },
-    [defHeading]
-  );
-  const wallpaperOf = useCallback(
-    (pair: ModePair<WallpaperChoice | null>, dark: boolean): Wallpaper | null => {
-      const v = forMode(pair, dark);
-      if (v === "none") return null;
-      return v ?? defWallpaper(dark);
-    },
-    [defWallpaper]
-  );
-
-  // The effective design/scene/font for a mode: the visitor's per-mode choice,
-  // else the admin default for that mode.
+  // The effective parts for a mode, for this render: the visitor's per-mode
+  // choice over the site default (see the *Of helpers above).
   const resolveDesign = useCallback(
-    (dark: boolean): DesignId => forMode(designs, dark) ?? defDesign(dark),
-    [designs, defDesign]
+    (dark: boolean): DesignId => forMode(designs, dark) ?? defDesign(site, dark),
+    [designs, site]
   );
   const resolveScene = useCallback(
-    (dark: boolean): SceneId => forMode(scenes, dark) ?? defScene(dark),
-    [scenes, defScene]
+    (dark: boolean): SceneId => forMode(scenes, dark) ?? defScene(site, dark),
+    [scenes, site]
   );
   const resolveFont = useCallback(
-    (dark: boolean): FontId => forMode(fonts, dark) ?? defFont(dark),
-    [fonts, defFont]
+    (dark: boolean): FontId => forMode(fonts, dark) ?? defFont(site, dark),
+    [fonts, site]
   );
-  const resolveTune = useCallback(
-    (dark: boolean): Tune | null => forMode(tunes, dark) ?? defTune(dark),
-    [tunes, defTune]
-  );
+  const resolveTune = useCallback((dark: boolean): Tune | null => tuneOf(tunes, site, dark), [tunes, site]);
   const resolveSceneFx = useCallback(
-    (dark: boolean): SceneFx | null => forMode(sceneFxs, dark) ?? defSceneFx(dark),
-    [sceneFxs, defSceneFx]
+    (dark: boolean): SceneFx | null => sceneFxOf(sceneFxs, site, dark),
+    [sceneFxs, site]
   );
   const resolveHeading = useCallback(
-    (dark: boolean): FontId | null => headingOf(headings, dark),
-    [headings, headingOf]
+    (dark: boolean): FontId | null => headingOf(headings, site, dark),
+    [headings, site]
   );
   const resolveDensity = useCallback(
-    (dark: boolean): Density => forMode(densities, dark) ?? defDensity(dark),
-    [densities, defDensity]
+    (dark: boolean): Density => forMode(densities, dark) ?? defDensity(site, dark),
+    [densities, site]
   );
   const resolveStatus = useCallback(
-    (dark: boolean): SemanticColors | null => forMode(statuses, dark) ?? defStatus(dark),
-    [statuses, defStatus]
+    (dark: boolean): SemanticColors | null => statusOf(statuses, site, dark),
+    [statuses, site]
   );
   const resolveWallpaper = useCallback(
-    (dark: boolean): Wallpaper | null => wallpaperOf(wallpapers, dark),
-    [wallpapers, wallpaperOf]
+    (dark: boolean): Wallpaper | null => wallpaperOf(wallpapers, site, dark),
+    [wallpapers, site]
   );
 
   // The two paints, and the only two: the colors, tune, effects, density,
@@ -462,63 +480,52 @@ export function useLook(
   // heading classes (paintChrome), each resolved for the mode on screen from
   // the LATEST state — what the setters have written so far in this handler
   // — never from this render's, so no setter has to hand a paint the part it
-  // just set (#363, #373, #394, #429). A setter writes, then paints.
+  // just set (#363, #373, #394, #429). A setter writes, then paints. The
+  // site default is resolved from that state too (the schedule switch).
   const paintLook = useCallback(() => {
     const s = latest();
+    const dt = siteOf(s);
     const theme = s.previewMode ?? s.theme;
     const dark = resolveDark(theme);
     paintAll({
       theme,
-      look: resolveLook(s.activeLook),
+      // A per-visitor custom look wins, otherwise the admin custom default
+      // colors, otherwise null = the built-in light/dark CSS defaults. The
+      // admin default carries BOTH variants, so the mode just selects one.
+      look: s.activeLook ?? adminLookOf(dt),
       accentOverride: s.accentOverride,
-      defaultAccent,
-      tune: forMode(s.tunes, dark) ?? defTune(dark),
-      sceneFx: forMode(s.sceneFxs, dark) ?? defSceneFx(dark),
+      defaultAccent: defAccent(dt),
+      tune: tuneOf(s.tunes, dt, dark),
+      sceneFx: sceneFxOf(s.sceneFxs, dt, dark),
       reduceMotion: s.reduceMotion,
-      density: forMode(s.densities, dark) ?? defDensity(dark),
-      status: forMode(s.statuses, dark) ?? defStatus(dark),
-      wallpaper: wallpaperOf(s.wallpapers, dark),
+      density: forMode(s.densities, dark) ?? defDensity(dt, dark),
+      status: statusOf(s.statuses, dt, dark),
+      wallpaper: wallpaperOf(s.wallpapers, dt, dark),
     });
-  }, [latest, resolveLook, defaultAccent, defTune, defSceneFx, defDensity, defStatus, wallpaperOf]);
+  }, [latest, siteOf]);
   const paintChrome = useCallback(() => {
     const s = latest();
+    const dt = siteOf(s);
     const dark = resolveDark(s.previewMode ?? s.theme);
-    applyDesign(forMode(s.designs, dark) ?? defDesign(dark));
-    applyScene(forMode(s.scenes, dark) ?? defScene(dark));
-    applyFont(forMode(s.fonts, dark) ?? defFont(dark));
-    applyHeadingFont(headingOf(s.headings, dark));
-  }, [latest, defDesign, defScene, defFont, headingOf]);
+    applyDesign(forMode(s.designs, dark) ?? defDesign(dt, dark));
+    applyScene(forMode(s.scenes, dark) ?? defScene(dt, dark));
+    applyFont(forMode(s.fonts, dark) ?? defFont(dt, dark));
+    applyHeadingFont(headingOf(s.headings, dt, dark));
+  }, [latest, siteOf]);
 
-  // A seeded color set for a mode when there's no active custom look yet, so
-  // editing one mode never leaves the other mode's colors null. `seedFor`
-  // takes the accent overrides to seed from (a setter passes the latest);
-  // `seedColorSet` seeds from this render's, for the builder's readers.
-  const seedFor = useCallback(
-    (override: AccentOverrides, dark: boolean): ColorSet => {
-      const a = resolveAccent(overrideFor(override, dark), variantFor(adminLook, dark), defaultAccent);
-      const ad = adminLook ? (dark ? adminLook.dark : adminLook.light) : null;
-      return {
-        background: ad?.background ?? (dark ? "#06070d" : "#eceef3"),
-        foreground: ad?.foreground ?? (dark ? "#f4f4f6" : "#181b24"),
-        accentFrom: a.from,
-        accentTo: a.to,
-      };
-    },
-    [adminLook, defaultAccent]
-  );
+  // The seeded color set for a mode (seedFor above): `seedColorSet` from
+  // this render's accents, for the builder's readers; `seedLook` both modes
+  // from the latest — the base a one-mode color edit builds on when no
+  // custom look exists yet.
   const seedColorSet = useCallback(
-    (dark: boolean): ColorSet => seedFor(accentOverride, dark),
-    [seedFor, accentOverride]
+    (dark: boolean): ColorSet => seedFor(accentOverride, site, dark),
+    [accentOverride, site]
   );
-  // Both modes seeded from the latest accents: the base a one-mode color
-  // edit builds on when no custom look exists yet.
-  const seedLook = useCallback(
-    (): ModeColors => {
-      const override = latest().accentOverride;
-      return { dark: seedFor(override, true), light: seedFor(override, false) };
-    },
-    [latest, seedFor]
-  );
+  const seedLook = useCallback((): ModeColors => {
+    const s = latest();
+    const dt = siteOf(s);
+    return { dark: seedFor(s.accentOverride, dt, true), light: seedFor(s.accentOverride, dt, false) };
+  }, [latest, siteOf]);
 
   const setTheme = useCallback(
     (next: Theme) => {
@@ -601,10 +608,11 @@ export function useLook(
     [latest, seedLook, update, paintLook]
   );
 
-  // Set (or clear) one mode's fine-tune over its design. Persists the per-mode
-  // pair and repaints only when that mode is the one on screen.
+  // Set one mode's fine-tune over its design ("none" = the design as drawn,
+  // null = the admin default). Persists the per-mode pair and repaints only
+  // when that mode is the one on screen.
   const setTune = useCallback(
-    (next: Tune | null, mode: Mode) => {
+    (next: TuneChoice | null, mode: Mode) => {
       const { tunes } = update((s) => ({ tunes: { ...s.tunes, [mode]: next } }));
       saveTune(tunes);
       if (onScreen(mode)) paintLook();
@@ -633,9 +641,10 @@ export function useLook(
     [update, onScreen, paintLook]
   );
 
-  // Set (or clear) one mode's semantic colors, like setTune.
+  // Set one mode's semantic colors, like setTune ("none" = the standard
+  // colors).
   const setStatusColors = useCallback(
-    (next: SemanticColors | null, mode: Mode) => {
+    (next: StatusChoice | null, mode: Mode) => {
       const { statuses } = update((s) => ({ statuses: { ...s.statuses, [mode]: next } }));
       saveStatusColors(statuses);
       if (onScreen(mode)) paintLook();
@@ -654,9 +663,9 @@ export function useLook(
     [update, onScreen, paintLook]
   );
 
-  // Set (or clear) one mode's scene effects, like setTune.
+  // Set one mode's scene effects, like setTune ("none" = as designed).
   const setSceneFx = useCallback(
-    (next: SceneFx | null, mode: Mode) => {
+    (next: SceneFxChoice | null, mode: Mode) => {
       const { sceneFxs } = update((s) => ({ sceneFxs: { ...s.sceneFxs, [mode]: next } }));
       saveSceneFx(sceneFxs);
       if (onScreen(mode)) paintLook();
@@ -675,35 +684,35 @@ export function useLook(
     [update, paintLook]
   );
 
-  // Apply a curated pack to one mode: its design + scene + that mode's colorset,
-  // and its tune over the design (a pack without one resets the tune, so the
-  // curated look lands as designed). Font isn't part of a pack, so the mode's
-  // font is left as-is.
+  // Apply a curated pack to one mode: its design + scene + that mode's
+  // colorset, and the parts it carries. A pack is a whole look, so what it
+  // doesn't carry is cleared outright, not left to the site default (#395):
+  // without a tune the design is as drawn, the scene runs as designed,
+  // without status colors the stylesheet's apply, without a wallpaper there
+  // is none. The fonts are the exception: a pack without them takes the
+  // site default's (#373). The no-flash script resolves a chosen pack the
+  // same way, so a reload paints what this click painted.
   const applyPack = useCallback(
     (pack: ThemePack, mode: Mode) => {
       const dark = mode === "dark";
-      const status = (dark ? pack.status : pack.statusLight ?? pack.status) ?? null;
-      const wallpaper = (dark ? pack.wallpaper : pack.wallpaperLight ?? pack.wallpaper) ?? null;
+      const status = (dark ? pack.status : pack.statusLight ?? pack.status) ?? "none";
+      const wallpaper = (dark ? pack.wallpaper : pack.wallpaperLight ?? pack.wallpaper) ?? "none";
       setDesign(packDesign(pack, dark), mode);
       setScene(packScene(pack, dark), mode);
-      setTune(pack.tune ?? null, mode);
-      setSceneFx(null, mode);
-      // Its fonts (#330), or the site default's — a pack is a whole look, so
-      // the previous theme's font doesn't stay on under it (#373).
+      setTune(pack.tune ?? "none", mode);
+      setSceneFx("none", mode);
       setFont(pack.font ?? null, mode);
       setHeadingFont(pack.headingFont ?? null, mode);
-      // Its semantic colors for the mode, or the stylesheet's (#331).
       setStatusColors(status, mode);
-      // Its wallpaper (#333), or none — a pack is a whole look, so an admin
-      // default wallpaper doesn't show through one.
-      setWallpaper(wallpaper ?? "none", mode);
+      setWallpaper(wallpaper, mode);
       // The colors paint last, with every part above: each paint reads the
       // latest state, so the setters' values are what it paints (#363).
       applyThemeColors({ dark: pack.dark, light: pack.light }, mode);
-      // Under "themes only" (#335) the choice is the pack's name: the parts
-      // above are what this visit paints, but the next page load resolves
-      // the name against the site's themes and reads nothing else.
-      if (policy === "packs") savePackChoice({ ...loadPackChoice(), [mode]: pack.name });
+      // Under "themes only" (#335) the choice is the pack's gallery key
+      // (stable across a rename, #395): the parts above are what this visit
+      // paints, but the next page load resolves the key against the site's
+      // themes and reads nothing else.
+      if (policy === "packs") savePackChoice({ ...loadPackChoice(), [mode]: packKey(pack) });
     },
     [
       policy,
@@ -733,7 +742,7 @@ export function useLook(
       const accent = resolveAccent(
         overrideFor(s.accentOverride, dark),
         variantFor(s.activeLook, dark),
-        defaultAccent
+        defAccent(siteOf(s))
       );
       const cs: ColorSet = {
         background,
@@ -752,7 +761,7 @@ export function useLook(
       // preview), so editing the previewed mode shows immediately.
       paintLook();
     },
-    [latest, liveTheme, defaultAccent, seedLook, update, paintLook]
+    [latest, liveTheme, siteOf, seedLook, update, paintLook]
   );
 
   // Set or clear one mode's accent on its own, leaving the background/foreground
@@ -852,12 +861,29 @@ export function useLook(
     } catch {
       // ignore
     }
+    // The day/night schedule switch (#336) is a setting too, so it goes
+    // back to following the site (#395).
     clearParts();
-    update({ theme: defaultTheme.mode, previewMode: null, reduceMotion: false });
+    update({ theme: defaultTheme.mode, previewMode: null, reduceMotion: false, followSchedule: true });
     saveReduceMotion(false);
+    saveFollowSchedule(true);
     paintLook();
     paintChrome();
   }, [defaultTheme.mode, clearParts, update, paintLook, paintChrome]);
+
+  // The visitor's day/night schedule switch (#336): off, the site's usual
+  // theme stands in for the phase's — with its mode, unless the visitor
+  // chose one — and the page repaints at once, as it does at a phase switch.
+  const setFollowSchedule = useCallback(
+    (follow: boolean) => {
+      update({ followSchedule: follow });
+      saveFollowSchedule(follow);
+      if (!hasOwnMode(policy) && !latest().previewMode) update({ theme: siteOf(latest()).mode });
+      paintLook();
+      paintChrome();
+    },
+    [update, policy, latest, siteOf, paintLook, paintChrome]
+  );
 
   // What an OS light/dark flip repaints: "system" re-resolved — the look AND
   // the design/scene/font are mode-aware. The visitor's parts come from the
@@ -885,7 +911,14 @@ export function useLook(
     // what's stored is left unread, so a browser customized before the
     // policy changed falls back at once — as the no-flash script did.
     const gated = policy !== "all";
-    let stored: Theme = defaultTheme.mode;
+    // The visitor's day/night schedule switch (#336), read under the same
+    // policy as the no-flash script (never under "none"), and before the
+    // paint below — so a visitor who turned the schedule off gets the
+    // site's usual theme from the first paint on, not the phase's for one
+    // paint and the usual one on the next (#395).
+    const follow = policy === "none" ? true : loadFollowSchedule();
+    const dt = follow || !unscheduled ? defaultTheme : unscheduled;
+    let stored: Theme = dt.mode;
     if (policy !== "none") {
       try {
         const raw = window.localStorage.getItem(THEME_KEY);
@@ -896,11 +929,10 @@ export function useLook(
         // ignore
       }
     }
+    // A chosen pack by its gallery key, or by name for a choice saved before
+    // keys were stored (#395).
     const choice = policy === "packs" ? loadPackChoice() : { dark: null, light: null };
-    const packOf = (dark: boolean): ThemePack | null => {
-      const name = dark ? choice.dark : choice.light;
-      return name ? (gate.packs.find((p) => p.name === name) ?? null) : null;
-    };
+    const packOf = (dark: boolean): ThemePack | null => packByRef(gate.packs, dark ? choice.dark : choice.light) ?? null;
     const dp = packOf(true);
     const lp = packOf(false);
     const fromPacks = <T,>(f: (p: ThemePack, dark: boolean) => T | null): ModePair<T | null> => ({
@@ -909,26 +941,32 @@ export function useLook(
     });
     const active = gated
       ? dp || lp
-        ? { dark: dp ? dp.dark : seedColorSet(true), light: lp ? lp.light : seedColorSet(false) }
+        ? {
+            dark: dp ? dp.dark : seedFor(NO_ACCENT_OVERRIDES, dt, true),
+            light: lp ? lp.light : seedFor(NO_ACCENT_OVERRIDES, dt, false),
+          }
         : null
       : loadActiveTheme();
     const overrideAccent = gated ? NO_ACCENT_OVERRIDES : loadAccentOverride();
     const storedDesigns = gated ? fromPacks(packDesign) : loadDesign();
     const storedScenes = gated ? fromPacks(packScene) : loadScene();
     const storedFonts = gated ? fromPacks((p) => p.font ?? null) : loadFont();
-    const storedTunes = gated ? fromPacks((p) => p.tune ?? null) : loadTune();
-    const storedFx: ModePair<SceneFx | null> = gated ? { dark: null, light: null } : loadSceneFx();
+    // A chosen pack lands exactly as applyPack lands it (#395): the parts
+    // it doesn't carry cleared, the fonts and the density the site's.
+    const storedTunes: ModePair<TuneChoice | null> = gated ? fromPacks((p) => p.tune ?? "none") : loadTune();
+    const storedFx: ModePair<SceneFxChoice | null> = gated ? fromPacks(() => "none") : loadSceneFx();
     const storedReduce = loadReduceMotion();
     const storedHeadings: ModePair<HeadingChoice | null> = gated ? fromPacks((p) => p.headingFont ?? null) : loadHeadingFont();
     const storedDensities: ModePair<Density | null> = gated ? { dark: null, light: null } : loadDensity();
-    const storedStatuses = gated
-      ? fromPacks((p, dark) => (dark ? p.status : p.statusLight ?? p.status) ?? null)
+    const storedStatuses: ModePair<StatusChoice | null> = gated
+      ? fromPacks((p, dark) => (dark ? p.status : p.statusLight ?? p.status) ?? "none")
       : loadStatusColors();
     const storedWallpapers: ModePair<WallpaperChoice | null> = gated
       ? fromPacks((p, dark) => (dark ? p.wallpaper : p.wallpaperLight ?? p.wallpaper) ?? "none")
       : loadWallpaper();
     update({
       theme: stored,
+      followSchedule: follow,
       designs: storedDesigns,
       scenes: storedScenes,
       fonts: storedFonts,
@@ -981,17 +1019,10 @@ export function useLook(
     if (paintedDefault.current === defaultKey) return;
     paintedDefault.current = defaultKey;
     // The mode too, unless the visitor chose one (a phase can bring its
-    // own, as the site's own mode does for an un-customized visitor).
-    let stored: string | null = null;
-    if (policy !== "none") {
-      try {
-        stored = window.localStorage.getItem(THEME_KEY);
-      } catch {
-        // ignore
-      }
-    }
-    const ownMode = stored === "light" || stored === "dark" || stored === "system";
-    if (!ownMode && !previewMode) update({ theme: defaultTheme.mode });
+    // own, as the site's own mode does for an un-customized visitor) — from
+    // the site default in force, the usual one for a visitor who turned the
+    // schedule off.
+    if (!hasOwnMode(policy) && !previewMode) update({ theme: siteOf(latest()).mode });
     paintLook();
     paintChrome();
     // Only a new default should repaint; the callbacks are this render's.
@@ -1024,8 +1055,8 @@ export function useLook(
       designFor: (mode: Mode) => resolveDesign(mode === "dark"),
       sceneFor: (mode: Mode) => resolveScene(mode === "dark"),
       fontFor: (mode: Mode) => resolveFont(mode === "dark"),
-      defaultFontFor: (mode: Mode) => defFont(mode === "dark"),
-      defaultHeadingFontFor: (mode: Mode) => defHeading(mode === "dark"),
+      defaultFontFor: (mode: Mode) => defFont(site, mode === "dark"),
+      defaultHeadingFontFor: (mode: Mode) => defHeading(site, mode === "dark"),
       tuneFor: (mode: Mode) => resolveTune(mode === "dark"),
       sceneFxFor: (mode: Mode) => resolveSceneFx(mode === "dark"),
       headingFontFor: (mode: Mode) => resolveHeading(mode === "dark"),
@@ -1081,17 +1112,16 @@ export function useLook(
   }, [
     defaultAccent,
     adminLook,
+    site,
     theme,
     displayTheme,
     resolveDesign,
     resolveScene,
     resolveFont,
-    defFont,
     resolveTune,
     resolveSceneFx,
     reduceMotion,
     resolveHeading,
-    defHeading,
     resolveDensity,
     resolveStatus,
     resolveWallpaper,
@@ -1129,5 +1159,5 @@ export function useLook(
     resetTheme,
   ]);
 
-  return { look, resetLook };
+  return { look, resetLook, followSchedule, setFollowSchedule };
 }
