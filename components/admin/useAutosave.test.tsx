@@ -74,6 +74,34 @@ describe("useAutosave", () => {
     rerender({ value: "unsaved" });
     unmount();
     await act(() => vi.advanceTimersByTimeAsync(0));
-    expect(save).toHaveBeenCalledWith("unsaved", { keepalive: true });
+    // A plain request: keepalive is for the page going away only (#399).
+    expect(save).toHaveBeenCalledWith("unsaved", undefined);
+  });
+});
+
+describe("the flush's keepalive (#399)", () => {
+  it("sets keepalive only when the page is going away, not on an in-app unmount", async () => {
+    const calls: unknown[][] = [];
+    const save = vi.fn(async (...args: unknown[]) => {
+      calls.push(args);
+    });
+    const hook = () =>
+      renderHook(({ value }) => useAutosave(value, save as (v: string, opts?: { keepalive?: boolean }) => Promise<void>, 600), {
+        initialProps: { value: "initial" },
+      });
+    const a = hook();
+    a.rerender({ value: "edited" });
+    a.unmount();
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(calls).toEqual([["edited", undefined]]);
+
+    const b = hook();
+    b.rerender({ value: "leaving" });
+    act(() => {
+      window.dispatchEvent(new Event("pagehide"));
+    });
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(calls[1]).toEqual(["leaving", { keepalive: true }]);
+    b.unmount();
   });
 });

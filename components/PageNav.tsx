@@ -60,7 +60,7 @@ export default function PageNav({
             aria-current="page"
             className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-90"
           >
-            <PageLabel {...p} />
+            <PageLabel label={p.label} icon={p.icon} />
           </span>
         ) : (
           <Link
@@ -68,7 +68,7 @@ export default function PageNav({
             href={p.href}
             className="inline-flex items-center gap-1.5 text-sm text-ink-50 transition-colors hover:text-ink-80"
           >
-            <PageLabel {...p} />
+            <PageLabel label={p.label} icon={p.icon} />
           </Link>
         )
       )}

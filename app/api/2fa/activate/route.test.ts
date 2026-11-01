@@ -56,3 +56,20 @@ describe("POST /api/2fa/activate", () => {
     });
   });
 });
+
+describe("confirmTotpEnrollment checks inside the write queue (#399)", () => {
+  it("refuses once the factor is on, and when the enrollment the code was checked against is gone", async () => {
+    const { confirmTotpEnrollment, setTotpPendingSecret, TotpStateError } = await import("@/lib/config");
+    const codes = [{ hash: "h1", salt: "s1" }];
+    await setTotpPendingSecret(PENDING);
+    await confirmTotpEnrollment(PENDING, codes);
+    // A second activation that passed its checks before the first landed.
+    await expect(confirmTotpEnrollment(PENDING, codes)).rejects.toMatchObject({ status: 409 });
+    const { disableTotp } = await import("@/lib/config");
+    await disableTotp();
+    await setTotpPendingSecret(LIVE);
+    const stale = confirmTotpEnrollment(PENDING, codes);
+    await expect(stale).rejects.toBeInstanceOf(TotpStateError);
+    await expect(stale).rejects.toMatchObject({ status: 400 });
+  });
+});

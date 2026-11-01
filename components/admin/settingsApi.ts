@@ -35,9 +35,13 @@ async function putJson(
   }
   if (!res.ok) {
     const data = await res.json().catch(() => null);
-    throw new Error(apiErrorMessage(data, fallback));
+    throw new Error(res.status === 401 ? SIGNED_OUT : apiErrorMessage(data, fallback));
   }
 }
+
+// What a save reports when the session is gone and the admin declined to
+// sign in again (#399): the draft is still on the page.
+export const SIGNED_OUT = "You've been signed out. Sign in again to save your changes.";
 
 export async function saveSettingsPatch(
   // The PUT body as the API parses it, so fields the schema defaults may be
@@ -99,7 +103,7 @@ export async function saveIntegrations(
 export async function fetchWidgetForEditing(id: string): Promise<WidgetEditContext> {
   let res: Response;
   try {
-    res = await fetch(`/api/widgets/${encodeURIComponent(id)}`);
+    res = await fetchWithReauth(`/api/widgets/${encodeURIComponent(id)}`);
   } catch {
     throw new Error("Couldn't load the widget");
   }
@@ -117,7 +121,7 @@ export async function saveWidget(widget: WidgetInstance, { keepalive }: { keepal
 export async function deleteWidget(id: string): Promise<void> {
   let res: Response;
   try {
-    res = await fetch(`/api/widgets/${encodeURIComponent(id)}`, { method: "DELETE" });
+    res = await fetchWithReauth(`/api/widgets/${encodeURIComponent(id)}`, { method: "DELETE" });
   } catch {
     throw new Error("Couldn't remove the widget");
   }
@@ -131,7 +135,7 @@ export async function deleteWidget(id: string): Promise<void> {
 export async function createWidget(type: string): Promise<WidgetInstance> {
   let res: Response;
   try {
-    res = await fetch("/api/widgets", {
+    res = await fetchWithReauth("/api/widgets", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type }),

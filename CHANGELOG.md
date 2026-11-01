@@ -69,6 +69,15 @@ here.
   the widget filters everywhere at once, and a group that a widget is
   filtered to counts as in use, so it can't be deleted out from under the
   widget. (#398)
+- **Admin paper cuts.** When your admin session ends or idles out while
+  you're editing, the next save now asks you to sign in again right there
+  and then saves, instead of showing "Unauthorized" in a corner and losing
+  the edits on reload. Deleting an uploaded icon asks first (and its ✕ is
+  reachable by keyboard and on touch screens), regenerating an inbound
+  webhook token asks first, a failed reorder of apps or bookmarks says so
+  and puts the order back, an edit still pending when you leave the admin is
+  no longer dropped when it is large, and the first-run setup now shows its
+  messages. (#399)
 
 ### Security
 

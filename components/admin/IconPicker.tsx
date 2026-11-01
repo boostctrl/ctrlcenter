@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Icon from "@/components/Icon";
 import { fetchIconSlugs } from "@/lib/icons";
+import { useConfirm } from "./Confirm";
+import { useFocusTrap } from "./useFocusTrap";
 
 const MAX_RESULTS = 120;
 
@@ -33,6 +35,9 @@ export default function IconPicker({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const confirm = useConfirm();
+  // Tab stays inside the dialog and focus returns to the opener (#399).
+  const trapRef = useFocusTrap<HTMLDivElement>(true);
 
   useEffect(() => {
     let active = true;
@@ -80,11 +85,24 @@ export default function IconPicker({
     }
   }
 
+  // Deleting an uploaded icon breaks every app, bookmark or board using it,
+  // so it asks first, and only drops the tile once the server agreed (#399).
   async function handleDelete(name: string) {
-    setUploaded((prev) => prev.filter((u) => u.name !== name));
-    await fetch(`/api/icons?name=${encodeURIComponent(name)}`, {
-      method: "DELETE",
-    }).catch(() => {});
+    const ok = await confirm({
+      title: `Delete the icon “${name}”?`,
+      message: "Any app, bookmark or board using it loses its icon. This can't be undone.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
+    setUploadError(null);
+    try {
+      const res = await fetch(`/api/icons?name=${encodeURIComponent(name)}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      setUploaded((prev) => prev.filter((u) => u.name !== name));
+    } catch {
+      setUploadError(`Couldn't delete “${name}”.`);
+    }
   }
 
   const q = query.trim().toLowerCase();
@@ -109,9 +127,11 @@ export default function IconPicker({
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 pt-[10vh] backdrop-blur-sm"
       onMouseDown={onClose}
       role="dialog"
+      aria-modal="true"
       aria-label="Choose an icon"
     >
       <div
+        ref={trapRef}
         className="glass-card flex max-h-[70vh] w-full max-w-2xl flex-col gap-4 p-5"
         onMouseDown={(e) => e.stopPropagation()}
       >
@@ -213,7 +233,7 @@ export default function IconPicker({
                       type="button"
                       onClick={() => handleDelete(u.name)}
                       aria-label={`Delete ${u.name}`}
-                      className="absolute top-1 right-1 rounded-md bg-background/70 px-1 text-xs text-ink-50 opacity-0 transition-opacity hover:text-status-down group-hover:opacity-100"
+                      className="absolute top-1 right-1 rounded-md bg-background/70 px-1.5 py-0.5 text-xs text-ink-50 opacity-0 transition-opacity hover:text-status-down group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
                     >
                       ✕
                     </button>

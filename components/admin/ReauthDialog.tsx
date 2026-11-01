@@ -4,14 +4,14 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button, TextField } from "./ui";
 import { useFocusTrap } from "./useFocusTrap";
 import { apiErrorMessage } from "./apiError";
-import { registerReauthPrompt } from "./reauth";
+import { registerReauthPrompt, type ReauthMode } from "./reauth";
 
 // The "Confirm it's you" dialog (#366): mounted once per admin surface, it
 // collects the password (and the authenticator code when the second factor
 // is on), posts /api/reauth, and resolves the request that opened it so the
 // original call retries. Escape or Cancel resolves false.
 
-type Pending = { totpRequired: boolean; resolve: (ok: boolean) => void };
+type Pending = { totpRequired: boolean; mode: ReauthMode; resolve: (ok: boolean) => void };
 
 export default function ReauthDialog() {
   const [pending, setPending] = useState<Pending | null>(null);
@@ -25,9 +25,9 @@ export default function ReauthDialog() {
 
   useEffect(() => {
     registerReauthPrompt(
-      (totpRequired) =>
+      (totpRequired, mode) =>
         new Promise<boolean>((resolve) => {
-          const next = { totpRequired, resolve };
+          const next = { totpRequired, mode, resolve };
           pendingRef.current = next;
           setPending(next);
           setNeedsCode(totpRequired);
@@ -57,10 +57,12 @@ export default function ReauthDialog() {
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    const signin = pendingRef.current?.mode === "signin";
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/reauth", {
+      // A sign-in takes the same body as a confirmation (#399).
+      const res = await fetch(signin ? "/api/login" : "/api/reauth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password, ...(code ? { totp: code } : {}) }),
@@ -73,15 +75,16 @@ export default function ReauthDialog() {
         return;
       }
       if (data?.totpRequired) setNeedsCode(true);
-      setError(apiErrorMessage(data, "Couldn't confirm"));
+      setError(apiErrorMessage(data, signin ? "Couldn't sign in" : "Couldn't confirm"));
     } catch {
-      setError("Couldn't confirm");
+      setError(signin ? "Couldn't sign in" : "Couldn't confirm");
     } finally {
       setBusy(false);
     }
   }
 
   if (!pending) return null;
+  const signin = pending.mode === "signin";
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 p-4 pt-[10vh] backdrop-blur-sm"
@@ -97,11 +100,12 @@ export default function ReauthDialog() {
         className="glass-card flex w-full max-w-md flex-col gap-4 p-6 text-left"
       >
         <h3 id="reauth-title" className="font-semibold">
-          Confirm it&apos;s you
+          {signin ? "Your session ended" : "Confirm it's you"}
         </h3>
         <p className="text-sm text-ink-60">
-          This change needs your password{needsCode ? " and an authenticator code" : ""} again,
-          so a session someone else got hold of can&apos;t make it.
+          {signin
+            ? `Sign in again to keep working. What you were editing is still here and saves once you're back in${needsCode ? "; you'll need your authenticator code too" : ""}.`
+            : `This change needs your password${needsCode ? " and an authenticator code" : ""} again, so a session someone else got hold of can't make it.`}
         </p>
         <TextField
           label="Password"
@@ -125,7 +129,7 @@ export default function ReauthDialog() {
         {error && <p className="text-sm text-status-down">{error}</p>}
         <div className="flex gap-2">
           <Button type="submit" disabled={busy}>
-            {busy ? "Confirming…" : "Confirm"}
+            {busy ? (signin ? "Signing in…" : "Confirming…") : signin ? "Sign in" : "Confirm"}
           </Button>
           <Button type="button" variant="ghost" onClick={() => settle(false)}>
             Cancel

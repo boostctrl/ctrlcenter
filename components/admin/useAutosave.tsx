@@ -86,20 +86,24 @@ export function useAutosave<T>(
   // last edit is silently dropped while the status may still read "Saving…".
   // The flush goes through the chain too, so it can never race ahead of an
   // in-flight older save; fire-and-forget since there's nothing left to notify.
+  // `keepalive` only when the page itself is going away: it caps the body at
+  // 64 KB, which a large widget list can exceed, and the flush on an in-app
+  // navigation has a page to finish a plain request in (#399).
   useEffect(() => {
-    const flush = () => {
+    const flush = (keepalive: boolean) => {
       const p = pending.current;
       if (!p) return;
       pending.current = null;
       chain.current = chain.current
         .catch(() => undefined)
-        .then(() => saveRef.current(p.value, { keepalive: true }))
+        .then(() => saveRef.current(p.value, keepalive ? { keepalive: true } : undefined))
         .catch(() => undefined);
     };
-    window.addEventListener("pagehide", flush);
+    const onPageHide = () => flush(true);
+    window.addEventListener("pagehide", onPageHide);
     return () => {
-      window.removeEventListener("pagehide", flush);
-      flush();
+      window.removeEventListener("pagehide", onPageHide);
+      flush(false);
     };
   }, []);
 

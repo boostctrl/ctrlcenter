@@ -24,6 +24,7 @@ import {
 import IconField from "./IconField";
 import { useReorder, dropIndicatorClass } from "./useReorder";
 import { useToast } from "./Toast";
+import { fetchWithReauth } from "./reauth";
 import { useConfirm } from "./Confirm";
 import { useRevealForm } from "./useRevealForm";
 import { guessCheckType, withHttpScheme } from "@/lib/urls";
@@ -318,12 +319,20 @@ export default function AppsManager({
   async function persistOrder(next: AppItem[]) {
     const previous = apps;
     setApps(next); // optimistic
-    const res = await fetch("/api/apps", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: next.map((a) => a.id) }),
-    });
-    if (!res.ok) {
+    // A network failure counts as a failure too (#399): the order goes back
+    // and the toast says so, instead of an unhandled rejection.
+    let ok = false;
+    try {
+      const res = await fetchWithReauth("/api/apps", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: next.map((a) => a.id) }),
+      });
+      ok = res.ok;
+    } catch {
+      ok = false;
+    }
+    if (!ok) {
       setApps(previous);
       toast("Couldn't save the new order", "error");
     }

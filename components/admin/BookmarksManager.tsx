@@ -19,6 +19,7 @@ import {
 import IconField from "./IconField";
 import { useReorder, dropIndicatorClass } from "./useReorder";
 import { useToast } from "./Toast";
+import { fetchWithReauth } from "./reauth";
 import { useConfirm } from "./Confirm";
 import { useRevealForm } from "./useRevealForm";
 import { withHttpScheme } from "@/lib/urls";
@@ -163,12 +164,19 @@ export default function BookmarksManager({
   async function persistOrder(next: BookmarkItem[]) {
     const previous = bookmarks;
     setBookmarks(next); // optimistic
-    const res = await fetch("/api/bookmarks", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: next.map((b) => b.id) }),
-    });
-    if (!res.ok) {
+    // A network failure counts as a failure too (#399).
+    let ok = false;
+    try {
+      const res = await fetchWithReauth("/api/bookmarks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: next.map((b) => b.id) }),
+      });
+      ok = res.ok;
+    } catch {
+      ok = false;
+    }
+    if (!ok) {
       setBookmarks(previous);
       toast("Couldn't save the new order", "error");
     }

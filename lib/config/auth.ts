@@ -25,11 +25,50 @@ export async function setTotpPendingSecret(pendingSecret: string): Promise<void>
 
 // Turn the pending secret into the active one and store the (hashed) recovery
 // codes — called only after the enrollment code verified.
+export class TotpStateError extends Error {
+  constructor(
+    message: string,
+    // What the route answers: 409 when the factor is already on, 400 when
+    // the enrollment the code was checked against is gone.
+    public readonly status: 400 | 409
+  ) {
+    super(message);
+  }
+}
+
+// Turn 2FA on with `secret` and these recovery codes, whatever the state.
 export async function activateTotp(
   secret: string,
   recoveryCodes: TotpAuth["recoveryCodes"]
 ): Promise<void> {
   await mutate((config) => {
+    config.auth.totp = {
+      enabled: true,
+      secret,
+      pendingSecret: "",
+      recoveryCodes,
+    };
+  });
+}
+
+// What the activation route does (#399): turn 2FA on with the secret the
+// code was checked against, which must still be the pending one, with the
+// checks inside the write queue, so two activations arriving together can't
+// both pass a check made outside it and replace a live secret.
+export async function confirmTotpEnrollment(
+  secret: string,
+  recoveryCodes: TotpAuth["recoveryCodes"]
+): Promise<void> {
+  await mutate((config) => {
+    if (config.auth.totp.enabled) {
+      throw new TotpStateError(
+        "Two-factor authentication is already on — turn it off first to set up a new authenticator.",
+        409
+      );
+    }
+    if (config.auth.totp.pendingSecret !== secret) {
+      throw new TotpStateError("Start setup again — no enrollment in progress.", 400);
+    }
     config.auth.totp = {
       enabled: true,
       secret,

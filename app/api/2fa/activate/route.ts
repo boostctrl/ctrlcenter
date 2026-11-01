@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/lib/api-auth";
-import { readConfigInternal, activateTotp } from "@/lib/config";
+import { readConfigInternal, confirmTotpEnrollment, TotpStateError } from "@/lib/config";
 import { rateLimit, pruneRateLimit, clientKey } from "@/lib/rate-limit";
 import { verifyTotp, generateRecoveryCodes } from "@/lib/totp";
 import { hashRecoveryCodes } from "@/lib/recovery-codes";
@@ -53,7 +53,13 @@ export async function POST(request: NextRequest) {
     );
   }
   const recoveryCodes = generateRecoveryCodes(10);
-  await activateTotp(auth.totp.pendingSecret, await hashRecoveryCodes(recoveryCodes));
+  try {
+    await confirmTotpEnrollment(auth.totp.pendingSecret, await hashRecoveryCodes(recoveryCodes));
+  } catch (e) {
+    // The same checks as above, made inside the write queue (#399).
+    if (e instanceof TotpStateError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
   await recordSecurityEvent("totp.enabled", eventMeta(request));
   return NextResponse.json({ ok: true, recoveryCodes });
 }

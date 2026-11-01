@@ -41,6 +41,7 @@ export default function MonitoringSection({
     updateWebhookService,
     genWebhookToken,
     toggleWebhookService,
+    confirm,
     alertTypeLabel,
     alertUrlPlaceholder,
   } = d;
@@ -225,9 +226,17 @@ export default function MonitoringSection({
                       service={svc}
                       label={WEBHOOK_LABELS[svc]}
                       token={w.token}
-                      onRegenerate={() =>
-                        updateWebhookService(svc, { token: genWebhookToken() })
-                      }
+                      onRegenerate={async () => {
+                        // One misclick would otherwise break the service's
+                        // connection until the new URL is pasted (#399).
+                        const ok = await confirm({
+                          title: `Regenerate the ${WEBHOOK_LABELS[svc]} webhook token?`,
+                          message: `The URL already pasted into ${WEBHOOK_LABELS[svc]} stops working until you paste the new one.`,
+                          confirmLabel: "Regenerate",
+                          danger: true,
+                        });
+                        if (ok) updateWebhookService(svc, { token: genWebhookToken() });
+                      }}
                     />
                   )}
                 </div>
