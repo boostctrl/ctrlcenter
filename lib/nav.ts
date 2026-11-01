@@ -87,6 +87,9 @@ export type NavPages = {
   member: boolean;
   // Nobody signed in (#450): the menu offers Sign in.
   visitor: boolean;
+  // A signed-in admin: the only one offered the admin portal and the
+  // Monitor, which anyone else would only be bounced from.
+  admin: boolean;
 };
 export function navPages(source: NavSource, viewer: Viewing | null): NavPages {
   return {
@@ -96,6 +99,7 @@ export function navPages(source: NavSource, viewer: Viewing | null): NavPages {
     calendar: activeCalendars(source, viewer).length > 0,
     member: isMember(viewer),
     visitor: viewer === null,
+    admin: viewer?.isAdmin === true,
   };
 }
 

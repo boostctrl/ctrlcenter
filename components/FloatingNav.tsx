@@ -10,12 +10,13 @@ import Icon from "./Icon";
 // The floating corner control — the old settings gear, evolved into a small menu
 // that links to every enabled page so navigation is reachable from anywhere
 // without touching the header. Which admin-gated pages appear is decided
-// server-side (see navPages); Help, Settings and the Admin portal always appear,
-// and the current page is omitted. With more than one board (#298) the menu
+// server-side (see navPages); Help and Settings always appear, the Monitor
+// and the Admin portal for a signed-in admin only, and the current page is
+// omitted. With more than one board (#298) the menu
 // opens with the board switcher: every board the visitor can open, the
 // current one marked; with one, a plain Dashboard link. Closes on outside
 // click or Escape.
-export default function FloatingNav({ boards, weather, status, calendar, member, visitor }: NavPages) {
+export default function FloatingNav({ boards, weather, status, calendar, member, visitor, admin }: NavPages) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
@@ -48,9 +49,9 @@ export default function FloatingNav({ boards, weather, status, calendar, member,
       calendar ? { href: "/calendar", label: "Calendar" } : null,
       // Monitor is a page to look at, like Status, so it sits with the
       // pages; the links about the site come after it (#374). Both admin
-      // links live under /admin and gate themselves behind its login, and
-      // are always listed, like on the Settings page.
-      { href: "/admin/monitor", label: "Monitor" },
+      // links live under /admin and are offered to an admin alone: anyone
+      // else would only be sent to sign in, or back here.
+      admin ? { href: "/admin/monitor", label: "Monitor" } : null,
       { href: "/help", label: "Help" },
       { href: "/settings", label: "Settings" },
       // A member's password, second factor and sessions (#423); an admin
@@ -58,7 +59,7 @@ export default function FloatingNav({ boards, weather, status, calendar, member,
       member ? { href: "/account", label: "Your account" } : null,
       // A visitor's way in (#450), back to this page afterwards.
       visitor ? { href: `/login?next=${encodeURIComponent(pathname)}`, label: "Sign in" } : null,
-      { href: "/admin", label: "Admin portal" },
+      admin ? { href: "/admin", label: "Admin portal" } : null,
     ].filter(Boolean) as { href: string; label: string }[]
   ).filter((l) => l.href !== pathname);
 

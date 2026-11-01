@@ -93,5 +93,9 @@ describe("boards for a member (#423)", () => {
     expect(navPages(source as never, null).visitor).toBe(true);
     expect(navPages(source as never, sam).visitor).toBe(false);
     expect(navPages(source as never, ADMIN_VIEW).visitor).toBe(false);
+    // And who gets the admin portal and the Monitor: an admin alone.
+    expect(navPages(source as never, ADMIN_VIEW).admin).toBe(true);
+    expect(navPages(source as never, sam).admin).toBe(false);
+    expect(navPages(source as never, null).admin).toBe(false);
   });
 });

@@ -11,6 +11,13 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **The corner menu offers the Admin portal and the Monitor to admins
+  only.** A visitor or a member no longer sees two entries that would only
+  send them to the sign-in form or straight back; a visitor has *Sign in*
+  there instead.
+
 ## [3.1.0-rc.2] - 2026-11-01
 
 ### Added
