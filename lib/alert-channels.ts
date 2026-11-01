@@ -65,3 +65,28 @@ export function wantsAlert(
 export function channelLabel(ch: AlertChannel): string {
   return ch.name.trim() || CHANNEL_LABELS[ch.type];
 }
+
+// Each channel's label told from its namesakes' (#434), keyed by id: two
+// unnamed webhooks are "Webhook" and "Webhook 2" — the first keeps the plain
+// label, the rest are numbered by position among the channels sharing it,
+// skipping a number some channel carries by name — and a label no other
+// channel has stays as it is. By id so that a filtered list, such as the
+// preview's receivers, names a channel as the full list does.
+export function uniqueChannelLabels(channels: AlertChannel[]): Map<string, string> {
+  const plain = channels.map((ch) => [ch.id, channelLabel(ch)] as const);
+  const taken = new Set(plain.map(([, label]) => label));
+  const seen = new Set<string>();
+  const labels = new Map<string, string>();
+  for (const [id, base] of plain) {
+    let label = base;
+    if (seen.has(base)) {
+      let n = 2;
+      while (taken.has(`${base} ${n}`)) n++;
+      label = `${base} ${n}`;
+      taken.add(label);
+    }
+    seen.add(base);
+    labels.set(id, label);
+  }
+  return labels;
+}

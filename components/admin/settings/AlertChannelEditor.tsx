@@ -2,7 +2,7 @@
 
 import type { AlertChannel, AlertType } from "@/lib/schema";
 import { ALERT_TYPES, CHANNEL_TYPES } from "@/lib/schema";
-import { CHANNEL_LABELS, channelLabel, missingFields } from "@/lib/alert-channels";
+import { CHANNEL_LABELS, channelLabel, missingFields, uniqueChannelLabels } from "@/lib/alert-channels";
 import { ChipGroup, ChipToggles } from "@/components/ChipGroup";
 import {
   ControlRow,
@@ -30,9 +30,11 @@ const EVENTS: { value: Event; label: string }[] = [
 
 // One entry of the alert channel list (#291): its type, the fields that type
 // needs, which events and apps it takes, and its own Send test, named for the
-// channel so two of them never sound alike to a screen reader (#350).
+// channel so two of them never sound alike to a screen reader (#350) — a
+// namesake by its position in the list (#434).
 export function AlertChannelEditor({
   channel: ch,
+  channels,
   apps,
   saving,
   formatLabel,
@@ -41,6 +43,8 @@ export function AlertChannelEditor({
   onRemove,
 }: {
   channel: AlertChannel;
+  // The whole list, for a name that tells this channel from a namesake.
+  channels: AlertChannel[];
   // The monitored apps, for the app filter.
   apps: { id: string; name: string }[];
   saving: boolean;
@@ -50,6 +54,10 @@ export function AlertChannelEditor({
   onRemove: () => void;
 }) {
   const label = channelLabel(ch);
+  // What the controls are named for assistive tech (#434): the second
+  // unnamed webhook's are "Webhook 2 enabled", "Send test from Webhook 2",
+  // while the heading over it still reads "Webhook".
+  const name = uniqueChannelLabels(channels).get(ch.id) ?? label;
   const missing = missingFields(ch);
   const smtp = (patch: Partial<AlertChannel["smtp"]>) => onChange({ smtp: { ...ch.smtp, ...patch } });
   // An app filter naming apps that no longer exist (deleted since) still
@@ -65,10 +73,10 @@ export function AlertChannelEditor({
             <Switch
               checked={ch.enabled}
               onChange={(enabled) => onChange({ enabled })}
-              label={`${label} enabled`}
+              label={`${name} enabled`}
             />
           </label>
-          <RemoveButton label={`Remove ${label}`} onClick={onRemove} />
+          <RemoveButton label={`Remove ${name}`} onClick={onRemove} />
         </div>
       </div>
 
@@ -103,7 +111,7 @@ export function AlertChannelEditor({
       <div className="flex flex-col gap-1.5">
         <span className={fieldLabelClasses}>Send on</span>
         <ChipToggles
-          label={`${label}: events`}
+          label={`${name}: events`}
           options={EVENTS}
           selected={EVENTS.filter((e) => ch[e.value]).map((e) => e.value)}
           onChange={(on) =>
@@ -114,7 +122,7 @@ export function AlertChannelEditor({
 
       <ControlRow label="Apps" hint="Which apps' outages reach this channel.">
         <ChipGroup
-          label={`${label}: apps`}
+          label={`${name}: apps`}
           shrink
           options={[
             { value: "all", label: "All" },
@@ -129,7 +137,7 @@ export function AlertChannelEditor({
       </ControlRow>
       {someApps && (
         <ChipToggles
-          label={`${label}: alert for`}
+          label={`${name}: alert for`}
           options={apps.map((a) => ({ value: a.id, label: a.name }))}
           selected={ch.apps}
           onChange={(ids) => onChange({ apps: ids })}
@@ -141,7 +149,7 @@ export function AlertChannelEditor({
           channel={ch.id}
           ready={missing.length === 0}
           saving={saving}
-          ariaLabel={`Send test from ${label}`}
+          ariaLabel={`Send test from ${name}`}
         />
         {missing.length > 0 && (
           <p className="text-xs text-status-warning">

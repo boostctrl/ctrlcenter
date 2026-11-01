@@ -141,4 +141,29 @@ describe("WebhookPreview (#347)", () => {
     rerender(<WebhookPreview {...props} alerts={alertsSchema.parse({})} />);
     expect(screen.queryByRole("button", { name: /^Send sample/ })).toBeNull();
   });
+
+  it("tells two unnamed channels of one type apart by their place in the channel list (#434)", () => {
+    const twins = alertsSchema.parse({
+      channels: [
+        { id: "a", type: "webhook", url: "https://a.test" },
+        { id: "mail", type: "email", smtp: { host: "smtp.test", from: "a@x", to: "b@y" }, onWebhooks: false },
+        { id: "b", type: "webhook", url: "https://b.test" },
+      ],
+    });
+    const { rerender } = render(<WebhookPreview {...props} alerts={twins} />);
+    const names = () => screen.getAllByRole("button", { name: /^Send sample/ }).map((b) => b.getAttribute("aria-label"));
+    expect(names()).toEqual(["Send sample to Webhook", "Send sample to Webhook 2"]);
+    expect(screen.getAllByRole("button", { name: /^Send sample/ }).map((b) => b.textContent)).toEqual([
+      "Send sample",
+      "Send sample",
+    ]);
+    // The rows keep the plain label.
+    expect(screen.getAllByText("Webhook")).toHaveLength(2);
+    // Numbered by place among all the channels, so it matches the Alerts
+    // card: with the first webhook not taking inbound webhooks, the one
+    // listed is still "Webhook 2".
+    const [first, mail, second] = twins.channels;
+    rerender(<WebhookPreview {...props} alerts={{ ...twins, channels: [{ ...first, onWebhooks: false }, mail, second] }} />);
+    expect(names()).toEqual(["Send sample to Webhook 2"]);
+  });
 });

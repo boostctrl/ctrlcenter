@@ -2,7 +2,7 @@
 
 import { useDeferredValue, useMemo, useState } from "react";
 import type { AlertConfig, WebhooksConfig } from "@/lib/schema";
-import { CHANNEL_LABELS, activeChannels, channelLabel } from "@/lib/alert-channels";
+import { CHANNEL_LABELS, activeChannels, channelLabel, uniqueChannelLabels } from "@/lib/alert-channels";
 import { buildNotificationEmail, buildPreheader, cleanHeader } from "@/lib/webhook-email";
 import {
   SAMPLE_AT,
@@ -98,6 +98,9 @@ export default function WebhookPreview({
   const summary = notification.report ? cleanHeader(notification.report.summary) : "";
   const cut = email.subject.endsWith("…") || (!!notification.report && !email.subject.endsWith(summary));
   const receivers = activeChannels(alerts).filter((ch) => ch.onWebhooks);
+  // Over every channel, not only the receivers, so a channel is "Webhook 2"
+  // here exactly when it is in the Alerts card above (#434).
+  const names = uniqueChannelLabels(alerts.channels);
   const label = SAMPLE_LABELS[shown];
 
   return (
@@ -190,13 +193,14 @@ export default function WebhookPreview({
                   )}
                 </span>
                 {/* Named per channel for assistive tech: the row's channel
-                    name is a sibling, not part of the button's name. */}
+                    name is a sibling, not part of the button's name. A
+                    namesake is told apart by its place in the list (#434). */}
                 <AlertTest
                   channel={ch.id}
                   sample={shown}
                   ready
                   saving={saving}
-                  ariaLabel={`Send sample to ${channelLabel(ch)}`}
+                  ariaLabel={`Send sample to ${names.get(ch.id) ?? channelLabel(ch)}`}
                 />
               </div>
             ))}

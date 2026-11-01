@@ -26,6 +26,15 @@ here.
 
 ### Fixed
 
+- **A screen reader can tell two unnamed alert channels of one type apart.**
+  Two channels in Settings → Monitoring → Alerts with no name and the same
+  service — two webhooks, say — had their controls named alike ("Send test
+  from Webhook", "Remove Webhook"), as were their Send sample buttons under
+  Inbound webhooks. The second and later namesakes are now numbered by
+  their place in the list ("Send test from Webhook 2"); a named channel, and
+  one no other channel matches, keeps its plain name. Nothing visible
+  changes. (#434)
+
 - **A service named with an "@everyone" can't page a Discord channel from an
   uptime alert.** Down and recovery alerts to a Discord webhook now carry the
   same no-mentions setting and 2,000-character cut as relayed notifications,

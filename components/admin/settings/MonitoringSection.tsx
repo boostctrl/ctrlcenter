@@ -134,6 +134,7 @@ export default function MonitoringSection({
                 <AlertChannelEditor
                   key={ch.id}
                   channel={ch}
+                  channels={alerts.channels}
                   apps={apps}
                   saving={saving}
                   formatLabel={alertTypeLabel}
