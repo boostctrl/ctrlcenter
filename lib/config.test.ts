@@ -986,6 +986,7 @@ describe("readConfigInternal stays off public surfaces", () => {
     // Admin-only (proxy-gated) pages and routes.
     "app/admin/page.tsx",
     "app/admin/setup/page.tsx",
+    "app/api/accounts/route.ts",
     "app/api/alerts/test/route.ts",
     "app/api/config/route.ts",
     // Admin-only integration snapshot: reads once, then gates on the hash.
@@ -1180,5 +1181,32 @@ describe("accounts (#423)", () => {
     expect(auth.totp.enabled).toBe(false);
     expect(auth.users[0].totp.enabled).toBe(false);
     await expect(config.setAccountPassword("nobody", "h", "s")).rejects.toThrow(/No account/);
+  });
+});
+
+describe("an item's audience (#423)", () => {
+  it("is kept by a board save that leaves it out, cleared by null or an empty one", async () => {
+    await config.replaceBoards([{ id: "home", name: "Home", visibility: "private", audience: { users: ["sam"] } }]);
+    expect((await config.readConfigInternal()).boards[0].audience).toEqual({ users: ["sam"] });
+    await config.replaceBoards([{ id: "home", name: "Home", visibility: "private" }]);
+    expect((await config.readConfigInternal()).boards[0].audience).toEqual({ users: ["sam"] });
+    await config.replaceBoards([{ id: "home", name: "Home", visibility: "private", audience: { users: [], groups: [] } }]);
+    expect((await config.readConfigInternal()).boards[0].audience).toBeUndefined();
+    await config.replaceBoards([{ id: "home", name: "Home", visibility: "private", audience: { groups: ["family"] } }]);
+    await config.replaceBoards([{ id: "home", name: "Home", visibility: "private", audience: null }]);
+    expect((await config.readConfigInternal()).boards[0].audience).toBeUndefined();
+  });
+  it("is stored with an app or bookmark, and dropped by a null update", async () => {
+    const app = await config.createApp({
+      name: "A", subtitle: "", url: "http://a", icon: "", expectStatus: "", checkType: "http", keyword: "", jsonQuery: "",
+      monitor: false, private: true, groupName: "", tags: [], audience: { users: ["sam"] },
+    } as never);
+    expect(app.audience).toEqual({ users: ["sam"] });
+    expect((await config.updateApp(app.id, { audience: null })).audience).toBeUndefined();
+    expect((await config.updateApp(app.id, { audience: { groups: ["family"] } })).audience).toEqual({ groups: ["family"] });
+    const bookmark = await config.createBookmark({ name: "B", url: "http://b", icon: "", private: true, groupName: "Links", audience: null });
+    expect("audience" in bookmark).toBe(false);
+    expect((await config.updateBookmark(bookmark.id, { audience: { users: ["kim"] } })).audience).toEqual({ users: ["kim"] });
+    expect((await config.updateBookmark(bookmark.id, { audience: null })).audience).toBeUndefined();
   });
 });

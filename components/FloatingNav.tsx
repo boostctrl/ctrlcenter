@@ -15,7 +15,7 @@ import Icon from "./Icon";
 // opens with the board switcher: every board the visitor can open, the
 // current one marked; with one, a plain Dashboard link. Closes on outside
 // click or Escape.
-export default function FloatingNav({ boards, weather, status, calendar }: NavPages) {
+export default function FloatingNav({ boards, weather, status, calendar, member }: NavPages) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
@@ -97,6 +97,23 @@ export default function FloatingNav({ boards, weather, status, calendar }: NavPa
               {l.label}
             </Link>
           ))}
+          {member && (
+            // A member's way out (#423): admins sign out from the portal.
+            <button
+              type="button"
+              onClick={async () => {
+                setOpen(false);
+                await fetch("/api/logout", { method: "POST" }).catch(() => {});
+                // A full load, so the page re-renders as a visitor (the admin
+                // portal's Log out does the same).
+                // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+                window.location.href = "/";
+              }}
+              className="border-t border-fg/10 px-4 py-2 text-left text-sm text-ink-70 transition-colors hover:bg-fg/10 hover:text-fg"
+            >
+              Sign out
+            </button>
+          )}
           {isAdmin && !editing && (
             <button
               type="button"

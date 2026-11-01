@@ -20,8 +20,7 @@ import {
   MAX_FEED_CARDS,
   MAX_FEED_URLS,
   MAX_WIDGET_INSTANCES,
-  weatherSchema,
-} from "./schema";
+  weatherSchema, audienceInputSchema, audienceSchema, MAX_AUDIENCE, boardSchema } from "./schema";
 
 describe("feedUrls", () => {
   it("trims entries and drops blank rows", () => {
@@ -587,5 +586,24 @@ describe("the first-visit IP location switch (#404)", () => {
     expect(weatherSchema.parse({ ipLocation: false }).ipLocation).toBe(false);
     expect(weatherUpdateSchema.parse({ ipLocation: false })).toEqual({ ipLocation: false });
     expect(weatherUpdateSchema.parse({})).toEqual({});
+  });
+});
+
+describe("audience (#423)", () => {
+  it("takes lists of sign-in and group names on input and refuses anything else", () => {
+    expect(audienceInputSchema.safeParse({ users: ["sam"], groups: ["family"] }).success).toBe(true);
+    expect(audienceInputSchema.safeParse({}).success).toBe(true);
+    expect(audienceInputSchema.safeParse({ users: ["Sam Smith"] }).success).toBe(false);
+    expect(audienceInputSchema.safeParse({ groups: "family" }).success).toBe(false);
+    expect(audienceInputSchema.safeParse({ users: Array.from({ length: MAX_AUDIENCE + 1 }, (_, i) => `u${i}`) }).success).toBe(false);
+  });
+  it("reads a stored audience leniently: bad names dropped, a bad list read as none", () => {
+    expect(audienceSchema.parse({ users: ["sam", "Not A Slug", 7], groups: "family" })).toEqual({ users: ["sam"], groups: [] });
+    const app = appItemSchema.parse({ id: "a", name: "A", url: "http://a", private: true, audience: { groups: ["family"] } });
+    expect(app.audience).toEqual({ groups: ["family"] });
+    expect(appItemSchema.parse({ id: "a", name: "A", url: "http://a", audience: "everyone" }).audience).toBeUndefined();
+    const board = boardSchema.parse({ id: "b", visibility: "private", audience: { users: ["sam"] } });
+    expect(board.audience).toEqual({ users: ["sam"] });
+    expect(boardSchema.parse({ id: "b" }).audience).toBeUndefined();
   });
 });

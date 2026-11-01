@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getSiteConfig } from "@/lib/config";
-import { requireAdminPage } from "@/lib/api-auth";
+import { requireAdminPage, viewerFromCookies } from "@/lib/api-auth";
 import { getMonitorSnapshot } from "@/lib/monitor";
 import MonitorDashboard from "@/components/monitor/MonitorDashboard";
 import FloatingNav from "@/components/FloatingNav";
@@ -22,8 +22,8 @@ export default async function MonitorPage() {
   const snapshot = await getMonitorSnapshot(site.integrations, site.twoFactorEnabled);
   return (
     <>
-      <MonitorDashboard initial={snapshot} nav={navPages(site, true)} />
-      <FloatingNav {...navPages(site, true)} />
+      <MonitorDashboard initial={snapshot} nav={navPages(site, await viewerFromCookies())} />
+      <FloatingNav {...navPages(site, await viewerFromCookies())} />
     </>
   );
 }

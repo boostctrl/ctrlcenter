@@ -30,11 +30,12 @@ export default async function BoardPage({
   // everything derived from the lists (search matches, per-app bangs, group
   // headings) follows from the filtered arrays for free. `isAdmin` also
   // unlocks the layout-editor UI (saves go through the gated API).
-  const { config, isAdmin } = await readPublicConfig();
+  const { config, isAdmin, viewer } = await readPublicConfig();
   const { settings, apps, bookmarks } = config;
 
-  const pick = pickBoard(config.boards, boardId, isAdmin);
+  const pick = pickBoard(config.boards, boardId, viewer);
   if (pick.kind === "signIn") redirect("/admin/login?next=/");
+  if (pick.kind === "nothing") return <NothingShared nav={navPages(config, viewer)} />;
   if (pick.kind === "notFound") notFound();
   if (pick.kind === "home") redirect(edit && isAdmin ? "/?edit=1" : "/");
   const { board } = pick;
@@ -70,7 +71,7 @@ export default async function BoardPage({
     isAdmin,
     now: new Date(),
   });
-  const nav = navPages(config, isAdmin);
+  const nav = navPages(config, viewer);
   // The greeting is the page's heading; a board without one still names
   // itself to screen readers.
   const hasGreeting = widgets.some((w) => w.type === "greeting" && !w.hidden);
@@ -117,6 +118,22 @@ export default async function BoardPage({
           {settings.settingsButton && <FloatingNav {...nav} />}
         </EditModeProvider>
       </StatusProvider>
+    </main>
+  );
+}
+
+// A signed-in member who can open no board yet (#423): say so, with the
+// corner menu for the pages they can reach and their Sign out.
+function NothingShared({ nav }: { nav: ReturnType<typeof navPages> }) {
+  return (
+    <main id="main-content" className="flex min-h-screen flex-col items-center justify-center gap-6 px-6">
+      <div role="status" className="glass-card flex w-full max-w-sm flex-col gap-3 p-8">
+        <h1 className="text-2xl font-bold">Nothing to show yet</h1>
+        <p className="text-sm text-ink-80">
+          No board is shared with your account. Ask an admin to share one with you, or with a group you are in.
+        </p>
+      </div>
+      <FloatingNav {...nav} />
     </main>
   );
 }

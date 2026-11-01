@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { boardDefaultTheme, boardForPath } from "./board-theme";
 import { THEME_PACKS } from "./theme";
 import { settingsSchema } from "./schema";
+import { ADMIN_VIEW } from "./visibility";
 
 const boards = [
   { id: "home", visibility: "public" as const, theme: undefined },
@@ -11,22 +12,22 @@ const boards = [
 
 describe("boardForPath (#337)", () => {
   it("finds the home board at / and a board at /b/<id>, for who may open it", () => {
-    expect(boardForPath("/", boards, false)?.id).toBe("home");
-    expect(boardForPath("/b/infra", boards, false)?.id).toBe("infra");
-    expect(boardForPath("/b/infra/", boards, false)?.id).toBe("infra");
-    expect(boardForPath("/b/secret", boards, false)).toBeNull();
-    expect(boardForPath("/b/secret", boards, true)?.id).toBe("secret");
-    expect(boardForPath("/b/home", boards, false)?.id).toBe("home");
+    expect(boardForPath("/", boards, null)?.id).toBe("home");
+    expect(boardForPath("/b/infra", boards, null)?.id).toBe("infra");
+    expect(boardForPath("/b/infra/", boards, null)?.id).toBe("infra");
+    expect(boardForPath("/b/secret", boards, null)).toBeNull();
+    expect(boardForPath("/b/secret", boards, ADMIN_VIEW)?.id).toBe("secret");
+    expect(boardForPath("/b/home", boards, null)?.id).toBe("home");
   });
 
   it("is null for any other page or an unknown board", () => {
     for (const p of ["/settings", "/b/", "/b/x/y", "/b/missing", "/weather", "", null, undefined]) {
-      expect(boardForPath(p, boards, true)).toBeNull();
+      expect(boardForPath(p, boards, ADMIN_VIEW)).toBeNull();
     }
     // A private first board: a guest's home is the next public one.
     const privateFirst = [{ id: "a", visibility: "private" as const }, { id: "b", visibility: "public" as const }];
-    expect(boardForPath("/", privateFirst, false)?.id).toBe("b");
-    expect(boardForPath("/", privateFirst, true)?.id).toBe("a");
+    expect(boardForPath("/", privateFirst, null)?.id).toBe("b");
+    expect(boardForPath("/", privateFirst, ADMIN_VIEW)?.id).toBe("a");
   });
 });
 

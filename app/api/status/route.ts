@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { readConfigInternal } from "@/lib/config";
-import { isAdminRequest, visibleItems } from "@/lib/api-auth";
+import { viewerOf } from "@/lib/api-auth";
+import { visibleTo } from "@/lib/visibility";
 import { checkApp, checkSignature, CHECK_CONCURRENCY } from "@/lib/status-check";
 import { mapLimit } from "@/lib/concurrency";
 import { latestCheck } from "@/lib/status-latest";
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest) {
 
   // Visibility is applied per response.
   const ids = new Set(
-    visibleItems(apps, await isAdminRequest(request, auth)).map(
+    visibleTo(apps, await viewerOf(request, auth)).map(
       (a) => a.id
     )
   );

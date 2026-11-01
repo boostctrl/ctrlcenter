@@ -2,6 +2,7 @@
 // visibility. The first board is the home page at `/`; the others live at
 // `/b/<id>`. Widget instances are shared: a board's rows place instances from
 // the top-level `widgets` list by id, so one notes card can sit on two boards.
+import { audienceInputSchema, audienceSchema } from "./audience";
 import { z } from "zod";
 import { listPatchOf } from "./input";
 import { DEFAULT_SECTIONS } from "../layout";
@@ -39,6 +40,8 @@ export const boardSchema = z.object({
   id: boardId,
   name: z.string().max(MAX_BOARD_NAME).catch("").default(""),
   visibility: storedVisibility.default("public"),
+  // Who else may open a private board (#423); absent means admins only.
+  audience: audienceSchema.optional().catch(undefined),
   // Shown before its name in the navigation (#316). Optional, so a board
   // without one stores nothing.
   icon: z.string().trim().min(1).max(MAX_ICON_LENGTH).optional().catch(undefined),
@@ -97,6 +100,8 @@ export const boardsUpdateSchema = z
       id: boardId,
       name: z.string().max(MAX_BOARD_NAME),
       visibility: boardVisibilitySchema,
+      // Left out, the stored audience stays; null clears it (#423).
+      audience: audienceInputSchema.nullable().optional(),
       icon: z.string().trim().max(MAX_ICON_LENGTH).optional(),
       theme: z.string().trim().max(40).optional(),
       layout: z.object({ sections: z.array(layoutRowInputSchema).max(MAX_BOARD_ROWS) }).optional(),

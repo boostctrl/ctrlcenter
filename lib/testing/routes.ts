@@ -65,6 +65,22 @@ export async function adminSession(passwordHash = ""): Promise<string> {
   );
 }
 
+// A member account (#423) signed in: created with a random password if it
+// doesn't exist yet, in the groups given, with a live session token.
+export async function memberSession(id: string, groups: string[] = []): Promise<string> {
+  const { createSessionToken } = await import("../auth");
+  const { createSession } = await import("../sessions");
+  const { readConfigInternal, addAccount } = await import("../config");
+  const { findAccount } = await import("../accounts");
+  const { userSchema } = await import("../schema/auth");
+  let account = findAccount((await readConfigInternal()).auth, id);
+  if (!account) {
+    account = userSchema.parse({ id, role: "member", groups, passwordHash: `hash-${id}`, passwordSalt: "s" });
+    await addAccount(account);
+  }
+  return createSessionToken(account, await createSession({ ip: "127.0.0.1", userAgent: "test", account: id }));
+}
+
 // Age a session's last confirmation past the step-up window (#366), so a
 // route that needs a recent one answers it with 403 and reauthRequired.
 export async function staleSession(session: string): Promise<void> {

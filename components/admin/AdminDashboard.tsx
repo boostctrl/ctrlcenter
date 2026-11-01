@@ -20,6 +20,7 @@ import PageNav from "@/components/PageNav";
 import { useEdgeFade } from "@/components/useEdgeFade";
 import { resolveThemeGallery } from "@/lib/theme";
 import { navPages } from "@/lib/nav";
+import { ADMIN_VIEW } from "@/lib/visibility";
 import { useGroups, type GroupMerges } from "./useGroups";
 import { useItems, useThemeGallery } from "./useAdminData";
 import { downloadJson } from "@/lib/download";
@@ -270,7 +271,7 @@ function AdminBody({
             settings; a feature toggled this session updates on reload. */}
         <PageNav current={null} {...navPages(
             { settings: initialSettings, boards: initialBoards, widgets: initialWidgets },
-            true
+            ADMIN_VIEW
           )} />
         <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-3xl font-bold">Manage your dashboard</h1>

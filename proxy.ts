@@ -37,6 +37,8 @@ const ADMIN_PREFIXES = [
   // checklist (#367).
   "/api/sessions",
   "/api/security",
+  // The accounts list for the admin's pickers (#423).
+  "/api/accounts",
   // Step-up confirmation (#366).
   "/api/reauth",
 ];

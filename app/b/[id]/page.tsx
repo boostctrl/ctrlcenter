@@ -14,8 +14,8 @@ type Props = {
 // The tab title is the board's name, for a board this visitor can open.
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const { config, isAdmin } = await readPublicConfig();
-  const board = visibleBoards(config.boards, isAdmin).find((b) => b.id === id);
+  const { config, viewer } = await readPublicConfig();
+  const board = visibleBoards(config.boards, viewer).find((b) => b.id === id);
   return board ? { title: boardName(board) } : {};
 }
 

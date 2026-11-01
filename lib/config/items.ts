@@ -1,7 +1,7 @@
 // Apps and bookmarks: create, update, delete, restore, reorder, and the bulk
 // group/tag assignment (#290 split). Forms name a group by name; the stored
 // item carries the group's id (#299), created on first use.
-import type { AppItem, BookmarkItem, Group } from "../schema";
+import type { AppItem, BookmarkItem, Group, Audience } from "../schema";
 import { cleanTags } from "../schema";
 import { newPushToken } from "../push";
 import { mutate, readConfigInternal, NotFoundError } from "./store";
@@ -16,6 +16,12 @@ function withoutUndefined<T extends object>(obj: T): Partial<T> {
   ) as Partial<T>;
 }
 
+// A new item stores no key for a cleared optional (an `audience: null`,
+// #423); an update's null means "drop the stored value" (see updateApp).
+function withoutNulls<T extends object>(obj: T): Partial<T> {
+  return Object.fromEntries(Object.entries(obj).filter(([, value]) => value !== null)) as Partial<T>;
+}
+
 export async function listApps(): Promise<AppItem[]> {
   return (await readConfigInternal()).apps;
 }
@@ -27,13 +33,17 @@ function withPushToken(app: AppItem): AppItem {
   return app.checkType === "push" && !app.pushToken ? { ...app, pushToken: newPushToken() } : app;
 }
 
-export type AppInput = Omit<AppItem, "id" | "pushToken" | "group"> & { groupName: string };
+export type AppInput = Omit<AppItem, "id" | "pushToken" | "group" | "audience"> & {
+  groupName: string;
+  // null: no audience (#423).
+  audience?: Audience | null;
+};
 
 export async function createApp(input: AppInput): Promise<AppItem> {
   return mutate((config) => {
     const { groupName, ...rest } = input;
     const group = resolveGroupName(config, groupName);
-    const item = withPushToken({ ...rest, group, id: crypto.randomUUID(), pushToken: "" });
+    const item = withPushToken({ ...withoutNulls(rest), group, id: crypto.randomUUID(), pushToken: "" } as AppItem);
     config.apps.push(item);
     return item;
   });
@@ -41,9 +51,9 @@ export async function createApp(input: AppInput): Promise<AppItem> {
 
 // The optional app fields an update can clear by sending null.
 type Clearable = "port" | "interval" | "timeout" | "retries" | "certWarnDays";
-export type AppUpdate = Partial<Omit<AppItem, "id" | "pushToken" | "group" | Clearable>> & {
+export type AppUpdate = Partial<Omit<AppItem, "id" | "pushToken" | "group" | "audience" | Clearable>> & {
   [K in Clearable]?: AppItem[K] | null;
-} & { groupName?: string };
+} & { groupName?: string; audience?: Audience | null };
 
 export async function updateApp(id: string, input: AppUpdate): Promise<AppItem> {
   return mutate((config) => {
@@ -137,12 +147,19 @@ export async function listBookmarks(): Promise<BookmarkItem[]> {
   return (await readConfigInternal()).bookmarks;
 }
 
-export type BookmarkInput = Omit<BookmarkItem, "id" | "group"> & { groupName: string };
+export type BookmarkInput = Omit<BookmarkItem, "id" | "group" | "audience"> & {
+  groupName: string;
+  audience?: Audience | null;
+};
 
 export async function createBookmark(input: BookmarkInput): Promise<BookmarkItem> {
   return mutate((config) => {
     const { groupName, ...rest } = input;
-    const item: BookmarkItem = { ...rest, group: resolveGroupName(config, groupName), id: crypto.randomUUID() };
+    const item = {
+      ...withoutNulls(rest),
+      group: resolveGroupName(config, groupName),
+      id: crypto.randomUUID(),
+    } as BookmarkItem;
     config.bookmarks.push(item);
     return item;
   });
@@ -156,11 +173,14 @@ export async function updateBookmark(
     const idx = config.bookmarks.findIndex((b) => b.id === id);
     if (idx === -1) throw new NotFoundError("Bookmark not found");
     const { groupName, ...rest } = input;
-    config.bookmarks[idx] = {
+    const next: Record<string, unknown> = {
       ...config.bookmarks[idx],
       ...withoutUndefined(rest),
       ...(groupName !== undefined ? { group: resolveGroupName(config, groupName) } : {}),
     };
+    // null means "back to the default": drop the key (the audience, #423).
+    for (const [k, v] of Object.entries(next)) if (v === null) delete next[k];
+    config.bookmarks[idx] = next as BookmarkItem;
     return config.bookmarks[idx];
   });
 }

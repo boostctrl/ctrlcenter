@@ -2,22 +2,26 @@
 // whole; the layout editor saves one board's arrangement.
 import type { z } from "zod";
 import type { Board, BoardsUpdate, boardLayoutUpdateSchema } from "../schema";
+import { audienceEmpty } from "../schema/audience";
 import { mutate } from "./store";
 
 // Replace the board list. A board sent without a layout keeps the one stored
 // under its id, and a new board starts empty. Its icon likewise: left out, the
 // stored one stays (the editor's board menu doesn't send icons); "" removes it.
-// Its theme (#337) the same way.
+// Its theme (#337) the same way, and its audience (#423): left out it
+// stays, null or empty clears it.
 export async function replaceBoards(input: BoardsUpdate): Promise<Board[]> {
   return mutate((config) => {
     const stored = new Map(config.boards.map((b) => [b.id, b]));
-    config.boards = input.map(({ layout, icon, theme, ...meta }) => {
+    config.boards = input.map(({ layout, icon, theme, audience, ...meta }) => {
       const kept = icon === undefined ? stored.get(meta.id)?.icon : icon;
       const keptTheme = theme === undefined ? stored.get(meta.id)?.theme : theme;
+      const keptAudience = audience === undefined ? stored.get(meta.id)?.audience : (audience ?? undefined);
       return {
         ...meta,
         ...(kept ? { icon: kept } : {}),
         ...(keptTheme ? { theme: keptTheme } : {}),
+        ...(audienceEmpty(keptAudience) ? {} : { audience: keptAudience }),
         layout: layout
           ? { sections: layout.sections }
           : (stored.get(meta.id)?.layout ?? { sections: [] }),

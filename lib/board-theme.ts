@@ -3,6 +3,7 @@
 // it is. Pure, shared by the root layout (the first paint, from the request
 // path), the board page (the live default while the board is open) and the
 // admin editors.
+import type { Viewing } from "./visibility";
 import type { Board } from "./schema";
 import type { ThemePack } from "./theme";
 import { pickBoard } from "./nav";
@@ -11,10 +12,10 @@ import { themeWithPack } from "./theme-schedule";
 // The board a request path shows, if it is a board page: `/` is the first
 // board this visitor can open, `/b/<id>` that board. Anything else (another
 // page, a board they can't open) is null.
-export function boardForPath<B extends Pick<Board, "id" | "visibility">>(
+export function boardForPath<B extends Pick<Board, "id" | "visibility" | "audience">>(
   pathname: string | null | undefined,
   boards: readonly B[],
-  isAdmin: boolean
+  viewer: Viewing | null
 ): B | null {
   if (!pathname) return null;
   let id: string | null;
@@ -28,11 +29,11 @@ export function boardForPath<B extends Pick<Board, "id" | "visibility">>(
       return null;
     }
   }
-  const pick = pickBoard(boards, id, isAdmin);
+  const pick = pickBoard(boards, id, viewer);
   if (pick.kind === "board") return pick.board;
   // /b/<home id> redirects to /, so it shows the home board.
   if (pick.kind === "home") {
-    const home = pickBoard(boards, null, isAdmin);
+    const home = pickBoard(boards, null, viewer);
     return home.kind === "board" ? home.board : null;
   }
   return null;

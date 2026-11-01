@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import fs from "node:fs/promises";
 import * as YAML from "js-yaml";
-import { useScratchConfig, request, adminSession } from "@/lib/testing/routes";
+import { useScratchConfig, request, adminSession, memberSession } from "@/lib/testing/routes";
 import { checkApp, checkSignature } from "@/lib/status-check";
 import { clearLatestChecks, publishChecks } from "@/lib/status-latest";
 import { swrCache } from "@/lib/swr-cache";
@@ -25,6 +25,8 @@ const app = (id: string, isPrivate: boolean) => ({
   name: id,
   url: `https://${id}.example.com`,
   private: isPrivate,
+  // The private app is shared with the member sam (#423).
+  ...(isPrivate ? { audience: { users: ["sam"] } } : {}),
 });
 
 beforeAll(async () => {
@@ -70,6 +72,14 @@ describe("GET /api/status", () => {
     const res = await GET(request("/api/status"));
     expect(res.headers.get("cache-control")).toBe("private, no-store");
     expect(await ids(res)).toEqual(["public-app"]);
+  });
+
+  it("shows a member the public apps and the private ones shared with them (#423)", async () => {
+    const sam = await memberSession("sam");
+    const kim = await memberSession("kim");
+    const seen = async (session: string) => (await ids(await GET(request("/api/status", { session })))).sort();
+    expect(await seen(sam)).toEqual(["private-app", "public-app"]);
+    expect(await seen(kim)).toEqual(["public-app"]);
   });
 
   it("shows the admin every app, from the same shared cache", async () => {

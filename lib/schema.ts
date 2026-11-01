@@ -31,6 +31,7 @@ export * from "./schema/boards";
 export * from "./schema/groups";
 export * from "./schema/apps-bookmarks";
 export * from "./schema/auth";
+export * from "./schema/audience";
 export * from "./schema/settings";
 export * from "./schema/config";
 export * from "./schema/meta";

@@ -172,7 +172,7 @@ export default async function RootLayout({
   // The settings and, for the theming policy (#335), whether this is an
   // admin: admins are never limited, so the policy the page carries is the
   // effective one for this visitor.
-  const { config, isAdmin } = await readPublicConfig();
+  const { config, isAdmin, viewer } = await readPublicConfig();
   const settings = config.settings;
   const weather = settings.weather;
   const visitorTheming: VisitorTheming = isAdmin ? "all" : settings.visitorTheming;
@@ -196,7 +196,7 @@ export default async function RootLayout({
   // BoardTheme clears on the way out — never the site default, since this
   // layout doesn't re-render on a client-side move and the pin then stayed
   // on every page after it (#385).
-  const board = boardForPath(requestHeaders.get("x-pathname"), config.boards, isAdmin);
+  const board = boardForPath(requestHeaders.get("x-pathname"), config.boards, viewer);
   const pinned = board?.theme ? boardDefaultTheme(settings.theme, board, gallery) : null;
 
   // Apply the effective theme before first paint — imperatively, so React never

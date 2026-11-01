@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Weather" };
 export const dynamic = "force-dynamic";
 
 export default async function WeatherPage() {
-  const { config: site, isAdmin } = await readPublicConfig();
+  const { config: site, viewer } = await readPublicConfig();
   const { settings } = site;
   const { weather } = settings;
   const initial = weather.enabled
@@ -21,7 +21,7 @@ export default async function WeatherPage() {
     <>
       <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 pt-12 pb-24 sm:px-10 lg:pt-16">
         <div>
-          <PageNav current="weather" {...navPages(site, isAdmin)} />
+          <PageNav current="weather" {...navPages(site, viewer)} />
           <h1 className="mt-3 text-3xl font-bold">Weather</h1>
         </div>
 
@@ -33,7 +33,7 @@ export default async function WeatherPage() {
           </p>
         )}
       </main>
-      {settings.settingsButton && <FloatingNav {...navPages(site, isAdmin)} />}
+      {settings.settingsButton && <FloatingNav {...navPages(site, viewer)} />}
     </>
   );
 }

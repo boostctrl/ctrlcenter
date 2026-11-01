@@ -13,6 +13,15 @@ here.
 ## [Unreleased]
 ### Added
 
+- **A private board, app or bookmark can be shared with named accounts and
+  groups.** Each gets an *audience*: the accounts and the groups that may
+  see it besides the admins. A member who signs in sees the public boards
+  and items plus the private ones shared with them, and nothing else; one
+  with nothing shared yet is told so. The admin portal and its settings stay
+  admin-only, and a member signs out from the corner menu. Set the audience
+  in `config.yaml` for now (`audience: { users: [sam], groups: [family] }`);
+  the pickers in Settings follow. (#423)
+
 - **Sign in with a username.** The login form asks for a username as well
   as the password; yours is `admin`, with the password you already use, and
   the browser remembers the name. The activity log in Settings → Security

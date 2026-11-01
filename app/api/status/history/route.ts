@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { readConfigInternal } from "@/lib/config";
-import { isAdminRequest, visibleItems } from "@/lib/api-auth";
+import { viewerOf } from "@/lib/api-auth";
+import { visibleTo } from "@/lib/visibility";
 import { monitoredApps } from "@/lib/schema";
 import { loadHistory, getHistory } from "@/lib/status-history";
 import { isValidTimeZone } from "@/lib/datetime";
@@ -30,10 +31,7 @@ export async function GET(request: NextRequest) {
   // Each app's poll cadence caps how long its 1h reading holds in the
   // timeline (its own interval, else the global one, #292). History
   // is recorded for every app; only the caller's visible ids are read out.
-  const visible = visibleItems(
-    monitoredApps(apps),
-    await isAdminRequest(request, auth)
-  );
+  const visible = visibleTo(monitoredApps(apps), await viewerOf(request, auth));
   return NextResponse.json(
     getHistory(
       visible.map((a) => a.id),

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getSiteConfig } from "@/lib/config";
-import { requireAdminPage } from "@/lib/api-auth";
+import { requireAdminPage, viewerFromCookies } from "@/lib/api-auth";
 import { getServiceDetail } from "@/lib/monitor-detail";
 import { integrationLabels } from "@/lib/services/ids";
 import MonitorDetail from "@/components/monitor/MonitorDetail";
@@ -34,8 +34,8 @@ export default async function MonitorDetailPage({ params }: Params) {
 
   return (
     <>
-      <MonitorDetail initial={result} nav={navPages(site, true)} />
-      <FloatingNav {...navPages(site, true)} />
+      <MonitorDetail initial={result} nav={navPages(site, await viewerFromCookies())} />
+      <FloatingNav {...navPages(site, await viewerFromCookies())} />
     </>
   );
 }

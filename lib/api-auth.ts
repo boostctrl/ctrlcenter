@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { sessionTokenFrom, verifySession, type LiveSession } from "./auth";
 import { isAdminAccount } from "./accounts";
+import { visibleTo } from "./visibility";
 import { watchSessionAddress } from "./session-watch";
 import { readConfigInternal, stripAuth, stripSecrets } from "./config";
 import type { AuthConfig, Config } from "./schema";
@@ -109,21 +110,11 @@ export async function isAdminSession(auth?: AuthConfig): Promise<boolean> {
 // Redirects exactly like the proxy does, so the login page sends the admin
 // back here afterwards.
 export async function requireAdminPage(next: string, auth?: AuthConfig): Promise<void> {
-  if (await isAdminSession(auth)) return;
-  redirect(`/admin/login?next=${encodeURIComponent(next)}`);
-}
-
-// Items flagged `private` (apps and bookmarks) exist only for the admin
-// session. Public pages get this applied for free via readPublicConfig below;
-// the status APIs call it directly because they filter per response over a
-// shared all-apps cache. The background poller, history recording, and alerts
-// deliberately bypass it: a private service should still be monitored, it
-// just shouldn't render for guests.
-export function visibleItems<T extends { private: boolean }>(
-  items: T[],
-  isAdmin: boolean
-): T[] {
-  return isAdmin ? items : items.filter((i) => !i.private);
+  const viewer = await viewerFromCookies(auth);
+  if (viewer?.isAdmin) return;
+  // A member (#423) has no business here and no need to sign in again:
+  // back to their dashboard.
+  redirect(viewer ? "/" : `/admin/login?next=${encodeURIComponent(next)}`);
 }
 
 // The one config accessor for anything a signed-out visitor might see (#147,
@@ -149,12 +140,16 @@ export async function viewerIsAdmin(): Promise<boolean> {
 export async function readPublicConfig(request?: NextRequest): Promise<{
   config: Omit<Config, "auth">;
   isAdmin: boolean;
+  // Who is looking (#423): null for a signed-out visitor. Private apps and
+  // bookmarks are kept for an admin and for the member they name.
+  viewer: Viewer | null;
 }> {
   const config = await readConfigInternal();
-  const isAdmin = request ? await isAdminRequest(request, config.auth) : await isAdminSession(config.auth);
+  const viewer = request ? await viewerOf(request, config.auth) : await viewerFromCookies(config.auth);
+  const isAdmin = viewer?.isAdmin === true;
   const safe = stripSecrets(stripAuth(config));
-  const apps = visibleItems(safe.apps, isAdmin);
-  const bookmarks = visibleItems(safe.bookmarks, isAdmin);
+  const apps = visibleTo(safe.apps, viewer);
+  const bookmarks = visibleTo(safe.bookmarks, viewer);
   // A guest gets only the groups their apps and bookmarks belong to (#299),
   // so a group holding only private items doesn't give its name away.
   const used = new Set([...apps, ...bookmarks].map((i) => i.group));
@@ -166,5 +161,6 @@ export async function readPublicConfig(request?: NextRequest): Promise<{
       groups: isAdmin ? safe.groups : safe.groups.filter((g) => used.has(g.id)),
     },
     isAdmin,
+    viewer,
   };
 }

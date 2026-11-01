@@ -35,7 +35,9 @@ Built with Next.js 16, React 19, and Tailwind v4.
     (keyboard- and touch-friendly, not just mouse drag).
   - **Private items** — mark an app or bookmark **Only show when logged in**
     and it disappears for signed-out visitors (from the dashboard, search, and
-    the status page alike) while staying monitored and alerted on.
+    the status page alike) while staying monitored and alerted on. A private
+    board, app or bookmark can be shared with named accounts and groups (its
+    `audience`), so a member who signs in sees it too.
 
 - **Uptime, status & alerts.** Optional reachability checks put an online/offline
   dot on each app and power a dedicated **/status** page with per-service **uptime
@@ -359,8 +361,8 @@ boards:                     # the dashboards; the first is the home page, the
                             # in and pick "Edit layout" from the corner menu
   - id: home
     name: Home
-    visibility: public      # public | private (only the signed-in admin);
-                            # anything else counts as private
+    visibility: public      # public | private (admins, plus the audience
+                            # below); anything else counts as private
     layout:
       sections:             # order = position; widgets flow row by row
         - { widget: greeting, span: 16 }    # `widget` names an instance below
@@ -377,6 +379,9 @@ boards:                     # the dashboards; the first is the home page, the
   - id: infra
     name: Infra
     visibility: private
+    audience:               # optional: who else may open a private board
+      users: [sam]          #   (an app or bookmark takes the same key)
+      groups: [family]
     icon: proxmox           # optional, beside its name in the menus: a slug,
                             # an image URL or an uploaded icon, like an app's
     theme: Lab              # optional: a gallery theme pinned on this board

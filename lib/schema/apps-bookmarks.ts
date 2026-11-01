@@ -1,6 +1,7 @@
 // Apps and bookmarks: stored rows, create/update inputs, and reorder. Both
 // belong to groups (#299, lib/schema/groups.ts) by id; forms name a group by
 // its name (groupName), and the server resolves or creates it.
+import { audienceInputSchema, audienceSchema } from "./audience";
 import { z } from "zod";
 import { CHECK_TYPE_KEYS } from "../status";
 import { httpUrl } from "./shared";
@@ -61,6 +62,8 @@ export const appItemSchema = z.object({
   // filters flagged items out of every public surface. Monitoring and alerts
   // ignore the flag.
   private: z.boolean().catch(false).default(false),
+  // Who else sees it while private (#423); absent means admins only.
+  audience: audienceSchema.optional().catch(undefined),
   // The group it belongs to (#299), by id; "" for none.
   group: z.string().catch("").default(""),
   // Free-text labels an apps widget can filter on (#299).
@@ -77,6 +80,7 @@ export const bookmarkItemSchema = z.object({
   icon: z.string().default(""),
   // Render only for the admin session, same contract as the app flag above.
   private: z.boolean().catch(false).default(false),
+  audience: audienceSchema.optional().catch(undefined),
 });
 
 export type AppItem = z.infer<typeof appItemSchema>;
@@ -107,6 +111,7 @@ export const appInputSchema = z.object({
   timeout: z.number().int().min(1).max(60).optional(),
   retries: z.number().int().min(0).max(5).optional(),
   private: z.boolean().optional().default(false),
+  audience: audienceInputSchema.nullable().optional(),
   groupName: groupNameInput.optional().default(""),
   tags: tagsInput.optional().default([]),
 });
@@ -117,6 +122,7 @@ export const bookmarkInputSchema = z.object({
   url: httpUrl,
   icon: z.string().optional().default(""),
   private: z.boolean().optional().default(false),
+  audience: audienceInputSchema.nullable().optional(),
 });
 
 export const appUpdateSchema = z.object({
@@ -137,6 +143,8 @@ export const appUpdateSchema = z.object({
   timeout: z.number().int().min(1).max(60).nullable().optional(),
   retries: z.number().int().min(0).max(5).nullable().optional(),
   private: z.boolean().optional(),
+  // null clears it, back to admins only (#423).
+  audience: audienceInputSchema.nullable().optional(),
   groupName: groupNameInput.optional(),
   tags: tagsInput.optional(),
 });
@@ -147,6 +155,7 @@ export const bookmarkUpdateSchema = z.object({
   url: httpUrl.optional(),
   icon: z.string().optional(),
   private: z.boolean().optional(),
+  audience: audienceInputSchema.nullable().optional(),
 });
 
 // Undo a delete (#307): put the deleted row back whole — same id, so status

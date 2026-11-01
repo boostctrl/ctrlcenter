@@ -144,7 +144,7 @@ function tableOfContents(content: React.ReactElement<{ children?: React.ReactNod
 // runtime reads are the built-in bang list and the settings flag that gates
 // the floating navigation menu.
 export default async function HelpPage() {
-  const { config: site, isAdmin } = await readPublicConfig();
+  const { config: site, viewer } = await readPublicConfig();
   const { settings } = site;
   const builtins = Object.entries(BUILTIN_BANGS);
 
@@ -1109,7 +1109,7 @@ export default async function HelpPage() {
     <>
       <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 pt-12 pb-24 sm:px-10 lg:pt-16">
         <div>
-          <PageNav current="help" {...navPages(site, isAdmin)} />
+          <PageNav current="help" {...navPages(site, viewer)} />
           <h1 className="mt-3 text-3xl font-bold">Help</h1>
           <p className="mt-1 text-sm text-ink-50">
             Everything ctrlcenter can do, plus setup notes for admins. Some
@@ -1148,7 +1148,7 @@ export default async function HelpPage() {
         </nav>
         {content}
       </main>
-      {settings.settingsButton && <FloatingNav {...navPages(site, isAdmin)} />}
+      {settings.settingsButton && <FloatingNav {...navPages(site, viewer)} />}
     </>
   );
 }

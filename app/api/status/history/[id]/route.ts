@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { readConfigInternal } from "@/lib/config";
-import { isAdminRequest, visibleItems } from "@/lib/api-auth";
+import { viewerOf } from "@/lib/api-auth";
+import { visibleTo } from "@/lib/visibility";
 import { monitoredApps } from "@/lib/schema";
 import { loadHistory, getAppDetail } from "@/lib/status-history";
 import { isValidTimeZone } from "@/lib/datetime";
@@ -24,7 +25,7 @@ export async function GET(
   const { id } = await params;
   const { settings, apps, auth } = await readConfigInternal();
   const visible = settings.statusChecks
-    ? visibleItems(monitoredApps(apps), await isAdminRequest(request, auth))
+    ? visibleTo(monitoredApps(apps), await viewerOf(request, auth))
     : [];
   if (!visible.some((a) => a.id === id)) {
     return NextResponse.json(

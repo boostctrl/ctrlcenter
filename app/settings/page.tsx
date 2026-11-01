@@ -13,10 +13,7 @@ import { navPages } from "@/lib/nav";
 export const metadata: Metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
-  const {
-    config: site,
-    isAdmin,
-  } = await readPublicConfig();
+  const { config: site, isAdmin, viewer } = await readPublicConfig();
   const { settings, themes } = site;
   const packs = resolveThemePacks(themes);
   // What this visitor may change (#335); an admin, everything.
@@ -25,7 +22,7 @@ export default async function SettingsPage() {
     <>
       <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-8 px-6 pt-12 pb-24 sm:px-10 lg:pt-16">
       <div>
-        <PageNav current="settings" {...navPages(site, isAdmin)} />
+        <PageNav current="settings" {...navPages(site, viewer)} />
         <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold">Settings</h1>
@@ -92,7 +89,7 @@ export default async function SettingsPage() {
       </ConfirmProvider>
       </main>
       {settings.settingsButton && (
-        <FloatingNav {...navPages(site, isAdmin)} />
+        <FloatingNav {...navPages(site, viewer)} />
       )}
     </>
   );
