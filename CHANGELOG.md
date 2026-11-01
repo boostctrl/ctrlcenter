@@ -14,6 +14,13 @@ here.
 
 ### Fixed
 
+- **A screen reader hears which set a theme-builder tile belongs to, and
+  which channel a Send test is for.** The design, font, heading-font, palette
+  and theme tiles in the theme builder are now named groups, announced with
+  the heading over them ("Palettes", "Your themes"), as the scene rows and
+  wallpaper patterns already were. In Settings → Monitoring → Alerts, each
+  channel's Send test button is named for its channel ("Send test from
+  Chat"), so two channels' buttons never sound alike. (#350)
 - **Long relayed notifications reach Discord.** Discord takes at most 2,000
   characters in a message and refuses a longer one, so a relayed notification
   whose text ran past that — a digest of many titles behind a long link, say

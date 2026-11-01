@@ -71,7 +71,10 @@ export default function ColorsTab({ d }: { d: ThemeDraft }) {
     >
       <div className="space-y-2">
         <div>
-          <span className="text-[10px] font-semibold tracking-[0.15em] text-ink-45 uppercase">
+          <span
+            id="tb-colors-palettes"
+            className="text-[10px] font-semibold tracking-[0.15em] text-ink-45 uppercase"
+          >
             Palettes
           </span>
           <p className="text-xs text-ink-40">
@@ -79,7 +82,13 @@ export default function ColorsTab({ d }: { d: ThemeDraft }) {
             shows its dark and light halves).
           </p>
         </div>
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-7">
+        {/* A named group, so a screen reader hears "Palettes" before the
+            tiles (#350). */}
+        <div
+          role="group"
+          aria-labelledby="tb-colors-palettes"
+          className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-7"
+        >
           {BASE_THEMES.map((t) => (
             <OptionCard
               key={t.name}

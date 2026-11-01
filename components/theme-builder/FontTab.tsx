@@ -25,10 +25,16 @@ export default function FontTab({ d }: { d: ThemeDraft }) {
       aria-labelledby="tb-tab-font"
       className="space-y-3"
     >
-      <p className="text-xs text-ink-40">
+      {/* Each tile grid is a group named by the text over it, so a screen
+          reader hears which set a font belongs to (#350). */}
+      <p id="tb-font-body" className="text-xs text-ink-40">
         The interface typeface of your {editMode} theme.
       </p>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+      <div
+        role="group"
+        aria-labelledby="tb-font-body"
+        className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6"
+      >
         {FONTS.map((f) => (
           <OptionCard
             key={f.id}
@@ -52,14 +58,21 @@ export default function FontTab({ d }: { d: ThemeDraft }) {
       {/* The heading face (#330): h1–h3 in their own font, or the body's. */}
       <div className="space-y-2 border-t border-fg/10 pt-4">
         <div>
-          <span className="text-[10px] font-semibold tracking-[0.15em] text-ink-45 uppercase">
+          <span
+            id="tb-font-headings"
+            className="text-[10px] font-semibold tracking-[0.15em] text-ink-45 uppercase"
+          >
             Headings
           </span>
           <p className="text-xs text-ink-40">
             A separate face for titles and section headings, or the body font.
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        <div
+          role="group"
+          aria-labelledby="tb-font-headings"
+          className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6"
+        >
           <OptionCard
             selected={heading === null}
             onClick={() => setHeadingFont("body", editMode)}

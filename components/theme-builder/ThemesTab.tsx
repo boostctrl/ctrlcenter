@@ -58,12 +58,20 @@ export default function ThemesTab({
       aria-labelledby="tb-tab-themes"
       className="space-y-4"
     >
+      {/* The first sentence names the tile group for a screen reader (#350);
+          the rest is advice, not a name. */}
       <p className="text-xs text-ink-40">
-        Curated looks — one tap sets the design, scene &amp; colors of your{" "}
-        {editMode} theme.{" "}
+        <span id="tb-themes-packs">
+          Curated looks — one tap sets the design, scene &amp; colors of your{" "}
+          {editMode} theme.
+        </span>{" "}
         {!packsOnly && "Tweak it in the other tabs, then name & save your own below."}
       </p>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+      <div
+        role="group"
+        aria-labelledby="tb-themes-packs"
+        className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6"
+      >
         {packs.map((p, i) => (
           <OptionCard
             key={`builtin:${i}`}
@@ -85,7 +93,10 @@ export default function ThemesTab({
       {!packsOnly && (
       <div className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-[10px] font-semibold tracking-[0.15em] text-ink-45 uppercase">
+          <span
+            id="tb-themes-saved"
+            className="text-[10px] font-semibold tracking-[0.15em] text-ink-45 uppercase"
+          >
             Your themes
           </span>
           {/* Import always (so an empty list can still receive a file);
@@ -187,7 +198,11 @@ export default function ThemesTab({
           </p>
         )}
         {customThemes.length > 0 && (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+          <div
+            role="group"
+            aria-labelledby="tb-themes-saved"
+            className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6"
+          >
             {customThemes.map((t) => {
               const swatch = (
                 <ThemeTile

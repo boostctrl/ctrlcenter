@@ -29,7 +29,8 @@ const EVENTS: { value: Event; label: string }[] = [
 ];
 
 // One entry of the alert channel list (#291): its type, the fields that type
-// needs, which events and apps it takes, and its own Send test.
+// needs, which events and apps it takes, and its own Send test, named for the
+// channel so two of them never sound alike to a screen reader (#350).
 export function AlertChannelEditor({
   channel: ch,
   apps,
@@ -136,7 +137,12 @@ export function AlertChannelEditor({
       )}
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <AlertTest channel={ch.id} ready={missing.length === 0} saving={saving} />
+        <AlertTest
+          channel={ch.id}
+          ready={missing.length === 0}
+          saving={saving}
+          ariaLabel={`Send test from ${label}`}
+        />
         {missing.length > 0 && (
           <p className="text-xs text-status-warning">
             Add {andList(missing)} to start sending.
