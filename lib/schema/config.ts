@@ -61,7 +61,8 @@ export type Config = z.infer<typeof configSchema>;
 // and not a restore: the admin chose this file, so a row it would lose is
 // refused with the reason, and so is a list past an input cap (one the admin
 // paths enforce but the stored read doesn't, like MAX_FEED_CARDS; stored
-// anyway, every later save of that list fails until something is deleted).
+// anyway, nothing more of that kind can be added until some are deleted,
+// #426).
 // Each row is parsed with its stored item schema (so a 2.x file's migrated
 // rows, which leave most fields to their defaults, pass) and the whole list
 // is then held to the input list schema's rules.

@@ -5,7 +5,7 @@ import path from "path";
 import * as YAML from "js-yaml";
 import { migrateConfig } from "./config-migrate";
 import { summarizeUpgrade } from "./config/upgrade";
-import { CONFIG_SCHEMA_VERSION, configSchema, MAX_GROUPS } from "./schema";
+import { CONFIG_SCHEMA_VERSION, configSchema, MAX_API_WIDGETS, MAX_FEED_CARDS, MAX_GROUPS } from "./schema";
 
 // The whole 2.x → 3.0 upgrade (#306) against configs as users of 2.0, 2.5,
 // 2.10 and 2.13 would have them (lib/__fixtures__, each checked against its
@@ -154,6 +154,26 @@ describe("the upgrade summary", () => {
 
     const few = { schemaVersion: 2, settings: {}, bookmarks: bookmarks.slice(0, 3) };
     expect(summarizeUpgrade(few, migrateConfig(few).value)).toMatchObject({ groups: 3, skippedCategories: [] });
+  });
+
+  it("names the feed cards and API widgets past their caps, and none otherwise (#426)", () => {
+    const feeds = Array.from({ length: MAX_FEED_CARDS + 2 }, (_, n) => ({
+      id: `feed-${n + 1}`,
+      enabled: true,
+      urls: ["https://x.test/feed"],
+    }));
+    const before = { schemaVersion: 2, settings: { feeds } };
+    expect(summarizeUpgrade(before, migrateConfig(before).value).widgetsPastCap).toEqual([
+      { label: "RSS feed cards", max: MAX_FEED_CARDS, ids: [`feed-${MAX_FEED_CARDS + 1}`, `feed-${MAX_FEED_CARDS + 2}`] },
+    ]);
+    // 2.x had no API widgets; a 3.0 pre-release file's are named the same way.
+    const api = Array.from({ length: MAX_API_WIDGETS + 1 }, (_, n) => ({ id: `api-${n + 1}`, type: "api" }));
+    const pre = { schemaVersion: 2, settings: {}, widgets: api };
+    expect(summarizeUpgrade(pre, migrateConfig(pre).value).widgetsPastCap).toEqual([
+      { label: "API widgets", max: MAX_API_WIDGETS, ids: [`api-${MAX_API_WIDGETS + 1}`] },
+    ]);
+    const few = { schemaVersion: 2, settings: { feeds: feeds.slice(0, 3) } };
+    expect(summarizeUpgrade(few, migrateConfig(few).value).widgetsPastCap).toEqual([]);
   });
 });
 

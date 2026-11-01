@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { migrateV2toV3 } from "./config-migrate-v3";
 import { migrateConfig } from "./config-migrate";
-import { configReadSchema, MAX_GROUP_NAME, MAX_GROUPS } from "./schema";
+import { configReadSchema, MAX_FEED_CARDS, MAX_GROUP_NAME, MAX_GROUPS } from "./schema";
 import { resolveLayout } from "./layout";
 import { THEME_PACKS } from "./theme";
 
@@ -198,6 +198,22 @@ describe("migrateV2toV3: content", () => {
     });
     expect(out.widgets.find((w) => w.type === "feed")?.id).toBe("my-news");
     expect(row(out, "my-news")).toMatchObject({ span: 12, hidden: false });
+  });
+
+  it("keeps a feed list past MAX_FEED_CARDS whole, as the stored read does (#426)", () => {
+    const feeds = Array.from({ length: MAX_FEED_CARDS + 2 }, (_, n) => ({
+      id: `feed-${n + 1}`,
+      enabled: true,
+      urls: ["https://x.test/feed"],
+    }));
+    const out = migrate({ feeds });
+    const ids = feeds.map((f) => f.id);
+    expect(out.widgets.filter((w) => w.type === "feed").map((w) => w.id)).toEqual(ids);
+    expect(rows(out).filter((r) => ids.includes(r.widget))).toHaveLength(ids.length);
+    // Nothing between the upgrade and the dashboard cuts the list; the
+    // upgrade summary names the cards past the cap instead.
+    const config = configReadSchema.parse(migrateConfig({ schemaVersion: 2, settings: { feeds } }).value);
+    expect(config.widgets.filter((w) => w.type === "feed").map((w) => w.id)).toEqual(ids);
   });
 
   it("leaves a config with boards alone", () => {

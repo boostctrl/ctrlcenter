@@ -183,6 +183,17 @@ export const widgetInstancesSchema = lenientArray(widgetInstanceSchema).default(
 export const MAX_WIDGET_INSTANCES = 64;
 export const MAX_API_WIDGETS = 20;
 
+// The caps on how many of one kind the list holds, as the saves state them:
+// the type, its cap, and what the message calls them. The stored read doesn't
+// cut a list past one (lib/schema/config.ts), so a 2.x file hand-edited past
+// MAX_FEED_CARDS is upgraded as it is; the upgrade names what's over
+// (lib/config/upgrade.ts), and a save holds such a list only to what's
+// stored (widgetInstancesUpdateSchemaFor, #426).
+export const WIDGET_CAPS = [
+  { type: "feed", max: MAX_FEED_CARDS, label: "RSS feed cards" },
+  { type: "api", max: MAX_API_WIDGETS, label: "API widgets" },
+] as const;
+
 const httpOrBlank = (u: string) => u.trim() === "" || /^https?:\/\//i.test(u.trim());
 
 // Admin input for one instance edited in place (PUT /api/widgets/[id], #303):
@@ -193,36 +204,45 @@ export const widgetInstanceUpdateSchema = wholeOf(widgetInstanceSchema);
 // the input-only rules the stored shape can't state. The admin's forms send
 // the patch form instead (widgetInstancesPatchSchema, #396); the route
 // applies it to the stored list and validates the result with this one.
-export const widgetInstancesUpdateSchema = z
-  .array(wholeOf(widgetInstanceSchema))
-  .max(MAX_WIDGET_INSTANCES)
-  .superRefine((list, ctx) => {
-    const ids = new Set<string>();
-    let feeds = 0;
-    list.forEach((w, i) => {
-      if (ids.has(w.id)) ctx.addIssue({ code: "custom", message: "Duplicate widget id", path: [i, "id"] });
-      ids.add(w.id);
-      if (w.type === "feed") {
-        feeds++;
-        if (w.urls.length > MAX_FEED_URLS)
-          ctx.addIssue({ code: "custom", message: "Too many feed URLs", path: [i, "urls"] });
-        if (!w.urls.every(httpOrBlank))
-          ctx.addIssue({ code: "custom", message: "Every feed URL must start with http(s)", path: [i, "urls"] });
+//
+// Given the stored list, a cap on a kind is held only past what's stored
+// (#426): a list already over it — a 2.x file upgraded with more feed cards
+// than fit — saves as long as it keeps as many of that kind or fewer, so the
+// admin can edit it and trim it down, and only a save adding another is
+// refused, naming the cap. Without one every cap holds outright, which is
+// what an import is held to (lib/schema/config.ts).
+export function widgetInstancesUpdateSchemaFor(stored: readonly { type: string }[] = []) {
+  const countOf = (list: readonly { type: string }[], type: string) => list.filter((w) => w.type === type).length;
+  return z
+    .array(widgetInstanceUpdateSchema)
+    .max(MAX_WIDGET_INSTANCES)
+    .superRefine((list, ctx) => {
+      const ids = new Set<string>();
+      list.forEach((w, i) => {
+        if (ids.has(w.id)) ctx.addIssue({ code: "custom", message: "Duplicate widget id", path: [i, "id"] });
+        ids.add(w.id);
+        if (w.type === "feed") {
+          if (w.urls.length > MAX_FEED_URLS)
+            ctx.addIssue({ code: "custom", message: "Too many feed URLs", path: [i, "urls"] });
+          if (!w.urls.every(httpOrBlank))
+            ctx.addIssue({ code: "custom", message: "Every feed URL must start with http(s)", path: [i, "urls"] });
+        }
+        if (w.type === "calendar" && !(w.url.trim() === "" || /^(https?|webcal):\/\//i.test(w.url.trim())))
+          ctx.addIssue({ code: "custom", message: "Calendar URL must start with http(s) or webcal", path: [i, "url"] });
+        if (w.type === "systemStats" && w.disks.length > MAX_STAT_DISKS)
+          ctx.addIssue({ code: "custom", message: "Too many disks", path: [i, "disks"] });
+      });
+      for (const { type, max, label } of WIDGET_CAPS) {
+        if (countOf(list, type) > Math.max(max, countOf(stored, type)))
+          ctx.addIssue({ code: "custom", message: `At most ${max} ${label}` });
       }
-      if (w.type === "calendar" && !(w.url.trim() === "" || /^(https?|webcal):\/\//i.test(w.url.trim())))
-        ctx.addIssue({ code: "custom", message: "Calendar URL must start with http(s) or webcal", path: [i, "url"] });
-      if (w.type === "systemStats" && w.disks.length > MAX_STAT_DISKS)
-        ctx.addIssue({ code: "custom", message: "Too many disks", path: [i, "disks"] });
+      list.forEach((w, i) => {
+        if (w.type === "api" && !httpOrBlank(w.url))
+          ctx.addIssue({ code: "custom", message: "An API widget's URL must start with http(s)", path: [i, "url"] });
+      });
     });
-    if (feeds > MAX_FEED_CARDS)
-      ctx.addIssue({ code: "custom", message: `At most ${MAX_FEED_CARDS} RSS feed cards` });
-    if (list.filter((w) => w.type === "api").length > MAX_API_WIDGETS)
-      ctx.addIssue({ code: "custom", message: `At most ${MAX_API_WIDGETS} API widgets` });
-    list.forEach((w, i) => {
-      if (w.type === "api" && !httpOrBlank(w.url))
-        ctx.addIssue({ code: "custom", message: "An API widget's URL must start with http(s)", path: [i, "url"] });
-    });
-  });
+}
+export const widgetInstancesUpdateSchema = widgetInstancesUpdateSchemaFor();
 
 // Re-exported for the editors that build rows.
 export { systemStatsDiskSchema };

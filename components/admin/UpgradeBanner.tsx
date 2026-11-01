@@ -18,6 +18,8 @@ export default function UpgradeBanner({ notice }: { notice: UpgradeSummary }) {
   if (!open) return null;
   // Categories past the group limit (#403); a notice 3.0.0 wrote has none.
   const skipped = notice.skippedCategories ?? [];
+  // Widgets past a cap on their kind (#426); a notice 3.0.1 or earlier wrote has none.
+  const pastCap = notice.widgetsPastCap ?? [];
 
   async function dismiss() {
     try {
@@ -56,6 +58,13 @@ export default function UpgradeBanner({ notice }: { notice: UpgradeSummary }) {
             the category&apos;s id until you move them into a group (Settings → Bookmarks).
           </li>
         )}
+        {pastCap.map(({ label, max, ids }) => (
+          <li key={label}>
+            CtrlCenter holds at most {max} {label} and your file has {max + ids.length}, so you can&apos;t add
+            another until the list is back within the limit. They&apos;re all kept, and you can edit or remove any
+            of them (Settings → Widgets); past the limit: <em>{ids.join(", ")}</em>.
+          </li>
+        ))}
         {notice.integrations > 0 && (
           <li>
             Your connected services are now {plural(notice.integrations, "integration")} in Settings →

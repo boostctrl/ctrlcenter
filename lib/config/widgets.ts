@@ -1,7 +1,14 @@
 // Widget instances (#297): the admin edits the whole list at once in
 // Settings → Widgets, or one instance in place from the layout editor (#303).
 import { randomUUID } from "node:crypto";
-import { boardName, newInstance, widgetInstancesUpdateSchema, type Group, type WidgetInstance } from "../schema";
+import {
+  boardName,
+  newInstance,
+  widgetInstancesUpdateSchema,
+  widgetInstancesUpdateSchemaFor,
+  type Group,
+  type WidgetInstance,
+} from "../schema";
 import type { WidgetType } from "../layout";
 import { allTags } from "../groups";
 import { integrationLabels } from "../services/ids";
@@ -60,14 +67,17 @@ export class InvalidWidgetsError extends Error {}
 // Save one instance, adding it when its id is new — checked against the rules
 // for the whole list (caps, URL schemes), so editing one in place can't get
 // past what Settings → Widgets enforces. The others are left exactly as
-// stored.
+// stored. A list already past a cap on a kind (a 2.x file upgraded with more
+// feed cards than fit, #426) is held only to what's stored: an edit in place
+// saves, and only adding another of that kind is refused, so the list can
+// be trimmed down.
 export async function saveWidget(widget: WidgetInstance): Promise<WidgetInstance> {
   return mutate((config) => {
     const exists = config.widgets.some((w) => w.id === widget.id);
     const next = exists
       ? config.widgets.map((w) => (w.id === widget.id ? widget : w))
       : [...config.widgets, widget];
-    const parsed = widgetInstancesUpdateSchema.safeParse(next);
+    const parsed = widgetInstancesUpdateSchemaFor(config.widgets).safeParse(next);
     if (!parsed.success) throw new InvalidWidgetsError(parsed.error.issues[0]?.message ?? "Invalid widget");
     config.widgets = next;
     return widget;

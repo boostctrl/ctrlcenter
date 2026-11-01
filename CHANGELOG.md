@@ -26,6 +26,16 @@ here.
 
 ### Fixed
 
+- **A 2.x config with more feed cards than fit no longer locks every widget
+  save.** CtrlCenter holds at most 8 RSS feed cards (and 20 API widgets), but
+  a hand-edited 2.x file with more was upgraded as it was, after which every
+  widget save — an edit in the layout editor or in Settings → Widgets —
+  failed until enough were deleted, with nothing saying why. The upgrade
+  banner and the log now name the widgets past the limit, and such a list
+  saves as long as the save doesn't add another of that kind, so you can
+  edit it and trim it down; adding one more is still refused with a message
+  naming the limit. (#426)
+
 - **The uptime history still shows from a read-only volume.** With the
   history database on a volume the app can't write to, the status pages
   started out empty after every restart: the file held the history, but the

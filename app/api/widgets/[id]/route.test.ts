@@ -106,4 +106,29 @@ describe("/api/widgets/[id]", () => {
     const { readConfigInternal } = await import("@/lib/config");
     expect((await readConfigInternal()).widgets.find((w) => w.id === "cal-1")).toMatchObject({ url: calendar.url, count: 9 });
   });
+
+  it("lets a list already past the feed-card cap be edited and trimmed, not grown (#426)", async () => {
+    const { replaceWidgets, readConfigInternal } = await import("@/lib/config");
+    const { MAX_FEED_CARDS } = await import("@/lib/schema");
+    // As the 3.0 upgrade leaves a 2.x file with more feed cards than fit:
+    // stored whole, never held to the cap.
+    const feeds = Array.from({ length: MAX_FEED_CARDS + 2 }, (_, i) => ({
+      ...newInstance("feed", `f${i}`),
+      urls: ["https://a.example/feed"],
+    }));
+    await replaceWidgets([notes, ...feeds]);
+    // An edit in place saves, and so does a widget of another kind.
+    expect((await put("f0", { ...feeds[0], count: 3 })).status).toBe(200);
+    expect((await put("notes-9", newInstance("notes", "notes-9"))).status).toBe(200);
+    // One more feed card is refused, naming the cap.
+    const res = await put("f-more", { ...newInstance("feed", "f-more"), urls: ["https://b.example/feed"] });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe(`At most ${MAX_FEED_CARDS} RSS feed cards`);
+    const stored = (await readConfigInternal()).widgets;
+    expect(stored.find((w) => w.id === "f0")).toMatchObject({ count: 3 });
+    expect(stored.map((w) => w.id)).not.toContain("f-more");
+    // Trimmed by one, the rest still saves.
+    expect((await del(`f${MAX_FEED_CARDS + 1}`)).status).toBe(204);
+    expect((await put("f1", { ...feeds[1], count: 4 })).status).toBe(200);
+  });
 });

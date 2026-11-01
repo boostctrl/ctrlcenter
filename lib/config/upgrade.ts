@@ -14,6 +14,7 @@ import { configVersion } from "../config-migrate";
 import { v2Categories } from "../config-migrate-v3";
 import { log } from "../log";
 import { MAX_GROUPS } from "../schema/groups";
+import { WIDGET_CAPS } from "../schema/instances";
 import { writeFileOnce } from "./files";
 
 export const V2_BACKUP_NAME = "config.v2.bak.yaml";
@@ -42,6 +43,13 @@ export type UpgradeSummary = {
   // (#403): their bookmarks are listed under the category's id instead.
   // Absent in a notice 3.0.0 wrote.
   skippedCategories?: string[];
+  // The widgets past a cap on their kind (#426): a 2.x file hand-edited past
+  // MAX_FEED_CARDS is upgraded as it is, and the stored read keeps the whole
+  // list, so a save can edit or trim it but not add another of that kind
+  // until it's back within the cap. For each kind over its cap: what the cap
+  // calls them, the cap, and the ids past it in the file's order. Absent in
+  // a notice 3.0.1 or earlier wrote.
+  widgetsPastCap?: { label: string; max: number; ids: string[] }[];
   // The rollback copy's file name, beside the config: the one this upgrade
   // wrote or found holding the same file (#386).
   backup: string;
@@ -53,6 +61,19 @@ const count = (v: unknown, key: string): number => {
   const list = typeof v === "object" && v !== null ? (v as Record<string, unknown>)[key] : undefined;
   return Array.isArray(list) ? list.length : 0;
 };
+
+// For each kind of widget past its cap in the upgraded file, the ids past it
+// (#426). Only rows with an id count: the stored read drops the others.
+function pastCaps(after: unknown): NonNullable<UpgradeSummary["widgetsPastCap"]> {
+  const rows = typeof after === "object" && after !== null ? (after as Record<string, unknown>).widgets : undefined;
+  const widgets = (Array.isArray(rows) ? rows : []).map((w) =>
+    typeof w === "object" && w !== null ? (w as { id?: unknown; type?: unknown }) : {}
+  );
+  return WIDGET_CAPS.flatMap(({ type, max, label }) => {
+    const ids = widgets.flatMap((w) => (w.type === type && typeof w.id === "string" ? [w.id] : [])).slice(max);
+    return ids.length > 0 ? [{ label, max, ids }] : [];
+  });
+}
 
 export function summarizeUpgrade(
   before: unknown,
@@ -70,6 +91,7 @@ export function summarizeUpgrade(
     skippedCategories: v2Categories(before)
       .slice(MAX_GROUPS)
       .map((c) => c.trim()),
+    widgetsPastCap: pastCaps(after),
     backup,
     at: at.toISOString(),
   };
@@ -122,6 +144,12 @@ export async function recordUpgrade(raw: string, before: unknown, after: unknown
     log.warn(
       `${skipped.length} bookmark categories past the limit of ${MAX_GROUPS} groups didn't become groups; ` +
         `their bookmarks are listed under the category's id until moved into a group: ${skipped.join(", ")}`
+    );
+  }
+  for (const { label, max, ids } of summary.widgetsPastCap ?? []) {
+    log.warn(
+      `the config has ${max + ids.length} ${label}, past the limit of ${max}; they're kept and can be edited or ` +
+        `removed, but none can be added until the list is back within the limit. Past it: ${ids.join(", ")}`
     );
   }
   try {

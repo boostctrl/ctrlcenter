@@ -10,7 +10,7 @@ import {
   widgetForAdmin,
 } from "@/lib/config";
 import { WIDGET_IDS } from "@/lib/widgets/defs";
-import { widgetInstancesPatchSchema, widgetInstancesUpdateSchema } from "@/lib/schema";
+import { widgetInstancesPatchSchema, widgetInstancesUpdateSchemaFor } from "@/lib/schema";
 import { applyListPatch } from "@/lib/list-patch";
 import { requireRecentAuth } from "@/lib/reauth";
 import { widgetsChangeTarget } from "@/lib/reauth-targets";
@@ -35,7 +35,10 @@ export async function PUT(request: NextRequest) {
     removed = (patch.data.remove ?? []).filter((id) => stored.some((w) => w.id === id));
     list = applyListPatch(stored, patch.data);
   }
-  const parsed = widgetInstancesUpdateSchema.safeParse(list);
+  // A list already past a cap on a kind (a 2.x file upgraded with more feed
+  // cards than fit, #426) saves as long as it doesn't add another of that
+  // kind, so Settings → Widgets can edit it and trim it down.
+  const parsed = widgetInstancesUpdateSchemaFor(stored).safeParse(list);
   if (!parsed.success) {
     return NextResponse.json(
       { error: parsed.error.issues[0]?.message ?? "Invalid widgets" },

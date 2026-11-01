@@ -454,7 +454,10 @@ const instancesStep: Step = (raw) => {
   const components = isRecord(settings.components) ? settings.components : {};
 
   // Feed cards keep their ids (made URL-safe if needed). A config that never
-  // had the key had v2's default: one stock card.
+  // had the key had v2's default: one stock card. A hand-edited list past
+  // MAX_FEED_CARDS is kept whole — the stored read doesn't cut it — and the
+  // upgrade summary names the cards past the cap (lib/config/upgrade.ts); a
+  // save can then trim the list but not add to it (#426).
   const taken = new Set<string>(V2_WIDGETS.filter((w) => w.id !== "feed").map((w) => w.id));
   const rename = new Map<string, string>();
   const feeds = (Array.isArray(settings.feeds) ? settings.feeds : [{ id: FEED_DEFAULT_ID }])

@@ -15,6 +15,7 @@ import {
   groupsUpdateSchema,
   feedUrls,
   widgetInstancesUpdateSchema,
+  widgetInstancesUpdateSchemaFor,
   newInstance,
   MAX_FEED_CARDS,
   MAX_FEED_URLS, weatherSchema } from "./schema";
@@ -63,6 +64,21 @@ describe("widgetInstancesUpdateSchema (#297)", () => {
   it("requires whole instances", () => {
     expect(ok([{ id: "n", type: "notes", title: "x" }])).toBe(false);
     expect(ok([newInstance("notes", "n")])).toBe(true);
+  });
+
+  it("holds a list already past a cap only to what's stored (#426)", () => {
+    const over = Array.from({ length: MAX_FEED_CARDS + 2 }, (_, i) => feed({ id: `f${i}` }));
+    const against = (stored: typeof over, list: unknown) => widgetInstancesUpdateSchemaFor(stored).safeParse(list);
+    // Edited in place, or trimmed: fine. One more: refused, naming the cap.
+    expect(against(over, over).success).toBe(true);
+    expect(against(over, over.slice(1)).success).toBe(true);
+    const more = against(over, [...over, feed({ id: "one-more" })]);
+    expect(more.success || more.error.issues[0]?.message).toBe(`At most ${MAX_FEED_CARDS} RSS feed cards`);
+    // Another kind isn't held back by it; within the cap, the cap holds as
+    // ever, and so it does with no stored list (an import).
+    expect(against(over, [...over, newInstance("notes", "n")]).success).toBe(true);
+    expect(against(over.slice(0, MAX_FEED_CARDS), over.slice(0, MAX_FEED_CARDS + 1)).success).toBe(false);
+    expect(ok(over)).toBe(false);
   });
 });
 
