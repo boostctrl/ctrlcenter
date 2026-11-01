@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "fs/promises";
 import os from "os";
 import path from "path";
-import { writeFileAtomic, writeFileOnce } from "./files";
+import { tightenPrivateFiles, writeFileAtomic, writeFileOnce } from "./files";
 
 // The writers behind config.yaml, its .bak and the 2.x backup (#386).
 let dir: string;
@@ -85,4 +85,44 @@ describe("writeFileOnce", () => {
     expect(await fs.readFile(dest, "utf8")).toBe("v2");
     expect(await leftovers()).toEqual([]);
   });
+});
+
+describe("tightenPrivateFiles (#408)", () => {
+  it.skipIf(process.platform === "win32")(
+    "makes the config, its backups and the other private files 0600, and leaves the rest",
+    async () => {
+      const dir = await fs.mkdtemp(path.join(os.tmpdir(), "ctrl-tighten-"));
+      const configPath = path.join(dir, "config.yaml");
+      const files = {
+        "config.yaml": 0o644,
+        "config.yaml.bak": 0o644,
+        "config.v2.bak.yaml": 0o644,
+        "config.v2.bak.2026-10-11.2.yaml": 0o664,
+        "upgrade-notice.json": 0o644,
+        "sessions.json": 0o600,
+        "notes.txt": 0o644,
+      };
+      for (const [name, mode] of Object.entries(files)) {
+        await fs.writeFile(path.join(dir, name), "x", { mode });
+      }
+      await fs.mkdir(path.join(dir, "uploads"), { mode: 0o755 });
+      const tightened = await tightenPrivateFiles(configPath);
+      expect(tightened.sort()).toEqual([
+        "config.v2.bak.2026-10-11.2.yaml",
+        "config.v2.bak.yaml",
+        "config.yaml",
+        "config.yaml.bak",
+        "upgrade-notice.json",
+      ]);
+      const modeOf = (name: string) => mode(path.join(dir, name));
+      expect(await modeOf("config.yaml")).toBe(0o600);
+      expect(await modeOf("config.v2.bak.2026-10-11.2.yaml")).toBe(0o600);
+      expect(await modeOf("sessions.json")).toBe(0o600);
+      expect(await modeOf("notes.txt")).toBe(0o644);
+      expect(await modeOf("uploads")).toBe(0o755);
+      // A second run has nothing to do; a missing directory is not an error.
+      expect(await tightenPrivateFiles(configPath)).toEqual([]);
+      expect(await tightenPrivateFiles(path.join(dir, "gone", "config.yaml"))).toEqual([]);
+    }
+  );
 });

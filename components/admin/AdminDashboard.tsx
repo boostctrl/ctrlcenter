@@ -301,6 +301,8 @@ function AdminBody({
                     Apps, bookmarks, settings, layout, themes and uploaded icons, as one JSON
                     file. Passwords and keys are left out unless you include them; a file
                     without them restores onto this instance with its stored credentials kept.
+                    An API widget&apos;s address and request body go in as written either
+                    way, so keep a token there in a header or a {"${NAME}"} reference.
                   </p>
                   <label className="flex cursor-pointer items-start gap-3 text-sm">
                     <input

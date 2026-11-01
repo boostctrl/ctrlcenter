@@ -971,10 +971,16 @@ export default async function HelpPage() {
             clear it. Password changes only happen through the flow below.
           </P>
           <P>
-            <strong>Treat a backup file as a secret.</strong> It holds your
-            whole configuration in clear text, which includes any calendar
-            Basic-auth credentials and SMTP password you&apos;ve set — the
-            admin password is the one thing left out.
+            <strong>Treat a backup file as a secret.</strong> A default export
+            leaves your credentials out: integration passwords and keys,
+            calendar addresses and their credentials, email credentials and
+            webhook tokens are blanked, and restoring that file onto this
+            instance keeps the ones stored here. Tick <em>Include secrets</em>{" "}
+            for a complete copy, which asks for your password first. Either
+            way, an API widget&apos;s address and request body are included as
+            written, so keep a token there in a header or a{" "}
+            <Code>{"${NAME}"}</Code> reference. The admin password is never
+            included.
           </P>
           <P>
             Icons and wallpapers you uploaded are bundled into the export

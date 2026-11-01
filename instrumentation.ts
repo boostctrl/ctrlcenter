@@ -5,7 +5,22 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   const { startStatusPoller } = await import("./lib/status-poller");
   startStatusPoller();
+  await tightenConfigFiles();
   await logSecurityWarnings();
+}
+
+// Files beside the config made before #386 could be world-readable through
+// the bind mount, and some are never rewritten (#408): tighten them once.
+async function tightenConfigFiles() {
+  try {
+    const [{ CONFIG_FILE }, { tightenPrivateFiles }] = await Promise.all([
+      import("./lib/config/store"),
+      import("./lib/config/files"),
+    ]);
+    await tightenPrivateFiles(CONFIG_FILE);
+  } catch {
+    // Best effort; the files are still usable as they were.
+  }
 }
 
 // The security checklist's red rows (#367), in the server log where someone

@@ -103,7 +103,9 @@ export default function ApiSettings({ w, onChange }: InstanceEditorProps<"api">)
       <Hint>
         Keep secrets out of the config: a header value like{" "}
         <code>{"Bearer ${NAS_TOKEN}"}</code> reads the token from that
-        environment variable on the server.
+        environment variable on the server. A token in the URL itself or in
+        the request body is stored, and backed up, as written, so put it in a
+        header instead.
       </Hint>
       {api.method === "POST" && (
         <TextArea

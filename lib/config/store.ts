@@ -26,6 +26,7 @@ const CONFIG_PATH =
 // icons live in an `uploads/` subdir). Derived from CONFIG_PATH so everything
 // persists in the same mounted volume.
 export const CONFIG_DIR = path.dirname(CONFIG_PATH);
+export const CONFIG_FILE = CONFIG_PATH;
 
 // Safety copy of the outgoing config, written just before an import replaces it
 // (see replaceConfig). One file, overwritten each import, sitting beside the

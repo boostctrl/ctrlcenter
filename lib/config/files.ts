@@ -106,3 +106,48 @@ export async function writeFileOnce(dest: string, text: string): Promise<boolean
   await syncDir(path.dirname(dest));
   return true;
 }
+
+// The files beside the config that hold secrets or private state. #386
+// creates each of them 0600, but only a rewrite could fix one made before
+// it, and some are never rewritten: an rc-era config.v2.bak.yaml stayed
+// world-readable for good, password hash and TOTP secret included (#408).
+// So every start tightens whichever of them is wider than 0600. Best effort:
+// a file this process can't change, or a platform without POSIX modes, is
+// left as it is. Returns the names it tightened.
+const PRIVATE_NAMES = new Set([
+  "sessions.json",
+  "session-secret",
+  "security-events.jsonl",
+  "upgrade-notice.json",
+]);
+export async function tightenPrivateFiles(configPath: string): Promise<string[]> {
+  const dir = path.dirname(configPath);
+  const base = path.basename(configPath);
+  const isPrivate = (name: string) =>
+    name === base ||
+    name === `${base}.bak` ||
+    name.startsWith("config.v2.bak") ||
+    PRIVATE_NAMES.has(name);
+  let names: string[];
+  try {
+    names = await fs.readdir(dir);
+  } catch {
+    return [];
+  }
+  const tightened: string[] = [];
+  for (const name of names.filter(isPrivate)) {
+    const file = path.join(dir, name);
+    try {
+      const st = await fs.lstat(file);
+      if (!st.isFile() || (st.mode & 0o077) === 0) continue;
+      await fs.chmod(file, PRIVATE);
+      tightened.push(name);
+    } catch (e) {
+      log.warn("couldn't make a config file private", { file: name, reason: errorReason(e) });
+    }
+  }
+  if (tightened.length > 0) {
+    log.info("made config files private (0600)", { files: tightened.join(", ") });
+  }
+  return tightened;
+}

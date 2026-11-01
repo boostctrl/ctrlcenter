@@ -12,6 +12,14 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **Clearer words on what a backup holds.** The export dialog, the API widget
+  editor and the Help page now say that an API widget's address and request
+  body go into a backup as written, so a token belongs in a header or a
+  `${NAME}` reference. The Help page's Backup card also matches the export
+  dialog again: a default export leaves credentials out. (#408)
+
 ### Security
 
 - **Next.js, nodemailer and zod updated past their published advisories.**
@@ -51,6 +59,12 @@ here.
   saved that image loads on every page, so whoever hosts it sees each of your
   visits. The link now says what it would apply, names any wallpaper host
   that isn't this site's, and changes nothing until you accept. (#413)
+- **Config backups are made private on start.** 3.0.0 began writing
+  `config.yaml` and its backups readable only by the app's own user, but a
+  file made before that kept its old permissions until it was next rewritten,
+  and the 2.x rollback copy never is. Every start now tightens the config,
+  its backups, the session and security-log files and the upgrade notice to
+  owner-only. (#408)
 
 ## [3.0.0] - 2026-10-16
 
