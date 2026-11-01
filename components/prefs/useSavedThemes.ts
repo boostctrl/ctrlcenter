@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useState,
-  type Dispatch,
-  type SetStateAction,
-} from "react";
+import { useCallback, useState } from "react";
 import {
   saveThemes,
   saveDesign,
@@ -18,7 +13,6 @@ import {
   saveStatusColors,
   saveWallpaper,
   newThemeId,
-  NO_ACCENT_OVERRIDES,
   type HeadingChoice,
   type WallpaperChoice,
   type CustomTheme,
@@ -37,19 +31,8 @@ import type {
   Wallpaper,
 } from "@/lib/theme";
 import type { FontId } from "@/lib/fonts";
-import {
-  applyAll as paintAll,
-  applyDesign,
-  applyFont,
-  applyHeadingFont,
-  applyScene,
-  overrideFor,
-  resolveAccent,
-  resolveDark,
-  type Accent,
-  type Mode,
-  type Theme,
-} from "./themeApply";
+import { overrideFor, resolveAccent, type Accent, type Mode } from "./themeApply";
+import type { UpdateLook } from "./lookState";
 
 // A theme's content, id excluded — field by field, not JSON of the whole
 // object, so the key can't silently start depending on key insertion order
@@ -83,7 +66,7 @@ function themeKey(t: CustomTheme): string {
 
 // The visitor's saved (named) themes: the list itself and its CRUD — save the
 // current look, restore one, rename, delete, import. The live look these read
-// and write (colors, per-mode design/scene/font) stays in PrefsProvider and is
+// and write (colors, per-mode design/scene/font) stays in useLook and is
 // passed in, so restoring a theme goes through the same state as any edit.
 export function useSavedThemes({
   activeLook,
@@ -94,25 +77,14 @@ export function useSavedThemes({
   resolveScene,
   resolveFont,
   resolveTune,
-  defTune,
   resolveSceneFx,
-  defSceneFx,
   applyThemeColors,
-  displayTheme,
-  setDesigns,
-  setScenes,
-  setFonts,
-  setTunes,
-  setSceneFxs,
-  reduceMotion,
+  update,
+  paintChrome,
   resolveHeading,
   resolveDensity,
-  setHeadings,
-  setDensities,
   resolveStatus,
-  setStatuses,
   resolveWallpaper,
-  setWallpapers,
 }: {
   activeLook: ModeColors | null;
   seedColorSet: (dark: boolean) => ColorSet;
@@ -122,25 +94,16 @@ export function useSavedThemes({
   resolveScene: (dark: boolean) => SceneId;
   resolveFont: (dark: boolean) => FontId;
   resolveTune: (dark: boolean) => Tune | null;
-  defTune: (dark: boolean) => Tune | null;
   resolveSceneFx: (dark: boolean) => SceneFx | null;
-  defSceneFx: (dark: boolean) => SceneFx | null;
   applyThemeColors: (colors: ModeColors, mode?: Mode) => void;
-  displayTheme: Theme;
-  setDesigns: Dispatch<SetStateAction<ModePair<DesignId | null>>>;
-  setScenes: Dispatch<SetStateAction<ModePair<SceneId | null>>>;
-  setFonts: Dispatch<SetStateAction<ModePair<FontId | null>>>;
-  setTunes: Dispatch<SetStateAction<ModePair<Tune | null>>>;
-  setSceneFxs: Dispatch<SetStateAction<ModePair<SceneFx | null>>>;
-  reduceMotion: boolean;
+  // The look state's writer and the chrome paint (see useLook): both work
+  // from the latest state, so a restore's parts are what they paint.
+  update: UpdateLook;
+  paintChrome: () => void;
   resolveHeading: (dark: boolean) => FontId | null;
   resolveDensity: (dark: boolean) => Density;
-  setHeadings: Dispatch<SetStateAction<ModePair<HeadingChoice | null>>>;
-  setDensities: Dispatch<SetStateAction<ModePair<Density | null>>>;
   resolveStatus: (dark: boolean) => SemanticColors | null;
-  setStatuses: Dispatch<SetStateAction<ModePair<SemanticColors | null>>>;
   resolveWallpaper: (dark: boolean) => Wallpaper | null;
-  setWallpapers: Dispatch<SetStateAction<ModePair<WallpaperChoice | null>>>;
 }) {
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([]);
 
@@ -242,97 +205,52 @@ export function useSavedThemes({
     [customThemes, commitThemes, captureTheme]
   );
 
-  // Restore a saved theme: both modes' design/scene/font and colors, then apply
-  // the chrome for whichever mode is displayed now — from the theme's own parts,
-  // not applyChrome, which would resolve from this render's designs/scenes/fonts
-  // state (the values from before the setState calls above commit) and re-apply
-  // the old chrome until a mode toggle or reload (#120).
+  // Restore a saved theme: both modes' parts, then the colors (which paint
+  // the look) and the chrome for whichever mode is displayed now. Both paints
+  // read the latest state, which the update just made the theme's own — not
+  // this render's, which would re-apply the old chrome, tune and effects
+  // until a mode toggle or reload (#120, #329, #429).
   const applyTheme = useCallback(
     (t: CustomTheme) => {
-      const nextDesigns = { dark: t.design, light: t.designLight };
-      const nextScenes = { dark: t.scene, light: t.sceneLight };
-      const nextFonts = { dark: t.font, light: t.fontLight };
-      setDesigns(nextDesigns);
-      saveDesign(nextDesigns);
-      setScenes(nextScenes);
-      saveScene(nextScenes);
-      setFonts(nextFonts);
-      saveFont(nextFonts);
-      const nextTunes = { dark: t.tune ?? null, light: t.tuneLight ?? null };
-      setTunes(nextTunes);
-      saveTune(nextTunes);
-      const nextFx = { dark: t.sceneFx ?? null, light: t.sceneFxLight ?? null };
-      setSceneFxs(nextFx);
-      saveSceneFx(nextFx);
+      const designs = { dark: t.design, light: t.designLight };
+      const scenes = { dark: t.scene, light: t.sceneLight };
+      const fonts = { dark: t.font, light: t.fontLight };
+      const tunes = { dark: t.tune ?? null, light: t.tuneLight ?? null };
+      const sceneFxs = { dark: t.sceneFx ?? null, light: t.sceneFxLight ?? null };
       // A saved theme without a heading face means the body font — "body",
       // so an admin default heading face doesn't show through it.
-      const nextHeadings: ModePair<HeadingChoice | null> = {
+      const headings: ModePair<HeadingChoice | null> = {
         dark: t.headingFont ?? "body",
         light: t.headingFontLight ?? "body",
       };
-      setHeadings(nextHeadings);
-      saveHeadingFont(nextHeadings);
-      const nextDensities: ModePair<Density | null> = {
+      const densities: ModePair<Density | null> = {
         dark: t.density ?? "comfortable",
         light: t.densityLight ?? "comfortable",
       };
-      setDensities(nextDensities);
-      saveDensity(nextDensities);
-      const nextStatuses: ModePair<SemanticColors | null> = {
+      const statuses: ModePair<SemanticColors | null> = {
         dark: t.status ?? null,
         light: t.statusLight ?? null,
       };
-      setStatuses(nextStatuses);
-      saveStatusColors(nextStatuses);
       // No wallpaper in the theme means none — "none", so an admin default
       // wallpaper doesn't show through it.
-      const nextWallpapers: ModePair<WallpaperChoice | null> = {
+      const wallpapers: ModePair<WallpaperChoice | null> = {
         dark: t.wallpaper ?? "none",
         light: t.wallpaperLight ?? "none",
       };
-      setWallpapers(nextWallpapers);
-      saveWallpaper(nextWallpapers);
+      update({ designs, scenes, fonts, tunes, sceneFxs, headings, densities, statuses, wallpapers });
+      saveDesign(designs);
+      saveScene(scenes);
+      saveFont(fonts);
+      saveTune(tunes);
+      saveSceneFx(sceneFxs);
+      saveHeadingFont(headings);
+      saveDensity(densities);
+      saveStatusColors(statuses);
+      saveWallpaper(wallpapers);
       applyThemeColors({ dark: t.dark, light: t.light });
-      const dark = resolveDark(displayTheme);
-      // applyThemeColors painted with this render's tune and effects (the
-      // state above hasn't committed); paint once more with the theme's own,
-      // so a restored tune isn't wiped until the next repaint (#329).
-      paintAll({
-        theme: displayTheme,
-        look: { dark: t.dark, light: t.light },
-        accentOverride: NO_ACCENT_OVERRIDES,
-        defaultAccent,
-        tune: (dark ? t.tune : t.tuneLight) ?? defTune(dark),
-        sceneFx: (dark ? t.sceneFx : t.sceneFxLight) ?? defSceneFx(dark),
-        reduceMotion,
-        density: (dark ? t.density : t.densityLight) ?? "comfortable",
-        status: (dark ? t.status : t.statusLight) ?? null,
-        wallpaper: (dark ? t.wallpaper : t.wallpaperLight) ?? null,
-      });
-      applyDesign(dark ? t.design : t.designLight);
-      applyScene(dark ? t.scene : t.sceneLight);
-      applyFont(dark ? t.font : t.fontLight);
-      applyHeadingFont((dark ? t.headingFont : t.headingFontLight) ?? null);
+      paintChrome();
     },
-    // The setters are PrefsProvider's useState setters — stable, listed only
-    // because they arrive as arguments here.
-    [
-      applyThemeColors,
-      displayTheme,
-      defaultAccent,
-      defTune,
-      defSceneFx,
-      reduceMotion,
-      setDesigns,
-      setScenes,
-      setFonts,
-      setTunes,
-      setSceneFxs,
-      setHeadings,
-      setDensities,
-      setStatuses,
-      setWallpapers,
-    ]
+    [update, applyThemeColors, paintChrome]
   );
 
   const applyNamedTheme = useCallback(

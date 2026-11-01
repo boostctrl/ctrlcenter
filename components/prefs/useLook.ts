@@ -5,6 +5,11 @@
 // the DOM application of all of it. PrefsProvider exposes the result as its
 // own context (useLookPrefs), so a color change doesn't re-render consumers
 // that only read the location or favorites.
+//
+// Every paint here reads the latest state (./lookState), never the render's:
+// a setter writes its slice, then calls paintLook/paintChrome, so a handler
+// that calls several setters in one click paints each from what the earlier
+// ones just set (#429).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   loadActiveTheme,
@@ -74,15 +79,9 @@ import {
   type Theme,
 } from "./themeApply";
 import { useSavedThemes } from "./useSavedThemes";
+import { forMode, initialLookState, NO_CHOICE, useLookState } from "./lookState";
 
 export const THEME_KEY = "ctrlcenter:theme";
-
-// Theme parts to paint alongside the colors (see applyThemeColors): what a
-// caller set through the setters a moment earlier, which this render's state
-// doesn't carry yet (#363, #394).
-export type PaintParts = Partial<
-  Pick<Parameters<typeof paintAll>[0], "tune" | "sceneFx" | "density" | "status" | "wallpaper">
->;
 
 // The admin-configured site default theme. Visitor choices override each part.
 // The optional custom default colors are a cohesive light+dark pair (dark =
@@ -207,7 +206,7 @@ export type LookValue = {
   // admin default), or null (not chosen).
   setWallpaper: (wallpaper: WallpaperChoice | null, mode: Mode) => void;
   applyPack: (pack: ThemePack, mode: Mode) => void;
-  applyThemeColors: (colors: ModeColors, mode?: Mode, paint?: PaintParts) => void;
+  applyThemeColors: (colors: ModeColors, mode?: Mode) => void;
   setBaseColors: (
     background: string,
     foreground: string,
@@ -287,60 +286,41 @@ export function useLook(
     defaultTheme.accentFromLight,
     defaultTheme.accentToLight,
   ]);
-  const [theme, setThemeState] = useState<Theme>(defaultTheme.mode);
-  // Per-mode visitor overrides; a null per mode means "use the admin default".
-  const [designs, setDesigns] = useState<ModePair<DesignId | null>>({
-    dark: null,
-    light: null,
-  });
-  const [scenes, setScenes] = useState<ModePair<SceneId | null>>({
-    dark: null,
-    light: null,
-  });
-  const [fonts, setFonts] = useState<ModePair<FontId | null>>({
-    dark: null,
-    light: null,
-  });
-  const [tunes, setTunes] = useState<ModePair<Tune | null>>({
-    dark: null,
-    light: null,
-  });
-  const [sceneFxs, setSceneFxs] = useState<ModePair<SceneFx | null>>({
-    dark: null,
-    light: null,
-  });
-  const [reduceMotion, setReduceMotionState] = useState(false);
-  const [headings, setHeadings] = useState<ModePair<HeadingChoice | null>>({
-    dark: null,
-    light: null,
-  });
-  const [densities, setDensities] = useState<ModePair<Density | null>>({
-    dark: null,
-    light: null,
-  });
-  const [statuses, setStatuses] = useState<ModePair<SemanticColors | null>>({
-    dark: null,
-    light: null,
-  });
-  const [wallpapers, setWallpapers] = useState<ModePair<WallpaperChoice | null>>({
-    dark: null,
-    light: null,
-  });
+  // The look state, with the live mirror the paints read (`latest`) and the
+  // one way to write it (`update`). The per-mode parts are visitor overrides:
+  // a null per mode means "use the admin default". `previewMode` is a
+  // non-persisted appearance-mode preview for the theme builder: lets the
+  // visitor see a mode while editing it without changing their saved choice.
+  const { state, latest, update } = useLookState(initialLookState(defaultTheme.mode));
+  const {
+    theme,
+    previewMode,
+    designs,
+    scenes,
+    fonts,
+    tunes,
+    sceneFxs,
+    reduceMotion,
+    headings,
+    densities,
+    statuses,
+    wallpapers,
+    activeLook,
+    accentOverride,
+  } = state;
   const [hydrated, setHydrated] = useState(false);
-  const [activeLook, setActiveLook] = useState<ModeColors | null>(null);
-  const [accentOverride, setAccentOverrideState] =
-    useState<AccentOverrides>(NO_ACCENT_OVERRIDES);
   // Tracks the OS color scheme so "system" mode resolves its surface lightness.
   const [systemDark, setSystemDark] = useState(false);
-  // A non-persisted appearance-mode preview for the theme builder: lets the
-  // visitor see a mode while editing it without changing their saved choice.
-  const [previewMode, setPreviewModeState] = useState<Mode | null>(null);
 
   // The mode actually shown on screen: a live builder preview overrides the
   // saved app mode (without persisting). Everything that drives the *display* —
   // the DOM classes/vars and the resolved design/scene/font — keys off this,
   // while persistence and the Preferences toggle still use the saved `theme`.
   const displayTheme: Theme = previewMode ?? theme;
+  // The same, from the latest state — for a setter's "is this mode on
+  // screen?" check, which must see a setTheme made a moment earlier.
+  const liveTheme = useCallback((): Theme => latest().previewMode ?? latest().theme, [latest]);
+  const onScreen = useCallback((mode: Mode) => (mode === "dark") === resolveDark(liveTheme()), [liveTheme]);
 
   // The look to apply: a per-visitor custom look wins, otherwise the admin custom
   // default colors, otherwise null = the built-in light/dark CSS defaults. The
@@ -417,97 +397,105 @@ export function useLook(
     ]
   );
 
-  // The effective design/scene/font for a mode: the visitor's per-mode choice,
-  // else the admin default for that mode.
-  const resolveDesign = useCallback(
-    (dark: boolean): DesignId => (dark ? designs.dark : designs.light) ?? defDesign(dark),
-    [designs, defDesign]
-  );
-  const resolveScene = useCallback(
-    (dark: boolean): SceneId => (dark ? scenes.dark : scenes.light) ?? defScene(dark),
-    [scenes, defScene]
-  );
-  const resolveFont = useCallback(
-    (dark: boolean): FontId => (dark ? fonts.dark : fonts.light) ?? defFont(dark),
-    [fonts, defFont]
-  );
-  const resolveTune = useCallback(
-    (dark: boolean): Tune | null => (dark ? tunes.dark : tunes.light) ?? defTune(dark),
-    [tunes, defTune]
-  );
-  const resolveSceneFx = useCallback(
-    (dark: boolean): SceneFx | null => (dark ? sceneFxs.dark : sceneFxs.light) ?? defSceneFx(dark),
-    [sceneFxs, defSceneFx]
-  );
-  // The heading font: the visitor's choice ("body" = none, over the admin
-  // default), else the admin default.
-  const resolveHeading = useCallback(
-    (dark: boolean): FontId | null => {
-      const v = dark ? headings.dark : headings.light;
+  // The heading font from a per-mode pair: the visitor's choice ("body" =
+  // none, over the admin default), else the admin default. The wallpaper the
+  // same ("none" = cleared). Shared by the resolvers below (this render's
+  // state) and the paints (the latest).
+  const headingOf = useCallback(
+    (pair: ModePair<HeadingChoice | null>, dark: boolean): FontId | null => {
+      const v = forMode(pair, dark);
       if (v === "body") return null;
       return v ?? defHeading(dark);
     },
-    [headings, defHeading]
+    [defHeading]
   );
-  const resolveDensity = useCallback(
-    (dark: boolean): Density => (dark ? densities.dark : densities.light) ?? defDensity(dark),
-    [densities, defDensity]
-  );
-  const resolveStatus = useCallback(
-    (dark: boolean): SemanticColors | null => (dark ? statuses.dark : statuses.light) ?? defStatus(dark),
-    [statuses, defStatus]
-  );
-  // The wallpaper: the visitor's ("none" = cleared, over the admin default),
-  // else the admin default.
-  const resolveWallpaper = useCallback(
-    (dark: boolean): Wallpaper | null => {
-      const v = dark ? wallpapers.dark : wallpapers.light;
+  const wallpaperOf = useCallback(
+    (pair: ModePair<WallpaperChoice | null>, dark: boolean): Wallpaper | null => {
+      const v = forMode(pair, dark);
       if (v === "none") return null;
       return v ?? defWallpaper(dark);
     },
-    [wallpapers, defWallpaper]
+    [defWallpaper]
   );
 
-  // Paint the look state, with the fine-tune, scene effects and Reduce motion
-  // switch resolved for the mode it shows unless the caller passes one
-  // explicitly (an edit paints its new value before the state commits).
-  const applyAll = useCallback(
-    (opts: Parameters<typeof paintAll>[0]) => {
-      const dark = resolveDark(opts.theme);
-      paintAll({
-        tune: resolveTune(dark),
-        sceneFx: resolveSceneFx(dark),
-        reduceMotion,
-        density: resolveDensity(dark),
-        status: resolveStatus(dark),
-        wallpaper: resolveWallpaper(dark),
-        ...opts,
-      });
-    },
-    [resolveTune, resolveSceneFx, reduceMotion, resolveDensity, resolveStatus, resolveWallpaper]
+  // The effective design/scene/font for a mode: the visitor's per-mode choice,
+  // else the admin default for that mode.
+  const resolveDesign = useCallback(
+    (dark: boolean): DesignId => forMode(designs, dark) ?? defDesign(dark),
+    [designs, defDesign]
+  );
+  const resolveScene = useCallback(
+    (dark: boolean): SceneId => forMode(scenes, dark) ?? defScene(dark),
+    [scenes, defScene]
+  );
+  const resolveFont = useCallback(
+    (dark: boolean): FontId => forMode(fonts, dark) ?? defFont(dark),
+    [fonts, defFont]
+  );
+  const resolveTune = useCallback(
+    (dark: boolean): Tune | null => forMode(tunes, dark) ?? defTune(dark),
+    [tunes, defTune]
+  );
+  const resolveSceneFx = useCallback(
+    (dark: boolean): SceneFx | null => forMode(sceneFxs, dark) ?? defSceneFx(dark),
+    [sceneFxs, defSceneFx]
+  );
+  const resolveHeading = useCallback(
+    (dark: boolean): FontId | null => headingOf(headings, dark),
+    [headings, headingOf]
+  );
+  const resolveDensity = useCallback(
+    (dark: boolean): Density => forMode(densities, dark) ?? defDensity(dark),
+    [densities, defDensity]
+  );
+  const resolveStatus = useCallback(
+    (dark: boolean): SemanticColors | null => forMode(statuses, dark) ?? defStatus(dark),
+    [statuses, defStatus]
+  );
+  const resolveWallpaper = useCallback(
+    (dark: boolean): Wallpaper | null => wallpaperOf(wallpapers, dark),
+    [wallpapers, wallpaperOf]
   );
 
-  // Apply the design/scene/font/heading classes for whichever mode is
-  // displayed now.
-  const applyChrome = useCallback(
-    (dark: boolean) => {
-      applyDesign(resolveDesign(dark));
-      applyScene(resolveScene(dark));
-      applyFont(resolveFont(dark));
-      applyHeadingFont(resolveHeading(dark));
-    },
-    [resolveDesign, resolveScene, resolveFont, resolveHeading]
-  );
+  // The two paints, and the only two: the colors, tune, effects, density,
+  // status colors and wallpaper (paintLook), and the design/scene/font/
+  // heading classes (paintChrome), each resolved for the mode on screen from
+  // the LATEST state — what the setters have written so far in this handler
+  // — never from this render's, so no setter has to hand a paint the part it
+  // just set (#363, #373, #394, #429). A setter writes, then paints.
+  const paintLook = useCallback(() => {
+    const s = latest();
+    const theme = s.previewMode ?? s.theme;
+    const dark = resolveDark(theme);
+    paintAll({
+      theme,
+      look: resolveLook(s.activeLook),
+      accentOverride: s.accentOverride,
+      defaultAccent,
+      tune: forMode(s.tunes, dark) ?? defTune(dark),
+      sceneFx: forMode(s.sceneFxs, dark) ?? defSceneFx(dark),
+      reduceMotion: s.reduceMotion,
+      density: forMode(s.densities, dark) ?? defDensity(dark),
+      status: forMode(s.statuses, dark) ?? defStatus(dark),
+      wallpaper: wallpaperOf(s.wallpapers, dark),
+    });
+  }, [latest, resolveLook, defaultAccent, defTune, defSceneFx, defDensity, defStatus, wallpaperOf]);
+  const paintChrome = useCallback(() => {
+    const s = latest();
+    const dark = resolveDark(s.previewMode ?? s.theme);
+    applyDesign(forMode(s.designs, dark) ?? defDesign(dark));
+    applyScene(forMode(s.scenes, dark) ?? defScene(dark));
+    applyFont(forMode(s.fonts, dark) ?? defFont(dark));
+    applyHeadingFont(headingOf(s.headings, dark));
+  }, [latest, defDesign, defScene, defFont, headingOf]);
 
   // A seeded color set for a mode when there's no active custom look yet, so
-  // editing one mode never leaves the other mode's colors null.
-  const seedColorSet = useCallback(
-    (dark: boolean): ColorSet => {
-      const a = resolveAccent(
-        overrideFor(accentOverride, dark),
-        variantFor(adminLook, dark),
-        defaultAccent
-      );
+  // editing one mode never leaves the other mode's colors null. `seedFor`
+  // takes the accent overrides to seed from (a setter passes the latest);
+  // `seedColorSet` seeds from this render's, for the builder's readers.
+  const seedFor = useCallback(
+    (override: AccentOverrides, dark: boolean): ColorSet => {
+      const a = resolveAccent(overrideFor(override, dark), variantFor(adminLook, dark), defaultAccent);
       const ad = adminLook ? (dark ? adminLook.dark : adminLook.light) : null;
       return {
         background: ad?.background ?? (dark ? "#06070d" : "#eceef3"),
@@ -516,14 +504,26 @@ export function useLook(
         accentTo: a.to,
       };
     },
-    [accentOverride, adminLook, defaultAccent]
+    [adminLook, defaultAccent]
+  );
+  const seedColorSet = useCallback(
+    (dark: boolean): ColorSet => seedFor(accentOverride, dark),
+    [seedFor, accentOverride]
+  );
+  // Both modes seeded from the latest accents: the base a one-mode color
+  // edit builds on when no custom look exists yet.
+  const seedLook = useCallback(
+    (): ModeColors => {
+      const override = latest().accentOverride;
+      return { dark: seedFor(override, true), light: seedFor(override, false) };
+    },
+    [latest, seedFor]
   );
 
   const setTheme = useCallback(
     (next: Theme) => {
       // Committing a real mode ends any live preview.
-      setPreviewModeState(null);
-      setThemeState(next);
+      update({ previewMode: null, theme: next });
       try {
         window.localStorage.setItem(THEME_KEY, next);
       } catch {
@@ -532,15 +532,10 @@ export function useLook(
       // Picking a mode keeps the effective look (visitor custom, else admin
       // default); it just re-resolves to that look's matching light/dark variant
       // — and to that mode's own design/scene/font, which are independent.
-      applyAll({
-        theme: next,
-        look: resolveLook(activeLook),
-        accentOverride,
-        defaultAccent,
-      });
-      applyChrome(resolveDark(next));
+      paintLook();
+      paintChrome();
     },
-    [activeLook, accentOverride, defaultAccent, resolveLook, applyChrome, applyAll]
+    [update, paintLook, paintChrome]
   );
 
   // Preview a mode's appearance live (theme builder) without persisting it, or
@@ -549,39 +544,31 @@ export function useLook(
   // clears this) reverts to the saved choice.
   const setPreviewMode = useCallback(
     (mode: Mode | null) => {
-      setPreviewModeState(mode);
-      const dt: Theme = mode ?? theme;
-      applyAll({
-        theme: dt,
-        look: resolveLook(activeLook),
-        accentOverride,
-        defaultAccent,
-      });
-      applyChrome(resolveDark(dt));
+      update({ previewMode: mode });
+      paintLook();
+      paintChrome();
     },
-    [theme, activeLook, accentOverride, defaultAccent, resolveLook, applyChrome, applyAll]
+    [update, paintLook, paintChrome]
   );
 
   // Set one mode's design/scene/font. Persists the per-mode pair and applies the
   // class immediately only when that mode is the one currently displayed.
   const setDesign = useCallback(
     (next: DesignId, mode: Mode) => {
-      const updated = { ...designs, [mode]: next };
-      setDesigns(updated);
-      saveDesign(updated);
-      if ((mode === "dark") === resolveDark(displayTheme)) applyDesign(next);
+      const { designs } = update((s) => ({ designs: { ...s.designs, [mode]: next } }));
+      saveDesign(designs);
+      if (onScreen(mode)) paintChrome();
     },
-    [designs, displayTheme]
+    [update, onScreen, paintChrome]
   );
 
   const setScene = useCallback(
     (next: SceneId, mode: Mode) => {
-      const updated = { ...scenes, [mode]: next };
-      setScenes(updated);
-      saveScene(updated);
-      if ((mode === "dark") === resolveDark(displayTheme)) applyScene(next);
+      const { scenes } = update((s) => ({ scenes: { ...s.scenes, [mode]: next } }));
+      saveScene(scenes);
+      if (onScreen(mode)) paintChrome();
     },
-    [scenes, displayTheme]
+    [update, onScreen, paintChrome]
   );
 
   // Set one mode's font, or null to fall back to the site default (a theme
@@ -589,13 +576,11 @@ export function useLook(
   // screen.
   const setFont = useCallback(
     (next: FontId | null, mode: Mode) => {
-      const updated = { ...fonts, [mode]: next };
-      setFonts(updated);
-      saveFont(updated);
-      const dark = resolveDark(displayTheme);
-      if ((mode === "dark") === dark) applyFont(next ?? defFont(dark));
+      const { fonts } = update((s) => ({ fonts: { ...s.fonts, [mode]: next } }));
+      saveFont(fonts);
+      if (onScreen(mode)) paintChrome();
     },
-    [fonts, displayTheme, defFont]
+    [update, onScreen, paintChrome]
   );
 
   // Apply (and persist) custom colors. With a `mode`, only that mode's colorset
@@ -603,181 +588,91 @@ export function useLook(
   // how a preset fills just the mode being edited. Without a `mode`, both modes
   // are replaced (restoring a complete saved theme). The colorset carries its own
   // accent, so any standalone accent override is dropped in favor of it.
-  // `paint` carries parts to paint alongside the colors (the tune, effects,
-  // status colors and wallpaper a pack just set, the status colors a built
-  // palette brings): applyAll would otherwise fill them from this render's
-  // state, which the setters called a moment earlier haven't committed yet
-  // (#363, #394).
   const applyThemeColors = useCallback(
-    (colors: ModeColors, mode?: Mode, paint?: PaintParts) => {
-      let look: ModeColors;
-      if (mode) {
-        const base =
-          activeLook ?? { dark: seedColorSet(true), light: seedColorSet(false) };
-        look = { ...base, [mode]: colors[mode] };
-      } else {
-        look = colors;
-      }
-      setActiveLook(look);
+    (colors: ModeColors, mode?: Mode) => {
+      const look: ModeColors = mode
+        ? { ...(latest().activeLook ?? seedLook()), [mode]: colors[mode] }
+        : colors;
+      update({ activeLook: look, accentOverride: NO_ACCENT_OVERRIDES });
       saveActiveTheme(look);
-      setAccentOverrideState(NO_ACCENT_OVERRIDES);
       saveAccentOverride(null);
-      applyAll({
-        theme: displayTheme,
-        look,
-        accentOverride: NO_ACCENT_OVERRIDES,
-        defaultAccent,
-        ...paint,
-      });
+      paintLook();
     },
-    [displayTheme, defaultAccent, activeLook, seedColorSet, applyAll]
+    [latest, seedLook, update, paintLook]
   );
 
   // Set (or clear) one mode's fine-tune over its design. Persists the per-mode
-  // pair and repaints only when that mode is the one on screen, with the new
-  // value passed explicitly so the paint doesn't wait for the state to commit.
+  // pair and repaints only when that mode is the one on screen.
   const setTune = useCallback(
     (next: Tune | null, mode: Mode) => {
-      setTunes((prev) => {
-        const updated = { ...prev, [mode]: next };
-        saveTune(updated);
-        return updated;
-      });
-      const dark = resolveDark(displayTheme);
-      if ((mode === "dark") === dark) {
-        applyAll({
-          theme: displayTheme,
-          look: resolveLook(activeLook),
-          accentOverride,
-          defaultAccent,
-          tune: next ?? defTune(dark),
-        });
-      }
+      const { tunes } = update((s) => ({ tunes: { ...s.tunes, [mode]: next } }));
+      saveTune(tunes);
+      if (onScreen(mode)) paintLook();
     },
-    [displayTheme, resolveLook, activeLook, accentOverride, defaultAccent, defTune, applyAll]
+    [update, onScreen, paintLook]
   );
 
   // Set one mode's heading font (a face, "body", or null to fall back to the
   // admin default); the class swaps only when that mode is on screen.
   const setHeadingFont = useCallback(
     (next: HeadingChoice | null, mode: Mode) => {
-      setHeadings((prev) => {
-        const updated = { ...prev, [mode]: next };
-        saveHeadingFont(updated);
-        return updated;
-      });
-      const dark = resolveDark(displayTheme);
-      if ((mode === "dark") === dark) {
-        applyHeadingFont(next === "body" ? null : (next ?? defHeading(dark)));
-      }
+      const { headings } = update((s) => ({ headings: { ...s.headings, [mode]: next } }));
+      saveHeadingFont(headings);
+      if (onScreen(mode)) paintChrome();
     },
-    [displayTheme, defHeading]
+    [update, onScreen, paintChrome]
   );
 
   // Set (or clear) one mode's density, painting its factor when on screen.
   const setDensity = useCallback(
     (next: Density | null, mode: Mode) => {
-      setDensities((prev) => {
-        const updated = { ...prev, [mode]: next };
-        saveDensity(updated);
-        return updated;
-      });
-      const dark = resolveDark(displayTheme);
-      if ((mode === "dark") === dark) {
-        applyAll({
-          theme: displayTheme,
-          look: resolveLook(activeLook),
-          accentOverride,
-          defaultAccent,
-          density: next ?? defDensity(dark),
-        });
-      }
+      const { densities } = update((s) => ({ densities: { ...s.densities, [mode]: next } }));
+      saveDensity(densities);
+      if (onScreen(mode)) paintLook();
     },
-    [displayTheme, resolveLook, activeLook, accentOverride, defaultAccent, defDensity, applyAll]
+    [update, onScreen, paintLook]
   );
 
   // Set (or clear) one mode's semantic colors, like setTune.
   const setStatusColors = useCallback(
     (next: SemanticColors | null, mode: Mode) => {
-      setStatuses((prev) => {
-        const updated = { ...prev, [mode]: next };
-        saveStatusColors(updated);
-        return updated;
-      });
-      const dark = resolveDark(displayTheme);
-      if ((mode === "dark") === dark) {
-        applyAll({
-          theme: displayTheme,
-          look: resolveLook(activeLook),
-          accentOverride,
-          defaultAccent,
-          status: next ?? defStatus(dark),
-        });
-      }
+      const { statuses } = update((s) => ({ statuses: { ...s.statuses, [mode]: next } }));
+      saveStatusColors(statuses);
+      if (onScreen(mode)) paintLook();
     },
-    [displayTheme, resolveLook, activeLook, accentOverride, defaultAccent, defStatus, applyAll]
+    [update, onScreen, paintLook]
   );
 
   // Set (or clear) one mode's wallpaper, like setTune; "none" hides an
   // admin default wallpaper too.
   const setWallpaper = useCallback(
     (next: WallpaperChoice | null, mode: Mode) => {
-      setWallpapers((prev) => {
-        const updated = { ...prev, [mode]: next };
-        saveWallpaper(updated);
-        return updated;
-      });
-      const dark = resolveDark(displayTheme);
-      if ((mode === "dark") === dark) {
-        applyAll({
-          theme: displayTheme,
-          look: resolveLook(activeLook),
-          accentOverride,
-          defaultAccent,
-          wallpaper: next === "none" ? null : (next ?? defWallpaper(dark)),
-        });
-      }
+      const { wallpapers } = update((s) => ({ wallpapers: { ...s.wallpapers, [mode]: next } }));
+      saveWallpaper(wallpapers);
+      if (onScreen(mode)) paintLook();
     },
-    [displayTheme, resolveLook, activeLook, accentOverride, defaultAccent, defWallpaper, applyAll]
+    [update, onScreen, paintLook]
   );
 
   // Set (or clear) one mode's scene effects, like setTune.
   const setSceneFx = useCallback(
     (next: SceneFx | null, mode: Mode) => {
-      setSceneFxs((prev) => {
-        const updated = { ...prev, [mode]: next };
-        saveSceneFx(updated);
-        return updated;
-      });
-      const dark = resolveDark(displayTheme);
-      if ((mode === "dark") === dark) {
-        applyAll({
-          theme: displayTheme,
-          look: resolveLook(activeLook),
-          accentOverride,
-          defaultAccent,
-          sceneFx: next ?? defSceneFx(dark),
-        });
-      }
+      const { sceneFxs } = update((s) => ({ sceneFxs: { ...s.sceneFxs, [mode]: next } }));
+      saveSceneFx(sceneFxs);
+      if (onScreen(mode)) paintLook();
     },
-    [displayTheme, resolveLook, activeLook, accentOverride, defaultAccent, defSceneFx, applyAll]
+    [update, onScreen, paintLook]
   );
 
   // The Reduce motion switch: a preference, not a theme part, so it survives
   // "Reset theme" (the global reset clears it).
   const setReduceMotion = useCallback(
     (reduce: boolean) => {
-      setReduceMotionState(reduce);
+      update({ reduceMotion: reduce });
       saveReduceMotion(reduce);
-      applyAll({
-        theme: displayTheme,
-        look: resolveLook(activeLook),
-        accentOverride,
-        defaultAccent,
-        reduceMotion: reduce,
-      });
+      paintLook();
     },
-    [displayTheme, resolveLook, activeLook, accentOverride, defaultAccent, applyAll]
+    [update, paintLook]
   );
 
   // Apply a curated pack to one mode: its design + scene + that mode's colorset,
@@ -802,24 +697,9 @@ export function useLook(
       // Its wallpaper (#333), or none — a pack is a whole look, so an admin
       // default wallpaper doesn't show through one.
       setWallpaper(wallpaper ?? "none", mode);
-      // Each setter above painted its part, but the colors paint last and
-      // would read the tune, effects, status colors and wallpaper from this
-      // render's state — the values from before the click — and paint those
-      // back over them (#363). Hand it the pack's own parts when the mode
-      // it applies to is the one on screen.
-      const onScreen = dark === resolveDark(displayTheme);
-      applyThemeColors(
-        { dark: pack.dark, light: pack.light },
-        mode,
-        onScreen
-          ? {
-              tune: pack.tune ?? defTune(dark),
-              sceneFx: defSceneFx(dark),
-              status: status ?? defStatus(dark),
-              wallpaper,
-            }
-          : undefined
-      );
+      // The colors paint last, with every part above: each paint reads the
+      // latest state, so the setters' values are what it paints (#363).
+      applyThemeColors({ dark: pack.dark, light: pack.light }, mode);
       // Under "themes only" (#335) the choice is the pack's name: the parts
       // above are what this visit paints, but the next page load resolves
       // the name against the site's themes and reads nothing else.
@@ -827,7 +707,6 @@ export function useLook(
     },
     [
       policy,
-      displayTheme,
       setDesign,
       setScene,
       setTune,
@@ -837,9 +716,6 @@ export function useLook(
       setStatusColors,
       setWallpaper,
       applyThemeColors,
-      defTune,
-      defSceneFx,
-      defStatus,
     ]
   );
 
@@ -852,10 +728,11 @@ export function useLook(
       // Which mode's colorset to edit. Defaults to the displayed mode (the old
       // behavior); the theme builder passes an explicit target so it can design
       // the non-active mode without changing what the app shows.
-      const dark = targetDark ?? resolveDark(displayTheme);
+      const s = latest();
+      const dark = targetDark ?? resolveDark(liveTheme());
       const accent = resolveAccent(
-        overrideFor(accentOverride, dark),
-        variantFor(activeLook, dark),
+        overrideFor(s.accentOverride, dark),
+        variantFor(s.activeLook, dark),
         defaultAccent
       );
       const cs: ColorSet = {
@@ -867,33 +744,28 @@ export function useLook(
       // With no custom look yet, seed each mode with ITS OWN defaults (admin
       // default colors, else the CSS :root / .theme-light values) so editing one
       // mode never overwrites the other.
-      const base =
-        activeLook ?? { dark: seedColorSet(true), light: seedColorSet(false) };
+      const base = s.activeLook ?? seedLook();
       const next: ModeColors = dark ? { ...base, dark: cs } : { ...base, light: cs };
-      setActiveLook(next);
+      update({ activeLook: next });
       saveActiveTheme(next);
       // Display follows the on-screen mode (the saved `theme`, or a live builder
       // preview), so editing the previewed mode shows immediately.
-      applyAll({ theme: displayTheme, look: next, accentOverride, defaultAccent });
+      paintLook();
     },
-    [displayTheme, defaultAccent, accentOverride, activeLook, seedColorSet, applyAll]
+    [latest, liveTheme, defaultAccent, seedLook, update, paintLook]
   );
 
   // Set or clear one mode's accent on its own, leaving the background/foreground
   // (and the other mode's accent) as-is.
   const setAccentOverride = useCallback(
     (next: AccentColors | null, mode: Mode) => {
-      const updated: AccentOverrides = { ...accentOverride, [mode]: next };
-      setAccentOverrideState(updated);
-      saveAccentOverride(updated);
-      applyAll({
-        theme: displayTheme,
-        look: resolveLook(activeLook),
-        accentOverride: updated,
-        defaultAccent,
-      });
+      const { accentOverride } = update((s) => ({
+        accentOverride: { ...s.accentOverride, [mode]: next },
+      }));
+      saveAccentOverride(accentOverride);
+      paintLook();
     },
-    [accentOverride, displayTheme, defaultAccent, activeLook, resolveLook, applyAll]
+    [update, paintLook]
   );
 
   const {
@@ -915,184 +787,89 @@ export function useLook(
     resolveScene,
     resolveFont,
     resolveTune,
-    defTune,
     resolveSceneFx,
-    defSceneFx,
     applyThemeColors,
-    displayTheme,
-    setDesigns,
-    setScenes,
-    setFonts,
-    setTunes,
-    setSceneFxs,
-    reduceMotion,
+    update,
+    paintChrome,
     resolveHeading,
     resolveDensity,
-    setHeadings,
-    setDensities,
     resolveStatus,
-    setStatuses,
     resolveWallpaper,
-    setWallpapers,
   });
 
-
   const clearCustomTheme = useCallback(() => {
-    setActiveLook(null);
+    update({ activeLook: null, accentOverride: NO_ACCENT_OVERRIDES });
     saveActiveTheme(null);
-    setAccentOverrideState(NO_ACCENT_OVERRIDES);
     saveAccentOverride(null);
-    applyAll({
-      theme: displayTheme,
-      look: resolveLook(null),
+    paintLook();
+  }, [update, paintLook]);
+
+  // Every part back to the admin default — what both resets share. The
+  // mode and the Reduce motion switch are the global reset's own.
+  const clearParts = useCallback(() => {
+    update({
+      activeLook: null,
       accentOverride: NO_ACCENT_OVERRIDES,
-      defaultAccent,
+      designs: NO_CHOICE,
+      scenes: NO_CHOICE,
+      fonts: NO_CHOICE,
+      tunes: NO_CHOICE,
+      sceneFxs: NO_CHOICE,
+      headings: NO_CHOICE,
+      densities: NO_CHOICE,
+      statuses: NO_CHOICE,
+      wallpapers: NO_CHOICE,
     });
-  }, [defaultAccent, displayTheme, resolveLook, applyAll]);
+    saveActiveTheme(null);
+    saveAccentOverride(null);
+    saveDesign(null);
+    saveScene(null);
+    saveFont(null);
+    saveTune(null);
+    saveSceneFx(null);
+    saveHeadingFont(null);
+    saveDensity(null);
+    saveStatusColors(null);
+    saveWallpaper(null);
+    savePackChoice(null);
+  }, [update]);
 
   // Reset just the theme (colors, accent, design, scene, font — both modes) back
   // to the admin defaults, leaving mode/location/greeting alone — the theme
   // builder's own reset, distinct from the global `reset`.
   const resetTheme = useCallback(() => {
-    setActiveLook(null);
-    saveActiveTheme(null);
-    setAccentOverrideState(NO_ACCENT_OVERRIDES);
-    saveAccentOverride(null);
-    saveDesign(null);
-    saveScene(null);
-    saveFont(null);
-    saveTune(null);
-    saveSceneFx(null);
-    saveHeadingFont(null);
-    saveDensity(null);
-    saveStatusColors(null);
-    saveWallpaper(null);
-    savePackChoice(null);
-    setDesigns({ dark: null, light: null });
-    setScenes({ dark: null, light: null });
-    setFonts({ dark: null, light: null });
-    setTunes({ dark: null, light: null });
-    setSceneFxs({ dark: null, light: null });
-    setHeadings({ dark: null, light: null });
-    setDensities({ dark: null, light: null });
-    setStatuses({ dark: null, light: null });
-    setWallpapers({ dark: null, light: null });
-    const dark = resolveDark(displayTheme);
-    applyAll({
-      theme: displayTheme,
-      look: resolveLook(null),
-      accentOverride: NO_ACCENT_OVERRIDES,
-      defaultAccent,
-      tune: defTune(dark),
-      sceneFx: defSceneFx(dark),
-      density: defDensity(dark),
-      status: defStatus(dark),
-      wallpaper: defWallpaper(dark),
-    });
-    applyDesign(defDesign(dark));
-    applyScene(defScene(dark));
-    applyFont(defFont(dark));
-    applyHeadingFont(defHeading(dark));
-  }, [
-    defaultAccent,
-    displayTheme,
-    resolveLook,
-    defDesign,
-    defScene,
-    defFont,
-    defTune,
-    defSceneFx,
-    defDensity,
-    defHeading,
-    defStatus,
-    defWallpaper,
-    applyAll,
-  ]);
+    clearParts();
+    paintLook();
+    paintChrome();
+  }, [clearParts, paintLook, paintChrome]);
 
   const resetLook = useCallback(() => {
     // Drop all theme customizations so the visitor falls back to the admin
-    // default theme (mode, design, colors, accent).
+    // default theme (mode, design, colors, accent). A builder preview ends
+    // too, as it does when a mode is picked: the page shows the site's mode.
     try {
       window.localStorage.removeItem(THEME_KEY);
     } catch {
       // ignore
     }
-    saveActiveTheme(null);
-    saveAccentOverride(null);
-    saveDesign(null);
-    saveScene(null);
-    saveFont(null);
-    saveTune(null);
-    saveSceneFx(null);
+    clearParts();
+    update({ theme: defaultTheme.mode, previewMode: null, reduceMotion: false });
     saveReduceMotion(false);
-    saveHeadingFont(null);
-    saveDensity(null);
-    saveStatusColors(null);
-    saveWallpaper(null);
-    savePackChoice(null);
-    setActiveLook(null);
-    setAccentOverrideState(NO_ACCENT_OVERRIDES);
-    setThemeState(defaultTheme.mode);
-    setDesigns({ dark: null, light: null });
-    setScenes({ dark: null, light: null });
-    setFonts({ dark: null, light: null });
-    setTunes({ dark: null, light: null });
-    setSceneFxs({ dark: null, light: null });
-    setReduceMotionState(false);
-    setHeadings({ dark: null, light: null });
-    setDensities({ dark: null, light: null });
-    setStatuses({ dark: null, light: null });
-    setWallpapers({ dark: null, light: null });
-    const dark = resolveDark(defaultTheme.mode);
-    paintAll({
-      theme: defaultTheme.mode,
-      look: adminLook,
-      accentOverride: NO_ACCENT_OVERRIDES,
-      defaultAccent,
-      tune: defTune(dark),
-      sceneFx: defSceneFx(dark),
-      reduceMotion: false,
-      density: defDensity(dark),
-      status: defStatus(dark),
-      wallpaper: defWallpaper(dark),
-    });
-    applyDesign(defDesign(dark));
-    applyScene(defScene(dark));
-    applyFont(defFont(dark));
-    applyHeadingFont(defHeading(dark));
-  }, [
-    defaultTheme.mode,
-    defDesign,
-    defScene,
-    defFont,
-    defTune,
-    defSceneFx,
-    defDensity,
-    defHeading,
-    defStatus,
-    defWallpaper,
-    adminLook,
-    defaultAccent,
-  ]);
+    paintLook();
+    paintChrome();
+  }, [defaultTheme.mode, clearParts, update, paintLook, paintChrome]);
 
-  // What an OS light/dark flip repaints: "system" re-resolved from the state
-  // of this render — the look AND the design/scene/font are mode-aware. The
-  // mount effect's listener reaches it through a ref, since its own closure
-  // is the mount's (#394): painting from that brought the page-load design,
-  // site theme and stored parts back over a design changed in the builder
-  // since, a pinned board's theme (#337) or a schedule phase (#336), while
-  // the scene, which follows React state, stayed on the current one. A
-  // builder preview (#290) shows one mode whatever the OS says, so it holds.
+  // What an OS light/dark flip repaints: "system" re-resolved — the look AND
+  // the design/scene/font are mode-aware. The visitor's parts come from the
+  // latest state; the site default (a pinned board's theme (#337), a schedule
+  // phase (#336)) is a prop, so the mount effect's listener reaches the
+  // current render's paint through a ref rather than its own closure (#394).
+  // A builder preview (#290) shows one mode whatever the OS says, so it holds.
   const paintSystem = useCallback(() => {
-    if (displayTheme !== "system") return;
-    applyAll({
-      theme: "system",
-      look: resolveLook(activeLook),
-      accentOverride,
-      defaultAccent,
-    });
-    applyChrome(resolveDark("system"));
-  }, [displayTheme, resolveLook, activeLook, accentOverride, defaultAccent, applyAll, applyChrome]);
+    if (liveTheme() !== "system") return;
+    paintLook();
+    paintChrome();
+  }, [liveTheme, paintLook, paintChrome]);
   const paintSystemRef = useRef(paintSystem);
   useEffect(() => {
     paintSystemRef.current = paintSystem;
@@ -1150,68 +927,33 @@ export function useLook(
     const storedWallpapers: ModePair<WallpaperChoice | null> = gated
       ? fromPacks((p, dark) => (dark ? p.wallpaper : p.wallpaperLight ?? p.wallpaper) ?? "none")
       : loadWallpaper();
-    const wallpaperOf = (dark: boolean): Wallpaper | null => {
-      const v = dark ? storedWallpapers.dark : storedWallpapers.light;
-      if (v === "none") return null;
-      return v ?? defWallpaper(dark);
-    };
-    const headingOf = (dark: boolean): FontId | null => {
-      const v = dark ? storedHeadings.dark : storedHeadings.light;
-      if (v === "body") return null;
-      return v ?? defHeading(dark);
-    };
-    // Resolve a mode's design/scene/font/tune/effects from the loaded pairs +
-    // admin defaults (the state isn't committed yet, so resolve from the raw
-    // values).
-    const chromeFor = (dark: boolean) => ({
-      design: (dark ? storedDesigns.dark : storedDesigns.light) ?? defDesign(dark),
-      scene: (dark ? storedScenes.dark : storedScenes.light) ?? defScene(dark),
-      font: (dark ? storedFonts.dark : storedFonts.light) ?? defFont(dark),
-      tune: (dark ? storedTunes.dark : storedTunes.light) ?? defTune(dark),
-      sceneFx: (dark ? storedFx.dark : storedFx.light) ?? defSceneFx(dark),
-      heading: headingOf(dark),
-      density: (dark ? storedDensities.dark : storedDensities.light) ?? defDensity(dark),
-      status: (dark ? storedStatuses.dark : storedStatuses.light) ?? defStatus(dark),
-      wallpaper: wallpaperOf(dark),
+    update({
+      theme: stored,
+      designs: storedDesigns,
+      scenes: storedScenes,
+      fonts: storedFonts,
+      tunes: storedTunes,
+      sceneFxs: storedFx,
+      reduceMotion: storedReduce,
+      headings: storedHeadings,
+      densities: storedDensities,
+      statuses: storedStatuses,
+      wallpapers: storedWallpapers,
+      activeLook: active,
+      accentOverride: overrideAccent,
     });
     /* eslint-disable react-hooks/set-state-in-effect */
-    setThemeState(stored);
-    setDesigns(storedDesigns);
-    setScenes(storedScenes);
-    setFonts(storedFonts);
-    setTunes(storedTunes);
-    setSceneFxs(storedFx);
-    setReduceMotionState(storedReduce);
-    setHeadings(storedHeadings);
-    setDensities(storedDensities);
-    setStatuses(storedStatuses);
-    setWallpapers(storedWallpapers);
-    setActiveLook(active);
-    setAccentOverrideState(overrideAccent);
     setCustomThemes(gated ? [] : loadThemes());
     setSystemDark(
       window.matchMedia("(prefers-color-scheme: dark)").matches
     );
     setHydrated(true);
     /* eslint-enable react-hooks/set-state-in-effect */
-    // The inline script already applied these; re-apply for consistency.
-    const initial = chromeFor(resolveDark(stored));
-    paintAll({
-      theme: stored,
-      look: resolveLook(active),
-      accentOverride: overrideAccent,
-      defaultAccent,
-      tune: initial.tune,
-      sceneFx: initial.sceneFx,
-      reduceMotion: storedReduce,
-      density: initial.density,
-      status: initial.status,
-      wallpaper: initial.wallpaper,
-    });
-    applyDesign(initial.design);
-    applyScene(initial.scene);
-    applyFont(initial.font);
-    applyHeadingFont(initial.heading);
+    // The inline script already applied these; re-apply for consistency —
+    // from the latest state, which the update above just made the stored
+    // look (the React state hasn't committed yet).
+    paintLook();
+    paintChrome();
 
     // Re-apply on OS scheme change. Only "system" mode tracks the OS; the
     // repaint itself comes from the latest render (paintSystem above), not
@@ -1249,16 +991,9 @@ export function useLook(
       }
     }
     const ownMode = stored === "light" || stored === "dark" || stored === "system";
-    const theme = ownMode || previewMode ? displayTheme : defaultTheme.mode;
-    if (!ownMode && !previewMode) setThemeState(defaultTheme.mode);
-    const dark = resolveDark(theme);
-    applyAll({
-      theme,
-      look: resolveLook(activeLook),
-      accentOverride,
-      defaultAccent,
-    });
-    applyChrome(dark);
+    if (!ownMode && !previewMode) update({ theme: defaultTheme.mode });
+    paintLook();
+    paintChrome();
     // Only a new default should repaint; the callbacks are this render's.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultKey]);
