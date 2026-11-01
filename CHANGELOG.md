@@ -20,6 +20,15 @@ here.
   `${NAME}` reference. The Help page's Backup card also matches the export
   dialog again: a default export leaves credentials out. (#408)
 
+### Fixed
+
+- **Builds no longer depend on Google Fonts.** The twelve selectable fonts
+  were downloaded from Google every time the app was built, and an odd
+  response from Google could fail a build outright, the release build
+  included. The faces now come bundled with the source instead, so a build
+  needs no network for them. Nothing changes for visitors: their browsers
+  were already served the fonts from this site. (#412)
+
 ### Security
 
 - **Next.js, nodemailer and zod updated past their published advisories.**

@@ -1,12 +1,14 @@
-// Selectable UI fonts for the theme builder. Each is loaded via next/font in
-// app/layout.tsx — which must import every face up front, since next/font is
-// analyzed at build time and fonts can't be loaded dynamically by id — and
-// exposes a CSS variable. A `font-<id>` class on <html> points --font-sans at
-// that variable (see app/globals.css). "jakarta" is the app default and carries
-// no class (it's the :root token).
+// Selectable UI fonts for the theme builder. Each is loaded via next/font/local
+// in app/layout.tsx from its Fontsource package (#412) — the layout must
+// declare every face up front, since next/font is analyzed at build time and
+// fonts can't be loaded dynamically by id — and exposes a CSS variable. A
+// `font-<id>` class on <html> points --font-sans at that variable (see
+// app/globals.css). "jakarta" is the app default and carries no class (it's
+// the :root token).
 //
-// To add a font: load it in app/layout.tsx, add a `.font-<id>` rule in
-// app/globals.css, and add an entry here — the inline pre-paint script
+// To add a font: install its @fontsource-variable/<name> (or @fontsource/<name>)
+// package as a devDependency, declare it in app/layout.tsx, add a `.font-<id>`
+// rule in app/globals.css, and add an entry here — the inline pre-paint script
 // interpolates FONT_IDS, so it picks the new id up automatically.
 export type FontId =
   | "jakarta"

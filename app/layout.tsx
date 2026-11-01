@@ -1,19 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import {
-  Plus_Jakarta_Sans,
-  Inter,
-  Poppins,
-  Nunito,
-  Lora,
-  JetBrains_Mono,
-  Outfit,
-  Space_Grotesk,
-  Manrope,
-  Rubik,
-  Playfair_Display,
-  Quicksand,
-} from "next/font/google";
+import localFont from "next/font/local";
 import { getSettings } from "@/lib/config";
 import { readPublicConfig } from "@/lib/api-auth";
 import { DEFAULT_UI_SCALE } from "@/lib/layout";
@@ -40,42 +27,90 @@ import SceneLayer from "@/components/scenes/SceneLayer";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
 import "./globals.css";
 
-// Every selectable font (see lib/fonts.ts) must be imported here: next/font is
-// analyzed at build time, so fonts can't be chosen dynamically by id. Each
-// exposes a CSS variable; the active one is selected by a `font-<id>` class on
-// <html> (app/globals.css). Only the default face is preloaded: next/font
-// preloads every font by default, which had each page download ~400 KB of
-// faces it never renders (#276). The others are fetched only when a visitor's
-// chosen font class makes the browser use them.
-const jakarta = Plus_Jakarta_Sans({
-  subsets: ["latin"],
+// Every selectable font (see lib/fonts.ts) must be declared here: next/font is
+// analyzed at build time, so fonts can't be chosen dynamically by id. The
+// faces come from the Fontsource packages in node_modules (#412), not from
+// Google at build time: a build needs no network for them, and an odd
+// response from Google can't fail it. Each exposes a CSS variable; the active
+// one is selected by a `font-<id>` class on <html> (app/globals.css). Only the
+// default face is preloaded: preloading every font had each page download
+// ~400 KB of faces it never renders (#276). The others are fetched only when a
+// visitor's chosen font class makes the browser use them.
+const jakarta = localFont({
+  src: "../node_modules/@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-latin-wght-normal.woff2",
+  weight: "200 800",
   variable: "--font-jakarta",
-  weight: ["300", "400", "500", "600", "700", "800"],
 });
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", preload: false });
-const poppins = Poppins({
-  subsets: ["latin"],
-  variable: "--font-poppins",
-  weight: ["400", "500", "600", "700"],
+const inter = localFont({
+  src: "../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2",
+  weight: "100 900",
+  variable: "--font-inter",
   preload: false,
 });
-const nunito = Nunito({ subsets: ["latin"], variable: "--font-nunito", preload: false });
-const lora = Lora({ subsets: ["latin"], variable: "--font-lora", preload: false });
-const jetbrains = JetBrains_Mono({
-  subsets: ["latin"],
+const poppins = localFont({
+  src: [
+    { path: "../node_modules/@fontsource/poppins/files/poppins-latin-400-normal.woff2", weight: "400" },
+    { path: "../node_modules/@fontsource/poppins/files/poppins-latin-500-normal.woff2", weight: "500" },
+    { path: "../node_modules/@fontsource/poppins/files/poppins-latin-600-normal.woff2", weight: "600" },
+    { path: "../node_modules/@fontsource/poppins/files/poppins-latin-700-normal.woff2", weight: "700" },
+  ],
+  variable: "--font-poppins",
+  preload: false,
+});
+const nunito = localFont({
+  src: "../node_modules/@fontsource-variable/nunito/files/nunito-latin-wght-normal.woff2",
+  weight: "200 1000",
+  variable: "--font-nunito",
+  preload: false,
+});
+const lora = localFont({
+  src: "../node_modules/@fontsource-variable/lora/files/lora-latin-wght-normal.woff2",
+  weight: "400 700",
+  variable: "--font-lora",
+  preload: false,
+});
+const jetbrains = localFont({
+  src: "../node_modules/@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2",
+  weight: "100 800",
   variable: "--font-jetbrains",
   preload: false,
 });
-const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit", preload: false });
-const grotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-grotesk", preload: false });
-const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope", preload: false });
-const rubik = Rubik({ subsets: ["latin"], variable: "--font-rubik", preload: false });
-const playfair = Playfair_Display({
-  subsets: ["latin"],
+const outfit = localFont({
+  src: "../node_modules/@fontsource-variable/outfit/files/outfit-latin-wght-normal.woff2",
+  weight: "100 900",
+  variable: "--font-outfit",
+  preload: false,
+});
+const grotesk = localFont({
+  src: "../node_modules/@fontsource-variable/space-grotesk/files/space-grotesk-latin-wght-normal.woff2",
+  weight: "300 700",
+  variable: "--font-grotesk",
+  preload: false,
+});
+const manrope = localFont({
+  src: "../node_modules/@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2",
+  weight: "200 800",
+  variable: "--font-manrope",
+  preload: false,
+});
+const rubik = localFont({
+  src: "../node_modules/@fontsource-variable/rubik/files/rubik-latin-wght-normal.woff2",
+  weight: "300 900",
+  variable: "--font-rubik",
+  preload: false,
+});
+const playfair = localFont({
+  src: "../node_modules/@fontsource-variable/playfair-display/files/playfair-display-latin-wght-normal.woff2",
+  weight: "400 900",
   variable: "--font-playfair",
   preload: false,
 });
-const quicksand = Quicksand({ subsets: ["latin"], variable: "--font-quicksand", preload: false });
+const quicksand = localFont({
+  src: "../node_modules/@fontsource-variable/quicksand/files/quicksand-latin-wght-normal.woff2",
+  weight: "300 700",
+  variable: "--font-quicksand",
+  preload: false,
+});
 
 const fontVariables = [
   jakarta.variable,
