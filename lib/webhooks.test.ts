@@ -304,6 +304,27 @@ describe("parseArrWebhook (Sonarr/Radarr)", () => {
     expect(parseArrWebhook("radarr", { eventType: "Test", applicationUrl: "ftp://x" })?.report?.link).toBeUndefined();
   });
 
+  it("takes the saved application URL only when the payload names none (#352)", () => {
+    const grab = { eventType: "Grab", series, episodes: [episodes[0]], release: {} };
+    const saved = { url: "https://saved.lan" };
+    const own = parseArrWebhook("sonarr", { ...grab, applicationUrl: "https://sonarr.lan" }, saved);
+    expect(own?.report?.link).toEqual({ label: "Open in Sonarr", url: "https://sonarr.lan" });
+    expect(own?.url).toBe("https://sonarr.lan");
+    const blank = parseArrWebhook("sonarr", { ...grab, applicationUrl: "" }, saved);
+    expect(blank?.report?.link).toEqual({ label: "Open in Sonarr", url: "https://saved.lan" });
+    expect(blank?.url).toBe("https://saved.lan");
+    expect(blank?.digest?.items[0].link?.url).toBe("https://saved.lan");
+    expect(parseArrWebhook("radarr", { eventType: "Test" }, saved)?.report?.link).toEqual({
+      label: "Open in Radarr",
+      url: "https://saved.lan",
+    });
+    // Nothing saved, or nothing usable, leaves the report without a button
+    // as before: the saved address is checked like the payload's.
+    expect(parseArrWebhook("sonarr", grab)?.report?.link).toBeUndefined();
+    expect(parseArrWebhook("sonarr", grab, { url: "" })?.report?.link).toBeUndefined();
+    expect(parseArrWebhook("sonarr", grab, { url: "javascript:alert(1)" })?.report?.link).toBeUndefined();
+  });
+
   it("returns null when there's no eventType", () => {
     expect(parseArrWebhook("sonarr", {})).toBeNull();
     expect(parseArrWebhook("radarr", null)).toBeNull();
@@ -440,6 +461,29 @@ describe("parseSeerrWebhook", () => {
   it("labels a test notification", () => {
     const n = parseSeerrWebhook({ notification_type: "TEST_NOTIFICATION", subject: "Test Notification" });
     expect(n?.title).toBe("Seerr test: Webhook connected");
+  });
+
+  it("links the saved application URL as the button, Seerr's payload naming none (#352)", () => {
+    const saved = { url: "https://seerr.lan" };
+    const n = parseSeerrWebhook(pending, saved);
+    expect(n?.url).toBe("https://seerr.lan");
+    expect(n?.report?.link).toEqual({ label: "Open in Seerr", url: "https://seerr.lan" });
+    expect(n?.digest?.items[0].link).toEqual({ label: "Open in Seerr", url: "https://seerr.lan" });
+    // The TMDB row stays a fact; the button is the app's.
+    expect(fact(n?.report, "TMDB")?.href).toBe("https://www.themoviedb.org/movie/402431");
+    const test = parseSeerrWebhook({ notification_type: "TEST_NOTIFICATION" }, saved);
+    expect(test?.report?.link).toEqual({ label: "Open in Seerr", url: "https://seerr.lan" });
+    // A merged run of requests keeps the button.
+    const second = parseSeerrWebhook(
+      { ...pending, subject: "Dune (2026)", request: { request_id: "129", requestedBy_username: "Sam" } },
+      saved
+    );
+    const run = mergeDigest(groupOf([n!, second!]));
+    expect(run.url).toBe("https://seerr.lan");
+    expect(run.report?.link).toEqual({ label: "Open in Seerr", url: "https://seerr.lan" });
+    // A bare host or an unsafe scheme is no link, as for a payload URL.
+    expect(parseSeerrWebhook(pending, { url: "seerr.lan" })?.report?.link).toBeUndefined();
+    expect(parseSeerrWebhook(pending, { url: "javascript:alert(1)" })?.url).toBeUndefined();
   });
 
   it("returns null without a notification_type", () => {
@@ -602,6 +646,13 @@ describe("parseWebhook dispatch", () => {
   });
   it("routes sonarr/radarr to the arr parser", () => {
     expect(parseWebhook("radarr", { eventType: "Test" })?.title).toBe("Radarr test: Webhook connected");
+  });
+  it("hands the saved application URL to either parser (#352)", () => {
+    const saved = { url: "https://app.lan" };
+    expect(parseWebhook("seerr", { notification_type: "MEDIA_APPROVED", subject: "X" }, saved)?.url).toBe(
+      "https://app.lan"
+    );
+    expect(parseWebhook("radarr", { eventType: "Test" }, saved)?.url).toBe("https://app.lan");
   });
 });
 

@@ -173,6 +173,37 @@ describe("buildNotificationEmail", () => {
     expect(text).toContain("OVERVIEW\nElphaba & Glinda meet at Shiz.");
   });
 
+  it("gives a Seerr email the Open in Seerr button from the saved application URL (#352)", () => {
+    const payload = {
+      notification_type: "MEDIA_PENDING",
+      subject: "Wicked (2024)",
+      media: { media_type: "movie", tmdbId: "402431", status: "PENDING" },
+      request: { requestedBy_username: "mara" },
+    };
+    // Nothing saved: the TMDB row is the only link, as before.
+    const plain = buildNotificationEmail(parseSeerrWebhook(payload)!, ctx);
+    expect(plain.html).not.toContain("Open in Seerr");
+    expect(plain.text).not.toContain("Open in Seerr");
+    const { html, text } = buildNotificationEmail(parseSeerrWebhook(payload, { url: "https://seerr.lan:5055" })!, ctx);
+    expect(html).toContain('<a href="https://seerr.lan:5055" target="_blank" rel="noopener"');
+    expect(html).toContain(">Open in Seerr</a>");
+    expect(html).toContain(">seerr.lan:5055</p>");
+    expect(html).toContain('<a class="link" href="https://www.themoviedb.org/movie/402431"');
+    expect(text).toContain("Open in Seerr: https://seerr.lan:5055");
+  });
+
+  it("gives a Sonarr email the saved address only when the event carries none (#352)", () => {
+    const event = { eventType: "Test", instanceName: "Sonarr" };
+    const saved = { url: "https://saved.lan" };
+    const own = buildNotificationEmail(parseArrWebhook("sonarr", { ...event, applicationUrl: "https://sonarr.lan" }, saved)!, ctx);
+    expect(own.html).toContain('<a href="https://sonarr.lan" target="_blank"');
+    expect(own.html).not.toContain("saved.lan");
+    const blank = buildNotificationEmail(parseArrWebhook("sonarr", { ...event, applicationUrl: "" }, saved)!, ctx);
+    expect(blank.html).toContain('<a href="https://saved.lan" target="_blank"');
+    expect(blank.html).toContain(">Open in Sonarr</a>");
+    expect(blank.text).toContain("Open in Sonarr: https://saved.lan");
+  });
+
   it("keeps the sheet small under a Seerr payload of thousands of extra rows", () => {
     const n = parseSeerrWebhook({
       notification_type: "MEDIA_PENDING",

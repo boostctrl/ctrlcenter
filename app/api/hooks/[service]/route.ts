@@ -97,7 +97,9 @@ export async function POST(
     payload = null;
   }
 
-  const notification = parseWebhook(service, payload);
+  // The service's saved address (#352) stands in for the URL the payload
+  // lacks: Seerr's always, an Arr's until its applicationUrl is set.
+  const notification = parseWebhook(service, payload, { url: svc.url });
   // Unrecognized/empty event: accept it so the sender's test doesn't error, but
   // there's nothing to relay.
   if (!notification) {

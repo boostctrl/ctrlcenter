@@ -335,7 +335,8 @@ settings:
   # and webhooks (inbound service events: enabled, digestSeconds and
   # digestScope — event | app | all, what a burst holds together — the email
   # report's poster / facts / synopsis switches and subjectPrefix, and a
-  # sonarr / radarr / seerr block each with enabled and token).
+  # sonarr / radarr / seerr block each with enabled, token and url — the
+  # app's own address, where the report's "Open in …" button leads).
   layout:                   # shared by every board:
     scale: 100              # UI scale, percent
     gap: 32                 # space between cards (px)

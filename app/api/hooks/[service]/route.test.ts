@@ -111,6 +111,15 @@ describe("POST /api/hooks/[service]", () => {
     expect(pendingWebhookDigests()).toEqual([]);
   });
 
+  it("hands the parser the service's saved application URL (#352)", async () => {
+    await seed(CHANNELS, { seerr: { enabled: true, token: "seerr-token", url: "https://seerr.lan" } });
+    const res = await hook("seerr", "seerr-token", { notification_type: "TEST_NOTIFICATION" });
+    expect(await res.json()).toEqual({ ok: true, delivered: true });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body as string)).toMatchObject({ url: "https://seerr.lan" });
+    await seed(CHANNELS);
+  });
+
   it("holds an episode import for the burst digest instead of relaying it (#346)", async () => {
     const res = await hook("sonarr", "s3cret-token", {
       eventType: "Download",

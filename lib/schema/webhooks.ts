@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { patchOf } from "./input";
 import { secretFields } from "./meta";
+import { httpUrl } from "./shared";
 
 // Inbound webhooks (#204): Sonarr/Radarr/Seerr POST an event to us
 // ("download complete", "request needs approval", "health issue") and we relay
@@ -19,6 +20,15 @@ export const webhookServiceSchema = z.object({
   // A credential (#382): the admin's forms get a placeholder and reveal it
   // behind a confirmation.
   token: z.string().default("").register(secretFields, { redact: "blank", credential: true }),
+  // The app's own address (#352): where the email report's "Open in …"
+  // button and the push channels' link lead when the payload names none.
+  // Seerr's payload never does; Sonarr's and Radarr's carry their
+  // applicationUrl once that is set in their own settings, and that wins.
+  // Empty = no such link, so a config from before this field reads the
+  // same. Input must be http(s) or blank (the derived update schema keeps
+  // the union); a hand-edited stored value that is neither reads as blank
+  // rather than failing the whole config.
+  url: httpUrl.or(z.literal("")).catch("").default(""),
 });
 export type WebhookServiceConfig = z.infer<typeof webhookServiceSchema>;
 

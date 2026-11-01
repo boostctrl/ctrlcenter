@@ -399,6 +399,26 @@ describe("settingsInputSchema partial merge semantics", () => {
     expect(settingsInputSchema.safeParse({ webhooks: { poster: "no" } }).success).toBe(false);
   });
 
+  it("takes a service's application URL as http(s) or blank, and reads a bad stored one as blank (#352)", () => {
+    expect(settingsInputSchema.parse({ webhooks: { seerr: { url: "https://seerr.lan:5055" } } })).toEqual({
+      webhooks: { seerr: { url: "https://seerr.lan:5055" } },
+    });
+    expect(settingsInputSchema.safeParse({ webhooks: { sonarr: { url: "" } } }).success).toBe(true);
+    for (const url of ["seerr.lan", "javascript:alert(1)", "ftp://seerr.lan", 7]) {
+      expect(settingsInputSchema.safeParse({ webhooks: { seerr: { url } } }).success, String(url)).toBe(false);
+    }
+    // Stored: a config from before the field, and a hand-edited value that
+    // is no http(s) URL, both read as none; a good one is kept.
+    const s = settingsSchema.parse({
+      webhooks: { radarr: { url: "http://radarr.lan:7878" }, seerr: { url: "javascript:x" } },
+    });
+    expect([s.webhooks.sonarr.url, s.webhooks.radarr.url, s.webhooks.seerr.url]).toEqual([
+      "",
+      "http://radarr.lan:7878",
+      "",
+    ]);
+  });
+
   it("takes the page-level layout values partially, with no rows (#298)", () => {
     const parsed = settingsInputSchema.parse({ layout: { gap: 24 } });
     expect(parsed.layout).toEqual({ gap: 24 });

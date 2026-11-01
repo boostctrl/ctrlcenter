@@ -3,6 +3,7 @@
 import { WEBHOOK_SERVICES } from "@/lib/schema";
 import { activeChannels, channelLabel } from "@/lib/alert-channels";
 import { STATUS_RANGES } from "@/lib/status";
+import { withHttpScheme } from "@/lib/urls";
 import {
   AddButton,
   Card,
@@ -222,22 +223,46 @@ export default function MonitoringSection({
                     onChange={(enabled) => toggleWebhookService(svc, enabled)}
                   />
                   {w.enabled && (
-                    <WebhookUrlRow
-                      service={svc}
-                      label={WEBHOOK_LABELS[svc]}
-                      token={w.token}
-                      onRegenerate={async () => {
-                        // One misclick would otherwise break the service's
-                        // connection until the new URL is pasted (#399).
-                        const ok = await confirm({
-                          title: `Regenerate the ${WEBHOOK_LABELS[svc]} webhook token?`,
-                          message: `The URL already pasted into ${WEBHOOK_LABELS[svc]} stops working until you paste the new one.`,
-                          confirmLabel: "Regenerate",
-                          danger: true,
-                        });
-                        if (ok) updateWebhookService(svc, { token: genWebhookToken() });
-                      }}
-                    />
+                    <>
+                      <WebhookUrlRow
+                        service={svc}
+                        label={WEBHOOK_LABELS[svc]}
+                        token={w.token}
+                        onRegenerate={async () => {
+                          // One misclick would otherwise break the service's
+                          // connection until the new URL is pasted (#399).
+                          const ok = await confirm({
+                            title: `Regenerate the ${WEBHOOK_LABELS[svc]} webhook token?`,
+                            message: `The URL already pasted into ${WEBHOOK_LABELS[svc]} stops working until you paste the new one.`,
+                            confirmLabel: "Regenerate",
+                            danger: true,
+                          });
+                          if (ok) updateWebhookService(svc, { token: genWebhookToken() });
+                        }}
+                      />
+                      {/* The app's own address (#352): where the email's
+                          "Open in …" button and the push channels' link
+                          lead when an event names none. Seerr's never do;
+                          Sonarr's and Radarr's carry their own Application
+                          URL once it is set there, and that wins. A bare
+                          host gets http:// on blur (#277). */}
+                      <TextField
+                        label="Application URL"
+                        inputMode="url"
+                        autoCapitalize="off"
+                        autoComplete="off"
+                        spellCheck={false}
+                        placeholder="https://"
+                        hint={
+                          svc === "seerr"
+                            ? "Where the email's “Open in Seerr” button leads. Seerr sends no address with its events."
+                            : `Where the email's “Open in ${WEBHOOK_LABELS[svc]}” button leads when an event carries no address. ${WEBHOOK_LABELS[svc]} sends its own once Settings → General → Application URL is set there.`
+                        }
+                        value={w.url}
+                        onChange={(e) => updateWebhookService(svc, { url: e.target.value })}
+                        onBlur={(e) => updateWebhookService(svc, { url: withHttpScheme(e.target.value) })}
+                      />
+                    </>
                   )}
                 </div>
               );

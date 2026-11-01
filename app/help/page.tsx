@@ -679,7 +679,11 @@ export default async function HelpPage() {
             method to <strong>POST</strong>, and pick which events to send. Each
             service has its own token in the URL — <strong>Regenerate</strong>{" "}
             rotates it if one leaks — and events need an alert channel that
-            sends inbound webhooks to land anywhere.
+            sends inbound webhooks to land anywhere. A service&apos;s{" "}
+            <strong>Application URL</strong>, beside its webhook URL, is where
+            the email&apos;s <em>Open in Seerr</em> button leads: Seerr sends
+            no address with its events, and Sonarr and Radarr send their own,
+            so for them it only fills in when that is blank.
           </P>
           <P>
             A season import arrives as one event per episode. CtrlCenter waits

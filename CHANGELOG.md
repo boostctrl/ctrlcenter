@@ -12,6 +12,18 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Webhook emails can link back into Seerr.** Each service under
+  Settings → Monitoring → Inbound webhooks now has an **Application URL**
+  beside its webhook URL. A Seerr event's email gets an *Open in Seerr*
+  button leading there (Seerr sends no address with its events, so those
+  emails had only the TMDB link), and a Sonarr or Radarr event falls back
+  to it when the event carries no address, as it doesn't until the app's
+  own Application URL is set. The push and chat channels get the same
+  link. Empty by default, so existing configs and backups are unaffected.
+  (#352)
+
 ### Fixed
 
 - **A screen reader hears which set a theme-builder tile belongs to, and

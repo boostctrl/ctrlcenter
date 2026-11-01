@@ -110,7 +110,7 @@ describe("the admin's view of credentials (#382)", () => {
     expect(hook.url).toBe(SECRET_PLACEHOLDER);
     // An environment reference names no secret; an empty field stays empty.
     expect([env.token, env.userKey]).toEqual(["${PUSHOVER_TOKEN}", ""]);
-    expect(view.webhooks.sonarr).toEqual({ enabled: true, token: SECRET_PLACEHOLDER });
+    expect(view.webhooks.sonarr).toEqual({ enabled: true, token: SECRET_PLACEHOLDER, url: "" });
     expect(view.title).toBe(settings.title);
   });
 

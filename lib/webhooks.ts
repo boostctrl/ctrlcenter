@@ -155,6 +155,14 @@ export function reportOptions(w: ReportOptions): ReportOptions {
   return { poster: w.poster, facts: w.facts, synopsis: w.synopsis, subjectPrefix: w.subjectPrefix };
 }
 
+// What the relay knows beyond the payload (#352): the service's own address
+// as saved in Settings → Monitoring → Inbound webhooks, the target of the
+// report's "Open in …" button and the push channels' link when the payload
+// names none — Seerr's never does, and an Arr's applicationUrl is blank
+// until set in its own settings. Checked like a payload URL (httpUrl
+// below): http(s) and bounded, or no link.
+export type ParseOptions = { url?: string };
+
 // --- Bounds ---
 
 // Every string the parsers read is the sender's, from a body of up to 256 KB
@@ -632,14 +640,19 @@ function arrDigest(
   });
 }
 
-export function parseArrWebhook(service: ArrService, payload: unknown): WebhookNotification | null {
+export function parseArrWebhook(
+  service: ArrService,
+  payload: unknown,
+  opts: ParseOptions = {}
+): WebhookNotification | null {
   const p = asRecord(payload);
   const eventType = str(p.eventType);
   if (!eventType) return null;
   const fixed = service === "sonarr" ? "Sonarr" : "Radarr";
   const app = appOf(p, fixed);
   const media = arrMedia(service, p);
-  const url = httpUrl(p.applicationUrl);
+  // The sender's own address, else the one saved for it (#352).
+  const url = httpUrl(p.applicationUrl) ?? httpUrl(opts.url);
   const [event, level] = ARR_EVENTS[eventType] ?? [humanize(eventType), "info" as const];
   const base = {
     service,
@@ -961,11 +974,15 @@ const EXTRA_ROWS = 12;
 const EXTRA_LABEL = 40;
 const EXTRA_VALUE = 300;
 
-export function parseSeerrWebhook(payload: unknown): WebhookNotification | null {
+export function parseSeerrWebhook(payload: unknown, opts: ParseOptions = {}): WebhookNotification | null {
   const p = asRecord(payload);
   const nt = str(p.notification_type);
   if (!nt) return null;
-  const base = { service: "seerr" as const, app: "Seerr", eventType: nt };
+  // Seerr's payload names no address of its own: the saved one is the
+  // button (#352), on every event, the Test included.
+  const appUrl = httpUrl(opts.url);
+  const link = appUrl ? { label: "Open in Seerr", url: appUrl } : undefined;
+  const base = { service: "seerr" as const, app: "Seerr", eventType: nt, link };
   if (nt === "TEST_NOTIFICATION") {
     return toContent({
       ...base,
@@ -1042,6 +1059,7 @@ export function parseSeerrWebhook(payload: unknown): WebhookNotification | null 
               label: subject + by,
               requester: requester || undefined,
               image,
+              link,
             },
           ],
         })
@@ -1256,6 +1274,10 @@ export function mergeDigests(groups: DigestGroup[]): WebhookNotification {
 }
 
 // Dispatch to the right parser for the addressed service.
-export function parseWebhook(service: WebhookService, payload: unknown): WebhookNotification | null {
-  return service === "seerr" ? parseSeerrWebhook(payload) : parseArrWebhook(service, payload);
+export function parseWebhook(
+  service: WebhookService,
+  payload: unknown,
+  opts: ParseOptions = {}
+): WebhookNotification | null {
+  return service === "seerr" ? parseSeerrWebhook(payload, opts) : parseArrWebhook(service, payload, opts);
 }
