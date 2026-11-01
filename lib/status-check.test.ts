@@ -448,7 +448,11 @@ describe("checkApp · TLS certificate (#294)", () => {
         setTimeout: () => socket,
         destroy: () => {},
         getPeerCertificate: () => ({
-          valid_to: new Date(Date.now() + (days ?? 0) * DAY).toUTCString(),
+          // A second short of the mark: toUTCString drops the milliseconds, so
+          // an expiry set exactly N days out read as N-1 days left unless the
+          // clock sat on a whole second, when it read N (a CI flake). A fixed
+          // second early makes the floor N-1 every time.
+          valid_to: new Date(Date.now() + (days ?? 0) * DAY - 1000).toUTCString(),
         }),
       });
       queueMicrotask(() =>
