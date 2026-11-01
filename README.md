@@ -446,6 +446,35 @@ bookmarks:
     icon: amazon
 ```
 
+### Accounts
+
+Settings → Users adds accounts beside the founding `admin`. An **admin**
+runs the portal; a **member** signs in to see the public boards, apps and
+bookmarks plus the private ones shared with them (each private item's
+*audience*, above). Every account has its own password, optional two-factor
+and sessions, kept at `/account`. The accounts live under `auth.users` in
+`config.yaml`, written by the app:
+
+```yaml
+auth:
+  users:
+    - id: admin            # the sign-in name; the founding admin is always `admin`
+      role: admin
+    - id: sam
+      name: Sam            # shown in the Users tab and the audit log
+      role: member         # admin | member
+      groups: [family]     # a board or item can be shared with a whole group
+      enabled: true
+      passwordHash: …      # set from Settings → Users or /account, never by hand
+      passwordSalt: …
+```
+
+`ADMIN_PASSWORD` stands in for the `admin` account only, and only while it
+has no password of its own. A backup carries the accounts: with secrets,
+whole; without, the roster alone, each to be given a password after a
+restore. A restore never changes or removes an account the instance already
+has.
+
 ### Icons
 
 Set `icon` to a slug from the

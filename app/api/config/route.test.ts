@@ -42,7 +42,9 @@ describe("/api/config", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.settings.title).toBe("Before");
-    expect(body.auth).toBeUndefined();
+    // The accounts travel as a roster only (#423): no hash, no second factor.
+    expect(body.auth).toEqual({ users: [expect.objectContaining({ id: "admin", role: "admin", passwordHash: "", mustChangePassword: true })] });
+    expect(body.auth.users[0].totp).toMatchObject({ enabled: false, secret: "", recoveryCodes: [] });
   });
 
   it("leaves secrets out of the export unless asked (#366)", async () => {
@@ -238,5 +240,30 @@ describe("/api/config", () => {
       expect((await res.json()).error).toMatch(/incident notes/);
       expect(await fs.readFile(configPath, "utf8")).toContain("Before");
     });
+  });
+});
+
+describe("accounts in a backup (#423)", () => {
+  it("exports them whole with secrets, as a roster without, and a restore adds the ones the instance lacks", async () => {
+    const { addAccount, readConfigInternal } = await import("@/lib/config");
+    const { userSchema } = await import("@/lib/schema");
+    await addAccount(userSchema.parse({ id: "sam", name: "Sam", role: "member", groups: ["family"], passwordHash: "hash-sam", passwordSalt: "s", totp: { enabled: true, secret: "SAMSECRET" } }));
+    const { GET } = await import("./route");
+    const plain = await (await GET(request("/api/config", { session }))).json();
+    const sam = plain.auth.users.find((u: { id: string }) => u.id === "sam");
+    expect(sam).toMatchObject({ name: "Sam", role: "member", groups: ["family"], passwordHash: "", mustChangePassword: true });
+    expect(sam.totp.enabled).toBe(false);
+    const full = await (await GET(request("/api/config?secrets=1", { session }))).json();
+    expect(full.auth.users.find((u: { id: string }) => u.id === "sam")).toMatchObject({ passwordHash: "hash-sam", totp: { enabled: true, secret: "SAMSECRET" } });
+    // Restoring a file that renames sam, drops them and brings kim: sam stays as is, kim arrives, the admin is untouched.
+    const file = { ...plain, auth: { passwordHash: "THEIRS", users: [{ id: "sam", name: "Not Sam", role: "admin" }, { id: "kim", role: "member", groups: ["ops"] }, { id: "admin", role: "member", passwordHash: "THEIRS" }] } };
+    const res = await importConfig(file);
+    expect(res.status).toBe(200);
+    const { auth } = await readConfigInternal();
+    expect(auth.users.map((u) => u.id)).toEqual(["admin", "sam", "kim"]);
+    expect(auth.users.find((u) => u.id === "sam")).toMatchObject({ name: "Sam", role: "member", passwordHash: "hash-sam" });
+    expect(auth.users.find((u) => u.id === "kim")).toMatchObject({ role: "member", groups: ["ops"], passwordHash: "" });
+    expect(auth.users.find((u) => u.id === "admin")?.role).toBe("admin");
+    expect(auth.passwordHash).not.toBe("THEIRS");
   });
 });

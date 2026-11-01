@@ -11,7 +11,7 @@ import { updateYamlText } from "../config-yaml";
 import { log, errorReason } from "../log";
 import { recordUpgrade } from "./upgrade";
 import { writeFileAtomic } from "./files";
-import { restoreImportSecrets } from "./redact";
+import { restoreImportSecrets, mergeImportedAccounts } from "./redact";
 import { globalSingleton } from "../singleton";
 import { CONFIG_SCHEMA_VERSION, configSchema, configReadSchema, type Config } from "../schema";
 
@@ -297,8 +297,9 @@ export async function replaceConfig(input: unknown): Promise<Config> {
     // able to change or wipe the password: an older or hand-made config carries
     // no auth, which would otherwise silently drop this instance to passwordless
     // (falling back to ADMIN_PASSWORD), and a backup from another instance would
-    // overwrite this one's password. Export omits auth for the same reason, so a
-    // freshly exported file has none to apply anyway.
+    // overwrite this one's password. Export carries the accounts as a roster
+    // (and whole only when secrets are asked for, #423): nothing in it can
+    // touch an account this instance already has.
     const { config: current, raw } = await loadMigrated();
     // Snapshot the outgoing config to config.yaml.bak before overwriting it, so
     // a mistaken or bad import is recoverable. Save the untouched on-disk BYTES
@@ -308,7 +309,9 @@ export async function replaceConfig(input: unknown): Promise<Config> {
     // the only thing standing between a bad import and lost state, so a crash
     // mid-write must not leave it torn.
     await snapshotBak(raw);
-    validated.auth = current.auth;
+    // The instance's own accounts stay (the admin's credential among them);
+    // the file may add accounts it lacks (#423).
+    validated.auth = { ...current.auth, users: mergeImportedAccounts(current.auth, validated.auth.users) };
     // A backup exported without secrets (#366) carries blanks where the
     // credentials were; fill them from what this instance holds, by id, so
     // restoring it doesn't wipe them. A file with its own secrets keeps them.

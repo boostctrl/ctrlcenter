@@ -1,5 +1,7 @@
 // What may leave the server (#290 split): the config minus the admin
 // credential, and minus every field the schemas mark secret.
+import { accountsOf } from "../accounts";
+import { FOUNDING_ACCOUNT_ID, userSchema, type User } from "../schema/auth";
 import {
   appItemSchema,
   settingsSchema,
@@ -86,6 +88,28 @@ export function stripExportSecrets<T extends Omit<Config, "auth">>(config: T): T
       ...Object.fromEntries(INTEGRATION_SECRETS.map((k) => [k, isEnvRef(i[k]) ? i[k] : ""])),
     })),
   };
+}
+
+// The accounts as a backup carries them (#423): with secrets, as stored
+// (password hash and second factor included); without, the roster only —
+// name, role, groups, enabled — each to be given a password by an admin
+// after a restore, so the file holds nothing that opens a way in.
+export function accountsForExport(auth: Config["auth"], withSecrets: boolean): User[] {
+  return accountsOf(auth).map((u) =>
+    withSecrets
+      ? u
+      : userSchema.parse({ id: u.id, name: u.name, role: u.role, enabled: u.enabled, groups: u.groups, createdAt: u.createdAt, mustChangePassword: true })
+  );
+}
+
+// The accounts after a restore (#423): the instance's own stay exactly as
+// they are, the founding admin first among them, and the file adds the ones
+// the instance lacks. A backup can never change or remove an account that
+// exists, or replace the admin's credential.
+export function mergeImportedAccounts(stored: Config["auth"], incoming: User[]): User[] {
+  const mine = accountsOf(stored);
+  const have = new Set(mine.map((u) => u.id));
+  return [...mine, ...incoming.filter((u) => !have.has(u.id) && u.id !== FOUNDING_ACCOUNT_ID)];
 }
 
 // A backup being restored with every blank secret filled from what the

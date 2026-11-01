@@ -346,8 +346,11 @@ Ordered by user demand and by how well each one builds on 3.0:
 9. **i18n**, if there's demand. The widget registry keeps strings in one place
    to make it feasible.
 
-**Out of scope:** full multi-user accounts with their own database
-(Homarr-style), and moving the config into a database.
+**Out of scope:** moving the config into a database. (This line used to
+rule out multi-user accounts as well. Named accounts arrived in 3.1, #423,
+as admins and members stored under `auth.users` in `config.yaml`, still with
+no user database; forward-auth and OIDC map onto the same accounts and
+audiences next.)
 
 ## Decisions (resolved 2026-10-09)
 

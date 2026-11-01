@@ -36,6 +36,13 @@ is the public entry point. A couple of settings matter for a safe deployment:
 
 - Set a strong `ADMIN_PASSWORD` (or configure a password in the admin portal;
   one set there must be at least 12 characters).
+- Give other people their own accounts (Settings → Users) rather than the
+  admin password. A *member* sees only what is shared with them, reaches no
+  admin page or API, and can change only its own password, second factor
+  and sessions; the audit log and the Security alerts name the account
+  behind every sign-in and change. Wrong passwords are counted per account
+  as well as per address. The founding `admin` can't be disabled, demoted
+  or removed, so an admin always remains.
 - Terminate TLS at the proxy. Over HTTPS the session cookie carries the
   `__Host-` prefix, and `HSTS=1` has the app add `Strict-Transport-Security`
   if the proxy doesn't.

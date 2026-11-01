@@ -14,6 +14,13 @@ here.
 
 ### Added
 
+- **Backups carry the accounts.** An export with secrets holds every
+  account as it is, password and second factor included; one without holds
+  the roster alone (name, role, groups), each account to be given a password
+  by an admin after a restore. A restore adds the accounts the instance
+  lacks and never changes or removes one it already has, the admin's
+  credential included. (#423)
+
 - **Accounts: more than one person can sign in.** Settings → Users adds
   accounts, each with its own password, role and groups: an *admin* runs
   the portal as before, a *member* signs in to see the boards, apps and

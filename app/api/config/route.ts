@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/lib/api-auth";
-import { readConfigInternal, replaceConfig, stripAuth, stripExportSecrets } from "@/lib/config";
+import { accountsForExport, readConfigInternal, replaceConfig, stripAuth, stripExportSecrets } from "@/lib/config";
 import { requireRecentAuth } from "@/lib/reauth";
 import { migrateConfig, NewerConfigError } from "@/lib/config-migrate";
 import { bundledOutageNotesSchema, configSchema, importListError } from "@/lib/schema";
@@ -49,6 +49,8 @@ export async function GET(request: NextRequest) {
   const outageNotes = exportOutageNotes();
   const body = {
     ...(withSecrets ? stripAuth(config) : stripExportSecrets(stripAuth(config))),
+    // The accounts (#423): whole with secrets, the roster without.
+    auth: { users: accountsForExport(config.auth, withSecrets) },
     ...(uploads.length > 0 ? { uploads } : {}),
     ...(outageNotes.length > 0 ? { outageNotes } : {}),
   };
