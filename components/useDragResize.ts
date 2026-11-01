@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useUndoGesture } from "./useUndoHistory";
 import {
   GRID_COLUMNS,
@@ -83,6 +83,12 @@ export function useDragResize({
   const previewRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<ResizeDrag>(null);
   const gesture = useUndoGesture();
+  // How to end the drag in progress, if any. A handle that unmounts mid-drag
+  // never gets its pointerup, so the drag ends here instead — else its undo
+  // gesture would stay open and the editor's autosave, which waits for it,
+  // would stop following edits (#400).
+  const endRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => endRef.current?.(), []);
 
   function begin(kind: ResizeKind, e: React.PointerEvent<HTMLElement>, corner: Corner = "bottom-right") {
     const frame = frameRef.current;
@@ -126,19 +132,24 @@ export function useDragResize({
       setDrag({ kind, span: curSpan, height: curHeight, x: ev.clientX, y: ev.clientY, startColumn, grid: gridBox });
     };
     const up = () => {
+      if (endRef.current === up) endRef.current = null;
       handle.removeEventListener("pointermove", move);
       handle.removeEventListener("pointerup", up);
       handle.removeEventListener("pointercancel", up);
+      handle.removeEventListener("lostpointercapture", up);
       setDrag(null);
       gesture.end();
     };
     gesture.begin();
+    endRef.current = up;
     setDrag({ kind, span, height, x: e.clientX, y: e.clientY, startColumn, grid: gridBox });
     // The pointer is captured by the handle, so its events keep coming here
-    // wherever the pointer goes.
+    // wherever the pointer goes — and losing the capture (the handle taken
+    // out of the document, say) ends the drag like a release would (#400).
     handle.addEventListener("pointermove", move);
     handle.addEventListener("pointerup", up);
     handle.addEventListener("pointercancel", up);
+    handle.addEventListener("lostpointercapture", up);
   }
 
   return {

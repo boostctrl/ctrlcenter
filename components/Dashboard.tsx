@@ -130,6 +130,7 @@ export default function Dashboard({
     undoLast,
     redoLast,
     gesture,
+    dragging,
     selectedId,
     select,
     doneEditing,
@@ -145,6 +146,7 @@ export default function Dashboard({
     setTopGap,
     toggleWidgetHidden,
     toggleWidgetLabel,
+    adoptWidget,
     forgetWidget,
     saveStatus,
     saveError,
@@ -167,6 +169,7 @@ export default function Dashboard({
     },
     onHide: (id) => showOrHide(id),
     onPlace: (id, to) => placeFromTray(id, to),
+    dragging,
   });
   const cardDrag = pointer.drag;
   // Drives the grid's vertical layout: deterministic masonry packing on lg+ (in
@@ -481,12 +484,16 @@ export default function Dashboard({
     } catch (e) {
       return e instanceof Error ? e.message : "Couldn't add the widget";
     }
-    const row: LayoutWidget = { id: created.id, type, span: widgetDef(type).span, hidden: false };
+    const row: LayoutWidget = { id: created.id, type, span: widgetDef(type).span, hidden: true };
+    // Into the tray first, outside the undo history, so that Undo right after
+    // takes back only the placement and leaves the widget where it can be
+    // reached (#400).
+    adoptWidget(row);
     mutateSections((sections) => {
-      const after = selectedId ? sections.findIndex((w) => w.id === selectedId) : -1;
-      const next = [...sections];
-      next.splice(after >= 0 ? after + 1 : next.length, 0, row);
-      return next;
+      const rest = sections.filter((w) => w.id !== row.id);
+      const after = selectedId ? rest.findIndex((w) => w.id === selectedId) : -1;
+      rest.splice(after >= 0 ? after + 1 : rest.length, 0, { ...row, hidden: false });
+      return rest;
     });
     announce(`${widgetDef(type).label} added`);
     configure(created.id);

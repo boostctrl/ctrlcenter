@@ -22,6 +22,15 @@ here.
 
 ### Fixed
 
+- **Escape during a drag no longer closes the layout editor.** Pressing
+  Escape while moving a card cancelled the move but also left edit mode and
+  threw away the undo history, and during an edge resize it could leave the
+  editor silently unable to save anything else until the page was reloaded.
+  Escape now only cancels the drag. Undo also skips a step that changed
+  nothing (End on a card already at full width, say) instead of discarding
+  what Redo could restore, and undoing a widget you have just added from the
+  palette puts it in the tray rather than making it vanish until a reload.
+  (#400)
 - **The page keeps up with the theme builder and with an OS light/dark
   switch.** "Build a palette from this accent" used to leave the page on the
   old colors under the new status colors, while the pickers showed the new

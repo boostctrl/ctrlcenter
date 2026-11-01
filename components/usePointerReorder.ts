@@ -102,11 +102,15 @@ export function usePointerReorder({
   onMove,
   onHide,
   onPlace,
+  dragging,
 }: {
   // Edit mode is on.
   enabled: boolean;
   gridRef: React.RefObject<HTMLElement | null>;
   trayRef: React.RefObject<HTMLElement | null>;
+  // Set while a card is being dragged, from activation to the drop or
+  // cancel, so the editor's Escape stands down (useLayoutEditor, #400).
+  dragging?: React.RefObject<boolean>;
   // A grid card dropped somewhere else in the grid.
   onMove: (id: string, from: number, to: number) => void;
   // A grid card dropped on the tray.
@@ -191,6 +195,7 @@ export function usePointerReorder({
 
       const activate = () => {
         active = true;
+        if (dragging) dragging.current = true;
         const r = el.getBoundingClientRect();
         const d: CardDrag = {
           id,
@@ -278,7 +283,10 @@ export function usePointerReorder({
       const key = (ev: KeyboardEvent) => {
         if (ev.key !== "Escape" || !active) return;
         ev.preventDefault();
-        ev.stopPropagation();
+        // Immediate: the editor's Escape listens on window too, and
+        // stopPropagation can't keep a later listener on the same target
+        // from running (#400).
+        ev.stopImmediatePropagation();
         end();
       };
 
@@ -290,6 +298,7 @@ export function usePointerReorder({
         window.removeEventListener("pointercancel", end);
         window.removeEventListener("keydown", key, true);
         touchDragging.current = false;
+        if (dragging) dragging.current = false;
         document.body.style.removeProperty("cursor");
         cleanupRef.current = null;
         update(null);
@@ -300,12 +309,13 @@ export function usePointerReorder({
       window.addEventListener("pointermove", move);
       window.addEventListener("pointerup", up);
       window.addEventListener("pointercancel", end);
-      // Capture phase, ahead of the editor's Escape (which would leave edit
-      // mode).
+      // Capture phase, like the editor's Escape (which would leave edit
+      // mode): that one stands down while `dragging` is set, and should it
+      // run second instead, the handler above has already stopped the event.
       window.addEventListener("keydown", key, true);
       if (touch) timer = window.setTimeout(activate, LONG_PRESS_MS);
     },
-    [retarget, update]
+    [retarget, update, dragging]
   );
 
   // For the card's click handler: whether this click ends a drag (and so

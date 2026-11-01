@@ -145,6 +145,10 @@ export function useLayoutEditor({
   function mutateLayout(update: Update<EditableLayout>) {
     const prev = latestRef.current;
     const next = typeof update === "function" ? update(prev) : update;
+    // A change that changes nothing (End on a card already 24 columns wide,
+    // Revert with nothing to revert) is no undo step, and must not take the
+    // redo stack with it (#400).
+    if (next === prev || JSON.stringify(next) === JSON.stringify(prev)) return;
     history.record(prev);
     dirtyRef.current = true;
     latestRef.current = next;
@@ -234,15 +238,24 @@ export function useLayoutEditor({
       delete rest.hideLabel;
       return rest;
     });
+  // Whether a pointer gesture is in progress: a resize drag or a held
+  // stepper (bracketed by `gesture` below), or a card being moved
+  // (usePointerReorder, which is handed this ref). The editor's Escape
+  // stands down while one is — the gesture's own Escape cancels it, and
+  // leaving edit mode under a captured pointer would unmount the handle
+  // before its pointerup, so the gesture would never end (#400).
+  const dragging = useRef(false);
   const { beginGesture, endGesture, group } = history;
   const gesture = useMemo(
     () => ({
       begin: () => {
         beginGesture();
+        dragging.current = true;
         setGestureStart(latestRef.current);
       },
       end: () => {
         endGesture(latestRef.current);
+        dragging.current = false;
         setGestureStart(null);
       },
       group,
@@ -277,10 +290,38 @@ export function useLayoutEditor({
     [rewrite]
   );
 
+  // A widget just created from the palette (#303), into the tray as a hidden
+  // row — the mirror of forgetWidget: in the arrangement, in every undo and
+  // redo step and in what Revert restores, and not an undo step itself. The
+  // caller then records its placement, so Undo right after adding takes back
+  // only that and leaves the widget in the tray, where it can be reached,
+  // rather than making it vanish until a reload (#400). Not a change to save
+  // either: a widget in none of a board's rows already resolves to a hidden
+  // one.
+  const adoptWidget = useCallback(
+    (row: LayoutWidget) => {
+      const withRow = (l: EditableLayout) =>
+        l.sections.some((w) => w.id === row.id)
+          ? l
+          : { ...l, sections: [...l.sections, { ...row, hidden: true }] };
+      const next = withRow(latestRef.current);
+      latestRef.current = next;
+      entryRef.current = withRow(entryRef.current);
+      rewrite(withRow, next);
+      setLayout(next);
+    },
+    [rewrite]
+  );
+
   const doneEditing = useCallback(() => {
     setEditing(false);
     setSelectedId(null);
     clearHistory();
+    // A gesture still open as edit mode ends (its handle unmounted under a
+    // captured pointer) must not leave the autosave watching a frozen value
+    // for the rest of the page session (#400).
+    dragging.current = false;
+    setGestureStart(null);
     // Drop a stale ?edit=1 (the deep link from admin Settings) so a reload
     // doesn't reopen the editor.
     if (window.location.search.includes("edit="))
@@ -306,6 +347,10 @@ export function useLayoutEditor({
         return;
       }
       if (e.key === "Escape") {
+        // A drag's own Escape cancels it; both listeners are capture-phase
+        // on window, so this one can't be stopped and has to stand down
+        // itself (#400).
+        if (dragging.current) return;
         // A layered surface closes first, on its own Escape: a card's More
         // menu, the widget settings panel, the add-widget palette, the boards
         // menu (#303).
@@ -340,6 +385,7 @@ export function useLayoutEditor({
     undoLast,
     redoLast,
     gesture,
+    dragging,
     selectedId,
     select: setSelectedId,
     doneEditing,
@@ -355,6 +401,7 @@ export function useLayoutEditor({
     setTopGap,
     toggleWidgetHidden,
     toggleWidgetLabel,
+    adoptWidget,
     forgetWidget,
     saveStatus,
     saveError,
