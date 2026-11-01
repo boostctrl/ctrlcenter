@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [3.0.1] - 2026-11-01
+
 ### Changed
 
 - **Clearer words on what a backup holds.** The export dialog, the API widget
@@ -3516,7 +3518,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v3.0.1...HEAD
+[3.0.1]: https://github.com/boostctrl/ctrlcenter/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.13.0...v3.0.0
 [2.13.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.12.0...v2.13.0
 [2.12.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.11.0...v2.12.0
