@@ -11,6 +11,8 @@ here.
 
 ## [Unreleased]
 
+## [3.1.0-rc.2] - 2026-11-01
+
 ### Added
 
 - **Webhook bursts still waiting when CtrlCenter restarts are sent once it
@@ -3802,7 +3804,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.0-rc.1...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.0-rc.2...HEAD
+[3.1.0-rc.2]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.0-rc.1...v3.1.0-rc.2
 [3.1.0-rc.1]: https://github.com/boostctrl/ctrlcenter/compare/v3.0.1...v3.1.0-rc.1
 [3.0.1]: https://github.com/boostctrl/ctrlcenter/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.13.0...v3.0.0
