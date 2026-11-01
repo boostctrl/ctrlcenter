@@ -220,9 +220,15 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
   // palette tile so it's one undoable step.
   function autoPair(hueShift?: number) {
     const derived = derivePalette(draft.accentFrom, hueShift === undefined ? {} : { hueShift });
-    applyThemeColors({ dark: derived.dark, light: derived.light });
+    // Each status setter paints from this render's look and accent — the
+    // values from before the click — so the colors go on last, handed the
+    // on-screen mode's new status colors, which this render's state doesn't
+    // carry yet (#394).
     setStatusColors(derived.status, "dark");
     setStatusColors(derived.statusLight, "light");
+    applyThemeColors({ dark: derived.dark, light: derived.light }, undefined, {
+      status: editMode === "dark" ? derived.status : derived.statusLight,
+    });
   }
 
   // Sharing as text (#329): the current look as a code on the clipboard, a

@@ -77,6 +77,13 @@ import { useSavedThemes } from "./useSavedThemes";
 
 export const THEME_KEY = "ctrlcenter:theme";
 
+// Theme parts to paint alongside the colors (see applyThemeColors): what a
+// caller set through the setters a moment earlier, which this render's state
+// doesn't carry yet (#363, #394).
+export type PaintParts = Partial<
+  Pick<Parameters<typeof paintAll>[0], "tune" | "sceneFx" | "density" | "status" | "wallpaper">
+>;
+
 // The admin-configured site default theme. Visitor choices override each part.
 // The optional custom default colors are a cohesive light+dark pair (dark =
 // `background`/`foreground`, light = `backgroundLight`/`foregroundLight`); when
@@ -200,7 +207,7 @@ export type LookValue = {
   // admin default), or null (not chosen).
   setWallpaper: (wallpaper: WallpaperChoice | null, mode: Mode) => void;
   applyPack: (pack: ThemePack, mode: Mode) => void;
-  applyThemeColors: (colors: ModeColors, mode?: Mode) => void;
+  applyThemeColors: (colors: ModeColors, mode?: Mode, paint?: PaintParts) => void;
   setBaseColors: (
     background: string,
     foreground: string,
@@ -597,11 +604,12 @@ export function useLook(
   // are replaced (restoring a complete saved theme). The colorset carries its own
   // accent, so any standalone accent override is dropped in favor of it.
   // `paint` carries parts to paint alongside the colors (the tune, effects,
-  // status colors and wallpaper a pack just set): applyAll would otherwise
-  // fill them from this render's state, which the setters called a moment
-  // earlier haven't committed yet (#363).
+  // status colors and wallpaper a pack just set, the status colors a built
+  // palette brings): applyAll would otherwise fill them from this render's
+  // state, which the setters called a moment earlier haven't committed yet
+  // (#363, #394).
   const applyThemeColors = useCallback(
-    (colors: ModeColors, mode?: Mode, paint?: Partial<Parameters<typeof paintAll>[0]>) => {
+    (colors: ModeColors, mode?: Mode, paint?: PaintParts) => {
       let look: ModeColors;
       if (mode) {
         const base =
@@ -1067,6 +1075,29 @@ export function useLook(
     defaultAccent,
   ]);
 
+  // What an OS light/dark flip repaints: "system" re-resolved from the state
+  // of this render — the look AND the design/scene/font are mode-aware. The
+  // mount effect's listener reaches it through a ref, since its own closure
+  // is the mount's (#394): painting from that brought the page-load design,
+  // site theme and stored parts back over a design changed in the builder
+  // since, a pinned board's theme (#337) or a schedule phase (#336), while
+  // the scene, which follows React state, stayed on the current one. A
+  // builder preview (#290) shows one mode whatever the OS says, so it holds.
+  const paintSystem = useCallback(() => {
+    if (displayTheme !== "system") return;
+    applyAll({
+      theme: "system",
+      look: resolveLook(activeLook),
+      accentOverride,
+      defaultAccent,
+    });
+    applyChrome(resolveDark("system"));
+  }, [displayTheme, resolveLook, activeLook, accentOverride, defaultAccent, applyAll, applyChrome]);
+  const paintSystemRef = useRef(paintSystem);
+  useEffect(() => {
+    paintSystemRef.current = paintSystem;
+  });
+
   // Load the stored theme + custom themes on mount and keep "system" in sync
   // with OS changes. Anything the visitor hasn't set falls back to the admin
   // default theme.
@@ -1182,39 +1213,13 @@ export function useLook(
     applyFont(initial.font);
     applyHeadingFont(initial.heading);
 
-    // Re-apply on OS scheme change. Only "system" mode tracks the OS — but the
-    // look AND the design/scene/font are mode-aware, so "system" must re-resolve
-    // all of them when the OS flips light/dark.
+    // Re-apply on OS scheme change. Only "system" mode tracks the OS; the
+    // repaint itself comes from the latest render (paintSystem above), not
+    // from what this effect loaded.
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => {
       setSystemDark(mq.matches);
-      let raw: string | null = null;
-      try {
-        raw = window.localStorage.getItem(THEME_KEY);
-      } catch {
-        // ignore
-      }
-      const isMode = raw === "light" || raw === "dark" || raw === "system";
-      const mode: Theme = isMode && policy !== "none" ? (raw as Theme) : defaultTheme.mode;
-      if (mode !== "system") return;
-      const look = resolveLook(gated ? active : loadActiveTheme());
-      const next = chromeFor(mq.matches);
-      paintAll({
-        theme: "system",
-        look,
-        accentOverride: gated ? NO_ACCENT_OVERRIDES : loadAccentOverride(),
-        defaultAccent,
-        tune: next.tune,
-        sceneFx: next.sceneFx,
-        reduceMotion: loadReduceMotion(),
-        density: next.density,
-        status: next.status,
-        wallpaper: next.wallpaper,
-      });
-      applyDesign(next.design);
-      applyScene(next.scene);
-      applyFont(next.font);
-      applyHeadingFont(next.heading);
+      paintSystemRef.current();
     };
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);

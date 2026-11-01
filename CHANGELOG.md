@@ -22,6 +22,14 @@ here.
 
 ### Fixed
 
+- **The page keeps up with the theme builder and with an OS light/dark
+  switch.** "Build a palette from this accent" used to leave the page on the
+  old colors under the new status colors, while the pickers showed the new
+  palette, until the next change or a reload. And in the default "system"
+  appearance mode, an OS switch between light and dark painted the theme the
+  page had loaded with: a design changed in the builder since then, a pinned
+  board's theme or the day/night phase was painted over, with the scene
+  staying on the current one. Both now paint the look that's current. (#394)
 - **Builds no longer depend on Google Fonts.** The twelve selectable fonts
   were downloaded from Google every time the app was built, and an odd
   response from Google could fail a build outright, the release build
