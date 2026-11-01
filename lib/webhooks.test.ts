@@ -525,6 +525,19 @@ describe("report helpers", () => {
     expect(clamp("Supercalifragilisticexpialidocious indeed", 12)).toBe("Supercalifr…");
   });
 
+  it("clamps by characters, so a mid-word cut never ends on half an emoji", () => {
+    // Twelve emoji are 24 UTF-16 units but twelve characters: within the room.
+    expect(clamp("😀".repeat(12), 12)).toBe("😀".repeat(12));
+    // Fifty are over it, and the mid-word cut used to land inside the sixth
+    // emoji (#441); it now keeps eleven whole ones and the ellipsis.
+    const cut = clamp("😀".repeat(50), 12);
+    expect(cut).toBe(`${"😀".repeat(11)}…`);
+    expect(Array.from(cut).length).toBe(12);
+    expect(cut.isWellFormed()).toBe(true);
+    // The word-boundary preference counts characters too.
+    expect(clamp(`${"😀".repeat(8)} ${"😀".repeat(4)}`, 12)).toBe(`${"😀".repeat(8)}…`);
+  });
+
   it("flattens a report to one line, a detail and a link", () => {
     const r: WebhookReport = {
       service: "sonarr",

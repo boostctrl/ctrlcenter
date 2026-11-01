@@ -383,10 +383,13 @@ export function plainNotification(c: NotificationContent): PlainMessage {
   };
 }
 
-// Telegram caps a message at 4,096 characters, counted as UTF-16 units (an
-// emoji is two); Gotify and Apprise set no cap of their own and get the same
-// bound, counted as characters. Both leave room for the link.
+// Gotify and Apprise set no cap of their own; their body gets this bound,
+// counted as characters, with the link appended whole.
 const MAX_TEXT = 3500;
+
+// Telegram caps a message at 4,096 characters, counted as UTF-16 units (an
+// emoji is two), and refuses a longer one outright.
+const TELEGRAM_MAX_TEXT = 4096;
 
 // `s` cut to at most `max` UTF-16 units, as Telegram counts, ending in an
 // ellipsis. The cut steps back off a high surrogate so an emoji is never
@@ -397,6 +400,19 @@ function clipUnits(s: string, max: number): string {
   const last = s.charCodeAt(end - 1);
   if (last >= 0xd800 && last <= 0xdbff) end -= 1;
   return `${s.slice(0, end)}…`;
+}
+
+// Telegram's text for `words` and an optional `link`, shaped as Discord's is
+// (discordPayload): the words get the cap less the link and its newline, so
+// the link stays whole however long the words run (#441) — the words used to
+// be cut to a fixed 3,500 units with the link appended after, and a link
+// near the 2,048-unit bound a relayed one may reach carried the message past
+// the cap. Only a link too long to leave any room is cut with the words.
+function telegramText(words: string, link: string): string {
+  const room = TELEGRAM_MAX_TEXT - (link ? link.length + 1 : 0);
+  return link && room > 0
+    ? [clipUnits(words, room), link].filter(Boolean).join("\n")
+    : clipUnits([words, link].filter(Boolean).join("\n"), TELEGRAM_MAX_TEXT);
 }
 
 const withLink = (s: string, url?: string) => (url ? `${s}\n${url}` : s);
@@ -412,7 +428,7 @@ export function buildServiceRequest(
       // Plain text: no parse_mode, so names with * or _ need no escaping.
       return jsonReq(`https://api.telegram.org/bot${ch.token.trim()}/sendMessage`, {
         chat_id: ch.chatId.trim(),
-        text: withLink(clipUnits(m.text, MAX_TEXT), m.url),
+        text: telegramText(m.text, m.url ?? ""),
         disable_web_page_preview: true,
       });
     case "gotify":

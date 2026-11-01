@@ -270,13 +270,17 @@ export function fmtDate(s: string): string {
 
 // Cut at a word boundary with one ellipsis. Mid-word only when no space sits
 // past 60% of the room; trailing punctuation goes so it never reads "Title:…".
+// Counted and cut in characters (Unicode code points), not UTF-16 units, so
+// the mid-word cut never lands inside an emoji and leaves half of one (#441).
 export function clamp(s: string, max: number): string {
   if (s.length <= max) return s;
+  const chars = Array.from(s);
+  if (chars.length <= max) return s;
   if (max < 2) return "…";
-  const cut = s.slice(0, max - 1);
+  const cut = chars.slice(0, max - 1);
   const sp = cut.lastIndexOf(" ");
   const kept = sp >= Math.floor(max * 0.6) ? cut.slice(0, sp) : cut;
-  return `${kept.replace(/[\s,:;.(–—-]+$/, "")}…`;
+  return `${kept.join("").replace(/[\s,:;.(–—-]+$/, "")}…`;
 }
 
 // A URL stripped to what a reader scans: "themoviedb.org/movie/402431".

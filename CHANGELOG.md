@@ -44,6 +44,16 @@ here.
 
 ### Fixed
 
+- **A long Telegram message with a long link arrives instead of being
+  refused.** The text of a relayed notification was cut to leave room for
+  its link, but a link near the 2,048-character bound could still carry the
+  whole message past Telegram's 4,096-character cap, and Telegram then
+  dropped it whole. The text now makes room for the whole link, as it does
+  on Discord, and only a link too long to leave any room is cut with it.
+  The cuts made as an event is read — a name, a title, an overview — could
+  also end in the middle of an emoji; they now land between characters.
+  (#441)
+
 - **The theme builder's "Card opacity" makes cards more or less solid.** The
   slider used to scale how much of the text color is mixed into a card's
   fill, so it brightened a card on a dark theme and greyed it on a light
@@ -52,6 +62,7 @@ here.
   it says: below 100% a card fades toward see-through, above it the page
   color builds up under the design's fill until the card is solid at 300%.
   At 100% every design looks as it did. (#444)
+
 - **"Scene glow" has a visible effect on every design and scene.** The
   slider could only dim the backdrop, and on the default Glass design it
   already sat at the maximum, so raising it did nothing; on Flat, Minimal,
@@ -59,6 +70,7 @@ here.
   (Starfield, Rain, …) never read it. It now dims the scene below 100%,
   leaves the design untouched at 100%, and above it brings the scene to full
   strength and brightens it, on every scene. (#445)
+
 - **A daily series' digest names the days, not episode codes.** Sonarr
   numbers a daily series' episodes by year and order (S2026E274), so a
   burst of them was summed up with a code range that means nothing to a

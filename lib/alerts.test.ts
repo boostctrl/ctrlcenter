@@ -389,6 +389,29 @@ describe("buildServiceRequest", () => {
     });
   });
 
+  // Telegram refuses a message past 4,096 UTF-16 units. The words used to be
+  // cut to 3,500 with the link appended after, so a relayed link near the
+  // 2,048-unit bound carried the message past the cap (#441); the words now
+  // get the cap less the link, which stays whole, as on Discord.
+  it("telegram keeps a 2,048-character link whole and the message within 4,096 units", () => {
+    const url = `https://seerr.lan/${"a".repeat(2048 - "https://seerr.lan/".length)}`;
+    expect(url.length).toBe(2048);
+    const m = plainNotification({ title: "Seerr issue: Dune", body: "x".repeat(5000), url });
+    const text = JSON.parse(buildServiceRequest(ch, m).init.body as string).text as string;
+    expect(text.length).toBe(4096);
+    expect(text.endsWith(`x…\n${url}`)).toBe(true);
+    expect(text.startsWith("Seerr issue: Dune\n")).toBe(true);
+  });
+
+  it("telegram cuts a link too long to leave any room along with the words", () => {
+    const url = `https://plex.test/${"a".repeat(5000)}`;
+    const m = plainAlert({ id: "a", type: "down" }, { name: "Plex", url });
+    const text = JSON.parse(buildServiceRequest(ch, m).init.body as string).text as string;
+    expect(text.length).toBe(4096);
+    expect(text.startsWith("🔴 Plex is down\nhttps://plex.test/")).toBe(true);
+    expect(text.endsWith("a…")).toBe(true);
+  });
+
   it("gotify posts to /message with the app token header and a high priority for down", () => {
     const req = buildServiceRequest({ ...ch, type: "gotify", url: "https://gotify.test/", token: "tok" }, down);
     expect(req.url).toBe("https://gotify.test/message");
@@ -462,10 +485,23 @@ describe("buildServiceRequest", () => {
     it("telegram: counts UTF-16 units and steps the cut off a surrogate pair", () => {
       const req = buildServiceRequest(ch, m);
       const text = JSON.parse(req.init.body as string).text as string;
-      // "T\n" then 4,000 two-unit emoji: the 3,500th unit would have been the
-      // first half of one, so the cut steps back a unit to land between two.
-      expect(text.length).toBe(3499);
+      // "T\n" then 4,000 two-unit emoji: with no link the words get the whole
+      // 4,096-unit cap, and the 4,096th unit would have been the first half
+      // of one, so the cut steps back a unit to land between two.
+      expect(text.length).toBe(4095);
       expect(text.endsWith(`${emoji}…`)).toBe(true);
+      expect(text.isWellFormed()).toBe(true);
+    });
+
+    it("telegram: a long body behind an emoji-heavy link lands within the cap", () => {
+      // 19 units of link plus its newline leave an even room, so the last
+      // unit of it would have split an emoji; the cut steps off it and the
+      // whole message still fits.
+      const url = "https://seerr.lan/x";
+      const req = buildServiceRequest(ch, { ...m, url });
+      const text = JSON.parse(req.init.body as string).text as string;
+      expect(text.length).toBeLessThanOrEqual(4096);
+      expect(text.endsWith(`${emoji}…\n${url}`)).toBe(true);
       expect(text.isWellFormed()).toBe(true);
     });
 
