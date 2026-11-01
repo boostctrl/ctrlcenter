@@ -18,7 +18,8 @@ export type WebhookService = (typeof WEBHOOK_SERVICES)[number];
 export const webhookServiceSchema = z.object({
   enabled: z.boolean().default(false),
   // A credential (#382): the admin's forms get a placeholder and reveal it
-  // behind a confirmation.
+  // behind a confirmation. The one field here a backup without secrets
+  // leaves out (#437).
   token: z.string().default("").register(secretFields, { redact: "blank", credential: true }),
   // The app's own address (#352): where the email report's "Open in …"
   // button and the push channels' link lead when the payload names none.

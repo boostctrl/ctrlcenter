@@ -45,7 +45,10 @@ export const settingsSchema = z.object({
   // board's layout rows (used directly in this shared schema): one malformed
   // hand-edited row is dropped rather than failing the whole settings parse.
   statusAnnouncements: lenientArray(statusAnnouncementSchema).default([]),
-  // Inbound-webhook tokens are shared secrets (#204), private wholesale.
+  // Inbound webhooks are private wholesale from a visitor (#204): the tokens
+  // are shared secrets, and which services are switched on is nobody else's
+  // business. A backup without secrets keeps the section and blanks just the
+  // tokens, which carry their own marks (#437).
   webhooks: webhooksSchema
     .default(webhooksSchema.parse({}))
     .register(secretFields, { redact: "all" }),

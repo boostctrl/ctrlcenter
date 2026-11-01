@@ -26,6 +26,15 @@ here.
 
 ### Fixed
 
+- **A backup exported without secrets keeps the inbound webhooks'
+  Application URLs and subject prefix.** The whole inbound-webhook section
+  counted as secret, so an export without secrets blanked each service's
+  Application URL and the email subject prefix along with its token, and a
+  backup restored on another instance lost them for nothing. Only the tokens
+  are secret: a file without secrets still leaves them out (and a restore
+  onto this instance still fills them back in), while the rest of the
+  section now goes in as written. (#437)
+
 - **The webhook preview shows the Application URL at work.** Under
   Settings → Monitoring → Inbound webhooks, the preview and its Send sample
   rendered the sample events without the Application URL saved for each

@@ -13,7 +13,11 @@ export const mergeRules = z.registry<{ merge: "replace" }>();
 // Fields a signed-out visitor must never receive (#157). "blank" empties a
 // string; "all" neutralizes a whole section — every string blanked, every
 // boolean off — for sections where even which parts are switched on is
-// private (integrations, inbound webhooks). Applied by stripSecrets.
+// private (integrations, inbound webhooks). Applied by stripSecrets. A backup
+// without secrets (redactForExport) goes by the "blank" marks alone: the
+// secrets inside an "all" section carry their own, and the rest of it — the
+// inbound webhooks' switches, Application URLs and subject prefix — is kept
+// (#437).
 //
 // `exportOnly` marks a secret the server's own public rendering reads from
 // the public config: a calendar's address (#380), which the board's fetch and
@@ -99,34 +103,31 @@ export function redactSecrets<T>(schema: z.ZodType, value: T): T {
 // holding a secret, so it may stay in an export.
 const isEnvRef = (v: unknown): boolean => typeof v === "string" && /^\$\{[A-Za-z_][A-Za-z0-9_]*\}$/.test(v.trim());
 
-// `value` for a backup without secrets (#366): every field secretFields
-// marks is blanked — an environment reference is kept, it names no secret —
-// and an "all" section keeps everything but its plain string fields (its
-// switches and choices survive, its tokens don't). The shape is otherwise
-// the stored one, so the file imports cleanly and restoreSecrets can fill
-// the blanks back from what the instance holds. `all` is set while inside
-// such a section.
-export function redactForExport<T>(schema: z.ZodType, value: T, all = false): T {
+// `value` for a backup without secrets (#366): every field marked "blank" is
+// emptied — an environment reference is kept, it names no secret. An "all"
+// section is private wholesale from a visitor only; a backup keeps its
+// settings and blanks just the fields marked within it, so the inbound
+// webhooks lose their tokens and keep their Application URLs (#437). The
+// shape is otherwise the stored one, so the file imports cleanly and
+// restoreSecrets can fill the blanks back from what the instance holds.
+export function redactForExport<T>(schema: z.ZodType, value: T): T {
   const stack = layers(schema);
   for (const s of stack) {
-    const rule = secretFields.get(s);
-    if (rule?.redact === "all") all = true;
-    if (rule?.redact === "blank") return (typeof value === "string" && !isEnvRef(value) ? "" : value) as T;
+    if (secretFields.get(s)?.redact === "blank") {
+      return (typeof value === "string" && !isEnvRef(value) ? "" : value) as T;
+    }
   }
   const base = stack[stack.length - 1];
-  if (all && base instanceof z.ZodString) {
-    return (typeof value === "string" && !isEnvRef(value) ? "" : value) as T;
-  }
   if (base instanceof z.ZodUnion) {
     const option = (base.options as z.ZodType[]).find((o) => o.safeParse(value).success);
-    return option ? redactForExport(option, value, all) : value;
+    return option ? redactForExport(option, value) : value;
   }
   const item = lenientItems.get(base) ?? (base instanceof z.ZodArray ? (base.element as z.ZodType) : null);
-  if (item && Array.isArray(value)) return value.map((v) => redactForExport(item, v, all)) as T;
+  if (item && Array.isArray(value)) return value.map((v) => redactForExport(item, v)) as T;
   if (base instanceof z.ZodObject && isPlainObject(value)) {
     const shape = base.shape as Record<string, z.ZodType>;
     return Object.fromEntries(
-      Object.entries(value).map(([k, v]) => [k, shape[k] ? redactForExport(shape[k], v, all) : v])
+      Object.entries(value).map(([k, v]) => [k, shape[k] ? redactForExport(shape[k], v) : v])
     ) as T;
   }
   return value;
@@ -141,36 +142,34 @@ function counterpart(list: unknown[], item: unknown, index: number): unknown {
   return list[index];
 }
 
-// `incoming` (a backup being restored, #366) with every secret field that is
-// blank in it taken from `stored` (what the instance already holds), matched
-// by id through the lists. A secret-less export then restores without
+// `incoming` (a backup being restored, #366) with every field marked "blank"
+// that is blank in it taken from `stored` (what the instance already holds),
+// matched by id through the lists. A secret-less export then restores without
 // wiping the credentials the instance has; a file that carries its own
-// secrets keeps them. `all` is set inside an "all" section, where every
-// plain string field counts.
-export function restoreSecrets<T>(schema: z.ZodType, incoming: T, stored: unknown, all = false): T {
+// secrets keeps them. The other fields of an "all" section are the file's own
+// (#437): a blank Application URL in it is a cleared one, not a gap.
+export function restoreSecrets<T>(schema: z.ZodType, incoming: T, stored: unknown): T {
   const stack = layers(schema);
-  const fill = () => (incoming === "" && typeof stored === "string" ? stored : incoming) as T;
   for (const s of stack) {
-    const rule = secretFields.get(s);
-    if (rule?.redact === "all") all = true;
-    if (rule?.redact === "blank") return fill();
+    if (secretFields.get(s)?.redact === "blank") {
+      return (incoming === "" && typeof stored === "string" ? stored : incoming) as T;
+    }
   }
   const base = stack[stack.length - 1];
-  if (all && base instanceof z.ZodString) return fill();
   if (base instanceof z.ZodUnion) {
     const option = (base.options as z.ZodType[]).find((o) => o.safeParse(incoming).success);
-    return option ? restoreSecrets(option, incoming, stored, all) : incoming;
+    return option ? restoreSecrets(option, incoming, stored) : incoming;
   }
   const item = lenientItems.get(base) ?? (base instanceof z.ZodArray ? (base.element as z.ZodType) : null);
   if (item && Array.isArray(incoming)) {
     const from = Array.isArray(stored) ? stored : [];
-    return incoming.map((v, i) => restoreSecrets(item, v, counterpart(from, v, i), all)) as T;
+    return incoming.map((v, i) => restoreSecrets(item, v, counterpart(from, v, i))) as T;
   }
   if (base instanceof z.ZodObject && isPlainObject(incoming)) {
     const shape = base.shape as Record<string, z.ZodType>;
     const from = isPlainObject(stored) ? stored : {};
     return Object.fromEntries(
-      Object.entries(incoming).map(([k, v]) => [k, shape[k] ? restoreSecrets(shape[k], v, from[k], all) : v])
+      Object.entries(incoming).map(([k, v]) => [k, shape[k] ? restoreSecrets(shape[k], v, from[k]) : v])
     ) as T;
   }
   return incoming;
