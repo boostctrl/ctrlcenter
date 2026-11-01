@@ -12,6 +12,17 @@ here.
 
 ## [Unreleased]
 
+### Security
+
+- **Next.js, nodemailer and zod updated past their published advisories.**
+  3.0.0 shipped Next.js 16.4.0, and three advisories against it, two rated
+  critical, were published on 2026-10-22. None of them reaches CtrlCenter: the
+  image optimizer is switched off, and the app has no Server Actions and no
+  `use cache` functions. The image now carries Next.js 16.4.3 all the same,
+  so a dependency audit of it comes back clean. nodemailer's address-parser
+  fixes and zod's memory-use fix come along, with the routine minor updates.
+  (#422)
+
 ## [3.0.0] - 2026-10-16
 
 ### Added
