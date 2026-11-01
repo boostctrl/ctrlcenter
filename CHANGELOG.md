@@ -26,6 +26,16 @@ here.
 
 ### Fixed
 
+- **The webhook preview shows the Application URL at work.** Under
+  Settings → Monitoring → Inbound webhooks, the preview and its Send sample
+  rendered the sample events without the Application URL saved for each
+  service, so the Seerr sample never showed its *Open in Seerr* button
+  after the address was filled in, and the Sonarr and Radarr samples carried
+  a made-up address of their own that the setting couldn't replace. Every
+  sample now links to the address saved for its service — as you type it,
+  for the preview — exactly as a real event from that service would, and
+  without one it shows no button, as such an event's email has none. (#436)
+
 - **A screen reader can tell two unnamed alert channels of one type apart.**
   Two channels in Settings → Monitoring → Alerts with no name and the same
   service — two webhooks, say — had their controls named alike ("Send test

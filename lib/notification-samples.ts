@@ -4,10 +4,14 @@
 // by running the real pipeline — the raw payload through parseWebhook and,
 // for the season, eight episode events through mergeDigest the way the burst
 // store sends them — so the preview can't drift from what a real event
-// becomes. Client-safe (imports only lib/webhooks.ts) so the settings form
-// renders it in the browser on every keystroke.
+// becomes. The Arr payloads name no applicationUrl of their own — blank
+// until set in the app's settings, as a fresh install's is — so every
+// sample's "Open in …" button follows the Application URL saved for its
+// service (#352), as a real event's does, and goes without one when none
+// is (#436). Client-safe (imports only lib/webhooks.ts) so the settings
+// form renders it in the browser on every keystroke.
 
-import type { DigestScope } from "./schema";
+import type { DigestScope, WebhookService } from "./schema";
 import { mergeDigest, mergeDigests, parseWebhook, type DigestGroup, type WebhookNotification } from "./webhooks";
 
 export const SAMPLE_IDS = ["sonarr-import", "radarr-grab", "seerr-request", "sonarr-health", "busy-minute"] as const;
@@ -56,7 +60,6 @@ function sonarrImport(n: number): unknown {
   return {
     eventType: "Download",
     instanceName: "Sonarr",
-    applicationUrl: "https://sonarr.example.com",
     series: {
       id: 12,
       title: "The Bear",
@@ -88,7 +91,6 @@ function sonarrGrab(n: number): unknown {
   return {
     eventType: "Grab",
     instanceName: "Sonarr",
-    applicationUrl: "https://sonarr.example.com",
     series: { id: 31, title: "Silo", year: 2023, type: "standard" },
     episodes: [{ id: 300 + n, seasonNumber: 3, episodeNumber: n, title: n === 1 ? "The Engineer" : "Order", airDate: "2026-10-09" }],
     release: {
@@ -105,7 +107,6 @@ function sonarrGrab(n: number): unknown {
 const RADARR_GRAB = {
   eventType: "Grab",
   instanceName: "Radarr",
-  applicationUrl: "https://radarr.example.com",
   movie: {
     id: 86,
     title: "Dune: Part Three",
@@ -147,7 +148,6 @@ const SONARR_HEALTH = {
   eventType: "Health",
   level: "warning",
   instanceName: "Sonarr",
-  applicationUrl: "https://sonarr.example.com",
   message: "Indexers unavailable due to failures for more than 6 hours: NZBgeek, DrunkenSlug",
   type: "IndexerStatusCheck",
   wikiUrl: "https://wiki.servarr.com/sonarr/system#indexers-are-unavailable-due-to-failures",
@@ -171,36 +171,51 @@ function burstOf(ns: WebhookNotification[]): DigestGroup {
   return { first: ns[0], last: ns[ns.length - 1], events: ns.length, items: [...items.values()], dropped: 0 };
 }
 
+// Each service's saved Application URL (#352; settings.webhooks.<service>.url):
+// the preview passes its draft, a Send sample the saved config. Just the
+// addresses, so the tokens stored beside them never ride along.
+export type SampleUrls = Partial<Record<WebhookService, string>>;
+
 // A sample event as the channels would get it. `digest` renders the season
 // import as the burst store sends it — eight episode events merged into one —
 // else as the single event an Off window relays; `scope` decides what the
 // busy minute holds — Sonarr's own two bursts, or every service's (#359);
-// `posterUrl` is the image the report shows, none by default.
+// `posterUrl` is the image the report shows, none by default; `urls` are
+// the saved Application URLs, each the "Open in …" button and the push
+// channels' link of its own service's events (#436), none by default.
 export function sampleNotification(
   id: SampleId,
-  { digest = false, scope = "all", posterUrl }: { digest?: boolean; scope?: DigestScope; posterUrl?: string } = {}
+  {
+    digest = false,
+    scope = "all",
+    posterUrl,
+    urls = {},
+  }: { digest?: boolean; scope?: DigestScope; posterUrl?: string; urls?: SampleUrls } = {}
 ): WebhookNotification {
+  // Through the real parser with the service's saved address, as the route
+  // hands a real event over.
+  const parse = (service: WebhookService, payload: unknown) => parseWebhook(service, payload, { url: urls[service] })!;
   switch (id) {
     case "sonarr-import": {
-      const first = parseWebhook("sonarr", sonarrImport(1))!;
+      const first = parse("sonarr", sonarrImport(1));
       if (!digest) return finish(first, posterUrl);
-      return finish(mergeDigest(burstOf(BEAR.map((_, i) => parseWebhook("sonarr", sonarrImport(i + 1))!))), posterUrl);
+      return finish(mergeDigest(burstOf(BEAR.map((_, i) => parse("sonarr", sonarrImport(i + 1))))), posterUrl);
     }
     case "busy-minute": {
       const bursts = [
-        burstOf(BEAR.map((_, i) => parseWebhook("sonarr", sonarrImport(i + 1))!)),
-        burstOf([1, 2].map((n) => parseWebhook("sonarr", sonarrGrab(n))!)),
+        burstOf(BEAR.map((_, i) => parse("sonarr", sonarrImport(i + 1)))),
+        burstOf([1, 2].map((n) => parse("sonarr", sonarrGrab(n)))),
       ];
       if (scope !== "app") {
-        bursts.push(burstOf([parseWebhook("radarr", RADARR_GRAB)!]), burstOf([parseWebhook("seerr", SEERR_REQUEST)!]));
+        bursts.push(burstOf([parse("radarr", RADARR_GRAB)]), burstOf([parse("seerr", SEERR_REQUEST)]));
       }
       return finish(mergeDigests(bursts), posterUrl);
     }
     case "radarr-grab":
-      return finish(parseWebhook("radarr", RADARR_GRAB)!, posterUrl);
+      return finish(parse("radarr", RADARR_GRAB), posterUrl);
     case "seerr-request":
-      return finish(parseWebhook("seerr", SEERR_REQUEST)!, posterUrl);
+      return finish(parse("seerr", SEERR_REQUEST), posterUrl);
     case "sonarr-health":
-      return finish(parseWebhook("sonarr", SONARR_HEALTH)!, posterUrl);
+      return finish(parse("sonarr", SONARR_HEALTH), posterUrl);
   }
 }

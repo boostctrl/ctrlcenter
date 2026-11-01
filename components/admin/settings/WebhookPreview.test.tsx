@@ -104,6 +104,29 @@ describe("WebhookPreview (#347)", () => {
     expect(screen.getByText("Radarr grabbed: Dune: Part Three (2026)")).toBeTruthy();
   });
 
+  it("gives each sample the draft's Application URL of its own service as the Open in button (#436)", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<WebhookPreview {...props} />);
+    await user.selectOptions(screen.getByLabelText("Sample event"), "seerr-request");
+    await waitFor(() => expect(srcdoc()).toContain("Wicked (2024)"));
+    expect(srcdoc()).not.toContain("Open in Seerr");
+    const seerr = { ...props.webhooks.seerr, url: "https://seerr.lan:5055" };
+    rerender(<WebhookPreview {...props} webhooks={{ ...props.webhooks, seerr }} />);
+    await waitFor(() => expect(srcdoc()).toContain(">Open in Seerr</a>"));
+    expect(srcdoc()).toContain('href="https://seerr.lan:5055"');
+    expect(screen.getByText(/Open in Seerr: https:\/\/seerr\.lan:5055/)).toBeTruthy();
+    // Seerr's address is no button on the Sonarr sample, whose payload names
+    // none, until Sonarr's own is filled in.
+    await user.selectOptions(screen.getByLabelText("Sample event"), "sonarr-import");
+    await waitFor(() => expect(srcdoc()).toContain("The Bear"));
+    expect(srcdoc()).not.toContain("Open in");
+    const sonarr = { ...props.webhooks.sonarr, url: "https://sonarr.lan" };
+    rerender(<WebhookPreview {...props} webhooks={{ ...props.webhooks, seerr, sonarr }} />);
+    await waitFor(() => expect(srcdoc()).toContain(">Open in Sonarr</a>"));
+    expect(srcdoc()).toContain('href="https://sonarr.lan"');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("follows the admin's surface, and forces dark through the data-ogsc hook", async () => {
     const user = userEvent.setup();
     render(<WebhookPreview {...props} />);

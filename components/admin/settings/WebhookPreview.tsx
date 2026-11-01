@@ -61,17 +61,20 @@ export default function WebhookPreview({
   const [scheme, setScheme] = useState<Scheme | null>(null);
   const dark = scheme ? scheme === "dark" : !surfaceIsLight;
 
-  const { digestSeconds, digestScope, poster, facts, synopsis, subjectPrefix } = webhooks;
+  const { digestSeconds, digestScope, poster, facts, synopsis, subjectPrefix, sonarr, radarr, seerr } = webhooks;
   // The busy-minute sample (#359) is offered only while bursts of different
   // kinds are grouped; narrowing the scope with it selected falls back to
   // the season import.
   const grouping = { digest: digestSeconds > 0, scope: digestScope };
   const offered = SAMPLE_IDS.filter((id) => sampleAvailable(id, grouping));
   const shown = sampleAvailable(sample, grouping) ? sample : "sonarr-import";
+  // The draft's Application URLs (#352) are the samples' "Open in …" button,
+  // each its own service's, as a real event's would be (#436).
+  const urls = { sonarr: sonarr.url, radarr: radarr.url, seerr: seerr.url };
   const notification = useMemo(
-    () => sampleNotification(shown, { ...grouping, posterUrl: POSTER_URL }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- grouping is rebuilt from these two
-    [shown, digestSeconds, digestScope]
+    () => sampleNotification(shown, { ...grouping, posterUrl: POSTER_URL, urls }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- grouping and urls are rebuilt from these
+    [shown, digestSeconds, digestScope, sonarr.url, radarr.url, seerr.url]
   );
   const email = useMemo(
     () =>

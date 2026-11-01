@@ -670,6 +670,26 @@ describe("sendSampleNotification", () => {
     expect(sendMailMock.mock.calls[0][0].subject).toBe("[Sonarr] Imported: The Bear S04E01");
   });
 
+  it("links the sample to its service's saved Application URL, as a real event is (#436)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    sendMailMock.mockResolvedValue({});
+    const config = settings({
+      alerts: { channels: [channel({ id: "hook" }), channel({ id: "mail", type: "email", smtp })] },
+      webhooks: { seerr: { url: "https://seerr.lan:5055" } },
+    });
+    await sendSampleNotification(config, "seerr-request");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body as string).url).toBe("https://seerr.lan:5055");
+    expect(sendMailMock.mock.calls[0][0].html).toContain(">Open in Seerr</a>");
+    // Nothing saved for Sonarr: its sample goes without a button, as its
+    // events do.
+    fetchMock.mockClear();
+    sendMailMock.mockClear();
+    await sendSampleNotification(config, "sonarr-import");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body as string).url).toBe("");
+    expect(sendMailMock.mock.calls[0][0].html).not.toContain("Open in");
+  });
+
   it("sends to one channel by id, even while it's switched off or not taking webhooks", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);

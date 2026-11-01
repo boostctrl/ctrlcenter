@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { SAMPLE_AT, SAMPLE_IDS, SAMPLE_LABELS, sampleAvailable, sampleNotification, type SampleId } from "./notification-samples";
 import { buildNotificationEmail } from "./webhook-email";
+import type { WebhookService } from "./schema";
 import type { NotificationContext, ReportOptions } from "./webhooks";
 
 // The preview's sample events (#347): built by the real parsers, rendered
@@ -106,6 +107,42 @@ describe("sampleNotification", () => {
     expect(injected.subject.length).toBeLessThanOrEqual(78);
     const long = render("radarr-grab", { subjectPrefix: "[A fairly long mailbox rule prefix tag]" });
     expect(long.subject.length).toBeLessThanOrEqual(78);
+  });
+
+  it("links each service's saved Application URL as its samples' button, and none without one (#436)", () => {
+    const urls = { sonarr: "https://sonarr.lan", radarr: "https://radarr.lan", seerr: "https://seerr.lan:5055" };
+    // The Arr payloads name no applicationUrl of their own, so the saved
+    // address decides every sample's button, as it does a Seerr event's.
+    const samples: [SampleId, WebhookService, string, boolean][] = [
+      ["sonarr-import", "sonarr", "Open in Sonarr", true],
+      ["sonarr-import", "sonarr", "Open in Sonarr", false],
+      ["radarr-grab", "radarr", "Open in Radarr", true],
+      ["seerr-request", "seerr", "Open in Seerr", true],
+      ["sonarr-health", "sonarr", "Open in Sonarr", true],
+    ];
+    for (const [id, service, label, digest] of samples) {
+      const bare = sampleNotification(id, { digest });
+      expect(bare.url).toBeUndefined();
+      expect(bare.report?.link).toBeUndefined();
+      expect(buildNotificationEmail(bare, ctx).html).not.toContain("Open in");
+      const url = urls[service];
+      const linked = sampleNotification(id, { digest, urls });
+      expect(linked.url).toBe(url);
+      expect(linked.report?.link).toEqual({ label, url });
+      const { html, text } = buildNotificationEmail(linked, ctx);
+      expect(html).toContain(`href="${url}"`);
+      expect(html).toContain(`>${label}</a>`);
+      expect(text).toContain(`${label}: ${url}`);
+    }
+    // Its own service's address only: Radarr's is no button on a Sonarr sample.
+    expect(sampleNotification("sonarr-import", { urls: { radarr: urls.radarr } }).report?.link).toBeUndefined();
+    // Checked as the route checks a saved address: a bare host is no link.
+    expect(sampleNotification("seerr-request", { urls: { seerr: "seerr.lan" } }).report?.link).toBeUndefined();
+    // The busy minute's button is its opening burst's, Sonarr's.
+    const busy = sampleNotification("busy-minute", { digest: true, scope: "all", urls });
+    expect(busy.url).toBe(urls.sonarr);
+    expect(busy.report?.link).toEqual({ label: "Open in Sonarr", url: urls.sonarr });
+    expect(sampleNotification("busy-minute", { digest: true, scope: "all" }).report?.link).toBeUndefined();
   });
 
   it("renders the same bytes twice, and a one-line ASCII title for the push channels", () => {

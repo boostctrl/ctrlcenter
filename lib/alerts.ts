@@ -633,9 +633,10 @@ export async function sendTestAlert(
 // land in a mailbox or the one-liner reach a phone without waiting for
 // Sonarr. Same channel choice as sendTestAlert, narrowed to the channels
 // that take inbound webhooks when none is named; the saved report options
-// apply, as a real event's would, and the season sample is merged or single
-// by the saved burst window. Goes straight to the channels — never held in
-// the burst store — and ignores `alerts.enabled` like the test. Never throws.
+// apply, as a real event's would, the season sample is merged or single by
+// the saved burst window, and each service's saved Application URL is its
+// sample's link (#436). Goes straight to the channels — never held in the
+// burst store — and ignores `alerts.enabled` like the test. Never throws.
 export async function sendSampleNotification(
   settings: Pick<Settings, "alerts" | "webhooks" | "title" | "timezone">,
   sample: SampleId,
@@ -648,7 +649,11 @@ export async function sendSampleNotification(
       : alerts.channels.filter((ch) => ch.id === channelId && channelReady(ch));
   const out: Outgoing = {
     kind: "notification",
-    content: sampleNotification(sample, { digest: webhooks.digestSeconds > 0, scope: webhooks.digestScope }),
+    content: sampleNotification(sample, {
+      digest: webhooks.digestSeconds > 0,
+      scope: webhooks.digestScope,
+      urls: { sonarr: webhooks.sonarr.url, radarr: webhooks.radarr.url, seerr: webhooks.seerr.url },
+    }),
     ctx: {
       at: Date.now(),
       timeZone: settings.timezone,
