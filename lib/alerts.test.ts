@@ -239,6 +239,28 @@ describe("buildAlertRequest", () => {
     expect(headers.Priority).toBe("high");
     expect(req.init.body).toContain("Café 日本 is down");
   });
+
+  // Discord's shaping is shared with relayed notifications (#433): a service
+  // named with an "@everyone" pages no one, and the content stays inside the
+  // 2,000-character cap with the link whole.
+  it("discord posts no mentions, so a service named with @everyone pages no one", () => {
+    const paged = { name: "@everyone Jellyfin", url: app.url };
+    const req = buildAlertRequest("discord", "https://discord", down, paged, at);
+    expect(JSON.parse(req.init.body as string)).toEqual({
+      content: `🔴 @everyone Jellyfin is down\n${app.url}`,
+      allowed_mentions: { parse: [] },
+    });
+  });
+
+  it("discord clips a long service name to the cap and keeps the link whole", () => {
+    const long = { name: "x".repeat(2500), url: app.url };
+    const req = buildAlertRequest("discord", "https://discord", down, long, at);
+    const { content, allowed_mentions } = JSON.parse(req.init.body as string);
+    expect(allowed_mentions).toEqual({ parse: [] });
+    expect(Array.from(content).length).toBe(2000);
+    expect(content.startsWith("🔴 xxx")).toBe(true);
+    expect(content.endsWith(`x…\n${app.url}`)).toBe(true);
+  });
 });
 
 describe("buildNotificationRequest", () => {
@@ -404,6 +426,53 @@ describe("buildServiceRequest", () => {
     expect(m).toMatchObject({ title: "Sonarr: grabbed", body: "Show S01E02", text: "Sonarr: grabbed\nShow S01E02" });
     const req = buildServiceRequest(ch, m);
     expect(JSON.parse(req.init.body as string).text).toBe("Sonarr: grabbed\nShow S01E02");
+  });
+
+  // Each cut used to count UTF-16 units and could end on half an emoji
+  // (#433). Pushover and the generic clip now count characters; Telegram's
+  // cap counts UTF-16 units, so its cut keeps that count and still steps off
+  // a surrogate pair.
+  describe("never cuts an emoji in half", () => {
+    const emoji = "😀";
+    const m = plainNotification({ title: "T", body: emoji.repeat(4000), url: "" });
+
+    it("pushover: title and message count characters", () => {
+      const titled = { ...m, title: emoji.repeat(300) };
+      const req = buildServiceRequest({ ...ch, type: "pushover", token: "app", userKey: "usr" }, titled);
+      const form = new URLSearchParams(req.init.body as string);
+      const message = form.get("message") ?? "";
+      expect(Array.from(message).length).toBe(1024);
+      expect(message.endsWith(`${emoji}…`)).toBe(true);
+      expect(message.isWellFormed()).toBe(true);
+      const title = form.get("title") ?? "";
+      expect(Array.from(title).length).toBe(250);
+      expect(title.endsWith(`${emoji}…`)).toBe(true);
+    });
+
+    it("gotify and apprise: the generic clip counts characters", () => {
+      const got = buildServiceRequest({ ...ch, type: "gotify", url: "https://gotify.test", token: "tok" }, m);
+      const message = JSON.parse(got.init.body as string).message as string;
+      expect(Array.from(message).length).toBe(3500);
+      expect(message.endsWith(`${emoji}…`)).toBe(true);
+      expect(message.isWellFormed()).toBe(true);
+      const app = buildServiceRequest({ ...ch, type: "apprise", url: "http://apprise:8000/notify/cc" }, m);
+      expect(JSON.parse(app.init.body as string).body).toBe(message);
+    });
+
+    it("telegram: counts UTF-16 units and steps the cut off a surrogate pair", () => {
+      const req = buildServiceRequest(ch, m);
+      const text = JSON.parse(req.init.body as string).text as string;
+      // "T\n" then 4,000 two-unit emoji: the 3,500th unit would have been the
+      // first half of one, so the cut steps back a unit to land between two.
+      expect(text.length).toBe(3499);
+      expect(text.endsWith(`${emoji}…`)).toBe(true);
+      expect(text.isWellFormed()).toBe(true);
+    });
+
+    it("leaves a short message as written", () => {
+      const short = plainNotification({ title: "T", body: emoji.repeat(10), url: "" });
+      expect(JSON.parse(buildServiceRequest(ch, short).init.body as string).text).toBe(`T\n${emoji.repeat(10)}`);
+    });
   });
 });
 

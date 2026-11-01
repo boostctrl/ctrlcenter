@@ -26,6 +26,14 @@ here.
 
 ### Fixed
 
+- **A service named with an "@everyone" can't page a Discord channel from an
+  uptime alert.** Down and recovery alerts to a Discord webhook now carry the
+  same no-mentions setting and 2,000-character cut as relayed notifications,
+  so a mention in a service's name shows as plain text and an alert too long
+  for Discord is cut to fit instead of refused. The text cuts for Telegram,
+  Gotify, Pushover and Apprise also land between characters now, so a long
+  message never ends in half an emoji. (#433)
+
 - **A 2.x config with more feed cards than fit no longer locks every widget
   save.** CtrlCenter holds at most 8 RSS feed cards (and 20 API widgets), but
   a hand-edited 2.x file with more was upgraded as it was, after which every

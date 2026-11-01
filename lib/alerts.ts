@@ -145,7 +145,7 @@ export function buildAlertRequest(
   const text = `${emoji} ${title}`;
   switch (type) {
     case "discord":
-      return jsonReq(webhookUrl, { content: app.url ? `${text}\n${app.url}` : text });
+      return jsonReq(webhookUrl, discordPayload(text, app.url));
     case "slack":
       return jsonReq(webhookUrl, { text: app.url ? `${text}\n${app.url}` : text });
     case "ntfy": {
@@ -205,6 +205,21 @@ function clipChars(s: string, max: number): string {
   return chars.length > max ? `${chars.slice(0, Math.max(max - 1, 0)).join("")}…` : s;
 }
 
+// Discord's payload for `words` and an optional `link`, shared by the uptime
+// alerts and the relayed notifications (#433). No mention in the text may
+// page anyone (#401): without allowed_mentions an "@everyone" in a relayed
+// comment, or in a service's name, rang the admin's whole channel. Past the
+// cap the words are cut and the link kept whole, as Telegram's are (#425);
+// only a link too long to leave any room is cut with them.
+function discordPayload(words: string, link: string) {
+  const room = DISCORD_MAX_CONTENT - (link ? Array.from(link).length + 1 : 0);
+  const content =
+    link && room > 0
+      ? [clipChars(words, room), link].filter(Boolean).join("\n")
+      : clipChars([words, link].filter(Boolean).join("\n"), DISCORD_MAX_CONTENT);
+  return { content, allowed_mentions: { parse: [] } };
+}
+
 // Shape a notification into a request for the chosen channel — the counterpart
 // to buildAlertRequest for events that aren't uptime transitions. Reuses each
 // channel's body/header conventions so inbound events read like every other
@@ -217,21 +232,13 @@ export function buildNotificationRequest(
   const detail = [c.body?.trim(), c.url?.trim()].filter(Boolean).join("\n");
   const text = [c.title, detail].filter(Boolean).join("\n");
   switch (type) {
-    case "discord": {
+    case "discord":
       // The text can be a sender's own words — a Seerr user's issue report —
-      // so no mention in it may page anyone (#401): without allowed_mentions
-      // an "@everyone" in a comment rang the admin's whole channel. Past the
-      // cap the words are cut and the link kept whole, as Telegram's are
-      // (#425); only a link too long to leave any room is cut with them.
-      const link = c.url?.trim() ?? "";
-      const words = [c.title, c.body?.trim()].filter(Boolean).join("\n");
-      const room = DISCORD_MAX_CONTENT - (link ? Array.from(link).length + 1 : 0);
-      const content =
-        link && room > 0
-          ? [clipChars(words, room), link].filter(Boolean).join("\n")
-          : clipChars(text, DISCORD_MAX_CONTENT);
-      return jsonReq(webhookUrl, { content, allowed_mentions: { parse: [] } });
-    }
+      // so the shaping above keeps any mention in it from paging anyone.
+      return jsonReq(
+        webhookUrl,
+        discordPayload([c.title, c.body?.trim()].filter(Boolean).join("\n"), c.url?.trim() ?? "")
+      );
     case "slack":
       // Slack reads <…> as a link or a command — "<!channel>" pages everyone
       // — and & as an entity, so relayed text is escaped to show as written.
@@ -376,10 +383,23 @@ export function plainNotification(c: NotificationContent): PlainMessage {
   };
 }
 
-// Telegram caps a message at 4096 characters; leave room for the link.
+// Telegram caps a message at 4,096 characters, counted as UTF-16 units (an
+// emoji is two); Gotify and Apprise set no cap of their own and get the same
+// bound, counted as characters. Both leave room for the link.
 const MAX_TEXT = 3500;
-const clip = (s: string) => (s.length > MAX_TEXT ? `${s.slice(0, MAX_TEXT)}…` : s);
-const withLink = (s: string, url?: string) => (url ? `${clip(s)}\n${url}` : clip(s));
+
+// `s` cut to at most `max` UTF-16 units, as Telegram counts, ending in an
+// ellipsis. The cut steps back off a high surrogate so an emoji is never
+// split in two (#433); clipChars is the same cut counted in characters.
+function clipUnits(s: string, max: number): string {
+  if (s.length <= max) return s;
+  let end = Math.max(max - 1, 0);
+  const last = s.charCodeAt(end - 1);
+  if (last >= 0xd800 && last <= 0xdbff) end -= 1;
+  return `${s.slice(0, end)}…`;
+}
+
+const withLink = (s: string, url?: string) => (url ? `${s}\n${url}` : s);
 
 // Shape a message into the request one of the native services expects (#291).
 // Pure, so each service's payload is unit-tested.
@@ -392,7 +412,7 @@ export function buildServiceRequest(
       // Plain text: no parse_mode, so names with * or _ need no escaping.
       return jsonReq(`https://api.telegram.org/bot${ch.token.trim()}/sendMessage`, {
         chat_id: ch.chatId.trim(),
-        text: withLink(m.text, m.url),
+        text: withLink(clipUnits(m.text, MAX_TEXT), m.url),
         disable_web_page_preview: true,
       });
     case "gotify":
@@ -403,17 +423,19 @@ export function buildServiceRequest(
           headers: { "Content-Type": "application/json", "X-Gotify-Key": ch.token.trim() },
           body: JSON.stringify({
             title: m.title,
-            message: withLink(m.body, m.url),
+            message: withLink(clipChars(m.body, MAX_TEXT), m.url),
             priority: m.level === "down" ? 8 : m.level === "warning" ? 6 : 5,
           }),
         },
       };
     case "pushover": {
+      // Pushover's caps count characters: 250 for the title, 1,024 for the
+      // message. Cut by characters too, so neither ends in half an emoji.
       const form = new URLSearchParams({
         token: ch.token.trim(),
         user: ch.userKey.trim(),
-        title: m.title.slice(0, 250),
-        message: clip(m.body).slice(0, 1024),
+        title: clipChars(m.title, 250),
+        message: clipChars(m.body, 1024),
         priority: m.level === "down" ? "1" : "0",
       });
       if (m.url && /^https?:\/\//i.test(m.url)) form.set("url", m.url.slice(0, 512));
@@ -432,7 +454,7 @@ export function buildServiceRequest(
       // its URL (a stateless /notify or a saved /notify/<key>) points at.
       return jsonReq(ch.url.trim(), {
         title: m.title,
-        body: withLink(m.body, m.url),
+        body: withLink(clipChars(m.body, MAX_TEXT), m.url),
         type: { down: "failure", warning: "warning", up: "success", info: "info" }[m.level],
       });
   }
