@@ -40,8 +40,8 @@
      — square on Bold, pills on Soft and Clay — without inheriting the much
      larger surface rounding. */
   --control-radius: calc(0.5rem * var(--tune-radius));
-  --surface-bg: color-mix(in srgb, var(--fg) calc(4% * var(--tune-fill)), transparent);
-  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(7% * var(--tune-fill)), transparent);
+  --surface-bg: color-mix(in srgb, var(--fg) 4%, transparent);
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 7%, transparent);
   --surface-bg-image: none;
   --surface-blur: 24px;
   /* Shadow ink, flipped per mode (see .theme-light) so card drop-shadows read
@@ -55,10 +55,21 @@
       color-mix(in srgb, var(--accent-from) calc(22% * var(--tune-shadow)), transparent),
     0 6px 22px color-mix(in srgb, var(--accent-to) calc(18% * var(--tune-shadow)), transparent);
   --surface-lift: -2px;
-  /* The scene glow's strength is a design token (--design-glow, 0–1) times the
-     visitor's tune; scenes read the product. */
+  /* The scene glow's strength is a design token (--design-glow, 0–1) shifted
+     by the visitor's tune (#445): below 100% the design's own dims toward off,
+     above it the scene is first brought to full strength (a design that hides
+     the glow can be asked to show it) and then brightened (--scene-brightness,
+     a filter on .scene-root, which every scene sits in, canvas ones included,
+     so the knob shows everywhere). Opacity alone could not exceed 1, which
+     is why raising the knob used to do nothing on Glass. The CSS scenes read
+     --glow-opacity. */
   --design-glow: 1;
-  --glow-opacity: calc(var(--design-glow) * var(--tune-glow));
+  --glow-opacity: clamp(
+    0,
+    calc(var(--design-glow) * min(1, var(--tune-glow)) + max(0, var(--tune-glow) - 1)),
+    1
+  );
+  --scene-brightness: max(1, var(--tune-glow));
 
   /* Fine-tune multipliers (#326), 1 = the design untouched. The design tokens
      above and below multiply these in, so one slider in the theme builder
@@ -71,6 +82,12 @@
   --tune-shadow: 1;
   --tune-fill: 1;
   --tune-glow: 1;
+  /* Card opacity (#444): .glass-card fades the design's fill toward
+     transparent below 100% and, above it, builds a layer of the page color
+     up under that fill until the card is solid at 300%. The designs' fill
+     tokens no longer multiply the knob into their tint, which only made the
+     card brighter or darker. */
+  --surface-under: color-mix(in srgb, var(--background) calc(50% * max(0, var(--tune-fill) - 1)), transparent);
 
   /* Scene effects (#327), set on <html> by the theme resolver: the backdrop's
      opacity, and the motion level as data-motion ("calm" slows every CSS
@@ -111,6 +128,7 @@
    --glow-opacity fold --scene-opacity into that inline value instead. */
 .scene-root {
   opacity: var(--scene-opacity, 1);
+  filter: brightness(var(--scene-brightness, 1));
 }
 /* The wallpaper (#333): an image behind the scene (z below the scene layers),
    from variables the theme resolver sets on <html>; with none set the layer
@@ -141,8 +159,8 @@
   --surface-radius: calc(0.75rem * var(--tune-radius));
   --surface-border: color-mix(in srgb, var(--fg) 12%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--fg) 22%, transparent);
-  --surface-bg: color-mix(in srgb, var(--fg) calc(5% * var(--tune-fill)), var(--background));
-  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(9% * var(--tune-fill)), var(--background));
+  --surface-bg: color-mix(in srgb, var(--fg) 5%, var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 9%, var(--background));
   --surface-bg-image: none;
   --surface-blur: 0px;
   --surface-shadow: 0 1px 2px rgba(var(--shadow-tint), calc(0.2 * var(--tune-shadow)));
@@ -158,7 +176,7 @@
   --surface-border: color-mix(in srgb, var(--fg) 8%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--fg) 14%, transparent);
   --surface-bg: transparent;
-  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(3% * var(--tune-fill)), transparent);
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 3%, transparent);
   --surface-bg-image: none;
   --surface-blur: 0px;
   --surface-shadow: none;
@@ -173,8 +191,8 @@
   --surface-border-width: 2px;
   --surface-border: color-mix(in srgb, var(--fg) 85%, transparent);
   --surface-border-hover: var(--accent-from);
-  --surface-bg: color-mix(in srgb, var(--fg) calc(5% * var(--tune-fill)), var(--background));
-  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(8% * var(--tune-fill)), var(--background));
+  --surface-bg: color-mix(in srgb, var(--fg) 5%, var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 8%, var(--background));
   --surface-bg-image: none;
   --surface-blur: 0px;
   --surface-shadow: calc(5px * var(--tune-shadow)) calc(5px * var(--tune-shadow)) 0 0 var(--accent-from);
@@ -189,8 +207,8 @@
   --surface-border-width: 0px;
   --surface-border: transparent;
   --surface-border-hover: transparent;
-  --surface-bg: color-mix(in srgb, var(--fg) calc(6% * var(--tune-fill)), var(--background));
-  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(9% * var(--tune-fill)), var(--background));
+  --surface-bg: color-mix(in srgb, var(--fg) 6%, var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 9%, var(--background));
   --surface-bg-image: none;
   --surface-blur: 0px;
   --surface-shadow: 0 10px 30px rgba(var(--shadow-tint), calc(0.22 * var(--tune-shadow))), 0 2px 8px rgba(var(--shadow-tint), calc(0.14 * var(--tune-shadow)));
@@ -206,8 +224,8 @@
   --surface-border-width: 1px;
   --surface-border: color-mix(in srgb, var(--accent-from) 45%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--accent-to) 70%, transparent);
-  --surface-bg: color-mix(in srgb, var(--accent-from) calc(7% * var(--tune-fill)), var(--background));
-  --surface-bg-hover: color-mix(in srgb, var(--accent-from) calc(11% * var(--tune-fill)), var(--background));
+  --surface-bg: color-mix(in srgb, var(--accent-from) 7%, var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--accent-from) 11%, var(--background));
   --surface-bg-image: none;
   --surface-blur: 0px;
   --surface-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-from) calc(15% * var(--tune-shadow)), transparent),
@@ -227,8 +245,8 @@
   --surface-border-width: 0px;
   --surface-border: transparent;
   --surface-border-hover: transparent;
-  --surface-bg: color-mix(in srgb, var(--fg) calc(8% * var(--tune-fill)), var(--background));
-  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(12% * var(--tune-fill)), var(--background));
+  --surface-bg: color-mix(in srgb, var(--fg) 8%, var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 12%, var(--background));
   --surface-bg-image: none;
   --surface-blur: 0px;
   --surface-shadow: 0 12px 28px rgba(var(--shadow-tint), calc(0.3 * var(--tune-shadow))),
@@ -246,8 +264,8 @@
   --surface-border-width: 1px;
   --surface-border: color-mix(in srgb, var(--fg) 30%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--fg) 45%, transparent);
-  --surface-bg: color-mix(in srgb, var(--fg) calc(6% * var(--tune-fill)), transparent);
-  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(9% * var(--tune-fill)), transparent);
+  --surface-bg: color-mix(in srgb, var(--fg) 6%, transparent);
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 9%, transparent);
   --surface-bg-image: linear-gradient(
     to bottom,
     color-mix(in srgb, var(--fg) 16%, transparent),
@@ -271,8 +289,8 @@
   --surface-border-width: 1px;
   --surface-border: color-mix(in srgb, var(--fg) 16%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--fg) 28%, transparent);
-  --surface-bg: color-mix(in srgb, var(--fg) calc(12% * var(--tune-fill)), transparent);
-  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(16% * var(--tune-fill)), transparent);
+  --surface-bg: color-mix(in srgb, var(--fg) 12%, transparent);
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 16%, transparent);
   --surface-bg-image: linear-gradient(
     to bottom,
     color-mix(in srgb, var(--fg) 14%, transparent),
@@ -295,7 +313,7 @@
   --surface-border: color-mix(in srgb, var(--accent-from) 45%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--accent-to) 70%, transparent);
   --surface-bg: transparent;
-  --surface-bg-hover: color-mix(in srgb, var(--accent-from) calc(6% * var(--tune-fill)), transparent);
+  --surface-bg-hover: color-mix(in srgb, var(--accent-from) 6%, transparent);
   --surface-bg-image: none;
   --surface-blur: 0px;
   --surface-shadow: none;
@@ -313,8 +331,8 @@
   --surface-border-width: 1px;
   --surface-border: color-mix(in srgb, var(--fg) 8%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--fg) 14%, transparent);
-  --surface-bg: color-mix(in srgb, var(--fg) calc(10% * var(--tune-fill)), var(--background));
-  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(14% * var(--tune-fill)), var(--background));
+  --surface-bg: color-mix(in srgb, var(--fg) 10%, var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 14%, var(--background));
   --surface-bg-image: none;
   --surface-blur: 0px;
   --surface-shadow: 0 1px 2px rgba(var(--shadow-tint), calc(0.16 * var(--tune-shadow))),
@@ -332,8 +350,8 @@
   --surface-border-width: 1px;
   --surface-border: color-mix(in srgb, var(--accent-from) 30%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--accent-to) 50%, transparent);
-  --surface-bg: color-mix(in srgb, var(--fg) calc(5% * var(--tune-fill)), transparent);
-  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(8% * var(--tune-fill)), transparent);
+  --surface-bg: color-mix(in srgb, var(--fg) 5%, transparent);
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 8%, transparent);
   --surface-bg-image: linear-gradient(
     135deg,
     color-mix(in srgb, var(--accent-from) 30%, transparent),
@@ -355,8 +373,8 @@
   --surface-border-width: 0px;
   --surface-border: transparent;
   --surface-border-hover: transparent;
-  --surface-bg: color-mix(in srgb, var(--fg) calc(5% * var(--tune-fill)), var(--background));
-  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(8% * var(--tune-fill)), var(--background));
+  --surface-bg: color-mix(in srgb, var(--fg) 5%, var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 8%, var(--background));
   --surface-bg-image: none;
   --surface-blur: 0px;
   --surface-shadow: 0 0 24px color-mix(in srgb, var(--accent-from) calc(25% * var(--tune-shadow)), transparent),
@@ -377,8 +395,8 @@
   --surface-border-width: 0px;
   --surface-border: transparent;
   --surface-border-hover: transparent;
-  --surface-bg: color-mix(in srgb, var(--fg) calc(3% * var(--tune-fill)), var(--background));
-  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(5% * var(--tune-fill)), var(--background));
+  --surface-bg: color-mix(in srgb, var(--fg) 3%, var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 5%, var(--background));
   --surface-bg-image: none;
   --surface-blur: 0px;
   --surface-shadow: -6px -6px 14px color-mix(in srgb, var(--fg) calc(7% * var(--tune-shadow)), transparent),
@@ -398,8 +416,8 @@
   --surface-border-width: 0px;
   --surface-border: transparent;
   --surface-border-hover: transparent;
-  --surface-bg: color-mix(in srgb, var(--background), rgb(var(--shadow-tint)) calc(10% * var(--tune-fill)));
-  --surface-bg-hover: color-mix(in srgb, var(--background), rgb(var(--shadow-tint)) calc(6% * var(--tune-fill)));
+  --surface-bg: color-mix(in srgb, var(--background), rgb(var(--shadow-tint)) 10%);
+  --surface-bg-hover: color-mix(in srgb, var(--background), rgb(var(--shadow-tint)) 6%);
   --surface-bg-image: none;
   --surface-blur: 0px;
   --surface-shadow: inset 0 2px 6px rgba(var(--shadow-tint), calc(0.4 * var(--tune-shadow))),
@@ -419,8 +437,8 @@
   --surface-border-width: 1px;
   --surface-border: color-mix(in srgb, var(--fg) 10%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--fg) 18%, transparent);
-  --surface-bg: color-mix(in srgb, var(--fg) calc(7% * var(--tune-fill)), var(--background));
-  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(10% * var(--tune-fill)), var(--background));
+  --surface-bg: color-mix(in srgb, var(--fg) 7%, var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 10%, var(--background));
   --surface-bg-image: none;
   --surface-blur: 0px;
   --surface-shadow: inset 0 3px 0 0 var(--accent-from),
@@ -439,8 +457,8 @@
   --surface-border-style: dashed;
   --surface-border: color-mix(in srgb, var(--fg) 40%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--fg) 60%, transparent);
-  --surface-bg: color-mix(in srgb, var(--fg) calc(2% * var(--tune-fill)), transparent);
-  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(5% * var(--tune-fill)), transparent);
+  --surface-bg: color-mix(in srgb, var(--fg) 2%, transparent);
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 5%, transparent);
   --surface-bg-image: none;
   --surface-blur: 0px;
   --surface-shadow: none;
@@ -457,8 +475,8 @@
   --surface-border-width: 1px;
   --surface-border: color-mix(in srgb, var(--fg) 14%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--accent-from) 50%, transparent);
-  --surface-bg: color-mix(in srgb, var(--fg) calc(4% * var(--tune-fill)), var(--background));
-  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(7% * var(--tune-fill)), var(--background));
+  --surface-bg: color-mix(in srgb, var(--fg) 4%, var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 7%, var(--background));
   --surface-bg-image: repeating-linear-gradient(
     0deg,
     color-mix(in srgb, var(--fg) 2.5%, transparent) 0 1px,
@@ -536,8 +554,8 @@
   --surface-border-width: 0px;
   --surface-border: transparent;
   --surface-border-hover: transparent;
-  --surface-bg: color-mix(in srgb, var(--fg) calc(5% * var(--tune-fill)), var(--background));
-  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(8% * var(--tune-fill)), var(--background));
+  --surface-bg: color-mix(in srgb, var(--fg) 5%, var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 8%, var(--background));
 }
 .theme-light.design-outline,
 .theme-light .design-outline {
@@ -556,8 +574,8 @@
   --surface-border-width: 2px;
   --surface-border: color-mix(in srgb, var(--fg) 62%, transparent);
   --surface-border-hover: color-mix(in srgb, var(--fg) 80%, transparent);
-  --surface-bg: rgba(255, 255, 255, calc(0.45 * var(--tune-fill)));
-  --surface-bg-hover: rgba(255, 255, 255, calc(0.65 * var(--tune-fill)));
+  --surface-bg: rgba(255, 255, 255, 0.45);
+  --surface-bg-hover: rgba(255, 255, 255, 0.65);
   --surface-shadow: calc(3px * var(--tune-shadow)) calc(3px * var(--tune-shadow)) 0 0 color-mix(in srgb, var(--fg) calc(22% * var(--tune-shadow)), transparent);
   --surface-shadow-hover: calc(4px * var(--tune-shadow)) calc(4px * var(--tune-shadow)) 0 0 color-mix(in srgb, var(--fg) calc(30% * var(--tune-shadow)), transparent);
 }
@@ -571,8 +589,8 @@
 .theme-light .design-console {
   /* A visible scanline wash and a firmer frame around the accent rule. */
   --surface-border: color-mix(in srgb, var(--fg) 22%, transparent);
-  --surface-bg: color-mix(in srgb, var(--fg) calc(6% * var(--tune-fill)), var(--background));
-  --surface-bg-hover: color-mix(in srgb, var(--fg) calc(9% * var(--tune-fill)), var(--background));
+  --surface-bg: color-mix(in srgb, var(--fg) 6%, var(--background));
+  --surface-bg-hover: color-mix(in srgb, var(--fg) 9%, var(--background));
   --surface-bg-image: repeating-linear-gradient(
     0deg,
     color-mix(in srgb, var(--fg) 7%, transparent) 0 1px,
@@ -754,8 +772,8 @@ select optgroup {
     border-radius: var(--surface-radius);
     border: calc(var(--surface-border-width) * var(--tune-border))
       var(--surface-border-style, solid) var(--surface-border);
-    background-color: var(--surface-bg);
-    background-image: var(--surface-bg-image);
+    background-color: color-mix(in srgb, var(--surface-bg) calc(100% * min(1, var(--tune-fill))), transparent);
+    background-image: var(--surface-bg-image), linear-gradient(var(--surface-under), var(--surface-under));
     box-shadow: var(--surface-shadow);
     -webkit-backdrop-filter: blur(calc(var(--surface-blur) * var(--tune-blur)));
     backdrop-filter: blur(calc(var(--surface-blur) * var(--tune-blur)));
@@ -764,7 +782,7 @@ select optgroup {
   .glass-card:hover {
     transform: translateY(var(--surface-lift));
     border-color: var(--surface-border-hover);
-    background-color: var(--surface-bg-hover);
+    background-color: color-mix(in srgb, var(--surface-bg-hover) calc(100% * min(1, var(--tune-fill))), transparent);
     box-shadow: var(--surface-shadow-hover);
   }
   /* A content widget at an explicit height (#353). The cell is exactly that

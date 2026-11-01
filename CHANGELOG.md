@@ -35,6 +35,21 @@ here.
 
 ### Fixed
 
+- **The theme builder's "Card opacity" makes cards more or less solid.** The
+  slider used to scale how much of the text color is mixed into a card's
+  fill, so it brightened a card on a dark theme and greyed it on a light
+  one, while the scene behind showed through exactly as before, and on the
+  opaque designs it changed nothing you could call opacity. It now does what
+  it says: below 100% a card fades toward see-through, above it the page
+  color builds up under the design's fill until the card is solid at 300%.
+  At 100% every design looks as it did. (#444)
+- **"Scene glow" has a visible effect on every design and scene.** The
+  slider could only dim the backdrop, and on the default Glass design it
+  already sat at the maximum, so raising it did nothing; on Flat, Minimal,
+  Bold, Paper and Stripe it did nothing at all, and the canvas scenes
+  (Starfield, Rain, …) never read it. It now dims the scene below 100%,
+  leaves the design untouched at 100%, and above it brings the scene to full
+  strength and brightens it, on every scene. (#445)
 - **A daily series' digest names the days, not episode codes.** Sonarr
   numbers a daily series' episodes by year and order (S2026E274), so a
   burst of them was summed up with a code range that means nothing to a
