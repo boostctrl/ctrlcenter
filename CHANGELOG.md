@@ -12,6 +12,15 @@ here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Undo during a drag no longer splits the drag in two.** Pressing Ctrl+Z
+  in the layout editor while an edge resize was in progress took back the
+  part already dragged, and the rest of the resize then counted as a
+  separate change, so one resize took two presses to undo and the first of
+  them also reverted something older. Undo and Redo now wait until the drag,
+  the held stepper or the card move is over. (#424)
+
 ## [3.0.1] - 2026-11-01
 
 ### Changed

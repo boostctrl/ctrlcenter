@@ -330,10 +330,10 @@ export function useLayoutEditor({
 
   // Editing hotkeys: Ctrl/Cmd+Z undoes the last layout change, and
   // Ctrl/Cmd+Shift+Z or Ctrl+Y redoes it — except in a text field, which
-  // keeps its own undo. Escape deselects the selected card, and with none
-  // selected exits edit mode like Done — unless a layered surface should eat
-  // it first (an open More popover, the reset confirm dialog), whose own
-  // handlers close it.
+  // keeps its own undo, and not during a gesture (#424). Escape deselects
+  // the selected card, and with none selected exits edit mode like Done —
+  // unless a layered surface should eat it first (an open More popover, the
+  // reset confirm dialog), whose own handlers close it.
   // Capture phase, so the open-popover check runs before those document-level
   // handlers have closed anything.
   useEffect(() => {
@@ -342,6 +342,11 @@ export function useLayoutEditor({
       const key = e.key.toLowerCase();
       if ((e.ctrlKey || e.metaKey) && (key === "z" || key === "y") && !inTextField(e.target)) {
         e.preventDefault();
+        // Mid-gesture the hotkeys stand down like Escape does: an undo
+        // then would close the history's open step, so the rest of the
+        // drag would land in a new one and one resize would take two
+        // presses to take back (#424).
+        if (dragging.current) return;
         if (key === "z" && !e.shiftKey) undoLast();
         else redoLast();
         return;

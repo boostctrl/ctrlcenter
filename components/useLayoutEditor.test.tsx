@@ -40,6 +40,14 @@ const escape = () =>
     document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
   });
 
+// Ctrl+Z (undo), Ctrl+Shift+Z or Ctrl+Y (redo) as the page gets them.
+const hotkey = (key: string, shift = false) =>
+  act(() => {
+    document.body.dispatchEvent(
+      new KeyboardEvent("keydown", { key, ctrlKey: true, shiftKey: shift, bubbles: true, cancelable: true })
+    );
+  });
+
 const spanOf = (layout: EditableLayout, id: string) => layout.sections.find((w) => w.id === id)?.span;
 
 afterEach(() => {
@@ -65,9 +73,47 @@ describe("useLayoutEditor", () => {
     expect(setEditing).toHaveBeenCalledWith(false);
   });
 
+  it("ignores the undo and redo hotkeys during a gesture, so one resize is one undo step (#424)", () => {
+    const { result } = setup();
+    // Two older changes, the newer one undone, so both stacks have a step
+    // a stray hotkey could take.
+    act(() => result.current.setWidgetSpan("notes-1", 20));
+    act(() => result.current.setWidgetSpan("notes-1", 16));
+    act(() => result.current.undoLast());
+    expect(spanOf(result.current.layout, "notes-1")).toBe(20);
+    // A resize drag: Redo before its first change, Undo between its changes.
+    act(() => result.current.gesture.begin());
+    hotkey("z", true);
+    expect(spanOf(result.current.layout, "notes-1")).toBe(20);
+    expect(result.current.canRedo).toBe(true);
+    act(() => result.current.setWidgetSpan("apps-1", 10));
+    hotkey("z");
+    expect(spanOf(result.current.layout, "apps-1")).toBe(10);
+    act(() => result.current.setWidgetSpan("apps-1", 8));
+    hotkey("y");
+    expect(spanOf(result.current.layout, "apps-1")).toBe(8);
+    act(() => result.current.gesture.end());
+    // One press takes back the whole resize and nothing older; Redo
+    // restores it whole; the next press reaches the older change.
+    hotkey("z");
+    expect(spanOf(result.current.layout, "apps-1")).toBe(12);
+    expect(spanOf(result.current.layout, "notes-1")).toBe(20);
+    hotkey("z", true);
+    expect(spanOf(result.current.layout, "apps-1")).toBe(8);
+    hotkey("z");
+    hotkey("z");
+    expect(spanOf(result.current.layout, "apps-1")).toBe(12);
+    expect(spanOf(result.current.layout, "notes-1")).toBe(24);
+    expect(result.current.canUndo).toBe(false);
+  });
+
   // The editor with the card-moving hook beside it, as Dashboard wires them,
-  // and a card mid-drag: a mouse press moved past the slop.
-  function setupMidDrag(setEditing: (editing: boolean) => void = vi.fn()) {
+  // and a card mid-drag: a mouse press moved past the slop. `prepare` runs
+  // against the editor before the press.
+  function setupMidDrag(
+    setEditing: (editing: boolean) => void = vi.fn(),
+    prepare?: (editor: ReturnType<typeof useLayoutEditor>) => void
+  ) {
     const gridRef = { current: null };
     const trayRef = { current: null };
     const hook = renderHook(
@@ -97,6 +143,7 @@ describe("useLayoutEditor", () => {
       target: card,
       currentTarget: card,
     } as unknown as ReactPointerEvent<HTMLElement>;
+    if (prepare) act(() => prepare(hook.result.current.editor));
     act(() => hook.result.current.pointer.begin(press, "notes-1", 0));
     act(() => {
       window.dispatchEvent(new PointerEvent("pointermove", { pointerId: 1, clientX: 130, clientY: 300 }));
@@ -126,6 +173,20 @@ describe("useLayoutEditor", () => {
     escape();
     expect(result.current.pointer.drag).toBeNull();
     expect(setEditing).not.toHaveBeenCalled();
+  });
+
+  it("ignores the undo hotkey while a card is being moved (#424)", () => {
+    const { result } = setupMidDrag(vi.fn(), (editor) => editor.setWidgetSpan("notes-1", 12));
+    hotkey("z");
+    expect(spanOf(result.current.editor.layout, "notes-1")).toBe(12);
+    expect(result.current.pointer.drag?.id).toBe("notes-1");
+    // Dropped back where it was, so nothing changes, and Undo works again.
+    act(() => {
+      window.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1, clientX: 130, clientY: 300 }));
+    });
+    expect(result.current.pointer.drag).toBeNull();
+    hotkey("z");
+    expect(spanOf(result.current.editor.layout, "notes-1")).toBe(24);
   });
 
   it("keeps saving after a gesture that edit mode's end cut short (#400)", async () => {
