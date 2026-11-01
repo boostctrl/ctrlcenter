@@ -14,7 +14,7 @@ import { configVersion } from "../config-migrate";
 import { v2Categories } from "../config-migrate-v3";
 import { log } from "../log";
 import { MAX_GROUPS } from "../schema/groups";
-import { WIDGET_CAPS } from "../schema/instances";
+import { WIDGET_CAPS, WIDGET_TOTAL_CAP } from "../schema/instances";
 import { writeFileOnce } from "./files";
 
 export const V2_BACKUP_NAME = "config.v2.bak.yaml";
@@ -43,12 +43,14 @@ export type UpgradeSummary = {
   // (#403): their bookmarks are listed under the category's id instead.
   // Absent in a notice 3.0.0 wrote.
   skippedCategories?: string[];
-  // The widgets past a cap on their kind (#426): a 2.x file hand-edited past
-  // MAX_FEED_CARDS is upgraded as it is, and the stored read keeps the whole
-  // list, so a save can edit or trim it but not add another of that kind
-  // until it's back within the cap. For each kind over its cap: what the cap
-  // calls them, the cap, and the ids past it in the file's order. Absent in
-  // a notice 3.0.1 or earlier wrote.
+  // The widgets past a cap on their kind (#426), or past the cap on the list
+  // as a whole (#438): a 2.x file hand-edited past MAX_FEED_CARDS or
+  // MAX_WIDGET_INSTANCES is upgraded as it is, and the stored read keeps the
+  // whole list, so a save can edit or trim it but not add another of that
+  // kind (or at all) until it's back within the cap. For the whole list,
+  // then each kind over its cap: what the cap calls them, the cap, and the
+  // ids past it in the file's order. Absent in a notice 3.0.1 or earlier
+  // wrote.
   widgetsPastCap?: { label: string; max: number; ids: string[] }[];
   // The rollback copy's file name, beside the config: the one this upgrade
   // wrote or found holding the same file (#386).
@@ -62,17 +64,19 @@ const count = (v: unknown, key: string): number => {
   return Array.isArray(list) ? list.length : 0;
 };
 
-// For each kind of widget past its cap in the upgraded file, the ids past it
-// (#426). Only rows with an id count: the stored read drops the others.
+// The ids past the cap on the whole list in the upgraded file (#438), then
+// for each kind of widget past its cap, the ids past it (#426). Only rows
+// with an id count: the stored read drops the others.
 function pastCaps(after: unknown): NonNullable<UpgradeSummary["widgetsPastCap"]> {
   const rows = typeof after === "object" && after !== null ? (after as Record<string, unknown>).widgets : undefined;
   const widgets = (Array.isArray(rows) ? rows : []).map((w) =>
     typeof w === "object" && w !== null ? (w as { id?: unknown; type?: unknown }) : {}
   );
-  return WIDGET_CAPS.flatMap(({ type, max, label }) => {
-    const ids = widgets.flatMap((w) => (w.type === type && typeof w.id === "string" ? [w.id] : [])).slice(max);
+  const past = ({ max, label }: { max: number; label: string }, of: (w: { type?: unknown }) => boolean) => {
+    const ids = widgets.flatMap((w) => (of(w) && typeof w.id === "string" ? [w.id] : [])).slice(max);
     return ids.length > 0 ? [{ label, max, ids }] : [];
-  });
+  };
+  return [...past(WIDGET_TOTAL_CAP, () => true), ...WIDGET_CAPS.flatMap((cap) => past(cap, (w) => w.type === cap.type))];
 }
 
 export function summarizeUpgrade(

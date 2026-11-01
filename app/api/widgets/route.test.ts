@@ -148,3 +148,30 @@ describe("PUT /api/widgets over a cap (#426)", () => {
     expect(stored[0]).toMatchObject({ count: 3 });
   });
 });
+
+describe("PUT /api/widgets over the cap on the whole list (#438)", () => {
+  it("lets a patch edit and trim a list already past it, not grow it, naming the limit", async () => {
+    const { replaceWidgets, readConfigInternal } = await import("@/lib/config");
+    const { MAX_WIDGET_INSTANCES } = await import("@/lib/schema");
+    const limit = `At most ${MAX_WIDGET_INSTANCES} widgets`;
+    // As the 3.0 upgrade leaves a 2.x file with more widgets than fit.
+    const notes = Array.from({ length: MAX_WIDGET_INSTANCES + 2 }, (_, i) => newInstance("notes", `n${i}`));
+    await replaceWidgets(notes);
+    expect((await put({ upsert: [{ ...notes[0], content: "edited" }] })).status).toBe(200);
+    expect((await put({ remove: ["n1"] })).status).toBe(200);
+    const res = await put({ upsert: [newInstance("notes", "n-more")] });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe(limit);
+    // The palette's add is refused the same way, not with zod's own words.
+    const added = await route.POST(request("/api/widgets", { method: "POST", body: { type: "notes" }, session }));
+    expect(added.status).toBe(400);
+    expect((await added.json()).error).toBe(limit);
+    const stored = (await readConfigInternal()).widgets;
+    expect(stored.map((w) => w.id)).toEqual(notes.filter((w) => w.id !== "n1").map((w) => w.id));
+    expect(stored[0]).toMatchObject({ content: "edited" });
+    // The whole list sent back replaces it as long as it doesn't grow.
+    expect((await put([...stored, newInstance("notes", "n-more")])).status).toBe(400);
+    expect((await put(stored.slice(1))).status).toBe(200);
+    expect((await readConfigInternal()).widgets).toHaveLength(MAX_WIDGET_INSTANCES);
+  });
+});

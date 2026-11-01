@@ -102,8 +102,11 @@ const LOADERS: Loader[] = [
   },
 
   // One rendered card per active feed widget (enabled with at least one URL);
-  // one render can fan out to every active card — bounded by MAX_FEED_CARDS ×
-  // MAX_FEED_URLS.
+  // one render can fan out to every active card, MAX_FEED_URLS fetches each.
+  // A save holds the list to MAX_FEED_CARDS, but the stored list may hold
+  // more after the 3.0 upgrade of a hand-edited 2.x file (#426, #438), and
+  // every stored card renders — the cap bounds what can be added, not what
+  // one render fetches.
   async (ctx) => {
     const nodes: Record<string, ReactNode> = {};
     await Promise.all(

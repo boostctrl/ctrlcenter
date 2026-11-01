@@ -18,7 +18,8 @@ export default function UpgradeBanner({ notice }: { notice: UpgradeSummary }) {
   if (!open) return null;
   // Categories past the group limit (#403); a notice 3.0.0 wrote has none.
   const skipped = notice.skippedCategories ?? [];
-  // Widgets past a cap on their kind (#426); a notice 3.0.1 or earlier wrote has none.
+  // Widgets past a cap on their kind (#426) or past the cap on the whole list
+  // (#438); a notice 3.0.1 or earlier wrote has none.
   const pastCap = notice.widgetsPastCap ?? [];
 
   async function dismiss() {

@@ -5,7 +5,14 @@ import path from "path";
 import * as YAML from "js-yaml";
 import { migrateConfig } from "./config-migrate";
 import { summarizeUpgrade } from "./config/upgrade";
-import { CONFIG_SCHEMA_VERSION, configSchema, MAX_API_WIDGETS, MAX_FEED_CARDS, MAX_GROUPS } from "./schema";
+import {
+  CONFIG_SCHEMA_VERSION,
+  configSchema,
+  MAX_API_WIDGETS,
+  MAX_FEED_CARDS,
+  MAX_GROUPS,
+  MAX_WIDGET_INSTANCES,
+} from "./schema";
 
 // The whole 2.x → 3.0 upgrade (#306) against configs as users of 2.0, 2.5,
 // 2.10 and 2.13 would have them (lib/__fixtures__, each checked against its
@@ -174,6 +181,30 @@ describe("the upgrade summary", () => {
     ]);
     const few = { schemaVersion: 2, settings: { feeds: feeds.slice(0, 3) } };
     expect(summarizeUpgrade(few, migrateConfig(few).value).widgetsPastCap).toEqual([]);
+  });
+
+  it("names the widgets past the cap on the whole list, ahead of those past a kind's (#438)", () => {
+    // A 2.x file with enough feed cards that, with the stock widgets, the
+    // whole list runs past MAX_WIDGET_INSTANCES too.
+    const feeds = Array.from({ length: MAX_WIDGET_INSTANCES }, (_, n) => ({
+      id: `feed-${n + 1}`,
+      enabled: true,
+      urls: ["https://x.test/feed"],
+    }));
+    const before = { schemaVersion: 2, settings: { feeds } };
+    const after = migrateConfig(before).value;
+    const ids = list(rec(after).widgets).map((w) => w.id);
+    expect(ids.length).toBeGreaterThan(MAX_WIDGET_INSTANCES);
+    expect(summarizeUpgrade(before, after).widgetsPastCap).toEqual([
+      { label: "widgets", max: MAX_WIDGET_INSTANCES, ids: ids.slice(MAX_WIDGET_INSTANCES) },
+      { label: "RSS feed cards", max: MAX_FEED_CARDS, ids: feeds.slice(MAX_FEED_CARDS).map((f) => f.id) },
+    ]);
+    // A 3.0 pre-release file past the cap with no kind over its own.
+    const notes = Array.from({ length: MAX_WIDGET_INSTANCES + 1 }, (_, n) => ({ id: `note-${n + 1}`, type: "notes" }));
+    const pre = { schemaVersion: 2, settings: {}, widgets: notes };
+    expect(summarizeUpgrade(pre, migrateConfig(pre).value).widgetsPastCap).toEqual([
+      { label: "widgets", max: MAX_WIDGET_INSTANCES, ids: [`note-${MAX_WIDGET_INSTANCES + 1}`] },
+    ]);
   });
 });
 

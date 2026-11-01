@@ -177,9 +177,9 @@ export const DEFAULT_INSTANCES: WidgetInstance[] = (WIDGET_DEFS as readonly Widg
 // is dropped rather than failing the whole config.
 export const widgetInstancesSchema = lenientArray(widgetInstanceSchema).default(DEFAULT_INSTANCES);
 
-// How many instances a config can hold, and how many feed cards: each feed is
-// MAX_FEED_URLS fetches per render, so the fan-out stays bounded. API widgets
-// are each a fetch per refresh window, so they're capped too (#302).
+// How many instances a config can hold in all, and how many feed cards: each
+// feed is MAX_FEED_URLS fetches per render, so the fan-out stays bounded. API
+// widgets are each a fetch per refresh window, so they're capped too (#302).
 export const MAX_WIDGET_INSTANCES = 64;
 export const MAX_API_WIDGETS = 20;
 
@@ -193,6 +193,10 @@ export const WIDGET_CAPS = [
   { type: "feed", max: MAX_FEED_CARDS, label: "RSS feed cards" },
   { type: "api", max: MAX_API_WIDGETS, label: "API widgets" },
 ] as const;
+// The cap on the list as a whole, stated the same way (#438): the stored read
+// doesn't cut a list past it either, so a 2.x file with more widgets in all
+// is upgraded as it is, named by the upgrade and held the same way on save.
+export const WIDGET_TOTAL_CAP = { max: MAX_WIDGET_INSTANCES, label: "widgets" } as const;
 
 const httpOrBlank = (u: string) => u.trim() === "" || /^https?:\/\//i.test(u.trim());
 
@@ -206,16 +210,19 @@ export const widgetInstanceUpdateSchema = wholeOf(widgetInstanceSchema);
 // applies it to the stored list and validates the result with this one.
 //
 // Given the stored list, a cap on a kind is held only past what's stored
-// (#426): a list already over it — a 2.x file upgraded with more feed cards
-// than fit — saves as long as it keeps as many of that kind or fewer, so the
-// admin can edit it and trim it down, and only a save adding another is
-// refused, naming the cap. Without one every cap holds outright, which is
-// what an import is held to (lib/schema/config.ts).
+// (#426), and so is the cap on the whole list (#438): a list already over it
+// — a 2.x file upgraded with more feed cards than fit — saves as long as it
+// keeps as many of that kind (or as many in all) or fewer, so the admin can
+// edit it and trim it down, and only a save adding another is refused,
+// naming the cap. Without one every cap holds outright, which is what an
+// import is held to (lib/schema/config.ts).
 export function widgetInstancesUpdateSchemaFor(stored: readonly { type: string }[] = []) {
   const countOf = (list: readonly { type: string }[], type: string) => list.filter((w) => w.type === type).length;
   return z
     .array(widgetInstanceUpdateSchema)
-    .max(MAX_WIDGET_INSTANCES)
+    // The whole list's cap as zod's own "too big" issue, not a custom one: an
+    // import's message reads the limit off it (importListError).
+    .max(Math.max(WIDGET_TOTAL_CAP.max, stored.length), `At most ${WIDGET_TOTAL_CAP.max} ${WIDGET_TOTAL_CAP.label}`)
     .superRefine((list, ctx) => {
       const ids = new Set<string>();
       list.forEach((w, i) => {

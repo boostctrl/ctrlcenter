@@ -18,7 +18,10 @@ import {
   widgetInstancesUpdateSchemaFor,
   newInstance,
   MAX_FEED_CARDS,
-  MAX_FEED_URLS, weatherSchema } from "./schema";
+  MAX_FEED_URLS,
+  MAX_WIDGET_INSTANCES,
+  weatherSchema,
+} from "./schema";
 
 describe("feedUrls", () => {
   it("trims entries and drops blank rows", () => {
@@ -79,6 +82,27 @@ describe("widgetInstancesUpdateSchema (#297)", () => {
     expect(against(over, [...over, newInstance("notes", "n")]).success).toBe(true);
     expect(against(over.slice(0, MAX_FEED_CARDS), over.slice(0, MAX_FEED_CARDS + 1)).success).toBe(false);
     expect(ok(over)).toBe(false);
+  });
+
+  it("holds a list already past the cap on the whole list only to what's stored (#438)", () => {
+    const over = Array.from({ length: MAX_WIDGET_INSTANCES + 2 }, (_, i) => newInstance("notes", `n${i}`));
+    const against = (stored: typeof over, list: unknown) => widgetInstancesUpdateSchemaFor(stored).safeParse(list);
+    const limit = `At most ${MAX_WIDGET_INSTANCES} widgets`;
+    // Edited in place, or trimmed: fine. One more: refused, naming the limit.
+    expect(against(over, over).success).toBe(true);
+    expect(against(over, over.slice(1)).success).toBe(true);
+    const more = against(over, [...over, newInstance("notes", "one-more")]);
+    expect(more.success || more.error.issues[0]?.message).toBe(limit);
+    // Within the cap it holds as ever, and so it does with no stored list (an
+    // import) — as zod's own "too big" issue, which the import's message
+    // reads the limit off (importListError).
+    expect(against(over.slice(0, MAX_WIDGET_INSTANCES), over.slice(0, MAX_WIDGET_INSTANCES + 1)).success).toBe(false);
+    const strict = widgetInstancesUpdateSchema.safeParse(over);
+    expect(strict.success || strict.error.issues[0]).toMatchObject({
+      code: "too_big",
+      maximum: MAX_WIDGET_INSTANCES,
+      message: limit,
+    });
   });
 });
 

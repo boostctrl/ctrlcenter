@@ -131,4 +131,23 @@ describe("/api/widgets/[id]", () => {
     expect((await del(`f${MAX_FEED_CARDS + 1}`)).status).toBe(204);
     expect((await put("f1", { ...feeds[1], count: 4 })).status).toBe(200);
   });
+
+  it("lets a list already past the cap on the whole list be edited and trimmed, not grown (#438)", async () => {
+    const { replaceWidgets, readConfigInternal } = await import("@/lib/config");
+    const { MAX_WIDGET_INSTANCES } = await import("@/lib/schema");
+    // As the 3.0 upgrade leaves a 2.x file with more widgets than fit.
+    const many = Array.from({ length: MAX_WIDGET_INSTANCES + 2 }, (_, i) => newInstance("notes", `n${i}`));
+    await replaceWidgets(many);
+    expect((await put("n0", { ...many[0], content: "edited" })).status).toBe(200);
+    // One more widget is refused, naming the limit.
+    const res = await put("n-more", newInstance("notes", "n-more"));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe(`At most ${MAX_WIDGET_INSTANCES} widgets`);
+    const stored = (await readConfigInternal()).widgets;
+    expect(stored.find((w) => w.id === "n0")).toMatchObject({ content: "edited" });
+    expect(stored.map((w) => w.id)).not.toContain("n-more");
+    // Trimmed by one, the rest still saves.
+    expect((await del(`n${MAX_WIDGET_INSTANCES + 1}`)).status).toBe(204);
+    expect((await put("n1", { ...many[1], content: "edited too" })).status).toBe(200);
+  });
 });

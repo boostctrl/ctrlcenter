@@ -72,6 +72,16 @@ here.
   edit it and trim it down; adding one more is still refused with a message
   naming the limit. (#426)
 
+- **A 2.x config with more than 64 widgets in all no longer locks every
+  widget save either.** CtrlCenter holds at most 64 widgets, but a
+  hand-edited 2.x file with more — fifty-odd feed cards, say — was upgraded
+  as it was, after which every widget save failed with a bare "too big" and
+  nothing named the limit. As with a list past the feed-card limit, the
+  upgrade banner and the log now name the widgets past it, and the list
+  saves as long as the save doesn't add a widget, so you can edit it and
+  trim it down; adding one is refused with a message naming the limit.
+  (#438)
+
 - **The uptime history still shows from a read-only volume.** With the
   history database on a volume the app can't write to, the status pages
   started out empty after every restart: the file held the history, but the
