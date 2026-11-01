@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { controlClasses } from "./ui";
 
 type Result = {
   id: number;
@@ -72,7 +73,7 @@ export default function CitySearch({
         onChange={(e) => setQuery(e.target.value)}
         onFocus={() => results.length > 0 && setOpen(true)}
         placeholder="Search a city…"
-        className="accent-focus w-full rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-fg outline-none transition-colors"
+        className={`${controlClasses} w-full`}
       />
       {open && results.length > 0 && (
         <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-fg/10 bg-[var(--background)] shadow-lg">

@@ -81,10 +81,13 @@ export default function TestConnectionButton<T>({
         >
           {loading ? pendingLabel : label}
         </button>
-        {!loading && error !== null && (
-          <span className="text-xs text-status-down">✗ {error}</span>
-        )}
-        {settled && renderResult(result)}
+        {/* A live region, so the outcome is announced (#399). */}
+        <span role="status" aria-live="polite" className="contents">
+          {!loading && error !== null && (
+            <span className="text-xs text-status-down">✗ {error}</span>
+          )}
+          {settled && renderResult(result)}
+        </span>
       </div>
       {settled && renderExtra?.(result)}
     </div>

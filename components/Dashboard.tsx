@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { buttonClasses } from "@/lib/buttons";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
@@ -700,7 +701,7 @@ export default function Dashboard({
                       type="button"
                       onClick={() => configure(widget.id)}
                       aria-label={`Configure ${label}`}
-                      className="rounded-md border border-fg/10 px-2 py-0.5 text-ink-70 transition-colors hover:bg-fg/10 hover:text-fg"
+                      className={buttonClasses("ghost", "sm")}
                     >
                       Configure
                     </button>
@@ -708,7 +709,7 @@ export default function Dashboard({
                       type="button"
                       onClick={() => showOrHide(widget.id)}
                       aria-label={`${widget.hidden ? "Show" : "Hide"} ${label}`}
-                      className="rounded-md border border-fg/10 px-2 py-0.5 text-ink-70 transition-colors hover:bg-fg/10 hover:text-fg"
+                      className={buttonClasses("ghost", "sm")}
                     >
                       {widget.hidden ? "Show" : "Hide"}
                     </button>
@@ -778,7 +779,7 @@ export default function Dashboard({
               onClick={webSearch}
               className="text-ink-60 underline transition-colors hover:text-ink-90"
             >
-              Search {engineLabel(search)} for “{query}” →
+              Search {engineLabel(search)} for “{query}”
             </button>
           )}
         </p>

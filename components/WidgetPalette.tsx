@@ -4,6 +4,8 @@
 // registry with what it shows. Picking one creates it (with its defaults)
 // and the editor places it and opens its settings beside the page.
 import { useEffect, useRef, useState } from "react";
+import { buttonClasses } from "@/lib/buttons";
+import { useFocusTrap } from "./admin/useFocusTrap";
 import { createPortal } from "react-dom";
 import { WIDGET_DEFS } from "@/lib/widgets/defs";
 import type { WidgetType } from "@/lib/layout";
@@ -48,6 +50,14 @@ export default function WidgetPalette({
     };
   }, [open]);
 
+  // Focus follows the popover (#399): its first item on open, and the trap
+  // puts it back on the button on close.
+  const trapRef = useFocusTrap<HTMLDivElement>(open);
+  useEffect(() => {
+    if (!open) return;
+    popRef.current?.querySelector<HTMLElement>("button:not([disabled])")?.focus();
+  }, [open]);
+
   async function add(type: WidgetType) {
     setBusy(type);
     setError(null);
@@ -74,14 +84,17 @@ export default function WidgetPalette({
           setError(null);
           setOpen((o) => !o);
         }}
-        className="shrink-0 rounded-full border border-fg/10 bg-fg/5 px-3 py-1.5 text-sm text-ink-80 transition-colors hover:bg-fg/10"
+        className={`${buttonClasses("ghost", "sm")} shrink-0`}
       >
         Add widget
       </button>
       {open &&
         createPortal(
           <div
-            ref={popRef}
+            ref={(el) => {
+              popRef.current = el;
+              trapRef.current = el;
+            }}
             data-widget-palette
             data-editor-keep
             role="dialog"

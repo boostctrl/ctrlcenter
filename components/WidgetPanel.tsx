@@ -117,7 +117,7 @@ export default function WidgetPanel({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full border border-fg/10 bg-fg/5 px-3 py-1 text-sm text-ink-80 transition-colors hover:bg-fg/10"
+            className={buttonClasses("ghost", "sm")}
           >
             Done
           </button>

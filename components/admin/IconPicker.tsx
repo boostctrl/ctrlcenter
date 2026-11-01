@@ -6,6 +6,8 @@ import Icon from "@/components/Icon";
 import { fetchIconSlugs } from "@/lib/icons";
 import { useConfirm } from "./Confirm";
 import { useFocusTrap } from "./useFocusTrap";
+import { controlClasses } from "./ui";
+import { buttonClasses } from "@/lib/buttons";
 
 const MAX_RESULTS = 120;
 
@@ -157,7 +159,7 @@ export default function IconPicker({
                   onClear();
                   onClose();
                 }}
-                className="rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-ink-80 transition-colors hover:bg-fg/10"
+                className={buttonClasses("ghost", "sm")}
               >
                 No icon
               </button>
@@ -166,7 +168,7 @@ export default function IconPicker({
               type="button"
               onClick={() => fileRef.current?.click()}
               disabled={uploading}
-              className="rounded-lg border border-fg/10 bg-fg/5 px-3 py-1.5 text-xs text-ink-80 transition-colors hover:bg-fg/10 disabled:opacity-50"
+              className={buttonClasses("ghost", "sm")}
             >
               {uploading ? "Uploading…" : "Upload image"}
             </button>
@@ -189,7 +191,7 @@ export default function IconPicker({
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search icons, or paste an image address…"
           aria-label="Search icons, or paste an image address"
-          className="accent-focus w-full rounded-lg border border-fg/10 bg-fg/5 px-3 py-2 text-fg outline-none transition-colors"
+          className={`${controlClasses} w-full`}
         />
 
         {typedUrl && (

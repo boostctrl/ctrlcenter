@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { slugId } from "@/lib/slug";
 import { saveBoards } from "./admin/settingsApi";
 import { useConfirm } from "./admin/Confirm";
+import { useFocusTrap } from "./admin/useFocusTrap";
 import { diffList } from "@/lib/list-patch";
 import { buttonClasses } from "@/lib/buttons";
 
@@ -78,6 +79,14 @@ export default function BoardsMenu({
       document.removeEventListener("keydown", onKey);
       document.removeEventListener("pointerdown", onDown);
     };
+  }, [open]);
+
+  // Focus follows the menu (#399): its first entry on open, and the trap puts
+  // it back on the button on close.
+  const trapRef = useFocusTrap<HTMLDivElement>(open);
+  useEffect(() => {
+    if (!open) return;
+    popRef.current?.querySelector<HTMLElement>("a[href], button:not([disabled])")?.focus();
   }, [open]);
 
   if (!current) return null;
@@ -157,8 +166,8 @@ export default function BoardsMenu({
 
   const field =
     "min-w-0 flex-1 rounded-lg border border-fg/15 bg-fg/[0.03] px-2.5 py-1.5 text-sm text-ink-90 outline-none focus-visible:border-violet-400";
-  const small =
-    "shrink-0 rounded-lg border border-fg/10 px-2.5 py-1.5 text-xs text-ink-70 transition-colors hover:bg-fg/10 disabled:opacity-40";
+  // The menu's actions on the app's button recipe (#399).
+  const small = `${buttonClasses("ghost", "sm")} shrink-0`;
 
   return (
     <div ref={ref} className="relative shrink-0">
@@ -173,14 +182,17 @@ export default function BoardsMenu({
           setError(null);
           setOpen((o) => !o);
         }}
-        className="max-w-48 truncate rounded-full border border-fg/10 bg-fg/5 px-3 py-1.5 text-sm text-ink-80 transition-colors hover:bg-fg/10"
+        className={`${buttonClasses("ghost", "sm")} max-w-48 truncate`}
       >
         Board: {nameOf(current)}
       </button>
       {open &&
         createPortal(
           <div
-            ref={popRef}
+            ref={(el) => {
+              popRef.current = el;
+              trapRef.current = el;
+            }}
             data-boards-menu
             data-editor-keep
             role="dialog"

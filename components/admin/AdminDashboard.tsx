@@ -319,6 +319,9 @@ function AdminBody({
                   <label className="flex cursor-pointer items-start gap-3 text-sm">
                     <input
                       type="checkbox"
+                      // The dialog's first control takes focus on open (#399);
+                      // the trap returns it to the Export button on close.
+                      autoFocus
                       className="accent-focus mt-0.5"
                       checked={exportSecrets}
                       onChange={(ev) => setExportSecrets(ev.target.checked)}

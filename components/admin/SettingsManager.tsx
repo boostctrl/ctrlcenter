@@ -137,6 +137,7 @@ export default function SettingsManager({
           <button
             key={s.id}
             type="button"
+            aria-current={section === s.id ? "true" : undefined}
             onClick={() => selectSection(s.id)}
             className={`shrink-0 rounded-lg px-3 py-2 text-left text-sm whitespace-nowrap transition-colors ${
               section === s.id
