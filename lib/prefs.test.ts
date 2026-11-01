@@ -8,6 +8,7 @@ import {
   packFromCustomTheme,
   encodeThemeCode,
   decodeThemeCode,
+  sharedThemeHosts,
   type CustomTheme,
 } from "./prefs";
 import { themeInputSchema, themeEntrySchema } from "./schema";
@@ -337,5 +338,34 @@ describe("packFromCustomTheme (#334)", () => {
     expect(plain.designLight).toBeUndefined();
     expect(plain.sceneLight).toBeUndefined();
     expect(plain.font).toBeUndefined();
+  });
+});
+
+describe("sharedThemeHosts (#413)", () => {
+  const theme = (wallpaper?: string, wallpaperLight?: string) =>
+    sanitizeCustomTheme({
+      name: "Linked",
+      dark: valid,
+      light: { ...valid, background: "#eceef3", foreground: "#181b24" },
+      ...(wallpaper ? { wallpaper: { src: wallpaper, blur: 0, dim: 0, fit: "cover" } } : {}),
+      ...(wallpaperLight
+        ? { wallpaperLight: { src: wallpaperLight, blur: 0, dim: 0, fit: "cover" } }
+        : {}),
+    })!;
+
+  it("names the hosts a theme's wallpapers would load from, other than the site's own", () => {
+    expect(sharedThemeHosts(theme(), "home.lan")).toEqual([]);
+    expect(sharedThemeHosts(theme("/backgrounds/dots.svg"), "home.lan")).toEqual([]);
+    expect(sharedThemeHosts(theme("https://home.lan/api/wallpapers/x.jpg"), "home.lan")).toEqual([]);
+    expect(sharedThemeHosts(theme("https://HOME.lan/w.jpg"), "home.lan")).toEqual([]);
+    expect(sharedThemeHosts(theme("https://cdn.example.com/sea.jpg"), "home.lan")).toEqual([
+      "cdn.example.com",
+    ]);
+    expect(
+      sharedThemeHosts(theme("https://cdn.example.com/a.jpg", "https://cdn.example.com/b.jpg"), "home.lan")
+    ).toEqual(["cdn.example.com"]);
+    expect(
+      sharedThemeHosts(theme("https://a.example/a.jpg", "http://b.example:8080/b.jpg"), "home.lan")
+    ).toEqual(["a.example", "b.example:8080"]);
   });
 });

@@ -25,6 +25,7 @@ import {
   newThemeId,
   packFromCustomTheme,
   parseThemesExport,
+  sharedThemeHosts,
   siteThemeFromCustomTheme,
 } from "@/lib/prefs";
 import type { CustomTheme, ThemeColors } from "@/lib/prefs";
@@ -264,14 +265,42 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
       setPasteOpen(false);
     }
   }
-  // The link form: taken once the stored look has hydrated (this hook's own
-  // mount effect runs before PrefsProvider's, when the saved list is still
-  // the empty SSR state and would be clobbered), through a latest-value ref
-  // so the adopt sees the loaded list; then cleared from the address bar so
-  // a reload doesn't re-import it.
+  // The link form: offered once the stored look has hydrated (this hook's
+  // own mount effect runs before PrefsProvider's, when the saved list is
+  // still the empty SSR state and would be clobbered), through latest-value
+  // refs so the adopt sees the loaded list, and cleared from the address bar
+  // first so a reload doesn't offer it again. Nothing is applied or saved
+  // until the visitor accepts (#413): a code can carry a wallpaper hosted
+  // anywhere, and once saved that image loads on every page view and reports
+  // each visit to its host, so the prompt names such a host.
   const takeCodeRef = useRef(takeCode);
   useEffect(() => {
     takeCodeRef.current = takeCode;
+  });
+  function offerLink(hash: string) {
+    const theme = decodeThemeCode(hash);
+    if (!theme) {
+      setCodeStatus("That link doesn't carry a theme code.");
+      return;
+    }
+    const hosts = sharedThemeHosts(theme, window.location.host);
+    const message =
+      "It will be saved to your themes and applied in this browser, replacing your current look." +
+      (hosts.length > 0
+        ? ` It uses a wallpaper hosted at ${hosts.join(" and ")}, which will see this browser load it on every page.`
+        : "");
+    void confirm({
+      title: `Apply the theme “${theme.name}” from this link?`,
+      message,
+      confirmLabel: "Apply and save",
+    }).then((ok) => {
+      if (ok) takeCodeRef.current(hash);
+      else setCodeStatus("Left your look as it was.");
+    });
+  }
+  const offerLinkRef = useRef(offerLink);
+  useEffect(() => {
+    offerLinkRef.current = offerLink;
   });
   const linkTaken = useRef(false);
   useEffect(() => {
@@ -279,10 +308,10 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
     const hash = window.location.hash;
     if (!hash.startsWith("#theme=")) return;
     linkTaken.current = true;
-    // The URL is the external system here; the status it sets is the
-    // outcome of reading it, once.
-    takeCodeRef.current(hash);
     window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    // The URL is the external system here; what follows is the outcome of
+    // reading it, once.
+    offerLinkRef.current(hash);
   }, [hydrated, visitorTheming]);
 
   // A palette or saved theme can bring in a two-color accent the Solid editor

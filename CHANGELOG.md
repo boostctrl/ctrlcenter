@@ -45,6 +45,12 @@ here.
   minutes and raised a false lockout alert. Signing out over HTTPS now also
   clears the cookie from the browser, not just the session on the server.
   (#392)
+- **A shared theme link asks before it applies.** Opening a
+  `/settings#theme=<code>` link used to apply the theme and save it to your
+  browser at once. A code can carry a wallpaper hosted anywhere, and once
+  saved that image loads on every page, so whoever hosts it sees each of your
+  visits. The link now says what it would apply, names any wallpaper host
+  that isn't this site's, and changes nothing until you accept. (#413)
 
 ## [3.0.0] - 2026-10-16
 

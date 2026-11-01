@@ -490,6 +490,28 @@ export function decodeThemeCode(input: string): CustomTheme | null {
   }
 }
 
+// The hosts a theme's wallpapers would be loaded from, other than the site's
+// own (#413). A theme arriving by link is offered with these named: once it's
+// saved, an external image loads on every page view and its host sees each
+// visit. Same-origin paths and the site's own host are left out; a host used
+// by both modes is listed once.
+export function sharedThemeHosts(theme: CustomTheme, siteHost: string): string[] {
+  const hosts: string[] = [];
+  for (const wallpaper of [theme.wallpaper, theme.wallpaperLight]) {
+    if (!wallpaper || !/^https?:\/\//i.test(wallpaper.src)) continue;
+    let host: string;
+    try {
+      host = new URL(wallpaper.src).host;
+    } catch {
+      continue;
+    }
+    if (host && host.toLowerCase() !== siteHost.toLowerCase() && !hosts.includes(host)) {
+      hosts.push(host);
+    }
+  }
+  return hosts;
+}
+
 // Mint an id for a saved theme. crypto.randomUUID() only exists in secure
 // contexts (HTTPS/localhost), and this app is routinely self-hosted over plain
 // HTTP on a LAN — so fall back to getRandomValues, which is available

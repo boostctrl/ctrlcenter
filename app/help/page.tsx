@@ -342,8 +342,10 @@ export default async function HelpPage() {
             switch in Settings, to follow it or keep the usual theme. To carry a look elsewhere, <em>Copy as code</em>{" "}
             puts it on the clipboard as a short code; <em>Paste a code</em> in
             another browser&apos;s builder applies and saves it, and a link of
-            the form <Code>/settings#theme=&lt;code&gt;</Code> does the same on
-            arrival. Export and Import move your whole list as a file. Signed-in admins get two extra controls here: the
+            the form <Code>/settings#theme=&lt;code&gt;</Code> offers to do the
+            same on arrival, naming any wallpaper host that isn&apos;t this
+            site&apos;s, and changes nothing until you accept. Export and
+            Import move your whole list as a file. Signed-in admins get two extra controls here: the
             globe on a saved theme makes that look the site-wide default every
             visitor starts from, and the grid adds it to the site&apos;s theme
             gallery for every visitor to pick — both copies, so editing the
