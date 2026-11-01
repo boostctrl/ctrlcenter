@@ -1,19 +1,43 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { holdForDigest, pendingWebhookDigests, resetWebhookDigest } from "./webhook-digest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import {
+  holdForDigest,
+  pendingWebhookDigests,
+  resetWebhookDigest,
+  restoreWebhookDigests,
+  webhookDigestSpooled,
+} from "./webhook-digest";
 import { keyForLog, parseArrWebhook } from "./webhooks";
 import { log } from "./log";
 
 // The burst store (#346) on fake timers: when a group goes out, what it
-// holds, and that nothing leaks between tests.
+// holds, and that nothing leaks between tests. Each test gets its own
+// scratch directory for the spool (#351), as a fresh install would.
 const MIN = 60_000;
+let dir: string;
+const spool = () => path.join(dir, "webhook-digest.json");
 
 // One Sonarr import event for an episode of series `sid`.
-const imported = (ep: number, sid = 1) =>
+const imported = (ep: number, sid = 1, over: Record<string, unknown> = {}) =>
   parseArrWebhook("sonarr", {
     eventType: "Download",
     series: { id: sid, title: sid === 1 ? "The Bear" : "Silo" },
     episodes: [{ id: sid * 1000 + ep, seasonNumber: 4, episodeNumber: ep, title: `Ep ${ep}` }],
     episodeFile: { quality: "WEBDL-1080p", size: 1024 ** 3 },
+    ...over,
+  })!;
+// The import that replaced an episode's file, and the delete Sonarr posts
+// for the file it replaced (#351) — by default for the upgrade's reason.
+const upgraded = (ep: number) => imported(ep, 1, { isUpgrade: true, deletedFiles: [{ quality: "HDTV-720p" }] });
+const deleted = (ep: number, reason = "Upgrade") =>
+  parseArrWebhook("sonarr", {
+    eventType: "EpisodeFileDelete",
+    series: { id: 1, title: "The Bear" },
+    episodes: [{ id: 1000 + ep, seasonNumber: 4, episodeNumber: ep, title: `Ep ${ep}` }],
+    episodeFile: { relativePath: `Season 04/The Bear - S04E0${ep}.mkv`, quality: "HDTV-720p" },
+    deleteReason: reason,
   })!;
 
 const sent = () => vi.fn<(c: unknown) => Promise<void>>().mockResolvedValue(undefined);
@@ -29,13 +53,18 @@ const movie = (id: number) =>
   parseArrWebhook("radarr", { eventType: "Grab", movie: { id, title: `Movie ${id}`, year: 2026 }, release: {} })!;
 
 beforeEach(() => {
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), "ctrl-digest-"));
+  vi.stubEnv("CONFIG_PATH", path.join(dir, "config.yaml"));
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-10-10T20:00:00Z"));
 });
 
-afterEach(() => {
+afterEach(async () => {
   resetWebhookDigest();
+  // A spool write still in flight lands before the directory goes away.
+  await webhookDigestSpooled();
   vi.useRealTimers();
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 
@@ -347,5 +376,227 @@ describe("holdForDigest scopes (#359)", () => {
     // A key already in the group still takes its event.
     expect(holdForDigest(imported(2, 32), o)).toBe(true);
     expect(pendingWebhookDigests()).toEqual([{ key: "sonarr|", count: 33 }]);
+  });
+});
+
+describe("holdForDigest folds an upgrade's delete into its import (#351)", () => {
+  it("drops the delete Sonarr posts before each upgraded import, and sends the imports alone", async () => {
+    const send = sent();
+    // Sonarr deletes the file an upgrade replaces and then imports, episode
+    // by episode: the first delete finds no import pending and opens a
+    // burst of its own, which its import then empties.
+    expect(holdForDigest(deleted(1), { windowMs: MIN, send })).toBe(true);
+    expect(pendingWebhookDigests()).toEqual([{ key: "sonarr||EpisodeFileDelete|1", count: 1 }]);
+    for (let e = 1; e <= 3; e += 1) {
+      if (e > 1) expect(holdForDigest(deleted(e), { windowMs: MIN, send })).toBe(true);
+      expect(holdForDigest(upgraded(e), { windowMs: MIN, send })).toBe(true);
+      expect(pendingWebhookDigests()).toEqual([{ key: "sonarr||Download|1", count: e }]);
+      await vi.advanceTimersByTimeAsync(2_000);
+    }
+    // The emptied delete group's timer went with it.
+    expect(vi.getTimerCount()).toBe(1);
+    await vi.advanceTimersByTimeAsync(MIN);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0][0]).toMatchObject({ title: "Sonarr upgraded 3 episodes of The Bear (S04E01-E03)" });
+    expect(pendingWebhookDigests()).toEqual([]);
+  });
+
+  it("drops a delete arriving after its import, sliding the import's window", async () => {
+    const send = sent();
+    const only = upgraded(3);
+    holdForDigest(only, { windowMs: MIN, send });
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(holdForDigest(deleted(3), { windowMs: MIN, send })).toBe(true);
+    expect(pendingWebhookDigests()).toEqual([{ key: "sonarr||Download|1", count: 1 }]);
+    await vi.advanceTimersByTimeAsync(MIN - 1);
+    expect(send).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(send).toHaveBeenCalledTimes(1);
+    // The import alone was one event about one item: it goes out unchanged.
+    expect(send.mock.calls[0][0]).toBe(only);
+  });
+
+  it("relays a delete whose import never comes, and a manual one beside an import, on their own", async () => {
+    const send = sent();
+    const alone = deleted(5);
+    holdForDigest(alone, { windowMs: MIN, send });
+    await vi.advanceTimersByTimeAsync(MIN);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0][0]).toBe(alone);
+    // A manual delete of an episode and an import of it in one window are
+    // two pieces of news.
+    const manual = deleted(3, "Manual");
+    holdForDigest(manual, { windowMs: MIN, send });
+    holdForDigest(imported(3), { windowMs: MIN, send });
+    expect(pendingWebhookDigests()).toEqual([
+      { key: "sonarr||EpisodeFileDelete|1", count: 1 },
+      { key: "sonarr||Download|1", count: 1 },
+    ]);
+    await vi.advanceTimersByTimeAsync(MIN);
+    expect(send).toHaveBeenCalledTimes(3);
+    expect(send.mock.calls[1][0]).toBe(manual);
+  });
+
+  it("keeps the deletes an import doesn't cover, standing for what is left by its own events", async () => {
+    const send = sent();
+    for (const e of [3, 4, 5]) holdForDigest(deleted(e), { windowMs: MIN, send });
+    holdForDigest(upgraded(3), { windowMs: MIN, send });
+    expect(pendingWebhookDigests()).toEqual([
+      { key: "sonarr||EpisodeFileDelete|1", count: 2 },
+      { key: "sonarr||Download|1", count: 1 },
+    ]);
+    await vi.advanceTimersByTimeAsync(MIN);
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send.mock.calls[0][0]).toMatchObject({ title: "Sonarr deleted 2 episodes of The Bear (S04E04-E05)" });
+    // One left: its own event goes out, not the burst's first, which the
+    // import covered.
+    const seventh = deleted(7);
+    holdForDigest(deleted(6), { windowMs: MIN, send });
+    holdForDigest(seventh, { windowMs: MIN, send });
+    holdForDigest(upgraded(6), { windowMs: MIN, send });
+    expect(pendingWebhookDigests()).toEqual([
+      { key: "sonarr||EpisodeFileDelete|1", count: 1 },
+      { key: "sonarr||Download|1", count: 1 },
+    ]);
+    await vi.advanceTimersByTimeAsync(MIN);
+    expect(send).toHaveBeenCalledTimes(4);
+    expect(send.mock.calls[2][0]).toBe(seventh);
+  });
+
+  it("folds inside the one group under a wider scope, which stays for its other bursts", async () => {
+    const send = sent();
+    const o = { windowMs: MIN, send, scope: "app" as const };
+    holdForDigest(deleted(1), o);
+    holdForDigest(grabbed(1), o);
+    expect(pendingWebhookDigests()).toEqual([{ key: "sonarr|", count: 2 }]);
+    holdForDigest(upgraded(1), o);
+    holdForDigest(deleted(2), o);
+    holdForDigest(upgraded(2), o);
+    expect(pendingWebhookDigests()).toEqual([{ key: "sonarr|", count: 3 }]);
+    await vi.advanceTimersByTimeAsync(MIN);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0][0]).toMatchObject({
+      title: "Sonarr: 2 updates",
+      body: "Sonarr grabbed: Silo S03E01\nSonarr upgraded 2 episodes of The Bear (S04E01-E02)",
+    });
+  });
+});
+
+describe("the digest spool (#351)", () => {
+  it("spools the pending groups and reads them back after a restart, due as they were", async () => {
+    const send = sent();
+    holdForDigest(imported(1), { windowMs: MIN, send });
+    await vi.advanceTimersByTimeAsync(10_000);
+    holdForDigest(imported(2), { windowMs: MIN, send });
+    holdForDigest(imported(1, 2), { windowMs: MIN, send });
+    await webhookDigestSpooled();
+    const file = JSON.parse(fs.readFileSync(spool(), "utf8"));
+    expect(file.version).toBe(1);
+    expect(file.groups.map((g: { key: string }) => g.key)).toEqual(["sonarr||Download|1", "sonarr||Download|2"]);
+    expect(file.groups[0].bursts[0].items).toHaveLength(2);
+    expect(fs.statSync(spool()).mode & 0o777).toBe(0o600);
+    // The process stops: the memory goes, the spool stays. Twenty seconds
+    // later it is back, with a delivery of its own for what it reads.
+    resetWebhookDigest();
+    expect(pendingWebhookDigests()).toEqual([]);
+    await vi.advanceTimersByTimeAsync(20_000);
+    const relay = sent();
+    expect(await restoreWebhookDigests({ send: relay })).toBe(2);
+    expect(pendingWebhookDigests()).toEqual([
+      { key: "sonarr||Download|1", count: 2 },
+      { key: "sonarr||Download|2", count: 1 },
+    ]);
+    // An event after the restart joins its restored group and slides it.
+    holdForDigest(imported(3), { windowMs: MIN, send });
+    expect(pendingWebhookDigests()[0]).toEqual({ key: "sonarr||Download|1", count: 3 });
+    // Silo was due a minute after its event, forty seconds from now.
+    await vi.advanceTimersByTimeAsync(40_000 - 1);
+    expect(relay).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(relay).toHaveBeenCalledTimes(1);
+    expect(relay.mock.calls[0][0]).toEqual(imported(1, 2));
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(relay).toHaveBeenCalledTimes(2);
+    expect(relay.mock.calls[1][0]).toMatchObject({ title: "Sonarr imported 3 episodes of The Bear (S04E01-E03)" });
+    expect(send).not.toHaveBeenCalled();
+    // Nothing pending: the spool goes.
+    await webhookDigestSpooled();
+    expect(fs.existsSync(spool())).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("sends a group whose due passed while the process was down at once", async () => {
+    holdForDigest(imported(1), { windowMs: MIN, send: sent() });
+    await webhookDigestSpooled();
+    resetWebhookDigest();
+    await vi.advanceTimersByTimeAsync(5 * MIN);
+    const relay = sent();
+    expect(await restoreWebhookDigests({ send: relay })).toBe(1);
+    expect(relay).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(relay).toHaveBeenCalledTimes(1);
+    expect(relay.mock.calls[0][0]).toEqual(imported(1));
+  });
+
+  it("folds a spooled burst into a group an event opened before the restore", async () => {
+    const send = sent();
+    holdForDigest(imported(1), { windowMs: MIN, send });
+    await webhookDigestSpooled();
+    const spooled = fs.readFileSync(spool(), "utf8");
+    resetWebhookDigest();
+    holdForDigest(imported(2), { windowMs: MIN, send });
+    await webhookDigestSpooled();
+    fs.writeFileSync(spool(), spooled);
+    expect(await restoreWebhookDigests({ send: sent() })).toBe(1);
+    expect(pendingWebhookDigests()).toEqual([{ key: "sonarr||Download|1", count: 2 }]);
+    expect(vi.getTimerCount()).toBe(1);
+    await vi.advanceTimersByTimeAsync(MIN);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0][0]).toMatchObject({ title: "Sonarr imported 2 episodes of The Bear (S04E01-E02)" });
+  });
+
+  it("starts empty from a missing, unreadable, corrupt or foreign spool, saying so", async () => {
+    const warn = vi.spyOn(log, "warn").mockImplementation(() => undefined);
+    const send = sent();
+    expect(await restoreWebhookDigests({ send })).toBe(0);
+    expect(warn).not.toHaveBeenCalled();
+    fs.writeFileSync(spool(), "{not json");
+    expect(await restoreWebhookDigests({ send })).toBe(0);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toMatch(/^webhook digest spool unparseable, starting empty/);
+    const burst = { key: "x", first: { title: 1 }, last: { title: "t" }, events: 1, items: [], dropped: 0, droppedIds: [] };
+    fs.writeFileSync(spool(), JSON.stringify({ version: 1, groups: [{ key: "x", firstAt: 1, due: 2, bursts: [burst] }] }));
+    expect(await restoreWebhookDigests({ send })).toBe(0);
+    fs.writeFileSync(spool(), JSON.stringify({ version: 2, groups: [] }));
+    expect(await restoreWebhookDigests({ send })).toBe(0);
+    expect(warn).toHaveBeenCalledTimes(3);
+    expect(warn.mock.calls[2][0]).toMatch(/^webhook digest spool isn't one, starting empty/);
+    fs.rmSync(spool());
+    fs.mkdirSync(spool());
+    expect(await restoreWebhookDigests({ send })).toBe(0);
+    expect(warn).toHaveBeenCalledTimes(4);
+    expect(warn.mock.calls[3][0]).toMatch(/^webhook digest spool unreadable, starting empty/);
+    expect(pendingWebhookDigests()).toEqual([]);
+    expect(vi.getTimerCount()).toBe(0);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("holds on in memory when the spool can't be written, saying so once", async () => {
+    const warn = vi.spyOn(log, "warn").mockImplementation(() => undefined);
+    // The config directory is a file: nothing can be written beside it.
+    fs.writeFileSync(path.join(dir, "blocked"), "");
+    vi.stubEnv("CONFIG_PATH", path.join(dir, "blocked", "config.yaml"));
+    const send = sent();
+    expect(holdForDigest(imported(1), { windowMs: MIN, send })).toBe(true);
+    await webhookDigestSpooled();
+    expect(holdForDigest(imported(2), { windowMs: MIN, send })).toBe(true);
+    await webhookDigestSpooled();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toMatch(/^can't spool pending webhook digests, they end with the process/);
+    await vi.advanceTimersByTimeAsync(MIN);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0][0]).toMatchObject({ title: "Sonarr imported 2 episodes of The Bear (S04E01-E02)" });
+    await webhookDigestSpooled();
+    expect(warn).toHaveBeenCalledTimes(1);
   });
 });

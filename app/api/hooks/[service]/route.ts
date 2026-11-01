@@ -4,6 +4,7 @@ import { readConfigInternal } from "@/lib/config";
 import { WEBHOOK_SERVICES, type WebhookService } from "@/lib/schema";
 import { keyForLog, parseWebhook, reportOptions } from "@/lib/webhooks";
 import { holdForDigest } from "@/lib/webhook-digest";
+import { relayDigest } from "@/lib/webhook-relay";
 import { sendNotification, anyChannelReady } from "@/lib/alerts";
 import { rateLimit, pruneRateLimit, clientKey } from "@/lib/rate-limit";
 import { log } from "@/lib/log";
@@ -120,29 +121,16 @@ export async function POST(
   // posted meanwhile (#359); a Test, a health issue or anything else the
   // parser left out of a digest, and every event while the window is off,
   // is relayed at once as before — as is one the store has no room to hold.
+  // The delivery (lib/webhook-relay.ts) reads the config afresh when the
+  // group goes out, and a group still pending at a restart is spooled and
+  // sent once the process is back (#351).
   const windowMs = settings.webhooks.digestSeconds * 1000;
   if (windowMs > 0 && notification.digest) {
     const key = keyForLog(notification.digest.key);
     const held = holdForDigest(notification, {
       windowMs,
       scope: settings.webhooks.digestScope,
-      send: async (merged) => {
-        // Read the config afresh: a channel added or edited while the burst
-        // was pending is honoured, one removed meanwhile isn't sent to, and
-        // a report-option toggle (#347) flipped meanwhile applies when it
-        // goes out.
-        const { settings } = await readConfigInternal();
-        if (!anyChannelReady(settings.alerts)) {
-          log.info("webhook digest dropped: no alert channel configured", { service });
-          return;
-        }
-        await sendNotification(settings.alerts, merged, {
-          at: Date.now(),
-          timeZone: settings.timezone,
-          siteTitle: settings.title,
-          options: reportOptions(settings.webhooks),
-        });
-      },
+      send: relayDigest,
     });
     if (held) {
       log.debug("webhook held for digest", { service, key });

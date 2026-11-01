@@ -1,18 +1,32 @@
 // The Node side of the startup hook (see instrumentation.ts): start the
 // background uptime poller so /status history accrues independent of page
-// views, make the config files private, and log the security checklist's red
-// rows.
+// views, make the config files private, send the webhook digests the last
+// process left pending, and log the security checklist's red rows.
 import { startStatusPoller } from "./lib/status-poller";
 import { CONFIG_FILE } from "./lib/config/store";
 import { tightenPrivateFiles } from "./lib/config/files";
 import { readConfigInternal } from "./lib/config";
 import { collectSecurityFacts, securityChecklist } from "./lib/security-checklist";
-import { log } from "./lib/log";
+import { restoreWebhookDigests } from "./lib/webhook-digest";
+import { relayDigest } from "./lib/webhook-relay";
+import { log, errorReason } from "./lib/log";
 
 export async function registerNode() {
   startStatusPoller();
   await tightenConfigFiles();
+  await restorePendingDigests();
   await logSecurityWarnings();
+}
+
+// The webhook digests still pending when the process last stopped (#351):
+// read back from their spool and re-armed, so a restart in the middle of a
+// burst still sends it.
+async function restorePendingDigests() {
+  try {
+    await restoreWebhookDigests({ send: relayDigest });
+  } catch (e) {
+    log.warn(`can't restore pending webhook digests: ${errorReason(e)}`);
+  }
 }
 
 // Files beside the config made before #386 could be world-readable through

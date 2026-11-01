@@ -55,6 +55,7 @@ next-env.d.ts
 /config/session-secret
 /config/sessions.json
 /config/security-events.jsonl
+/config/webhook-digest.json
 
 # browser smoke-test screenshots (npm run smoke)
 /smoke-screenshots/

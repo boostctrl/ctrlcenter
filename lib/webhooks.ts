@@ -69,7 +69,8 @@ export type WebhookReport = {
 // size when every item agrees. `id` dedupes a resent event; `season` and
 // `episode` let the merged title carry a range — `airDate` ("YYYY-MM-DD")
 // in their place for a daily series' episode, whose code means nothing
-// (#351) — and `upgrade` lets a burst of nothing but upgrades say so.
+// (#351) — and `upgrade` lets a burst of nothing but upgrades say so, and
+// marks the delete an upgrade made, which its import folds away (#351).
 export type DigestItem = {
   id: string;
   label: string;
@@ -109,6 +110,14 @@ export type WebhookDigest = {
   event: string;
   noun: DigestNoun;
   items: DigestItem[];
+  // An upgrade's delete and its import, paired by key (#351): Sonarr posts
+  // the delete of the file an upgrade replaces (EpisodeFileDelete, reason
+  // Upgrade) beside the import, which already says what it replaced. The
+  // delete names the import burst it adds nothing to (`foldInto`), the
+  // import the delete burst whose covered items it makes redundant
+  // (`folds`); lib/webhook-digest.ts folds the pair into one notification.
+  foldInto?: string;
+  folds?: string;
 };
 
 // What the channels relay: the flat contract every builder reads, plus the
@@ -323,7 +332,9 @@ function dateRange(dates: string[], dash = "–"): string {
   return first === last ? first : `${first} ${dash} ${last}`;
 }
 
-type Episode = { id?: number; season: number; episode: number; title: string; airDate: string };
+// `daily` is the series' type: a daily series' episode is named by its air
+// date, not its code (#351).
+type Episode = { id?: number; season: number; episode: number; title: string; airDate: string; daily: boolean };
 
 // "S04E03-E05" for a run within one season, "S04E01-E03, E05" with a gap,
 // seasons joined with ", "; more than three seasons collapse to "S01-S05".
@@ -402,19 +413,25 @@ const SERIES_TYPES: Record<string, string> = {
 };
 
 function episodesOf(p: Record<string, unknown>): Episode[] {
+  const daily = str(asRecord(p.series).type).toLowerCase() === "daily";
   return list(p.episodes).flatMap((e) => {
     const ep = asRecord(e);
     const season = num(ep.seasonNumber);
     const episode = num(ep.episodeNumber);
     return season === undefined || episode === undefined
       ? []
-      : [{ id: num(ep.id), season, episode, title: str(ep.title), airDate: str(ep.airDate) }];
+      : [{ id: num(ep.id), season, episode, title: str(ep.title), airDate: str(ep.airDate), daily }];
   });
 }
 
-// One episode's line: S04E03 "Scrap".
-const episodeLine = (e: Episode) =>
-  `S${pad2(e.season)}E${pad2(e.episode)}${e.title ? ` "${e.title}"` : ""}`;
+// One episode's line: S04E03 "Scrap" — or, for a daily series, whose code
+// Sonarr makes of the year and a running number (S2026E271), its air date,
+// 2026-10-01 "Day 1", the way Sonarr names the file (#351). A daily episode
+// with no date yet keeps its code rather than go unnamed.
+const episodeLine = (e: Episode) => {
+  const date = e.daily ? isoDate(e.airDate) : "";
+  return `${date || `S${pad2(e.season)}E${pad2(e.episode)}`}${e.title ? ` "${e.title}"` : ""}`;
+};
 
 // `lines` one per line, stopping at `max` and saying how many of `total`
 // remain — a season pack's episodes, a burst's items. Each line is cut at
@@ -611,6 +628,8 @@ export function keyForLog(key: string): string {
 // The Daily Show (2026-10-01 - 2026-10-07)"; anything else groups by
 // instance and event alone — Radarr's payload names no collection — with
 // the series or movie as the item. An event with no subject joins nothing.
+// A series' import names the delete burst it folds, and the delete of a
+// file an upgrade replaced the import burst it folds into (#351).
 function arrDigest(
   service: ArrService,
   p: Record<string, unknown>,
@@ -623,17 +642,21 @@ function arrDigest(
   if (service === "sonarr" && media.episodes.length) {
     const series = asRecord(p.series);
     const sid = num(series.id) ?? num(series.tvdbId) ?? media.title;
+    const keyOf = (eventType: string) => `sonarr|${instanceKey(r)}|${keyPart(eventType)}|${keyPart(String(sid))}`;
     // A daily series' episodes are numbered by year and order (S2026E274),
     // a code that means nothing to a reader: its items carry their air date
     // instead, and the merged title ranges over the dates (#351).
-    const daily = str(series.type).toLowerCase() === "daily";
+    const daily = media.episodes.every((e) => e.daily);
+    const upgradeDelete = r.eventType === "EpisodeFileDelete" && str(p.deleteReason).toLowerCase() === "upgrade";
     return digestOf({
-      key: `sonarr|${instanceKey(r)}|${keyPart(r.eventType)}|${keyPart(String(sid))}`,
+      key: keyOf(r.eventType),
       sender: `sonarr|${instanceKey(r)}`,
       lead: digestLead(r.app, r.event, "episodes", ` of ${media.title}`),
       headline: media.title,
       event: r.event,
       noun: "episodes",
+      ...(r.eventType === "Download" ? { folds: keyOf("EpisodeFileDelete") } : {}),
+      ...(upgradeDelete ? { foldInto: keyOf("Download") } : {}),
       // A multi-episode event's quality, indexer and client hold for each of
       // its episodes; its size belongs to the event (one file can span two
       // episodes), so it rides on the first item and the rest carry 0 — the
@@ -643,6 +666,7 @@ function arrDigest(
         label: episodeLine(e),
         ...(daily ? { airDate: isoDate(e.airDate) || undefined } : { season: e.season, episode: e.episode }),
         ...file,
+        ...(upgradeDelete ? { upgrade: true } : {}),
         sizeBytes: file.sizeBytes === undefined ? undefined : i === 0 ? file.sizeBytes : 0,
         ...shared,
       })),
@@ -765,9 +789,12 @@ export function parseArrWebhook(
         push(facts, "Indexer", indexer);
         push(facts, "Download client", clientOf(p));
         push(facts, "Release", str(release.releaseTitle), { mono: true });
+        // The event's own verb, as a single episode's below; the digest
+        // keeps `base` — "Imported" — for the same reason.
         return toContent(
           {
             ...base,
+            event: upgrade ? "Upgraded" : "Imported",
             summary: `${media.title || "Untitled"}${code} (${n} episodes)`,
             chips: [quality, size, `${count} files`, indexer].filter(Boolean),
             facts,
@@ -1075,12 +1102,16 @@ export function parseSeerrWebhook(payload: unknown, opts: ParseOptions = {}): We
   const url = httpsUrl(p.image);
   const image = url ? { url, alt: `${subject || "Media"} poster` } : undefined;
   // A request event with a subject may be one of a run; the item names the
-  // requester so a burst from several people still says who asked.
+  // requester so a burst from several people still says who asked. The
+  // payload carries no instance name, so the saved address stands in as
+  // the key's instance part (#351): two Seerr instances posting to one
+  // relay URL, each with its own Application URL, never share a group.
+  const instance = appUrl ? keyPart(appUrl) : "";
   const digest =
     nt.startsWith("MEDIA_") && subject
       ? digestOf({
-          key: `seerr|${keyPart(nt)}`,
-          sender: "seerr",
+          key: `seerr|${instance}|${keyPart(nt)}`,
+          sender: `seerr|${instance}`,
           lead: SEERR_DIGEST_LEADS[nt] ?? `Seerr ${lowerFirst(event)}: {n} requests`,
           headline: "Seerr",
           event,

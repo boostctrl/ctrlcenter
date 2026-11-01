@@ -75,7 +75,7 @@ export const DIGEST_SCOPE_OPTIONS: { id: DigestScope; name: string; hint: string
   {
     id: "app",
     name: "Everything from an app",
-    hint: "Everything one app posts in the window goes out as one notification — an import, the grab before it and the files it replaced — listed by kind.",
+    hint: "Everything one app posts in the window goes out as one notification — an import, the grab before it, a series added — listed by kind.",
   },
   {
     id: "all",

@@ -695,16 +695,19 @@ export default async function HelpPage() {
             with the episodes listed. A batch of movies in Radarr and a run of
             Seerr requests merge the same way. Set it to <strong>Off</strong>{" "}
             for one message per event. Health issues, updates, failed
-            downloads and a sender&apos;s Test are never held. Events still
-            waiting when CtrlCenter restarts are dropped.
+            downloads and a sender&apos;s Test are never held. The delete
+            Sonarr posts for the file an upgrade replaced goes with the
+            import, not as a deletion of its own. Events still waiting when
+            CtrlCenter restarts are kept beside the config and sent once it
+            is back.
           </P>
           <P>
             <strong>Group together</strong> decides what shares a burst.{" "}
             <em>Like events</em> keeps kinds apart, as above. <em>Everything
             from an app</em> sends all that one app posted in the window as
-            one notification — &ldquo;Sonarr: 3 updates&rdquo;, listing the
-            import, the grab before it and the files it replaced, each with
-            its own line and facts. <em>Everything</em> does the same across
+            one notification — &ldquo;Sonarr: 2 updates&rdquo;, listing the
+            import and the grab before it, each with its own line and facts.{" "}
+            <em>Everything</em> does the same across
             every service: &ldquo;Sonarr and Radarr: 4 updates&rdquo;. The
             preview offers <em>A busy minute</em> to show what that looks
             like.

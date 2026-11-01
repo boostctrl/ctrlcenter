@@ -1,6 +1,5 @@
-# Changelog
-
-All notable changes to this project are documented in this file.
+changelog merged: 5 bullet(s) added under their own headings
+ed in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -14,6 +13,14 @@ here.
 
 ### Added
 
+- **Webhook bursts still waiting when CtrlCenter restarts are sent once it
+  is back.** A burst held for its window — a season import, a run of
+  requests — was dropped with the process; a restart or an update in the
+  middle of one lost the notification. What is waiting is now kept in
+  `webhook-digest.json` beside the config, read back when the server
+  starts, and sent when it was due, and events arriving after the restart
+  join it as before. (#351)
+
 - **Sign in from the corner menu.** Anyone not signed in finds *Sign in*
   there, which opens the form at `/login` and brings them back to the board
   they were on; `/admin/login` still works and still leads to the portal.
@@ -21,7 +28,36 @@ here.
   with more, the field starts empty (the browser remembers the last name
   used here) and says which account is the founding one. (#450)
 
+### Changed
+
+- **Two Seerr instances on one relay URL keep their bursts apart.** A Seerr
+  event names no instance, so two Seerr servers posting to the same webhook
+  URL were merged into one digest. Each one's Application URL under
+  Settings → Monitoring → Inbound webhooks now tells them apart; with none
+  saved, nothing changes. (#351)
+
 ### Fixed
+
+- **A season upgrade is one notification, not two.** Sonarr posts a delete
+  for the file each upgrade replaces beside the import, so an upgraded
+  season arrived as "Sonarr deleted 8 episodes of The Bear" next to "Sonarr
+  upgraded 8 episodes of The Bear". The delete now goes with the import,
+  which already says what it replaced; a delete whose import never arrives
+  still goes out on its own, and a manual delete is still its own news.
+  (#351)
+
+- **A daily series' episodes are named by their air date.** The digest's
+  range already read by date, but each episode in its list and in the
+  email's Episodes row still carried the code Sonarr makes of the year and
+  a running number — `S2026E271 "Day 1"`. Those now read `2026-10-01 "Day
+  1"`, the way Sonarr names the file, in a single event's report and in a
+  digest alike; an episode with no air date yet keeps its code, and every
+  other kind of series its codes. (#351)
+
+- **A season pack that replaced its files says Upgraded.** A single
+  season-pack import always read "Imported", while a single upgraded
+  episode reads "Upgraded" and a burst of upgraded packs did too. A pack
+  that was an upgrade now says so on its own. (#351)
 
 - **A private app shared with a member shows on a board upgraded from
   2.x.** The upgrade split each apps widget into one hiding private apps and
