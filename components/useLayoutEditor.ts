@@ -154,8 +154,22 @@ export function useLayoutEditor({
     latestRef.current = next;
     setLayout(next);
   }
+  // Whether a pointer gesture is in progress: a resize drag or a held
+  // stepper (bracketed by `gesture` below), or a card being moved
+  // (usePointerReorder, which is handed this ref). The editor's Escape
+  // stands down while one is — the gesture's own Escape cancels it, and
+  // leaving edit mode under a captured pointer would unmount the handle
+  // before its pointerup, so the gesture would never end (#400). So do
+  // Undo and Redo, whoever calls them: an undo mid-gesture would close the
+  // history's open step, so the rest of the drag would land in a new one
+  // and one resize would take two to take back (#424). The guard lives in
+  // the two functions rather than in the hotkey handler because the
+  // toolbar's buttons call them too, and a second finger on a touch screen
+  // can reach those mid-drag (#432).
+  const dragging = useRef(false);
   const { undo, redo } = history;
   const undoLast = useCallback(() => {
+    if (dragging.current) return;
     const prev = undo(latestRef.current);
     if (!prev) return;
     dirtyRef.current = true;
@@ -163,6 +177,7 @@ export function useLayoutEditor({
     setLayout(prev);
   }, [undo]);
   const redoLast = useCallback(() => {
+    if (dragging.current) return;
     const next = redo(latestRef.current);
     if (!next) return;
     dirtyRef.current = true;
@@ -238,13 +253,6 @@ export function useLayoutEditor({
       delete rest.hideLabel;
       return rest;
     });
-  // Whether a pointer gesture is in progress: a resize drag or a held
-  // stepper (bracketed by `gesture` below), or a card being moved
-  // (usePointerReorder, which is handed this ref). The editor's Escape
-  // stands down while one is — the gesture's own Escape cancels it, and
-  // leaving edit mode under a captured pointer would unmount the handle
-  // before its pointerup, so the gesture would never end (#400).
-  const dragging = useRef(false);
   const { beginGesture, endGesture, group } = history;
   const gesture = useMemo(
     () => ({
@@ -341,12 +349,10 @@ export function useLayoutEditor({
     function onKeyDown(e: KeyboardEvent) {
       const key = e.key.toLowerCase();
       if ((e.ctrlKey || e.metaKey) && (key === "z" || key === "y") && !inTextField(e.target)) {
+        // Prevented even mid-gesture, when undoLast and redoLast stand
+        // down themselves (#424, #432), so the browser's own undo doesn't
+        // run instead.
         e.preventDefault();
-        // Mid-gesture the hotkeys stand down like Escape does: an undo
-        // then would close the history's open step, so the rest of the
-        // drag would land in a new one and one resize would take two
-        // presses to take back (#424).
-        if (dragging.current) return;
         if (key === "z" && !e.shiftKey) undoLast();
         else redoLast();
         return;

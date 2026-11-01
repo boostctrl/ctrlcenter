@@ -66,6 +66,13 @@ here.
   them also reverted something older. Undo and Redo now wait until the drag,
   the held stepper or the card move is over. (#424)
 
+- **Tapping Undo mid-drag no longer splits the drag either.** On a touch
+  screen, a second finger could tap the layout editor's Undo or Redo button
+  while an edge resize or a held stepper was in progress, which took back
+  the part already dragged and left the rest as separate changes, one per
+  step of the drag. The two buttons now stand down until the gesture is
+  over, as the Ctrl+Z and Ctrl+Shift+Z hotkeys already do. (#432)
+
 ## [3.0.1] - 2026-11-01
 
 ### Changed

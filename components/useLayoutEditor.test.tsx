@@ -107,6 +107,42 @@ describe("useLayoutEditor", () => {
     expect(result.current.canUndo).toBe(false);
   });
 
+  it("ignores the toolbar's Undo and Redo during a gesture, so one resize is still one undo step (#432)", () => {
+    const { result } = setup();
+    // Two older changes, the newer one undone, so both stacks have a step a
+    // stray tap could take.
+    act(() => result.current.setWidgetSpan("notes-1", 20));
+    act(() => result.current.setWidgetSpan("notes-1", 16));
+    act(() => result.current.undoLast());
+    expect(spanOf(result.current.layout, "notes-1")).toBe(20);
+    // A resize drag with a second finger on the toolbar, calling undoLast
+    // and redoLast as its buttons do: Redo before the drag's first change,
+    // Undo between its changes.
+    act(() => result.current.gesture.begin());
+    act(() => result.current.redoLast());
+    expect(spanOf(result.current.layout, "notes-1")).toBe(20);
+    expect(result.current.canRedo).toBe(true);
+    act(() => result.current.setWidgetSpan("apps-1", 10));
+    act(() => result.current.undoLast());
+    expect(spanOf(result.current.layout, "apps-1")).toBe(10);
+    act(() => result.current.setWidgetSpan("apps-1", 8));
+    act(() => result.current.redoLast());
+    expect(spanOf(result.current.layout, "apps-1")).toBe(8);
+    act(() => result.current.gesture.end());
+    // One Undo takes back the whole resize and nothing older; Redo restores
+    // it whole; the next Undo reaches the older change.
+    act(() => result.current.undoLast());
+    expect(spanOf(result.current.layout, "apps-1")).toBe(12);
+    expect(spanOf(result.current.layout, "notes-1")).toBe(20);
+    act(() => result.current.redoLast());
+    expect(spanOf(result.current.layout, "apps-1")).toBe(8);
+    act(() => result.current.undoLast());
+    act(() => result.current.undoLast());
+    expect(spanOf(result.current.layout, "apps-1")).toBe(12);
+    expect(spanOf(result.current.layout, "notes-1")).toBe(24);
+    expect(result.current.canUndo).toBe(false);
+  });
+
   // The editor with the card-moving hook beside it, as Dashboard wires them,
   // and a card mid-drag: a mouse press moved past the slop. `prepare` runs
   // against the editor before the press.
@@ -186,6 +222,19 @@ describe("useLayoutEditor", () => {
     });
     expect(result.current.pointer.drag).toBeNull();
     hotkey("z");
+    expect(spanOf(result.current.editor.layout, "notes-1")).toBe(24);
+  });
+
+  it("ignores the toolbar's Undo while a card is being moved (#432)", () => {
+    const { result } = setupMidDrag(vi.fn(), (editor) => editor.setWidgetSpan("notes-1", 12));
+    act(() => result.current.editor.undoLast());
+    expect(spanOf(result.current.editor.layout, "notes-1")).toBe(12);
+    expect(result.current.pointer.drag?.id).toBe("notes-1");
+    act(() => {
+      window.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1, clientX: 130, clientY: 300 }));
+    });
+    expect(result.current.pointer.drag).toBeNull();
+    act(() => result.current.editor.undoLast());
     expect(spanOf(result.current.editor.layout, "notes-1")).toBe(24);
   });
 
