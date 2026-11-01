@@ -1,20 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { NO_PASSWORD_MESSAGE, issueSession, setSessionCookie } from "@/lib/auth";
 import { findAccount, passwordConfigured } from "@/lib/accounts";
-import { readConfigInternal } from "@/lib/config";
+import { noteSignIn, readConfigInternal } from "@/lib/config";
 import { verifyCredentials, type CredentialResult } from "@/lib/credentials";
-import { FOUNDING_ACCOUNT_ID } from "@/lib/schema";
+import { FOUNDING_ACCOUNT_ID, USER_ID_PATTERN } from "@/lib/schema";
 import { rateLimit, refundRateLimit, pruneRateLimit, clientKey } from "@/lib/rate-limit";
 import {
   PER_CLIENT_MAX_ATTEMPTS,
   WINDOW_MS,
   chargeWrongCode,
   chargeWrongPassword,
+  chargeWrongPasswordFor,
   codeChecksPausedFor,
 } from "@/lib/login-throttle";
 import { isSameOriginRequest } from "@/lib/api-auth";
 import { eventMeta, recordSecurityEvent } from "@/lib/security-events";
-import { CODES_LOCKED, notifySecurityEvent } from "@/lib/security-alerts";
+import { ACCOUNT_LOCKED, CODES_LOCKED, notifySecurityEvent } from "@/lib/security-alerts";
 
 // Allow a small burst of attempts per client, then lock that source out for the
 // window — the primary gate, checked before any password hashing. The shared
@@ -71,6 +72,8 @@ export async function POST(request: NextRequest) {
   if (username === FOUNDING_ACCOUNT_ID && account && !passwordConfigured(account)) {
     return NextResponse.json({ error: NO_PASSWORD_MESSAGE }, { status: 503 });
   }
+  // The audit log names the account tried, when it is a name at all.
+  const meta = eventMeta(request, USER_ID_PATTERN.test(username) ? username : undefined);
   // While the shared wrong-code budget is spent, no code is checked at all, a
   // correct one included (#392): whoever spent it has the password, and the
   // admin's own sign-in waiting a few minutes is the lesser harm.
@@ -94,9 +97,22 @@ export async function POST(request: NextRequest) {
   if (!result.ok && result.reason !== "totp-required") {
     // A wrong password or code, in the audit log (#368); a missing code is
     // the form's second step, not a failure.
-    await recordSecurityEvent("signin.fail", eventMeta(request));
+    await recordSecurityEvent("signin.fail", meta);
   }
   if (!result.ok && result.reason === "password") {
+    // The account's own wrong-password budget (#423), then the shared one:
+    // neither is charged by a correct password, so neither can be used to
+    // keep the account's owner out. Once an account's runs out, say so once.
+    const forAccount = account ? chargeWrongPasswordFor(account.id) : null;
+    if (forAccount && forAccount.allowed && forAccount.remaining === 0) {
+      notifySecurityEvent(await recordSecurityEvent("signin.locked", meta, ACCOUNT_LOCKED));
+    }
+    if (forAccount && !forAccount.allowed) {
+      return NextResponse.json(
+        { error: "Too many attempts. Try again later." },
+        { status: 429, headers: { "Retry-After": String(forAccount.retryAfterSeconds) } }
+      );
+    }
     // Charge the shared wrong-password budget only here — a correct password
     // never reaches this branch, so the budget can't be used to deny the
     // legitimate admin. It still bounds a distributed brute force: once too
@@ -124,7 +140,7 @@ export async function POST(request: NextRequest) {
       // Password right, code wrong, and that one spent the shared wrong-code
       // budget: whoever is guessing has the password. Code checks pause (see
       // above); say so, once.
-      notifySecurityEvent(await recordSecurityEvent("signin.locked", eventMeta(request), CODES_LOCKED));
+      notifySecurityEvent(await recordSecurityEvent("signin.locked", meta, CODES_LOCKED));
     }
     // A wrong code never touches the wrong-password budget, so someone who
     // has the password but not the device can't lock the real admin out of
@@ -150,8 +166,9 @@ export async function POST(request: NextRequest) {
   // record the session so logout, the idle timeout and "sign out everywhere"
   // can end it (#365).
   const { token } = await issueSession(request, account);
+  await noteSignIn(account.id);
   // In the audit log, and out through the channels when the address is new.
-  notifySecurityEvent(await recordSecurityEvent("signin.ok", eventMeta(request)));
+  notifySecurityEvent(await recordSecurityEvent("signin.ok", eventMeta(request, account.id)));
   const response = NextResponse.json({ ok: true });
   setSessionCookie(response, request, token);
   return response;

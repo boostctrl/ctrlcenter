@@ -55,6 +55,6 @@ export async function POST(request: NextRequest) {
   await disableTotp(account.id);
   // Write actions need the second factor (#367): off with it, and said so.
   const actionsDisabled = await clearAllowActions();
-  notifySecurityEvent(await recordSecurityEvent("totp.disabled", eventMeta(request)));
+  notifySecurityEvent(await recordSecurityEvent("totp.disabled", eventMeta(request, account.id)));
   return NextResponse.json({ ok: true, actionsDisabled });
 }

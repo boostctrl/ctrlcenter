@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
-    await recordSecurityEvent("reauth.fail", eventMeta(request));
+    await recordSecurityEvent("reauth.fail", eventMeta(request, account.id));
     if (result.reason === "password") {
       // A wrong password here is a guess at the same password as sign-in, and
       // counts on the same shared budget (#392).
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
         );
       }
     } else if (chargeWrongCode()) {
-      notifySecurityEvent(await recordSecurityEvent("signin.locked", eventMeta(request), CODES_LOCKED));
+      notifySecurityEvent(await recordSecurityEvent("signin.locked", eventMeta(request, account.id), CODES_LOCKED));
     }
     return NextResponse.json(
       {
@@ -85,6 +85,6 @@ export async function POST(request: NextRequest) {
   }
   refundRateLimit(throttleKey);
   await markReauth(viewer.session.id);
-  await recordSecurityEvent("reauth.ok", eventMeta(request));
+  await recordSecurityEvent("reauth.ok", eventMeta(request, account.id));
   return NextResponse.json({ ok: true });
 }

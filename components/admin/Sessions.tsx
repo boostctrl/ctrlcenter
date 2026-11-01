@@ -19,6 +19,9 @@ type Session = {
   ip: string | null;
   userAgent: string;
   current: boolean;
+  // The account the session belongs to (#423); a record 3.0 wrote names
+  // none, which is the founding admin's.
+  account?: string;
 };
 
 const IDLE_CHOICES: { hours: number; label: string }[] = [
@@ -216,7 +219,7 @@ export default function Sessions() {
                     )}
                   </div>
                   <p className="text-xs text-ink-45">
-                    {s.ip ?? "Unknown address"} · signed in {relativeTime(s.createdAt, now)} · last seen{" "}
+                    {s.account ?? "admin"} · {s.ip ?? "Unknown address"} · signed in {relativeTime(s.createdAt, now)} · last seen{" "}
                     {relativeTime(s.lastSeenAt, now)}
                   </p>
                 </div>

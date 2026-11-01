@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { clientIp, throttleBucket } from "./rate-limit";
-import { noteSessionAddress, type SessionRecord } from "./sessions";
+import { noteSessionAddress, sessionAccount, type SessionRecord } from "./sessions";
 import { eventMeta, recordSecurityEvent } from "./security-events";
 import { notifySecurityEvent } from "./security-alerts";
 
@@ -19,6 +19,6 @@ export async function watchSessionAddress(request: NextRequest, session: Session
   if (session.addresses?.some((a) => throttleBucket(a) === throttleBucket(ip))) return;
   if (!(await noteSessionAddress(session.id, ip))) return;
   notifySecurityEvent(
-    await recordSecurityEvent("session.moved", eventMeta(request), `signed in from ${session.ip}`)
+    await recordSecurityEvent("session.moved", eventMeta(request, sessionAccount(session)), `signed in from ${session.ip}`)
   );
 }

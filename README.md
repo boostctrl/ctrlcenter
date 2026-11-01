@@ -197,7 +197,7 @@ at your own risk**, and review the code yourself first.
    `ghcr.io/boostctrl/ctrlcenter:latest`. To build from source instead, comment
    out `image:`, uncomment `build: .`, and run `docker compose up -d --build`.
 3. Open **http://localhost:3000** for the dashboard and **/admin** to manage it
-   (sign in with `ADMIN_PASSWORD`). A new install starts with a short guided
+   (sign in as `admin` with `ADMIN_PASSWORD`). A new install starts with a short guided
    setup — location and time zone, your first apps, status checks and a
    theme. Skip any step; it's all in Settings later.
 
@@ -457,7 +457,7 @@ for reuse. You can also paste a direct image URL or a `data:` URI.
 
 | Variable | Required | Description |
 | --- | --- | --- |
-| `ADMIN_PASSWORD` | yes | Bootstrap password for `/admin`. After you set one in **Settings → Reset password**, login uses that. **Special characters:** quote the value in `.env` and double any literal `$` as `$$` (docker compose interpolates `$`), or a complex password can be mangled before the app sees it. |
+| `ADMIN_PASSWORD` | yes | Bootstrap password for the `admin` account at `/admin`. After you set one in **Settings → Reset password**, login uses that. **Special characters:** quote the value in `.env` and double any literal `$` as `$$` (docker compose interpolates `$`), or a complex password can be mangled before the app sees it. |
 | `SESSION_SECRET` | no | Secret used to sign session cookies. If unset, a random one is generated on first start and kept in the config volume (`session-secret`); only if that volume isn't writable does it fall back to deriving one from `ADMIN_PASSWORD`. Set it yourself to manage the secret explicitly (e.g. `openssl rand -base64 32`). |
 | `CONFIG_PATH` | no | Path to the config file (default `./config/config.yaml`; the container sets `/config/config.yaml`). The uptime history (`status-history.db`, a SQLite database), the admin session list (`sessions.json`), the security log (`security-events.jsonl`) and uploaded custom icons (`uploads/`) are written beside it. |
 | `CTRLCENTER_SMTP_PASS` | no | Overrides the email-alert SMTP password, so the secret can stay out of `config.yaml`. |

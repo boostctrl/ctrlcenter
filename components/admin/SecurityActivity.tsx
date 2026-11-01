@@ -93,6 +93,7 @@ export default function SecurityActivity({ version }: { version: number }) {
               {describeEvent(e)}
             </span>
             <p className="text-xs text-ink-45" title={e.userAgent}>
+              {e.account ? `${e.account} · ` : ""}
               {e.ip ?? "Unknown address"} · {describeUserAgent(e.userAgent)}
             </p>
           </div>

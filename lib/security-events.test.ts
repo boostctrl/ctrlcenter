@@ -7,8 +7,7 @@ import {
   MAX_EVENTS,
   listSecurityEvents,
   recordSecurityEvent,
-  securityLogPersisted,
-} from "./security-events";
+  securityLogPersisted, eventAccount } from "./security-events";
 
 let dir: string;
 beforeEach(() => {
@@ -133,5 +132,27 @@ describe("security events (#368)", () => {
     expect((await listSecurityEvents()).length).toBeGreaterThanOrEqual(1);
     expect(await securityLogPersisted()).toBe(false);
     warn.mockRestore();
+  });
+});
+
+describe("the account on an entry (#423)", () => {
+  it("records the account named, and judges a new address per account", async () => {
+    const t = Date.now();
+    const meta = { ip: "203.0.113.77", userAgent: "Firefox" };
+    const admin = await recordSecurityEvent("signin.ok", { ...meta, account: "admin" }, undefined, t);
+    expect(admin.account).toBe("admin");
+    expect(admin.newAddress).toBe(true);
+    // Sam from the same address: new to Sam, known to the admin.
+    const sam = await recordSecurityEvent("signin.ok", { ...meta, account: "sam" }, undefined, t + 1_000);
+    expect(sam.newAddress).toBe(true);
+    const again = await recordSecurityEvent("signin.ok", { ...meta, account: "admin" }, undefined, t + 2_000);
+    expect(again.newAddress).toBe(false);
+    // An entry without an account is the founding admin's.
+    const old = await recordSecurityEvent("signin.ok", meta, undefined, t + 3_000);
+    expect(old.account).toBeUndefined();
+    expect(old.newAddress).toBe(false);
+    expect(eventAccount(old)).toBe("admin");
+    const failed = await recordSecurityEvent("signin.fail", { ...meta, account: "root" }, undefined, t + 4_000);
+    expect(failed.account).toBe("root");
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { CODES_LOCKED, notificationDue, securityNotification } from "./security-alerts";
+import { CODES_LOCKED, notificationDue, securityNotification, ACCOUNT_LOCKED } from "./security-alerts";
 import type { SecurityEvent } from "./security-events";
 
 const at = Date.UTC(2026, 9, 11, 12, 0);
@@ -23,7 +23,7 @@ describe("securityNotification (#368)", () => {
   it("notifies the account-shaping events and the lockout", () => {
     expect(securityNotification(ev({ kind: "signin.locked" }))?.title).toMatch(/locked/);
     expect(securityNotification(ev({ kind: "totp.disabled" }))?.title).toMatch(/turned off/);
-    expect(securityNotification(ev({ kind: "password.changed" }))?.title).toMatch(/password changed/);
+    expect(securityNotification(ev({ kind: "password.changed" }))?.title).toMatch(/password changed/i);
     expect(securityNotification(ev({ kind: "actions.enabled", detail: "qBittorrent" }))?.body).toContain("qBittorrent");
   });
 
@@ -57,5 +57,27 @@ describe("notification pacing (#392)", () => {
     expect(n?.title).toMatch(/codes paused/);
     expect(n?.body).toMatch(/has the password/);
     expect(n?.body).toContain("203.0.113.9");
+  });
+});
+
+describe("the account in a notification (#423)", () => {
+  const base = { at: 1, ip: "203.0.113.9", userAgent: "Firefox" } as const;
+  it("names the account that signed in, changed its password or had its guesses refused", () => {
+    const signin = securityNotification({ ...base, kind: "signin.ok", newAddress: true, account: "sam" });
+    expect(signin?.title).toBe("Sign-in from a new address");
+    expect(signin?.body).toMatch(/^The account "sam" signed in/);
+    const changed = securityNotification({ ...base, kind: "password.changed", account: "sam" });
+    expect(changed?.body).toMatch(/password of "sam" was changed/);
+    expect(changed?.body).toMatch(/session of that account/);
+    const refused = securityNotification({ ...base, kind: "signin.locked", detail: ACCOUNT_LOCKED, account: "sam" });
+    expect(refused?.title).toMatch(/guesses for an account refused/);
+    expect(refused?.body).toMatch(/for "sam" from many addresses/);
+    expect(refused?.body).toMatch(/right password still signs in/);
+  });
+  it("reads an entry 3.0 wrote, which names no account, as the admin's", () => {
+    const signin = securityNotification({ ...base, kind: "signin.ok", newAddress: true });
+    expect(signin?.body).toMatch(/^Someone signed in/);
+    const off = securityNotification({ ...base, kind: "totp.disabled" });
+    expect(off?.body).toMatch(/second factor of the admin was turned off/);
   });
 });

@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     ? await verifyPasswordHash(current, account.passwordHash, account.passwordSalt)
     : usesEnvPassword(account) && verifyEnvPassword(current);
   if (!ok) {
-    await recordSecurityEvent("password.fail", eventMeta(request));
+    await recordSecurityEvent("password.fail", eventMeta(request, account.id));
     return NextResponse.json(
       { error: "Current password is incorrect" },
       { status: 403 }
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
   // old hash — and everyone else stays signed in (#423).
   await revokeSessions(undefined, account.id);
   const { token } = await issueSession(request, { id: account.id, passwordHash: hash });
-  notifySecurityEvent(await recordSecurityEvent("password.changed", eventMeta(request)));
+  notifySecurityEvent(await recordSecurityEvent("password.changed", eventMeta(request, account.id)));
   const response = NextResponse.json({ ok: true });
   setSessionCookie(response, request, token);
   return response;

@@ -62,6 +62,6 @@ export async function POST(request: NextRequest) {
     if (e instanceof TotpStateError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;
   }
-  await recordSecurityEvent("totp.enabled", eventMeta(request));
+  await recordSecurityEvent("totp.enabled", eventMeta(request, account.id));
   return NextResponse.json({ ok: true, recoveryCodes });
 }

@@ -1,9 +1,14 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { TextField, Button } from "@/components/admin/ui";
 import { safeNextPath } from "@/lib/urls";
+
+// The sign-in name last used in this browser (#423), so it needn't be
+// retyped; `admin` until one is.
+const NAME_KEY = "ctrlcenter:signin-name";
+const DEFAULT_NAME = "admin";
 
 // `passwordConfigured` is decided on the server (page.tsx): with no stored
 // hash and no ADMIN_PASSWORD nobody can sign in, so explain that instead of
@@ -14,6 +19,18 @@ export default function LoginForm({
   passwordConfigured: boolean;
 }) {
   const searchParams = useSearchParams();
+  const [username, setUsername] = useState(DEFAULT_NAME);
+  // Read after mount, not in the initial state: the server renders the
+  // default, and a remembered name would otherwise mismatch at hydration.
+  useEffect(() => {
+    try {
+      const remembered = window.localStorage.getItem(NAME_KEY);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one read of browser storage after mount
+      if (remembered) setUsername(remembered);
+    } catch {
+      // Private mode / blocked storage — the default stands.
+    }
+  }, []);
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   // The password checked out and the server is asking for the second factor
@@ -29,7 +46,7 @@ export default function LoginForm({
     const res = await fetch("/api/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password, totp: code }),
+      body: JSON.stringify({ username, password, totp: code }),
     });
     setLoading(false);
     if (!res.ok) {
@@ -55,6 +72,11 @@ export default function LoginForm({
       }
       setError(data?.error || "Incorrect password");
       return;
+    }
+    try {
+      window.localStorage.setItem(NAME_KEY, username.trim().toLowerCase());
+    } catch {
+      // Not remembered, then.
     }
     // Hard navigation (not router.push): a full document load re-runs the auth
     // middleware with the freshly-set session cookie, so the protected route
@@ -88,14 +110,26 @@ export default function LoginForm({
     <form onSubmit={handleSubmit} className="glass-card flex w-full max-w-sm flex-col gap-4 p-8">
       <h1 className="text-2xl font-bold">Sign in</h1>
       {!needCode ? (
-        <TextField
-          label="Password"
-          type="password"
-          autoFocus
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+        <>
+          <TextField
+            label="Username"
+            autoComplete="username"
+            autoCapitalize="off"
+            spellCheck={false}
+            required
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
+          <TextField
+            label="Password"
+            type="password"
+            autoComplete="current-password"
+            autoFocus
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </>
       ) : (
         <>
           <p className="text-sm text-ink-60">

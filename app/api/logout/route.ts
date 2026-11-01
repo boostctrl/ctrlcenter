@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { clearSessionCookie, sessionTokenFrom, verifySessionId } from "@/lib/auth";
+import { clearSessionCookie, sessionTokenFrom, verifySession } from "@/lib/auth";
 import { isSameOriginRequest } from "@/lib/api-auth";
 import { readConfigInternal } from "@/lib/config";
 import { revokeSession } from "@/lib/sessions";
@@ -15,10 +15,10 @@ export async function POST(request: NextRequest) {
   const token = sessionTokenFrom(request.cookies);
   if (token) {
     const { auth } = await readConfigInternal();
-    const id = await verifySessionId(token, auth);
-    if (id) {
-      await revokeSession(id);
-      await recordSecurityEvent("signout", eventMeta(request));
+    const live = await verifySession(token, auth);
+    if (live) {
+      await revokeSession(live.session.id);
+      await recordSecurityEvent("signout", eventMeta(request, live.account.id));
     }
   }
   const response = NextResponse.json({ ok: true });

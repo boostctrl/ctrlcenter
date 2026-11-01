@@ -43,6 +43,13 @@ export async function addAccount(user: User): Promise<void> {
   });
 }
 
+// The moment an account signed in, for the Users list.
+export async function noteSignIn(id: string, at = new Date()): Promise<void> {
+  await mutateAccount(id, (account) => {
+    account.lastSignInAt = at.toISOString();
+  });
+}
+
 // An account's new password (hash and salt from lib/auth.ts hashPassword).
 // Clears a must-change flag: the change is what it asked for.
 export async function setAccountPassword(id: string, passwordHash: string, passwordSalt: string): Promise<void> {

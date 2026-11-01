@@ -13,6 +13,15 @@ here.
 ## [Unreleased]
 ### Added
 
+- **Sign in with a username.** The login form asks for a username as well
+  as the password; yours is `admin`, with the password you already use, and
+  the browser remembers the name. The activity log in Settings → Security
+  and the Security alerts now say which account signed in, changed its
+  password or its second factor, or had its sign-ins refused, and wrong
+  passwords are also counted per account, so a guessing run spread over
+  many addresses is bounded for each one. This is the first step toward
+  per-user logins; nothing else changes for a single admin. (#423)
+
 - **Webhook emails can link back into Seerr.** Each service under
   Settings → Monitoring → Inbound webhooks now has an **Application URL**
   beside its webhook URL. A Seerr event's email gets an *Open in Seerr*

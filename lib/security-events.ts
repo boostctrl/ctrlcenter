@@ -4,6 +4,7 @@ import type { NextRequest } from "next/server";
 import { log, errorReason } from "./log";
 import { globalSingleton } from "./singleton";
 import { clientIp, throttleBucket } from "./rate-limit";
+import { FOUNDING_ACCOUNT_ID } from "./schema/auth";
 
 // The security audit log (#368): sign-ins and failed bursts, sign-outs,
 // sessions ended, password and second-factor changes, step-up
@@ -51,12 +52,16 @@ export type SecurityEvent = {
   // How many addresses a folded entry covers, when a flood of failures from
   // many addresses folded into one line (#392). Absent for one address.
   addresses?: number;
-  // A successful sign-in from an address no sign-in used in the last
-  // 30 days — the one worth a notification.
+  // A successful sign-in from an address no sign-in of this account used
+  // in the last 30 days — the one worth a notification.
   newAddress?: boolean;
+  // The account the entry is about (#423): the one that signed in or was
+  // tried, changed its password, and so on. Absent in an entry 3.0 wrote
+  // (the founding admin's) and for events about no account in particular.
+  account?: string;
 };
 
-export type EventMeta = { ip: string | null; userAgent: string };
+export type EventMeta = { ip: string | null; userAgent: string; account?: string };
 
 // Caps: entries kept, how far back a listing reaches, and the windows for
 // folding repeated failures and for "new address".
@@ -170,11 +175,17 @@ function persist(store: Store): Promise<void> {
 
 // The client facts a request contributes: its address (as the login
 // throttle resolves it) and browser.
-export function eventMeta(request: NextRequest): EventMeta {
+export function eventMeta(request: NextRequest, account?: string): EventMeta {
   return {
     ip: clientIp(request),
     userAgent: (request.headers.get("user-agent") ?? "").slice(0, 300),
+    ...(account ? { account } : {}),
   };
+}
+
+// The account an entry is about, the founding admin's when it names none.
+export function eventAccount(e: Pick<SecurityEvent, "account">): string {
+  return e.account ?? FOUNDING_ACCOUNT_ID;
 }
 
 // Whether two addresses count as one source: the same, or in the same
@@ -216,9 +227,16 @@ export async function recordSecurityEvent(
   }
   const event: SecurityEvent = { at: now, kind, ip: meta.ip, userAgent: meta.userAgent };
   if (detail) event.detail = detail;
+  if (meta.account) event.account = meta.account;
   if (kind === "signin.ok") {
+    // New to this account: another account's sign-in from the same place
+    // says nothing about this one's (#423).
     event.newAddress = !store.events.some(
-      (e) => e.kind === "signin.ok" && e.ip === meta.ip && now - e.at < NEW_ADDRESS_MS
+      (e) =>
+        e.kind === "signin.ok" &&
+        e.ip === meta.ip &&
+        eventAccount(e) === eventAccount(event) &&
+        now - e.at < NEW_ADDRESS_MS
     );
   }
   store.events.push(event);

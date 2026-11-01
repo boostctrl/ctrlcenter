@@ -28,6 +28,16 @@ export function chargeWrongPassword(): RateLimitResult {
   return rateLimit(GLOBAL_PASSWORD_KEY, GLOBAL_MAX_ATTEMPTS, WINDOW_MS);
 }
 
+// Wrong passwords for one account from every address together (#423): a
+// guessing run spread over many addresses is bounded per account, not only
+// by the shared budget above, and locks that account's guesses out longer
+// each time. Charged only after a wrong password, like the shared budget, so
+// it can't be spent to keep the account's owner out.
+export const PER_ACCOUNT_MAX_ATTEMPTS = 40;
+export function chargeWrongPasswordFor(account: string): RateLimitResult {
+  return rateLimit(`login:account:${account}`, PER_ACCOUNT_MAX_ATTEMPTS, WINDOW_MS, { escalate: true });
+}
+
 // Charge one wrong code. True when this one used the budget up: the moment to
 // say so, once.
 export function chargeWrongCode(): boolean {

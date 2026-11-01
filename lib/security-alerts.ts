@@ -17,6 +17,9 @@ const where = (e: SecurityEvent) => (e.ip ? `from ${e.ip}` : "from an unknown ad
 // The detail a `signin.locked` entry carries when it was the shared
 // wrong-code budget that ran out, not one address's password attempts.
 export const CODES_LOCKED = "authentication codes";
+// The detail a `signin.locked` entry carries when one account's wrong-
+// password budget ran out (#423): guesses for it from many addresses.
+export const ACCOUNT_LOCKED = "account";
 
 // At most one notification of each kind every ten minutes (#392). The lockout
 // notice can be provoked from any address without knowing the password, so a
@@ -39,38 +42,47 @@ export function notificationDue(e: SecurityEvent, now = Date.now()): boolean {
 
 // The message for an event, or null for the ones that don't warrant one.
 export function securityNotification(e: SecurityEvent): WebhookNotification | null {
+  // The account the entry names (#423); an entry 3.0 wrote names none.
+  const who = e.account ? `The account "${e.account}"` : "Someone";
+  const whose = e.account ? `"${e.account}"` : "the admin";
   switch (e.kind) {
     case "signin.ok":
       if (!e.newAddress) return null;
       return {
-        title: "Admin sign-in from a new address",
-        body: `Someone signed in to the admin portal ${where(e)} with ${e.userAgent || "an unknown browser"}. If that wasn't you, sign out everywhere else in Settings → Security and change the password.`,
+        title: "Sign-in from a new address",
+        body: `${who} signed in to the admin portal ${where(e)} with ${e.userAgent || "an unknown browser"}. If that wasn't you, sign out everywhere else in Settings → Security and change the password.`,
       };
     case "session.moved":
       return {
-        title: "Admin session used from a new address",
-        body: `A session that ${e.detail ?? "signed in elsewhere"} was just used ${where(e)} with ${e.userAgent || "an unknown browser"}. If that wasn't you, sign out everywhere else in Settings → Security and change the password.`,
+        title: "Session used from a new address",
+        body: `A session of ${whose} that ${e.detail ?? "signed in elsewhere"} was just used ${where(e)} with ${e.userAgent || "an unknown browser"}. If that wasn't you, sign out everywhere else in Settings → Security and change the password.`,
       };
     case "signin.locked":
       if (e.detail === CODES_LOCKED) {
         return {
           title: "Two-factor codes paused after repeated failures",
-          body: `Too many wrong authentication codes were tried, most recently ${where(e)}. Whoever is trying has the password: code sign-in is paused for a while, and nothing got in. Change the password in Settings → Security.`,
+          body: `Too many wrong authentication codes were tried for ${whose}, most recently ${where(e)}. Whoever is trying has the password: code sign-in is paused for a while, and nothing got in. Change the password in Settings → Security.`,
+        };
+      }
+      if (e.detail === ACCOUNT_LOCKED) {
+        return {
+          title: "Password guesses for an account refused after repeated failures",
+          body: `Too many wrong passwords were tried for ${whose} from many addresses, most recently ${where(e)}. Further wrong guesses for it are refused for a while; the right password still signs in, and nothing got in.`,
         };
       }
       return {
-        title: "Admin login locked after repeated failures",
+        title: "Login locked after repeated failures",
         body: `Too many wrong passwords ${where(e)}; that address is locked out for a while. Nothing got in.`,
       };
     case "totp.disabled":
       return {
         title: "Two-factor authentication turned off",
-        body: `The admin's second factor was turned off ${where(e)}. Dashboard actions were turned off with it.`,
+        body: `The second factor of ${whose} was turned off ${where(e)}. Dashboard actions were turned off with it.`,
       };
     case "password.changed":
       return {
-        title: "Admin password changed",
-        body: `The admin password was changed ${where(e)}. Every other session was signed out.`,
+        title: "Password changed",
+        body: `The password of ${whose} was changed ${where(e)}. Every other session of that account was signed out.`,
       };
     case "actions.enabled":
       return {
