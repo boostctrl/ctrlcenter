@@ -204,9 +204,14 @@ export function buildNotificationRequest(
   const text = [c.title, detail].filter(Boolean).join("\n");
   switch (type) {
     case "discord":
-      return jsonReq(webhookUrl, { content: text });
+      // The text can be a sender's own words — a Seerr user's issue report —
+      // so no mention in it may page anyone (#401): without allowed_mentions
+      // an "@everyone" in a comment rang the admin's whole channel.
+      return jsonReq(webhookUrl, { content: text, allowed_mentions: { parse: [] } });
     case "slack":
-      return jsonReq(webhookUrl, { text });
+      // Slack reads <…> as a link or a command — "<!channel>" pages everyone
+      // — and & as an entity, so relayed text is escaped to show as written.
+      return jsonReq(webhookUrl, { text: escapeSlack(text) });
     case "ntfy": {
       // Title header is latin-1 only (see buildAlertRequest); send it only when
       // ASCII-safe, and put an optional link in the Click header ntfy honors.
@@ -234,6 +239,11 @@ export function buildNotificationRequest(
         at: new Date().toISOString(),
       });
   }
+}
+
+// Slack's three reserved characters, in the order its docs give.
+function escapeSlack(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 // The link line of an alert email. Only http(s) URLs become a link: the URL

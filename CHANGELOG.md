@@ -28,6 +28,31 @@ here.
 
 ### Fixed
 
+- **The uptime history no longer piles up in memory while its database is
+  unavailable.** On a read-only volume, a full disk or a file locked at
+  start-up, the poller kept every unsaved reading forever and logged a warning
+  every minute (43,000 readings and 1,440 lines after a day with 30 services).
+  It now keeps only the 90 minutes the database would hold anyway, warns once
+  an hour, and once the database can be opened it loads the saved history
+  first and then writes, so a restart that found the file briefly locked no
+  longer loses the history for the rest of the run or overwrites the current
+  hour's counts with the few checks since boot. (#401)
+- **Checks run on time.** A check could land a few milliseconds short of its
+  interval and then wait a whole extra minute, so a 1-minute check sometimes
+  ran every 2 minutes, and every 1-minute check skipped the first regular
+  tick after start-up. (#401)
+- **The 30d and 90d timelines show real calendar days.** Their bars were
+  rolling 24- and 72-hour spans labelled with the date they started on, so an
+  outage at 8 in the morning of the 12th showed under the 11th, and the
+  screen-reader summary repeated it. The bars are now your calendar days, in
+  your time zone, with today as the last bar; a bar covering several days
+  (the 90d strip's) says so, as "Oct 10 – 12". (#401)
+- **Relayed notifications can't page your whole chat.** Text relayed from an
+  inbound webhook — including a Seerr user's issue report or comment — was
+  posted to Discord and Slack as written, so an "@everyone" or "<!channel>"
+  in it rang the whole channel and a masked link rendered. Discord now gets
+  the text with mentions switched off, and Slack gets it escaped so it shows
+  as written. (#401)
 - **Long bookmark categories survive the upgrade from 2.x.** A bookmark
   category longer than 60 characters became a group the dashboard then
   dropped, so its bookmarks appeared under a bare id and the first save of

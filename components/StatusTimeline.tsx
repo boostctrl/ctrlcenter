@@ -154,8 +154,9 @@ export const StatusTimeline = memo(function StatusTimeline({
   const [active, setActive] = useState<number | null>(null);
   if (points.length === 0) return null;
   // Each bar covers this slice of the range's window. Passed to formatBarLabel
-  // so a sub-day bucket reads as a range ("Jul 7, 5:54 – 6:42 PM"); day-scale
-  // bars ignore it and stay a single date.
+  // so a sub-day bucket reads as a range ("Jul 7, 5:54 – 6:42 PM") and a bar
+  // of several days as its dates ("Oct 10 – 12", the 90d strip, #401); a
+  // single day stays a single date.
   const bucketMs = STATUS_RANGE_MS[range] / points.length;
   // The detail line for one bar — the same text the mouse tooltip shows, reused
   // for the traversal's live region and its visible readout so keyboard, touch,

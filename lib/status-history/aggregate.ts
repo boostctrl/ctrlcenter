@@ -42,17 +42,99 @@ export function hourOf(ts: number): number {
   return Math.floor(ts / HOUR_MS);
 }
 
+// One wall-clock formatter per zone: a day-scale strip asks for ninety-odd
+// dates and midnights per request, and building a formatter each time costs
+// more than the formatting.
+const wallFormatters = new Map<string, Intl.DateTimeFormat>();
+function wallFormatter(timeZone: string): Intl.DateTimeFormat {
+  let f = wallFormatters.get(timeZone);
+  if (!f) {
+    f = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    wallFormatters.set(timeZone, f);
+  }
+  return f;
+}
+
+// The wall-clock fields of an instant in a zone.
+function wallFields(ms: number, timeZone: string): Record<string, number> {
+  const o: Record<string, number> = {};
+  for (const p of wallFormatter(timeZone).formatToParts(new Date(ms)))
+    if (p.type !== "literal") o[p.type] = Number(p.value);
+  return o;
+}
+
 // "YYYY-MM-DD" calendar date for an instant (ms), in the given time zone, so the
 // daily timeline groups by the visitor's local day rather than the UTC day.
 export function localDayStr(ms: number, timeZone: string): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date(ms));
-  const get = (t: string) => parts.find((p) => p.type === t)!.value;
-  return `${get("year")}-${get("month")}-${get("day")}`;
+  const w = wallFields(ms, timeZone);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${w.year}-${pad(w.month)}-${pad(w.day)}`;
+}
+
+// The zone's UTC offset (ms) at an instant: its wall clock read as UTC, minus
+// the instant.
+function zoneOffset(ms: number, timeZone: string): number {
+  const w = wallFields(ms, timeZone);
+  return Date.UTC(w.year, w.month - 1, w.day, w.hour, w.minute, w.second) - ms;
+}
+
+// The instant (ms) the local day containing `ms` begins in `timeZone`: its
+// calendar date's midnight, settled against the zone's offset in two passes
+// so a DST change on the day lands on the right side (lib/calendar's
+// zonedToUtc does the same for event times).
+export function dayStartInZone(ms: number, timeZone: string): number {
+  const w = wallFields(ms, timeZone);
+  const guess = Date.UTC(w.year, w.month - 1, w.day);
+  return guess - zoneOffset(guess - zoneOffset(guess, timeZone), timeZone);
+}
+
+// The bar edges of a day-scale strip (#401): `bars` bars over the last `days`
+// calendar days in `timeZone`, the last bar ending at the coming midnight so
+// it is today so far, the one before it yesterday, and so on. The 30d row
+// strip is thirty whole days; with more bars than days each day is split
+// evenly (the detail page's 30d view is thirds of a day), with fewer, a bar
+// spans whole days (the 90d row strip is thirty three-day bars). Days are
+// walked midnight to midnight, so a 23- or 25-hour DST day keeps its bar.
+// Returns bars + 1 instants, oldest first.
+export function dayAlignedEdges(
+  now: number,
+  timeZone: string,
+  days: number,
+  bars: number
+): number[] {
+  // Midnights from `days - 1` days ago through tomorrow's: days + 1 of them.
+  // Stepping from a midnight by half a day lands inside the neighbouring
+  // day whatever its length, and that day's start is the next midnight.
+  const midnights = [dayStartInZone(dayStartInZone(now, timeZone) + 36 * HOUR_MS, timeZone)];
+  for (let i = 0; i < days; i++) {
+    midnights.unshift(dayStartInZone(midnights[0] - 12 * HOUR_MS, timeZone));
+  }
+  if (bars % days === 0) {
+    const per = bars / days;
+    const edges: number[] = [];
+    for (let d = 0; d < days; d++) {
+      const len = midnights[d + 1] - midnights[d];
+      for (let k = 0; k < per; k++) edges.push(midnights[d] + (len * k) / per);
+    }
+    edges.push(midnights[days]);
+    return edges;
+  }
+  if (days % bars === 0) {
+    const per = days / bars;
+    return midnights.filter((_, i) => i % per === 0);
+  }
+  // Neither divides the other: equal spans over the same window.
+  const span = (midnights[days] - midnights[0]) / bars;
+  return Array.from({ length: bars + 1 }, (_, i) => midnights[0] + i * span);
 }
 
 // `YYYY-MM-DDThh:mm` for a sub-day bar's `at` (a UTC instant; formatBarLabel
@@ -161,6 +243,23 @@ export function fixedBarsFromBuckets(
   atOf: (ms: number) => string
 ): BarPoint[] {
   const span = (endMs - startMs) / bars;
+  return barsFromBuckets(
+    buckets,
+    Array.from({ length: bars + 1 }, (_, i) => (i === bars ? endMs : startMs + i * span)),
+    atOf
+  );
+}
+
+// The same resampling over bars of any widths: `edges` holds the bars + 1
+// boundaries, oldest first (dayAlignedEdges builds the calendar-day ones).
+export function barsFromBuckets(
+  buckets: Bucket[],
+  edges: number[],
+  atOf: (ms: number) => string
+): BarPoint[] {
+  const bars = edges.length - 1;
+  const startMs = edges[0];
+  const endMs = edges[bars];
   const acc = Array.from({ length: bars }, () => ({
     up: 0,
     down: 0,
@@ -173,10 +272,10 @@ export function fixedBarsFromBuckets(
     const lo = Math.max(hStart, startMs);
     const hi = Math.min(hStart + HOUR_MS, endMs);
     if (hi <= lo) continue; // hour outside the window
-    for (let i = Math.floor((lo - startMs) / span); i < bars; i++) {
-      const bStart = startMs + i * span;
+    for (let i = firstBarAt(edges, lo); i < bars; i++) {
+      const bStart = edges[i];
       if (bStart >= hi) break;
-      const overlap = Math.min(bStart + span, hi) - Math.max(bStart, lo);
+      const overlap = Math.min(edges[i + 1], hi) - Math.max(bStart, lo);
       if (overlap <= 0) continue;
       const w = overlap / HOUR_MS;
       acc[i].up += b.up * w;
@@ -193,13 +292,26 @@ export function fixedBarsFromBuckets(
     const total = a.up + a.down;
     return withMaint(
       {
-        at: atOf(startMs + i * span),
+        at: atOf(edges[i]),
         uptime: total === 0 ? null : (a.up / total) * 100,
         ms: a.msCount === 0 ? null : Math.round(a.msSum / a.msCount),
       },
       a.maint > 0 && a.down === 0
     );
   });
+}
+
+// Index of the last bar starting at or before `ms` (binary search over the
+// ascending edges), so an hour's loop starts at the bar it first overlaps.
+function firstBarAt(edges: number[], ms: number): number {
+  let lo = 0;
+  let hi = edges.length - 2;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (edges[mid] <= ms) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo;
 }
 
 // A bar with maintenance downtime and no real downtime is a maintenance bar

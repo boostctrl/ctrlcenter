@@ -61,9 +61,16 @@ async function round(): Promise<void> {
     const globalMinutes = settings.statusInterval ?? 5;
     const now = Date.now();
     // An app is due once its interval (its own, else the global one) has
-    // passed since its last check. A tick is a minute, the smallest interval.
+    // passed since its last check, give or take half a tick (#401): `now` is
+    // read after awaits of varying length, so a round can land a few ms short
+    // of a whole interval, and without the slack the app waited a whole extra
+    // tick; and the first round runs FIRST_DELAY_MS in, not on a tick, which
+    // cost a 1-minute app the first regular tick. A tick is a minute, the
+    // smallest interval, so half of one never makes an app due a tick early.
     const due = apps.filter(
-      (a) => now - (lastChecked.get(a.id) ?? 0) >= (a.interval ?? globalMinutes) * 60_000
+      (a) =>
+        now - (lastChecked.get(a.id) ?? 0) >=
+        (a.interval ?? globalMinutes) * 60_000 - TICK_MS / 2
     );
     if (due.length === 0) return;
     // Claim the slots before the awaits, so a slow round can't be re-entered.

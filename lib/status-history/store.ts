@@ -58,6 +58,8 @@ type HistoryState = {
   // waits PRUNE_GRACE_MS past this, so undoing a delete (#307) finds the
   // app's history still there.
   missingSince: Map<string, number>;
+  // The database's history is in memory (readHistory got it). Until then
+  // nothing is written: see flush.
   loaded: boolean;
   // The in-flight (or finished) load, shared by every caller — see loadHistory.
   loading?: Promise<void>;
@@ -66,6 +68,8 @@ type HistoryState = {
   dirty: Dirty;
   // The open database, with the path it was opened for (CONFIG_PATH decides).
   db?: { file: string; handle: DatabaseSync };
+  // When each warning last went out — see warnThrottled.
+  warnedAt: Map<string, number>;
 };
 
 type Dirty = {
@@ -97,12 +101,14 @@ const state = globalSingleton<HistoryState>("__ctrlcenterStatusHistory", () => (
   loaded: false,
   flushQueue: Promise.resolve(),
   dirty: emptyDirty(),
+  warnedAt: new Map(),
 }));
 state.recent ??= new Map(); // tolerate a state created by an older build
 state.downSince ??= new Map(); // ditto — added after the recent ring
 state.outages ??= new Map(); // ditto — added with the recorded outages (#175)
 state.missingSince ??= new Map(); // ditto — added with the prune grace (#307)
 state.dirty ??= emptyDirty(); // ditto — added with the database (#278)
+state.warnedAt ??= new Map(); // ditto — added with the warning throttle (#401)
 
 function historyDir(): string {
   // Untraced like CONFIG_PATH (lib/config.ts): a runtime path, not a build input.
@@ -128,21 +134,36 @@ function historyDb(): DatabaseSync {
 const isDamaged = (e: unknown) =>
   typeof e === "object" && e !== null && [11, 26].includes((e as { errcode?: number }).errcode ?? 0);
 
-// Load the persisted history into memory once (idempotent).
+// At most one warning an hour per message while the database stays
+// unavailable (#401): the poller flushes every minute, and a read-only volume
+// or a full disk used to log every tick — 1,441 lines a day.
+const WARN_EVERY_MS = HOUR_MS;
+function warnThrottled(msg: string, fields: Record<string, unknown>, now = Date.now()): void {
+  const last = state.warnedAt.get(msg);
+  if (last !== undefined && now - last < WARN_EVERY_MS) return;
+  state.warnedAt.set(msg, now);
+  log.warn(msg, fields);
+}
+
+// Load the persisted history into memory (idempotent once it has succeeded).
 export function loadHistory(): Promise<void> {
   // Every caller awaits the same load: a request (or the poller's first tick)
   // arriving while the history is still being read must wait for it, not see
-  // an empty store.
-  state.loading ??= readHistory();
+  // an empty store. A load that found the database unavailable is let go of
+  // once it settles (#401), so the next caller — the poller's next tick, a
+  // request — tries again: a volume that mounts late or a lock held at boot
+  // clears, and the file's history then belongs in memory before anything
+  // is written over it (see flush). The attempt is one failed open per call.
+  if (!state.loading) {
+    state.loading = readHistory().finally(() => {
+      if (!state.loaded) state.loading = undefined;
+    });
+  }
   return state.loading;
 }
 
 async function readHistory(): Promise<void> {
   if (state.loaded) return;
-  state.loaded = true;
-  // Memory is about to mirror the database; pending changes are moot.
-  state.dirty = emptyDirty();
-  applyRows({ buckets: [], readings: [], downSince: [], outages: [] });
   await fs.mkdir(historyDir(), { recursive: true }).catch(() => undefined);
   let db: DatabaseSync;
   try {
@@ -150,9 +171,9 @@ async function readHistory(): Promise<void> {
     await importLegacyOnce(db);
   } catch (e) {
     if (!isDamaged(e)) {
-      // Unwritable, or from a newer version: run on in memory, and say why
-      // (each flush will too) rather than touch a file we don't understand.
-      log.warn("status history unavailable", { reason: errorReason(e) });
+      // Unwritable, locked, or from a newer version: run on in memory and say
+      // why — once an hour — rather than touch a file we don't understand.
+      warnThrottled("status history unavailable", { reason: errorReason(e) });
       return;
     }
     // A damaged file can't be read by anyone: set it aside, start afresh.
@@ -166,55 +187,103 @@ async function readHistory(): Promise<void> {
       db = historyDb();
       await importLegacyOnce(db);
     } catch (e2) {
-      log.warn("status history unavailable", { reason: errorReason(e2) });
+      warnThrottled("status history unavailable", { reason: errorReason(e2) });
       return;
     }
   }
   const now = Date.now();
-  applyRows(
+  mergeRows(
     readHistoryRows(db, {
       minReadingT: now - RECENT_KEEP_MS,
       minOutageEnd: now - RETENTION_HOURS * HOUR_MS,
     })
   );
+  state.loaded = true;
 }
 
-// Replace the in-memory history with `rows`.
-function applyRows(rows: HistoryRows): void {
-  const store = new Map<string, AppBuckets>();
+// Bring the database's rows into memory, under what the poller has recorded
+// meanwhile (#401). Normally memory is empty — the poller waits for the load
+// — and this is a plain apply. After an open that failed at boot, memory
+// holds what has been recorded since: the file's counts for the same hours
+// are added to it (the two cover disjoint stretches of the hour, and a flush
+// writes the hour whole), its readings and outage records join memory's, and
+// its open-outage marks fill in for apps memory hasn't polled since boot.
+// For an app it has: an outage memory saw open at its first poll is the
+// file's outage still going, so it keeps the file's earlier start; one the
+// file left open but memory has seen up ended, as near as memory can tell,
+// at its first poll.
+function mergeRows(rows: HistoryRows): void {
   for (const b of rows.buckets) {
-    let m = store.get(b.app);
-    if (!m) store.set(b.app, (m = new Map()));
-    m.set(b.hour, {
-      up: b.up,
-      down: b.down,
-      maint: b.maint ?? 0,
-      msCount: b.msCount,
-      msSum: b.msSum,
-      msMax: b.msMax,
-    });
+    let m = state.store.get(b.app);
+    if (!m) state.store.set(b.app, (m = new Map()));
+    const cur = m.get(b.hour);
+    m.set(
+      b.hour,
+      cur
+        ? {
+            up: cur.up + b.up,
+            down: cur.down + b.down,
+            maint: cur.maint + (b.maint ?? 0),
+            msCount: cur.msCount + b.msCount,
+            msSum: cur.msSum + b.msSum,
+            msMax: Math.max(cur.msMax, b.msMax),
+          }
+        : {
+            up: b.up,
+            down: b.down,
+            maint: b.maint ?? 0,
+            msCount: b.msCount,
+            msSum: b.msSum,
+            msMax: b.msMax,
+          }
+    );
   }
-  const recent = new Map<string, Reading[]>();
+  // Apps polled since boot, as of before the file's readings join theirs.
+  const polled = new Map<string, Reading>();
+  for (const [app, list] of state.recent) if (list.length > 0) polled.set(app, list[0]);
   for (const r of rows.readings) {
     const reading: Reading = { t: r.t, up: r.up };
     if (r.ms != null) reading.ms = r.ms;
     if (r.maint) reading.maint = true;
-    const list = recent.get(r.app);
+    const list = state.recent.get(r.app);
     if (list) list.push(reading);
-    else recent.set(r.app, [reading]);
+    else state.recent.set(r.app, [reading]);
   }
-  const outages = new Map<string, RecordedOutage[]>();
+  for (const app of polled.keys()) {
+    state.recent.get(app)!.sort((a, b) => a.t - b.t);
+  }
   for (const o of rows.outages) {
+    const list = state.outages.get(o.app) ?? [];
+    if (list.some((x) => x.start === o.start)) continue;
     const rec: RecordedOutage = { start: o.start, end: o.end };
     if (o.note) rec.note = o.note;
-    const list = outages.get(o.app);
-    if (list) list.push(rec);
-    else outages.set(o.app, [rec]);
+    list.push(rec);
+    state.outages.set(o.app, list);
   }
-  state.store = store;
-  state.recent = recent;
-  state.downSince = new Map(rows.downSince.map((d) => [d.app, d.since]));
-  state.outages = outages;
+  for (const d of rows.downSince) {
+    const first = polled.get(d.app);
+    const mine = state.downSince.get(d.app);
+    if (!first) {
+      state.downSince.set(d.app, d.since);
+    } else if (mine !== undefined && !first.up && !first.maint && first.t === mine) {
+      state.downSince.set(d.app, Math.min(mine, d.since));
+      state.dirty.downSince.add(d.app);
+    } else if (mine === undefined) {
+      const list = state.outages.get(d.app) ?? [];
+      const tail = !first.up && !first.maint ? list.find((o) => o.start === first.t) : undefined;
+      if (tail) tail.start = Math.min(tail.start, d.since);
+      else list.push({ start: d.since, end: first.t });
+      state.outages.set(d.app, list);
+      state.dirty.downSince.add(d.app);
+      state.dirty.outages.add(d.app);
+    }
+  }
+  for (const [app, list] of state.outages) {
+    state.outages.set(
+      app,
+      list.sort((a, b) => a.start - b.start).slice(-MAX_OUTAGES)
+    );
+  }
 }
 
 // The first time a database is opened, carry over the JSON history an older
@@ -488,20 +557,38 @@ function forgetDirty(d: Dirty, id: string): void {
   d.outages.delete(id);
 }
 
+const WRITE_FAILED = "status history write failed";
+
 // Write what changed since the last flush, serialized and in one transaction
 // (#278). On failure the changes are kept for the next flush to retry.
-export function flush(): Promise<void> {
-  state.flushQueue = state.flushQueue.then(() => {
+// `now` is for tests; the poller leaves it.
+export function flush(now = Date.now()): Promise<void> {
+  state.flushQueue = state.flushQueue.then(async () => {
+    // Nothing is written before the file's history is in memory (#401): a
+    // bucket is written whole, so a flush ahead of the load would overwrite
+    // the file's hour with the count since boot. The load retries here too,
+    // so the first flush after the database opens brings the file in, then
+    // writes. Until then the pending changes stay, kept within their keep
+    // windows (see trimDirty). A load that throws is the poller's to report
+    // (it awaits one first); here it must not reject the queue, or no flush
+    // would run again.
+    if (!state.loaded) await loadHistory().catch(() => undefined);
+    if (!state.loaded) {
+      state.dirty = trimDirty(state.dirty, now);
+      return;
+    }
     const dirty = state.dirty;
     state.dirty = emptyDirty();
     try {
-      writeHistoryChanges(historyDb(), changesFrom(dirty, Date.now()));
+      writeHistoryChanges(historyDb(), changesFrom(dirty, now));
+      // Writes work again: the next failure is news.
+      state.warnedAt.delete(WRITE_FAILED);
     } catch (e) {
-      mergeDirty(dirty);
+      mergeDirty(dirty, now);
       // Best-effort — history is non-critical and the next flush retries —
       // but leave a trace, or a full disk or read-only volume would silently
       // stop the uptime history from persisting.
-      log.warn("status history write failed", { reason: errorReason(e) });
+      warnThrottled(WRITE_FAILED, { reason: errorReason(e) }, now);
     }
   });
   return state.flushQueue as Promise<void>;
@@ -535,15 +622,36 @@ function changesFrom(d: Dirty, now: number): HistoryChanges {
 }
 
 // Put a failed flush's changes back in front of anything recorded since.
-function mergeDirty(failed: Dirty): void {
-  const now = state.dirty;
-  for (const id of now.dropped) forgetDirty(failed, id);
-  state.dirty = {
-    buckets: new Set([...failed.buckets, ...now.buckets]),
-    readings: [...failed.readings, ...now.readings],
-    downSince: new Set([...failed.downSince, ...now.downSince]),
-    outages: new Set([...failed.outages, ...now.outages]),
-    dropped: new Set([...failed.dropped, ...now.dropped]),
+function mergeDirty(failed: Dirty, now: number): void {
+  const since = state.dirty;
+  for (const id of since.dropped) forgetDirty(failed, id);
+  state.dirty = trimDirty(
+    {
+      buckets: new Set([...failed.buckets, ...since.buckets]),
+      readings: [...failed.readings, ...since.readings],
+      downSince: new Set([...failed.downSince, ...since.downSince]),
+      outages: new Set([...failed.outages, ...since.outages]),
+      dropped: new Set([...failed.dropped, ...since.dropped]),
+    },
+    now
+  );
+}
+
+// Drop pending changes the database would not keep anyway (#401): readings
+// past the ring's keep window and buckets past retention. While the database
+// stays unavailable the pending set is otherwise unbounded — 30 apps at one
+// minute reached 43,000 readings in a day. What remains is what a flush once
+// the database is back should write: the last 90 minutes of readings, and
+// every hour's bucket whole from memory.
+function trimDirty(d: Dirty, now: number): Dirty {
+  const minT = now - RECENT_KEEP_MS;
+  const minHour = hourOf(now) - RETENTION_HOURS;
+  return {
+    ...d,
+    buckets: new Set(
+      [...d.buckets].filter((k) => Number(k.slice(0, k.indexOf("\u0000"))) >= minHour)
+    ),
+    readings: d.readings.filter((r) => r.t >= minT),
   };
 }
 

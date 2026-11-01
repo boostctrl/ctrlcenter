@@ -163,7 +163,10 @@ export const DETAIL_BARS = 90;
 // One bar in a timeline: uptime % for that bucket, or null if nothing was
 // recorded (server off, or before this app existed). `at` is `YYYY-MM-DD` for a
 // daily bar, `YYYY-MM-DDThh` for an hourly one, or `YYYY-MM-DDThh:mm` for a
-// single recent poll. All three are UTC instants (produced via toISOString).
+// single recent poll. The last two are UTC instants (produced via
+// toISOString); a daily bar's date is a calendar day in the zone the history
+// was requested for — the day-scale strips are aligned to that zone's
+// midnights (#401), and a bar of several days carries its first date.
 // `ms` is the average up-check latency for that bucket, or null when the bucket
 // has no up-check samples (empty, or down the whole time) — see fixedBars* in
 // status-history/aggregate.ts.
@@ -174,14 +177,15 @@ export type BarPoint = { at: string; uptime: number | null; ms: number | null; m
 // Format a BarPoint's `at` for the timeline tooltip in the visitor's time zone,
 // so the status page reads in the same zone as the rest of the app instead of
 // UTC. The minute/hour bars are real instants and are converted to local time; a
-// daily bar is a UTC calendar date and is shown as-is (converting it would
-// mislabel the bucket). Falls back to UTC if the zone is invalid.
+// daily bar is already a calendar date in the visitor's zone (the server
+// aligned it there, #401) and is shown as-is. Falls back to UTC if the zone
+// is invalid.
 //
 // `spanMs` is the bucket's width: a sub-day bucket spans a real interval (48
 // minutes on the 24h view), so passing its width labels the whole RANGE ("Jul
-// 7, 5:54 – 6:42 PM") instead of implying an instant. Only the minute-level
-// (sub-day) bars honour it; a daily bar is already a whole-day bucket and stays
-// a single date whatever `spanMs` says.
+// 7, 5:54 – 6:42 PM") instead of implying an instant. A daily bar of several
+// days (the 90d row strip's are three) shows the dates it covers, last day
+// inclusive ("Oct 10 – 12"); a single day stays a single date.
 export function formatBarLabel(
   at: string,
   timeZone: string,
@@ -210,10 +214,19 @@ export function formatBarLabel(
       month: "short", day: "numeric", hour: "numeric", hour12: true,
     });
   }
-  // Daily bucket: a UTC calendar date — prettify it without shifting the zone.
-  return formatInZone(new Date(`${at}T00:00:00Z`), "UTC", {
-    month: "short", day: "numeric",
-  });
+  // Daily bucket: a calendar date — prettify it without shifting the zone.
+  const day = new Date(`${at}T00:00:00Z`);
+  const dateOpts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+  const days = spanMs && spanMs > 0 ? Math.round(spanMs / STATUS_RANGE_MS.d1) : 1;
+  if (days > 1) {
+    return formatRangeInZone(
+      day,
+      new Date(day.getTime() + (days - 1) * STATUS_RANGE_MS.d1),
+      "UTC",
+      dateOpts
+    );
+  }
+  return formatInZone(day, "UTC", dateOpts);
 }
 
 // Build the timeline strip's screen-reader summary from its bars, so the whole

@@ -139,6 +139,27 @@ describe("status poller tick", () => {
     expect(calls).toContain("check:a");
   });
 
+  it("treats a round a few ms short of the interval as due (#401)", async () => {
+    // `now` is read after awaits of varying length, so a tick can land just
+    // short of a whole interval; it used to wait a whole extra tick then.
+    await tick();
+    calls.length = 0;
+    vi.advanceTimersByTime(5 * 60_000 - 5);
+    await tick();
+    expect(calls.filter((c) => c.startsWith("check:"))).toEqual(["check:a", "check:b"]);
+  });
+
+  it("checks a 1-minute app on the first regular tick after the early first round (#401)", async () => {
+    // The first round runs 8 s in, so the tick at 60 s found only 52 s gone
+    // and the app skipped to 120 s.
+    apps = [{ id: "a" }, { id: "b", interval: 1 }];
+    await tick();
+    calls.length = 0;
+    vi.advanceTimersByTime(52_000);
+    await tick();
+    expect(calls.filter((c) => c.startsWith("check:"))).toEqual(["check:b"]);
+  });
+
   it("passes each app's interval to the prior-state read", async () => {
     const { priorDownStreaks } = await import("./status-history");
     apps = [{ id: "a" }, { id: "b", interval: 1 }];

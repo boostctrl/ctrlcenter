@@ -608,10 +608,34 @@ describe("parseWebhook dispatch", () => {
 describe("notification channel shaping", () => {
   const n = { title: "Sonarr grabbed: The Bear S04E03", body: "WEBDL-1080p" };
 
-  it("Discord posts the title + body as content", () => {
+  it("Discord posts the title + body as content, with no mention let through (#401)", () => {
     const req = buildNotificationRequest("discord", "https://d/hook", n);
     expect(JSON.parse(req.init.body as string)).toEqual({
       content: "Sonarr grabbed: The Bear S04E03\nWEBDL-1080p",
+      allowed_mentions: { parse: [] },
+    });
+    // A Seerr user's "@everyone" reaches the channel as text, not as a page.
+    const shout = buildNotificationRequest("discord", "https://d/hook", {
+      title: "Seerr issue: Dune",
+      body: "@everyone it buffers <@&1234>",
+    });
+    expect(JSON.parse(shout.init.body as string)).toMatchObject({
+      content: "Seerr issue: Dune\n@everyone it buffers <@&1234>",
+      allowed_mentions: { parse: [] },
+    });
+  });
+
+  it("Slack gets <, > and & escaped, so a relayed <!channel> or masked link shows as written (#401)", () => {
+    const req = buildNotificationRequest("slack", "https://s/hook", {
+      title: "Seerr issue: Dune & co",
+      body: "<!channel> see <https://evil.example|the report>",
+      url: "https://seerr.lan/issues/7?a=1&b=2",
+    });
+    expect(JSON.parse(req.init.body as string)).toEqual({
+      text:
+        "Seerr issue: Dune &amp; co\n" +
+        "&lt;!channel&gt; see &lt;https://evil.example|the report&gt;\n" +
+        "https://seerr.lan/issues/7?a=1&amp;b=2",
     });
   });
 

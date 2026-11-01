@@ -11,6 +11,7 @@ import {
   oldestSampleMs,
   fixedBarsFromReadings,
   fixedBarsFromBuckets,
+  dayAlignedEdges,
   extractOutages,
   loadHistory,
   flush,
@@ -25,6 +26,25 @@ import {
   type Reading,
 } from "./status-history";
 import { log } from "./log";
+
+// The SQLite layer, with a switch to make the database unopenable or
+// unwritable (#401) — a read-only volume, a full disk, a lock held at boot.
+// Off, every call passes straight through.
+const dbFault = vi.hoisted(() => ({ open: null as Error | null, write: null as Error | null }));
+vi.mock("./status-history/db", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("./status-history/db")>();
+  return {
+    ...mod,
+    openHistoryDb: (file: string) => {
+      if (dbFault.open) throw dbFault.open;
+      return mod.openHistoryDb(file);
+    },
+    writeHistoryChanges: (...args: Parameters<typeof mod.writeHistoryChanges>) => {
+      if (dbFault.write) throw dbFault.write;
+      return mod.writeHistoryChanges(...args);
+    },
+  };
+});
 
 const HOUR = 3_600_000;
 const MIN = 60_000;
@@ -61,14 +81,27 @@ const g = globalThis as unknown as {
     downSince: Map<string, unknown>;
     outages: Map<string, unknown>;
     missingSince: Map<string, number>;
-    dirty: unknown;
+    dirty: {
+      buckets: Set<string>;
+      readings: { t: number }[];
+      downSince: Set<string>;
+      outages: Set<string>;
+      dropped: Set<string>;
+    };
+    warnedAt: Map<string, number>;
+    db?: { handle: { close(): void } };
   };
 };
+// Back to a just-started process: nothing in memory, no load, and no open
+// database handle — a restart has none, and one left open would let a load
+// that should fail (see dbFault) succeed on it.
 function resetHistoryState() {
   const s = g.__ctrlcenterStatusHistory;
   if (s) {
     s.loaded = false;
     s.loading = undefined;
+    s.db?.handle.close();
+    s.db = undefined;
     s.store = new Map();
     s.recent = new Map();
     s.downSince = new Map();
@@ -81,6 +114,7 @@ function resetHistoryState() {
       outages: new Set(),
       dropped: new Set(),
     };
+    s.warnedAt = new Map();
   }
 }
 
@@ -295,6 +329,43 @@ describe("fixedBarsFromBuckets", () => {
       at
     );
     for (const b of out) expect(b.ms).toBe(200); // 800 / 4
+  });
+});
+
+describe("dayAlignedEdges (#401)", () => {
+  const CHICAGO = "America/Chicago";
+
+  it("ends at the coming local midnight and walks back whole local days", () => {
+    const now = Date.UTC(2026, 9, 12, 8); // 03:00 on Oct 12 in Chicago (CDT, UTC-5)
+    const edges = dayAlignedEdges(now, CHICAGO, 30, 30);
+    expect(edges).toHaveLength(31);
+    expect(edges[30]).toBe(Date.UTC(2026, 9, 13, 5)); // tomorrow's midnight
+    expect(edges[29]).toBe(Date.UTC(2026, 9, 12, 5)); // today's
+    expect(edges[0]).toBe(Date.UTC(2026, 8, 13, 5)); // 30 days: today and 29 before
+  });
+
+  it("keeps a 25-hour DST day one bar", () => {
+    // US DST ends Nov 1 2026: Chicago's Nov 1 runs from 05:00Z to 06:00Z the next day.
+    const now = Date.UTC(2026, 10, 3, 12);
+    const edges = dayAlignedEdges(now, CHICAGO, 30, 30);
+    const nov1 = edges.indexOf(Date.UTC(2026, 10, 1, 5));
+    expect(nov1).toBeGreaterThan(-1);
+    expect(edges[nov1 + 1] - edges[nov1]).toBe(25 * HOUR);
+    expect(edges[30]).toBe(Date.UTC(2026, 10, 4, 6)); // CST by now
+  });
+
+  it("splits each day evenly with more bars than days, and groups whole days with fewer", () => {
+    const now = Date.UTC(2026, 9, 12, 8);
+    const thirds = dayAlignedEdges(now, "UTC", 30, 90);
+    expect(thirds).toHaveLength(91);
+    expect(thirds[87]).toBe(Date.UTC(2026, 9, 12));
+    expect(thirds[88]).toBe(Date.UTC(2026, 9, 12, 8));
+    expect(thirds[90]).toBe(Date.UTC(2026, 9, 13));
+    const triples = dayAlignedEdges(now, "UTC", 90, 30);
+    expect(triples).toHaveLength(31);
+    expect(triples[30]).toBe(Date.UTC(2026, 9, 13));
+    expect(triples[29]).toBe(Date.UTC(2026, 9, 10)); // Oct 10–12, today last
+    expect(triples[0]).toBe(Date.UTC(2026, 6, 15));
   });
 });
 
@@ -876,6 +947,155 @@ describe("history database (#278)", () => {
     await reload();
     expect(getHistory(["a"]).apps[0].uptime.h1).toBe(100);
     warn.mockRestore();
+  });
+});
+
+describe("history while the database is unavailable (#401)", () => {
+  let warn: ReturnType<typeof vi.spyOn>;
+  const reload = async () => {
+    resetHistoryState();
+    await loadHistory();
+  };
+  const pending = () => g.__ctrlcenterStatusHistory!.dirty;
+  const up = (id: string) => ({ id, up: true, status: 200, ms: 10 });
+  const down = (id: string) => ({ id, up: false, status: null, ms: 5000 });
+  // Instants inside the current hour, so a count split across two buckets
+  // can't hide a partial overwrite.
+  const h = hourOf(Date.now()) * HOUR;
+
+  beforeEach(async () => {
+    await freshHistoryDir();
+    warn = vi.spyOn(log, "warn").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    dbFault.open = null;
+    dbFault.write = null;
+    warn.mockRestore();
+  });
+
+  it("keeps the pending readings within the ring's window, and warns once an hour", async () => {
+    await loadHistory();
+    dbFault.write = new Error("database or disk is full");
+    const ids = ["a", "b", "c"];
+    const t0 = Date.now() - 24 * HOUR;
+    // A day of one-minute ticks: 43,200 readings and 1,440 warnings before.
+    for (let i = 0; i < 1440; i++) {
+      const at = t0 + i * MIN;
+      recordResults(ids.map(up), at);
+      await flush(at);
+    }
+    expect(pending().readings.length).toBeLessThanOrEqual(ids.length * 91);
+    expect(pending().readings.length).toBeGreaterThan(0);
+    expect(warn).toHaveBeenCalledTimes(24);
+    expect(warn).toHaveBeenCalledWith("status history write failed", {
+      reason: "database or disk is full",
+    });
+    // Once the disk frees up the next flush lands: every hour's count and
+    // the last readings.
+    dbFault.write = null;
+    await flush(t0 + 1440 * MIN);
+    expect(pending().readings).toHaveLength(0);
+    await reload();
+    const a = getHistory(["a"]).apps[0];
+    expect(a.uptime.d1).toBe(100);
+    expect(a.uptime.h1).toBe(100);
+    expect(a.series.d1.every((b) => b.uptime === 100)).toBe(true);
+  });
+
+  it("loads the file once it opens, and writes an hour's count whole, not the count since boot", async () => {
+    // Before the restart: 3 up, 1 down this hour.
+    recordResults([up("a"), up("a"), up("a"), down("a")], h + MIN);
+    await flush(h + MIN);
+    // A restart finds the file unopenable (a lock, a volume not mounted yet).
+    resetHistoryState();
+    dbFault.open = new Error("database is locked");
+    await loadHistory();
+    expect(warn).toHaveBeenCalledWith("status history unavailable", {
+      reason: "database is locked",
+    });
+    expect(getHistory(["a"]).apps[0].uptime.d1).toBeNull();
+    // The poller records on in memory; nothing is written, and the retries
+    // don't warn again within the hour.
+    recordResults([up("a")], h + 2 * MIN);
+    await flush(h + 2 * MIN);
+    await flush(h + 3 * MIN);
+    expect(warn).toHaveBeenCalledTimes(1);
+    // The file opens: its history comes in under what was recorded meanwhile…
+    dbFault.open = null;
+    await loadHistory();
+    expect(getHistory(["a"]).apps[0].uptime.d1).toBeCloseTo(80, 6);
+    expect(getHistory(["a"]).apps[0].uptime.h1).toBeCloseTo(80, 6);
+    // …and the next flush writes the hour whole. (1 up, 0 down overwrote 3/1 before.)
+    await flush(h + 4 * MIN);
+    await reload();
+    expect(getHistory(["a"]).apps[0].uptime.d1).toBeCloseTo(80, 6);
+    expect(getHistory(["a"]).apps[0].uptime.h1).toBeCloseTo(80, 6);
+  });
+
+  it("keeps the start of an outage that was open across the restart", async () => {
+    recordResults([down("a")], h + MIN);
+    await flush(h + MIN);
+    resetHistoryState();
+    dbFault.open = new Error("database is locked");
+    await loadHistory();
+    recordResults([down("a")], h + 2 * MIN); // still down at the first poll
+    dbFault.open = null;
+    await loadHistory();
+    expect(getHistory(["a"]).apps[0].downSince).toBe(h + MIN);
+    await flush(h + 3 * MIN);
+    await reload();
+    expect(getHistory(["a"]).apps[0].downSince).toBe(h + MIN);
+  });
+
+  it("closes an outage the file left open at the first poll that saw the app up", async () => {
+    recordResults([down("b")], h + MIN);
+    await flush(h + MIN);
+    resetHistoryState();
+    dbFault.open = new Error("database is locked");
+    await loadHistory();
+    recordResults([up("b")], h + 2 * MIN);
+    dbFault.open = null;
+    await loadHistory();
+    expect(getHistory(["b"]).apps[0].downSince).toBeNull();
+    expect(getAppDetail("b", "UTC", 5).outages).toEqual([
+      { startMs: h + MIN, endMs: h + 2 * MIN, downMs: MIN, exact: true, recorded: true },
+    ]);
+    await flush(h + 3 * MIN);
+    await reload();
+    expect(getHistory(["b"]).apps[0].downSince).toBeNull();
+    expect(getAppDetail("b", "UTC", 5).outages).toHaveLength(1);
+  });
+});
+
+describe("getHistory day-scale strips (#401)", () => {
+  beforeEach(freshHistoryDir);
+  afterEach(() => vi.useRealTimers());
+
+  const withData = (bars: { at: string; uptime: number | null }[]) =>
+    bars.filter((b) => b.uptime !== null).map((b) => b.at);
+
+  it("puts a reading under the visitor's calendar day, today being the last bar", async () => {
+    await loadHistory();
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.UTC(2026, 9, 12, 8)); // 03:00 on Oct 12 in Chicago
+    const at = Date.UTC(2026, 9, 12, 7, 30); // 02:30 on Oct 12 in Chicago
+    recordResults([{ id: "a", up: false, status: null, ms: 5000 }], at);
+    const h = getHistory(["a"], "America/Chicago").apps[0];
+    // A rolling 24 h bar starting at 03:00 the day before read "Oct 11".
+    expect(withData(h.series.d30)).toEqual(["2026-10-12"]);
+    expect(h.series.d30.at(-1)?.at).toBe("2026-10-12");
+    expect(h.series.d30[0].at).toBe("2026-09-13");
+    // The 90d row strip's bars are three days each, labelled by their first.
+    expect(withData(h.series.d90)).toEqual(["2026-10-10"]);
+    // Another zone groups the same instant under its own date.
+    expect(withData(getHistory(["a"], "Pacific/Honolulu").apps[0].series.d30)).toEqual([
+      "2026-10-11",
+    ]);
+    // The detail page's 30d bars are thirds of a day from local midnight,
+    // labelled by their start instant; its 90d bars are single days.
+    const d = getAppDetail("a", "America/Chicago", 5);
+    expect(withData(d.series.d30)).toEqual(["2026-10-12T05:00"]);
+    expect(withData(d.series.d90)).toEqual(["2026-10-12"]);
   });
 });
 

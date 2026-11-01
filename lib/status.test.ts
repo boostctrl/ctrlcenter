@@ -144,10 +144,17 @@ describe("formatBarLabel", () => {
     ).toBe("Jul 7, 11:50 PM – Jul 8, 12:20 AM");
   });
 
-  it("ignores the span for a day-scale bucket (stays a single date)", () => {
-    expect(
-      formatBarLabel("2026-06-25", "America/Chicago", 3 * 24 * 60 * 60 * 1000)
-    ).toBe("Jun 25");
+  it("keeps a one-day bar a single date whatever zone is given", () => {
+    expect(formatBarLabel("2026-06-25", "America/Chicago", 24 * 60 * 60 * 1000)).toBe("Jun 25");
+  });
+
+  it("labels a bar of several days by the dates it covers, last day inclusive (#401)", () => {
+    // The 90d row strip's bars are three days each; one used to read as its
+    // first date alone, as if the other two days were not in it.
+    expect(formatBarLabel("2026-06-25", "America/Chicago", 3 * 24 * 60 * 60 * 1000)).toBe(
+      "Jun 25 – 27"
+    );
+    expect(formatBarLabel("2026-10-30", "UTC", 3 * 24 * 60 * 60 * 1000)).toBe("Oct 30 – Nov 1");
   });
 
   it("falls back to UTC for a range label when the time zone is invalid", () => {
@@ -170,6 +177,22 @@ describe("timelineSummary", () => {
     const points = [bar("2026-07-07T17:06", 100), bar("2026-07-07T17:54", 0)];
     expect(timelineSummary(points, "UTC", "d1")).toBe(
       "24h uptime timeline: 50.0% up, worst Jul 7, 5:54 PM – Jul 8, 5:54 AM at 0.0% up"
+    );
+  });
+
+  it("calls out a day-scale bar by its calendar date, or dates (#401)", () => {
+    // Thirty bars: one day each on the 30d strip, three days each on 90d.
+    const strip = (last: string) =>
+      Array.from({ length: 30 }, (_, i) => bar(i === 29 ? last : "2026-09-01", 100));
+    const days = strip("2026-10-12");
+    days[29].uptime = 0;
+    expect(timelineSummary(days, "America/Chicago", "d30")).toBe(
+      "30d uptime timeline: 96.7% up, worst Oct 12 at 0.0% up"
+    );
+    const triples = strip("2026-10-10");
+    triples[29].uptime = 0;
+    expect(timelineSummary(triples, "America/Chicago", "d90")).toBe(
+      "90d uptime timeline: 96.7% up, worst Oct 10 – 12 at 0.0% up"
     );
   });
 
