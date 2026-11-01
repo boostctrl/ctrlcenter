@@ -84,14 +84,18 @@
   --tune-shadow: 1;
   --tune-fill: 1;
   --tune-glow: 1;
-  /* Card opacity (#444): .glass-card fades the design's fill toward
-     transparent below 100% and, above it, builds a layer of a solid card
-     color up under that fill until the card is solid at 300%. That color
-     sits a shade apart from the page (--surface-solid), so a solid card is
-     plainly a card: the page color itself, which it used to build, left a
-     300% card on a dark page looking exactly like glass. The designs' fill
-     tokens no longer multiply the knob into their tint, which only made the
-     card brighter or darker. */
+  /* Card opacity (#444): how much of the backdrop shows through a card. At
+     0% a card is clear glass: .glass-card fades the design's tint, its
+     texture (the --surface-bg-image gradients below multiply --fill-share
+     into their stops) and its frost (the backdrop blur) all to nothing, so
+     the scene or wallpaper shows through as it is. 100% is the design's own
+     look, the Blur knob setting the frost on its own. Above 100% the card
+     builds a layer of a solid card color up under its fill until it is
+     solid at 300%. That color sits a shade apart from the page
+     (--surface-solid), so a solid card is plainly a card: the page color
+     itself, which it used to build, left a 300% card on a dark page looking
+     exactly like glass. */
+  --fill-share: min(1, var(--tune-fill));
   --surface-solid: color-mix(in srgb, var(--fg) 12%, var(--background));
   --surface-under: color-mix(in srgb, var(--surface-solid) calc(50% * max(0, var(--tune-fill) - 1)), transparent);
 
@@ -275,9 +279,9 @@
   --surface-bg-hover: color-mix(in srgb, var(--fg) 9%, transparent);
   --surface-bg-image: linear-gradient(
     to bottom,
-    color-mix(in srgb, var(--fg) 16%, transparent),
-    color-mix(in srgb, var(--fg) 2%, transparent) 55%,
-    color-mix(in srgb, var(--fg) 6%, transparent)
+    color-mix(in srgb, var(--fg) calc(16% * var(--fill-share)), transparent),
+    color-mix(in srgb, var(--fg) calc(2% * var(--fill-share)), transparent) 55%,
+    color-mix(in srgb, var(--fg) calc(6% * var(--fill-share)), transparent)
   );
   --surface-blur: 16px;
   --surface-shadow: 0 8px 24px rgba(var(--shadow-tint), calc(0.3 * var(--tune-shadow))),
@@ -300,7 +304,7 @@
   --surface-bg-hover: color-mix(in srgb, var(--fg) 16%, transparent);
   --surface-bg-image: linear-gradient(
     to bottom,
-    color-mix(in srgb, var(--fg) 14%, transparent),
+    color-mix(in srgb, var(--fg) calc(14% * var(--fill-share)), transparent),
     transparent 60%
   );
   --surface-blur: 48px;
@@ -361,8 +365,8 @@
   --surface-bg-hover: color-mix(in srgb, var(--fg) 8%, transparent);
   --surface-bg-image: linear-gradient(
     135deg,
-    color-mix(in srgb, var(--accent-from) 30%, transparent),
-    color-mix(in srgb, var(--accent-to) 18%, transparent)
+    color-mix(in srgb, var(--accent-from) calc(30% * var(--fill-share)), transparent),
+    color-mix(in srgb, var(--accent-to) calc(18% * var(--fill-share)), transparent)
   );
   --surface-blur: 14px;
   --surface-shadow: 0 8px 28px rgba(var(--shadow-tint), calc(0.3 * var(--tune-shadow)));
@@ -486,7 +490,7 @@
   --surface-bg-hover: color-mix(in srgb, var(--fg) 7%, var(--background));
   --surface-bg-image: repeating-linear-gradient(
     0deg,
-    color-mix(in srgb, var(--fg) 2.5%, transparent) 0 1px,
+    color-mix(in srgb, var(--fg) calc(2.5% * var(--fill-share)), transparent) 0 1px,
     transparent 1px 4px
   );
   --surface-blur: 0px;
@@ -600,7 +604,7 @@
   --surface-bg-hover: color-mix(in srgb, var(--fg) 9%, var(--background));
   --surface-bg-image: repeating-linear-gradient(
     0deg,
-    color-mix(in srgb, var(--fg) 7%, transparent) 0 1px,
+    color-mix(in srgb, var(--fg) calc(7% * var(--fill-share)), transparent) 0 1px,
     transparent 1px 4px
   );
   --surface-shadow: inset 4px 0 0 0 var(--scene-from);
@@ -779,17 +783,18 @@ select optgroup {
     border-radius: var(--surface-radius);
     border: calc(var(--surface-border-width) * var(--tune-border))
       var(--surface-border-style, solid) var(--surface-border);
-    background-color: color-mix(in srgb, var(--surface-bg) calc(100% * min(1, var(--tune-fill))), transparent);
+    background-color: color-mix(in srgb, var(--surface-bg) calc(100% * var(--fill-share)), transparent);
     background-image: var(--surface-bg-image), linear-gradient(var(--surface-under), var(--surface-under));
     box-shadow: var(--surface-shadow);
-    -webkit-backdrop-filter: blur(calc(var(--surface-blur) * var(--tune-blur)));
-    backdrop-filter: blur(calc(var(--surface-blur) * var(--tune-blur)));
+    /* The frost goes with the opacity (#444): a clear card blurs nothing. */
+    -webkit-backdrop-filter: blur(calc(var(--surface-blur) * var(--tune-blur) * var(--fill-share)));
+    backdrop-filter: blur(calc(var(--surface-blur) * var(--tune-blur) * var(--fill-share)));
     transition: all 0.3s ease;
   }
   .glass-card:hover {
     transform: translateY(var(--surface-lift));
     border-color: var(--surface-border-hover);
-    background-color: color-mix(in srgb, var(--surface-bg-hover) calc(100% * min(1, var(--tune-fill))), transparent);
+    background-color: color-mix(in srgb, var(--surface-bg-hover) calc(100% * var(--fill-share)), transparent);
     box-shadow: var(--surface-shadow-hover);
   }
   /* A content widget at an explicit height (#353). The cell is exactly that

@@ -11,6 +11,15 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **"Card opacity" runs from clear glass to a solid card.** At 0% a card
+  is clear: no tint, no texture and no frost, so the scene or wallpaper
+  behind it shows through as it is; the design's own look sits at 100%,
+  with "Blur" still setting the frost on its own; by 300% the card is
+  solid. Before, the lower half of the knob barely showed on a frosted
+  design, whose tint is faint and whose blur stayed. (#444)
+
 ## [3.1.0-rc.3] - 2026-11-01
 
 ### Fixed
