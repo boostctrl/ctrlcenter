@@ -1171,12 +1171,17 @@ function meanDiff(page, a, b) {
   );
 }
 
+// Signed in through the real form. The page is left to settle first: Enter
+// before React has hydrated the form submits it natively, to the login page
+// itself, and the wait below then runs out. WebKit's slow frame cadence in
+// CI (#448) lost that race on the run's second sign-in, hence the settle
+// and the longer budget.
 async function signIn(ctx) {
   const login = await ctx.newPage();
-  await login.goto(`${base}/admin/login`);
+  await login.goto(`${base}/admin/login`, { waitUntil: "networkidle" });
   await login.fill('input[type="password"]', PASSWORD);
   await login.keyboard.press("Enter");
-  await login.waitForURL((u) => u.pathname === "/admin", { timeout: 15_000 });
+  await login.waitForURL((u) => u.pathname === "/admin", { timeout: 30_000 });
   await login.close();
 }
 
