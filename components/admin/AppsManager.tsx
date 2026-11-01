@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import type { AppItem, Group } from "@/lib/schema";
+import type { Audience, AppItem, Group } from "@/lib/schema";
 import { CHECK_TYPES, type CheckType } from "@/lib/status";
 import Icon from "@/components/Icon";
 import { ChipGroup } from "@/components/ChipGroup";
@@ -21,6 +21,7 @@ import {
   controlClasses,
   subCardClasses,
 } from "./ui";
+import AudiencePicker from "./AudiencePicker";
 import IconField from "./IconField";
 import { useReorder, dropIndicatorClass } from "./useReorder";
 import { useToast } from "./Toast";
@@ -45,6 +46,8 @@ type FormState = {
   url: string;
   icon: string;
   private: boolean;
+  // Who else sees it while private (#423); null for admins only.
+  audience: Audience | null;
   expectStatus: string;
   checkType: CheckType;
   port: string;
@@ -67,6 +70,7 @@ const emptyForm: FormState = {
   url: "",
   icon: "",
   private: false,
+  audience: null,
   expectStatus: "",
   checkType: "http",
   port: "",
@@ -178,6 +182,7 @@ export default function AppsManager({
       url: app.url,
       icon: app.icon,
       private: app.private,
+      audience: app.audience ?? null,
       expectStatus: app.expectStatus ?? "",
       checkType: app.checkType ?? "http",
       port: app.port != null ? String(app.port) : "",
@@ -219,6 +224,8 @@ export default function AppsManager({
         url: withHttpScheme(form.url),
         icon: form.icon,
         private: form.private,
+        // Only a private app has an audience; null clears a stored one.
+        audience: form.private ? form.audience : null,
         monitor: form.monitor,
         checkType: form.checkType,
         expectStatus: form.checkType === "http" ? form.expectStatus : "",
@@ -543,10 +550,17 @@ export default function AppsManager({
             </datalist>
             <ToggleRow
               label="Only show when logged in"
-              hint="Hides this app from signed-out visitors everywhere, including the status page. It's still monitored and alerted on."
+              hint="Hides this app from signed-out visitors everywhere, including the status page. It's still monitored and alerted on. Admins see it; tick who else may."
               checked={form.private}
               onChange={(v) => setForm({ ...form, private: v })}
             />
+            {form.private && (
+              <AudiencePicker
+                idPrefix="app-audience"
+                value={form.audience}
+                onChange={(audience) => setForm({ ...form, audience })}
+              />
+            )}
             <ToggleRow
               label="Monitor this app"
               hint="Check it with the status checks: a status dot, a row on the status page, and alerts. Off for things that don't need watching."

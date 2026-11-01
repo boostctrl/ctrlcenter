@@ -6,6 +6,7 @@ import Link from "next/link";
 import { buttonClasses } from "@/lib/buttons";
 import type { ThemePack } from "@/lib/theme";
 import { boardName, GROUP_COLORS, MAX_BOARD_NAME, MAX_BOARDS, MAX_GROUP_NAME, type GroupColor } from "@/lib/schema";
+import AudiencePicker from "@/components/admin/AudiencePicker";
 import IconChooser from "../IconChooser";
 import { findGroupByName, groupUsage } from "@/lib/groups";
 import { useConfirm } from "../Confirm";
@@ -29,7 +30,7 @@ function BoardsCard({ d, themePacks }: { d: SettingsDraft; themePacks: ThemePack
   return (
     <Card
       title="Boards"
-      intro="Separate dashboards, each with its own arrangement of widgets. The first board is the home page; switch boards from the corner menu, or with the 1–9, [ and ] keys. A private board is only there for you, signed in. A board's icon shows beside its name in the menus."
+      intro="Separate dashboards, each with its own arrangement of widgets. The first board is the home page; switch boards from the corner menu, or with the 1–9, [ and ] keys. A private board is there for admins, and for the members and groups you share it with. A board's icon shows beside its name in the menus."
     >
       <ListPanel>
         {boards.map((b, i) => {
@@ -64,7 +65,7 @@ function BoardsCard({ d, themePacks }: { d: SettingsDraft; themePacks: ThemePack
                   className={controlClasses}
                 >
                   <option value="public">Everyone</option>
-                  <option value="private">Only me</option>
+                  <option value="private">Private</option>
                 </select>
                 {/* A gallery theme pinned on the board (#337). */}
                 <select
@@ -93,6 +94,13 @@ function BoardsCard({ d, themePacks }: { d: SettingsDraft; themePacks: ThemePack
                   <RemoveButton label={`Delete the ${label} board`} onClick={() => removeBoard(b.id, label)} />
                 )}
               </div>
+              {b.visibility === "private" && (
+                <AudiencePicker
+                  idPrefix={`board-${b.id}-audience`}
+                  value={b.audience}
+                  onChange={(audience) => updateBoard(b.id, { audience })}
+                />
+              )}
               <span className="text-xs text-ink-45">
                 {i === 0 ? "Home page, at /" : `At ${href}`}
                 {b.visibility === "private" && i === 0 && boards.length > 1

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AlertType, Board, BoardVisibility, Integration, Settings, SettingsInput, WidgetInstance } from "@/lib/schema";
+import type { Audience, AlertType, Board, BoardVisibility, Integration, Settings, SettingsInput, WidgetInstance } from "@/lib/schema";
 import {
   type WebhookService,
   alertChannelSchema,
@@ -106,9 +106,11 @@ export function useSettingsDraft(
       id: b.id,
       name: b.name,
       visibility: b.visibility,
-      // Sent ("" for none) so clearing one here sticks.
+      // Sent ("" for none) so clearing one here sticks; the audience (#423)
+      // likewise, null for none.
       icon: b.icon ?? "",
       theme: b.theme ?? "",
+      audience: b.audience ?? null,
       ...(withLayout ? { layout: { sections: b.layout.sections } } : {}),
     });
     const before = new Map(savedBoards.current.map((b) => [b.id, b]));
@@ -257,12 +259,14 @@ export function useSettingsDraft(
   // An icon of "" clears it (#316).
   const updateBoard = (
     id: string,
-    patch: { name?: string; visibility?: BoardVisibility; icon?: string; theme?: string }
+    patch: { name?: string; visibility?: BoardVisibility; icon?: string; theme?: string; audience?: Audience | null }
   ) =>
     setBoards((bs) =>
       bs.map((b) => {
         if (b.id !== id) return b;
-        const next = { ...b, ...patch };
+        const { audience, ...rest } = patch;
+        const next = { ...b, ...rest, ...(audience === undefined ? {} : audience ? { audience } : {}) };
+        if (audience === null) delete next.audience;
         if (!next.icon) delete next.icon;
         if (!next.theme) delete next.theme;
         return next;

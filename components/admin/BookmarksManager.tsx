@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import type { BookmarkItem, Group } from "@/lib/schema";
+import type { Audience, BookmarkItem, Group } from "@/lib/schema";
 import { findGroupByName, groupBookmarks, groupName } from "@/lib/groups";
 import Icon from "@/components/Icon";
 import { RenameButton, RenameField } from "@/components/InlineRename";
@@ -16,6 +16,7 @@ import {
   PrivateChip,
   subCardClasses,
 } from "./ui";
+import AudiencePicker from "./AudiencePicker";
 import IconField from "./IconField";
 import { useReorder, dropIndicatorClass } from "./useReorder";
 import { useToast } from "./Toast";
@@ -34,6 +35,8 @@ type FormState = {
   url: string;
   icon: string;
   private: boolean;
+  // Who else sees it while private (#423); null for admins only.
+  audience: Audience | null;
 };
 const emptyForm: FormState = {
   name: "",
@@ -41,6 +44,7 @@ const emptyForm: FormState = {
   url: "",
   icon: "",
   private: false,
+  audience: null,
 };
 
 export default function BookmarksManager({
@@ -72,6 +76,7 @@ export default function BookmarksManager({
       url: bookmark.url,
       icon: bookmark.icon,
       private: bookmark.private,
+      audience: bookmark.audience ?? null,
     });
     revealForm();
   }
@@ -88,7 +93,12 @@ export default function BookmarksManager({
       const res = await fetch(editingId ? `/api/bookmarks/${editingId}` : "/api/bookmarks", {
         method: editingId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, url: withHttpScheme(form.url) }),
+        body: JSON.stringify({
+          ...form,
+          url: withHttpScheme(form.url),
+          // Only a private bookmark has an audience; null clears a stored one.
+          audience: form.private ? form.audience : null,
+        }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
@@ -381,10 +391,17 @@ export default function BookmarksManager({
             />
             <ToggleRow
               label="Only show when logged in"
-              hint="Hides this bookmark from signed-out visitors. A group whose bookmarks are all private disappears with them."
+              hint="Hides this bookmark from signed-out visitors. A group whose bookmarks are all private disappears with them. Admins see it; tick who else may."
               checked={form.private}
               onChange={(v) => setForm({ ...form, private: v })}
             />
+            {form.private && (
+              <AudiencePicker
+                idPrefix="bookmark-audience"
+                value={form.audience}
+                onChange={(audience) => setForm({ ...form, audience })}
+              />
+            )}
             <div className="flex gap-2">
               <Button type="submit" disabled={saving}>
                 {editingId ? "Save changes" : "Add"}

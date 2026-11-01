@@ -224,7 +224,7 @@ export default function BoardsMenu({
                         {i === 0
                           ? "Home"
                           : b.visibility === "private"
-                            ? "Only me"
+                            ? "Private"
                             : ""}
                       </span>
                     </Link>
@@ -301,7 +301,7 @@ export default function BoardsMenu({
                 className={field}
               >
                 <option value="public">Everyone</option>
-                <option value="private">Only me</option>
+                <option value="private">Private</option>
               </select>
               {current.visibility === "private" && index === 0 && boards.length > 1 && (
                 <p className="text-xs text-ink-55">

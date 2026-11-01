@@ -439,6 +439,7 @@ export default async function HelpPage() {
               icon. Mark one <strong>Only show when logged in</strong> to keep
               an internal service off the dashboard and status page for
               signed-out visitors — it&apos;s still monitored and alerted on.
+              Admins see it; tick the members and groups who may too.
             </li>
             <li>
               <strong>Groups and tags.</strong> An app can belong to a{" "}
@@ -800,7 +801,7 @@ export default async function HelpPage() {
             and <strong>Arrange</strong> opens one in the layout editor.
           </P>
           <P>
-            Set a board to <strong>Only me</strong> and it&apos;s private:
+            Set a board to <strong>Private</strong> and it&apos;s for admins, and for the members and groups you tick under it:
             visitors who aren&apos;t signed in get a &ldquo;not found&rdquo;
             page, and it never shows up in their menu. If the first board is
             private, signed-out visitors land on the first board open to
