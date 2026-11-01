@@ -1,4 +1,5 @@
 import type { SceneProps } from "./index";
+import { glowMix } from "./color";
 
 // Dots — a soft halftone field of accent dots drifting slowly behind everything.
 // Two offset repeating radial-gradients recolored by the accent vars, on an
@@ -9,7 +10,7 @@ export default function Dots({ light }: SceneProps) {
   const a = light ? 0.22 : 0.3;
   const b = light ? 0.16 : 0.22;
   const dot = (c: string, op: number) =>
-    `radial-gradient(color-mix(in srgb, ${c} ${op * 100}%, transparent) 1.5px, transparent 1.6px)`;
+    `radial-gradient(${glowMix(c, op)} 1.5px, transparent 1.6px)`;
   return (
     <div
       aria-hidden

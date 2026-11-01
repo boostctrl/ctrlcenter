@@ -1,4 +1,5 @@
 import type { SceneProps } from "./index";
+import { glowMix } from "./color";
 
 // Horizon — a retro sun sinking to a glowing horizon line: a large accent
 // gradient disc with scanline slits cut from its lower half, a hairline horizon
@@ -11,8 +12,7 @@ export default function Horizon({ light }: SceneProps) {
   const sky = light ? 0.16 : 0.22;
   const haze = light ? 0.14 : 0.18;
   const line = light ? 0.55 : 0.7;
-  const mix = (c: string, op: number) =>
-    `color-mix(in srgb, ${c} ${op * 100}%, transparent)`;
+  const mix = glowMix;
   return (
     <div
       aria-hidden

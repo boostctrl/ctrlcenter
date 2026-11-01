@@ -58,18 +58,20 @@
   /* The scene glow's strength is a design token (--design-glow, 0–1) shifted
      by the visitor's tune (#445): below 100% the design's own dims toward off,
      above it the scene is first brought to full strength (a design that hides
-     the glow can be asked to show it) and then brightened (--scene-brightness,
-     a filter on .scene-root, which every scene sits in, canvas ones included,
-     so the knob shows everywhere). Opacity alone could not exceed 1, which
-     is why raising the knob used to do nothing on Glass. The CSS scenes read
-     --glow-opacity. */
+     the glow can be asked to show it) and then boosted: --glow-boost
+     multiplies every CSS scene's own light (components/scenes/color.ts
+     glowMix, Aurora's blob opacities), and .scene-root, which every scene
+     sits in, canvas ones included, is saturated and brightened with it, so
+     the knob shows everywhere without greying the glow the way brightness
+     alone did. Opacity alone could not exceed 1, which is why raising the
+     knob used to do nothing on Glass. The CSS scenes read --glow-opacity. */
   --design-glow: 1;
   --glow-opacity: clamp(
     0,
     calc(var(--design-glow) * min(1, var(--tune-glow)) + max(0, var(--tune-glow) - 1)),
     1
   );
-  --scene-brightness: max(1, var(--tune-glow));
+  --glow-boost: max(1, var(--tune-glow));
 
   /* Fine-tune multipliers (#326), 1 = the design untouched. The design tokens
      above and below multiply these in, so one slider in the theme builder
@@ -83,11 +85,15 @@
   --tune-fill: 1;
   --tune-glow: 1;
   /* Card opacity (#444): .glass-card fades the design's fill toward
-     transparent below 100% and, above it, builds a layer of the page color
-     up under that fill until the card is solid at 300%. The designs' fill
+     transparent below 100% and, above it, builds a layer of a solid card
+     color up under that fill until the card is solid at 300%. That color
+     sits a shade apart from the page (--surface-solid), so a solid card is
+     plainly a card: the page color itself, which it used to build, left a
+     300% card on a dark page looking exactly like glass. The designs' fill
      tokens no longer multiply the knob into their tint, which only made the
      card brighter or darker. */
-  --surface-under: color-mix(in srgb, var(--background) calc(50% * max(0, var(--tune-fill) - 1)), transparent);
+  --surface-solid: color-mix(in srgb, var(--fg) 12%, var(--background));
+  --surface-under: color-mix(in srgb, var(--surface-solid) calc(50% * max(0, var(--tune-fill) - 1)), transparent);
 
   /* Scene effects (#327), set on <html> by the theme resolver: the backdrop's
      opacity, and the motion level as data-motion ("calm" slows every CSS
@@ -128,7 +134,8 @@
    --glow-opacity fold --scene-opacity into that inline value instead. */
 .scene-root {
   opacity: var(--scene-opacity, 1);
-  filter: brightness(var(--scene-brightness, 1));
+  filter: saturate(calc(1 + 0.3 * (var(--glow-boost, 1) - 1)))
+    brightness(calc(1 + 0.25 * (var(--glow-boost, 1) - 1)));
 }
 /* The wallpaper (#333): an image behind the scene (z below the scene layers),
    from variables the theme resolver sets on <html>; with none set the layer

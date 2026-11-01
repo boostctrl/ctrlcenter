@@ -1,4 +1,5 @@
 import type { SceneProps } from "./index";
+import { glowMix } from "./color";
 
 // Blueprint — a flat sheet of drafting paper: a fine grid with bolder major
 // lines, plus a few construction marks (a dashed circle with crosshairs and a
@@ -10,8 +11,7 @@ export default function Blueprint({ light }: SceneProps) {
   const minor = light ? 0.1 : 0.08;
   const major = light ? 0.18 : 0.15;
   const marks = light ? 0.4 : 0.32;
-  const mix = (c: string, op: number) =>
-    `color-mix(in srgb, ${c} ${op * 100}%, transparent)`;
+  const mix = glowMix;
   const line = (angle: string, color: string, gap: number) =>
     `repeating-linear-gradient(${angle}, ${color} 0 1px, transparent 1px ${gap}px)`;
   return (

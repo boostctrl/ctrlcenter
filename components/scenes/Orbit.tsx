@@ -1,4 +1,5 @@
 import type { SceneProps } from "./index";
+import { glowMix } from "./color";
 
 // Orbit — astronomical line-art: concentric orbit rings around an anchor in the
 // upper right, each carrying a small glowing planet. The rings are bordered
@@ -17,8 +18,7 @@ export default function Orbit({ light }: SceneProps) {
     { size: 118, dur: 108, angle: 250, dot: 7 },
     { size: 154, dur: 150, angle: 330, dot: 9 },
   ];
-  const mix = (c: string, op: number) =>
-    `color-mix(in srgb, ${c} ${op * 100}%, transparent)`;
+  const mix = glowMix;
   return (
     <div
       aria-hidden

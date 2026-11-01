@@ -18,6 +18,17 @@ here.
   send them to the sign-in form or straight back; a visitor has *Sign in*
   there instead.
 
+- **"Card opacity" at its top makes a plainly solid card.** Above 100% the
+  knob used to build the page colour up under the card, which on a dark
+  page looked no different from glass. It now builds a card colour a shade
+  apart from the page, so by 300% the card is unmistakably solid; below
+  100% it still fades toward see-through. (#444)
+
+- **"Scene glow" reaches further.** Above 100% the knob only brightened the
+  whole scene, which greyed a glow rather than strengthening it. Every glow
+  scene now scales its own light with the knob, the scene is saturated as it
+  brightens, and the knob goes to 300%. (#445)
+
 ## [3.1.0-rc.2] - 2026-11-01
 
 ### Added

@@ -1,4 +1,5 @@
 import type { SceneProps } from "./index";
+import { glowMix } from "./color";
 
 // Nebula — a dense, textured cloudbank of accent light: many overlapping
 // radial-gradient blobs at varied sizes and offsets, layered so they read as a
@@ -27,9 +28,7 @@ export default function Nebula({ light }: SceneProps) {
           key={i}
           className={`animate-drift absolute rounded-full blur-2xl ${c.className}`}
           style={{
-            background: `radial-gradient(circle, color-mix(in srgb, ${c.color} ${
-              op * 100
-            }%, transparent) 0%, transparent 68%)`,
+            background: `radial-gradient(circle, ${glowMix(c.color, op)} 0%, transparent 68%)`,
             animationDelay: c.delay,
           }}
         />

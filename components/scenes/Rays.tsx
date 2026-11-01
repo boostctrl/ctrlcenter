@@ -1,4 +1,5 @@
 import type { SceneProps } from "./index";
+import { glowMix } from "./color";
 
 // Rays — broad beams of accent light fanning out from above (crepuscular rays /
 // aurora curtains): two offset repeating-conic-gradients in the accent colors,
@@ -10,9 +11,7 @@ export default function Rays({ light }: SceneProps) {
   const a = light ? 0.5 : 0.8;
   const b = light ? 0.34 : 0.55;
   const beam = (c: string, op: number, off: number) =>
-    `repeating-conic-gradient(from ${off}deg at 50% 0%, color-mix(in srgb, ${c} ${
-      op * 100
-    }%, transparent) 0deg 3deg, transparent 3deg 13deg)`;
+    `repeating-conic-gradient(from ${off}deg at 50% 0%, ${glowMix(c, op)} 0deg 3deg, transparent 3deg 13deg)`;
   return (
     <div
       aria-hidden

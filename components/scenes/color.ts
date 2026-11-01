@@ -34,3 +34,11 @@ export function effectRgbFor(light: boolean, cssVar: string): string {
   const rgb = hexToRgb(accent);
   return rgb ? `${rgb[0]}, ${rgb[1]}, ${rgb[2]}` : fallback;
 }
+
+// A scene colour at a share of its strength, as the Scene glow knob scales
+// it (#445): above 100% the knob multiplies every layer's share, capped where
+// the colour is solid. The CSS scenes build their gradients from this, so the
+// knob reaches each of them the same way; the canvas scenes get the knob's
+// saturate-and-brighten filter on .scene-root alone.
+export const glowMix = (c: string, op: number): string =>
+  `color-mix(in srgb, ${c} min(100%, calc(${op * 100}% * var(--glow-boost, 1))), transparent)`;

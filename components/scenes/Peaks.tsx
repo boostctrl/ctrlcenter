@@ -1,4 +1,5 @@
 import type { SceneProps } from "./index";
+import { glowMix } from "./color";
 
 // Peaks — layered mountain ridgelines rising from the bottom of the page, each
 // nearer range deeper in tone, with a soft mist where they meet the content.
@@ -28,8 +29,7 @@ export default function Peaks({ light }: SceneProps) {
       clip: "polygon(0 100%, 0 55%, 11% 78%, 22% 35%, 34% 72%, 47% 45%, 58% 80%, 71% 30%, 83% 68%, 92% 50%, 100% 72%, 100% 100%)",
     },
   ];
-  const mix = (c: string, op: number) =>
-    `color-mix(in srgb, ${c} ${op * 100}%, transparent)`;
+  const mix = glowMix;
   return (
     <div
       aria-hidden

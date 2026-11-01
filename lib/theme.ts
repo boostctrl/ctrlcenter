@@ -472,8 +472,8 @@ export const TUNE_FIELDS: { key: TuneKey; label: string; description: string; ma
   { key: "border", label: "Border weight", description: "The card edge's thickness", max: 300 },
   { key: "blur", label: "Blur", description: "How much the backdrop blurs through a card", max: 200 },
   { key: "shadow", label: "Shadow depth", description: "The weight of card shadows and glows", max: 200 },
-  { key: "fill", label: "Card opacity", description: "How solid a card is over the backdrop, from see-through to opaque", max: 300 },
-  { key: "glow", label: "Scene glow", description: "How strongly the backdrop shows: dimmer, the design's own, or brighter", max: 200 },
+  { key: "fill", label: "Card opacity", description: "How solid a card is over the backdrop, from see-through to a solid card", max: 300 },
+  { key: "glow", label: "Scene glow", description: "How strongly the backdrop glows: off, the design's own, or up to three times as strong", max: 300 },
 ];
 
 export const TUNE_KEYS = TUNE_FIELDS.map((f) => f.key) as [TuneKey, ...TuneKey[]];

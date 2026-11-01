@@ -1,4 +1,5 @@
 import type { SceneProps } from "./index";
+import { glowMix } from "./color";
 
 // How far beam-sweep (app/globals.css) carries the layer each cycle, in px.
 // The bar pattern repeats along its 115° gradient line every SWEEP·sin(115°)
@@ -19,8 +20,7 @@ const PERIOD = SWEEP * Math.sin((ANGLE * Math.PI) / 180);
 export default function Beams({ light }: SceneProps) {
   const hi = light ? 0.34 : 0.26;
   const lo = light ? 0.22 : 0.16;
-  const mix = (c: string, op: number) =>
-    `color-mix(in srgb, ${c} ${op * 100}%, transparent)`;
+  const mix = glowMix;
   const bars = [
     `transparent 0`,
     `${mix("var(--scene-from)", hi)} 90px 300px`,

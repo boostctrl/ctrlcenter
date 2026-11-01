@@ -1,4 +1,5 @@
 import type { SceneProps } from "./index";
+import { glowMix } from "./color";
 
 // Bokeh — nine rimmed, out-of-focus discs of accent light drifting slowly, the
 // way point lights render behind a wide-open lens: a slightly hollow centre, a
@@ -12,8 +13,7 @@ import type { SceneProps } from "./index";
 export default function Bokeh({ light }: SceneProps) {
   // The same light spread over more glass: big discs faint, small ones bright.
   const [lg, md, sm] = light ? [0.24, 0.32, 0.4] : [0.18, 0.24, 0.3];
-  const mix = (c: string, op: number) =>
-    `color-mix(in srgb, ${c} ${op * 100}%, transparent)`;
+  const mix = glowMix;
   const disc = (c: string, op: number) =>
     `radial-gradient(circle closest-side, ${mix(c, op * 0.55)} 0 66%, ${mix(c, op)} 84% 91%, transparent 100%)`;
   const from = "var(--scene-from)";
