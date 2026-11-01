@@ -14,6 +14,11 @@ here.
 
 ### Fixed
 
+- **Long relayed notifications reach Discord.** Discord takes at most 2,000
+  characters in a message and refuses a longer one, so a relayed notification
+  whose text ran past that — a digest of many titles behind a long link, say
+  — never arrived at all. The text is now cut to fit, ending in an ellipsis,
+  and the link stays whole. (#425)
 - **Undo during a drag no longer splits the drag in two.** Pressing Ctrl+Z
   in the layout editor while an edge resize was in progress took back the
   part already dragged, and the rest of the resize then counted as a

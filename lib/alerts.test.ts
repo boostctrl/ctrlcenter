@@ -4,6 +4,7 @@ import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import {
   evaluateTransitions,
   buildAlertRequest,
+  buildNotificationRequest,
   buildEmailMessage,
   renderSubject,
   sendTestAlert,
@@ -237,6 +238,51 @@ describe("buildAlertRequest", () => {
     expect(headers.Title).toBeUndefined();
     expect(headers.Priority).toBe("high");
     expect(req.init.body).toContain("Café 日本 is down");
+  });
+});
+
+describe("buildNotificationRequest", () => {
+  // Discord takes at most 2,000 characters of `content` and answers 400 past
+  // it, which dropped a long relayed notification outright (#425).
+  const chars = (s: string) => Array.from(s).length;
+  const hook = "https://d/hook";
+
+  it("discord clips a body over 2,000 characters with an ellipsis", () => {
+    const req = buildNotificationRequest("discord", hook, { title: "Seerr issue: Dune", body: "x".repeat(2500) });
+    const { content } = JSON.parse(req.init.body as string);
+    expect(chars(content)).toBe(2000);
+    expect(content.startsWith("Seerr issue: Dune\nxxx")).toBe(true);
+    expect(content.endsWith("x…")).toBe(true);
+  });
+
+  it("discord leaves a body under the cap as written", () => {
+    const body = "y".repeat(1900);
+    const req = buildNotificationRequest("discord", hook, { title: "Seerr issue: Dune", body });
+    expect(JSON.parse(req.init.body as string)).toEqual({
+      content: `Seerr issue: Dune\n${body}`,
+      allowed_mentions: { parse: [] },
+    });
+  });
+
+  it("discord keeps the link whole when the words are cut", () => {
+    const url = "https://seerr.lan/issues/7";
+    const req = buildNotificationRequest("discord", hook, { title: "Seerr issue: Dune", body: "x".repeat(2500), url });
+    const { content } = JSON.parse(req.init.body as string);
+    expect(chars(content)).toBe(2000);
+    expect(content.endsWith(`x…\n${url}`)).toBe(true);
+  });
+
+  it("discord counts characters, not UTF-16 units, and never splits an emoji", () => {
+    // 1,990 emoji are 3,980 UTF-16 units but 1,990 characters: under the cap.
+    const under = buildNotificationRequest("discord", hook, { title: "T", body: "😀".repeat(1990) });
+    const kept = JSON.parse(under.init.body as string).content as string;
+    expect(kept.length).toBe(3982);
+    expect(kept.endsWith("😀")).toBe(true);
+    // 2,100 are over it: the cut lands between emoji, never inside one.
+    const over = buildNotificationRequest("discord", hook, { title: "T", body: "😀".repeat(2100) });
+    const cut = JSON.parse(over.init.body as string).content as string;
+    expect(chars(cut)).toBe(2000);
+    expect(cut.endsWith("😀…")).toBe(true);
   });
 });
 

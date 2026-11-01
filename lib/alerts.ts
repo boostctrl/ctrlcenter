@@ -191,6 +191,20 @@ export function buildAlertRequest(
 export type NotificationContent = WebhookNotification;
 export { buildNotificationEmail };
 
+// Discord caps a message's `content` at 2,000 characters and answers 400 past
+// it, so a long relayed notification — a digest of many titles behind a long
+// link, say — was dropped whole (#425). It counts characters, not bytes or
+// UTF-16 units: an emoji is one.
+const DISCORD_MAX_CONTENT = 2000;
+
+// `s` cut to at most `max` characters as the chat APIs count them (Unicode
+// code points, so a surrogate pair is never split), ending in an ellipsis
+// that fits inside the cap.
+function clipChars(s: string, max: number): string {
+  const chars = Array.from(s);
+  return chars.length > max ? `${chars.slice(0, Math.max(max - 1, 0)).join("")}…` : s;
+}
+
 // Shape a notification into a request for the chosen channel — the counterpart
 // to buildAlertRequest for events that aren't uptime transitions. Reuses each
 // channel's body/header conventions so inbound events read like every other
@@ -203,14 +217,26 @@ export function buildNotificationRequest(
   const detail = [c.body?.trim(), c.url?.trim()].filter(Boolean).join("\n");
   const text = [c.title, detail].filter(Boolean).join("\n");
   switch (type) {
-    case "discord":
+    case "discord": {
       // The text can be a sender's own words — a Seerr user's issue report —
       // so no mention in it may page anyone (#401): without allowed_mentions
-      // an "@everyone" in a comment rang the admin's whole channel.
-      return jsonReq(webhookUrl, { content: text, allowed_mentions: { parse: [] } });
+      // an "@everyone" in a comment rang the admin's whole channel. Past the
+      // cap the words are cut and the link kept whole, as Telegram's are
+      // (#425); only a link too long to leave any room is cut with them.
+      const link = c.url?.trim() ?? "";
+      const words = [c.title, c.body?.trim()].filter(Boolean).join("\n");
+      const room = DISCORD_MAX_CONTENT - (link ? Array.from(link).length + 1 : 0);
+      const content =
+        link && room > 0
+          ? [clipChars(words, room), link].filter(Boolean).join("\n")
+          : clipChars(text, DISCORD_MAX_CONTENT);
+      return jsonReq(webhookUrl, { content, allowed_mentions: { parse: [] } });
+    }
     case "slack":
       // Slack reads <…> as a link or a command — "<!channel>" pages everyone
       // — and & as an entity, so relayed text is escaped to show as written.
+      // Not cut: Slack sets no hard cap on `text` (it truncates past 40,000
+      // characters, beyond the reach of the bounded title, body and link).
       return jsonReq(webhookUrl, { text: escapeSlack(text) });
     case "ntfy": {
       // Title header is latin-1 only (see buildAlertRequest); send it only when
