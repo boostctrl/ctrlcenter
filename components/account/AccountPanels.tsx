@@ -29,7 +29,7 @@ export default function AccountPanels({
             </p>
           )}
           <Card title="Password" intro="The password you sign in with.">
-            <ChangePassword />
+            <ChangePassword own />
           </Card>
           <Card title="Two-factor authentication" intro="Add a time-based code from an authenticator app to your sign-in.">
             <TwoFactor enabled={twoFactor} onChange={setTwoFactor} />

@@ -8,7 +8,10 @@ import { useFocusTrap } from "./useFocusTrap";
 import { apiErrorMessage } from "./apiError";
 import { fetchWithReauth } from "./reauth";
 
-export default function ChangePassword() {
+// `own` is the account page's wording (#423): any account changing the
+// password it signs in with. Without it, the admin portal's Security card,
+// which still explains the ADMIN_PASSWORD fallback.
+export default function ChangePassword({ own = false }: { own?: boolean } = {}) {
   const [open, setOpen] = useState(false);
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -61,12 +64,16 @@ export default function ChangePassword() {
   return (
     <div className="flex items-center justify-between gap-4">
       <div>
-        <span className="text-sm text-ink-70">Admin password</span>
-        <p className="text-xs text-ink-40">
-          Set a password stored with the app. Until you do, the
-          <code className="mx-1 rounded bg-fg/10 px-1">ADMIN_PASSWORD</code>
-          environment variable is used.
-        </p>
+        <span className="text-sm text-ink-70">{own ? "Your password" : "Admin password"}</span>
+        {own ? (
+          <p className="text-xs text-ink-40">Change the password you sign in with.</p>
+        ) : (
+          <p className="text-xs text-ink-40">
+            Set a password stored with the app. Until you do, the
+            <code className="mx-1 rounded bg-fg/10 px-1">ADMIN_PASSWORD</code>
+            environment variable is used.
+          </p>
+        )}
       </div>
       <Button
         type="button"
@@ -74,7 +81,7 @@ export default function ChangePassword() {
         className="shrink-0"
         onClick={() => setOpen(true)}
       >
-        Reset password
+        {own ? "Change password" : "Reset password"}
       </Button>
 
       {/* The dialog goes to <body> (#409): this card is a glass surface
@@ -87,7 +94,7 @@ export default function ChangePassword() {
           onMouseDown={close}
           role="dialog"
           aria-modal="true"
-          aria-label="Reset admin password"
+          aria-label={own ? "Change password" : "Reset admin password"}
         >
           <form
             ref={trapRef}
@@ -95,7 +102,7 @@ export default function ChangePassword() {
             onMouseDown={(e) => e.stopPropagation()}
             className="glass-card flex w-full max-w-md flex-col gap-4 p-6 text-left"
           >
-            <h3 className="font-semibold">Reset password</h3>
+            <h3 className="font-semibold">{own ? "Change password" : "Reset password"}</h3>
             <TextField
               label="Current password"
               type="password"
