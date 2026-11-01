@@ -109,15 +109,17 @@ deployment safe.
   proxy, a persisted session secret — and keep a Security alert channel
   pointed somewhere you'll see it. With those in place a stolen admin session
   ends when you sign it out (or on its own after the idle timeout), and
-  can't change the password, turn the second factor off, change where an
-  integration's credentials are sent, export them, restore a backup or run
-  a destructive action without the password again; a sign-in from an
-  address not seen in a month is announced on your Security channels. The
-  remaining exposure is what a session can read in its window: the Monitor
-  page, the integrations' addresses and the credentials stored in
-  `config.yaml`, which the admin's forms show. So keep secrets in
-  environment variables, which the admin never shows, and give each
-  integration the least privilege its service allows (both above).
+  can't change the password, turn the second factor off, reach the stored
+  credentials (the admin's forms show placeholders; reading one back, like
+  exporting them, takes the password again), change where an integration's
+  credentials are sent, silence the Security notifications, lengthen the
+  idle timeout, restore a backup or run a destructive action without the
+  password again. A sign-in from an address not seen in a month, and a
+  session used from an address other than the one it signed in from, are
+  announced on your Security channels. The remaining exposure is what a
+  session can read in its window: the Monitor page and the integrations'
+  addresses. Keep secrets in environment variables where you can, and give
+  each integration the least privilege its service allows (both above).
 - **Exports leave secrets out unless you ask.** `Export` writes a backup
   without integration credentials, calendar and email credentials or webhook
   tokens; restoring it onto the same instance keeps the ones stored there.

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { SECRET_PLACEHOLDER } from "@/lib/schema";
 import { z } from "zod";
 import { isAdminRequest } from "@/lib/api-auth";
 import { SERVICE_IDS, SERVICES } from "@/lib/services/registry";
@@ -44,8 +45,15 @@ export async function POST(request: NextRequest) {
   const saved = (await getSiteConfig()).integrations.find(
     (i) => i.id === integration && i.type === service
   );
+  // A placeholder in the form stands for the stored credential (#382).
+  const creds = {
+    password: fields.password === SECRET_PLACEHOLDER ? (saved?.password ?? "") : fields.password,
+    apiKey: fields.apiKey === SECRET_PLACEHOLDER ? (saved?.apiKey ?? "") : fields.apiKey,
+  };
   const run = () =>
-    SERVICES[service].probe(resolveIntegration({ ...fields, id: integration, type: service }));
+    SERVICES[service].probe(
+      resolveIntegration({ ...fields, ...creds, id: integration, type: service })
+    );
   const result =
     saved && isSavedUrl(fields.url, saved.url)
       ? await run()

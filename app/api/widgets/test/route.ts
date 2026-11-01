@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { restoreWidgets } from "@/lib/config";
 import { z } from "zod";
 import { isAdminRequest } from "@/lib/api-auth";
 import { getSiteConfig } from "@/lib/config";
@@ -36,8 +37,10 @@ export async function POST(request: NextRequest) {
   if (!parsed.success || parsed.data.widget.type !== "api") {
     return NextResponse.json({ error: "Bad request" }, { status: 400 });
   }
-  const w = parsed.data.widget;
-  const saved = (await getSiteConfig()).widgets.find((x) => x.id === w.id);
+  const saved = (await getSiteConfig()).widgets.find((x) => x.id === parsed.data.widget.id);
+  // A placeholder in the form stands for the stored header value (#382).
+  const w = saved ? restoreWidgets([parsed.data.widget], [saved])[0] : parsed.data.widget;
+  if (w.type !== "api") return NextResponse.json({ error: "Bad request" }, { status: 400 });
   const own = saved?.type === "api" && isSavedRequest(w, saved);
   try {
     const data = await (own ? fetchApiJson(w) : withoutEnvSecrets(() => fetchApiJson(w)));

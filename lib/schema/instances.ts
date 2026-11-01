@@ -90,7 +90,12 @@ const apiContent = {
     .array(
       z.object({
         name: z.string().max(100).catch("").default(""),
-        value: z.string().max(2000).catch("").default("").register(secretFields, { redact: "blank" }),
+        value: z
+          .string()
+          .max(2000)
+          .catch("")
+          .default("")
+          .register(secretFields, { redact: "blank", credential: true }),
       })
     )
     .max(MAX_API_HEADERS)

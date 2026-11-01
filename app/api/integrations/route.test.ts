@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
-import { useScratchConfig, request, adminSession } from "@/lib/testing/routes";
+import { useScratchConfig, request, adminSession, staleSession } from "@/lib/testing/routes";
 import { integrationSchema } from "@/lib/schema";
 
 // Integrations (#300): the admin replaces the whole list.
@@ -64,5 +64,20 @@ describe("PUT /api/integrations", () => {
     expect((await putStale([{ ...qb, allowActions: false }])).status).toBe(200);
     expect((await readConfigInternal()).integrations[0].allowActions).toBe(false);
     expect((await putStale([qb])).status).toBe(403);
+  });
+});
+
+describe("PUT /api/integrations with the admin's placeholders (#382)", () => {
+  it("keeps the stored key when the placeholder comes back, without asking to confirm", async () => {
+    const { SECRET_PLACEHOLDER } = await import("@/lib/schema");
+    const { readConfigInternal } = await import("@/lib/config");
+    expect((await put([sonarr("keep")])).status).toBe(200);
+    const stale = await adminSession();
+    await staleSession(stale);
+    const saved = await route.PUT(
+      request("/api/integrations", { method: "PUT", body: [{ ...sonarr("keep"), apiKey: SECRET_PLACEHOLDER, enabled: false }], session: stale })
+    );
+    expect(saved.status).toBe(200);
+    expect((await readConfigInternal()).integrations.find((i) => i.id === "keep")).toMatchObject({ apiKey: "secret", enabled: false });
   });
 });

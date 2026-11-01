@@ -7,6 +7,9 @@ import { lenientArray } from "./shared";
 // Redacted from public reads (stripSecrets): credentials, and the addresses
 // and endpoints that map where alerts go.
 const secret = () => z.string().default("").register(secretFields, { redact: "blank" });
+// A credential proper (#382): hidden from the admin's own forms as well.
+const credential = () =>
+  z.string().default("").register(secretFields, { redact: "blank", credential: true });
 
 // The payload formats a webhook channel can send.
 export const ALERT_TYPES = ["generic", "discord", "slack", "ntfy"] as const;
@@ -22,7 +25,7 @@ const smtpShape = {
   // upgrades automatically.
   secure: z.boolean().default(false),
   user: secret(),
-  pass: secret(),
+  pass: credential(),
   from: secret(),
   to: secret(),
   // Subject template for uptime alerts; {service} and {status} are
@@ -61,14 +64,15 @@ export const alertChannelSchema = z.object({
   apps: z.array(z.string()).catch([]).default([]),
   // Webhook: which service's payload to send.
   format: z.enum(ALERT_TYPES).catch("generic").default("generic"),
-  // Webhook, Gotify server and Apprise API endpoint.
-  url: secret(),
+  // Webhook, Gotify server and Apprise API endpoint. A Discord or Slack
+  // webhook URL is the credential itself, so the whole field is one.
+  url: credential(),
   // Telegram bot token, Gotify app token, Pushover app token.
-  token: secret(),
+  token: credential(),
   // Telegram chat id.
   chatId: secret(),
   // Pushover user (or group) key.
-  userKey: secret(),
+  userKey: credential(),
   smtp: smtpSchema.default(smtpSchema.parse({})),
 });
 export type AlertChannel = z.infer<typeof alertChannelSchema>;

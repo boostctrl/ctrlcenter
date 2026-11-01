@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { SECRET_PLACEHOLDER } from "@/lib/schema";
 import { isAdminRequest } from "@/lib/api-auth";
 import { ENV_CALENDAR_ID, probeCalendar } from "@/lib/calendar-fetch";
 import { getSiteConfig } from "@/lib/config";
@@ -23,9 +24,25 @@ export async function POST(request: NextRequest) {
   // CTRLCENTER_CALDAV_PASS only goes to the saved URL of the calendar it
   // belongs to (lib/calendar-fetch asCalendar); a probe of any other URL uses
   // just the credentials the form sent.
-  const envCalendar = (await getSiteConfig()).widgets.find((w) => w.id === ENV_CALENDAR_ID);
+  const widgets = (await getSiteConfig()).widgets;
+  const envCalendar = widgets.find((w) => w.id === ENV_CALENDAR_ID);
   const saved = envCalendar?.type === "calendar" ? envCalendar.url : "";
-  const probe = () => probeCalendar(url, { username, password });
+  // A placeholder in the form stands for the stored password of the calendar
+  // at that address (#382); for any other address it stands for nothing.
+  const storedPassword =
+    password === SECRET_PLACEHOLDER
+      ? widgets.find((w) => w.type === "calendar" && isSavedUrl(url, w.url))
+      : undefined;
+  const probe = () =>
+    probeCalendar(url, {
+      username,
+      password:
+        password === SECRET_PLACEHOLDER
+          ? storedPassword?.type === "calendar"
+            ? storedPassword.password
+            : ""
+          : password,
+    });
   const result = isSavedUrl(url, saved)
     ? await probe()
     : await withoutEnvSecrets(probe);

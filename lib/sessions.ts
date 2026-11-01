@@ -34,6 +34,9 @@ export type SessionRecord = {
   // When the session last proved the password (and the second factor when
   // on): at sign-in, then each step-up confirmation (#366).
   reauthAt: number;
+  // Addresses other than the sign-in's that the session was used from
+  // (#382), each announced once when first seen. Bounded; absent when none.
+  addresses?: string[];
 };
 
 export type SessionMeta = {
@@ -121,6 +124,9 @@ function normalize(r: SessionRecord, version: unknown): SessionRecord {
         ? r.forwarded
         : null,
     reauthAt: typeof r.reauthAt === "number" ? r.reauthAt : r.createdAt,
+    ...(Array.isArray(r.addresses) && r.addresses.every((a) => typeof a === "string")
+      ? { addresses: r.addresses }
+      : {}),
   };
 }
 
@@ -255,6 +261,21 @@ export async function touchSession(id: string, now = Date.now()): Promise<Sessio
     void persist(store);
   }
   return s;
+}
+
+// Note that a live session was used from `ip`, an address other than its
+// sign-in's (#382). True the first time that address is seen on this session,
+// which is the moment to announce it; false after, or for a dead session.
+// Keeps the last few, so a phone moving between networks is noted once per
+// network rather than on every request.
+const MAX_SESSION_ADDRESSES = 8;
+export async function noteSessionAddress(id: string, ip: string): Promise<boolean> {
+  const store = await ready();
+  const s = store.sessions.get(id);
+  if (!s || s.ip === ip || s.addresses?.includes(ip)) return false;
+  s.addresses = [...(s.addresses ?? []), ip].slice(-MAX_SESSION_ADDRESSES);
+  await persist(store);
+  return true;
 }
 
 // The record for a live session without marking it seen.

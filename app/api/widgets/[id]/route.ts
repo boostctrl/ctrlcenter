@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/lib/api-auth";
-import { InvalidWidgetsError, readConfigInternal, removeWidget, saveWidget, widgetForEditing } from "@/lib/config";
+import { InvalidWidgetsError, readConfigInternal, removeWidget, saveWidget, widgetForEditing, restoreWidgets, widgetForAdmin } from "@/lib/config";
 import { widgetInstanceUpdateSchema, type WidgetInstance } from "@/lib/schema";
 import { requireRecentAuth } from "@/lib/reauth";
 import { widgetsChangeTarget } from "@/lib/reauth-targets";
@@ -18,7 +18,8 @@ export async function GET(request: NextRequest, { params }: Params) {
   }
   const context = await widgetForEditing((await params).id);
   if (!context) return NextResponse.json({ error: "No such widget" }, { status: 404 });
-  return NextResponse.json(context);
+  // Credentials stay on the server (#382): placeholders in their place.
+  return NextResponse.json({ ...context, widget: widgetForAdmin(context.widget) });
 }
 
 export async function PUT(request: NextRequest, { params }: Params) {
@@ -36,12 +37,14 @@ export async function PUT(request: NextRequest, { params }: Params) {
   // Step-up (#378) when the save re-points an API widget's request or a
   // calendar's address or sign-in — where an env-held secret would go.
   const { auth, widgets: stored } = await readConfigInternal();
-  if (widgetsChangeTarget([parsed.data as WidgetInstance], stored)) {
+  // A placeholder the form sent back stands for the stored credential (#382).
+  const [incoming] = restoreWidgets([parsed.data as WidgetInstance], stored);
+  if (widgetsChangeTarget([incoming], stored)) {
     const recent = await requireRecentAuth(request, auth.passwordHash);
     if (!recent.ok) return recent.response;
   }
   try {
-    return NextResponse.json(await saveWidget(parsed.data as WidgetInstance));
+    return NextResponse.json(widgetForAdmin(await saveWidget(incoming)));
   } catch (e) {
     if (e instanceof InvalidWidgetsError) return NextResponse.json({ error: e.message }, { status: 400 });
     throw e;

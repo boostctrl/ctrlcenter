@@ -29,6 +29,8 @@ export const SECURITY_EVENT_KINDS = [
   "reauth.ok",
   "reauth.fail",
   "password.fail",
+  "session.moved",
+  "secret.revealed",
   "export.secrets",
   "integration.changed",
   "actions.enabled",

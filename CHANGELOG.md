@@ -74,6 +74,18 @@ here.
   and the 2.x rollback copy never is. Every start now tightens the config,
   its backups, the session and security-log files and the upgrade notice to
   owner-only. (#408)
+- **A stolen session can no longer read your stored credentials.** The admin
+  page and its APIs used to carry every stored password, key and token to
+  the browser, so a session cookie taken more than ten minutes after sign-in
+  could read them all from the forms. The forms now show a placeholder for
+  each stored credential and keep it unless you type a new one or clear the
+  field; the Test buttons still work with what is stored. Reading an
+  inbound-webhook token back asks for your password, like an export with
+  secrets, and is logged. Silencing a Security alert channel and lengthening
+  the idle timeout ask for the password too, and a session used from an
+  address other than the one it signed in from is announced on your
+  Security channels and in Settings → Security, once per address.
+  SECURITY.md's wording is back to what 3.0.0 had promised. (#382)
 
 ## [3.0.0] - 2026-10-16
 

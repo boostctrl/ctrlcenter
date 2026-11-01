@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { z } from "zod";
-import { redactSecrets, secretFields } from "./meta";
+import { redactForAdmin, redactSecrets, restoreAdminSecrets, SECRET_PLACEHOLDER, secretFields } from "./meta";
 import { lenientItems } from "./shared";
 import { settingsSchema } from "./settings";
 import { appItemSchema } from "./apps-bookmarks";
@@ -86,5 +86,69 @@ describe("secret marks", () => {
     expect(redactSecrets(widgetInstanceSchema, notes)).toEqual(notes);
     // The input is left alone.
     expect(calendar.type === "calendar" && calendar.password).toBe("pw");
+  });
+});
+
+describe("the admin's view of credentials (#382)", () => {
+  const settings = settingsSchema.parse({
+    alerts: {
+      channels: [
+        { id: "mail", type: "email", smtp: { host: "smtp.lan", user: "me", pass: "hunter2", from: "a@b" } },
+        { id: "tg", type: "telegram", token: "123:abc", chatId: "42" },
+        { id: "hook", type: "webhook", url: "https://hooks.example/abc" },
+        { id: "env", type: "pushover", token: "${PUSHOVER_TOKEN}", userKey: "" },
+      ],
+    },
+    webhooks: { enabled: true, sonarr: { enabled: true, token: "tok-sonarr" } },
+  });
+
+  it("hands the forms a placeholder for each stored credential, and nothing else changes", () => {
+    const view = redactForAdmin(settingsSchema, settings);
+    const [mail, tg, hook, env] = view.alerts.channels;
+    expect(mail.smtp).toMatchObject({ host: "smtp.lan", user: "me", pass: SECRET_PLACEHOLDER, from: "a@b" });
+    expect([tg.token, tg.chatId]).toEqual([SECRET_PLACEHOLDER, "42"]);
+    expect(hook.url).toBe(SECRET_PLACEHOLDER);
+    // An environment reference names no secret; an empty field stays empty.
+    expect([env.token, env.userKey]).toEqual(["${PUSHOVER_TOKEN}", ""]);
+    expect(view.webhooks.sonarr).toEqual({ enabled: true, token: SECRET_PLACEHOLDER });
+    expect(view.title).toBe(settings.title);
+  });
+
+  it("puts the stored value back where the placeholder comes back, and takes anything else as typed", () => {
+    const view = redactForAdmin(settingsSchema, settings);
+    const edited = {
+      ...view,
+      alerts: {
+        ...view.alerts,
+        channels: [
+          view.alerts.channels[0],
+          { ...view.alerts.channels[1], token: "" },
+          { ...view.alerts.channels[2], url: "https://hooks.example/new" },
+        ],
+      },
+    };
+    const saved = restoreAdminSecrets(settingsSchema, edited, settings);
+    expect(saved.alerts.channels[0].smtp.pass).toBe("hunter2");
+    expect(saved.alerts.channels[1].token).toBe("");
+    expect(saved.alerts.channels[2].url).toBe("https://hooks.example/new");
+    expect(saved.webhooks.sonarr.token).toBe("tok-sonarr");
+    // A placeholder with nothing stored behind it (a new row) stays as sent.
+    const fresh = restoreAdminSecrets(settingsSchema, { alerts: { channels: [{ ...view.alerts.channels[1], id: "new" }] } }, settings);
+    expect(fresh.alerts.channels[0].token).toBe(SECRET_PLACEHOLDER);
+  });
+
+  it("covers an API widget's header values and a calendar's password, not the rest", () => {
+    const api = widgetInstanceSchema.parse({
+      id: "a", type: "api", url: "http://x", headers: [{ name: "Authorization", value: "Bearer t" }, { name: "X", value: "" }],
+    });
+    const cal = widgetInstanceSchema.parse({ id: "c", type: "calendar", url: "https://cal/x.ics", username: "me", password: "pw" });
+    const apiView = redactForAdmin(widgetInstanceSchema, api);
+    const calView = redactForAdmin(widgetInstanceSchema, cal);
+    if (apiView.type !== "api" || calView.type !== "calendar") throw new Error("type");
+    expect(apiView.headers.map((h) => h.value)).toEqual([SECRET_PLACEHOLDER, ""]);
+    expect(apiView.url).toBe("http://x");
+    expect([calView.url, calView.username, calView.password]).toEqual(["https://cal/x.ics", "me", SECRET_PLACEHOLDER]);
+    expect(restoreAdminSecrets(widgetInstanceSchema, calView, cal)).toEqual(cal);
+    expect(restoreAdminSecrets(widgetInstanceSchema, apiView, api)).toEqual(api);
   });
 });

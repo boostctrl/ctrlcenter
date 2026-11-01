@@ -50,3 +50,55 @@ describe("/api/settings", () => {
     expect(settings.alerts.channels[0].smtp.host).toBe("smtp.lan");
   });
 });
+
+describe("/api/settings keeps credentials on the server (#382)", () => {
+  it("answers with placeholders, keeps the stored value when one comes back, and clears on empty", async () => {
+    const { alertChannelSchema, SECRET_PLACEHOLDER } = await import("@/lib/schema");
+    const channel = alertChannelSchema.parse({ id: "tg", type: "telegram", token: "123:abc", chatId: "42" });
+    expect((await put({ alerts: { channels: [channel] } })).status).toBe(200);
+    const read = async () => (await (await route.GET(request("/api/settings", { session }))).json()).alerts.channels[0];
+    expect(await read()).toMatchObject({ token: SECRET_PLACEHOLDER, chatId: "42" });
+    // The form saves the row back with the placeholder: the token stays.
+    const saved = await put({ alerts: { channels: [{ ...(await read()), chatId: "43" }] } });
+    expect(saved.status).toBe(200);
+    expect((await saved.json()).alerts.channels[0].token).toBe(SECRET_PLACEHOLDER);
+    const { readConfigInternal } = await import("@/lib/config");
+    expect((await readConfigInternal()).settings.alerts.channels[0]).toMatchObject({ token: "123:abc", chatId: "43" });
+    // Emptied, it's gone.
+    expect((await put({ alerts: { channels: [{ ...(await read()), token: "" }] } })).status).toBe(200);
+    expect((await readConfigInternal()).settings.alerts.channels[0].token).toBe("");
+  });
+
+  it("asks a stale session to confirm before silencing the Security notifications", async () => {
+    const { alertChannelSchema } = await import("@/lib/schema");
+    const channel = alertChannelSchema.parse({ id: "sec", type: "telegram", token: "t", chatId: "1", onSecurity: true });
+    expect((await put({ alerts: { channels: [channel] } })).status).toBe(200);
+    const stale = await adminSession();
+    await staleSession(stale);
+    const putStale = (body: unknown) => route.PUT(request("/api/settings", { method: "PUT", body, session: stale }));
+    // Turning the Security switch off, disabling the channel, or removing it.
+    expect((await putStale({ alerts: { channels: [{ ...channel, onSecurity: false }] } })).status).toBe(403);
+    expect((await putStale({ alerts: { channels: [{ ...channel, enabled: false }] } })).status).toBe(403);
+    expect((await putStale({ alerts: { channels: [] } })).status).toBe(403);
+    // Other edits to the channel pass on the session alone.
+    expect((await putStale({ alerts: { channels: [{ ...channel, name: "Ops" }] } })).status).toBe(200);
+  });
+
+  it("announces a session used from a new address, once per address", async () => {
+    const { listSecurityEvents } = await import("@/lib/security-events");
+    const moved = async () => (await listSecurityEvents(200)).filter((e) => e.kind === "session.moved");
+    const before = (await moved()).length;
+    const from = (ip: string) => route.GET(request("/api/settings", { session, headers: { "x-forwarded-for": ip } }));
+    expect((await from("198.51.100.7")).status).toBe(200);
+    expect((await from("198.51.100.7")).status).toBe(200);
+    let events = await moved();
+    expect(events.length).toBe(before + 1);
+    expect(events[0]).toMatchObject({ ip: "198.51.100.7", detail: "signed in from 127.0.0.1" });
+    expect((await from("198.51.100.8")).status).toBe(200);
+    events = await moved();
+    expect(events.length).toBe(before + 2);
+    // Back at the sign-in address, nothing new.
+    expect((await from("127.0.0.1")).status).toBe(200);
+    expect((await moved()).length).toBe(before + 2);
+  });
+});

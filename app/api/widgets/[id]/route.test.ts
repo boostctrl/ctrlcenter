@@ -32,15 +32,21 @@ describe("/api/widgets/[id]", () => {
     expect((await del("cal-1", false)).status).toBe(401);
   });
 
-  it("answers with the instance as stored, secrets included, and what its editor needs", async () => {
+  it("answers with the instance, a placeholder for its credential (#382), and what its editor needs", async () => {
+    const { SECRET_PLACEHOLDER } = await import("@/lib/schema");
     const res = await get("cal-1");
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.widget).toMatchObject({ username: "me", password: "s3cret" });
+    expect(body.widget).toMatchObject({ username: "me", password: SECRET_PLACEHOLDER });
     expect(Array.isArray(body.groups)).toBe(true);
     expect(Array.isArray(body.tags)).toBe(true);
     expect(Array.isArray(body.integrations)).toBe(true);
     expect((await get("nope")).status).toBe(404);
+    // Saved back as the editor holds it, the stored password stays.
+    expect((await put("cal-1", body.widget)).status).toBe(200);
+    const { readConfigInternal } = await import("@/lib/config");
+    const stored = (await readConfigInternal()).widgets.find((w) => w.id === "cal-1");
+    expect(stored?.type === "calendar" && stored.password).toBe("s3cret");
   });
 
   it("saves one instance and leaves the others exactly as stored", async () => {

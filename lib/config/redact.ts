@@ -5,12 +5,16 @@ import {
   settingsSchema,
   widgetInstanceSchema,
   redactSecrets,
+  redactForAdmin,
   redactForExport,
+  restoreAdminSecrets,
   restoreSecrets,
+  SECRET_PLACEHOLDER,
   type AppItem,
   type Config,
   type Integration,
   type Settings,
+  type SettingsInput,
   type WidgetInstance,
 } from "../schema";
 
@@ -106,4 +110,44 @@ export function restoreImportSecrets(incoming: Config, stored: Config): Config {
       };
     }),
   };
+}
+
+// --- The admin's own view (#382) ---
+//
+// A signed-in admin's page and APIs carry the settings, widgets and
+// integrations for editing, but not the credentials in them: each stored
+// password, key or token arrives as SECRET_PLACEHOLDER, and a save that still
+// carries the placeholder keeps the stored value. A session someone else got
+// hold of can then edit the forms but not read the secrets out of them; the
+// admin replaces a credential by typing a new one and clears it by emptying
+// the field. Environment references are shown as they are.
+
+export function settingsForAdmin(settings: Settings): Settings {
+  return redactForAdmin(settingsSchema, settings);
+}
+export function widgetForAdmin(widget: WidgetInstance): WidgetInstance {
+  return redactForAdmin(widgetInstanceSchema, widget);
+}
+export function integrationsForAdmin(list: Integration[]): Integration[] {
+  const hide = (v: string) => (v !== "" && !isEnvRef(v) ? SECRET_PLACEHOLDER : v);
+  return list.map((i) => ({ ...i, password: hide(i.password), apiKey: hide(i.apiKey) }));
+}
+
+// A settings patch, widget list or integrations list from the admin's forms
+// with the placeholders filled back in from what is stored.
+export function restoreSettingsPatch(patch: SettingsInput, stored: Settings): SettingsInput {
+  return restoreAdminSecrets(settingsSchema, patch, stored);
+}
+export function restoreWidgets(incoming: WidgetInstance[], stored: WidgetInstance[]): WidgetInstance[] {
+  return incoming.map((w) =>
+    restoreAdminSecrets(widgetInstanceSchema, w, stored.find((o) => o.id === w.id))
+  );
+}
+export function restoreIntegrations(incoming: Integration[], stored: Integration[]): Integration[] {
+  return incoming.map((i) => {
+    const was = stored.find((o) => o.id === i.id);
+    const keep = (v: string, k: "password" | "apiKey") =>
+      v === SECRET_PLACEHOLDER && was ? was[k] : v;
+    return { ...i, password: keep(i.password, "password"), apiKey: keep(i.apiKey, "apiKey") };
+  });
 }

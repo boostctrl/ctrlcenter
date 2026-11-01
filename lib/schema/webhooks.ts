@@ -1,6 +1,7 @@
 // Inbound webhooks from Sonarr/Radarr/Seerr.
 import { z } from "zod";
 import { patchOf } from "./input";
+import { secretFields } from "./meta";
 
 // Inbound webhooks (#204): Sonarr/Radarr/Seerr POST an event to us
 // ("download complete", "request needs approval", "health issue") and we relay
@@ -15,7 +16,9 @@ export type WebhookService = (typeof WEBHOOK_SERVICES)[number];
 
 export const webhookServiceSchema = z.object({
   enabled: z.boolean().default(false),
-  token: z.string().default(""),
+  // A credential (#382): the admin's forms get a placeholder and reveal it
+  // behind a confirmation.
+  token: z.string().default("").register(secretFields, { redact: "blank", credential: true }),
 });
 export type WebhookServiceConfig = z.infer<typeof webhookServiceSchema>;
 

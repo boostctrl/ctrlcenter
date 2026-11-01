@@ -1,7 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
 import type { NextRequest } from "next/server";
 import { persistedSessionSecret } from "./session-secret";
-import { createSession, touchSession } from "./sessions";
+import { createSession, touchSession, type SessionRecord } from "./sessions";
 import { arrivedForwarded, clientIp } from "./rate-limit";
 
 export const SESSION_COOKIE_NAME = "homepage_admin_session";
@@ -223,6 +223,15 @@ export async function verifySessionId(
   token: string | undefined,
   extra = ""
 ): Promise<string | null> {
+  return (await verifySession(token, extra))?.id ?? null;
+}
+
+// The live session record a token names, marked seen, or null (see
+// verifySessionId for the cases).
+export async function verifySession(
+  token: string | undefined,
+  extra = ""
+): Promise<SessionRecord | null> {
   if (!token) return null;
   let jti: string | undefined;
   try {
@@ -232,7 +241,7 @@ export async function verifySessionId(
     return null;
   }
   if (!jti) return null;
-  return (await touchSession(jti)) ? jti : null;
+  return touchSession(jti);
 }
 
 export async function verifySessionToken(

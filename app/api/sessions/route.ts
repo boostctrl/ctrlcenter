@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminSessionId, isAdminRequest } from "@/lib/api-auth";
 import { sessionSettingsSchema } from "@/lib/schema";
 import { getIdleHours, listSessions, setIdleHours } from "@/lib/sessions";
+import { requireRecentAuth } from "@/lib/reauth";
 
 // Admin-only (gated by the /api/sessions proxy prefix and re-checked here).
 // The active admin sessions (#365): GET lists them, newest activity first,
@@ -26,6 +27,12 @@ export async function PATCH(request: NextRequest) {
       { error: parsed.error.issues[0]?.message ?? "Invalid request" },
       { status: 400 }
     );
+  }
+  // Lengthening the timeout extends how long a stolen session would live:
+  // that takes a recent confirmation (#382). Shortening it never does.
+  if (parsed.data.idleHours > (await getIdleHours())) {
+    const recent = await requireRecentAuth(request);
+    if (!recent.ok) return recent.response;
   }
   const idleHours = await setIdleHours(parsed.data.idleHours);
   return NextResponse.json({ idleHours });

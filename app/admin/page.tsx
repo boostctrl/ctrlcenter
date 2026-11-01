@@ -1,5 +1,11 @@
 import { redirect } from "next/navigation";
-import { readConfigInternal, readUpgradeNotice } from "@/lib/config";
+import {
+  integrationsForAdmin,
+  readConfigInternal,
+  readUpgradeNotice,
+  settingsForAdmin,
+  widgetForAdmin,
+} from "@/lib/config";
 import { needsSetup } from "@/lib/setup";
 import { requireAdminPage } from "@/lib/api-auth";
 import AdminDashboard from "@/components/admin/AdminDashboard";
@@ -28,11 +34,12 @@ export default async function AdminPage({
     <AdminDashboard
       initialApps={config.apps}
       initialBookmarks={config.bookmarks}
-      initialSettings={config.settings}
-      initialWidgets={config.widgets}
+      // Credentials stay on the server (#382): the forms get placeholders.
+      initialSettings={settingsForAdmin(config.settings)}
+      initialWidgets={config.widgets.map(widgetForAdmin)}
       initialBoards={config.boards}
       initialGroups={config.groups}
-      initialIntegrations={config.integrations}
+      initialIntegrations={integrationsForAdmin(config.integrations)}
       initialThemes={config.themes}
       // Only the boolean crosses to the client — never the TOTP secret (#198).
       initialTwoFactorEnabled={config.auth.totp.enabled}

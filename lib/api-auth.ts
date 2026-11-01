@@ -1,7 +1,8 @@
 import type { NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { sessionTokenFrom, verifySessionId, verifySessionToken } from "./auth";
+import { sessionTokenFrom, verifySession, verifySessionToken } from "./auth";
+import { watchSessionAddress } from "./session-watch";
 import { readConfigInternal, stripAuth, stripSecrets } from "./config";
 import type { Config } from "./schema";
 
@@ -38,7 +39,11 @@ export async function adminSessionId(
   }
   const token = sessionTokenFrom(request.cookies);
   const hash = passwordHash ?? (await readConfigInternal()).auth.passwordHash;
-  return verifySessionId(token, hash);
+  const session = await verifySession(token, hash);
+  if (!session) return null;
+  // A session used from a new address announces itself once (#382).
+  await watchSessionAddress(request, session);
+  return session.id;
 }
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);

@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/lib/api-auth";
 import { z } from "zod";
-import { InvalidWidgetsError, addWidget, readConfigInternal, replaceWidgets } from "@/lib/config";
+import {
+  InvalidWidgetsError,
+  addWidget,
+  readConfigInternal,
+  replaceWidgets,
+  restoreWidgets,
+  widgetForAdmin,
+} from "@/lib/config";
 import { WIDGET_IDS } from "@/lib/widgets/defs";
 import { widgetInstancesUpdateSchema } from "@/lib/schema";
 import { requireRecentAuth } from "@/lib/reauth";
@@ -24,11 +31,13 @@ export async function PUT(request: NextRequest) {
   // Step-up (#378) when the save re-points an API widget's request or a
   // calendar's address or sign-in — where an env-held secret would go.
   const { auth, widgets: stored } = await readConfigInternal();
-  if (widgetsChangeTarget(parsed.data, stored)) {
+  // A placeholder the form sent back stands for the stored credential (#382).
+  const incoming = restoreWidgets(parsed.data, stored);
+  if (widgetsChangeTarget(incoming, stored)) {
     const recent = await requireRecentAuth(request, auth.passwordHash);
     if (!recent.ok) return recent.response;
   }
-  return NextResponse.json(await replaceWidgets(parsed.data));
+  return NextResponse.json((await replaceWidgets(incoming)).map(widgetForAdmin));
 }
 
 // Admin-only: add one widget of a type, with its defaults and a fresh id —

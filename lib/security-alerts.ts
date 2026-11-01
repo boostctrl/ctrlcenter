@@ -46,6 +46,11 @@ export function securityNotification(e: SecurityEvent): WebhookNotification | nu
         title: "Admin sign-in from a new address",
         body: `Someone signed in to the admin portal ${where(e)} with ${e.userAgent || "an unknown browser"}. If that wasn't you, sign out everywhere else in Settings → Security and change the password.`,
       };
+    case "session.moved":
+      return {
+        title: "Admin session used from a new address",
+        body: `A session that ${e.detail ?? "signed in elsewhere"} was just used ${where(e)} with ${e.userAgent || "an unknown browser"}. If that wasn't you, sign out everywhere else in Settings → Security and change the password.`,
+      };
     case "signin.locked":
       if (e.detail === CODES_LOCKED) {
         return {

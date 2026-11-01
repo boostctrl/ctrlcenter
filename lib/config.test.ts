@@ -1025,6 +1025,9 @@ describe("readConfigInternal stays off public surfaces", () => {
     // config to check the per-service token and to read the alert-channel
     // secrets it relays through. It never serializes config back to the caller.
     "app/api/hooks/[service]/route.ts",
+    // Admin-only reveal of one inbound-webhook token behind step-up (#382):
+    // reads the token the admin's forms only hold a placeholder for.
+    "app/api/hooks/token/route.ts",
     // Public but token-gated push pings (#294): matches the per-app token,
     // which only the unfiltered config carries. Answers with no config data.
     "app/api/push/[token]/route.ts",

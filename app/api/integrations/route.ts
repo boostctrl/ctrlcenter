@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/lib/api-auth";
-import { readConfigInternal, replaceIntegrations } from "@/lib/config";
+import { readConfigInternal, replaceIntegrations, restoreIntegrations } from "@/lib/config";
 import { integrationsUpdateSchema, type Integration } from "@/lib/schema";
 import { requireRecentAuth } from "@/lib/reauth";
 import { eventMeta, recordSecurityEvent } from "@/lib/security-events";
@@ -33,12 +33,14 @@ export async function PUT(request: NextRequest) {
     );
   }
   const { auth, integrations: stored } = await readConfigInternal();
+  // A placeholder the form sent back stands for the stored credential (#382).
+  const incoming = restoreIntegrations(parsed.data, stored);
   // Step-up (#366) when the save changes what a credential reaches or turns
   // actions on: a new integration with credentials, an edited URL, username,
   // password or key, or the opt-in flipping on. Renames, reorders, removals
   // and the enable toggle pass on the session alone, so the autosave only
   // asks when it matters.
-  const targetChanged = changesTarget(parsed.data, stored);
+  const targetChanged = changesTarget(incoming, stored);
   if (targetChanged) {
     const recent = await requireRecentAuth(request, auth.passwordHash);
     if (!recent.ok) return recent.response;
@@ -46,8 +48,8 @@ export async function PUT(request: NextRequest) {
   // Write actions need two-factor authentication on (#367): without it the
   // opt-in is stored off, whatever the list said, and the form says why.
   const integrations = auth.totp.enabled
-    ? parsed.data
-    : parsed.data.map((i) => (i.allowActions ? { ...i, allowActions: false } : i));
+    ? incoming
+    : incoming.map((i) => (i.allowActions ? { ...i, allowActions: false } : i));
   await replaceIntegrations(integrations);
   // The audit log (#368): credential or address edits, and actions turned
   // on (which also goes out through the channels).

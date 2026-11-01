@@ -59,3 +59,16 @@ export function alertChannelsChangeTarget(next: ChannelTarget[], stored: Channel
     return host !== (was.smtp?.host ?? "").trim();
   });
 }
+
+// Whether a channel list silences the Security notifications (#382): a
+// stored channel that carried them, enabled, is gone, switched off, or has
+// its Security switch turned off. A stolen session could otherwise quiet the
+// one thing that would announce it.
+type ChannelSecurity = Pick<AlertChannel, "id" | "enabled" | "onSecurity">;
+export function alertChannelsDropSecurity(next: ChannelSecurity[], stored: ChannelSecurity[]): boolean {
+  return stored.some((was) => {
+    if (!was.enabled || !was.onSecurity) return false;
+    const now = next.find((c) => c.id === was.id);
+    return !now || !now.enabled || !now.onSecurity;
+  });
+}

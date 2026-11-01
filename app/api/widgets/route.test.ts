@@ -80,3 +80,24 @@ describe("POST /api/widgets", () => {
     expect((await put([{ ...api, url: "https://other.lan/" }])).status).toBe(200);
   });
 });
+
+describe("PUT /api/widgets with the admin's placeholders (#382)", () => {
+  it("answers with placeholders for header values and keeps the stored ones when they come back", async () => {
+    const { SECRET_PLACEHOLDER } = await import("@/lib/schema");
+    const api = { ...newInstance("api", "secretapi"), url: "http://x", headers: [{ name: "Authorization", value: "Bearer t" }] };
+    const res = await put([api]);
+    expect(res.status).toBe(200);
+    expect((await res.json())[0].headers[0].value).toBe(SECRET_PLACEHOLDER);
+    // Saved back as the form holds it, from a stale session: the value stays
+    // and nothing moved, so no confirmation is asked.
+    const stale = await adminSession();
+    await staleSession(stale);
+    const again = await route.PUT(
+      request("/api/widgets", { method: "PUT", body: [{ ...api, headers: [{ name: "Authorization", value: SECRET_PLACEHOLDER }] }], session: stale })
+    );
+    expect(again.status).toBe(200);
+    const { readConfigInternal } = await import("@/lib/config");
+    const stored = (await readConfigInternal()).widgets.find((w) => w.id === "secretapi");
+    expect(stored?.type === "api" && stored.headers[0].value).toBe("Bearer t");
+  });
+});

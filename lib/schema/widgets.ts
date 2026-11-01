@@ -33,7 +33,7 @@ export const calendarSchema = z.object({
   // Optional Basic-auth credentials for a private CalDAV/WebDAV calendar (e.g. a
   // Nextcloud DAV URL). The password can also come from CTRLCENTER_CALDAV_PASS.
   username: z.string().default("").register(secretFields, { redact: "blank" }),
-  password: z.string().default("").register(secretFields, { redact: "blank" }),
+  password: z.string().default("").register(secretFields, { redact: "blank", credential: true }),
 });
 export type CalendarConfig = z.infer<typeof calendarSchema>;
 

@@ -1,6 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { configSchema, type Config } from "../schema";
-import { restoreImportSecrets, stripAuth, stripExportSecrets, stripSecrets } from "./redact";
+import {
+  integrationsForAdmin,
+  restoreImportSecrets,
+  restoreIntegrations,
+  stripAuth,
+  stripExportSecrets,
+  stripSecrets,
+} from "./redact";
+import { SECRET_PLACEHOLDER } from "../schema";
 
 // A backup without secrets (#366), restoring one over what the instance
 // holds, and what the public config keeps.
@@ -71,5 +79,30 @@ describe("restoreImportSecrets", () => {
       stored
     );
     expect(fresh.integrations[0].apiKey).toBe("");
+  });
+});
+
+describe("integrations in the admin's view (#382)", () => {
+  it("replaces stored credentials with the placeholder and keeps references, then restores by id", () => {
+    const stored = config().integrations;
+    const view = integrationsForAdmin(stored);
+    expect(view.map((i) => [i.id, i.url, i.username, i.password, i.apiKey])).toEqual([
+      ["qb", "http://qb", "admin", SECRET_PLACEHOLDER, ""],
+      ["sonarr", "http://s", "", "", "${SONARR_KEY}"],
+    ]);
+    const edited = [
+      { ...view[0], url: "http://qb:8080" },
+      { ...view[1], apiKey: "new-key" },
+      { ...view[0], id: "qb2", password: SECRET_PLACEHOLDER },
+    ];
+    const restored = restoreIntegrations(edited, stored);
+    expect(restored.map((i) => [i.id, i.url, i.password, i.apiKey])).toEqual([
+      ["qb", "http://qb:8080", "hunter2", ""],
+      ["sonarr", "http://s", "", "new-key"],
+      // No stored row to take it from: the placeholder is what was sent.
+      ["qb2", "http://qb", SECRET_PLACEHOLDER, ""],
+    ]);
+    // Emptying the field clears the credential.
+    expect(restoreIntegrations([{ ...view[0], password: "" }], stored)[0].password).toBe("");
   });
 });

@@ -20,7 +20,20 @@ export const mergeRules = z.registry<{ merge: "replace" }>();
 // the nav's calendar link need. stripSecrets leaves it, and a visitor's page
 // is kept clear of it by sending each widget's public shape instead
 // (lib/widgets/public.ts); a backup without secrets blanks it like any other.
-export const secretFields = z.registry<{ redact: "blank" | "all"; exportOnly?: true }>();
+//
+// `credential` marks the subset the admin's own client doesn't get either
+// (#382): passwords, keys and tokens. redactForAdmin replaces a stored one
+// with SECRET_PLACEHOLDER, and restoreAdminSecrets puts the stored value back
+// when the placeholder is saved, so a stolen session can read the forms
+// without reading the secrets, and the admin clears one by emptying the field.
+export const secretFields = z.registry<{
+  redact: "blank" | "all";
+  exportOnly?: true;
+  credential?: true;
+}>();
+
+// What the admin's forms show in place of a stored credential (#382).
+export const SECRET_PLACEHOLDER = "••••••••";
 
 // The schema a wrapper stands for: defaults, .catch fallbacks and optionals
 // peeled off. Metadata can sit on any layer, so walkers check each.
@@ -158,6 +171,68 @@ export function restoreSecrets<T>(schema: z.ZodType, incoming: T, stored: unknow
     const from = isPlainObject(stored) ? stored : {};
     return Object.fromEntries(
       Object.entries(incoming).map(([k, v]) => [k, shape[k] ? restoreSecrets(shape[k], v, from[k], all) : v])
+    ) as T;
+  }
+  return incoming;
+}
+
+// `value` as the admin's own client receives it (#382): every field marked
+// `credential` that holds something is replaced by SECRET_PLACEHOLDER. An
+// environment reference stays, it names no secret, and an empty field stays
+// empty so the form shows what is and isn't set.
+export function redactForAdmin<T>(schema: z.ZodType, value: T): T {
+  const stack = layers(schema);
+  for (const s of stack) {
+    const rule = secretFields.get(s);
+    if (rule?.credential) {
+      return (typeof value === "string" && value !== "" && !isEnvRef(value)
+        ? SECRET_PLACEHOLDER
+        : value) as T;
+    }
+  }
+  const base = stack[stack.length - 1];
+  if (base instanceof z.ZodUnion) {
+    const option = (base.options as z.ZodType[]).find((o) => o.safeParse(value).success);
+    return option ? redactForAdmin(option, value) : value;
+  }
+  const item = lenientItems.get(base) ?? (base instanceof z.ZodArray ? (base.element as z.ZodType) : null);
+  if (item && Array.isArray(value)) return value.map((v) => redactForAdmin(item, v)) as T;
+  if (base instanceof z.ZodObject && isPlainObject(value)) {
+    const shape = base.shape as Record<string, z.ZodType>;
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [k, shape[k] ? redactForAdmin(shape[k], v) : v])
+    ) as T;
+  }
+  return value;
+}
+
+// `incoming` (a save from the admin's forms, #382) with every credential field
+// that still carries SECRET_PLACEHOLDER taken from `stored`, matched by id
+// through the lists. Anything else the form sent, an empty field included,
+// is the admin's own value.
+export function restoreAdminSecrets<T>(schema: z.ZodType, incoming: T, stored: unknown): T {
+  const stack = layers(schema);
+  for (const s of stack) {
+    const rule = secretFields.get(s);
+    if (rule?.credential) {
+      return (incoming === SECRET_PLACEHOLDER && typeof stored === "string" ? stored : incoming) as T;
+    }
+  }
+  const base = stack[stack.length - 1];
+  if (base instanceof z.ZodUnion) {
+    const option = (base.options as z.ZodType[]).find((o) => o.safeParse(incoming).success);
+    return option ? restoreAdminSecrets(option, incoming, stored) : incoming;
+  }
+  const item = lenientItems.get(base) ?? (base instanceof z.ZodArray ? (base.element as z.ZodType) : null);
+  if (item && Array.isArray(incoming)) {
+    const from = Array.isArray(stored) ? stored : [];
+    return incoming.map((v, i) => restoreAdminSecrets(item, v, counterpart(from, v, i))) as T;
+  }
+  if (base instanceof z.ZodObject && isPlainObject(incoming)) {
+    const shape = base.shape as Record<string, z.ZodType>;
+    const from = isPlainObject(stored) ? stored : {};
+    return Object.fromEntries(
+      Object.entries(incoming).map(([k, v]) => [k, shape[k] ? restoreAdminSecrets(shape[k], v, from[k]) : v])
     ) as T;
   }
   return incoming;

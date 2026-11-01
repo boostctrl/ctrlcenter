@@ -126,3 +126,18 @@ describe("POST /api/logout (#365)", () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe("the idle timeout (#382)", () => {
+  it("can be shortened on the session alone, but lengthening it asks a stale session to confirm", async () => {
+    const { staleSession } = await import("@/lib/testing/routes");
+    const session = await adminSession();
+    const patch = (idleHours: number) => PATCH(request("/api/sessions", { method: "PATCH", body: { idleHours }, session }));
+    expect((await patch(12)).status).toBe(200);
+    await staleSession(session);
+    expect((await patch(6)).status).toBe(200);
+    const longer = await patch(48);
+    expect(longer.status).toBe(403);
+    expect(await longer.json()).toMatchObject({ reauthRequired: true });
+    expect((await list(session)).idleHours).toBe(6);
+  });
+});
