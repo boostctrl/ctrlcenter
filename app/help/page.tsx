@@ -280,7 +280,11 @@ export default async function HelpPage() {
             <li>
               <strong>Weather location and units.</strong> Set a spot or tap{" "}
               <em>Use my location</em>, and switch between °F and °C (when the
-              admin has weather on).
+              admin has weather on). On a first visit your browser asks
+              ipwho.is for a rough location from its IP address, unless the
+              admin has turned that off; <em>Use my location</em> asks
+              bigdatacloud.net for the place name. Setting a location yourself
+              stops both.
             </li>
             <li>
               <strong>Reset all settings.</strong> Wipe your personalizations

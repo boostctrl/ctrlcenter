@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, Hint, NumberField, SelectField, fieldLabelClasses } from "../../ui";
+import { Card, Hint, NumberField, SelectField, ToggleRow, fieldLabelClasses } from "../../ui";
 import CitySearch from "../../CitySearch";
 import type { SettingsDraft } from "../useSettingsDraft";
 
@@ -75,6 +75,15 @@ export default function WeatherSettings({ d }: { d: SettingsDraft }) {
         <option value="imperial">Imperial (°F)</option>
         <option value="metric">Metric (°C)</option>
       </SelectField>
+
+      <ToggleRow
+        label="Guess visitors' location from their IP address"
+        hint="On a first visit, the visitor's browser asks ipwho.is for a rough location, so the weather starts out local. Off, everyone starts at the default location above until they set their own in Settings."
+        checked={settings.weather.ipLocation}
+        onChange={(ipLocation) =>
+          setSettings({ ...settings, weather: { ...settings.weather, ipLocation } })
+        }
+      />
     </Card>
   );
 }

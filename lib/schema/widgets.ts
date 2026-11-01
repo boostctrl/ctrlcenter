@@ -11,6 +11,10 @@ export const weatherSchema = z.object({
   latitude: z.number().default(38.9072),
   longitude: z.number().default(-77.0369),
   units: z.enum(["imperial", "metric"]).default("imperial"),
+  // Whether a visitor's browser asks ipwho.is for a rough location from its
+  // IP address on a first visit (#404). On by default, as it always was;
+  // off, visitors start at the default location until they set their own.
+  ipLocation: z.boolean().default(true),
 });
 
 // Agenda widget fed by a published iCal (.ics) URL. Stored leniently; the URL is

@@ -30,6 +30,20 @@ if (!fs.existsSync(path.join(STANDALONE, "server.js"))) {
   process.exit(2);
 }
 
+// The standalone output must hold only the server and what it traced (#404):
+// a computed file path once made Turbopack trace the whole project into it
+// (app/, lib/, docs, a dev config/), which the Docker image then shipped.
+// Caught by eye that time; caught here from now on.
+const STANDALONE_ALLOWED = new Set(["server.js", "package.json", "node_modules", ".next", "public", "server-entry.mjs"]);
+const stray = fs.readdirSync(STANDALONE).filter((name) => !STANDALONE_ALLOWED.has(name));
+if (stray.length > 0) {
+  console.error(
+    `The standalone build holds more than the server: ${stray.join(", ")}. A dynamic file path ` +
+      "made the build trace the whole project; mark it /* turbopackIgnore: true */ (see lib/config/store.ts)."
+  );
+  process.exit(2);
+}
+
 // Same assembly as the Dockerfile's runner stage (cp into an existing dir
 // would nest static/static, hence the rm first).
 for (const [from, to] of [

@@ -303,6 +303,7 @@ settings:
     latitude: 38.9072
     longitude: -77.0369
     units: imperial         # imperial | metric
+    ipLocation: true        # first visit: the browser asks ipwho.is for a rough location from its IP
   alerts:                   # notify when a service goes down / recovers
     enabled: false
     confirmations: 2        # consecutive failed checks before "down" (flap dampening)

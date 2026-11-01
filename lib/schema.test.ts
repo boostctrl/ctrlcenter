@@ -17,8 +17,7 @@ import {
   widgetInstancesUpdateSchema,
   newInstance,
   MAX_FEED_CARDS,
-  MAX_FEED_URLS,
-} from "./schema";
+  MAX_FEED_URLS, weatherSchema } from "./schema";
 
 describe("feedUrls", () => {
   it("trims entries and drops blank rows", () => {
@@ -519,5 +518,14 @@ describe("countdown date resilience", () => {
       { label: "Dec 32", date: "" },
       { label: "Padded", date: "2026-10-15" },
     ]);
+  });
+});
+
+describe("the first-visit IP location switch (#404)", () => {
+  it("is on by default, and the settings PUT can turn it off", () => {
+    expect(weatherSchema.parse({}).ipLocation).toBe(true);
+    expect(weatherSchema.parse({ ipLocation: false }).ipLocation).toBe(false);
+    expect(weatherUpdateSchema.parse({ ipLocation: false })).toEqual({ ipLocation: false });
+    expect(weatherUpdateSchema.parse({})).toEqual({});
   });
 });

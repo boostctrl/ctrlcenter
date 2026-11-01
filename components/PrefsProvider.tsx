@@ -117,6 +117,7 @@ type Defaults = {
 export function PrefsProvider({
   defaults,
   weatherEnabled,
+  ipLocation = true,
   defaultTheme,
   initialBoardTheme = null,
   visitorTheming = "all",
@@ -126,6 +127,8 @@ export function PrefsProvider({
 }: {
   defaults: Defaults;
   weatherEnabled: boolean;
+  // Whether a first visit looks the location up from the IP address (#404).
+  ipLocation?: boolean;
   // The site's own theme (the current phase's, under a schedule), never a
   // board's: this provider outlives every page, so a board's theme handed
   // in here stayed on after the board was left (#385).
@@ -171,7 +174,7 @@ export function PrefsProvider({
     setManualLocation,
     clearLocation,
     useMyLocation,
-  } = useLocationDetect({ prefs, persist, weatherEnabled });
+  } = useLocationDetect({ prefs, persist, weatherEnabled, ipLocation });
 
   // On mount: load stored prefs, silently detect timezone, and IP-detect the
   // location on a first visit (no stored location, not previously reset).

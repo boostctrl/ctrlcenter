@@ -101,6 +101,18 @@ deployment safe.
   enters. Restrict the container's egress to the specific service addresses it
   needs rather than the whole LAN/VLAN, so a mistaken or malicious URL can't be
   turned into a way to probe the rest of your network.
+- **What visitors' browsers connect to besides this server.** With the
+  weather widget on, a visitor's browser fetches forecasts from Open-Meteo
+  (`api.open-meteo.com`; the server's own weather requests can go to a
+  self-hosted instance through `CTRLCENTER_WEATHER_API`), and on their first
+  visit asks `ipwho.is` for a rough location from their IP address, so the
+  weather starts out local; **Settings → Widgets → Weather** has a switch to
+  turn that lookup off, and a visitor who sets a location themselves is never
+  looked up again. *Use my location* asks `api.bigdatacloud.net` for a place
+  name, and the city search asks Open-Meteo's geocoder. The admin's icon
+  picker loads the icon index from `cdn.jsdelivr.net`; the icons themselves
+  are served from this server's cache. The content-security policy
+  (`lib/csp.ts`) allows exactly these hosts and no others.
 - **Exposing the portal to the internet.** A VPN or tunnel (Tailscale,
   WireGuard, Cloudflare Tunnel) is still the smallest attack surface, but a
   public port is a supported deployment: open **Settings → Security** and

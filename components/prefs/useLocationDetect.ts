@@ -12,10 +12,13 @@ export function useLocationDetect({
   prefs,
   persist,
   weatherEnabled,
+  ipLocation = true,
 }: {
   prefs: VisitorPrefs;
   persist: (next: VisitorPrefs) => void;
   weatherEnabled: boolean;
+  // The admin's switch for the first-visit IP lookup (#404).
+  ipLocation?: boolean;
 }) {
   const [detecting, setDetecting] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -27,8 +30,9 @@ export function useLocationDetect({
   const detectFromIp = useCallback(
     (stored: VisitorPrefs): (() => void) | undefined => {
       // Location only matters for weather; skip the IP lookup entirely when the
-      // weather widget is off, or once the visitor has set/reset their location.
-      if (!weatherEnabled || stored.location || stored.dismissedAuto) return;
+      // weather widget is off, when the admin turned the lookup off (#404), or
+      // once the visitor has set/reset their location.
+      if (!weatherEnabled || !ipLocation || stored.location || stored.dismissedAuto) return;
       let active = true;
       setDetecting(true);
       fetch("https://ipwho.is/?fields=success,latitude,longitude,city,country_code")
@@ -54,7 +58,7 @@ export function useLocationDetect({
         active = false;
       };
     },
-    [persist, weatherEnabled]
+    [persist, weatherEnabled, ipLocation]
   );
 
   const setManualLocation = useCallback(

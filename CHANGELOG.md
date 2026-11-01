@@ -19,6 +19,12 @@ here.
   body go into a backup as written, so a token belongs in a header or a
   `${NAME}` reference. The Help page's Backup card also matches the export
   dialog again: a default export leaves credentials out. (#408)
+- **The first-visit location lookup is documented and can be turned off.**
+  With the weather widget on, a visitor's browser asks ipwho.is for a rough
+  location from their IP address the first time they open the dashboard, so
+  the weather starts out local. The README, the Help page and SECURITY.md now
+  say so, and Settings → Widgets → Weather has a switch to turn it off, in
+  which case everyone starts at the site's default location. (#404)
 
 ### Fixed
 

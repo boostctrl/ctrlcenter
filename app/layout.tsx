@@ -260,6 +260,7 @@ export default async function RootLayout({
         </a>
         <PrefsProvider
           weatherEnabled={weather.enabled}
+          ipLocation={weather.ipLocation}
           defaultTheme={siteTheme}
           initialBoardTheme={pinned}
           visitorTheming={visitorTheming}
