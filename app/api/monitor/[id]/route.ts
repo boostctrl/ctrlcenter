@@ -13,7 +13,7 @@ export async function GET(
 ) {
   const { id } = await params;
   const config = await readConfigInternal();
-  if (!(await isAdminRequest(request, config.auth.passwordHash))) {
+  if (!(await isAdminRequest(request, config.auth))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const result = await getServiceDetail(id, config.integrations, config.auth.totp.enabled);

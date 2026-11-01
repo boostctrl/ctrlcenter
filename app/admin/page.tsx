@@ -23,7 +23,7 @@ export default async function AdminPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const config = await readConfigInternal();
-  await requireAdminPage("/admin", config.auth.passwordHash);
+  await requireAdminPage("/admin", config.auth);
   // A fresh install starts with the first-run setup (#304).
   if (needsSetup(config)) redirect("/admin/setup");
   const params = await searchParams;

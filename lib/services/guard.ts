@@ -41,7 +41,7 @@ export async function requireAction(
   type: ServiceId
 ): Promise<GuardSuccess | GuardFailure> {
   const config = await readConfigInternal();
-  if (!(await isAdminRequest(request, config.auth.passwordHash))) {
+  if (!(await isAdminRequest(request, config.auth))) {
     return { ok: false, status: 401, error: "Unauthorized" };
   }
   const integration = config.integrations.find((i) => i.id === integrationId && i.type === type);

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { useScratchConfig, request, adminSession, staleSession } from "@/lib/testing/routes";
 import { integrationSchema } from "@/lib/schema";
+import { FOUNDING_ACCOUNT_ID } from "@/lib/schema";
 
 // Integrations (#300): the admin replaces the whole list.
 let route: typeof import("./route");
@@ -42,7 +43,7 @@ describe("PUT /api/integrations", () => {
     const { readConfigInternal, activateTotp } = await import("@/lib/config");
     expect((await readConfigInternal()).integrations[0].allowActions).toBe(false);
     // With the factor on, the opt-in is kept.
-    await activateTotp("JBSWY3DPEHPK3PXP", []);
+    await activateTotp(FOUNDING_ACCOUNT_ID, "JBSWY3DPEHPK3PXP", []);
     expect((await put([qb])).status).toBe(200);
     expect((await readConfigInternal()).integrations[0].allowActions).toBe(true);
   });
@@ -57,7 +58,7 @@ describe("PUT /api/integrations", () => {
     const qb = integrationSchema.parse({ id: "qb", type: "qbittorrent", url: "http://q", username: "u", password: "p", allowActions: true });
     await replaceIntegrations([qb]);
     const stale = await adminSession();
-    const id = await verifySessionId(stale);
+    const id = await verifySessionId(stale, (await readConfigInternal()).auth);
     if (!id) throw new Error("no session");
     await markReauth(id, Date.now() - REAUTH_WINDOW_MS - 1);
     const putStale = (body: unknown) => route.PUT(request("/api/integrations", { method: "PUT", body, session: stale }));

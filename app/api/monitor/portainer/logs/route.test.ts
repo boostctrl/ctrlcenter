@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import * as YAML from "js-yaml";
 import { useScratchConfig, request, adminSession } from "@/lib/testing/routes";
+import { FOUNDING_ACCOUNT_ID } from "@/lib/schema";
 
 // The log tail's container id goes into a Docker API path (#379): anything
 // but a real id is refused before Portainer is asked, so this read-only route
@@ -41,7 +42,7 @@ beforeAll(async () => {
   // The log tail sits behind the same gates as the actions, the second
   // factor included (#367).
   const { activateTotp } = await import("@/lib/config");
-  await activateTotp("JBSWY3DPEHPK3PXP", []);
+  await activateTotp(FOUNDING_ACCOUNT_ID, "JBSWY3DPEHPK3PXP", []);
 });
 
 afterEach(() => {

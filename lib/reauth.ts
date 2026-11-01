@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { adminSessionId } from "./api-auth";
 import { getSession } from "./sessions";
+import type { AuthConfig } from "./schema/auth";
 
 // Step-up re-authentication (#366). A signed-in session is enough for
 // ordinary admin work, but the actions a stolen session could do the most
@@ -20,14 +21,14 @@ export type RecentAuth =
 
 // Whether the request's session proved its credentials within the window.
 // Not an admin at all → 401; an admin whose proof is stale → 403 with
-// `reauthRequired`, the signal the UI acts on. `passwordHash` is the fast
-// path callers that already read the config take (see isAdminRequest).
+// `reauthRequired`, the signal the UI acts on. `auth` is the fast path
+// callers that already read the config take (see isAdminRequest).
 export async function requireRecentAuth(
   request: NextRequest,
-  passwordHash?: string,
+  auth?: AuthConfig,
   now = Date.now()
 ): Promise<RecentAuth> {
-  const sessionId = await adminSessionId(request, passwordHash);
+  const sessionId = await adminSessionId(request, auth);
   if (!sessionId) {
     return { ok: false, response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }

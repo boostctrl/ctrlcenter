@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { adminSession, request, useScratchConfig } from "@/lib/testing/routes";
 import { REAUTH_WINDOW_MS } from "@/lib/reauth";
+import { FOUNDING_ACCOUNT_ID } from "@/lib/schema";
+import { readConfigInternal } from "@/lib/config";
 
 // Step-up re-authentication (#366): the confirmation route, and a guarded
 // route (the password change) seen through it — fresh sign-in passes, a
@@ -45,7 +47,7 @@ const changePassword = (session: string) =>
 async function stale(session: string) {
   const { verifySessionId } = await import("@/lib/auth");
   const { markReauth } = await import("@/lib/sessions");
-  const id = await verifySessionId(session);
+  const id = await verifySessionId(session, (await readConfigInternal()).auth);
   if (!id) throw new Error("no session");
   await markReauth(id, Date.now() - REAUTH_WINDOW_MS - 1);
 }
@@ -105,7 +107,7 @@ describe("requireRecentAuth (#366)", () => {
   it("asks for the code too once the second factor is on", async () => {
     const session = await adminSession();
     const { activateTotp, disableTotp } = await import("@/lib/config");
-    await activateTotp("JBSWY3DPEHPK3PXP", []);
+    await activateTotp(FOUNDING_ACCOUNT_ID, "JBSWY3DPEHPK3PXP", []);
     try {
       const noCode = await reauth(session, { password: "correct horse" });
       expect(noCode.status).toBe(401);
@@ -114,14 +116,14 @@ describe("requireRecentAuth (#366)", () => {
       const ok = await reauth(session, { password: "correct horse", totp: await totpCode("JBSWY3DPEHPK3PXP") });
       expect(ok.status).toBe(200);
     } finally {
-      await disableTotp();
+      await disableTotp(FOUNDING_ACCOUNT_ID);
     }
   });
 
   it("gives the password-only step back, so a two-factor confirmation costs one attempt (#392)", async () => {
     const session = await adminSession();
     const { activateTotp, disableTotp } = await import("@/lib/config");
-    await activateTotp("GEZDGNBVGY3TQOJQ", []);
+    await activateTotp(FOUNDING_ACCOUNT_ID, "GEZDGNBVGY3TQOJQ", []);
     try {
       for (let i = 0; i < 8; i++) {
         const step = await reauth(session, { password: "correct horse" });
@@ -132,7 +134,7 @@ describe("requireRecentAuth (#366)", () => {
       const ok = await reauth(session, { password: "correct horse", totp: await totpCode("GEZDGNBVGY3TQOJQ") });
       expect(ok.status).toBe(200);
     } finally {
-      await disableTotp();
+      await disableTotp(FOUNDING_ACCOUNT_ID);
     }
   });
 });

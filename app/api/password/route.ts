@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest } from "@/lib/api-auth";
+import { viewerOf } from "@/lib/api-auth";
 import {
   verifyEnvPassword,
   verifyPasswordHash,
@@ -7,7 +7,8 @@ import {
   issueSession,
   setSessionCookie,
 } from "@/lib/auth";
-import { readConfigInternal, setPasswordHash } from "@/lib/config";
+import { setAccountPassword } from "@/lib/config";
+import { usesEnvPassword } from "@/lib/accounts";
 import { passwordChangeSchema } from "@/lib/schema";
 import { revokeSessions } from "@/lib/sessions";
 import { requireRecentAuth } from "@/lib/reauth";
@@ -20,7 +21,8 @@ import { notifySecurityEvent } from "@/lib/security-alerts";
 // password still requires the current one as defense-in-depth, even with a
 // valid session.
 export async function POST(request: NextRequest) {
-  if (!(await isAdminRequest(request))) {
+  const viewer = await viewerOf(request);
+  if (!viewer?.isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   // Step-up (#366): the current password below proves the password; with a
@@ -48,10 +50,12 @@ export async function POST(request: NextRequest) {
       { status: 429, headers: { "Retry-After": String(limited.retryAfterSeconds) } }
     );
   }
-  const { auth } = await readConfigInternal();
-  const ok = auth.passwordHash
-    ? await verifyPasswordHash(current, auth.passwordHash, auth.passwordSalt)
-    : verifyEnvPassword(current);
+  // The viewer's own account (#423): its stored password, else, for the
+  // founding admin, ADMIN_PASSWORD.
+  const { account } = viewer;
+  const ok = account.passwordHash
+    ? await verifyPasswordHash(current, account.passwordHash, account.passwordSalt)
+    : usesEnvPassword(account) && verifyEnvPassword(current);
   if (!ok) {
     await recordSecurityEvent("password.fail", eventMeta(request));
     return NextResponse.json(
@@ -70,14 +74,12 @@ export async function POST(request: NextRequest) {
     );
   }
   const { hash, salt } = await hashPassword(next);
-  await setPasswordHash(hash, salt);
+  await setAccountPassword(account.id, hash, salt);
 
-  // Changing the password revokes every existing session (the key mixes in the
-  // hash, and the records go too). Reissue this admin a fresh cookie bound to
-  // the new hash so they stay signed in while any other sessions are
-  // invalidated.
-  await revokeSessions();
-  const { token } = await issueSession(request, hash);
+  // This account's other sessions end — the token was signed against the
+  // old hash — and everyone else stays signed in (#423).
+  await revokeSessions(undefined, account.id);
+  const { token } = await issueSession(request, { id: account.id, passwordHash: hash });
   notifySecurityEvent(await recordSecurityEvent("password.changed", eventMeta(request)));
   const response = NextResponse.json({ ok: true });
   setSessionCookie(response, request, token);

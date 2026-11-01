@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
   const token = sessionTokenFrom(request.cookies);
   if (token) {
     const { auth } = await readConfigInternal();
-    const id = await verifySessionId(token, auth.passwordHash);
+    const id = await verifySessionId(token, auth);
     if (id) {
       await revokeSession(id);
       await recordSecurityEvent("signout", eventMeta(request));

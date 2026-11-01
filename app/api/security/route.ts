@@ -8,7 +8,7 @@ import { collectSecurityFacts, securityChecklist } from "@/lib/security-checklis
 // see of this deployment's posture, as rows with a fix each.
 export async function GET(request: NextRequest) {
   const config = await readConfigInternal();
-  if (!(await isAdminRequest(request, config.auth.passwordHash))) {
+  if (!(await isAdminRequest(request, config.auth))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   return NextResponse.json({ rows: securityChecklist(await collectSecurityFacts(config)) });

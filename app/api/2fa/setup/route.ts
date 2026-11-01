@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import QRCode from "qrcode";
-import { isAdminRequest } from "@/lib/api-auth";
+import { viewerOf } from "@/lib/api-auth";
 import { requireRecentAuth } from "@/lib/reauth";
-import { readConfigInternal, setTotpPendingSecret } from "@/lib/config";
+import { setTotpPendingSecret } from "@/lib/config";
 import { generateTotpSecret, otpauthUri } from "@/lib/totp";
 
 // Admin-only (gated by the /api/2fa proxy prefix and re-checked here). Begins
@@ -11,17 +11,18 @@ import { generateTotpSecret, otpauthUri } from "@/lib/totp";
 // otpauth:// URI, and a scannable QR data-URI. The secret is only ever sent to
 // the browser during this enrollment step.
 const ISSUER = "CtrlCenter";
-const ACCOUNT = "admin";
 
 export async function POST(request: NextRequest) {
-  if (!(await isAdminRequest(request))) {
+  const viewer = await viewerOf(request);
+  if (!viewer?.isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   // Never over an active factor (#384): activating would replace its secret
   // and recovery codes, silently breaking the authenticator and the codes the
   // admin saved. Checked before the step-up, which would only lead here.
-  const { auth } = await readConfigInternal();
-  if (auth.totp.enabled) {
+  // The viewer's own second factor (#423).
+  const { account } = viewer;
+  if (account.totp.enabled) {
     return NextResponse.json(
       { error: "Two-factor authentication is already on — turn it off first to set up a new authenticator." },
       { status: 409 }
@@ -32,8 +33,8 @@ export async function POST(request: NextRequest) {
   const recent = await requireRecentAuth(request);
   if (!recent.ok) return recent.response;
   const secret = generateTotpSecret();
-  await setTotpPendingSecret(secret);
-  const uri = otpauthUri(secret, ACCOUNT, ISSUER);
+  await setTotpPendingSecret(account.id, secret);
+  const uri = otpauthUri(secret, account.id, ISSUER);
   const qr = await QRCode.toDataURL(uri, { margin: 1, width: 220 });
   return NextResponse.json({ secret, otpauthUri: uri, qr });
 }

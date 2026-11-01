@@ -7,6 +7,7 @@
 // No network probes and no guess at "is this exposed to the internet": the
 // rows state what the app can see and let the admin judge.
 
+import { foundingAccount } from "./accounts";
 import type { Config } from "./schema";
 import { integrationLabels } from "./services/ids";
 import { persistedSessionSecret } from "./session-secret";
@@ -239,7 +240,7 @@ export async function collectSecurityFacts(
       : "password";
   return {
     totpEnabled: config.auth.totp.enabled,
-    passwordStored: Boolean(config.auth.passwordHash),
+    passwordStored: Boolean(foundingAccount(config.auth).passwordHash),
     passwordEnv: Boolean(process.env.ADMIN_PASSWORD),
     sessionSecret,
     sessionsPersisted: await sessionsPersisted(),

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest } from "@/lib/api-auth";
+import { viewerOf } from "@/lib/api-auth";
 import { requireRecentAuth } from "@/lib/reauth";
-import { readConfigInternal, disableTotp, clearAllowActions } from "@/lib/config";
+import { disableTotp, clearAllowActions } from "@/lib/config";
 import { rateLimit, pruneRateLimit, clientKey } from "@/lib/rate-limit";
 import { verifyTotpOnce } from "@/lib/totp";
 import { verifyRecoveryCode } from "@/lib/recovery-codes";
@@ -17,7 +17,8 @@ const MAX_ATTEMPTS = 10;
 const WINDOW_MS = 5 * 60 * 1000;
 
 export async function POST(request: NextRequest) {
-  if (!(await isAdminRequest(request))) {
+  const viewer = await viewerOf(request);
+  if (!viewer?.isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   // Step-up (#366): the code below proves the device; a recent confirmation
@@ -36,21 +37,22 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
-  const { auth } = await readConfigInternal();
-  if (!auth.totp.enabled) {
+  // The viewer's own second factor (#423).
+  const { account } = viewer;
+  if (!account.totp.enabled) {
     return NextResponse.json({ ok: true }); // already off
   }
   const { code } = parsed.data;
   const ok =
-    (await verifyTotpOnce(auth.totp.secret, code)) ||
-    (await verifyRecoveryCode(code, auth.totp.recoveryCodes)).ok;
+    (await verifyTotpOnce(account.totp.secret, code)) ||
+    (await verifyRecoveryCode(code, account.totp.recoveryCodes)).ok;
   if (!ok) {
     return NextResponse.json(
       { error: "That code didn't match." },
       { status: 401 }
     );
   }
-  await disableTotp();
+  await disableTotp(account.id);
   // Write actions need the second factor (#367): off with it, and said so.
   const actionsDisabled = await clearAllowActions();
   notifySecurityEvent(await recordSecurityEvent("totp.disabled", eventMeta(request)));

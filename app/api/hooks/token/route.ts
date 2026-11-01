@@ -11,14 +11,14 @@ import { eventMeta, recordSecurityEvent } from "@/lib/security-events";
 // and lands in the audit log, like an export with secrets.
 export async function GET(request: NextRequest) {
   const config = await readConfigInternal();
-  if (!(await isAdminRequest(request, config.auth.passwordHash))) {
+  if (!(await isAdminRequest(request, config.auth))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const service = request.nextUrl.searchParams.get("service") ?? "";
   if (!(WEBHOOK_SERVICES as readonly string[]).includes(service)) {
     return NextResponse.json({ error: "Unknown service" }, { status: 400 });
   }
-  const recent = await requireRecentAuth(request, config.auth.passwordHash);
+  const recent = await requireRecentAuth(request, config.auth);
   if (!recent.ok) return recent.response;
   await recordSecurityEvent("secret.revealed", eventMeta(request), `${service} webhook token`);
   return NextResponse.json({ token: config.settings.webhooks[service as WebhookService].token });

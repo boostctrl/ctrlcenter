@@ -77,10 +77,11 @@ export async function proxy(request: NextRequest) {
   if (!needsAuth(pathname)) return pass();
 
   const token = sessionTokenFrom(request.cookies);
-  // Verify against the current password hash so a password change revokes the
-  // session (the proxy runs in the Node runtime, so it can read config).
+  // Verify against the accounts' current password hashes so a password
+  // change revokes that account's sessions (the proxy runs in the Node
+  // runtime, so it can read config).
   const { auth } = await readConfigInternal();
-  if (await verifySessionToken(token, auth.passwordHash)) return pass();
+  if (await verifySessionToken(token, auth)) return pass();
 
   if (pathname.startsWith("/api/")) {
     return withCsp(

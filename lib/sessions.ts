@@ -1,6 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 import { randomBytes } from "crypto";
+import { FOUNDING_ACCOUNT_ID } from "./schema/auth";
 import { log, errorReason } from "./log";
 import { globalSingleton } from "./singleton";
 
@@ -37,6 +38,9 @@ export type SessionRecord = {
   // Addresses other than the sign-in's that the session was used from
   // (#382), each announced once when first seen. Bounded; absent when none.
   addresses?: string[];
+  // The account the session belongs to (#423). Absent in a record 3.0
+  // wrote, which is the founding admin's (sessionAccount).
+  account?: string;
 };
 
 export type SessionMeta = {
@@ -44,7 +48,14 @@ export type SessionMeta = {
   userAgent: string;
   https?: boolean;
   forwarded?: boolean | null;
+  account?: string;
 };
+
+// The account a session belongs to: its record's, else the founding
+// admin's, whose records 3.0 wrote without one.
+export function sessionAccount(session: Pick<SessionRecord, "account">): string {
+  return session.account ?? FOUNDING_ACCOUNT_ID;
+}
 
 // Defaults and bounds for the idle timeout: a session unused for this long
 // ends. The absolute lifetime stays SESSION_MAX_AGE (lib/auth.ts); the token's
@@ -238,6 +249,7 @@ export async function createSession(meta: SessionMeta, now = Date.now()): Promis
     https: meta.https === true,
     forwarded: meta.forwarded ?? null,
     reauthAt: now,
+    ...(meta.account ? { account: meta.account } : {}),
   });
   prune(store, now);
   await persist(store);
@@ -307,13 +319,14 @@ export async function revokeSession(id: string): Promise<boolean> {
 }
 
 // End every session but one ("sign out everywhere else"), or every session
-// when `keep` is omitted (a password change, "sign out everywhere"). Returns
-// how many ended.
-export async function revokeSessions(keep?: string): Promise<number> {
+// when `keep` is omitted ("sign out everywhere"); with `account`, only that
+// account's sessions (its password change, #423). Returns how many ended.
+export async function revokeSessions(keep?: string, account?: string): Promise<number> {
   const store = await ready();
   let count = 0;
-  for (const id of [...store.sessions.keys()]) {
+  for (const [id, s] of [...store.sessions.entries()]) {
     if (id === keep) continue;
+    if (account !== undefined && sessionAccount(s) !== account) continue;
     store.sessions.delete(id);
     count += 1;
   }

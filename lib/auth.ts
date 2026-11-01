@@ -1,8 +1,10 @@
-import { SignJWT, jwtVerify } from "jose";
+import { SignJWT, decodeJwt, jwtVerify } from "jose";
 import type { NextRequest } from "next/server";
 import { persistedSessionSecret } from "./session-secret";
-import { createSession, touchSession, type SessionRecord } from "./sessions";
+import { createSession, sessionAccount, touchSession, type SessionRecord } from "./sessions";
 import { arrivedForwarded, clientIp } from "./rate-limit";
+import { findAccount, foundingAccount } from "./accounts";
+import { FOUNDING_ACCOUNT_ID, type AuthConfig, type User } from "./schema/auth";
 
 export const SESSION_COOKIE_NAME = "homepage_admin_session";
 // Over HTTPS the cookie carries the __Host- prefix (#369): a browser then
@@ -99,12 +101,13 @@ export function clearSessionCookie(response: { cookies: CookieJar }): void {
   response.cookies.delete(SESSION_COOKIE_NAME);
 }
 
-// Whether any admin credential exists: a password set through the UI (stored
-// hash) or the ADMIN_PASSWORD env var. With neither, nobody can sign in, and the
-// login page says so instead of answering every attempt with "Invalid
-// password" (#275).
-export function adminPasswordConfigured(auth: { passwordHash?: string }): boolean {
-  return Boolean(auth.passwordHash) || Boolean(process.env.ADMIN_PASSWORD);
+// Whether the founding admin can sign in at all: a password set through the
+// UI (stored hash) or the ADMIN_PASSWORD env var. With neither, nobody can
+// sign in, and the login page says so instead of answering every attempt
+// with "Invalid password" (#275).
+export function adminPasswordConfigured(auth: { passwordHash?: string; users?: Pick<User, "id" | "passwordHash">[] }): boolean {
+  const hash = auth.users?.find((u) => u.id === FOUNDING_ACCOUNT_ID)?.passwordHash ?? auth.passwordHash;
+  return Boolean(hash) || Boolean(process.env.ADMIN_PASSWORD);
 }
 
 export const NO_PASSWORD_MESSAGE =
@@ -184,16 +187,23 @@ export async function verifyPasswordHash(
   }
 }
 
+// What a session token names (#423): the account it was signed for, in
+// `sub`, and the session record, in `jti`. The signature binds to that
+// account's password hash, so one account's password change revokes its
+// own sessions and nobody else's.
+export type LiveSession = { session: SessionRecord; account: User };
+
 // Sign a token for an existing session record (lib/sessions.ts): the record's
 // id rides in `jti`, and verification requires the record to still exist, so
 // a revoked or idle-expired session's token stops working at once (#365).
 export async function createSessionToken(
-  extra = "",
+  account: Pick<User, "id" | "passwordHash">,
   sessionId: string
 ): Promise<string> {
-  const key = await getSecretKey(extra);
-  return new SignJWT({ role: "admin" })
+  const key = await getSecretKey(account.passwordHash);
+  return new SignJWT({})
     .setProtectedHeader({ alg: "HS256" })
+    .setSubject(account.id)
     .setJti(sessionId)
     .setIssuedAt()
     .setExpirationTime(SESSION_DURATION)
@@ -204,49 +214,54 @@ export async function createSessionToken(
 // and browser, for the active-sessions list) and the token for the cookie.
 export async function issueSession(
   request: NextRequest,
-  extra = ""
+  account: Pick<User, "id" | "passwordHash">
 ): Promise<{ token: string; id: string }> {
   const id = await createSession({
     ip: clientIp(request),
     userAgent: request.headers.get("user-agent") ?? "",
     https: isHttps(request),
     forwarded: arrivedForwarded(request),
+    account: account.id,
   });
-  return { token: await createSessionToken(extra, id), id };
+  return { token: await createSessionToken(account, id), id };
 }
 
-// The id of the live session a token names, or null: a bad signature, an
-// expired token, a token without a session id (issued before 3.0.0 — those
-// sign in again once), or a session that was revoked or idled out. A live
-// session is marked seen.
-export async function verifySessionId(
-  token: string | undefined,
-  extra = ""
-): Promise<string | null> {
-  return (await verifySession(token, extra))?.id ?? null;
-}
-
-// The live session record a token names, marked seen, or null (see
-// verifySessionId for the cases).
-export async function verifySession(
-  token: string | undefined,
-  extra = ""
-): Promise<SessionRecord | null> {
+// The live session a token names and the account it belongs to, marked
+// seen, or null: a bad signature, an expired token, a token without a
+// session id (issued before 3.0.0 — those sign in again once), a session
+// that was revoked or idled out, or an account that is gone or disabled.
+// A token without `sub` (issued before 3.1.0) is the founding admin's, as
+// is a record without an account, so the upgrade signs nobody out. The
+// account is read from the token before the signature is checked only to
+// pick the key; the signature then has to match that account's.
+export async function verifySession(token: string | undefined, auth: AuthConfig): Promise<LiveSession | null> {
   if (!token) return null;
+  let sub: string | undefined;
+  try {
+    sub = decodeJwt(token).sub;
+  } catch {
+    return null;
+  }
+  const account = sub === undefined ? foundingAccount(auth) : findAccount(auth, sub);
+  if (!account || !account.enabled) return null;
   let jti: string | undefined;
   try {
-    const key = await getSecretKey(extra);
+    const key = await getSecretKey(account.passwordHash);
     jti = (await jwtVerify(token, key)).payload.jti;
   } catch {
     return null;
   }
   if (!jti) return null;
-  return touchSession(jti);
+  const session = await touchSession(jti);
+  if (!session || sessionAccount(session) !== account.id) return null;
+  return { session, account };
 }
 
-export async function verifySessionToken(
-  token: string | undefined,
-  extra = ""
-): Promise<boolean> {
-  return (await verifySessionId(token, extra)) !== null;
+// The id of the live session a token names, or null (see verifySession).
+export async function verifySessionId(token: string | undefined, auth: AuthConfig): Promise<string | null> {
+  return (await verifySession(token, auth))?.session.id ?? null;
+}
+
+export async function verifySessionToken(token: string | undefined, auth: AuthConfig): Promise<boolean> {
+  return (await verifySession(token, auth)) !== null;
 }

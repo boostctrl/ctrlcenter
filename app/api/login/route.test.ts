@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { useScratchConfig, request } from "@/lib/testing/routes";
+import { FOUNDING_ACCOUNT_ID } from "@/lib/schema";
 
 // Route-handler tests for sign-in (#289): the real handler, a scratch config,
 // and NextRequests — so the CSRF check, the per-client throttle and the
@@ -136,11 +137,11 @@ describe("POST /api/login throttle gaps (#392)", () => {
     );
   async function withTotp<T>(fn: () => Promise<T>): Promise<T> {
     const { activateTotp, disableTotp } = await import("@/lib/config");
-    await activateTotp(SECRET, []);
+    await activateTotp(FOUNDING_ACCOUNT_ID, SECRET, []);
     try {
       return await fn();
     } finally {
-      await disableTotp();
+      await disableTotp(FOUNDING_ACCOUNT_ID);
     }
   }
   const code = async () => (await import("@/lib/totp")).totpCode(SECRET);
@@ -194,4 +195,33 @@ describe("POST /api/login throttle gaps (#392)", () => {
       );
       expect(locked).toHaveLength(1);
     }));
+});
+
+describe("POST /api/login with a username (#423)", () => {
+  function loginAs(username: unknown, password: string) {
+    ip += 1;
+    return POST(
+      request("/api/login", {
+        method: "POST",
+        body: { username, password },
+        headers: { "x-forwarded-for": `10.0.1.${ip}` },
+      })
+    );
+  }
+
+  it("signs in the account named, however it is typed, and refuses an unknown name like a wrong password", async () => {
+    expect((await loginAs("admin", "correct horse")).status).toBe(200);
+    expect((await loginAs(" Admin ", "correct horse")).status).toBe(200);
+    const res = await loginAs("nobody", "correct horse");
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "Invalid password" });
+    expect(res.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("binds the session to the account that signed in", async () => {
+    const res = await loginAs(FOUNDING_ACCOUNT_ID, "correct horse");
+    const token = /homepage_admin_session=([^;]+)/.exec(res.headers.get("set-cookie") ?? "")?.[1] ?? "";
+    const { decodeJwt } = await import("jose");
+    expect(decodeJwt(token).sub).toBe(FOUNDING_ACCOUNT_ID);
+  });
 });

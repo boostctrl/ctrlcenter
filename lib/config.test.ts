@@ -14,6 +14,7 @@ import {
   newInstance,
 } from "./schema";
 import { log } from "./log";
+import { FOUNDING_ACCOUNT_ID, userSchema } from "./schema/auth";
 
 // config.ts captures CONFIG_PATH at module load, so the env var has to be set
 // before the module is imported — hence the dynamic import in beforeAll.
@@ -962,16 +963,16 @@ describe("spendTotpRecoveryCode", () => {
       { hash: "h1", salt: "s1" },
       { hash: "h2", salt: "s2" },
     ];
-    await config.activateTotp("SECRET", codes);
+    await config.activateTotp(FOUNDING_ACCOUNT_ID, "SECRET", codes);
     const results = await Promise.all([
-      config.spendTotpRecoveryCode("h1"),
-      config.spendTotpRecoveryCode("h1"),
+      config.spendTotpRecoveryCode(FOUNDING_ACCOUNT_ID, "h1"),
+      config.spendTotpRecoveryCode(FOUNDING_ACCOUNT_ID, "h1"),
     ]);
     expect(results.sort()).toEqual([false, true]);
     const { auth } = await config.readConfigInternal();
     expect(auth.totp.recoveryCodes.map((c) => c.hash)).toEqual(["h2"]);
-    expect(await config.spendTotpRecoveryCode("nope")).toBe(false);
-    await config.disableTotp();
+    expect(await config.spendTotpRecoveryCode(FOUNDING_ACCOUNT_ID, "nope")).toBe(false);
+    await config.disableTotp(FOUNDING_ACCOUNT_ID);
   });
 });
 
@@ -987,7 +988,6 @@ describe("readConfigInternal stays off public surfaces", () => {
     "app/admin/setup/page.tsx",
     "app/api/alerts/test/route.ts",
     "app/api/config/route.ts",
-    "app/api/password/route.ts",
     // Admin-only integration snapshot: reads once, then gates on the hash.
     "app/api/monitor/route.ts",
     // Admin-only per-service detail: same read-once-then-gate as the snapshot.
@@ -1007,9 +1007,6 @@ describe("readConfigInternal stays off public surfaces", () => {
     // password configured, #275) to the form. Nothing else reaches the client.
     "app/admin/login/page.tsx",
     // Admin-only 2FA management: read the current TOTP state before mutating.
-    "app/api/2fa/activate/route.ts",
-    "app/api/2fa/disable/route.ts",
-    "app/api/2fa/setup/route.ts",
     // Admin-only widget and settings saves: read the stored widgets, alert
     // channels and `auth` to tell whether a save re-points where a secret is
     // sent, which needs a recent confirmation (#378).
@@ -1157,5 +1154,31 @@ describe("settings-secret redaction", () => {
       password: "cal-secret",
     });
     expect(await config.getCalendarAuth("nope")).toEqual({ username: "", password: "" });
+  });
+});
+
+describe("accounts (#423)", () => {
+  it("materialises the list from the legacy fields on the first write and mirrors the founding admin back", async () => {
+    await config.setPasswordHash("hash-1", "salt-1");
+    let { auth } = await config.readConfigInternal();
+    expect(auth.users.map((u) => u.id)).toEqual([FOUNDING_ACCOUNT_ID]);
+    expect(auth.users[0]).toMatchObject({ role: "admin", passwordHash: "hash-1", passwordSalt: "salt-1" });
+    expect(auth).toMatchObject({ passwordHash: "hash-1", passwordSalt: "salt-1" });
+    // Another account's password and second factor leave the legacy fields
+    // (the founding admin's, for a 3.0.x rollback) alone.
+    await config.addAccount(userSchema.parse({ id: "sam", role: "member" }));
+    await expect(config.addAccount(userSchema.parse({ id: "sam" }))).rejects.toThrow(/already exists/);
+    await config.setAccountPassword("sam", "hash-sam", "salt-sam");
+    await config.activateTotp("sam", "SAMSECRET", []);
+    ({ auth } = await config.readConfigInternal());
+    expect(auth.users.find((u) => u.id === "sam")).toMatchObject({
+      passwordHash: "hash-sam",
+      passwordSalt: "salt-sam",
+      totp: { enabled: true, secret: "SAMSECRET" },
+    });
+    expect(auth).toMatchObject({ passwordHash: "hash-1", passwordSalt: "salt-1" });
+    expect(auth.totp.enabled).toBe(false);
+    expect(auth.users[0].totp.enabled).toBe(false);
+    await expect(config.setAccountPassword("nobody", "h", "s")).rejects.toThrow(/No account/);
   });
 });

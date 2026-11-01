@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
 
   // Visibility is applied per response.
   const ids = new Set(
-    visibleItems(apps, await isAdminRequest(request, auth.passwordHash)).map(
+    visibleItems(apps, await isAdminRequest(request, auth)).map(
       (a) => a.id
     )
   );

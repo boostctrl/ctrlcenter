@@ -1,49 +1,60 @@
 import type { NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { sessionTokenFrom, verifySession, verifySessionToken } from "./auth";
+import { sessionTokenFrom, verifySession, type LiveSession } from "./auth";
+import { isAdminAccount } from "./accounts";
 import { watchSessionAddress } from "./session-watch";
 import { readConfigInternal, stripAuth, stripSecrets } from "./config";
-import type { Config } from "./schema";
+import type { AuthConfig, Config } from "./schema";
+
+// Who is asking (#423): the live session and its account, and whether that
+// account may act as an admin. The one resolver behind every admin check
+// below, so a request is judged the same way everywhere.
+export type Viewer = LiveSession & { isAdmin: boolean };
+
+const authOf = async (auth?: AuthConfig) => auth ?? (await readConfigInternal()).auth;
+
+// The viewer behind a route-handler request, or null when it carries no
+// live session. Mirrors the proxy's verification (a token signed against its
+// account's password hash, so a password change revokes that account's
+// sessions). Writes (any non-GET/HEAD/OPTIONS method) must also pass the
+// same-origin check below, so a valid cookie alone can't authorize a
+// cross-site request. Callers that already hold the config pass `auth` so
+// the check doesn't read and parse config.yaml a second time in the same
+// request — the status APIs are polled by every open dashboard tab, so the
+// double read adds up.
+export async function viewerOf(request: NextRequest, auth?: AuthConfig): Promise<Viewer | null> {
+  if (!isSafeMethod(request.method) && !isSameOriginRequest(request)) return null;
+  const live = await verifySession(sessionTokenFrom(request.cookies), await authOf(auth));
+  if (!live) return null;
+  // A session used from a new address announces itself once (#382).
+  await watchSessionAddress(request, live.session);
+  return { ...live, isAdmin: isAdminAccount(live.account) };
+}
+
+// The same for server components (no NextRequest there — the cookie comes
+// from next/headers). Presentation-only trust: the APIs a page's affordances
+// call re-check the session themselves.
+export async function viewerFromCookies(auth?: AuthConfig): Promise<Viewer | null> {
+  const live = await verifySession(sessionTokenFrom(await cookies()), await authOf(auth));
+  return live ? { ...live, isAdmin: isAdminAccount(live.account) } : null;
+}
 
 // Route-level admin check for endpoints the proxy's path-prefix allowlist can't
 // gate. The icons API is the case: individual icons (GET /api/icons/[name]) must
 // be public because they render on the unauthenticated dashboard, while listing,
 // uploading, and deleting (the /api/icons collection) must be admin-only — so a
-// single prefix in the proxy can't express it. Mirrors the proxy's verification
-// (token signed against the current password hash, so a password change revokes
-// outstanding sessions).
-//
-// Writes (any non-GET/HEAD/OPTIONS method) must also pass the same-origin
-// check below, so a valid cookie alone can't authorize a cross-site request.
-//
-// Callers that already hold the config pass `passwordHash` so the check doesn't
-// read and parse config.yaml a second time in the same request — the status
-// APIs are polled by every open dashboard tab, so the double read adds up.
-export async function isAdminRequest(
-  request: NextRequest,
-  passwordHash?: string
-): Promise<boolean> {
-  return (await adminSessionId(request, passwordHash)) !== null;
+// single prefix in the proxy can't express it.
+export async function isAdminRequest(request: NextRequest, auth?: AuthConfig): Promise<boolean> {
+  return (await viewerOf(request, auth))?.isAdmin === true;
 }
 
 // The same check, answering with the session's id (null when not an admin
 // request) for the routes that act on the current session: logout, the
 // active-sessions list, "sign out everywhere else" (#365).
-export async function adminSessionId(
-  request: NextRequest,
-  passwordHash?: string
-): Promise<string | null> {
-  if (!isSafeMethod(request.method) && !isSameOriginRequest(request)) {
-    return null;
-  }
-  const token = sessionTokenFrom(request.cookies);
-  const hash = passwordHash ?? (await readConfigInternal()).auth.passwordHash;
-  const session = await verifySession(token, hash);
-  if (!session) return null;
-  // A session used from a new address announces itself once (#382).
-  await watchSessionAddress(request, session);
-  return session.id;
+export async function adminSessionId(request: NextRequest, auth?: AuthConfig): Promise<string | null> {
+  const viewer = await viewerOf(request, auth);
+  return viewer?.isAdmin ? viewer.session.id : null;
 }
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -84,15 +95,11 @@ export function isSameOriginRequest(request: NextRequest): boolean {
   return hosts.includes(originHost.toLowerCase());
 }
 
-// Same check for server components (no NextRequest there — the cookie comes
-// from next/headers). Lets a page decide whether to offer admin affordances
-// like the home-page layout editor; the APIs those affordances call re-check
-// the session themselves, so this is presentation-only trust. Same optional
-// `passwordHash` fast path as isAdminRequest.
-export async function isAdminSession(passwordHash?: string): Promise<boolean> {
-  const token = sessionTokenFrom(await cookies());
-  const hash = passwordHash ?? (await readConfigInternal()).auth.passwordHash;
-  return verifySessionToken(token, hash);
+// Whether a server component's viewer is an admin. Lets a page decide
+// whether to offer admin affordances like the home-page layout editor. Same
+// optional `auth` fast path as isAdminRequest.
+export async function isAdminSession(auth?: AuthConfig): Promise<boolean> {
+  return (await viewerFromCookies(auth))?.isAdmin === true;
 }
 
 // Page-level gate for everything under /admin (except the login page itself).
@@ -101,11 +108,8 @@ export async function isAdminSession(passwordHash?: string): Promise<boolean> {
 // not depend on the proxy alone: a proxy bypass would otherwise serve them.
 // Redirects exactly like the proxy does, so the login page sends the admin
 // back here afterwards.
-export async function requireAdminPage(
-  next: string,
-  passwordHash?: string
-): Promise<void> {
-  if (await isAdminSession(passwordHash)) return;
+export async function requireAdminPage(next: string, auth?: AuthConfig): Promise<void> {
+  if (await isAdminSession(auth)) return;
   redirect(`/admin/login?next=${encodeURIComponent(next)}`);
 }
 
@@ -139,7 +143,7 @@ export function visibleItems<T extends { private: boolean }>(
 // Whether this request comes from the signed-in admin, for server pages that
 // read the full config themselves (the calendar page needs its credentials).
 export async function viewerIsAdmin(): Promise<boolean> {
-  return isAdminSession((await readConfigInternal()).auth.passwordHash);
+  return isAdminSession((await readConfigInternal()).auth);
 }
 
 export async function readPublicConfig(request?: NextRequest): Promise<{
@@ -147,9 +151,7 @@ export async function readPublicConfig(request?: NextRequest): Promise<{
   isAdmin: boolean;
 }> {
   const config = await readConfigInternal();
-  const isAdmin = request
-    ? await isAdminRequest(request, config.auth.passwordHash)
-    : await isAdminSession(config.auth.passwordHash);
+  const isAdmin = request ? await isAdminRequest(request, config.auth) : await isAdminSession(config.auth);
   const safe = stripSecrets(stripAuth(config));
   const apps = visibleItems(safe.apps, isAdmin);
   const bookmarks = visibleItems(safe.bookmarks, isAdmin);

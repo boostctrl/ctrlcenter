@@ -10,6 +10,7 @@ import {
   createSessionToken,
   verifySessionId,
   verifySessionToken,
+  verifySession,
   sessionCookieName,
   sessionTokenFrom,
   SESSION_COOKIE_NAME,
@@ -19,6 +20,12 @@ import {
 import { NextRequest, NextResponse } from "next/server";
 import { createSession, revokeSession, revokeSessions } from "./sessions";
 import { SignJWT } from "jose";
+import { authSchema, FOUNDING_ACCOUNT_ID, userSchema } from "./schema/auth";
+
+// The founding admin on ADMIN_PASSWORD (no stored hash), and with one.
+const AUTH = authSchema.parse({});
+const authWith = (passwordHash: string) => authSchema.parse({ passwordHash });
+const ADMIN = { id: FOUNDING_ACCOUNT_ID, passwordHash: "" };
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -102,38 +109,38 @@ function noVolume() {
 // record exists, so every signed token here starts one.
 const meta = { ip: "203.0.113.9", userAgent: "test" };
 async function signedToken(extra = ""): Promise<string> {
-  return createSessionToken(extra, await createSession(meta));
+  return createSessionToken({ id: FOUNDING_ACCOUNT_ID, passwordHash: extra }, await createSession(meta));
 }
 
 describe("session tokens", () => {
   it("round-trips a token signed and verified with the same secret", async () => {
     useVolume();
     const token = await signedToken();
-    expect(await verifySessionToken(token)).toBe(true);
+    expect(await verifySessionToken(token, AUTH)).toBe(true);
   });
 
   it("names the session the token belongs to", async () => {
     useVolume();
     const id = await createSession(meta);
-    const token = await createSessionToken("", id);
-    expect(await verifySessionId(token)).toBe(id);
-    expect(await verifySessionId("not-a-jwt")).toBeNull();
+    const token = await createSessionToken(ADMIN, id);
+    expect(await verifySessionId(token, AUTH)).toBe(id);
+    expect(await verifySessionId("not-a-jwt", AUTH)).toBeNull();
   });
 
   it("stops verifying once the session is revoked (#365)", async () => {
     useVolume();
     const id = await createSession(meta);
-    const token = await createSessionToken("", id);
-    expect(await verifySessionToken(token)).toBe(true);
+    const token = await createSessionToken(ADMIN, id);
+    expect(await verifySessionToken(token, AUTH)).toBe(true);
     await revokeSession(id);
-    expect(await verifySessionToken(token)).toBe(false);
+    expect(await verifySessionToken(token, AUTH)).toBe(false);
   });
 
   it("stops verifying after sign-out-everywhere (#365)", async () => {
     useVolume();
     const token = await signedToken();
     await revokeSessions();
-    expect(await verifySessionToken(token)).toBe(false);
+    expect(await verifySessionToken(token, AUTH)).toBe(false);
   });
 
   it("rejects a token without a session id, however well signed", async () => {
@@ -148,15 +155,15 @@ describe("session tokens", () => {
       .setIssuedAt()
       .setExpirationTime("7d")
       .sign(key);
-    expect(await verifySessionToken(legacy)).toBe(false);
+    expect(await verifySessionToken(legacy, AUTH)).toBe(false);
     // The same key does sign a current token, so it was the missing id.
-    expect(await verifySessionToken(await signedToken())).toBe(true);
+    expect(await verifySessionToken(await signedToken(), AUTH)).toBe(true);
   });
 
   it("rejects an undefined or garbage token", async () => {
     useVolume();
-    expect(await verifySessionToken(undefined)).toBe(false);
-    expect(await verifySessionToken("not-a-jwt")).toBe(false);
+    expect(await verifySessionToken(undefined, AUTH)).toBe(false);
+    expect(await verifySessionToken("not-a-jwt", AUTH)).toBe(false);
   });
 
   it("persists a random secret in the volume when SESSION_SECRET is unset", async () => {
@@ -169,7 +176,7 @@ describe("session tokens", () => {
     expect(fs.statSync(path.join(dir, "session-secret")).mode & 0o777).toBe(0o600);
     // Signing no longer depends on the admin password.
     vi.stubEnv("ADMIN_PASSWORD", "new-password");
-    expect(await verifySessionToken(token)).toBe(true);
+    expect(await verifySessionToken(token, AUTH)).toBe(true);
   });
 
   it("falls back to ADMIN_PASSWORD when the volume can't hold the secret", async () => {
@@ -178,7 +185,7 @@ describe("session tokens", () => {
     vi.stubEnv("ADMIN_PASSWORD", "old-password");
     const token = await signedToken();
     vi.stubEnv("ADMIN_PASSWORD", "new-password");
-    expect(await verifySessionToken(token)).toBe(false);
+    expect(await verifySessionToken(token, AUTH)).toBe(false);
   });
 
   it("keeps tokens valid across password changes when SESSION_SECRET is set", async () => {
@@ -188,7 +195,7 @@ describe("session tokens", () => {
     const token = await signedToken();
 
     vi.stubEnv("ADMIN_PASSWORD", "new-password");
-    expect(await verifySessionToken(token)).toBe(true);
+    expect(await verifySessionToken(token, AUTH)).toBe(true);
   });
 
   it("invalidates a token when the mixed-in key material (password hash) changes", async () => {
@@ -196,10 +203,10 @@ describe("session tokens", () => {
     vi.stubEnv("SESSION_SECRET", "dedicated-secret");
     const token = await signedToken("password-hash-A");
     // Same material still verifies...
-    expect(await verifySessionToken(token, "password-hash-A")).toBe(true);
+    expect(await verifySessionToken(token, authWith("password-hash-A"))).toBe(true);
     // ...but a changed password hash (e.g. after a password change) does not,
     // even though SESSION_SECRET is unchanged.
-    expect(await verifySessionToken(token, "password-hash-B")).toBe(false);
+    expect(await verifySessionToken(token, authWith("password-hash-B"))).toBe(false);
   });
 
   it("fails closed when no secret is available at all", async () => {
@@ -207,9 +214,9 @@ describe("session tokens", () => {
     vi.stubEnv("ADMIN_PASSWORD", "");
     noVolume();
     // Signing must refuse rather than derive a guessable empty-string key...
-    await expect(createSessionToken("", "some-session")).rejects.toThrow();
+    await expect(createSessionToken(ADMIN, "some-session")).rejects.toThrow();
     // ...and verification of any token returns false (never accepts a forgery).
-    expect(await verifySessionToken("anything")).toBe(false);
+    expect(await verifySessionToken("anything", AUTH)).toBe(false);
   });
 
   it("prefers SESSION_SECRET over the persisted secret", async () => {
@@ -221,7 +228,7 @@ describe("session tokens", () => {
     // ...then drop SESSION_SECRET so the persisted secret signs instead. The
     // key now differs, so the previously issued token must no longer verify.
     vi.stubEnv("SESSION_SECRET", "");
-    expect(await verifySessionToken(token)).toBe(false);
+    expect(await verifySessionToken(token, AUTH)).toBe(false);
   });
 });
 
@@ -256,5 +263,59 @@ describe("clearSessionCookie (#392)", () => {
     expect(secure).toMatch(/Path=\//);
     expect(secure).toMatch(/Expires=Thu, 01 Jan 1970/);
     expect(set.find((c) => c.startsWith(SESSION_COOKIE_NAME + "="))).toBeTruthy();
+  });
+});
+
+describe("session tokens per account (#423)", () => {
+  const admin = userSchema.parse({ id: "admin", role: "admin", passwordHash: "admin-hash", passwordSalt: "x" });
+  const sam = userSchema.parse({ id: "sam", role: "member", passwordHash: "sam-hash", passwordSalt: "x" });
+  const auth = authSchema.parse({ passwordHash: "admin-hash", passwordSalt: "x", users: [admin, sam] });
+  const session = (account?: string) => createSession({ ...meta, account });
+
+  it("names its account and verifies only against that account's hash", async () => {
+    useVolume();
+    const id = await session("sam");
+    const token = await createSessionToken(sam, id);
+    const live = await verifySession(token, auth);
+    expect(live?.account.id).toBe("sam");
+    expect(live?.session.id).toBe(id);
+    // Sam's password change revokes Sam's token; the admin's keeps working.
+    const changed = authSchema.parse({ ...auth, users: [admin, { ...sam, passwordHash: "new-hash" }] });
+    expect(await verifySessionToken(token, changed)).toBe(false);
+    const adminToken = await createSessionToken(admin, await session("admin"));
+    expect(await verifySessionToken(adminToken, changed)).toBe(true);
+  });
+
+  it("rejects a token whose account is disabled or gone, or signed over another account's session", async () => {
+    useVolume();
+    const token = await createSessionToken(sam, await session("sam"));
+    const disabled = authSchema.parse({ ...auth, users: [admin, { ...sam, enabled: false }] });
+    expect(await verifySessionToken(token, disabled)).toBe(false);
+    expect(await verifySessionToken(token, authSchema.parse({ ...auth, users: [admin] }))).toBe(false);
+    const crossed = await createSessionToken(sam, await session("admin"));
+    expect(await verifySessionToken(crossed, auth)).toBe(false);
+  });
+
+  it("reads a 3.0 token and record, which name no account, as the founding admin's", async () => {
+    useVolume();
+    vi.stubEnv("SESSION_SECRET", "dedicated-secret");
+    // What 3.0 signed: keyed on the stored hash, no `sub`, over a record
+    // without an account.
+    const id = await createSession(meta);
+    const key = new Uint8Array(
+      await crypto.subtle.digest("SHA-256", new TextEncoder().encode("dedicated-secret\0admin-hash"))
+    );
+    const old = await new SignJWT({ role: "admin" })
+      .setProtectedHeader({ alg: "HS256" })
+      .setJti(id)
+      .setIssuedAt()
+      .setExpirationTime("7d")
+      .sign(key);
+    const live = await verifySession(old, auth);
+    expect(live?.account.id).toBe("admin");
+    expect(live?.session.id).toBe(id);
+    // It still binds to the founding admin's hash.
+    const changed = authSchema.parse({ ...auth, passwordHash: "other", users: [{ ...admin, passwordHash: "other" }, sam] });
+    expect(await verifySessionToken(old, changed)).toBe(false);
   });
 });

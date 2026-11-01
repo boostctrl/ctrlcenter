@@ -52,7 +52,7 @@ export async function PUT(request: NextRequest) {
   // asks when it matters.
   const targetChanged = changesTarget(incoming, stored);
   if (targetChanged) {
-    const recent = await requireRecentAuth(request, auth.passwordHash);
+    const recent = await requireRecentAuth(request, auth);
     if (!recent.ok) return recent.response;
   }
   // Write actions need two-factor authentication on (#367): without it the

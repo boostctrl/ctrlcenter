@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  adminPasswordConfigured,
-  NO_PASSWORD_MESSAGE,
-  issueSession,
-  setSessionCookie,
-} from "@/lib/auth";
+import { NO_PASSWORD_MESSAGE, issueSession, setSessionCookie } from "@/lib/auth";
+import { findAccount, passwordConfigured } from "@/lib/accounts";
 import { readConfigInternal } from "@/lib/config";
-import { verifyCredentials } from "@/lib/credentials";
+import { verifyCredentials, type CredentialResult } from "@/lib/credentials";
+import { FOUNDING_ACCOUNT_ID } from "@/lib/schema";
 import { rateLimit, refundRateLimit, pruneRateLimit, clientKey } from "@/lib/rate-limit";
 import {
   PER_CLIENT_MAX_ATTEMPTS,
@@ -62,17 +59,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid password" }, { status: 401 });
   }
 
-  // Prefer a password set through the UI (stored hash); otherwise fall back to
-  // the ADMIN_PASSWORD env var.
+  // The account named, else the founding admin (#423): a form from before
+  // 3.1 sends no username. Prefer a password set through the UI (stored
+  // hash); for the founding admin, fall back to the ADMIN_PASSWORD env var.
   const { auth } = await readConfigInternal();
-  if (!adminPasswordConfigured(auth)) {
+  const username =
+    typeof body?.username === "string" && body.username.trim() !== ""
+      ? body.username.trim().toLowerCase()
+      : FOUNDING_ACCOUNT_ID;
+  const account = findAccount(auth, username);
+  if (username === FOUNDING_ACCOUNT_ID && account && !passwordConfigured(account)) {
     return NextResponse.json({ error: NO_PASSWORD_MESSAGE }, { status: 503 });
   }
   // While the shared wrong-code budget is spent, no code is checked at all, a
   // correct one included (#392): whoever spent it has the password, and the
   // admin's own sign-in waiting a few minutes is the lesser harm.
   const sentCode = typeof body?.totp === "string" && body.totp.trim() !== "";
-  if (sentCode && auth.totp.enabled) {
+  if (sentCode && account?.totp.enabled) {
     const paused = codeChecksPausedFor();
     if (paused > 0) {
       return NextResponse.json(
@@ -83,7 +86,11 @@ export async function POST(request: NextRequest) {
   }
   // The password, and the code when the second factor is on (#198), through
   // the one credential check the step-up confirmation shares (#366).
-  const result = await verifyCredentials(auth, body?.password, body?.totp);
+  // An unknown name fails like a wrong password, so the form can't tell
+  // which names exist.
+  const result: CredentialResult = account
+    ? await verifyCredentials(account, body?.password, body?.totp)
+    : { ok: false, reason: "password" };
   if (!result.ok && result.reason !== "totp-required") {
     // A wrong password or code, in the audit log (#368); a missing code is
     // the form's second step, not a failure.
@@ -137,10 +144,12 @@ export async function POST(request: NextRequest) {
   // per-client charge, so only failures count toward the lockout.
   refundRateLimit(throttleKey);
 
-  // Bind the token to the current password hash so a later password change
-  // revokes it (see proxy.ts / verifySessionToken), and record the session
-  // so logout, the idle timeout and "sign out everywhere" can end it (#365).
-  const { token } = await issueSession(request, auth.passwordHash);
+  if (!account) return NextResponse.json({ error: "Invalid password" }, { status: 401 });
+  // Bind the token to the account and its current password hash so a later
+  // password change revokes it (see proxy.ts / verifySessionToken), and
+  // record the session so logout, the idle timeout and "sign out everywhere"
+  // can end it (#365).
+  const { token } = await issueSession(request, account);
   // In the audit log, and out through the channels when the address is new.
   notifySecurityEvent(await recordSecurityEvent("signin.ok", eventMeta(request)));
   const response = NextResponse.json({ ok: true });

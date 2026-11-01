@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   // isAdminRequest instead of letting it read and parse config.yaml a second
   // time (the fast path the polled status routes already take).
   const config = await readConfigInternal();
-  if (!(await isAdminRequest(request, config.auth.passwordHash))) {
+  if (!(await isAdminRequest(request, config.auth))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   return NextResponse.json(

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest } from "@/lib/api-auth";
-import { readConfigInternal, confirmTotpEnrollment, TotpStateError } from "@/lib/config";
+import { viewerOf } from "@/lib/api-auth";
+import { confirmTotpEnrollment, TotpStateError } from "@/lib/config";
 import { rateLimit, pruneRateLimit, clientKey } from "@/lib/rate-limit";
 import { verifyTotp, generateRecoveryCodes } from "@/lib/totp";
 import { hashRecoveryCodes } from "@/lib/recovery-codes";
@@ -15,7 +15,8 @@ const MAX_ATTEMPTS = 10;
 const WINDOW_MS = 5 * 60 * 1000;
 
 export async function POST(request: NextRequest) {
-  if (!(await isAdminRequest(request))) {
+  const viewer = await viewerOf(request);
+  if (!viewer?.isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   pruneRateLimit();
@@ -30,23 +31,24 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
-  const { auth } = await readConfigInternal();
+  // The viewer's own enrollment (#423).
+  const { account } = viewer;
   // Never over an active factor (#384), as /setup refuses too: a pending
   // secret left beside it (an older version minted one regardless) would
   // otherwise replace the live secret and recovery codes.
-  if (auth.totp.enabled) {
+  if (account.totp.enabled) {
     return NextResponse.json(
       { error: "Two-factor authentication is already on — turn it off first to set up a new authenticator." },
       { status: 409 }
     );
   }
-  if (!auth.totp.pendingSecret) {
+  if (!account.totp.pendingSecret) {
     return NextResponse.json(
       { error: "Start setup again — no enrollment in progress." },
       { status: 400 }
     );
   }
-  if (!(await verifyTotp(auth.totp.pendingSecret, parsed.data.code))) {
+  if (!(await verifyTotp(account.totp.pendingSecret, parsed.data.code))) {
     return NextResponse.json(
       { error: "That code didn't match. Check your authenticator and try again." },
       { status: 401 }
@@ -54,7 +56,7 @@ export async function POST(request: NextRequest) {
   }
   const recoveryCodes = generateRecoveryCodes(10);
   try {
-    await confirmTotpEnrollment(auth.totp.pendingSecret, await hashRecoveryCodes(recoveryCodes));
+    await confirmTotpEnrollment(account.id, account.totp.pendingSecret, await hashRecoveryCodes(recoveryCodes));
   } catch (e) {
     // The same checks as above, made inside the write queue (#399).
     if (e instanceof TotpStateError) return NextResponse.json({ error: e.message }, { status: e.status });

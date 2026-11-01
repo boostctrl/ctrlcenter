@@ -37,7 +37,7 @@ export async function PUT(request: NextRequest) {
     (alertChannelsChangeTarget(channels, stored.alerts.channels) ||
       alertChannelsDropSecurity(channels, stored.alerts.channels))
   ) {
-    const recent = await requireRecentAuth(request, auth.passwordHash);
+    const recent = await requireRecentAuth(request, auth);
     if (!recent.ok) return recent.response;
   }
   const settings = await updateSettings(patch);

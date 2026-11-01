@@ -11,6 +11,7 @@ import {
   listSessions,
   revokeSession,
   revokeSessions,
+  sessionAccount,
   sessionsPersisted,
   setIdleHours,
   touchSession,
@@ -196,5 +197,28 @@ describe("session records (#365)", () => {
     const id = await createSession(meta);
     expect(await getSession(id)).not.toBeNull();
     warn.mockRestore();
+  });
+});
+
+describe("sessions per account (#423)", () => {
+  it("records the account, reads a 3.0 record as the founding admin's, and ends one account's sessions only", async () => {
+    const a1 = await createSession({ ...meta, account: "admin" });
+    const s1 = await createSession({ ...meta, account: "sam" });
+    const s2 = await createSession({ ...meta, account: "sam" });
+    const old = await createSession(meta);
+    expect((await getSession(s1))?.account).toBe("sam");
+    const record = await getSession(old);
+    expect(record?.account).toBeUndefined();
+    expect(record && sessionAccount(record)).toBe("admin");
+    expect(await revokeSessions(undefined, "sam")).toBe(2);
+    expect(await getSession(s1)).toBeNull();
+    expect(await getSession(s2)).toBeNull();
+    expect(await getSession(a1)).not.toBeNull();
+    expect(await getSession(old)).not.toBeNull();
+    // The founding admin's own password change keeps the caller's session
+    // and ends its others, the 3.0 record among them.
+    expect(await revokeSessions(a1, "admin")).toBe(1);
+    expect(await getSession(a1)).not.toBeNull();
+    expect(await getSession(old)).toBeNull();
   });
 });

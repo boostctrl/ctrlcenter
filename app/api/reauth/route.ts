@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminSessionId } from "@/lib/api-auth";
+import { viewerOf } from "@/lib/api-auth";
 import { readConfigInternal } from "@/lib/config";
 import { verifyCredentials } from "@/lib/credentials";
 import { clientKey, pruneRateLimit, rateLimit, refundRateLimit } from "@/lib/rate-limit";
@@ -23,10 +23,12 @@ import { CODES_LOCKED, notifySecurityEvent } from "@/lib/security-alerts";
 
 export async function POST(request: NextRequest) {
   const config = await readConfigInternal();
-  const sessionId = await adminSessionId(request, config.auth.passwordHash);
-  if (!sessionId) {
+  const viewer = await viewerOf(request, config.auth);
+  if (!viewer?.isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  // The viewer's own credentials (#423).
+  const { account } = viewer;
   pruneRateLimit();
   const throttleKey = clientKey(request, "reauth");
   const limited = rateLimit(throttleKey, PER_CLIENT_MAX_ATTEMPTS, WINDOW_MS, { escalate: true });
@@ -40,7 +42,7 @@ export async function POST(request: NextRequest) {
   // No code is checked while the shared wrong-code budget is spent (#392);
   // see the sign-in route.
   const sentCode = typeof body?.totp === "string" && body.totp.trim() !== "";
-  if (sentCode && config.auth.totp.enabled) {
+  if (sentCode && account.totp.enabled) {
     const paused = codeChecksPausedFor();
     if (paused > 0) {
       return NextResponse.json(
@@ -49,7 +51,7 @@ export async function POST(request: NextRequest) {
       );
     }
   }
-  const result = await verifyCredentials(config.auth, body?.password, body?.totp);
+  const result = await verifyCredentials(account, body?.password, body?.totp);
   if (!result.ok) {
     if (result.reason === "totp-required") {
       // The form's second step, not a failure: its charge goes back (#392).
@@ -76,13 +78,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: result.reason === "code" ? "Invalid authentication code" : "Invalid password",
-        totpRequired: config.auth.totp.enabled,
+        totpRequired: account.totp.enabled,
       },
       { status: 401 }
     );
   }
   refundRateLimit(throttleKey);
-  await markReauth(sessionId);
+  await markReauth(viewer.session.id);
   await recordSecurityEvent("reauth.ok", eventMeta(request));
   return NextResponse.json({ ok: true });
 }

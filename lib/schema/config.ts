@@ -4,7 +4,7 @@ import { lenientArray } from "./shared";
 import { settingsSchema } from "./settings";
 import { appItemSchema, bookmarkItemSchema } from "./apps-bookmarks";
 import { themeEntrySchema } from "./theme";
-import { authSchema } from "./auth";
+import { authSchema, userSchema } from "./auth";
 import { widgetInstanceSchema, widgetInstancesSchema, widgetInstancesUpdateSchema } from "./instances";
 import { boardSchema, boardsSchema, boardsUpdateSchema } from "./boards";
 import { groupSchema, groupsSchema, groupsUpdateSchema } from "./groups";
@@ -50,6 +50,10 @@ export const configReadSchema = configSchema.extend({
   apps: lenientArray(appItemSchema),
   bookmarks: lenientArray(bookmarkItemSchema),
   themes: lenientArray(themeEntrySchema),
+  // A malformed account row is dropped rather than failing the load (#423);
+  // the founding admin reads from the legacy fields whatever the list holds
+  // (lib/accounts.ts), so a bad row can't lock everyone out.
+  auth: authSchema.extend({ users: lenientArray(userSchema) }).default(authSchema.parse({})),
 });
 
 export type Config = z.infer<typeof configSchema>;

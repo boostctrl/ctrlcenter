@@ -40,7 +40,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
   // A placeholder the form sent back stands for the stored credential (#382).
   const [incoming] = restoreWidgets([parsed.data as WidgetInstance], stored);
   if (widgetsChangeTarget([incoming], stored)) {
-    const recent = await requireRecentAuth(request, auth.passwordHash);
+    const recent = await requireRecentAuth(request, auth);
     if (!recent.ok) return recent.response;
   }
   try {

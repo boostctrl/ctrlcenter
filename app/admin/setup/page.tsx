@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 // (or once anything has been added), this goes to the admin page instead.
 export default async function SetupPage() {
   const config = await readConfigInternal();
-  await requireAdminPage("/admin/setup", config.auth.passwordHash);
+  await requireAdminPage("/admin/setup", config.auth);
   if (!needsSetup(config)) redirect("/admin");
   // The same toast and confirm hosts the admin dashboard has (#399): the
   // two-factor card reports through toasts, and the icon picker asks before

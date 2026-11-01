@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
   // is recorded for every app; only the caller's visible ids are read out.
   const visible = visibleItems(
     monitoredApps(apps),
-    await isAdminRequest(request, auth.passwordHash)
+    await isAdminRequest(request, auth)
   );
   return NextResponse.json(
     getHistory(

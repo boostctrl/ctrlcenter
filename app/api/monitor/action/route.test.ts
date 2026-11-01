@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import fs from "node:fs/promises";
 import * as YAML from "js-yaml";
 import { useScratchConfig, request, adminSession } from "@/lib/testing/routes";
+import { FOUNDING_ACCOUNT_ID } from "@/lib/schema";
 
 // The action guard (#289): every gate before a dashboard action reaches a
 // service, and the shape of the ids it carries there (#379). Only a
@@ -96,7 +97,7 @@ describe("POST /api/monitor/action target ids (#379)", () => {
     // Actions need the second factor on (#367); the session is fresh, so the
     // destructive verbs' step-up (#366) passes too.
     const { activateTotp } = await import("@/lib/config");
-    await activateTotp("JBSWY3DPEHPK3PXP", []);
+    await activateTotp(FOUNDING_ACCOUNT_ID, "JBSWY3DPEHPK3PXP", []);
   });
 
   it("refuses anything but a container id, before any request", async () => {

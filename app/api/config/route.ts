@@ -32,7 +32,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   const config = await readConfigInternal();
-  if (!(await isAdminRequest(request, config.auth.passwordHash))) {
+  if (!(await isAdminRequest(request, config.auth))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   // Secrets stay out of a backup unless asked for (#366): `?secrets=1`
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
   // takes a recent step-up confirmation.
   const withSecrets = request.nextUrl.searchParams.get("secrets") === "1";
   if (withSecrets) {
-    const recent = await requireRecentAuth(request, config.auth.passwordHash);
+    const recent = await requireRecentAuth(request, config.auth);
     if (!recent.ok) return recent.response;
     await recordSecurityEvent("export.secrets", eventMeta(request));
   }

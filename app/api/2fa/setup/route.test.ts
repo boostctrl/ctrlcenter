@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import { adminSession, request, useScratchConfig } from "@/lib/testing/routes";
+import { FOUNDING_ACCOUNT_ID } from "@/lib/schema";
 
 // TOTP enrollment (#198) starts here, and never over an active factor (#384).
 let route: typeof import("./route");
@@ -14,7 +15,7 @@ beforeAll(async () => {
 
 afterEach(async () => {
   const { disableTotp } = await import("@/lib/config");
-  await disableTotp();
+  await disableTotp(FOUNDING_ACCOUNT_ID);
 });
 
 const setup = (auth = true) =>
@@ -39,7 +40,7 @@ describe("POST /api/2fa/setup", () => {
   it("refuses with 409 while it's on, leaving the live secret and codes alone (#384)", async () => {
     const { activateTotp, readConfigInternal } = await import("@/lib/config");
     const codes = [{ hash: "h1", salt: "s1" }];
-    await activateTotp("JBSWY3DPEHPK3PXP", codes);
+    await activateTotp(FOUNDING_ACCOUNT_ID, "JBSWY3DPEHPK3PXP", codes);
     const res = await setup();
     expect(res.status).toBe(409);
     expect((await res.json()).error).toMatch(/already on/);

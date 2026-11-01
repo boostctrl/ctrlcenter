@@ -19,14 +19,53 @@ export const totpAuthSchema = z.object({
 });
 export type TotpAuth = z.infer<typeof totpAuthSchema>;
 
-// Optional stored admin credential (PBKDF2). Empty means "no UI password set"
-// — login falls back to the ADMIN_PASSWORD env var. Kept as a top-level key
-// (not under settings) so it's never rendered into public pages.
-export const authSchema = z.object({
+// An account (#423): the sign-in name `id` (a lowercase slug, stable), a
+// display name, the role, and its own credential — a password hash and a
+// TOTP enrollment, the shapes the single admin of 3.0 had. `groups` names
+// the groups the account belongs to (the visibility rules of 3.1 read them);
+// `mustChangePassword` makes the next sign-in set a new password first.
+// Timestamps are ISO strings, "" when unknown.
+export const USER_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/;
+export const userRoleSchema = z.enum(["admin", "member"]);
+export type UserRole = z.infer<typeof userRoleSchema>;
+export const userSchema = z.object({
+  id: z
+    .string()
+    .regex(USER_ID_PATTERN, "A sign-in name is 1–64 lowercase letters, digits, dots, dashes or underscores"),
+  name: z.string().max(80).default(""),
+  role: userRoleSchema.default("member"),
+  enabled: z.boolean().default(true),
   passwordHash: z.string().default(""),
   passwordSalt: z.string().default(""),
   totp: totpAuthSchema.default(totpAuthSchema.parse({})),
+  groups: z.array(z.string()).max(64).default([]),
+  mustChangePassword: z.boolean().default(false),
+  createdAt: z.string().default(""),
+  lastSignInAt: z.string().default(""),
 });
+export type User = z.infer<typeof userSchema>;
+
+// The account the single admin of 3.0 became (#423): synthesised from the
+// legacy fields below while `users` is empty, and the one ADMIN_PASSWORD
+// stands in for while it has no stored password.
+export const FOUNDING_ACCOUNT_ID = "admin";
+
+// The accounts and their credentials (PBKDF2). Kept as a top-level key (not
+// under settings) so it's never rendered into public pages.
+export const authSchema = z.object({
+  // The founding account's credential as 3.0 stored it. Empty means "no UI
+  // password set" — sign-in falls back to the ADMIN_PASSWORD env var. Kept
+  // in step with its entry in `users` on every write (lib/config/auth.ts),
+  // so a 3.0.x build, which reads these and ignores `users`, still signs in
+  // after a rollback. Read through lib/accounts.ts, never directly.
+  passwordHash: z.string().default(""),
+  passwordSalt: z.string().default(""),
+  totp: totpAuthSchema.default(totpAuthSchema.parse({})),
+  // Every account (#423). Empty in a file 3.0 wrote: the founding admin is
+  // then the legacy credential above, as one account (lib/accounts.ts).
+  users: z.array(userSchema).default([]),
+});
+export type AuthConfig = z.infer<typeof authSchema>;
 
 // Request bodies for the 2FA routes.
 export const totpActivateSchema = z.object({ code: z.string() });
