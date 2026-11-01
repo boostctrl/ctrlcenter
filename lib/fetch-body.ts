@@ -16,8 +16,20 @@ import { log, hostOf } from "./log";
 export async function readCapped(
   res: Response,
   max: number,
-  { trustContentLength = true }: { trustContentLength?: boolean } = {}
+  opts: { trustContentLength?: boolean } = {}
 ): Promise<string | null> {
+  const bytes = await readCappedBytes(res, max, opts);
+  return bytes === null ? null : new TextDecoder().decode(bytes);
+}
+
+// The same capped read, as the raw bytes, for a body that isn't text (the
+// Portainer log tail's framed Docker stream, #402): an empty Buffer for no
+// body, null over the cap, as with readCapped.
+export async function readCappedBytes(
+  res: Response,
+  max: number,
+  { trustContentLength = true }: { trustContentLength?: boolean } = {}
+): Promise<Buffer | null> {
   const declared = Number(res.headers.get("content-length"));
   if (trustContentLength && Number.isFinite(declared) && declared > max) {
     log.warn("readCapped: declared content-length over cap", {
@@ -29,10 +41,10 @@ export async function readCapped(
     return null;
   }
   const reader = res.body?.getReader();
-  // No body stream — an empty response, not an oversized one. Return "" so the
-  // caller surfaces it as a parse/validation error (or an empty result), never
-  // as a misleading "too large".
-  if (!reader) return "";
+  // No body stream — an empty response, not an oversized one. Return an empty
+  // body ("" once decoded) so the caller surfaces it as a parse/validation
+  // error (or an empty result), never as a misleading "too large".
+  if (!reader) return Buffer.alloc(0);
   const chunks: Uint8Array[] = [];
   let total = 0;
   for (;;) {
@@ -51,9 +63,11 @@ export async function readCapped(
     }
     chunks.push(value);
   }
-  return new TextDecoder().decode(
-    chunks.length === 1 ? chunks[0] : Buffer.concat(chunks)
-  );
+  if (chunks.length === 1) {
+    const one = chunks[0];
+    return Buffer.from(one.buffer, one.byteOffset, one.byteLength);
+  }
+  return Buffer.concat(chunks);
 }
 
 // An AbortSignal that fires after `ms`. Built on a plain `controller.abort()`

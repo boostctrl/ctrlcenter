@@ -237,6 +237,26 @@ describe("containerLogs", () => {
     await expect(containerLogs(CFG, 2, "cid")).rejects.toThrow("Redirected to another host — check the URL");
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it("caps the body while it streams, instead of buffering it all first (#402)", async () => {
+    // A tail far over the service body cap, served in 1 MiB chunks: the read
+    // stops at the cap, the rest is never pulled, and the admin sees the same
+    // message as for any oversized service response.
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const chunk = new Uint8Array(1024 * 1024).fill(0x61);
+    let pulled = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += 1;
+        if (pulled > 8) controller.close();
+        else controller.enqueue(chunk);
+      },
+    });
+    vi.stubGlobal("fetch", vi.fn<typeof fetch>(async () => new Response(body)));
+    await expect(containerLogs(CFG, 2, "cid")).rejects.toThrow("Response too large");
+    // 4 MiB cap: the fifth chunk tips it, and at most one more was read ahead.
+    expect(pulled).toBeLessThanOrEqual(6);
+  });
 });
 
 describe("probePortainer", () => {

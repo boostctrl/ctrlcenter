@@ -1,7 +1,24 @@
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { serviceRequest, serviceBase, ServiceError, throwForStatus } from "./http";
+import {
+  serviceRequest,
+  serviceBase,
+  ServiceError,
+  throwForStatus,
+  insecureHttpsRequest,
+  SERVICE_MAX_BYTES,
+} from "./http";
+
+// insecureHttpsRequest (#402) is exercised against a plain local server:
+// node:https is swapped for node:http in this file, so the request and
+// response objects — and the deadline and close handling under test — are the
+// real ones, without a self-signed certificate to mint. Nothing else here
+// touches https.
+vi.mock("node:https", async () => {
+  const http = await import("node:http");
+  return { default: { request: http.request } };
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -49,6 +66,14 @@ describe("serviceBase", () => {
     expect(serviceBase("http://x.local:8080/")).toBe("http://x.local:8080");
     expect(serviceBase("https://x.local///")).toBe("https://x.local");
     expect(() => serviceBase("x.local:8080")).toThrow(ServiceError);
+  });
+
+  it("refuses an address that only looks like a URL, before a fetch could quote it whole (#402)", () => {
+    // fetch's own error for this one is "Failed to parse URL from <the whole
+    // URL>", apikey and all, straight into the log.
+    expect(() => serviceBase("http://192.168.1.300:8181")).toThrow("Set a valid http(s) URL");
+    expect(() => serviceBase("http://")).toThrow(ServiceError);
+    expect(() => serviceBase("ftp://x.local")).toThrow(ServiceError);
   });
 });
 
@@ -203,5 +228,72 @@ describe("serviceRequest redirects", () => {
       a.close();
       b.close();
     }
+  });
+});
+
+// The self-signed path (#402): one deadline for the whole exchange, and a
+// connection that drops mid-body fails instead of pending for good.
+describe("insecureHttpsRequest", () => {
+  let server: http.Server | null = null;
+  afterEach(async () => {
+    if (!server) return;
+    server.closeAllConnections();
+    await new Promise((r) => server!.close(r));
+    server = null;
+  });
+  async function serve(handler: http.RequestListener): Promise<string> {
+    server = http.createServer(handler);
+    await new Promise<void>((r) => server!.listen(0, "127.0.0.1", r));
+    return `http://127.0.0.1:${(server.address() as AddressInfo).port}/`;
+  }
+
+  it("settles a complete response with its status, cookies and text", async () => {
+    let got: { method?: string; key?: string; body: string } = { body: "" };
+    const url = await serve((req, res) => {
+      let body = "";
+      req.on("data", (c: Buffer) => (body += c.toString()));
+      req.on("end", () => {
+        got = { method: req.method, key: String(req.headers["x-api-key"]), body };
+        res.setHeader("set-cookie", ["TOKEN=jwt; Path=/; HttpOnly", "csrf=1"]);
+        res.end("hello");
+      });
+    });
+    const out = await insecureHttpsRequest(url, {
+      method: "POST",
+      headers: { "X-Api-Key": "SECRET" },
+      body: "u=1",
+    });
+    expect(out).toEqual({
+      status: 200,
+      ok: true,
+      setCookie: ["TOKEN=jwt; Path=/; HttpOnly", "csrf=1"],
+      text: "hello",
+    });
+    expect(got).toEqual({ method: "POST", key: "SECRET", body: "u=1" });
+  });
+
+  it("gives up on a body that dribbles past the deadline", async () => {
+    // A byte every 10 ms never trips a socket idle timeout; the overall
+    // deadline has to end it.
+    const url = await serve((_req, res) => {
+      res.writeHead(200);
+      const drip = setInterval(() => res.write("x"), 10);
+      res.on("close", () => clearInterval(drip));
+    });
+    const started = Date.now();
+    await expect(insecureHttpsRequest(url, {}, SERVICE_MAX_BYTES, 100)).rejects.toThrow("Timed out");
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
+
+  it("fails, rather than hanging, when the connection drops mid-body", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const url = await serve((_req, res) => {
+      res.writeHead(200, { "content-length": "100" });
+      res.write("partial");
+      setTimeout(() => res.destroy(), 10);
+    });
+    await expect(insecureHttpsRequest(url, {}, SERVICE_MAX_BYTES, 2000)).rejects.toThrow(
+      "Couldn't connect"
+    );
   });
 });

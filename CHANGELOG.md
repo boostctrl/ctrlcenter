@@ -75,6 +75,26 @@ here.
   the widget filters everywhere at once, and a group that a widget is
   filtered to counts as in use, so it can't be deleted out from under the
   widget. (#398)
+- **A UniFi controller on a self-signed certificate can no longer freeze its
+  tile.** With *Allow self-signed certificate* on, a controller that kept
+  sending its reply a few bytes at a time, or dropped the connection partway
+  through, was never given up on: the tile then showed stale data for good,
+  and until a first reply came in, the Monitor page and any board with that
+  tile waited with it. The request now has the same six-second limit as every
+  other integration, reply included, and a connection that drops mid-reply
+  counts as a failed check. (#402)
+- **Portainer's log tail is bounded before it is read.** A container's last
+  200 log lines were read into memory in full before the size limit applied,
+  so a container writing enormous lines could have the app buffer all of it.
+  The tail is now read under the same 4 MB limit as every other integration
+  reply, and one over it reports "Response too large". (#402)
+- **A mistyped integration address no longer puts its key in the server
+  log.** An address that looks right but isn't one, such as
+  `http://192.168.1.300:8181`, used to fail only inside the request, whose
+  error message quoted the whole address, an `apikey=` in it included. Such an
+  address is now refused with "Set a valid http(s) URL" before any request is
+  made, and the error for any other address that won't parse no longer repeats
+  it. (#402)
 - **Admin paper cuts.** When your admin session ends or idles out while
   you're editing, the next save now asks you to sign in again right there
   and then saves, instead of showing "Unauthorized" in a corner and losing
@@ -142,6 +162,14 @@ here.
   address other than the one it signed in from is announced on your
   Security channels and in Settings → Security, once per address.
   SECURITY.md's wording is back to what 3.0.0 had promised. (#382)
+- **Alert deliveries follow a redirect only on the same host.** Gotify sends
+  its app token in a header, and a redirect to another host used to carry it
+  along, so a Gotify address that answers with a 307 or 308 pointing elsewhere
+  handed the token to that host. Alert channels now follow a redirect only
+  within the host you saved, as integration requests already do, and a
+  refused one shows up as the channel's result in *Send test*. A channel that
+  relied on a redirect to another host needs its address updated to the final
+  one. (#402)
 
 ## [3.0.0] - 2026-10-16
 

@@ -63,8 +63,12 @@ export function hostOf(url: string): string {
 }
 
 // A short reason string for a failed fetch/parse, distinguishing a timeout
-// (AbortError) from other network/parse errors.
+// (AbortError) from other network/parse errors. fetch's own message for a URL
+// it couldn't parse quotes the whole URL, a key in its query included, so that
+// one is reduced to what Node's URL parser says (#402).
 export function errorReason(e: unknown): string {
-  if (e instanceof Error) return e.name === "AbortError" ? "timeout" : e.message;
-  return String(e);
+  if (!(e instanceof Error)) return String(e);
+  if (e.name === "AbortError") return "timeout";
+  if (e.message.startsWith("Failed to parse URL")) return "Invalid URL";
+  return e.message;
 }

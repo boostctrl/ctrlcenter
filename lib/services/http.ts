@@ -21,11 +21,20 @@ export const SERVICE_MAX_BYTES = 4 * 1024 * 1024;
 export class ServiceError extends Error {}
 
 // The base URL with trailing slashes trimmed, so path joins are uniform.
-// Throws when it isn't http(s): integration URLs are validated on the admin
-// path, but a hand-edited config must fail with a message, not a bad fetch.
+// Throws when it isn't an http(s) URL that parses: integration URLs are
+// checked on the admin path, but a hand-edited config, or an address that
+// only looks right (`http://192.168.1.300:8181`), must fail with a message
+// here, not inside the fetch — whose own error quotes the whole URL, an
+// `?apikey=` in it included, against this module's host-only logging (#402).
 export function serviceBase(url: string): string {
   const base = url.trim().replace(/\/+$/, "");
-  if (!/^https?:\/\//i.test(base)) {
+  let parsed: URL | undefined;
+  try {
+    parsed = new URL(base);
+  } catch {
+    // Not a URL at all; refused below.
+  }
+  if (!parsed || (parsed.protocol !== "http:" && parsed.protocol !== "https:")) {
     throw new ServiceError("Set a valid http(s) URL");
   }
   return base;
@@ -139,7 +148,8 @@ export type InsecureResponse = {
 export async function insecureHttpsRequest(
   url: string,
   init: { method?: string; headers?: Record<string, string>; body?: string } = {},
-  maxBytes: number = SERVICE_MAX_BYTES
+  maxBytes: number = SERVICE_MAX_BYTES,
+  timeoutMs: number = SERVICE_TIMEOUT_MS
 ): Promise<InsecureResponse> {
   let target: URL;
   try {
@@ -152,15 +162,26 @@ export async function insecureHttpsRequest(
     const settle = (fn: () => void) => {
       if (settled) return;
       settled = true;
+      clearTimeout(deadline);
       fn();
     };
+    // A failed exchange, before or during the body: a refused connection, or a
+    // socket that closed mid-body — the response then ends with `close` but
+    // no `end`, which used to leave this promise pending for good (#402).
+    const fail = (e: unknown) =>
+      settle(() => {
+        log.warn("insecure service fetch error", {
+          host: hostOf(url),
+          reason: errorReason(e),
+        });
+        reject(new ServiceError("Couldn't connect"));
+      });
     const req = https.request(
       target,
       {
         method: init.method ?? "GET",
         headers: init.headers,
         rejectUnauthorized: false,
-        timeout: SERVICE_TIMEOUT_MS,
       },
       (res) => {
         const chunks: Buffer[] = [];
@@ -185,21 +206,22 @@ export async function insecureHttpsRequest(
             });
           })
         );
+        res.on("error", fail);
+        res.on("close", () => {
+          if (!res.complete) fail(new Error("connection closed before the body ended"));
+        });
       }
     );
-    req.on("timeout", () => {
+    // One deadline for the whole exchange, body included — what timeoutSignal
+    // does for fetch. node:https's `timeout` option is a socket *idle* timeout:
+    // a body that dribbled a byte at a time reset it forever, and the swr
+    // cache's in-flight entry never cleared (#402).
+    const deadline = setTimeout(() => {
       settle(() => reject(new ServiceError("Timed out")));
       req.destroy();
-    });
-    req.on("error", (e) =>
-      settle(() => {
-        log.warn("insecure service fetch error", {
-          host: hostOf(url),
-          reason: errorReason(e),
-        });
-        reject(new ServiceError("Couldn't connect"));
-      })
-    );
+    }, timeoutMs);
+    deadline.unref?.();
+    req.on("error", fail);
     if (init.body !== undefined) req.write(init.body);
     req.end();
   });

@@ -7,7 +7,7 @@ import {
 } from "./alert-channels";
 import { log, hostOf, errorReason } from "./log";
 import { resolveSecret } from "./secrets";
-import { fetchWithTimeout } from "./fetch-body";
+import { ServiceError, serviceFetch } from "./services/http";
 import { reportOptions, type NotificationContext, type WebhookNotification } from "./webhooks";
 import { buildNotificationEmail, escapeHtml } from "./webhook-email";
 import { sampleNotification, type SampleId } from "./notification-samples";
@@ -428,13 +428,17 @@ export type ChannelResult = { ok: boolean; detail: string };
 
 // Fire one request, time-boxed, and report the outcome instead of throwing so
 // both the poller (which logs) and the test path (which shows the result) share
-// the exact same request logic.
+// the exact same request logic. Through serviceFetch, so a redirect is
+// followed only on the same host (#402): fetch's own following keeps a custom
+// header across hosts, and Gotify's app token rides in X-Gotify-Key, so a
+// Gotify URL that answered 307/308 to another host handed the token to it. A
+// refused redirect is the channel's result, as a failed status would be.
 async function runRequest(req: AlertRequest): Promise<ChannelResult> {
   try {
-    const res = await fetchWithTimeout(req.url, req.init, ALERT_TIMEOUT_MS);
+    const res = await serviceFetch(req.url, req.init, ALERT_TIMEOUT_MS);
     return { ok: res.ok, detail: `HTTP ${res.status}` };
   } catch (e) {
-    return { ok: false, detail: errorReason(e) };
+    return { ok: false, detail: e instanceof ServiceError ? e.message : errorReason(e) };
   }
 }
 

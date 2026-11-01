@@ -26,4 +26,12 @@ describe("log", () => {
     expect(errorReason(new Error("ECONNREFUSED"))).toBe("ECONNREFUSED");
     expect(errorReason("boom")).toBe("boom");
   });
+
+  it("doesn't repeat the URL fetch couldn't parse, key and all (#402)", async () => {
+    // undici quotes the whole input in its message. Parsing fails before any
+    // network, so the real fetch is safe to call here.
+    const e: unknown = await fetch("http://192.168.1.300:8181/api?apikey=SECRET").catch((x) => x);
+    expect(e).toBeInstanceOf(TypeError);
+    expect(errorReason(e)).toBe("Invalid URL");
+  });
 });

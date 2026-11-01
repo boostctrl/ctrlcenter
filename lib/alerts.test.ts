@@ -1,3 +1,5 @@
+import http from "node:http";
+import type { AddressInfo } from "node:net";
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import {
   evaluateTransitions,
@@ -443,6 +445,42 @@ describe("sendTestAlert", () => {
   it("skips a channel that is missing a required field", async () => {
     const config = alertsSchema.parse({ channels: [channel({ id: "a", url: "" })] });
     expect(await sendTestAlert(config, "a")).toEqual({ results: [] });
+  });
+
+  it("won't follow a Gotify redirect to another host with the app token (#402)", async () => {
+    // Two real servers, no fetch stub: A answers 307 to B, which records what
+    // it receives. fetch's own following replayed the POST, X-Gotify-Key
+    // included, to B (127.0.0.1 and localhost are different hosts to the URL
+    // rules). The refusal is the channel's result.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const seen: string[] = [];
+    const b = http.createServer((req, res) => {
+      seen.push(String(req.headers["x-gotify-key"]));
+      res.end("{}");
+    });
+    await new Promise<void>((r) => b.listen(0, "127.0.0.1", r));
+    const bPort = (b.address() as AddressInfo).port;
+    const a = http.createServer((_req, res) => {
+      res.writeHead(307, { location: `http://localhost:${bPort}/message` }).end();
+    });
+    await new Promise<void>((r) => a.listen(0, "127.0.0.1", r));
+    const aPort = (a.address() as AddressInfo).port;
+    try {
+      const config = alertsSchema.parse({
+        channels: [channel({ id: "g", type: "gotify", url: `http://127.0.0.1:${aPort}`, token: "tok" })],
+      });
+      const { results } = await sendTestAlert(config, "g");
+      expect(results).toEqual([
+        { id: "g", label: "Gotify", ok: false, detail: "Redirected to another host — check the URL" },
+      ]);
+      expect(seen).toEqual([]);
+    } finally {
+      a.closeAllConnections();
+      b.closeAllConnections();
+      a.close();
+      b.close();
+      warn.mockRestore();
+    }
   });
 
   it("reports an email send failure as ok:false with the reason", async () => {

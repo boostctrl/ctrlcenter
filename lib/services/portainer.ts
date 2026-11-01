@@ -10,6 +10,7 @@
 
 import {
   ServiceError,
+  SERVICE_MAX_BYTES,
   serviceBase,
   serviceRequest,
   serviceFetch,
@@ -18,6 +19,7 @@ import {
   runProbe,
   type ProbeResult,
 } from "./http";
+import { readCappedBytes } from "../fetch-body";
 import { log, hostOf, errorReason } from "../log";
 
 export type PortainerConfig = { url: string; apiKey: string };
@@ -266,12 +268,17 @@ export async function containerLogs(
   try {
     const res = await serviceFetch(url, { headers: { "X-API-Key": cfg.apiKey } });
     throwForStatus(res, KEY_ERRORS);
-    const bytes = Buffer.from(await res.arrayBuffer());
-    // Demux the whole framed body first, THEN cap the decoded text. Capping the
-    // raw bytes before demuxing could slice mid-frame, so demuxDockerLog would
-    // hit a misaligned header, bail to raw, and leave stray header bytes at line
-    // starts (#218). `tail=PORTAINER_LOG_TAIL` bounds the body, so demuxing the
-    // whole thing stays cheap.
+    // Read the body as bytes, capped while it streams, at the module's limit
+    // for any service response (#402). `tail=PORTAINER_LOG_TAIL` bounds the
+    // line count at the source, not the bytes, and the text cap below used to
+    // apply only once an uncapped arrayBuffer() had the whole body in memory.
+    // A body over the limit is refused, never sliced: capping the raw bytes
+    // by truncation would cut mid-frame, so demuxDockerLog would hit a
+    // misaligned header, bail to raw, and leave stray header bytes at line
+    // starts (#218).
+    const bytes = await readCappedBytes(res, SERVICE_MAX_BYTES, { trustContentLength: false });
+    if (bytes === null) throw new ServiceError("Response too large");
+    // Demux the whole framed body first, THEN cap the decoded text.
     const text = demuxDockerLog(bytes);
     return text.length > PORTAINER_LOG_MAX_BYTES
       ? text.slice(text.length - PORTAINER_LOG_MAX_BYTES)
