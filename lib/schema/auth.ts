@@ -67,6 +67,30 @@ export const authSchema = z.object({
 });
 export type AuthConfig = z.infer<typeof authSchema>;
 
+// What the Users tab sends (#423): a new account with its first password,
+// an edit to one, and a password reset. A group name is a slug like a
+// sign-in name.
+const groupList = z.array(z.string().regex(USER_ID_PATTERN, "A group name is lowercase letters, digits, dots, dashes or underscores")).max(64);
+export const accountCreateSchema = z.object({
+  id: userSchema.shape.id,
+  name: z.string().trim().max(80).default(""),
+  role: userRoleSchema.default("member"),
+  groups: groupList.default([]),
+  password: z.string().min(12, "A password must be at least 12 characters"),
+  // Make the first sign-in set a new password: on by default.
+  mustChangePassword: z.boolean().default(true),
+});
+export const accountUpdateSchema = z.object({
+  name: z.string().trim().max(80).optional(),
+  role: userRoleSchema.optional(),
+  groups: groupList.optional(),
+  enabled: z.boolean().optional(),
+  mustChangePassword: z.boolean().optional(),
+});
+export const accountPasswordResetSchema = z.object({
+  password: z.string().min(12, "A password must be at least 12 characters"),
+});
+
 // Request bodies for the 2FA routes.
 export const totpActivateSchema = z.object({ code: z.string() });
 export const totpDisableSchema = z.object({ code: z.string() });

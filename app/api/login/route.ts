@@ -169,7 +169,8 @@ export async function POST(request: NextRequest) {
   await noteSignIn(account.id);
   // In the audit log, and out through the channels when the address is new.
   notifySecurityEvent(await recordSecurityEvent("signin.ok", eventMeta(request, account.id)));
-  const response = NextResponse.json({ ok: true });
+  // An account whose password an admin set or reset picks its own first.
+  const response = NextResponse.json({ ok: true, mustChangePassword: account.mustChangePassword });
   setSessionCookie(response, request, token);
   return response;
 }

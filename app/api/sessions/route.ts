@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminSessionId, isAdminRequest } from "@/lib/api-auth";
+import { isAdminRequest, viewerOf } from "@/lib/api-auth";
 import { sessionSettingsSchema } from "@/lib/schema";
-import { getIdleHours, listSessions, setIdleHours } from "@/lib/sessions";
+import { getIdleHours, listSessions, sessionAccount, setIdleHours } from "@/lib/sessions";
 import { requireRecentAuth } from "@/lib/reauth";
 
 // Admin-only (gated by the /api/sessions proxy prefix and re-checked here).
@@ -9,11 +9,15 @@ import { requireRecentAuth } from "@/lib/reauth";
 // with the caller's own marked, plus the idle timeout; PATCH sets the idle
 // timeout. Ending sessions is the [id] and others routes.
 export async function GET(request: NextRequest) {
-  const current = await adminSessionId(request);
-  if (!current) {
+  const viewer = await viewerOf(request);
+  if (!viewer) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const sessions = (await listSessions()).map((s) => ({ ...s, current: s.id === current }));
+  // An admin sees every session; a member only its own (#423).
+  const current = viewer.session.id;
+  const sessions = (await listSessions())
+    .filter((s) => viewer.isAdmin || sessionAccount(s) === viewer.account.id)
+    .map((s) => ({ ...s, current: s.id === current }));
   return NextResponse.json({ idleHours: await getIdleHours(), sessions });
 }
 

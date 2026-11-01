@@ -18,7 +18,8 @@ const WINDOW_MS = 5 * 60 * 1000;
 
 export async function POST(request: NextRequest) {
   const viewer = await viewerOf(request);
-  if (!viewer?.isAdmin) {
+  // Any signed-in account, for its own (#423).
+  if (!viewer) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   // Step-up (#366): the code below proves the device; a recent confirmation

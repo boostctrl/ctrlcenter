@@ -60,6 +60,44 @@ export async function setAccountPassword(id: string, passwordHash: string, passw
   });
 }
 
+// An admin's reset of another account's password (#423): stored like a
+// change, and the account must pick its own at its next sign-in.
+export async function resetAccountPassword(id: string, passwordHash: string, passwordSalt: string): Promise<void> {
+  await mutateAccount(id, (account) => {
+    account.passwordHash = passwordHash;
+    account.passwordSalt = passwordSalt;
+    account.mustChangePassword = true;
+  });
+}
+
+// The parts of an account the Users tab edits (#423). The founding admin
+// stays an enabled admin whatever is asked, so nobody can lock every admin
+// out of the portal.
+export type AccountPatch = Partial<Pick<User, "name" | "role" | "groups" | "enabled" | "mustChangePassword">>;
+export async function updateAccount(id: string, patch: AccountPatch): Promise<User> {
+  return mutateAccount(id, (account) => {
+    if (patch.name !== undefined) account.name = patch.name;
+    if (patch.groups !== undefined) account.groups = [...patch.groups];
+    if (patch.mustChangePassword !== undefined) account.mustChangePassword = patch.mustChangePassword;
+    if (account.id !== FOUNDING_ACCOUNT_ID) {
+      if (patch.role !== undefined) account.role = patch.role;
+      if (patch.enabled !== undefined) account.enabled = patch.enabled;
+    }
+    return { ...account, totp: { ...account.totp }, groups: [...account.groups] };
+  });
+}
+
+// Remove an account (#423); never the founding admin. Its sessions are the
+// caller's to end (lib/sessions revokeSessions).
+export async function deleteAccount(id: string): Promise<void> {
+  if (id === FOUNDING_ACCOUNT_ID) throw new Error("The founding admin account can't be removed");
+  await mutate((config) => {
+    const users = accountsOf(config.auth);
+    if (!users.some((u) => u.id === id)) throw new NotFoundError(`No account "${id}"`);
+    config.auth = { ...config.auth, users: users.filter((u) => u.id !== id) };
+  });
+}
+
 // The founding admin's password: what the first-run setup sets.
 export async function setPasswordHash(passwordHash: string, passwordSalt: string): Promise<void> {
   await setAccountPassword(FOUNDING_ACCOUNT_ID, passwordHash, passwordSalt);

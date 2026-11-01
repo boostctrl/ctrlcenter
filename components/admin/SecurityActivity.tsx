@@ -30,6 +30,10 @@ const LABEL: Record<SecurityEventKind, string> = {
   "integration.changed": "Integration address or credentials changed",
   "actions.enabled": "Dashboard actions turned on",
   action: "Dashboard action",
+  "account.created": "Account added",
+  "account.changed": "Account changed",
+  "account.deleted": "Account removed",
+  "password.reset": "Password reset for an account",
 };
 
 // The entries that mean something went wrong, or that reshape the account.
@@ -42,6 +46,9 @@ const NOTABLE: ReadonlySet<SecurityEventKind> = new Set([
   "secret.revealed",
   "totp.disabled",
   "password.changed",
+  "account.created",
+  "account.deleted",
+  "password.reset",
   "actions.enabled",
   "export.secrets",
 ]);

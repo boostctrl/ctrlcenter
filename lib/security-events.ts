@@ -36,6 +36,12 @@ export const SECURITY_EVENT_KINDS = [
   "integration.changed",
   "actions.enabled",
   "action",
+  // Accounts (#423): made, edited, removed by an admin, and a password
+  // reset for one. `account` is the actor; `detail` names the account.
+  "account.created",
+  "account.changed",
+  "account.deleted",
+  "password.reset",
 ] as const;
 export type SecurityEventKind = (typeof SECURITY_EVENT_KINDS)[number];
 

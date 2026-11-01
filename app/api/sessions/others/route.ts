@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminSessionId } from "@/lib/api-auth";
+import { viewerOf } from "@/lib/api-auth";
 import { revokeSessions } from "@/lib/sessions";
 import { eventMeta, recordSecurityEvent } from "@/lib/security-events";
 
@@ -7,11 +7,13 @@ import { eventMeta, recordSecurityEvent } from "@/lib/security-events";
 // caller's, so a session on a device the admin no longer trusts is gone
 // without signing this one out.
 export async function POST(request: NextRequest) {
-  const current = await adminSessionId(request);
-  if (!current) {
+  const viewer = await viewerOf(request);
+  if (!viewer) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const ended = await revokeSessions(current);
-  if (ended > 0) await recordSecurityEvent("sessions.ended", eventMeta(request), `${ended} other session${ended === 1 ? "" : "s"}`);
+  // Everyone else's for an admin; a member's own others only (#423).
+  const current = viewer.session.id;
+  const ended = await revokeSessions(current, viewer.isAdmin ? undefined : viewer.account.id);
+  if (ended > 0) await recordSecurityEvent("sessions.ended", eventMeta(request, viewer.account.id), `${ended} other session${ended === 1 ? "" : "s"}`);
   return NextResponse.json({ ok: true, ended });
 }

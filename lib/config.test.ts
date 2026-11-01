@@ -987,6 +987,10 @@ describe("readConfigInternal stays off public surfaces", () => {
     "app/admin/page.tsx",
     "app/admin/setup/page.tsx",
     "app/api/accounts/route.ts",
+    "app/api/accounts/[id]/password/route.ts",
+    "app/api/accounts/[id]/route.ts",
+    "app/api/accounts/[id]/sessions/end/route.ts",
+    "app/api/accounts/[id]/totp/route.ts",
     "app/api/alerts/test/route.ts",
     "app/api/config/route.ts",
     // Admin-only integration snapshot: reads once, then gates on the hash.

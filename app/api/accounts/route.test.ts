@@ -16,11 +16,11 @@ describe("GET /api/accounts", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.groups).toEqual(["family"]);
-    expect(body.accounts).toEqual([
-      { id: "admin", name: "", role: "admin", enabled: true, groups: [] },
-      { id: "sam", name: "", role: "member", enabled: true, groups: ["family"] },
+    expect(body.accounts).toMatchObject([
+      { id: "admin", name: "", role: "admin", enabled: true, groups: [], totp: false },
+      { id: "sam", name: "", role: "member", enabled: true, groups: ["family"], totp: false, sessions: 1 },
     ]);
-    expect(JSON.stringify(body)).not.toMatch(/passwordHash|totp|secret/);
+    expect(JSON.stringify(body)).not.toMatch(/passwordHash|passwordSalt|secret|recoveryCodes|pendingSecret/);
     // A member may not list them, nor a visitor.
     expect((await GET(request("/api/accounts", { session: member }))).status).toBe(401);
     expect((await GET(request("/api/accounts"))).status).toBe(401);

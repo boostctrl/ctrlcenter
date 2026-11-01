@@ -24,7 +24,8 @@ import { CODES_LOCKED, notifySecurityEvent } from "@/lib/security-alerts";
 export async function POST(request: NextRequest) {
   const config = await readConfigInternal();
   const viewer = await viewerOf(request, config.auth);
-  if (!viewer?.isAdmin) {
+  // Any signed-in account, for its own (#423).
+  if (!viewer) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   // The viewer's own credentials (#423).

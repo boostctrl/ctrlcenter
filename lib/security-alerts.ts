@@ -84,6 +84,21 @@ export function securityNotification(e: SecurityEvent): WebhookNotification | nu
         title: "Password changed",
         body: `The password of ${whose} was changed ${where(e)}. Every other session of that account was signed out.`,
       };
+    case "account.created":
+      return {
+        title: "Account added",
+        body: `${who} added the account ${e.detail ?? "(unnamed)"} ${where(e)}.`,
+      };
+    case "account.deleted":
+      return {
+        title: "Account removed",
+        body: `${who} removed the account ${e.detail ?? "(unnamed)"} ${where(e)}. Its sessions were signed out.`,
+      };
+    case "password.reset":
+      return {
+        title: "Password reset for an account",
+        body: `${who} reset the password of ${e.detail ?? "an account"} ${where(e)}. That account's sessions were signed out, and it must choose a new password at its next sign-in.`,
+      };
     case "actions.enabled":
       return {
         title: "Dashboard actions turned on",

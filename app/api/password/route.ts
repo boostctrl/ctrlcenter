@@ -22,7 +22,8 @@ import { notifySecurityEvent } from "@/lib/security-alerts";
 // valid session.
 export async function POST(request: NextRequest) {
   const viewer = await viewerOf(request);
-  if (!viewer?.isAdmin) {
+  // Any signed-in account, for its own (#423).
+  if (!viewer) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   // Step-up (#366): the current password below proves the password; with a

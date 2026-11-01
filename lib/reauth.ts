@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { adminSessionId } from "./api-auth";
-import { getSession } from "./sessions";
+import { viewerOf } from "./api-auth";
 import type { AuthConfig } from "./schema/auth";
 
 // Step-up re-authentication (#366). A signed-in session is enough for
@@ -20,20 +19,23 @@ export type RecentAuth =
   | { ok: false; response: NextResponse };
 
 // Whether the request's session proved its credentials within the window.
-// Not an admin at all → 401; an admin whose proof is stale → 403 with
-// `reauthRequired`, the signal the UI acts on. `auth` is the fast path
-// callers that already read the config take (see isAdminRequest).
+// No live session → 401; one whose proof is stale → 403 with
+// `reauthRequired`, the signal the UI acts on. Any account's session counts
+// (#423): a member confirms its own password for its own changes, and the
+// admin-only routes check the role before they get here. `auth` is the
+// fast path callers that already read the config take (see isAdminRequest).
 export async function requireRecentAuth(
   request: NextRequest,
   auth?: AuthConfig,
   now = Date.now()
 ): Promise<RecentAuth> {
-  const sessionId = await adminSessionId(request, auth);
-  if (!sessionId) {
+  const viewer = await viewerOf(request, auth);
+  if (!viewer) {
     return { ok: false, response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }
-  const session = await getSession(sessionId, now);
-  if (!session || now - session.reauthAt > REAUTH_WINDOW_MS) {
+  const { session } = viewer;
+  const sessionId = session.id;
+  if (now - session.reauthAt > REAUTH_WINDOW_MS) {
     return {
       ok: false,
       response: NextResponse.json(

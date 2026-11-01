@@ -14,7 +14,8 @@ const ISSUER = "CtrlCenter";
 
 export async function POST(request: NextRequest) {
   const viewer = await viewerOf(request);
-  if (!viewer?.isAdmin) {
+  // Any signed-in account, for its own (#423).
+  if (!viewer) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   // Never over an active factor (#384): activating would replace its secret
