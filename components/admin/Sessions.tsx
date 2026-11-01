@@ -66,7 +66,9 @@ export function describeUserAgent(ua: string): string {
   return ua ? "Unknown browser" : "Unknown client";
 }
 
-export default function Sessions() {
+// `idleControl` off hides the site-wide idle timeout (an admin setting) on a
+// member's own account page (#423).
+export default function Sessions({ idleControl = true }: { idleControl?: boolean } = {}) {
   const [sessions, setSessions] = useState<Session[] | null>(null);
   const [idleHours, setIdleHours] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -171,19 +173,21 @@ export default function Sessions() {
 
   return (
     <div className="flex flex-col gap-4">
-      <SelectField
-        label="Sign out after"
-        hint="A session unused for this long ends on its own. Every session ends 7 days after it signed in regardless."
-        value={idleHours ?? 24}
-        disabled={idleHours === null}
-        onChange={(e) => void changeIdle(Number(e.target.value))}
-      >
-        {choices.map((c) => (
-          <option key={c.hours} value={c.hours}>
-            {c.label}
-          </option>
-        ))}
-      </SelectField>
+      {idleControl && (
+        <SelectField
+          label="Sign out after"
+          hint="A session unused for this long ends on its own. Every session ends 7 days after it signed in regardless."
+          value={idleHours ?? 24}
+          disabled={idleHours === null}
+          onChange={(e) => void changeIdle(Number(e.target.value))}
+        >
+          {choices.map((c) => (
+            <option key={c.hours} value={c.hours}>
+              {c.label}
+            </option>
+          ))}
+        </SelectField>
+      )}
 
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-4">

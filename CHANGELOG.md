@@ -14,6 +14,17 @@ here.
 
 ### Added
 
+- **Accounts: more than one person can sign in.** Settings → Users adds
+  accounts, each with its own password, role and groups: an *admin* runs
+  the portal as before, a *member* signs in to see the boards, apps and
+  bookmarks shared with them. An admin hands over a first password, which
+  the account replaces at its first sign-in, and can rename, regroup,
+  disable, remove or sign out an account, reset its password or turn a lost
+  second factor off; the steps that open a way in ask for the admin's
+  password first. Every account has a page of its own at `/account` (a
+  member finds it in the corner menu) for its password, second factor and
+  sessions. (#423)
+
 - **A private board, app or bookmark can be shared with named accounts and
   groups.** Each gets an *audience*: the accounts and the groups that may
   see it besides the admins. A member who signs in sees the public boards

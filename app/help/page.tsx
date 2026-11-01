@@ -1025,6 +1025,10 @@ export default async function HelpPage() {
         <Card title="Password & sessions">
           <P>
             Sign in with the username <strong>admin</strong> and the password.
+            <strong>Settings → Users</strong> adds more accounts: an <em>admin</em>
+            runs this portal, a <em>member</em> signs in to see the boards, apps
+            and bookmarks shared with them. Every account keeps its own
+            password, second factor and sessions at <strong>/account</strong>.
             Set or change the admin password from the portal. If none is set,
             login falls back to the <Code>ADMIN_PASSWORD</Code> environment
             variable. Changing the password signs out every other session.

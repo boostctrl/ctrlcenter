@@ -78,6 +78,14 @@ export default function LoginForm({
     } catch {
       // Not remembered, then.
     }
+    // A password an admin set or reset is replaced before anything else
+    // (#423): the account page asks for a new one.
+    const signedIn = await res.json().catch(() => null);
+    if (signedIn?.mustChangePassword) {
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.href = "/account?change=1";
+      return;
+    }
     // Hard navigation (not router.push): a full document load re-runs the auth
     // middleware with the freshly-set session cookie, so the protected route
     // loads on the first try. A client navigation can resolve against a stale

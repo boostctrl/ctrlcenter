@@ -38,6 +38,9 @@ Built with Next.js 16, React 19, and Tailwind v4.
     the status page alike) while staying monitored and alerted on. A private
     board, app or bookmark can be shared with named accounts and groups (its
     `audience`), so a member who signs in sees it too.
+  - **Accounts** — Settings → Users adds admins (who run the portal) and
+    members (who sign in to see what is shared with them); each has its own
+    password, optional two-factor and sessions, kept at `/account`.
 
 - **Uptime, status & alerts.** Optional reachability checks put an online/offline
   dot on each app and power a dedicated **/status** page with per-service **uptime

@@ -53,6 +53,9 @@ export default function FloatingNav({ boards, weather, status, calendar, member 
       { href: "/admin/monitor", label: "Monitor" },
       { href: "/help", label: "Help" },
       { href: "/settings", label: "Settings" },
+      // A member's password, second factor and sessions (#423); an admin
+      // has the portal's Security section.
+      member ? { href: "/account", label: "Your account" } : null,
       { href: "/admin", label: "Admin portal" },
     ].filter(Boolean) as { href: string; label: string }[]
   ).filter((l) => l.href !== pathname);

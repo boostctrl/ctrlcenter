@@ -47,6 +47,11 @@ export const SETTINGS_SECTIONS = [
     label: "Security",
     blurb: "The password that guards this portal.",
   },
+  {
+    id: "users",
+    label: "Users",
+    blurb: "Who can sign in: admins who run this portal, and members who see what is shared with them.",
+  },
 ] as const;
 export type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]["id"];
 

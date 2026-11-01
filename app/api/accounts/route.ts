@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest, viewerOf } from "@/lib/api-auth";
+import { viewerOf } from "@/lib/api-auth";
 import { addAccount, AccountExistsError, readConfigInternal } from "@/lib/config";
 import { accountsOf } from "@/lib/accounts";
 import { hashPassword } from "@/lib/auth";
@@ -15,7 +15,8 @@ import { notifySecurityEvent } from "@/lib/security-alerts";
 // how many sessions it holds. Never a credential or a secret.
 export async function GET(request: NextRequest) {
   const config = await readConfigInternal();
-  if (!(await isAdminRequest(request, config.auth))) {
+  const viewer = await viewerOf(request, config.auth);
+  if (!viewer?.isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const sessions = await listSessions();
@@ -32,7 +33,9 @@ export async function GET(request: NextRequest) {
     sessions: sessions.filter((s) => sessionAccount(s) === u.id).length,
   }));
   const groups = [...new Set(accounts.flatMap((a) => a.groups))].sort();
-  return NextResponse.json({ accounts, groups });
+  // `current`: the asking admin's own account, which the Users tab treats
+  // with care (no disabling or removing oneself).
+  return NextResponse.json({ accounts, groups, current: viewer.account.id });
 }
 
 // A new account (#423), with the first password the admin hands over and,

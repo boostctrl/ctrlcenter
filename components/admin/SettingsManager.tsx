@@ -21,6 +21,7 @@ import MonitoringSection from "./settings/MonitoringSection";
 import IntegrationsSection from "./settings/IntegrationsSection";
 import AnnouncementsSection from "./settings/AnnouncementsSection";
 import SecuritySection from "./settings/SecuritySection";
+import UsersSection from "./settings/UsersSection";
 
 // The admin settings page: a section nav rail beside the open section's cards.
 // The draft settings object and its autosave live in useSettingsDraft; each
@@ -188,6 +189,7 @@ export default function SettingsManager({
         {section === "monitoring" && <MonitoringSection d={draft} apps={apps} />}
         {section === "integrations" && <IntegrationsSection d={draft} twoFactorEnabled={twoFactorEnabled} />}
         {section === "announcements" && <AnnouncementsSection d={draft} apps={apps} />}
+        {section === "users" && <UsersSection />}
         {section === "security" && (
           <SecuritySection twoFactorEnabled={twoFactorEnabled} onTwoFactorChange={changeTwoFactor} />
         )}
