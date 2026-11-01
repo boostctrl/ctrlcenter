@@ -83,11 +83,11 @@ export default function TimeWeather({
               </p>
             </div>
           </div>
-          {showClock && <div className="hidden h-10 w-px bg-fg/10 @sm:block" />}
+          {showClock && <div className="hidden h-10 w-px bg-fg/10 @min-[22rem]:block" />}
         </>
       )}
       {showClock && (
-        <div className={paired ? "@sm:text-right" : ""}>
+        <div className={paired ? "@min-[22rem]:text-right" : ""}>
           <p
             className="text-2xl leading-tight font-semibold tabular-nums"
             suppressHydrationWarning
@@ -111,10 +111,16 @@ export default function TimeWeather({
   // its own padding. The parent card is a `@container`, so the row keys off the
   // card's own width: weather and clock sit at opposite ends when it's wide
   // enough, and stack vertically (divider hidden, clock left-aligned) when it
-  // isn't — narrow cells stack instead of clipping. When weather is on, the row
-  // links to the full forecast.
-  const row = `flex flex-col gap-3 px-6 py-4 @sm:flex-row @sm:items-center @sm:gap-5 ${
-    paired ? "@sm:justify-between" : "@sm:justify-center"
+  // isn't — narrow cells stack instead of clipping. Side by side from 22rem
+  // (#453): the stock span-8 card is 379px wide on a 1280px viewport (a
+  // 13-inch laptop at 250% scaling), where the old 24rem step stacked the
+  // clock under the weather for no reason. Between 22rem and 24rem the
+  // padding and gaps are a step tighter, so the widest content (100°F, 100%
+  // humidity, 12:55:13 PM) still fits, and the row may wrap rather than
+  // clip should a wider font push it past the edge. When weather is on, the
+  // row links to the full forecast.
+  const row = `flex flex-col gap-3 px-6 py-4 @min-[22rem]:flex-row @min-[22rem]:flex-wrap @min-[22rem]:items-center @min-[22rem]:gap-x-4 @min-[22rem]:gap-y-3 @min-[22rem]:px-5 @sm:gap-x-5 @sm:px-6 ${
+    paired ? "@min-[22rem]:justify-between" : "@min-[22rem]:justify-center"
   }`;
   return weatherEnabled ? (
     <Link

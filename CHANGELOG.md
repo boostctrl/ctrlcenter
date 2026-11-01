@@ -11,6 +11,15 @@ here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The header card keeps the clock beside the weather on a 13-inch
+  laptop.** On a 1280-pixel-wide window, a screen at 250% scaling, the
+  stock card is a few pixels under the width at which the two sat side by
+  side, so the clock dropped under the weather. The card now pairs them
+  from a narrower width, with slightly tighter spacing there, and never
+  clips either. (#453)
+
 ### Changed
 
 - **The corner menu offers the Admin portal and the Monitor to admins
