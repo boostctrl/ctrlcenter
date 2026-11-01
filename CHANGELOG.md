@@ -12,6 +12,14 @@ here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A private app shared with a member shows on a board upgraded from
+  2.x.** The upgrade split each apps widget into one hiding private apps and
+  a "Private Applications" one showing only them, and the second was left
+  off every page but an admin's. A member now gets it too, listing exactly
+  the private apps shared with them; a visitor still sees neither. (#451)
+
 ## [3.1.0-rc.1] - 2026-11-01
 
 ### Added

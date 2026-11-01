@@ -9,7 +9,7 @@ import { readPublicConfig } from "@/lib/api-auth";
 import { navPages, pickBoard } from "@/lib/nav";
 import { boardName, monitoredApps } from "@/lib/schema";
 import { loadHomeData } from "@/lib/widgets/load";
-import { shownToGuests } from "@/lib/widgets/integration-tiles";
+import { rowsFor } from "@/lib/board-rows";
 import { boardDefaultTheme } from "@/lib/board-theme";
 import { packKey, resolveThemeGallery } from "@/lib/theme";
 import BoardTheme from "@/components/BoardTheme";
@@ -46,20 +46,10 @@ export default async function BoardPage({
   // on show: the hidden rows, and the instances behind them (a notes card
   // placed only on a private board, say), never reach the page.
   const resolved = resolveLayout(board.layout.sections, config.widgets);
-  // Never for a guest: an apps widget showing only private apps (#299) has
-  // nothing for them, and an integration tile (#301) or API widget (#302) is
-  // admin-only unless set to "Everyone".
-  const adminOnly = new Set(
-    config.widgets
-      .filter(
-        (w) =>
-          (w.type === "apps" && w.filter.private === "only") ||
-          (w.type === "integration" && !shownToGuests(w)) ||
-          (w.type === "api" && w.visibility !== "public")
-      )
-      .map((w) => w.id)
-  );
-  const widgets = isAdmin ? resolved : resolved.filter((w) => !w.hidden && !adminOnly.has(w.id));
+  // The rows with something for this viewer (lib/board-rows.ts): a member
+  // gets the "Private Applications" widget when an app is shared with them
+  // (#451), a guest never does.
+  const widgets = rowsFor(resolved, config.widgets, apps, isAdmin);
   const onShow = new Set(widgets.map((w) => w.id));
   const data = await loadHomeData({
     settings,
