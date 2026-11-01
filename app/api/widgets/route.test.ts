@@ -101,3 +101,29 @@ describe("PUT /api/widgets with the admin's placeholders (#382)", () => {
     expect(stored?.type === "api" && stored.headers[0].value).toBe("Bearer t");
   });
 });
+
+describe("PUT /api/widgets with a patch (#396)", () => {
+  it("keeps an instance added elsewhere, applies edits by id, and drops a removed one's rows", async () => {
+    const a = { ...newInstance("notes", "p-a"), content: "a" };
+    const b = { ...newInstance("notes", "p-b"), content: "b" };
+    expect((await put([a, b])).status).toBe(200);
+    // The layout editor adds one meanwhile (POST), and places it.
+    const added = await (await route.POST(request("/api/widgets", { method: "POST", body: { type: "notes" }, session }))).json();
+    const { readConfigInternal, replaceBoards } = await import("@/lib/config");
+    const boards = (await readConfigInternal()).boards;
+    await replaceBoards(boards.map((bd, i) => ({
+      id: bd.id, name: bd.name, visibility: bd.visibility,
+      ...(i === 0 ? { layout: { sections: [{ widget: "p-b", span: 1 }, { widget: added.id, span: 1 }] } } : {}),
+    })));
+    // Settings → Widgets, from before the add: edits a, removes b.
+    const res = await put({ upsert: [{ ...a, content: "a2" }], remove: ["p-b"] });
+    expect(res.status).toBe(200);
+    const stored = (await readConfigInternal());
+    expect(stored.widgets.map((w) => w.id)).toEqual(["p-a", added.id]);
+    expect(stored.widgets[0].type === "notes" && stored.widgets[0].content).toBe("a2");
+    expect(stored.boards[0].layout.sections.map((r) => r.widget)).toEqual([added.id]);
+    // The caps still hold over the combined list.
+    const feeds = Array.from({ length: 9 }, (_, i) => ({ ...newInstance("feed", `f${i}`), urls: ["https://x/${i}"] }));
+    expect((await put({ upsert: feeds })).status).toBe(400);
+  });
+});

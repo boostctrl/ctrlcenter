@@ -1016,6 +1016,8 @@ describe("readConfigInternal stays off public surfaces", () => {
     "app/api/settings/route.ts",
     "app/api/widgets/route.ts",
     "app/api/widgets/[id]/route.ts",
+    // Admin-only board save: reads the stored list to apply a patch (#396).
+    "app/api/boards/route.ts",
     // Public, but their shared cache must hold every app; each filters per
     // response via visibleItems (the [id] detail route 404s non-visible ids).
     "app/api/status/route.ts",

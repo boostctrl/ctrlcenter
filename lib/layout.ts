@@ -206,3 +206,18 @@ export function toSections(widgets: readonly LayoutWidget[]): LayoutSectionRow[]
     return { widget: id, ...rest };
   });
 }
+
+// The layout editor's save for one board (#396): its rows, and of the
+// site-wide scale, gap and top gap only the ones that differ from what the
+// editor loaded. The editor used to send its snapshot of all three with
+// every board save, so switching boards inside the debounce of a Scale
+// change had the next board's editor write the old scale back.
+export function boardLayoutPatch<
+  L extends { sections: unknown; scale: number; gap: number; topGap: number },
+>(loaded: Pick<L, "scale" | "gap" | "topGap">, layout: L): Pick<L, "sections"> & Partial<Pick<L, "scale" | "gap" | "topGap">> {
+  const out: Pick<L, "sections"> & Partial<Pick<L, "scale" | "gap" | "topGap">> = { sections: layout.sections };
+  for (const key of ["scale", "gap", "topGap"] as const) {
+    if (layout[key] !== loaded[key]) out[key] = layout[key];
+  }
+  return out;
+}

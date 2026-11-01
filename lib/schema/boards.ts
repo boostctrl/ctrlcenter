@@ -3,6 +3,7 @@
 // `/b/<id>`. Widget instances are shared: a board's rows place instances from
 // the top-level `widgets` list by id, so one notes card can sit on two boards.
 import { z } from "zod";
+import { listPatchOf } from "./input";
 import { DEFAULT_SECTIONS } from "../layout";
 import { slugId } from "../slug";
 import { boardLayoutSchema, layoutRowInputSchema, MAX_BOARD_ROWS } from "./layout";
@@ -111,3 +112,10 @@ export const boardsUpdateSchema = z
     });
   });
 export type BoardsUpdate = z.infer<typeof boardsUpdateSchema>;
+
+// One board as the list PUT takes it.
+export const boardUpdateItemSchema = boardsUpdateSchema.element;
+// The patch form (#396): the boards this form touched, ids to drop, and the
+// order when it changed. Applied to the stored list, then held to the whole
+// list's rules (at least one board, at most MAX_BOARDS).
+export const boardsPatchSchema = listPatchOf(boardUpdateItemSchema);

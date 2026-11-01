@@ -91,3 +91,31 @@ describe("PUT /api/boards/<id>/layout", () => {
     expect(config.settings.layout).toMatchObject({ scale: 110, gap: 24 });
   });
 });
+
+describe("PUT /api/boards with a patch (#396)", () => {
+  it("touches only the boards named, so another tab's board and its visibility survive", async () => {
+    const current = (await stored()).boards.map(({ id, name, visibility }) => ({ id, name, visibility }));
+    const home = current[0].id;
+    // Tab B: a private board, and the home board set private.
+    expect(
+      (await put([...current.map((b) => (b.id === home ? { ...b, visibility: "private" } : b)), { id: "infra-396", name: "Infra 396", visibility: "private" }])).status
+    ).toBe(200);
+    // Tab A, from its page-load copy: renames the home board with a patch.
+    const res = await put({ upsert: [{ id: home, name: "Front", visibility: "private" }] });
+    expect(res.status).toBe(200);
+    const boards = (await stored()).boards;
+    expect(boards.map((b) => [b.id, b.name, b.visibility])).toEqual(
+      expect.arrayContaining([[home, "Front", "private"], ["infra-396", "Infra 396", "private"]])
+    );
+    // Remove and reorder, and the last board can't go.
+    expect((await put({ remove: ["infra-396"] })).status).toBe(200);
+    expect((await stored()).boards.some((b) => b.id === "infra-396")).toBe(false);
+    const ids = (await stored()).boards.map((b) => b.id);
+    if (ids.length > 1) {
+      expect((await put({ order: [...ids].reverse() })).status).toBe(200);
+      expect((await stored()).boards.map((b) => b.id)).toEqual([...ids].reverse());
+    }
+    expect((await put({ remove: (await stored()).boards.map((b) => b.id) })).status).toBe(400);
+    expect((await put({ upsert: "nope" })).status).toBe(400);
+  });
+});

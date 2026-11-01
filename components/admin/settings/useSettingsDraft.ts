@@ -20,6 +20,7 @@ import { useConfirm } from "../Confirm";
 import { useAutosave, type SaveOptions, type SaveState } from "../useAutosave";
 import { settingsPatch } from "../settingsPatch";
 import { saveBoards, saveIntegrations, saveSettingsPatch, saveWidgets } from "../settingsApi";
+import { diffList } from "@/lib/list-patch";
 import type { ServiceId } from "@/lib/services/ids";
 import { reorder } from "../useReorder";
 import { useKeyedRows } from "./useKeyedRows";
@@ -60,8 +61,17 @@ export function useSettingsDraft(
     saved.current = next;
   }, []);
   const settingsSave = useAutosave(settings, save);
+  // Each list goes out as what changed since its last successful save
+  // (#396), never as the whole page-load copy: an instance the layout editor
+  // added meanwhile, or an edit it made in place, isn't overwritten by an
+  // unrelated edit here. A failed save leaves the snapshot, so the change
+  // goes out again with the next one.
+  const savedWidgets = useRef<WidgetInstance[]>(widgets);
   const widgetsSave = useAutosave(widgets, async (next, opts) => {
-    await saveWidgets(next, { keepalive: opts?.keepalive });
+    const patch = diffList(savedWidgets.current, next);
+    if (!patch) return;
+    await saveWidgets(patch, { keepalive: opts?.keepalive });
+    savedWidgets.current = next;
   });
   // The boards (#298), with their own autosave to /api/boards. A board's rows
   // go out only when this form changed them since the last save, so it can't
@@ -74,27 +84,35 @@ export function useSettingsDraft(
     () => new Set(initialBoards.map((b) => b.id))
   );
   const boardsSave = useAutosave(boards, async (next, opts) => {
-    const before = new Map(savedBoards.current.map((b) => [b.id, b.layout]));
-    await saveBoards(
-      next.map(({ id, name, visibility, icon, theme, layout }) => ({
-        id,
-        name,
-        visibility,
-        // Sent every time ("" for none), so clearing one here sticks.
-        icon: icon ?? "",
-        theme: theme ?? "",
-        ...(JSON.stringify(before.get(id)) === JSON.stringify(layout)
-          ? {}
-          : { layout: { sections: layout.sections } }),
-      })),
-      { keepalive: opts?.keepalive }
+    // Each board as the API takes it, its layout only when this form changed
+    // it; the diff then keeps the boards this form didn't touch out of the
+    // save (#396).
+    const item = (b: Board, withLayout: boolean) => ({
+      id: b.id,
+      name: b.name,
+      visibility: b.visibility,
+      // Sent ("" for none) so clearing one here sticks.
+      icon: b.icon ?? "",
+      theme: b.theme ?? "",
+      ...(withLayout ? { layout: { sections: b.layout.sections } } : {}),
+    });
+    const before = new Map(savedBoards.current.map((b) => [b.id, b]));
+    const patch = diffList(
+      savedBoards.current.map((b) => item(b, false)),
+      next.map((b) => item(b, JSON.stringify(before.get(b.id)?.layout) !== JSON.stringify(b.layout)))
     );
+    if (!patch) return;
+    await saveBoards(patch, { keepalive: opts?.keepalive });
     savedBoards.current = next;
     setSavedBoardIds(new Set(next.map((b) => b.id)));
   });
   const [integrations, setIntegrations] = useState<Integration[]>(initialIntegrations);
+  const savedIntegrations = useRef<Integration[]>(initialIntegrations);
   const integrationsSave = useAutosave(integrations, async (next, opts) => {
-    await saveIntegrations(next, { keepalive: opts?.keepalive });
+    const patch = diffList(savedIntegrations.current, next);
+    if (!patch) return;
+    await saveIntegrations(patch, { keepalive: opts?.keepalive });
+    savedIntegrations.current = next;
   });
   // One status for the header: saving while any is, else the latest error.
   const saves = [settingsSave, widgetsSave, boardsSave, integrationsSave];

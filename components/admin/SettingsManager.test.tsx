@@ -1,3 +1,4 @@
+import type { ListPatch } from "@/lib/list-patch";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -24,7 +25,7 @@ const qb = (patch: Partial<Integration> = {}) =>
   integrationSchema.parse({ id: "qb", type: "qbittorrent", url: "http://q", username: "u", password: "p", ...patch });
 
 // The integration lists the autosave sent, oldest first.
-let integrationSaves: Integration[][];
+let integrationSaves: ListPatch<Integration>[];
 
 function renderSettings(twoFactorEnabled: boolean, integrations: Integration[]) {
   return render(
@@ -124,7 +125,8 @@ describe("Settings and two-factor authentication (#384)", () => {
     // The cleared draft goes out with actions off — no step-up, since turning
     // them off never needs one (app/api/integrations).
     await waitFor(() => expect(integrationSaves).toHaveLength(1), { timeout: 2000 });
-    expect(integrationSaves[0][0].allowActions).toBe(false);
+    // The list goes out as what changed (#396): the one integration, actions off.
+    expect(integrationSaves[0].upsert![0].allowActions).toBe(false);
 
     await user.click(section("Integrations"));
     expect(actionsSwitch().disabled).toBe(true);
@@ -133,6 +135,6 @@ describe("Settings and two-factor authentication (#384)", () => {
     // An unrelated edit afterwards still sends actions off.
     await user.type(screen.getByLabelText("Name"), "Seedbox");
     await waitFor(() => expect(integrationSaves).toHaveLength(2), { timeout: 2000 });
-    expect(integrationSaves[1][0]).toMatchObject({ name: "Seedbox", allowActions: false });
+    expect(integrationSaves[1].upsert![0]).toMatchObject({ name: "Seedbox", allowActions: false });
   });
 });

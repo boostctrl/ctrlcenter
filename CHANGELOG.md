@@ -28,6 +28,14 @@ here.
   included. The faces now come bundled with the source instead, so a build
   needs no network for them. Nothing changes for visitors: their browsers
   were already served the fonts from this site. (#412)
+- **Two admin tabs no longer overwrite each other's widgets, integrations and
+  boards.** Settings → Widgets, Settings → Integrations, Settings → Layout
+  and the layout editor's board menu saved their whole lists from the copy
+  loaded with the page, so a widget added in the layout editor was deleted
+  by the next unrelated edit in Settings, an in-place edit was reverted, and
+  a board renamed in one tab could delete a board another tab had just
+  created or set it back to public. Each form now saves only what it
+  changed. (#396)
 
 ### Security
 

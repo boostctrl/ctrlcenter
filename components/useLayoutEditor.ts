@@ -13,6 +13,7 @@ import {
   DEFAULT_GRID_GAP,
   DEFAULT_TOP_GAP,
   DEFAULT_SECTIONS,
+  boardLayoutPatch,
   resolveLayout,
   smallScreenTopGap,
   toSections,
@@ -33,12 +34,20 @@ export type EditableLayout = {
   topGap: number;
 };
 
-// Persist the board's rows (stored by instance id, #297) and the page-level
-// values to the board's layout endpoint (#298).
-async function saveLayout(boardId: string, layout: EditableLayout, opts?: SaveOptions): Promise<void> {
+// Persist the board's rows (stored by instance id, #297) to the board's
+// layout endpoint (#298), with the page-level values this editor changed
+// since it loaded (#396) — an unchanged scale isn't written back over one
+// another board's editor just saved.
+async function saveLayout(
+  boardId: string,
+  loaded: EditableLayout,
+  layout: EditableLayout,
+  opts?: SaveOptions
+): Promise<void> {
+  const patch = boardLayoutPatch(loaded, layout);
   await saveBoardLayout(
     boardId,
-    { ...layout, sections: toSections(layout.sections) },
+    { ...patch, sections: toSections(layout.sections) },
     { keepalive: opts?.keepalive }
   );
 }
@@ -96,11 +105,14 @@ export function useLayoutEditor({
   // sees the layout as it was when the gesture began, so it saves once the
   // gesture ends rather than partway through (#312).
   const [gestureStart, setGestureStart] = useState<EditableLayout | null>(null);
+  // What the page loaded with: the page-level values go out only when they
+  // differ from these (#396).
+  const loadedRef = useRef(initial);
   const { status: saveStatus, error: saveError } = useAutosave(
     gestureStart ?? layout,
     async (value, opts) => {
       if (!dirtyRef.current) return;
-      await saveLayout(boardId, value, opts);
+      await saveLayout(boardId, loadedRef.current, value, opts);
     }
   );
 

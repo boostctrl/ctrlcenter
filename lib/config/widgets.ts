@@ -10,9 +10,19 @@ import { mutate, readConfigInternal } from "./store";
 // Replace every widget instance. Layout rows naming an instance that's gone
 // are left in place and skipped when the layout resolves (lib/layout.ts), so
 // this never has to touch the layout and the two saves can't race.
-export async function replaceWidgets(widgets: WidgetInstance[]): Promise<WidgetInstance[]> {
+export async function replaceWidgets(
+  widgets: WidgetInstance[],
+  // Ids the save removed (#396): their rows come off every board, as a
+  // single removal's do (removeWidget), so no board keeps a row naming them.
+  removed: string[] = []
+): Promise<WidgetInstance[]> {
   return mutate((config) => {
     config.widgets = widgets;
+    if (removed.length > 0) {
+      const gone = new Set(removed);
+      for (const board of config.boards)
+        board.layout = { ...board.layout, sections: board.layout.sections.filter((r) => !gone.has(r.widget)) };
+    }
     return config.widgets;
   });
 }

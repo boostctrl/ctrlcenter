@@ -14,7 +14,7 @@
 // key; each type reads the fields its SERVICE_META.credentials names.
 import { z } from "zod";
 import { SERVICE_IDS } from "../services/ids";
-import { wholeOf } from "./input";
+import { wholeOf, listPatchOf } from "./input";
 
 const integrationId = z.string().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/);
 
@@ -86,3 +86,6 @@ export const integrationsUpdateSchema = z
       ids.add(i.id);
     });
   });
+
+// The patch form (#396): see widgetInstancesPatchSchema.
+export const integrationsPatchSchema = listPatchOf(wholeOf(integrationSchema));

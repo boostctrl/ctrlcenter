@@ -81,3 +81,18 @@ describe("PUT /api/integrations with the admin's placeholders (#382)", () => {
     expect((await readConfigInternal()).integrations.find((i) => i.id === "keep")).toMatchObject({ apiKey: "secret", enabled: false });
   });
 });
+
+describe("PUT /api/integrations with a patch (#396)", () => {
+  it("applies an edit by id and keeps an integration added in another tab", async () => {
+    expect((await put([sonarr("one")])).status).toBe(200);
+    const { readConfigInternal } = await import("@/lib/config");
+    // Another tab adds a second one.
+    expect((await put([sonarr("one"), sonarr("two")])).status).toBe(200);
+    // This tab, from before that: renames the first with a patch.
+    const res = await put({ upsert: [{ ...sonarr("one"), name: "Main" }] });
+    expect(res.status).toBe(200);
+    expect((await readConfigInternal()).integrations.map((i) => [i.id, i.name])).toEqual([["one", "Main"], ["two", ""]]);
+    expect((await put({ remove: ["two"], order: ["one"] })).status).toBe(200);
+    expect((await readConfigInternal()).integrations.map((i) => i.id)).toEqual(["one"]);
+  });
+});

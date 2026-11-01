@@ -8,7 +8,7 @@ import { z } from "zod";
 import { lenientArray } from "./shared";
 import { secretFields } from "./meta";
 import { WIDGET_DEFS, type WidgetDef } from "../widgets/defs";
-import { wholeOf } from "./input";
+import { wholeOf, listPatchOf } from "./input";
 import {
   calendarSchema,
   countdownSchema,
@@ -190,7 +190,9 @@ const httpOrBlank = (u: string) => u.trim() === "" || /^https?:\/\//i.test(u.tri
 export const widgetInstanceUpdateSchema = wholeOf(widgetInstanceSchema);
 
 // Admin input (PUT /api/widgets): the whole list, each instance complete, with
-// the input-only rules the stored shape can't state.
+// the input-only rules the stored shape can't state. The admin's forms send
+// the patch form instead (widgetInstancesPatchSchema, #396); the route
+// applies it to the stored list and validates the result with this one.
 export const widgetInstancesUpdateSchema = z
   .array(wholeOf(widgetInstanceSchema))
   .max(MAX_WIDGET_INSTANCES)
@@ -224,3 +226,5 @@ export const widgetInstancesUpdateSchema = z
 
 // Re-exported for the editors that build rows.
 export { systemStatsDiskSchema };
+
+export const widgetInstancesPatchSchema = listPatchOf(wholeOf(widgetInstanceSchema));

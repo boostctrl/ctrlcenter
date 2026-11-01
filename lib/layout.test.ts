@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveLayout, toSections, fillSpan, DEFAULT_SECTIONS } from "./layout";
+import { resolveLayout, toSections, fillSpan, DEFAULT_SECTIONS, boardLayoutPatch } from "./layout";
 import {
   settingsSchema,
   configSchema,
@@ -228,5 +228,18 @@ describe("layout schema", () => {
     ]) {
       expect(boardLayoutUpdateSchema.safeParse(bad).success).toBe(false);
     }
+  });
+});
+
+describe("boardLayoutPatch (#396)", () => {
+  it("sends the rows, and a page-level value only when the editor changed it", () => {
+    const loaded = { scale: 100, gap: 16, topGap: 24 };
+    const rows = [{ id: "n1", type: "notes", span: 2 }];
+    expect(boardLayoutPatch(loaded, { sections: rows, scale: 100, gap: 16, topGap: 24 })).toEqual({ sections: rows });
+    expect(boardLayoutPatch(loaded, { sections: rows, scale: 110, gap: 16, topGap: 0 })).toEqual({
+      sections: rows,
+      scale: 110,
+      topGap: 0,
+    });
   });
 });

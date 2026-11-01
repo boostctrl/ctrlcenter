@@ -6,6 +6,7 @@ import type {
 } from "@/lib/schema";
 import type { WidgetInstance } from "@/lib/schema";
 import type { WidgetEditContext } from "@/lib/config/widgets";
+import type { ListPatch } from "@/lib/list-patch";
 import { apiErrorMessage } from "./apiError";
 import { fetchWithReauth } from "./reauth";
 
@@ -50,20 +51,24 @@ export async function saveSettingsPatch(
   await putJson("/api/settings", patch, fallback, keepalive);
 }
 
-// Save the whole widget-instance list (#297). Throws like saveSettingsPatch.
+// Save what changed in the widget-instance list (#297, #396): the instances
+// this form touched, the ids it removed, the order when it changed. The
+// server applies it to the stored list. Throws like saveSettingsPatch.
 export async function saveWidgets(
-  widgets: unknown[],
+  patch: ListPatch<unknown>,
   { keepalive }: { keepalive?: boolean } = {}
 ): Promise<void> {
-  await putJson("/api/widgets", widgets, "Failed to save widgets", keepalive);
+  await putJson("/api/widgets", patch, "Failed to save widgets", keepalive);
 }
 
-// Save the board list (#298): names, order, visibility, and any layouts sent.
+// Save what changed in the board list (#298, #396): the boards this form
+// touched (names, visibility, icon, theme, and a layout when it changed),
+// the ids it removed, the order when it changed.
 export async function saveBoards(
-  boards: z.input<typeof boardsUpdateSchema>,
+  patch: ListPatch<z.input<typeof boardsUpdateSchema>[number]>,
   { keepalive }: { keepalive?: boolean } = {}
 ): Promise<void> {
-  await putJson("/api/boards", boards, "Failed to save boards", keepalive);
+  await putJson("/api/boards", patch, "Failed to save boards", keepalive);
 }
 
 // Save one board's arrangement from the layout editor, with the page-level
@@ -81,12 +86,12 @@ export async function saveBoardLayout(
   );
 }
 
-// Save the whole integration list (#300).
+// Save what changed in the integration list (#300, #396).
 export async function saveIntegrations(
-  integrations: unknown[],
+  patch: ListPatch<unknown>,
   { keepalive }: { keepalive?: boolean } = {}
 ): Promise<void> {
-  await putJson("/api/integrations", integrations, "Failed to save integrations", keepalive);
+  await putJson("/api/integrations", patch, "Failed to save integrations", keepalive);
 }
 
 // One widget edited in place from the layout editor (#303): the instance as

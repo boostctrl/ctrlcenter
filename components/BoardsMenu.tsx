@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { slugId } from "@/lib/slug";
 import { saveBoards } from "./admin/settingsApi";
 import { useConfirm } from "./admin/Confirm";
+import { diffList } from "@/lib/list-patch";
 import { buttonClasses } from "@/lib/buttons";
 
 export type EditorBoard = {
@@ -85,10 +86,12 @@ export default function BoardsMenu({
     setBusy(true);
     setError(null);
     try {
-      await saveBoards(
-        // The theme goes every time ("" for none), so clearing it sticks.
-        next.map(({ id, name, visibility, theme }) => ({ id, name, visibility, theme: theme ?? "" })),
-      );
+      // Only what this menu changed goes out (#396): one board's name,
+      // visibility or theme ("" for none, so clearing it sticks), a removal,
+      // or the order. A board another tab added meanwhile isn't touched.
+      const item = ({ id, name, visibility, theme }: EditorBoard) => ({ id, name, visibility, theme: theme ?? "" });
+      const patch = diffList(boards.map(item), next.map(item));
+      if (patch) await saveBoards(patch);
       if (then) then();
       else router.refresh();
     } catch (e) {

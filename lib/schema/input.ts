@@ -82,3 +82,14 @@ function patch(schema: z.ZodType): z.ZodType {
 
 export const wholeOf = <T extends z.ZodType>(schema: T) => whole(schema) as unknown as Whole<T>;
 export const patchOf = <T extends z.ZodType>(schema: T) => patch(schema) as unknown as Patch<T>;
+
+// A list PUT as what changed since the form's last save (#396): items to
+// replace or add by id, ids to drop, and the full id order when it changed.
+// The route applies it to the stored list (lib/list-patch.ts) and validates
+// the result with the whole-list schema, so the caps still hold.
+export const listPatchOf = <T extends z.ZodType>(item: T) =>
+  z.object({
+    upsert: z.array(item).max(500).optional(),
+    remove: z.array(z.string().min(1)).max(500).optional(),
+    order: z.array(z.string().min(1)).max(500).optional(),
+  });
