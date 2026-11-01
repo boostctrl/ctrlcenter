@@ -3,6 +3,7 @@ import {
   discoverFeedLinks,
   fetchFeeds,
   getFeedHealth,
+  MAX_FEED_ENTRIES,
   mergeFeeds,
   parseFeed,
   parseJsonFeed,
@@ -585,5 +586,118 @@ describe("discoverFeedLinks", () => {
       <link rel="alternate" type="application/rss+xml" href="/feed.xml">
       <link rel="alternate" type="application/rss+xml" href="/feed.xml">`;
     expect(discoverFeedLinks(html, base)).toEqual(["https://example.com/feed.xml"]);
+  });
+});
+
+describe("hostile input stays linear (#393)", () => {
+  // Each of these took seconds with the old regexes (7.6 s and 15.3 s for the
+  // first two) and would take minutes at the 3 MB body cap. The budgets are
+  // loose so a slow CI runner passes; a quadratic scan misses them by a mile.
+  const BUDGET_MS = 1500;
+  const timed = <T,>(fn: () => T): [T, number] => {
+    const start = performance.now();
+    const out = fn();
+    return [out, performance.now() - start];
+  };
+
+  it("parses eighty thousand unclosed <item> tags in well under a second", () => {
+    const [feed, ms] = timed(() => parseFeed("<rss>" + "<item>".repeat(80_000)));
+    expect(feed.items).toEqual([]);
+    expect(ms).toBeLessThan(BUDGET_MS);
+  });
+
+  it("discovers links in eighty thousand unclosed <link tags in well under a second", () => {
+    const [links, ms] = timed(() =>
+      discoverFeedLinks("<link ".repeat(80_000), "https://example.com/")
+    );
+    expect(links).toEqual([]);
+    expect(ms).toBeLessThan(BUDGET_MS);
+  });
+
+  it("strips a body of two hundred thousand stray '<' and unterminated CDATA in time", () => {
+    const xml =
+      "<rss><item><title>" +
+      "<".repeat(200_000) +
+      "<![CDATA[".repeat(50_000) +
+      "ok</title></item></rss>";
+    const [feed, ms] = timed(() => parseFeed(xml));
+    expect(feed.items).toHaveLength(1);
+    expect(ms).toBeLessThan(BUDGET_MS);
+  });
+
+  it("copes with an entry made of eighty thousand <link> tags", () => {
+    const xml =
+      "<feed><entry><title>t</title>" +
+      '<link rel="enclosure" href="https://x.example/a"/>'.repeat(80_000) +
+      "</entry></feed>";
+    const [feed, ms] = timed(() => parseFeed(xml));
+    expect(feed.items[0].url).toBe("https://x.example/a");
+    expect(ms).toBeLessThan(BUDGET_MS);
+  });
+
+  it("reads at most MAX_FEED_ENTRIES entries, newest first", () => {
+    const items = Array.from(
+      { length: MAX_FEED_ENTRIES + 50 },
+      (_, i) => `<item><title>n${i}</title></item>`
+    ).join("");
+    const feed = parseFeed(`<rss><channel><title>Big</title>${items}</channel></rss>`);
+    expect(feed.title).toBe("Big");
+    expect(feed.items).toHaveLength(MAX_FEED_ENTRIES);
+    expect(feed.items[0].title).toBe("n0");
+    const json = JSON.stringify({
+      version: "https://jsonfeed.org/version/1.1",
+      items: Array.from({ length: MAX_FEED_ENTRIES + 50 }, (_, i) => ({ title: `j${i}` })),
+    });
+    expect(parseJsonFeed(json)?.items).toHaveLength(MAX_FEED_ENTRIES);
+  });
+
+  it("still reads mixed case tags, self-closing links and an <item> with no close after a good one", () => {
+    const xml = `<RSS><CHANNEL><TITLE>Caps</TITLE>
+      <ITEM><TITLE>First</TITLE><LINK>https://x.example/1</LINK><PUBDATE>Tue, 30 Jun 2026 10:00:00 GMT</PUBDATE></ITEM>
+      <item><title>Unclosed`;
+    const feed = parseFeed(xml);
+    expect(feed.title).toBe("Caps");
+    expect(feed.items).toEqual([
+      {
+        title: "First",
+        url: "https://x.example/1",
+        publishedAt: Date.parse("Tue, 30 Jun 2026 10:00:00 GMT"),
+      },
+    ]);
+    expect(
+      discoverFeedLinks(
+        `<LINK REL="alternate" TYPE="application/rss+xml" HREF="/f.xml"/><link rel=alternate>`,
+        "https://example.com/"
+      )
+    ).toEqual(["https://example.com/f.xml"]);
+  });
+});
+
+describe("failed feeds are not refetched on every render (#393)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("remembers a cold-cache failure for a minute, then tries again", async () => {
+    const url = "https://neg-cache.example/feed";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("nope", { status: 500 }))
+      .mockResolvedValue(
+        new Response(
+          `<rss><channel><title>S</title><item><title>back</title></item></channel></rss>`
+        )
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const base = Date.now();
+    const now = vi.spyOn(Date, "now").mockReturnValue(base);
+    expect(await fetchFeeds([url], 5)).toBeNull();
+    now.mockReturnValue(base + 30_000);
+    expect(await fetchFeeds([url], 5)).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    now.mockReturnValue(base + 61_000);
+    expect((await fetchFeeds([url], 5))?.items[0].title).toBe("back");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

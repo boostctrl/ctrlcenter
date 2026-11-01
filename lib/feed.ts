@@ -37,6 +37,80 @@ export type Feed = {
 };
 
 // --- Pure parsing helpers (unit-tested) ---
+//
+// Everything below scans its input once with indexOf. The regexes it replaced
+// backtracked quadratically on crafted input (#393): eighty thousand unclosed
+// <item> tags took seconds, and three megabytes would have blocked the event
+// loop for minutes, stopping pages, status checks and alerts. The body cap
+// bounds bytes, not CPU, so the scanners have to be linear on their own.
+
+// A copy of `s` with only ASCII letters lowercased. It has the same length as
+// `s`, so a position found in it maps straight onto `s` (a full toLowerCase can
+// change the length of some non-ASCII characters).
+function asciiLower(s: string): string {
+  return s.replace(/[A-Z]+/g, (m) => m.toLowerCase());
+}
+
+function isSpace(code: number): boolean {
+  return code === 32 || (code >= 9 && code <= 13);
+}
+
+function isWordChar(code: number): boolean {
+  return (
+    (code >= 48 && code <= 57) ||
+    (code >= 65 && code <= 90) ||
+    (code >= 97 && code <= 122) ||
+    code === 95
+  );
+}
+
+// A tag's position: where its "<" is, and the index just past its ">".
+type Span = [start: number, end: number];
+
+// The next `<tag>` or `<tag …>` start tag at or after `from`, by position in
+// the lowercased copy. Null when there isn't a complete one: a start tag with
+// no ">" anywhere after it means no later one can have one either.
+function openTag(lower: string, tag: string, from: number): Span | null {
+  const needle = `<${tag}`;
+  for (let i = lower.indexOf(needle, from); i !== -1; i = lower.indexOf(needle, i + 1)) {
+    const next = lower.charCodeAt(i + needle.length);
+    if (next === 62 /* > */) return [i, i + needle.length + 1];
+    if (!isSpace(next)) continue;
+    const close = lower.indexOf(">", i + needle.length);
+    return close === -1 ? null : [i, close + 1];
+  }
+  return null;
+}
+
+// The next `</tag>` (whitespace allowed before the ">") at or after `from`.
+function closeTag(lower: string, tag: string, from: number): Span | null {
+  const needle = `</${tag}`;
+  for (let i = lower.indexOf(needle, from); i !== -1; i = lower.indexOf(needle, i + 1)) {
+    let j = i + needle.length;
+    while (isSpace(lower.charCodeAt(j))) j++;
+    if (lower.charCodeAt(j) === 62 /* > */) return [i, j + 1];
+  }
+  return null;
+}
+
+// The attribute text of each `<tag …>` start tag in document order (what
+// /<tag\b([^>]*)>/gi used to capture), handed to `visit` until it returns
+// true. Stops at a start tag with no ">" after it.
+function eachStartTag(
+  xml: string,
+  lower: string,
+  tag: string,
+  visit: (attrs: string) => boolean | void
+): void {
+  const needle = `<${tag}`;
+  for (let i = lower.indexOf(needle, 0); i !== -1; i = lower.indexOf(needle, i + 1)) {
+    if (isWordChar(lower.charCodeAt(i + needle.length))) continue;
+    const close = lower.indexOf(">", i + needle.length);
+    if (close === -1) return;
+    if (visit(xml.slice(i + needle.length, close))) return;
+    i = close;
+  }
+}
 
 // Decode the XML/HTML entities that actually appear in feed titles. Numeric
 // forms go first so an escaped entity like "&amp;#38;" ends up as the literal
@@ -54,19 +128,53 @@ function decodeEntities(s: string): string {
     .replace(/&apos;/g, "'");
 }
 
+// Each <![CDATA[ … ]]> replaced by its content; an unterminated one stays as
+// it is.
+function unwrapCdata(s: string): string {
+  const OPEN = "<![CDATA[";
+  const CLOSE = "]]>";
+  let out = "";
+  let pos = 0;
+  for (;;) {
+    const start = s.indexOf(OPEN, pos);
+    if (start === -1) break;
+    const end = s.indexOf(CLOSE, start + OPEN.length);
+    if (end === -1) break;
+    out += s.slice(pos, start) + s.slice(start + OPEN.length, end);
+    pos = end + CLOSE.length;
+  }
+  return pos === 0 ? s : out + s.slice(pos);
+}
+
+// Every "<…>" run dropped; a "<" with no ">" after it stays as text.
+function stripTags(s: string): string {
+  let out = "";
+  let pos = 0;
+  for (;;) {
+    const lt = s.indexOf("<", pos);
+    if (lt === -1) break;
+    const gt = s.indexOf(">", lt + 1);
+    if (gt === -1) break;
+    out += s.slice(pos, lt);
+    pos = gt + 1;
+  }
+  return pos === 0 ? s : out + s.slice(pos);
+}
+
 // The display text of an XML fragment: CDATA unwrapped, tags stripped,
 // entities decoded, whitespace collapsed.
 function textContent(fragment: string): string {
-  const unwrapped = fragment.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1");
-  return decodeEntities(unwrapped.replace(/<[^>]*>/g, "")).replace(/\s+/g, " ").trim();
+  return decodeEntities(stripTags(unwrapCdata(fragment))).replace(/\s+/g, " ").trim();
 }
 
-// The inner text of the first <tag>…</tag> in `xml` (any attributes, any
-// namespace prefix on the CLOSING match handled by the non-greedy body).
-function firstTag(xml: string, tag: string): string | null {
-  const re = new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}\\s*>`, "i");
-  const m = re.exec(xml);
-  return m ? m[1] : null;
+// The inner text of the first <tag>…</tag> in `xml` (any attributes, tag name
+// matched case-insensitively), or null. `lower` is asciiLower(xml).
+function firstTag(xml: string, lower: string, tag: string): string | null {
+  const name = tag.toLowerCase();
+  const open = openTag(lower, name, 0);
+  if (!open) return null;
+  const close = closeTag(lower, name, open[1]);
+  return close ? xml.slice(open[1], close[0]) : null;
 }
 
 function httpOnly(url: string): string {
@@ -74,19 +182,25 @@ function httpOnly(url: string): string {
   return /^https?:\/\//i.test(trimmed) ? trimmed : "";
 }
 
+function hrefOf(attrs: string): string {
+  const m = /href\s*=\s*["']([^"']+)["']/i.exec(attrs);
+  return m ? decodeEntities(m[1]) : "";
+}
+
 // An Atom entry's link: prefer rel="alternate" (or no rel), fall back to the
 // first link with an href.
-function atomLink(entry: string): string {
-  const links = [...entry.matchAll(/<link\b([^>]*)>/gi)].map((m) => m[1]);
-  const hrefOf = (attrs: string): string => {
-    const m = /href\s*=\s*["']([^"']+)["']/i.exec(attrs);
-    return m ? decodeEntities(m[1]) : "";
-  };
-  const alternate = links.find((attrs) => {
+function atomLink(entry: string, entryLower: string): string {
+  let first: string | null = null;
+  let alternate: string | null = null;
+  eachStartTag(entry, entryLower, "link", (attrs) => {
+    if (first === null) first = attrs;
     const rel = /rel\s*=\s*["']([^"']+)["']/i.exec(attrs)?.[1];
-    return !rel || rel === "alternate";
+    if (!rel || rel === "alternate") {
+      alternate = attrs;
+      return true;
+    }
   });
-  return httpOnly(hrefOf(alternate ?? links[0] ?? ""));
+  return httpOnly(hrefOf(alternate ?? first ?? ""));
 }
 
 function parseDate(raw: string | null): number | null {
@@ -109,36 +223,63 @@ function clipSummary(text: string): string {
   return `${clipped.trimEnd()}…`;
 }
 
+// How many entries a parse reads before stopping. Feeds run newest-first and
+// a card shows at most a couple of dozen items, so the rest of a huge feed is
+// never looked at, let alone kept. Exported for the test.
+export const MAX_FEED_ENTRIES = 200;
+
 // Parse an RSS 2.0 or Atom document into a Feed. Entries missing a title are
 // dropped (there'd be nothing to show); order is preserved (feeds put newest
 // first — re-sorting would misorder feeds without dates).
 export function parseFeed(xml: string): Feed {
-  const entryRe = /<(item|entry)(?:\s[^>]*)?>([\s\S]*?)<\/\1\s*>/gi;
+  const lower = asciiLower(xml);
   const items: FeedItem[] = [];
   let firstEntryIndex = xml.length;
-  for (const m of xml.matchAll(entryRe)) {
-    const at = m.index ?? 0;
-    if (at < firstEntryIndex) firstEntryIndex = at;
-    const body = m[2];
-    const title = textContent(firstTag(body, "title") ?? "");
+  // One forward scan for each entry tag, so a feed of one kind never rescans
+  // for the other: the next <item> and <entry> are looked up again only once
+  // the parse has moved past them.
+  let nextItem = openTag(lower, "item", 0);
+  let nextEntry = openTag(lower, "entry", 0);
+  let pos = 0;
+  let read = 0;
+  while (read < MAX_FEED_ENTRIES) {
+    if (nextItem && nextItem[0] < pos) nextItem = openTag(lower, "item", pos);
+    if (nextEntry && nextEntry[0] < pos) nextEntry = openTag(lower, "entry", pos);
+    const isAtom = !nextItem || (nextEntry !== null && nextEntry[0] < nextItem[0]);
+    const open = isAtom ? nextEntry : nextItem;
+    if (!open) break;
+    const tag = isAtom ? "entry" : "item";
+    const close = closeTag(lower, tag, open[1]);
+    if (!close) {
+      // No complete element of this kind remains; the other kind may still
+      // have some.
+      if (isAtom) nextEntry = null;
+      else nextItem = null;
+      continue;
+    }
+    read++;
+    if (open[0] < firstEntryIndex) firstEntryIndex = open[0];
+    const body = xml.slice(open[1], close[0]);
+    const bodyLower = lower.slice(open[1], close[0]);
+    pos = close[1];
+    const title = textContent(firstTag(body, bodyLower, "title") ?? "");
     if (!title) continue;
-    const isAtom = m[1].toLowerCase() === "entry";
     const url = isAtom
-      ? atomLink(body)
-      : httpOnly(textContent(firstTag(body, "link") ?? ""));
+      ? atomLink(body, bodyLower)
+      : httpOnly(textContent(firstTag(body, bodyLower, "link") ?? ""));
     const publishedAt =
-      parseDate(firstTag(body, "pubDate")) ??
-      parseDate(firstTag(body, "published")) ??
-      parseDate(firstTag(body, "updated")) ??
-      parseDate(firstTag(body, "dc:date"));
+      parseDate(firstTag(body, bodyLower, "pubDate")) ??
+      parseDate(firstTag(body, bodyLower, "published")) ??
+      parseDate(firstTag(body, bodyLower, "updated")) ??
+      parseDate(firstTag(body, bodyLower, "dc:date"));
     // The entry body: <description> (RSS) / <summary>, else <content> (Atom),
     // reduced to clipped plain text by the same textContent pipeline as the
     // title — the no-HTML guarantee holds for summaries too.
     const summary = clipSummary(
       textContent(
         (isAtom
-          ? firstTag(body, "summary") ?? firstTag(body, "content")
-          : firstTag(body, "description")) ?? ""
+          ? firstTag(body, bodyLower, "summary") ?? firstTag(body, bodyLower, "content")
+          : firstTag(body, bodyLower, "description")) ?? ""
       )
     );
     items.push(
@@ -149,8 +290,9 @@ export function parseFeed(xml: string): Feed {
   }
   // The feed's own title: the first <title> that appears before any entry
   // (entries have titles too, so position matters).
-  const head = xml.slice(0, firstEntryIndex);
-  const title = textContent(firstTag(head, "title") ?? "");
+  const title = textContent(
+    firstTag(xml.slice(0, firstEntryIndex), lower.slice(0, firstEntryIndex), "title") ?? ""
+  );
   return { title, items };
 }
 
@@ -179,7 +321,8 @@ export function parseJsonFeed(body: string): Feed | null {
   const plain = (v: unknown): string =>
     typeof v === "string" ? v.replace(/\s+/g, " ").trim() : "";
   const items: FeedItem[] = [];
-  for (const raw of Array.isArray(d.items) ? d.items : []) {
+  const list = Array.isArray(d.items) ? d.items.slice(0, MAX_FEED_ENTRIES) : [];
+  for (const raw of list) {
     if (typeof raw !== "object" || raw === null) continue;
     const it = raw as {
       title?: unknown;
@@ -222,27 +365,28 @@ const FEED_LINK_TYPES = /application\/(rss\+xml|atom\+xml|feed\+json)/i;
 export function discoverFeedLinks(html: string, baseUrl: string): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
-  for (const m of html.matchAll(/<link\b([^>]*?)\/?>/gi)) {
-    const attrs = m[1];
+  eachStartTag(html, asciiLower(html), "link", (raw) => {
+    // A self-closing tag's "/" is not an attribute.
+    const attrs = raw.endsWith("/") ? raw.slice(0, -1) : raw;
     const type = /type\s*=\s*["']([^"']+)["']/i.exec(attrs)?.[1] ?? "";
-    if (!FEED_LINK_TYPES.test(type)) continue;
+    if (!FEED_LINK_TYPES.test(type)) return;
     // Autodiscovery links are rel="alternate"; tolerate a missing rel but skip
     // an unrelated one (e.g. an Atom service document's rel="edit").
     const rel = /rel\s*=\s*["']([^"']*)["']/i.exec(attrs)?.[1] ?? "";
-    if (rel && !/\balternate\b/i.test(rel)) continue;
+    if (rel && !/\balternate\b/i.test(rel)) return;
     const href = /href\s*=\s*["']([^"']+)["']/i.exec(attrs)?.[1];
-    if (!href) continue;
+    if (!href) return;
     let resolved: string;
     try {
       resolved = new URL(decodeEntities(href), baseUrl).href;
     } catch {
-      continue;
+      return;
     }
-    if (!/^https?:\/\//i.test(resolved) || seen.has(resolved)) continue;
+    if (!/^https?:\/\//i.test(resolved) || seen.has(resolved)) return;
     seen.add(resolved);
     out.push(resolved);
-    if (out.length >= MAX_FEED_URLS) break;
-  }
+    return out.length >= MAX_FEED_URLS;
+  });
   return out;
 }
 
@@ -277,6 +421,16 @@ export type FeedHealth = {
 };
 
 const feeds = swrCache<FeedCacheValue>("feed", FEED_CACHE_TTL_MS);
+// When a URL's cold load fails, the next render doesn't fetch it again: the
+// failure is remembered for a minute (#393), so a feed that is down or
+// unreadable costs one download a minute instead of one per page view. Only
+// the cold path looks here; a URL with a cached parse refreshes in the
+// background anyway.
+const FEED_FAILURE_TTL_MS = 60_000;
+const feedFailures = globalSingleton(
+  "__ctrlcenterFeedFailures",
+  () => new Map<string, number>()
+);
 const feedHealthMap = globalSingleton(
   "__ctrlcenterFeedHealth",
   () => new Map<string, FeedHealth>()
@@ -357,6 +511,7 @@ async function loadFeed(
   const at = Date.now();
   if (result.notModified) {
     if (!prev) return undefined;
+    feedFailures.delete(target);
     feedHealthMap.set(target, {
       ok: true,
       count: prev.value.feed.items.length,
@@ -365,6 +520,7 @@ async function loadFeed(
     return prev.value;
   }
   if (result.feed && result.feed.items.length > 0) {
+    feedFailures.delete(target);
     feedHealthMap.set(target, { ok: true, count: result.feed.items.length, at });
     return {
       feed: result.feed,
@@ -377,6 +533,7 @@ async function loadFeed(
     error: result.error ?? "Unreadable feed",
     at,
   });
+  feedFailures.set(target, at);
   return undefined;
 }
 
@@ -389,6 +546,10 @@ async function loadFeed(
 async function fetchOneFeed(url: string, cap: number): Promise<Feed | null> {
   const target = url.trim();
   if (!/^https?:\/\//i.test(target)) return null;
+  if (!feeds.peek(target)) {
+    const failedAt = feedFailures.get(target);
+    if (failedAt !== undefined && Date.now() - failedAt < FEED_FAILURE_TTL_MS) return null;
+  }
   const feed = (await feeds.get(target, (prev) => loadFeed(target, prev)))
     ?.feed;
   if (!feed) return null;

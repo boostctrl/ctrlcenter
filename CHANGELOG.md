@@ -22,6 +22,13 @@ here.
   so a dependency audit of it comes back clean. nodemailer's address-parser
   fixes and zod's memory-use fix come along, with the routine minor updates.
   (#422)
+- **A hostile or broken RSS feed can no longer stall the server.** The feed
+  reader's tag matching backtracked badly on crafted input: a feed of eighty
+  thousand unclosed `<item>` tags took seconds to give up on, and one at the
+  3 MB size cap would have frozen every page, status check and alert for
+  minutes. Feeds, and the web pages checked for feed links, are now scanned
+  in a single pass, a parse stops after 200 entries, and a feed that fails to
+  load isn't fetched again for a minute. (#393)
 
 ## [3.0.0] - 2026-10-16
 
