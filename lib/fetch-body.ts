@@ -22,14 +22,19 @@ export async function readCapped(
   return bytes === null ? null : new TextDecoder().decode(bytes);
 }
 
-// The same capped read, as the raw bytes, for a body that isn't text (the
-// Portainer log tail's framed Docker stream, #402): an empty Buffer for no
-// body, null over the cap, as with readCapped.
-export async function readCappedBytes(
+// Stream a response body, chunk by chunk, into `sink`, up to `max` bytes in
+// total: true once the body has ended, false when it ran over the cap (the
+// read is cancelled, so the rest is never pulled). readCappedBytes collects
+// the chunks for the callers that need the whole body; the Portainer log
+// tail demuxes its framed Docker stream as it arrives and keeps only a
+// window of the end (#427), so for it the cap bounds what is read, not what
+// is held.
+export async function streamCapped(
   res: Response,
   max: number,
+  sink: (chunk: Uint8Array) => void,
   { trustContentLength = true }: { trustContentLength?: boolean } = {}
-): Promise<Buffer | null> {
+): Promise<boolean> {
   const declared = Number(res.headers.get("content-length"));
   if (trustContentLength && Number.isFinite(declared) && declared > max) {
     log.warn("readCapped: declared content-length over cap", {
@@ -38,18 +43,17 @@ export async function readCappedBytes(
       declared,
       max,
     });
-    return null;
+    return false;
   }
   const reader = res.body?.getReader();
-  // No body stream — an empty response, not an oversized one. Return an empty
-  // body ("" once decoded) so the caller surfaces it as a parse/validation
+  // No body stream — an empty response, not an oversized one: nothing reaches
+  // the sink, and the caller surfaces the empty body as a parse/validation
   // error (or an empty result), never as a misleading "too large".
-  if (!reader) return Buffer.alloc(0);
-  const chunks: Uint8Array[] = [];
+  if (!reader) return true;
   let total = 0;
   for (;;) {
     const { done, value } = await reader.read();
-    if (done) break;
+    if (done) return true;
     if (!value) continue;
     total += value.length;
     if (total > max) {
@@ -59,10 +63,22 @@ export async function readCappedBytes(
         status: res.status,
         overBytes: max,
       });
-      return null;
+      return false;
     }
-    chunks.push(value);
+    sink(value);
   }
+}
+
+// The same capped read, as the raw bytes, for a body that isn't text: an
+// empty Buffer for no body, null over the cap, as with readCapped.
+export async function readCappedBytes(
+  res: Response,
+  max: number,
+  opts: { trustContentLength?: boolean } = {}
+): Promise<Buffer | null> {
+  const chunks: Uint8Array[] = [];
+  const complete = await streamCapped(res, max, (chunk) => chunks.push(chunk), opts);
+  if (!complete) return null;
   if (chunks.length === 1) {
     const one = chunks[0];
     return Buffer.from(one.buffer, one.byteOffset, one.byteLength);

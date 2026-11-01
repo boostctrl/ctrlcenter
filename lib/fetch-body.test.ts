@@ -1,7 +1,7 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
-import { fetchWithTimeout, timeoutSignal } from "./fetch-body";
+import { fetchWithTimeout, readCappedBytes, streamCapped, timeoutSignal } from "./fetch-body";
 import { errorReason } from "./log";
 
 // A local server that sends headers and one chunk, then never finishes — so a
@@ -57,5 +57,44 @@ describe("fetchWithTimeout", () => {
     controller.abort();
     const err = await pending.catch((e) => e);
     expect(err.name).toBe("AbortError");
+  });
+});
+
+describe("streamCapped", () => {
+  // A body of `pieces`, one per read, counting how many were pulled.
+  function body(pieces: Uint8Array[]) {
+    let pulled = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        const piece = pieces[pulled++];
+        if (piece === undefined) controller.close();
+        else controller.enqueue(piece);
+      },
+    });
+    return { res: new Response(stream), pulled: () => pulled };
+  }
+
+  it("hands every chunk to the sink in order and reports a complete body", async () => {
+    const { res } = body([new Uint8Array([1, 2]), new Uint8Array([3])]);
+    const seen: number[] = [];
+    expect(await streamCapped(res, 10, (c) => seen.push(...c))).toBe(true);
+    expect(seen).toEqual([1, 2, 3]);
+  });
+
+  it("stops at the cap, pulls no more, and reports an incomplete body", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const { res, pulled } = body(Array.from({ length: 6 }, () => new Uint8Array(4)));
+    let sunk = 0;
+    expect(await streamCapped(res, 10, (c) => (sunk += c.length))).toBe(false);
+    // The third chunk tips it (12 > 10) and is not handed on.
+    expect(sunk).toBe(8);
+    expect(pulled()).toBeLessThanOrEqual(4);
+    expect(warn).toHaveBeenCalledOnce();
+    warn.mockRestore();
+  });
+
+  it("treats a body-less response as empty, not too large", async () => {
+    expect(await streamCapped(new Response(null), 10, () => undefined)).toBe(true);
+    expect(await readCappedBytes(new Response(null), 10)).toEqual(Buffer.alloc(0));
   });
 });

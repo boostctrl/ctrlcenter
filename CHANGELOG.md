@@ -26,6 +26,15 @@ here.
 
 ### Fixed
 
+- **A huge Portainer log tail shows its end instead of "Response too large".**
+  A container whose last 200 log lines ran past 4 MB — one writing enormous
+  lines — was refused outright since 3.0.1, where it used to show the last
+  256 KB. The tail is now read as it streams and only its last 256 KB are
+  kept, so the end of any tail shows, however much the container writes, and
+  the app never holds more than that in memory. A tail still running past
+  32 MB is refused as before, so a stream that never ends can't hold the
+  request. (#427)
+
 - **A backup exported without secrets keeps the inbound webhooks'
   Application URLs and subject prefix.** The whole inbound-webhook section
   counted as secret, so an export without secrets blanked each service's

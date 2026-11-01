@@ -10,7 +10,6 @@
 
 import {
   ServiceError,
-  SERVICE_MAX_BYTES,
   serviceBase,
   serviceRequest,
   serviceFetch,
@@ -19,7 +18,7 @@ import {
   runProbe,
   type ProbeResult,
 } from "./http";
-import { readCappedBytes } from "../fetch-body";
+import { streamCapped } from "../fetch-body";
 import { log, hostOf, errorReason } from "../log";
 
 export type PortainerConfig = { url: string; apiKey: string };
@@ -159,10 +158,22 @@ export const CONTAINER_ID_PATTERN = /^(?:[0-9a-f]{12}|[0-9a-f]{64})$/;
 // hundreds of containers, and the card is a control surface, not an inventory.
 export const PORTAINER_CONTAINER_CAP = 100;
 
-// How much log tail to pull and how much to keep. tail bounds it at the source;
-// the byte cap is a backstop against a single enormous line.
+// How much log tail to pull and how much to keep. `tail` bounds the line
+// count at the source, not the bytes: a container writing enormous lines can
+// answer with far more than the window, so the body is demuxed as it streams
+// and only the last PORTAINER_LOG_MAX_BYTES of text are held (#427) — memory
+// stays flat whatever the container writes, and a huge tail still shows its
+// end. The window bounds what is held, not what is read, so the read itself
+// has a hard cap too: PORTAINER_LOG_READ_MAX_BYTES on the raw bytes pulled,
+// past which the tail is refused as "Response too large" like any oversized
+// service response. Without it a body that never ends (a proxy that ignores
+// `tail`, or streams as if `follow=1`) would hold the request, pulling bytes
+// the whole time, until the service timeout cut it off. 32 MiB is eight times
+// the service body cap and over a hundred times the window; a 200-line tail
+// past it averages 160 KiB a line.
 export const PORTAINER_LOG_TAIL = 200;
 export const PORTAINER_LOG_MAX_BYTES = 256 * 1024;
+export const PORTAINER_LOG_READ_MAX_BYTES = 32 * 1024 * 1024;
 
 type RawContainer = {
   Id?: string;
@@ -227,34 +238,114 @@ export function restartContainer(cfg: PortainerConfig, endpointId: number, id: s
 }
 
 // Docker multiplexes a non-TTY container's logs: each chunk is framed with an
-// 8-byte header [stream(1), 0, 0, 0, size(4, big-endian)]. Walk the frames and
-// concatenate their payloads. A TTY container streams raw text with no frames,
-// so a header that isn't a valid frame (stream byte > 2 or the reserved bytes
-// non-zero) means the rest is raw — return it verbatim. Exported for testing.
-export function demuxDockerLog(buf: Buffer): string {
-  const out: Buffer[] = [];
-  let i = 0;
-  while (i + 8 <= buf.length) {
-    const stream = buf[i];
-    if (stream > 2 || buf[i + 1] !== 0 || buf[i + 2] !== 0 || buf[i + 3] !== 0) {
-      // Not framed (a TTY container, or unexpected data) — the rest is raw.
-      out.push(buf.subarray(i));
-      return Buffer.concat(out).toString("utf8");
-    }
-    const size = buf.readUInt32BE(i + 4);
-    const end = i + 8 + size;
-    out.push(buf.subarray(i + 8, Math.min(end, buf.length)));
-    i = end;
+// 8-byte header [stream(1), 0, 0, 0, size(4, big-endian)]. This walks the
+// frames as the body streams in — a frame, or its header, can straddle two
+// chunks — and keeps the last `windowBytes` of their payloads in a ring
+// buffer, so what is held is the window plus the chunk in hand whatever the
+// body's size (#427). The window applies to the demuxed text, never to the
+// raw bytes: cutting those would land mid-frame, and a misaligned header
+// would bail to raw with stray header bytes at line starts (#218). A TTY
+// container streams raw text with no frames, so a header that isn't a valid
+// frame (stream byte > 2 or the reserved bytes non-zero) means the rest is
+// raw and goes into the window verbatim. Exported for testing.
+export class DockerLogTail {
+  private readonly ring: Buffer;
+  // Next write offset into the ring, and how much of the ring holds text.
+  private pos = 0;
+  private filled = 0;
+  // Whether text has fallen out of the window (the start may then be
+  // mid-character).
+  private dropped = false;
+  private raw = false;
+  // The header of the frame being started, as much of it as has arrived.
+  private readonly header = Buffer.alloc(8);
+  private headerLen = 0;
+  // Payload bytes still to come for the current frame.
+  private remaining = 0;
+
+  constructor(private readonly windowBytes: number = PORTAINER_LOG_MAX_BYTES) {
+    this.ring = Buffer.allocUnsafe(windowBytes);
   }
-  // A trailing run shorter than a full header is raw tail; keep it.
-  if (i < buf.length) out.push(buf.subarray(i));
-  return Buffer.concat(out).toString("utf8");
+
+  push(chunk: Uint8Array): void {
+    let i = 0;
+    while (i < chunk.length) {
+      if (this.raw) {
+        this.keep(chunk.subarray(i));
+        return;
+      }
+      if (this.remaining > 0) {
+        const n = Math.min(this.remaining, chunk.length - i);
+        this.keep(chunk.subarray(i, i + n));
+        i += n;
+        this.remaining -= n;
+        continue;
+      }
+      // At a frame boundary: gather the header, which may arrive in pieces.
+      const take = Math.min(8 - this.headerLen, chunk.length - i);
+      this.header.set(chunk.subarray(i, i + take), this.headerLen);
+      this.headerLen += take;
+      i += take;
+      if (this.headerLen < 8) return;
+      this.headerLen = 0;
+      const h = this.header;
+      if (h[0] > 2 || h[1] !== 0 || h[2] !== 0 || h[3] !== 0) {
+        // Not framed (a TTY container, or unexpected data) — the rest is raw,
+        // these eight bytes included.
+        this.raw = true;
+        this.keep(h);
+        continue;
+      }
+      this.remaining = h.readUInt32BE(4);
+    }
+  }
+
+  // The window's text, once the body has ended. A header cut short by the
+  // end is raw tail and kept; a frame cut short just ends early.
+  text(): string {
+    if (this.headerLen > 0) {
+      this.keep(this.header.subarray(0, this.headerLen));
+      this.headerLen = 0;
+    }
+    let out =
+      this.filled < this.windowBytes
+        ? this.ring.subarray(0, this.filled)
+        : Buffer.concat([this.ring.subarray(this.pos), this.ring.subarray(0, this.pos)]);
+    // Dropping text can cut a multi-byte character; skip what's left of it
+    // (its continuation bytes) so the text starts whole, not with U+FFFD.
+    if (this.dropped) {
+      let skip = 0;
+      while (skip < out.length && skip < 3 && (out[skip] & 0xc0) === 0x80) skip++;
+      out = out.subarray(skip);
+    }
+    return out.toString("utf8");
+  }
+
+  // Append text to the ring, letting the oldest fall out past the window.
+  private keep(p: Uint8Array): void {
+    const w = this.windowBytes;
+    if (p.length >= w) {
+      this.ring.set(p.subarray(p.length - w));
+      if (this.filled > 0 || p.length > w) this.dropped = true;
+      this.pos = 0;
+      this.filled = w;
+      return;
+    }
+    const first = Math.min(p.length, w - this.pos);
+    this.ring.set(p.subarray(0, first), this.pos);
+    if (first < p.length) this.ring.set(p.subarray(first), 0);
+    this.pos = (this.pos + p.length) % w;
+    if (this.filled + p.length > w) this.dropped = true;
+    this.filled = Math.min(w, this.filled + p.length);
+  }
 }
 
 // A read-only tail of one container's logs. Reads raw bytes (not the utf8 text
 // serviceRequest yields) so the multiplexed frame headers survive to be
-// demuxed, timeout-bounded, and capped. No exec, no console — logs only. The
-// id is encoded for the same reason as containerCommand's (#379).
+// demuxed, under the same timeout as every service read (serviceFetch's
+// signal covers the body), and bounded as PORTAINER_LOG_READ_MAX_BYTES
+// describes. No exec, no console — logs only. The id is encoded for the same
+// reason as containerCommand's (#379).
 export async function containerLogs(
   cfg: PortainerConfig,
   endpointId: number,
@@ -268,21 +359,19 @@ export async function containerLogs(
   try {
     const res = await serviceFetch(url, { headers: { "X-API-Key": cfg.apiKey } });
     throwForStatus(res, KEY_ERRORS);
-    // Read the body as bytes, capped while it streams, at the module's limit
-    // for any service response (#402). `tail=PORTAINER_LOG_TAIL` bounds the
-    // line count at the source, not the bytes, and the text cap below used to
-    // apply only once an uncapped arrayBuffer() had the whole body in memory.
-    // A body over the limit is refused, never sliced: capping the raw bytes
-    // by truncation would cut mid-frame, so demuxDockerLog would hit a
-    // misaligned header, bail to raw, and leave stray header bytes at line
-    // starts (#218).
-    const bytes = await readCappedBytes(res, SERVICE_MAX_BYTES, { trustContentLength: false });
-    if (bytes === null) throw new ServiceError("Response too large");
-    // Demux the whole framed body first, THEN cap the decoded text.
-    const text = demuxDockerLog(bytes);
-    return text.length > PORTAINER_LOG_MAX_BYTES
-      ? text.slice(text.length - PORTAINER_LOG_MAX_BYTES)
-      : text;
+    // Demux the body as it streams, keeping the last PORTAINER_LOG_MAX_BYTES
+    // of text (#427). Under #402 the whole body was read first, under the
+    // service body cap, so a tail past 4 MB was refused outright where it
+    // used to show its end; now only the window is ever held.
+    const tail = new DockerLogTail(PORTAINER_LOG_MAX_BYTES);
+    const complete = await streamCapped(
+      res,
+      PORTAINER_LOG_READ_MAX_BYTES,
+      (chunk) => tail.push(chunk),
+      { trustContentLength: false }
+    );
+    if (!complete) throw new ServiceError("Response too large");
+    return tail.text();
   } catch (e) {
     if (e instanceof ServiceError) throw e;
     log.warn("portainer logs fetch error", {
