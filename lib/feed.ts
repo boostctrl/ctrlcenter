@@ -112,15 +112,21 @@ function eachStartTag(
   }
 }
 
+// A numeric character reference as text: U+FFFD for one that names no
+// character (past U+10FFFF, a lone surrogate, or NUL), which
+// String.fromCodePoint would throw on and so fail the whole feed (#460).
+function charFromCode(n: number): string {
+  const valid = Number.isInteger(n) && n > 0 && n <= 0x10ffff && !(n >= 0xd800 && n <= 0xdfff);
+  return valid ? String.fromCodePoint(n) : "\uFFFD";
+}
+
 // Decode the XML/HTML entities that actually appear in feed titles. Numeric
 // forms go first so an escaped entity like "&amp;#38;" ends up as the literal
 // "&#38;" instead of being decoded twice.
 function decodeEntities(s: string): string {
   return s
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) =>
-      String.fromCodePoint(parseInt(hex, 16))
-    )
-    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(Number(dec)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => charFromCode(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => charFromCode(Number(dec)))
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")

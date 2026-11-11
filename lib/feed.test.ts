@@ -106,6 +106,19 @@ describe("parseFeed", () => {
     expect(feed.items[0].title).toBe("A & B &#38; C");
   });
 
+  it("keeps the feed when a numeric entity names no character (#460)", () => {
+    const feed = parseFeed(
+      `<rss><channel><title>t</title>` +
+        `<item><title>ok</title></item>` +
+        `<item><title>hex &#x110000; dec &#99999999; sur &#xD800; nul &#0; fine &#x1F600;</title></item>` +
+        `</channel></rss>`
+    );
+    expect(feed.items.map((i) => i.title)).toEqual([
+      "ok",
+      "hex � dec � sur � nul � fine \u{1F600}",
+    ]);
+  });
+
   it("returns an empty feed for non-feed input", () => {
     expect(parseFeed("<html><body>nope</body></html>")).toEqual({
       title: "",

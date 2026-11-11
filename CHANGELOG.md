@@ -28,6 +28,12 @@ here.
   work at any length. A name one character short of the limit also no longer
   gets a copy that looks just like it. (#458)
 
+- **One malformed character code no longer breaks a whole RSS feed.** A
+  feed with a numeric character reference that names no character, such as
+  `&#x110000;`, showed as "Couldn't connect" and none of its items appeared.
+  That one character now shows as a replacement mark, and the rest of the feed
+  reads as normal. (#460)
+
 ## [3.1.0-rc.4] - 2026-11-01
 
 ### Changed
