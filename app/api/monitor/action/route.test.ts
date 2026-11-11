@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import fs from "node:fs/promises";
 import * as YAML from "js-yaml";
-import { useScratchConfig, request, adminSession } from "@/lib/testing/routes";
+import { useScratchConfig, request, adminSession, otherAdminSession, latestAuditEntry } from "@/lib/testing/routes";
 import { FOUNDING_ACCOUNT_ID } from "@/lib/schema";
 
 // The action guard (#289): every gate before a dashboard action reaches a
@@ -138,6 +138,16 @@ describe("POST /api/monitor/action target ids (#379)", () => {
       `http://portainer.lan/api/endpoints/2/docker/containers/${CONTAINER}/start`,
       `http://portainer.lan/api/endpoints/2/docker/containers/${CONTAINER.slice(0, 12)}/stop`,
     ]);
+  });
+
+  it("credits the action to the admin who took it (#457)", async () => {
+    stubServices();
+    expect((await act(start)).status).toBe(200);
+    expect(await latestAuditEntry()).toMatchObject({ kind: "action", account: FOUNDING_ACCOUNT_ID });
+    const ada = await otherAdminSession("ada");
+    const res = await POST(request("/api/monitor/action", { method: "POST", body: start, session: ada }));
+    expect(res.status).toBe(200);
+    expect(await latestAuditEntry()).toMatchObject({ kind: "action", account: "ada" });
   });
 
   it("acts on a real info-hash, v1 or v2, either case", async () => {

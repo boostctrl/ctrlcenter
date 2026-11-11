@@ -81,6 +81,22 @@ export async function memberSession(id: string, groups: string[] = []): Promise<
   return createSessionToken(account, await createSession({ ip: "127.0.0.1", userAgent: "test", account: id }));
 }
 
+// A second admin account (#423) signed in, for the checks that credit what an
+// admin does to that admin rather than the founding one (#457).
+export async function otherAdminSession(id: string): Promise<string> {
+  const token = await memberSession(id);
+  const { updateAccount } = await import("../config");
+  await updateAccount(id, { role: "admin" });
+  return token;
+}
+
+// The newest entry in the audit log (lib/security-events).
+export async function latestAuditEntry() {
+  const { listSecurityEvents } = await import("../security-events");
+  const [latest] = await listSecurityEvents(1);
+  return latest;
+}
+
 // Age a session's last confirmation past the step-up window (#366), so a
 // route that needs a recent one answers it with 403 and reauthRequired.
 export async function staleSession(session: string): Promise<void> {

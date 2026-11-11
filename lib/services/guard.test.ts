@@ -3,12 +3,17 @@ import type { NextRequest } from "next/server";
 
 // The guard reads config and re-checks the admin session; both are stubbed so
 // the test drives the gate ordering directly.
-const { readConfigInternal, isAdminRequest } = vi.hoisted(() => ({
+const { readConfigInternal, viewerOf } = vi.hoisted(() => ({
   readConfigInternal: vi.fn(),
-  isAdminRequest: vi.fn(),
+  viewerOf: vi.fn(),
 }));
 vi.mock("../config", () => ({ readConfigInternal }));
-vi.mock("../api-auth", () => ({ isAdminRequest }));
+vi.mock("../api-auth", () => ({ viewerOf }));
+
+// The viewers the session gate sees: an admin account (not the founding one,
+// so the result's `account` is visibly the actor's, #457) and a member.
+const ADMIN = { isAdmin: true, account: { id: "ada" } };
+const MEMBER = { isAdmin: false, account: { id: "sam" } };
 
 import { requireAction } from "./guard";
 
@@ -43,7 +48,7 @@ afterEach(() => {
 
 describe("requireAction", () => {
   it("passes all five gates and returns the integration and its resolved credentials", async () => {
-    isAdminRequest.mockResolvedValue(true);
+    viewerOf.mockResolvedValue(ADMIN);
     withQbit({ password: "${QBIT_PW}" });
     vi.stubEnv("QBIT_PW", "from-env");
     const result = await requireAction(req, "qbit", "qbittorrent");
@@ -52,27 +57,31 @@ describe("requireAction", () => {
       expect(result.cfg.url).toBe("http://qbit.local:8080");
       expect(result.cfg.password).toBe("from-env");
       expect(result.integration.id).toBe("qbit");
+      expect(result.account).toBe("ada");
     }
     vi.unstubAllEnvs();
   });
 
   it("refuses an opted-in integration while two-factor authentication is off (#367)", async () => {
-    isAdminRequest.mockResolvedValue(true);
+    viewerOf.mockResolvedValue(ADMIN);
     withQbit({}, false);
     const result = await requireAction(req, "qbit", "qbittorrent");
     expect(result).toMatchObject({ ok: false, status: 403, error: expect.stringContaining("two-factor") });
   });
 
   it("rejects a non-admin session with 401, before any config gate", async () => {
-    isAdminRequest.mockResolvedValue(false);
+    viewerOf.mockResolvedValue(MEMBER);
     // Even with actions off AND the service disabled, the session gate wins.
     withQbit({ enabled: false, allowActions: false });
     const result = await requireAction(req, "qbit", "qbittorrent");
     expect(result).toMatchObject({ ok: false, status: 401 });
+    // No session at all, likewise.
+    viewerOf.mockResolvedValue(null);
+    expect(await requireAction(req, "qbit", "qbittorrent")).toMatchObject({ ok: false, status: 401 });
   });
 
   it("rejects an unconfigured, unknown or wrong-type integration with 409", async () => {
-    isAdminRequest.mockResolvedValue(true);
+    viewerOf.mockResolvedValue(ADMIN);
     withQbit({ url: "   " });
     expect(await requireAction(req, "qbit", "qbittorrent")).toMatchObject({ ok: false, status: 409 });
     withQbit();
@@ -81,7 +90,7 @@ describe("requireAction", () => {
   });
 
   it("rejects a configured integration with actions off with 403", async () => {
-    isAdminRequest.mockResolvedValue(true);
+    viewerOf.mockResolvedValue(ADMIN);
     withQbit({ allowActions: false });
     const result = await requireAction(req, "qbit", "qbittorrent");
     expect(result).toMatchObject({ ok: false, status: 403 });

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import * as YAML from "js-yaml";
-import { useScratchConfig, request, adminSession } from "@/lib/testing/routes";
+import { useScratchConfig, request, adminSession, otherAdminSession, latestAuditEntry } from "@/lib/testing/routes";
 import {
   getAppDetail,
   loadHistory,
@@ -35,6 +35,12 @@ describe("/api/config", () => {
   it("refuses export and import without a session", async () => {
     expect((await route.GET(request("/api/config"))).status).toBe(401);
     expect((await importConfig({ settings: {} }, false)).status).toBe(401);
+  });
+
+  it("credits an export with secrets to the admin who took it (#457)", async () => {
+    const ada = await otherAdminSession("ada");
+    expect((await route.GET(request("/api/config?secrets=1", { session: ada }))).status).toBe(200);
+    expect(await latestAuditEntry()).toMatchObject({ kind: "export.secrets", account: "ada" });
   });
 
   it("exports the config without the admin credential", async () => {

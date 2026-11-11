@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest } from "@/lib/api-auth";
+import { viewerOf } from "@/lib/api-auth";
 import { readConfigInternal } from "@/lib/config";
 import { requireRecentAuth } from "@/lib/reauth";
 import { WEBHOOK_SERVICES, type WebhookService } from "@/lib/schema";
@@ -11,7 +11,8 @@ import { eventMeta, recordSecurityEvent } from "@/lib/security-events";
 // and lands in the audit log, like an export with secrets.
 export async function GET(request: NextRequest) {
   const config = await readConfigInternal();
-  if (!(await isAdminRequest(request, config.auth))) {
+  const viewer = await viewerOf(request, config.auth);
+  if (!viewer?.isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const service = request.nextUrl.searchParams.get("service") ?? "";
@@ -20,6 +21,6 @@ export async function GET(request: NextRequest) {
   }
   const recent = await requireRecentAuth(request, config.auth);
   if (!recent.ok) return recent.response;
-  await recordSecurityEvent("secret.revealed", eventMeta(request), `${service} webhook token`);
+  await recordSecurityEvent("secret.revealed", eventMeta(request, viewer.account.id), `${service} webhook token`);
   return NextResponse.json({ token: config.settings.webhooks[service as WebhookService].token });
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
-import { useScratchConfig, request, adminSession, staleSession } from "@/lib/testing/routes";
+import { useScratchConfig, request, adminSession, staleSession, otherAdminSession, latestAuditEntry } from "@/lib/testing/routes";
 import { integrationSchema } from "@/lib/schema";
 import { FOUNDING_ACCOUNT_ID } from "@/lib/schema";
 
@@ -35,6 +35,15 @@ describe("PUT /api/integrations", () => {
     expect(await res.json()).toEqual({ ok: true });
     const { readConfigInternal } = await import("@/lib/config");
     expect((await readConfigInternal()).integrations.map((i) => i.id)).toEqual(["sonarr", "sonarr-4k"]);
+  });
+
+  it("credits a credential change to the admin who made it (#457)", async () => {
+    const ada = await otherAdminSession("ada");
+    const res = await route.PUT(
+      request("/api/integrations", { method: "PUT", body: [sonarr("audit-check")], session: ada })
+    );
+    expect(res.status).toBe(200);
+    expect(await latestAuditEntry()).toMatchObject({ kind: "integration.changed", account: "ada" });
   });
 
   it("stores the actions opt-in off while two-factor authentication is off (#367)", async () => {

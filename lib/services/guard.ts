@@ -5,7 +5,8 @@
 //
 //   1. Proxy prefix — the action routes live under /api/monitor, already gated
 //      in proxy.ts (ADMIN_PREFIXES). Enforced there, not here.
-//   2. Route session re-check — isAdminRequest, mirroring app/api/monitor/route.
+//   2. Route session re-check — an admin viewer (viewerOf), mirroring
+//      app/api/monitor/route.
 //   3. Integration configured — enabled with a URL set (isServiceConfigured).
 //   4. allowActions opt-in — the per-integration write flag, default off.
 //   5. Two-factor authentication on (#367) — a write action is the most a
@@ -16,7 +17,7 @@
 // Server-side only — the credentials in the returned config never leave here.
 
 import type { NextRequest } from "next/server";
-import { isAdminRequest } from "../api-auth";
+import { viewerOf } from "../api-auth";
 import { readConfigInternal } from "../config";
 import type { Integration } from "../schema";
 import type { ServiceId } from "./ids";
@@ -29,6 +30,8 @@ export type GuardSuccess = {
   integration: Integration;
   // The credentials the action's client call uses.
   cfg: ResolvedIntegration;
+  // The acting admin's account, for the audit log (#457).
+  account: string;
 };
 
 // Resolve the action's target integration after the gates, or the reason it
@@ -41,7 +44,8 @@ export async function requireAction(
   type: ServiceId
 ): Promise<GuardSuccess | GuardFailure> {
   const config = await readConfigInternal();
-  if (!(await isAdminRequest(request, config.auth))) {
+  const viewer = await viewerOf(request, config.auth);
+  if (!viewer?.isAdmin) {
     return { ok: false, status: 401, error: "Unauthorized" };
   }
   const integration = config.integrations.find((i) => i.id === integrationId && i.type === type);
@@ -66,5 +70,5 @@ export async function requireAction(
       error: "Actions need two-factor authentication to be on",
     };
   }
-  return { ok: true, integration, cfg: resolveIntegration(integration) };
+  return { ok: true, integration, cfg: resolveIntegration(integration), account: viewer.account.id };
 }

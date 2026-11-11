@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest } from "@/lib/api-auth";
+import { viewerOf } from "@/lib/api-auth";
 import { readConfigInternal, replaceIntegrations, restoreIntegrations } from "@/lib/config";
 import { integrationsPatchSchema, integrationsUpdateSchema, type Integration } from "@/lib/schema";
 import { applyListPatch } from "@/lib/list-patch";
@@ -23,7 +23,8 @@ function changesTarget(next: Integration[], stored: Integration[]): boolean {
 // stored list); a plain array replaces the list whole. Answers with nothing
 // but ok: the credentials never travel back.
 export async function PUT(request: NextRequest) {
-  if (!(await isAdminRequest(request))) {
+  const viewer = await viewerOf(request);
+  if (!viewer?.isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const body = await request.json().catch(() => null);
@@ -62,15 +63,17 @@ export async function PUT(request: NextRequest) {
     : incoming.map((i) => (i.allowActions ? { ...i, allowActions: false } : i));
   await replaceIntegrations(integrations);
   // The audit log (#368): credential or address edits, and actions turned
-  // on (which also goes out through the channels).
+  // on (which also goes out through the channels), credited to the admin
+  // who made them (#457).
+  const meta = eventMeta(request, viewer.account.id);
   const labels = integrationLabels(integrations);
   const turnedOn = integrations
     .filter((i) => i.allowActions && !stored.find((o) => o.id === i.id)?.allowActions)
     .map((i) => labels[i.id]);
   if (turnedOn.length > 0) {
-    notifySecurityEvent(await recordSecurityEvent("actions.enabled", eventMeta(request), turnedOn.join(", ")));
+    notifySecurityEvent(await recordSecurityEvent("actions.enabled", meta, turnedOn.join(", ")));
   } else if (targetChanged) {
-    await recordSecurityEvent("integration.changed", eventMeta(request));
+    await recordSecurityEvent("integration.changed", meta);
   }
   return NextResponse.json({ ok: true });
 }

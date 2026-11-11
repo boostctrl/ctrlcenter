@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest } from "@/lib/api-auth";
+import { isAdminRequest, viewerOf } from "@/lib/api-auth";
 import { accountsForExport, readConfigInternal, replaceConfig, stripAuth, stripExportSecrets } from "@/lib/config";
 import { requireRecentAuth } from "@/lib/reauth";
 import { migrateConfig, NewerConfigError } from "@/lib/config-migrate";
@@ -32,7 +32,8 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   const config = await readConfigInternal();
-  if (!(await isAdminRequest(request, config.auth))) {
+  const viewer = await viewerOf(request, config.auth);
+  if (!viewer?.isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   // Secrets stay out of a backup unless asked for (#366): `?secrets=1`
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
   if (withSecrets) {
     const recent = await requireRecentAuth(request, config.auth);
     if (!recent.ok) return recent.response;
-    await recordSecurityEvent("export.secrets", eventMeta(request));
+    await recordSecurityEvent("export.secrets", eventMeta(request, viewer.account.id));
   }
   const uploads = await exportIcons();
   await loadHistory();

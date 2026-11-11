@@ -133,6 +133,6 @@ export async function POST(request: NextRequest) {
     action: body.action,
     host: hostOf(guard.cfg.url),
   });
-  await recordSecurityEvent("action", eventMeta(request), `${body.service} ${body.action} (${body.integration})`);
+  await recordSecurityEvent("action", eventMeta(request, guard.account), `${body.service} ${body.action} (${body.integration})`);
   return NextResponse.json({ ok: true });
 }

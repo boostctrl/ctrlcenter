@@ -63,6 +63,12 @@ here.
   addresses, failures still fold into one line, which now says when it covers
   several accounts. (#456)
 
+- **The security activity names the admin who did it.** With more than one
+  admin account, a container action, an integration change, turning actions
+  on, an export with secrets or a revealed webhook token was logged under the
+  founding admin, whoever did it. These entries now name the admin who acted.
+  (#457)
+
 ## [3.1.0-rc.4] - 2026-11-01
 
 ### Changed
