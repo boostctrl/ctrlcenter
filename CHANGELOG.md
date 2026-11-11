@@ -21,6 +21,13 @@ here.
   clocks or system stats widget with one malformed row keeps its title and its
   other rows instead of disappearing. (#459)
 
+- **Duplicating a theme with a long name no longer freezes the page.** In
+  Settings → Themes, duplicating a theme with a name of 40 characters, or a
+  name of 36 or more twice, hung the browser tab. The copy's name now makes
+  room for its number within the 40-character limit, so "Copy 2" and "Copy 3"
+  work at any length. A name one character short of the limit also no longer
+  gets a copy that looks just like it. (#458)
+
 ## [3.1.0-rc.4] - 2026-11-01
 
 ### Changed

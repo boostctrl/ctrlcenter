@@ -802,12 +802,16 @@ export function newThemeEntryKey(): string {
 }
 
 // `base` as a name no pack in `taken` has: "Ocean", "Ocean 2", "Ocean 3"…
+// Within the 40-character cap, the root gives way to the number: cutting the
+// number off instead returned the root itself, so a long name that was taken
+// looped forever (#458).
 export function uniquePackName(base: string, taken: Iterable<string>): string {
   const names = new Set([...taken].map((n) => n.trim().toLowerCase()));
-  const root = base.trim().slice(0, 40) || "Theme";
+  const root = base.trim().slice(0, 40).trimEnd() || "Theme";
   if (!names.has(root.toLowerCase())) return root;
   for (let i = 2; ; i++) {
-    const candidate = `${root} ${i}`.slice(0, 40);
+    const suffix = ` ${i}`;
+    const candidate = root.slice(0, 40 - suffix.length).trimEnd() + suffix;
     if (!names.has(candidate.toLowerCase())) return candidate;
   }
 }

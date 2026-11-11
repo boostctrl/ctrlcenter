@@ -223,6 +223,25 @@ describe("the theme gallery (#334)", () => {
     expect(uniquePackName("Ocean", ["Ocean", "Ocean 2"])).toBe("Ocean 3");
     expect(uniquePackName("   ", [])).toBe("Theme");
   });
+
+  it("makes room for the number within 40 characters when a long name is taken (#458)", () => {
+    const forty = "A".repeat(40);
+    expect(uniquePackName(forty, [forty])).toBe(`${"A".repeat(38)} 2`);
+    expect(uniquePackName(forty, [forty, `${"A".repeat(38)} 2`])).toBe(`${"A".repeat(38)} 3`);
+    // 39 characters: the old cut left "AAA… " (a trailing space), the taken name again.
+    const thirtyNine = "A".repeat(39);
+    expect(uniquePackName(thirtyNine, [thirtyNine])).toBe(`${"A".repeat(38)} 2`);
+    // Duplicating a long-named pack twice: "<name> copy" is cut to 40 both times.
+    const name = "B".repeat(36);
+    const first = uniquePackName(`${name} copy`, [name]);
+    expect(first).toBe(`${name} cop`);
+    const second = uniquePackName(`${name} copy`, [name, first]);
+    expect(second.length).toBeLessThanOrEqual(40);
+    expect([name, first]).not.toContain(second);
+    // A two-digit number takes one more character from the root.
+    const taken = [forty, ...Array.from({ length: 8 }, (_, i) => `${"A".repeat(38)} ${i + 2}`)];
+    expect(uniquePackName(forty, taken)).toBe(`${"A".repeat(37)} 10`);
+  });
 });
 
 describe("sanitizeTune (#326)", () => {
