@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import LoginForm from "./LoginForm";
 
 vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams() }));
@@ -28,5 +28,21 @@ describe("LoginForm", () => {
     render(<LoginForm passwordConfigured singleAccount={false} />);
     await waitFor(() => expect((screen.getByLabelText(/^Username/) as HTMLInputElement).value).toBe("sam"));
     expect(document.activeElement).toBe(screen.getByLabelText(/^Password/));
+  });
+
+  it("says so and lets the form be sent again when the server can't be reached (#462)", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      render(<LoginForm passwordConfigured singleAccount />);
+      fireEvent.change(screen.getByLabelText(/^Password/), { target: { value: "pw" } });
+      fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+      await waitFor(() => expect(screen.getByText(/Couldn't reach CtrlCenter/)).toBeTruthy());
+      const button = screen.getByRole("button", { name: "Sign in" }) as HTMLButtonElement;
+      expect(button.disabled).toBe(false);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

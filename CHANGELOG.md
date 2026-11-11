@@ -34,6 +34,11 @@ here.
   That one character now shows as a replacement mark, and the rest of the feed
   reads as normal. (#460)
 
+- **The sign-in form no longer hangs when CtrlCenter can't be reached.**
+  If the server was restarting or the connection dropped when you pressed
+  *Sign in*, the button stayed on "Signing in…" until the page was reloaded.
+  The form now says it couldn't reach CtrlCenter and can be sent again. (#462)
+
 ### Security
 
 - **A calendar widget without a password no longer shows another widget's

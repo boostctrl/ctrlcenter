@@ -56,11 +56,20 @@ export default function LoginForm({
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const res = await fetch("/api/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password, totp: code }),
-    });
+    let res: Response;
+    try {
+      res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password, totp: code }),
+      });
+    } catch {
+      // The request never got an answer (the server restarting, the network
+      // gone): say so rather than leave the button on "Signing in…" (#462).
+      setLoading(false);
+      setError("Couldn't reach CtrlCenter. Check the connection and try again.");
+      return;
+    }
     setLoading(false);
     if (!res.ok) {
       const data = await res.json().catch(() => null);
