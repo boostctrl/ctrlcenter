@@ -212,6 +212,34 @@ describe("configSchema defaults", () => {
     ]);
   });
 
+  it("drops a malformed bang row, or a bangs value that isn't a list, instead of failing the read (#459)", () => {
+    const rows = configReadSchema.parse({
+      settings: { search: { bangs: [{ key: 5, url: "x" }, { key: "y", url: "https://y/?q=%s" }] } },
+    });
+    expect(rows.settings.search.bangs).toEqual([{ key: "y", url: "https://y/?q=%s" }]);
+    const notList = configReadSchema.parse({ settings: { title: "Dash", search: { bangs: "oops" } } });
+    expect(notList.settings.title).toBe("Dash");
+    expect(notList.settings.search.bangs).toEqual([]);
+  });
+
+  it("keeps a countdown, world-clocks or system-stats widget when one of its rows is malformed (#459)", () => {
+    const config = configReadSchema.parse({
+      widgets: [
+        { id: "cd", type: "countdown", title: "Dates", items: [{ label: "a", date: "2027-01-01" }, 5] },
+        { id: "wc", type: "worldClocks", title: "Zones", items: ["UTC", { label: "Tokyo", timeZone: "Asia/Tokyo" }] },
+        { id: "ss", type: "systemStats", title: "Host", disks: [null, { label: "Data", path: "/data" }] },
+      ],
+    });
+    const byId = Object.fromEntries(config.widgets.map((w) => [w.id, w]));
+    expect(byId.cd).toMatchObject({ title: "Dates", items: [{ label: "a", date: "2027-01-01" }] });
+    expect(byId.wc).toMatchObject({ title: "Zones", items: [{ label: "Tokyo", timeZone: "Asia/Tokyo" }] });
+    expect(byId.ss).toMatchObject({ title: "Host", disks: [{ label: "Data", path: "/data" }] });
+  });
+
+  it("still refuses a malformed bang row on the admin input path", () => {
+    expect(settingsInputSchema.safeParse({ search: { bangs: [{ key: 5, url: "x" }] } }).success).toBe(false);
+  });
+
   it("accepts an optional theme preset pointer", () => {
     const config = configSchema.parse({ settings: { theme: { preset: "Mariana" } } });
     expect(config.settings.theme.preset).toBe("Mariana");

@@ -12,6 +12,15 @@ here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **One bad search bang in a hand-edited config no longer takes every page
+  down.** A `bangs` entry that wasn't a key and a URL, or a `bangs` value that
+  wasn't a list at all, made every page fail to load, the sign-in page
+  included. The bad entry is now skipped. In the same way, a countdown, world
+  clocks or system stats widget with one malformed row keeps its title and its
+  other rows instead of disappearing. (#459)
+
 ## [3.1.0-rc.4] - 2026-11-01
 
 ### Changed

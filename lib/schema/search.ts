@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { SEARCH_ENGINE_KEYS, isValidCustomUrl } from "../search";
 import { patchOf } from "./input";
+import { lenientArray } from "./shared";
 
 // Stored search config is lenient (so a hand-edited file always parses); the
 // custom URL is validated on the admin-input path and at use time instead.
@@ -15,7 +16,8 @@ export const bangSchema = z.object({
 export const searchSchema = z.object({
   engine: z.enum(SEARCH_ENGINE_KEYS).default("duckduckgo"),
   customUrl: z.string().default(""),
-  bangs: z.array(bangSchema).default([]),
+  // A bad row (or a non-list) is dropped, not the whole config load (#459).
+  bangs: lenientArray(bangSchema).default([]),
 });
 
 // Admin input, derived from the stored schema (lib/schema/input.ts). Bang

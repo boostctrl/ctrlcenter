@@ -4,6 +4,7 @@
 import { z } from "zod";
 import { secretFields } from "./meta";
 import { patchOf } from "./input";
+import { lenientArray } from "./shared";
 import { isCalendarDate } from "../datetime";
 
 export const weatherSchema = z.object({
@@ -65,7 +66,8 @@ export const countdownItemSchema = z.object({
 });
 export const countdownSchema = z.object({
   title: z.string().default("Countdown"),
-  items: z.array(countdownItemSchema).default([]),
+  // One bad row drops only itself, not the widget (#459).
+  items: lenientArray(countdownItemSchema).default([]),
 });
 export type CountdownConfig = z.infer<typeof countdownSchema>;
 
@@ -78,7 +80,7 @@ export const worldClockItemSchema = z.object({
 });
 export const worldClocksSchema = z.object({
   title: z.string().default("World clocks"),
-  items: z.array(worldClockItemSchema).default([]),
+  items: lenientArray(worldClockItemSchema).default([]),
 });
 export type WorldClocksConfig = z.infer<typeof worldClocksSchema>;
 
@@ -101,7 +103,7 @@ export const systemStatsDiskSchema = z.object({
 });
 export const systemStatsSchema = z.object({
   title: z.string().default("System stats"),
-  disks: z.array(systemStatsDiskSchema).default([]),
+  disks: lenientArray(systemStatsDiskSchema).default([]),
 });
 export type SystemStatsConfig = z.infer<typeof systemStatsSchema>;
 
