@@ -65,6 +65,9 @@ export type SecurityEvent = {
   // tried, changed its password, and so on. Absent in an entry 3.0 wrote
   // (the founding admin's) and for events about no account in particular.
   account?: string;
+  // A flood entry (#392) that folded in failures for more than one account
+  // (#456): `account` is then only the first one's.
+  manyAccounts?: boolean;
 };
 
 export type EventMeta = { ip: string | null; userAgent: string; account?: string };
@@ -210,9 +213,10 @@ function flooding(events: SecurityEvent[], kind: SecurityEventKind, now: number)
   return false;
 }
 
-// Record one event. Repeated failures from the same source fold into the
-// previous entry (and, during a flood, from any source, counting the
-// addresses); a successful sign-in notes whether its address is new.
+// Record one event. Repeated failures from the same source against the same
+// account fold into the previous entry (and, during a flood, from any source
+// against any account, counting the addresses and marking a mix of
+// accounts); a successful sign-in notes whether its address is new.
 export async function recordSecurityEvent(
   kind: SecurityEventKind,
   meta: EventMeta,
@@ -223,10 +227,14 @@ export async function recordSecurityEvent(
   const last = store.events[store.events.length - 1];
   if (FOLDABLE.has(kind) && last && last.kind === kind && now - last.at < FOLD_MS) {
     const same = sameSource(last.ip, meta.ip);
-    if (same || flooding(store.events, kind, now)) {
+    // Outside a flood an entry is one source trying one account, so a try at
+    // another account from the same address is a line of its own (#456).
+    const sameTarget = last.account === meta.account && (last.detail ?? "") === (detail ?? "");
+    if ((same && sameTarget) || flooding(store.events, kind, now)) {
       last.at = now;
       last.count = (last.count ?? 1) + 1;
       if (!same) last.addresses = (last.addresses ?? 1) + 1;
+      if (last.account !== meta.account) last.manyAccounts = true;
       await persist(store);
       return last;
     }

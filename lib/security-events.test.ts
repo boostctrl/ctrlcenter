@@ -155,4 +155,30 @@ describe("the account on an entry (#423)", () => {
     const failed = await recordSecurityEvent("signin.fail", { ...meta, account: "root" }, undefined, t + 4_000);
     expect(failed.account).toBe("root");
   });
+
+  it("keeps failures for different accounts from one address apart (#456)", async () => {
+    const t = Date.now();
+    await recordSecurityEvent("signin.fail", { ...here, account: "alice" }, undefined, t);
+    await recordSecurityEvent("signin.fail", { ...here, account: "bob" }, undefined, t + 1_000);
+    await recordSecurityEvent("signin.fail", { ...here, account: "bob" }, undefined, t + 2_000);
+    const events = await listSecurityEvents(50, t + 3_000);
+    expect(events.map((e) => [e.account, e.count ?? 1])).toEqual([
+      ["bob", 2],
+      ["alice", 1],
+    ]);
+    expect(events.some((e) => e.manyAccounts)).toBe(false);
+  });
+
+  it("still folds a flood across accounts, and says it covers several (#392, #456)", async () => {
+    const t = Date.now();
+    for (let i = 0; i < 20; i++) {
+      await recordSecurityEvent("signin.fail", { ip: `203.0.113.${i + 1}`, userAgent: "curl", account: `user${i}` }, undefined, t + i * 1000);
+    }
+    for (let i = 20; i < 30; i++) {
+      await recordSecurityEvent("signin.fail", { ip: `198.51.100.${i}`, userAgent: "curl", account: `user${i}` }, undefined, t + i * 1000);
+    }
+    const events = await listSecurityEvents(50, t + 30_000);
+    expect(events).toHaveLength(20);
+    expect(events[0]).toMatchObject({ account: "user19", count: 11, manyAccounts: true });
+  });
 });

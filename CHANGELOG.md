@@ -55,6 +55,14 @@ here.
   the founding admin's second factor going off does that now, since it's the
   one actions depend on. (#455)
 
+- **Failed sign-ins for different accounts from one address get a line
+  each in the security activity.** Since 3.1.0-rc.1 the log names the account
+  a failed sign-in tried. But a try at a second account from the same address
+  within a few minutes was counted on the first account's line, so the second
+  never showed. Each account now gets its own line. During a flood from many
+  addresses, failures still fold into one line, which now says when it covers
+  several accounts. (#456)
+
 ## [3.1.0-rc.4] - 2026-11-01
 
 ### Changed

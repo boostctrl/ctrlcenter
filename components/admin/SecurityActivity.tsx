@@ -57,9 +57,10 @@ export function describeEvent(e: SecurityEvent): string {
   const base = LABEL[e.kind] ?? e.kind;
   const times = e.count && e.count > 1 ? ` × ${e.count}` : "";
   const spread = e.addresses && e.addresses > 1 ? ` from ${e.addresses} addresses` : "";
+  const targets = e.manyAccounts ? " for several accounts" : "";
   const detail = e.detail ? `: ${e.detail}` : "";
   const fresh = e.kind === "signin.ok" && e.newAddress ? " (new address)" : "";
-  return `${base}${times}${spread}${detail}${fresh}`;
+  return `${base}${times}${spread}${targets}${detail}${fresh}`;
 }
 
 export default function SecurityActivity({ version }: { version: number }) {
@@ -100,7 +101,7 @@ export default function SecurityActivity({ version }: { version: number }) {
               {describeEvent(e)}
             </span>
             <p className="text-xs text-ink-45" title={e.userAgent}>
-              {e.account ? `${e.account} · ` : ""}
+              {e.account && !e.manyAccounts ? `${e.account} · ` : ""}
               {e.ip ?? "Unknown address"} · {describeUserAgent(e.userAgent)}
             </p>
           </div>
