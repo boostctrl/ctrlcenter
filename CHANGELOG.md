@@ -48,6 +48,13 @@ here.
   them. Each set of credentials now has its own copy, and a widget without
   any gets only what the calendar shows without signing in. (#461)
 
+- **A member turning off their own two-factor no longer turns off write
+  actions.** Since 3.1.0-rc.1, any account can turn off its own second factor
+  from its account page, and doing so switched off the actions (restart a
+  container, pause a torrent, approve a request) on every integration. Only
+  the founding admin's second factor going off does that now, since it's the
+  one actions depend on. (#455)
+
 ## [3.1.0-rc.4] - 2026-11-01
 
 ### Changed

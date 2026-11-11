@@ -5,7 +5,7 @@ import { disableTotp, clearAllowActions } from "@/lib/config";
 import { rateLimit, pruneRateLimit, clientKey } from "@/lib/rate-limit";
 import { verifyTotpOnce } from "@/lib/totp";
 import { verifyRecoveryCode } from "@/lib/recovery-codes";
-import { totpDisableSchema } from "@/lib/schema";
+import { FOUNDING_ACCOUNT_ID, totpDisableSchema } from "@/lib/schema";
 import { eventMeta, recordSecurityEvent } from "@/lib/security-events";
 import { notifySecurityEvent } from "@/lib/security-alerts";
 
@@ -55,7 +55,9 @@ export async function POST(request: NextRequest) {
   }
   await disableTotp(account.id);
   // Write actions need the second factor (#367): off with it, and said so.
-  const actionsDisabled = await clearAllowActions();
+  // The action gate (lib/services/guard.ts) reads the founding admin's, so
+  // only that one going off turns them off; a member's own doesn't (#455).
+  const actionsDisabled = account.id === FOUNDING_ACCOUNT_ID ? await clearAllowActions() : 0;
   notifySecurityEvent(await recordSecurityEvent("totp.disabled", eventMeta(request, account.id)));
   return NextResponse.json({ ok: true, actionsDisabled });
 }
