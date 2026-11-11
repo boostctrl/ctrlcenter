@@ -34,6 +34,15 @@ here.
   That one character now shows as a replacement mark, and the rest of the feed
   reads as normal. (#460)
 
+### Security
+
+- **A calendar widget without a password no longer shows another widget's
+  private events.** When two calendar widgets used the same address, one with
+  a username and password and one without, the one without could show the
+  private calendar's events for several minutes after the other had loaded
+  them. Each set of credentials now has its own copy, and a widget without
+  any gets only what the calendar shows without signing in. (#461)
+
 ## [3.1.0-rc.4] - 2026-11-01
 
 ### Changed

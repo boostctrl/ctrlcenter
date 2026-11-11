@@ -2,6 +2,7 @@
 // behind the home-page agenda and the /calendar page, plus the admin "Test"
 // probe. Split from lib/calendar.ts (pure parsing and display helpers) so the
 // client components that format events never import network or secret code.
+import { createHash } from "node:crypto";
 import {
   DAY_MS,
   RECUR_WINDOW_MS,
@@ -22,9 +23,10 @@ const CAL_CACHE_TTL_MS = 5 * 60_000;
 // feeds are well under 1 MB).
 const CAL_MAX_BYTES = 5 * 1024 * 1024;
 
-// Parsed-event cache keyed by URL, so the homepage (force-dynamic) doesn't make
-// a blocking third-party request on every render. Stale-while-revalidate with
-// one in-flight refetch per URL and stale-on-failure (see lib/swr-cache.ts).
+// Parsed-event cache keyed by URL and credentials (see cacheKey), so the
+// homepage (force-dynamic) doesn't make a blocking third-party request on every
+// render. Stale-while-revalidate with one in-flight refetch per key and
+// stale-on-failure (see lib/swr-cache.ts).
 const calendars = swrCache<CalendarEvent[]>("calendar", CAL_CACHE_TTL_MS);
 
 export type CalendarAuth = { username?: string; password?: string };
@@ -49,6 +51,16 @@ function calendarHeaders(auth?: CalendarAuth): Record<string, string> {
       "Basic " + Buffer.from(`${user}:${pass}`).toString("base64");
   }
   return headers;
+}
+
+// A calendar's cache key: its URL, plus a digest of the credentials the request
+// sends. Keyed by URL alone, a widget without credentials was served the events
+// another widget had fetched with them (#461). A digest, so the credential
+// itself never sits in the cache's keys.
+function cacheKey(target: string, headers: Record<string, string>): string {
+  const auth = headers.Authorization;
+  if (!auth) return target;
+  return `${target} ${createHash("sha256").update(auth).digest("hex")}`;
 }
 
 // GET a URL (time-boxed, size-capped) and return its ICS body, or a short reason
@@ -106,8 +118,9 @@ async function loadParsedEvents(
   if (!/^https?:\/\//i.test(target)) return [];
   // Only a successful ICS parse replaces the entry; a failure (undefined)
   // keeps serving the last good one.
-  const events = await calendars.get(target, async () => {
-    const { text } = await requestIcs(target, calendarHeaders(auth));
+  const headers = calendarHeaders(auth);
+  const events = await calendars.get(cacheKey(target, headers), async () => {
+    const { text } = await requestIcs(target, headers);
     return text ? parseICS(text) : undefined;
   });
   return events ?? [];
