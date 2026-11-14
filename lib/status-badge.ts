@@ -76,8 +76,10 @@ export function responseColor(ms: number): string {
 }
 
 // "100%" for a perfect window, else two decimals ("99.95%"), never rounding
-// a real miss up to 100.
+// a real miss up to 100. The float noise is rounded off before the floor, or
+// 0.29 * 100 (28.999999999999996) would show as 0.28% (#481).
 export function formatUptime(pct: number): string {
   if (pct >= 100) return "100%";
-  return `${(Math.floor(pct * 100) / 100).toFixed(2)}%`;
+  const hundredths = Math.min(9999, Math.floor(Math.round(pct * 1e6) / 1e4));
+  return `${(hundredths / 100).toFixed(2)}%`;
 }

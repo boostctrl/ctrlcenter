@@ -27,6 +27,19 @@ describe("formatUptime", () => {
     expect(formatUptime(100)).toBe("100%");
     expect(formatUptime(99.999)).toBe("99.99%");
     expect(formatUptime(97.5)).toBe("97.50%");
+    expect(formatUptime(99.9999999)).toBe("99.99%");
+  });
+
+  // #481: flooring pct * 100 took float noise for a real fraction.
+  it("shows two-decimal values as they are", () => {
+    for (const pct of [0.29, 0.57, 1.13, 50.01]) {
+      expect(formatUptime(pct)).toBe(`${pct.toFixed(2)}%`);
+    }
+    for (let i = 0; i < 10_000; i++) {
+      expect(formatUptime(i / 100)).toBe(`${(i / 100).toFixed(2)}%`);
+    }
+    expect(formatUptime((991 / 1000) * 100)).toBe("99.10%");
+    expect(formatUptime((9 / 1000) * 100)).toBe("0.90%");
   });
 
   it("colours by how close to perfect", () => {

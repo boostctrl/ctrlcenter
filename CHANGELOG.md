@@ -33,6 +33,11 @@ here.
   time zone differed from the weather location's it sat in the wrong spot or
   at one end. It now follows the time at the location. (#486)
 
+- **Status badges show the right uptime.** Some uptime figures on an app's
+  status badge came out a hundredth of a percent low, so 0.29% showed as
+  0.28% and 0.9% as 0.89%. They now show as they are, and an uptime short of
+  perfect still never rounds up to 100%. (#481)
+
 ## [3.1.1] - 2026-11-14
 
 ### Fixed
