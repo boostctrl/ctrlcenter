@@ -49,6 +49,12 @@ here.
   as either, and the card lists them in a muted color instead of the warning
   one. (#491)
 
+- **Widgets with similar titles get different names in the pickers.** Three
+  widgets titled "Notes", "Notes" and "Notes 2" were listed as "Notes",
+  "Notes 2" and "Notes 2" in Settings and the layout editor, so two of them
+  couldn't be told apart. The repeated one is now numbered past any name
+  already in use: "Notes", "Notes 3", "Notes 2". (#484)
+
 ## [3.1.1] - 2026-11-14
 
 ### Fixed
