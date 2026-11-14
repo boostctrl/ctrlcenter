@@ -323,11 +323,12 @@ async function themeMatrixPhase(run) {
   // only place those loops run in CI. The list comes from the components
   // themselves: every scene file that calls requestAnimationFrame, named
   // after its id, so a new canvas scene is covered without being listed
-  // anywhere (about two seconds each).
+  // anywhere (about two seconds each). A scene's unit test sits beside it
+  // and may stub requestAnimationFrame; it isn't a scene.
   const scenesDir = path.join(ROOT, "components", "scenes");
   const canvas = fs
     .readdirSync(scenesDir)
-    .filter((f) => f.endsWith(".tsx"))
+    .filter((f) => f.endsWith(".tsx") && !f.endsWith(".test.tsx"))
     .filter((f) => fs.readFileSync(path.join(scenesDir, f), "utf8").includes("requestAnimationFrame"))
     .map((f) => ({ file: f, id: f.slice(0, -".tsx".length).toLowerCase() }));
   const ids = new Set(SCENES.map((s) => s.id));
