@@ -128,6 +128,20 @@ describe("getArrSnapshot (sonarr)", () => {
     expect(String(calCall[0])).toContain("includeSeries=true");
   });
 
+  // #491: a notice was mapped to a warning, so the tile counted it as one.
+  it("keeps each health entry's level, reading an unknown one as a warning", async () => {
+    stubEndpoints({
+      health: [
+        { type: "error", message: "Root folder missing" },
+        { type: "notice", message: "Update available" },
+        { type: "warning", message: "Indexer down" },
+        { type: "odd", message: "Something" },
+      ],
+    });
+    const snap = await getArrSnapshot("sonarr", CFG);
+    expect(snap.health.map((h) => h.type)).toEqual(["error", "notice", "warning", "warning"]);
+  });
+
   it("tolerates a failed history endpoint without blanking the card", async () => {
     stubEndpoints({
       calendar: [

@@ -38,7 +38,7 @@ export type ArrRecentItem = {
   at: number | null;
 };
 
-export type ArrHealthItem = { type: "warning" | "error"; message: string };
+export type ArrHealthItem = { type: "notice" | "warning" | "error"; message: string };
 
 export type ArrSnapshot = {
   upcoming: ArrUpcomingItem[];
@@ -200,8 +200,9 @@ function mapHealth(raw: unknown): ArrHealthItem[] {
     .filter((h) => typeof h.message === "string" && h.message !== "")
     .map(
       (h): ArrHealthItem => ({
-        // Anything that isn't explicitly an error reads as a warning.
-        type: h.type === "error" ? "error" : "warning",
+        // A notice stays one (#491); anything else that isn't explicitly an
+        // error reads as a warning.
+        type: h.type === "error" || h.type === "notice" ? h.type : "warning",
         message: h.message as string,
       })
     )

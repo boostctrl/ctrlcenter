@@ -239,9 +239,10 @@ export const GLANCES: {
 // cadence over the last seven days.
 function arrGlance(d: ServiceSnapshotMap["sonarr"], now: number | null): Glance {
   // Only a health *error* alarms; a warning (a stale branch, an unmapped root
-  // folder) is routine and shouldn't read as a failure.
+  // folder) is routine and shouldn't read as a failure. Each is counted as
+  // what it is, and a notice as neither (#491).
   const errors = d.health.filter((h) => h.type === "error").length;
-  const warnings = d.health.length;
+  const warnings = d.health.filter((h) => h.type === "warning").length;
 
   // Bucket recent grabs/imports into the last seven days (index 0 = six days
   // ago … index 6 = today). Before the client mounts `now` is null, so every bar
@@ -282,7 +283,11 @@ function arrGlance(d: ServiceSnapshotMap["sonarr"], now: number | null): Glance 
     alert: errors > 0,
     lines: [
       d.upcoming.length > 0 ? `${plural(d.upcoming.length, "upcoming")}` : "No recent activity",
-      ...(warnings > 0 ? [plural(warnings, "warning")] : []),
+      ...(errors > 0
+        ? [plural(errors, "error")]
+        : warnings > 0
+          ? [plural(warnings, "warning")]
+          : []),
     ],
     visual,
   };

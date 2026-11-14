@@ -42,6 +42,13 @@ here.
   and blocked counts from 999,950 to 999,999 showed as "1000.0k". They now
   show as "1.0M". (#490)
 
+- **Sonarr and Radarr tiles count health problems as what they are.** With
+  nothing landed recently, a tile counted every health entry as a warning,
+  so a single error showed as "1 warning". Errors now show as errors and
+  warnings as warnings. Sonarr's and Radarr's notices are no longer counted
+  as either, and the card lists them in a muted color instead of the warning
+  one. (#491)
+
 ## [3.1.1] - 2026-11-14
 
 ### Fixed

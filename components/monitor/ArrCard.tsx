@@ -138,7 +138,11 @@ export default function ArrCard({
                 <li
                   key={`${h.message}-${i}`}
                   className={`text-xs ${
-                    h.type === "error" ? "text-status-down" : "text-status-warning/90"
+                    h.type === "error"
+                      ? "text-status-down"
+                      : h.type === "notice"
+                        ? "text-ink-60"
+                        : "text-status-warning/90"
                   }`}
                 >
                   {h.message}
