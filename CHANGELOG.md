@@ -111,15 +111,13 @@ here.
   now always fires the first time round; in some zones, such as Berlin, it
   fired the second time. (#476)
 
-- **Status history resumes saving once a read-only history file is made
-  writable.** If `status-history.db` itself was read-only (for example mode
-  0444) in a folder the app could write to, the status page's history
-  loaded but new results weren't saved, and the "status history write
-  failed" warning kept coming back every hour until a restart. Making the
-  file writable often didn't fix it even then, because of read-only side
-  files left beside it. The app now treats such a file like a read-only
-  volume and starts saving again at the next check after the file becomes
-  writable, fixing the side files it left behind. (#439)
+- **Status history starts saving again once its file is writable.** If
+  `status-history.db` itself was read-only (for example mode 0444) in a
+  folder the app could write to, new results weren't saved, and the "status
+  history write failed" warning kept coming back every hour, even after the
+  file was made writable. Saving now resumes at the next check after the
+  file becomes writable, including where an earlier version already ran
+  into this. (#439)
 
 - **The UniFi card counts devices, not their roles.** The "devices online"
   count added up UniFi's per-role tallies, so a Dream Machine, which acts as
