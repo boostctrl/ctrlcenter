@@ -367,6 +367,20 @@ describe("renderSubject", () => {
   it("falls back to the default when the template is blank", () => {
     expect(renderSubject("   ", { name: "API", url: "" }, "up")).toBe("API is up");
   });
+
+  // #480: a string replacement expanded "$&" in the name, and the second
+  // pass substituted a "{status}" the name brought in.
+  it("puts the app name in as written", () => {
+    expect(renderSubject("", { name: "Price $& co", url: "" }, "down")).toBe(
+      "Price $& co is down"
+    );
+    expect(renderSubject("", { name: "My {status} app", url: "" }, "down")).toBe(
+      "My {status} app is down"
+    );
+    expect(renderSubject("{SERVICE}: {Status}", { name: "$1 $' $`", url: "" }, "up")).toBe(
+      "$1 $' $`: up"
+    );
+  });
 });
 
 describe("buildServiceRequest", () => {

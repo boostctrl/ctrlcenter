@@ -292,17 +292,20 @@ function linkRow(url: string, accent: string): string {
 }
 
 // Render the subject from its template, substituting {service}/{status}
-// (down, up or warning). CR/LF
-// are stripped (the service name is admin-controlled but flows into a header) and
-// the length is capped; an empty template falls back to the default.
+// (down, up or warning) in one pass with a replacer function, so "$&" in an
+// app name isn't expanded and a "{status}" in it isn't substituted (#480).
+// CR/LF are stripped (the service name is admin-controlled but flows into a
+// header) and the length is capped; an empty template falls back to the
+// default.
 export function renderSubject(
   template: string,
   app: AlertApp,
   status: string
 ): string {
   const out = (template.trim() || "{service} is {status}")
-    .replace(/\{service\}/gi, app.name)
-    .replace(/\{status\}/gi, status)
+    .replace(/\{(service|status)\}/gi, (_, key: string) =>
+      key.toLowerCase() === "service" ? app.name : status
+    )
     .replace(/[\r\n]+/g, " ")
     .trim()
     .slice(0, 200);

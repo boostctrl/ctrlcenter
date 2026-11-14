@@ -12,6 +12,13 @@ here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Alert email subjects show an app's name as written.** An app named with
+  `$&` in it, such as "Price $& co", got "{service}" in its place in the
+  subject, and a name containing "{status}" had that replaced with "down" or
+  "up". The name now goes into the subject exactly as typed. (#480)
+
 ## [3.1.1] - 2026-11-14
 
 ### Fixed
