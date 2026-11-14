@@ -5,9 +5,10 @@ import type { UnifiDetail as UnifiDetailData, UnifiDevice } from "@/lib/services
 import UnifiCard from "../UnifiCard";
 
 // UniFi's detail page body (#231): the card's internet/client/health summary
-// plus the adopted-device list — which access points, switches, and gateways
-// exist, whether each is up, and how many clients it carries. That inventory is
-// the depth the health-count card can't show.
+// plus the device list — which access points, switches, and gateways exist
+// (and other UniFi apps' devices, such as Protect cameras), whether each is
+// up, and how many clients it carries. That inventory is the depth the
+// health-count card can't show.
 
 // Compact uptime: "5d 4h", "12h", "34m".
 function uptimeLabel(seconds: number | null): string {
@@ -37,9 +38,11 @@ function DeviceRow({ device }: { device: UnifiDevice }) {
       <span className="flex shrink-0 items-baseline gap-3 text-xs tabular-nums text-ink-50">
         {device.up ? (
           <>
-            <span>
-              {device.clients} client{device.clients === 1 ? "" : "s"}
-            </span>
+            {device.clients !== null && (
+              <span>
+                {device.clients} client{device.clients === 1 ? "" : "s"}
+              </span>
+            )}
             {device.uptime !== null && <span>up {uptimeLabel(device.uptime)}</span>}
           </>
         ) : (

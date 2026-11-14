@@ -6,6 +6,7 @@ import {
   mapUnifiHealth,
   mapUnifiDevices,
   countUnifiDevices,
+  countUnifiClients,
   UNIFI_ISSUE_CAP,
   UNIFI_DEVICE_CAP,
 } from "./unifi";
@@ -57,12 +58,15 @@ const HEALTH = [
 const envelope = (data: unknown) => JSON.stringify({ meta: { rc: "ok" }, data });
 
 // Dispatching stub: /api/auth/login (UniFi OS) sets a TOKEN cookie; the
-// proxied health/sysinfo endpoints return their envelopes.
+// proxied health/sysinfo endpoints return their envelopes. The v2 lists
+// (bare JSON, no envelope) 404, as on a controller without them, unless given.
 function stubUnifiOs(opts: {
   loginStatus?: number;
   health?: unknown;
   sysinfo?: unknown;
   devices?: unknown;
+  appDevices?: unknown;
+  clients?: unknown;
   healthStatus?: () => number;
 } = {}) {
   const fetchMock = vi.fn<typeof fetch>(async (input) => {
@@ -89,11 +93,20 @@ function stubUnifiOs(opts: {
     if (url.includes("/proxy/network/api/s/default/stat/device")) {
       return new Response(envelope(opts.devices ?? DEVICES));
     }
+    if (url.includes("/proxy/network/v2/api/site/default/device") && opts.appDevices) {
+      return new Response(JSON.stringify(opts.appDevices));
+    }
+    if (url.includes("/proxy/network/v2/api/site/default/clients/active") && opts.clients) {
+      return new Response(JSON.stringify(opts.clients));
+    }
     return new Response("not found", { status: 404 });
   });
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
 }
+
+// n copies of an object.
+const times = <T,>(n: number, item: T): T[] => Array.from({ length: n }, () => item);
 
 // A trimmed stat/device payload: a gateway, two APs (one offline), a switch.
 const DEVICES = [
@@ -185,6 +198,89 @@ describe("getUnifiSnapshot", () => {
     );
     const snap = await getUnifiSnapshot(CFG);
     expect(snap.devices).toEqual({ online: 8, disconnected: 0, pending: 0 });
+  });
+
+  // #502: on a live controller the health summary had 15 WiFi clients and
+  // UniFi Network's own pages 13, the count its v2 active-client list gives.
+  it("counts clients from the active-client list UniFi Network reads", async () => {
+    const health = HEALTH.map((s) =>
+      s.subsystem === "wlan" ? { ...s, num_user: 15 } : s.subsystem === "lan" ? { ...s, num_user: 7 } : s
+    );
+    stubUnifiOs({
+      health,
+      clients: [
+        ...times(12, { type: "WIRELESS", is_wired: false, is_guest: false }),
+        { type: "WIRELESS", is_wired: false, is_guest: true },
+        ...times(7, { type: "WIRED", is_wired: true, is_guest: false }),
+      ],
+    });
+    const snap = await getUnifiSnapshot(CFG);
+    expect(snap.clients).toEqual({ total: 20, wireless: 13, wired: 7, guests: 1 });
+  });
+
+  // #467: on a live controller UniFi Network showed 8 devices online and 2
+  // offline: the 6 network devices in stat/device, and 4 Protect devices
+  // from its v2 device list, 2 of them disconnected.
+  it("counts other UniFi apps' devices from the v2 device list", async () => {
+    const network = ["udm", "udm", "uap", "uap", "usw", "usw"].map((type) => ({ type, state: 1 }));
+    stubUnifiOs({
+      devices: network,
+      appDevices: {
+        network_devices: network,
+        protect_devices: [{ state: 1 }, { state: 1 }, { state: 0 }, { state: 0 }],
+        access_devices: [],
+        unmanaged_devices: [{ state: 0 }],
+      },
+    });
+    const snap = await getUnifiSnapshot(CFG);
+    expect(snap.devices).toEqual({ online: 8, disconnected: 2, pending: 0 });
+    expect(snap.issues).toEqual([{ level: "error", message: "2 devices disconnected" }]);
+  });
+
+  it("takes the network gear from the v2 device list when stat/device fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(async (input) => {
+        const url = String(input);
+        if (url.endsWith("/api/auth/login"))
+          return new Response("{}", { status: 200, headers: { "set-cookie": "TOKEN=jwt; Path=/" } });
+        if (url.includes("/stat/health")) return new Response(envelope(HEALTH));
+        if (url.includes("/v2/api/site/default/device"))
+          return new Response(
+            JSON.stringify({
+              network_devices: [{ type: "udm", state: 1 }, { type: "uap", state: 1 }],
+              protect_devices: [{ state: 0 }],
+            })
+          );
+        if (url.includes("/v2/api/site/default/clients/active")) return new Response("<html>oops</html>");
+        return new Response("nope", { status: 500 });
+      })
+    );
+    const snap = await getUnifiSnapshot(CFG);
+    expect(snap.devices).toEqual({ online: 2, disconnected: 1, pending: 0 });
+    // The client list didn't parse: the health summary's counts.
+    expect(snap.clients).toEqual({ total: 25, wireless: 17, wired: 8, guests: 0 });
+  });
+});
+
+describe("countUnifiClients", () => {
+  it("counts WiFi, wired and guest clients, by type or else by is_wired", () => {
+    expect(
+      countUnifiClients([
+        { type: "WIRELESS" },
+        { type: "WIRELESS", is_guest: true },
+        { type: "WIRED", is_guest: true },
+        { is_wired: false },
+        { is_wired: true },
+        // Neither WiFi nor wired, or not a client at all: not counted.
+        { type: "VPN", is_guest: true },
+        {},
+        null,
+        "x",
+      ])
+    ).toEqual({ total: 5, wireless: 3, wired: 2, guests: 2 });
+    expect(countUnifiClients([])).toEqual({ total: 0, wireless: 0, wired: 0, guests: 0 });
+    expect(countUnifiClients({ data: [] })).toBeNull();
   });
 });
 
@@ -280,6 +376,26 @@ describe("getUnifiDetail", () => {
     const detail = await getUnifiDetail(CFG);
     expect(detail.internet.up).toBe(true);
     expect(detail.deviceList).toEqual([]);
+  });
+
+  it("lists other UniFi apps' devices by app, without clients or uptime", async () => {
+    stubUnifiOs({
+      devices: [{ name: "Dream Machine", type: "udm", state: 1, num_sta: 20, uptime: 600 }],
+      appDevices: {
+        protect_devices: [
+          { name: "Driveway", state: 1, uptime: 123_456_789 },
+          { name: "Porch", state: 0 },
+        ],
+        apollo_devices: [{ name: "Mystery", state: 1 }],
+      },
+    });
+    const detail = await getUnifiDetail(CFG);
+    expect(detail.deviceList).toEqual([
+      { name: "Porch", kind: "Protect", up: false, clients: null, uptime: null },
+      { name: "Dream Machine", kind: "Gateway", up: true, clients: 20, uptime: 600 },
+      { name: "Driveway", kind: "Protect", up: true, clients: null, uptime: null },
+      { name: "Mystery", kind: "Device", up: true, clients: null, uptime: null },
+    ]);
   });
 });
 

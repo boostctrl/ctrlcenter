@@ -122,11 +122,15 @@ here.
 - **The UniFi card counts devices, not their roles.** The "devices online"
   count added up UniFi's per-role tallies, so a Dream Machine, which acts as
   a gateway and also as a switch or access point, counted twice. The card
-  and its tile now count each device in the controller's device list once,
-  the same devices the UniFi page lists, and count devices that are
-  offline or waiting to be adopted from that list too. UniFi Network's own
-  device count can still be higher, since it can include devices that list
-  doesn't return. (#467)
+  and its tile now count each device once, along with the devices that are
+  offline or waiting to be adopted. Like UniFi Network's own count, they
+  include other UniFi apps' devices, such as Protect cameras, and the UniFi
+  page lists those devices too. (#467)
+
+- **The UniFi card's WiFi client count matches UniFi Network.** The card
+  took its client counts from UniFi's health summary, whose WiFi count can
+  run a couple above the client list UniFi Network shows. It now counts
+  clients from that list on controllers that provide it. (#502)
 
 ## [3.1.1] - 2026-11-14
 
