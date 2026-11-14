@@ -75,6 +75,12 @@ here.
   letting go made Redo unavailable, though nothing had changed. Redo now
   stays as it was. (#488)
 
+- **Advanced check settings stay open while you edit them.** Editing an app
+  with a custom check interval, timeout or retry count and clearing that
+  field to type a new one closed the Advanced check settings panel under the
+  cursor. The panel now opens when the form does if the app has a custom
+  setting, and then stays open or closed as you leave it. (#495)
+
 ## [3.1.1] - 2026-11-14
 
 ### Fixed

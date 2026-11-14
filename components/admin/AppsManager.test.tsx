@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { appItemSchema, type AppItem } from "@/lib/schema";
 import { ToastProvider } from "./Toast";
 import { useItems } from "./useAdminData";
 import { useGroups } from "./useGroups";
@@ -12,16 +13,55 @@ vi.mock("@/components/PrefsProvider", async (original) => ({
 
 const { default: AppsManager } = await import("./AppsManager");
 
-function Harness() {
-  const items = useItems([], []);
+function Harness({ apps = [] }: { apps?: AppItem[] }) {
+  const items = useItems(apps, []);
   const groupsState = useGroups([]);
   return (
     <AppsManager items={items} groupsState={groupsState} statusChecksEnabled statusInterval={5} />
   );
 }
 
+function stubResizeObserver() {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
+}
+
 describe("AppsManager", () => {
   afterEach(() => vi.unstubAllGlobals());
+
+  // #495: the panel's open state was worked out from the fields on every
+  // render, so clearing the last override snapped it shut under the cursor.
+  it("keeps Advanced check settings open while its fields are cleared", async () => {
+    const user = userEvent.setup();
+    stubResizeObserver();
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => {})));
+    const app = appItemSchema.parse({ id: "a", name: "Plex", url: "https://plex.example.com", interval: 5 });
+    render(
+      <ToastProvider>
+        <Harness apps={[app]} />
+      </ToastProvider>
+    );
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    const panel = screen.getByText("Advanced check settings").closest("details")!;
+    expect(panel.open).toBe(true);
+    await user.clear(screen.getByLabelText(/^Interval/));
+    expect(panel.open).toBe(true);
+
+    // Opened by hand on an app without overrides, it stays open as well.
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(panel.open).toBe(false);
+    await user.click(screen.getByText("Advanced check settings"));
+    expect(panel.open).toBe(true);
+    await user.type(screen.getByLabelText(/^Retries/), "2");
+    await user.clear(screen.getByLabelText(/^Retries/));
+    expect(panel.open).toBe(true);
+  });
 
   // #473: after adding a push-check app under a new group, the form stays
   // open for the push URL, and its Group field showed the new group's id
@@ -29,14 +69,7 @@ describe("AppsManager", () => {
   // a group named after that id.
   it("keeps a new group's typed name on a just-added push app", async () => {
     const user = userEvent.setup();
-    vi.stubGlobal(
-      "ResizeObserver",
-      class {
-        observe() {}
-        unobserve() {}
-        disconnect() {}
-      }
-    );
+    stubResizeObserver();
     vi.stubGlobal(
       "fetch",
       vi.fn((url: string, init?: RequestInit) => {

@@ -141,6 +141,16 @@ function modeFromExpect(v: string): UpMode {
   return "custom";
 }
 
+// Whether a form opens with "Advanced check settings" expanded: when it holds
+// a per-app override. Read once, as the form is set up; after that the panel
+// stays as the user leaves it, so clearing a field doesn't snap it shut
+// (#495).
+function hasCheckOverrides(f: FormState): boolean {
+  return Boolean(
+    f.interval || f.timeout || f.retries || (f.certWarnDays && f.checkType !== "tls")
+  );
+}
+
 export default function AppsManager({
   items,
   groupsState,
@@ -159,6 +169,7 @@ export default function AppsManager({
   const { apps, setApps } = items;
   const [form, setForm] = useState<FormState>(emptyForm);
   const [upMode, setUpMode] = useState<UpMode>("any");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   // Whether the check method was chosen by hand. Until it is, a new app's
   // method follows its URL (guessCheckType, #296).
@@ -176,7 +187,7 @@ export default function AppsManager({
   function startEdit(app: AppItem, typedGroup?: string) {
     setEditingId(app.id);
     setMethodChosen(true);
-    setForm({
+    const next: FormState = {
       name: app.name,
       subtitle: app.subtitle,
       groupName: app.group ? (typedGroup ?? groupName(groups, app.group)) : "",
@@ -195,7 +206,9 @@ export default function AppsManager({
       interval: app.interval != null ? String(app.interval) : "",
       timeout: app.timeout != null ? String(app.timeout) : "",
       retries: app.retries != null ? String(app.retries) : "",
-    });
+    };
+    setForm(next);
+    setAdvancedOpen(hasCheckOverrides(next));
     setUpMode(modeFromExpect(app.expectStatus ?? ""));
     revealForm();
   }
@@ -204,6 +217,7 @@ export default function AppsManager({
     setEditingId(null);
     setMethodChosen(false);
     setForm(emptyForm);
+    setAdvancedOpen(false);
     setUpMode("any");
   }
 
@@ -716,12 +730,8 @@ export default function AppsManager({
                     away: the defaults suit almost every app. */}
                 <details
                   className="rounded-lg border border-fg/10 px-3 py-2"
-                  open={Boolean(
-                    form.interval ||
-                      form.timeout ||
-                      form.retries ||
-                      (form.certWarnDays && form.checkType !== "tls")
-                  )}
+                  open={advancedOpen}
+                  onToggle={(e) => setAdvancedOpen(e.currentTarget.open)}
                 >
                   <summary className="cursor-pointer text-sm text-ink-70 select-none">
                     Advanced check settings
