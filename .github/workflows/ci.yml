@@ -37,11 +37,9 @@ jobs:
   # The sized-cell keyboard contract (#355) and clip-box geometry (#354) in
   # WebKit, Safari's engine, where they differ from Chromium (#430): the same
   # build, driven by scripts/smoke.mjs with SMOKE_BROWSER=webkit. Its own job,
-  # so the Chromium run above stays as long as it is. Pinned to 24.04, where it
-  # last passed: on ubuntu-26.04 (ubuntu-latest since early November) its
-  # WebKit build never gets past the smoke run's sign-in (#498).
+  # so the Chromium run above stays as long as it is.
   smoke-webkit:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
