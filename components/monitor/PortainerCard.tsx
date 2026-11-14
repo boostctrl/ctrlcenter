@@ -205,10 +205,23 @@ export default function PortainerCard({
   const [logLoading, setLogLoading] = useState(false);
   const [logError, setLogError] = useState<string | null>(null);
 
+  // The environment whose list is on screen, and a counter over list and log
+  // loads: a reply lands only while it is still the latest for what's open,
+  // so a slow environment's list can't fill another's row (and its buttons
+  // act on the wrong environment), nor a slow log another container's
+  // modal (#463).
+  const shown = useRef<number | null>(null);
+  const listSeq = useRef(0);
+  const logSeq = useRef(0);
+
   const loadContainers = useCallback(async (endpointId: number) => {
+    // An action's reload for an environment closed since doesn't take over.
+    if (shown.current !== endpointId) return;
+    const seq = ++listSeq.current;
     setLoadingList(true);
     setListError(null);
     const res = await fetchContainers(integration, endpointId);
+    if (seq !== listSeq.current || shown.current !== endpointId) return;
     setLoadingList(false);
     if (res.error) setListError(res.error);
     else setContainers(res.containers ?? []);
@@ -227,6 +240,7 @@ export default function PortainerCard({
     // Defer the open past the effect (as the cockpit does for its clock) so it
     // isn't a synchronous set-state in the effect body.
     const raf = requestAnimationFrame(() => {
+      shown.current = first.id;
       setExpanded(first.id);
       loadContainers(first.id);
     });
@@ -235,9 +249,13 @@ export default function PortainerCard({
 
   const toggle = (endpointId: number) => {
     if (expanded === endpointId) {
+      shown.current = null;
+      listSeq.current++;
+      setLoadingList(false);
       setExpanded(null);
       return;
     }
+    shown.current = endpointId;
     setExpanded(endpointId);
     setContainers([]);
     loadContainers(endpointId);
@@ -269,11 +287,13 @@ export default function PortainerCard({
   };
 
   const openLogs = async (endpointId: number, c: PortainerContainer) => {
+    const seq = ++logSeq.current;
     setLogTarget(c);
     setLogs("");
     setLogError(null);
     setLogLoading(true);
     const res = await fetchContainerLogs(integration, endpointId, c.id);
+    if (seq !== logSeq.current) return;
     setLogLoading(false);
     if (res.error) setLogError(res.error);
     else setLogs(res.logs ?? "");
@@ -356,7 +376,10 @@ export default function PortainerCard({
           logs={logs}
           loading={logLoading}
           error={logError}
-          onClose={() => setLogTarget(null)}
+          onClose={() => {
+            logSeq.current++;
+            setLogTarget(null);
+          }}
         />
       )}
     </MonitorCard>

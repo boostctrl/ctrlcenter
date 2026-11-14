@@ -57,6 +57,13 @@ here.
   Save again added the ones before it a second time, so the dashboard showed
   them twice. A retry now adds only what's still missing. (#464)
 
+- **The Portainer card no longer mixes up environments or logs.** Opening a
+  slow environment and then another straight away could fill the second one
+  with the first one's containers, and Start, Stop and Restart on those rows
+  then went to the wrong environment. In the same way, a slow log could show
+  up in the window opened for another container. A list or a log now only
+  shows if it's for what's open at the time it arrives. (#463)
+
 ### Security
 
 - **A custom search bang can only lead to a web address.** A bang whose URL
