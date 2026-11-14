@@ -91,6 +91,12 @@ here.
   page, the server read all of it into memory before turning it down. It now
   stops reading as soon as the response passes the 512 KiB limit. (#479)
 
+- **An outage open across a restart is kept when the history file opens
+  late.** If the status history couldn't be opened at startup and an app
+  that had been down went up and then down again before it could, the
+  outage from before the restart was lost when the history was read in. It
+  is now recorded, ending when the app was first seen up. (#474)
+
 ## [3.1.1] - 2026-11-14
 
 ### Fixed

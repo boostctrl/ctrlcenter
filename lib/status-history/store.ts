@@ -309,7 +309,11 @@ function mergeRows(rows: HistoryRows): void {
     } else if (mine !== undefined && !first.up && !first.maint && first.t === mine) {
       state.downSince.set(d.app, Math.min(mine, d.since));
       state.dirty.downSince.add(d.app);
-    } else if (mine === undefined) {
+    } else {
+      // Memory's first reading closes the file's outage: up, or down with an
+      // outage recorded from it, whether memory has since come up (no mark)
+      // or gone down again (a mark of its own, later). Either way memory's
+      // own mark, if any, stands (#474).
       const list = state.outages.get(d.app) ?? [];
       const tail = !first.up && !first.maint ? list.find((o) => o.start === first.t) : undefined;
       if (tail) tail.start = Math.min(tail.start, d.since);

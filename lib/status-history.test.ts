@@ -1071,6 +1071,50 @@ describe("history while the database is unavailable (#401)", () => {
     expect(getHistory(["b"]).apps[0].downSince).toBeNull();
     expect(getAppDetail("b", "UTC", 5).outages).toHaveLength(1);
   });
+
+  // #474: with memory down again by the time the file opened, the merge
+  // matched none of its cases and dropped the outage the file left open.
+  const recorded = (app: string) =>
+    getAppDetail(app, "UTC", 5)
+      .outages.filter((o) => o.recorded)
+      .map((o) => [o.startMs, o.endMs]);
+
+  it("closes an outage the file left open when the app was up, then down again", async () => {
+    recordResults([down("c")], h + MIN);
+    await flush(h + MIN);
+    resetHistoryState();
+    dbFault.open = new Error("database is locked");
+    await loadHistory();
+    recordResults([up("c")], h + 2 * MIN);
+    recordResults([down("c")], h + 3 * MIN);
+    dbFault.open = null;
+    await loadHistory();
+    expect(getHistory(["c"]).apps[0].downSince).toBe(h + 3 * MIN);
+    expect(recorded("c")).toEqual([[h + MIN, h + 2 * MIN]]);
+    await flush(h + 4 * MIN);
+    await reload();
+    expect(getHistory(["c"]).apps[0].downSince).toBe(h + 3 * MIN);
+    expect(recorded("c")).toEqual([[h + MIN, h + 2 * MIN]]);
+  });
+
+  it("joins an outage the file left open to the first one since, when the app has gone down again", async () => {
+    recordResults([down("d")], h + MIN);
+    await flush(h + MIN);
+    resetHistoryState();
+    dbFault.open = new Error("database is locked");
+    await loadHistory();
+    recordResults([down("d")], h + 2 * MIN); // still down at the first poll
+    recordResults([up("d")], h + 3 * MIN);
+    recordResults([down("d")], h + 4 * MIN);
+    dbFault.open = null;
+    await loadHistory();
+    expect(getHistory(["d"]).apps[0].downSince).toBe(h + 4 * MIN);
+    expect(recorded("d")).toEqual([[h + MIN, h + 3 * MIN]]);
+    await flush(h + 5 * MIN);
+    await reload();
+    expect(getHistory(["d"]).apps[0].downSince).toBe(h + 4 * MIN);
+    expect(recorded("d")).toEqual([[h + MIN, h + 3 * MIN]]);
+  });
 });
 
 describe("history on a volume the app can't write to (#428)", () => {
