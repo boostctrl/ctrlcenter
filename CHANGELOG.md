@@ -12,181 +12,7 @@ here.
 
 ## [Unreleased]
 
-## [3.1.0-rc.5] - 2026-11-14
-
-### Fixed
-
-- **One bad search bang in a hand-edited config no longer takes every page
-  down.** A `bangs` entry that wasn't a key and a URL, or a `bangs` value that
-  wasn't a list at all, made every page fail to load, the sign-in page
-  included. The bad entry is now skipped. In the same way, a countdown, world
-  clocks or system stats widget with one malformed row keeps its title and its
-  other rows instead of disappearing. (#459)
-
-- **Duplicating a theme with a long name no longer freezes the page.** In
-  Settings → Themes, duplicating a theme with a name of 40 characters, or a
-  name of 36 or more twice, hung the browser tab. The copy's name now makes
-  room for its number within the 40-character limit, so "Copy 2" and "Copy 3"
-  work at any length. A name one character short of the limit also no longer
-  gets a copy that looks just like it. (#458)
-
-- **One malformed character code no longer breaks a whole RSS feed.** A
-  feed with a numeric character reference that names no character, such as
-  `&#x110000;`, showed as "Couldn't connect" and none of its items appeared.
-  That one character now shows as a replacement mark, and the rest of the feed
-  reads as normal. (#460)
-
-- **The sign-in form no longer hangs when CtrlCenter can't be reached.**
-  If the server was restarting or the connection dropped when you pressed
-  *Sign in*, the button stayed on "Signing in…" until the page was reloaded.
-  The form now says it couldn't reach CtrlCenter and can be sent again. (#462)
-
-### Security
-
-- **A calendar widget without a password no longer shows another widget's
-  private events.** When two calendar widgets used the same address, one with
-  a username and password and one without, the one without could show the
-  private calendar's events for several minutes after the other had loaded
-  them. Each set of credentials now has its own copy, and a widget without
-  any gets only what the calendar shows without signing in. (#461)
-
-- **A member turning off their own two-factor no longer turns off write
-  actions.** Since 3.1.0-rc.1, any account can turn off its own second factor
-  from its account page, and doing so switched off the actions (restart a
-  container, pause a torrent, approve a request) on every integration. Only
-  the founding admin's second factor going off does that now, since it's the
-  one actions depend on. (#455)
-
-- **Failed sign-ins for different accounts from one address get a line
-  each in the security activity.** Since 3.1.0-rc.1 the log names the account
-  a failed sign-in tried. But a try at a second account from the same address
-  within a few minutes was counted on the first account's line, so the second
-  never showed. Each account now gets its own line. During a flood from many
-  addresses, failures still fold into one line, which now says when it covers
-  several accounts. (#456)
-
-- **The security activity names the admin who did it.** With more than one
-  admin account, a container action, an integration change, turning actions
-  on, an export with secrets or a revealed webhook token was logged under the
-  founding admin, whoever did it. These entries now name the admin who acted.
-  (#457)
-
-- **Next.js and nodemailer updated past their latest advisories.** 3.0.1
-  and the earlier 3.1.0 candidates shipped Next.js 16.4.3, and seven
-  advisories against it were fixed in 16.4.5. None of them reaches
-  CtrlCenter: the image optimizer is switched off, and the app has no Edge
-  routes, no `use cache` functions and no route that passes a fetched
-  response through unchanged. The image now carries Next.js 16.4.6 all the
-  same, so a dependency audit of it comes back clean. nodemailer's fix for
-  alert email addresses that could be delivered to a different domain than
-  the one they name comes along, with the routine minor updates. (#499)
-
-## [3.1.0-rc.4] - 2026-11-01
-
-### Changed
-
-- **"Card opacity" runs from clear glass to a solid card.** At 0% a card
-  is clear: no tint, no texture and no frost, so the scene or wallpaper
-  behind it shows through as it is; the design's own look sits at 100%,
-  with "Blur" still setting the frost on its own; by 300% the card is
-  solid. Before, the lower half of the knob barely showed on a frosted
-  design, whose tint is faint and whose blur stayed. (#444)
-
-## [3.1.0-rc.3] - 2026-11-01
-
-### Fixed
-
-- **The header card keeps the clock beside the weather on a 13-inch
-  laptop.** On a 1280-pixel-wide window, a screen at 250% scaling, the
-  stock card is a few pixels under the width at which the two sat side by
-  side, so the clock dropped under the weather. The card now pairs them
-  from a narrower width, with slightly tighter spacing there, and never
-  clips either. (#453)
-
-### Changed
-
-- **The corner menu offers the Admin portal and the Monitor to admins
-  only.** A visitor or a member no longer sees two entries that would only
-  send them to the sign-in form or straight back; a visitor has *Sign in*
-  there instead.
-
-- **"Card opacity" at its top makes a plainly solid card.** Above 100% the
-  knob used to build the page colour up under the card, which on a dark
-  page looked no different from glass. It now builds a card colour a shade
-  apart from the page, so by 300% the card is unmistakably solid; below
-  100% it still fades toward see-through. (#444)
-
-- **"Scene glow" reaches further.** Above 100% the knob only brightened the
-  whole scene, which greyed a glow rather than strengthening it. Every glow
-  scene now scales its own light with the knob, the scene is saturated as it
-  brightens, and the knob goes to 300%. (#445)
-
-## [3.1.0-rc.2] - 2026-11-01
-
 ### Added
-
-- **Webhook bursts still waiting when CtrlCenter restarts are sent once it
-  is back.** A burst held for its window — a season import, a run of
-  requests — was dropped with the process; a restart or an update in the
-  middle of one lost the notification. What is waiting is now kept in
-  `webhook-digest.json` beside the config, read back when the server
-  starts, and sent when it was due, and events arriving after the restart
-  join it as before. (#351)
-
-- **Sign in from the corner menu.** Anyone not signed in finds *Sign in*
-  there, which opens the form at `/login` and brings them back to the board
-  they were on; `/admin/login` still works and still leads to the portal.
-  The username is prefilled with `admin` only while that is the one account;
-  with more, the field starts empty (the browser remembers the last name
-  used here) and says which account is the founding one. (#450)
-
-### Changed
-
-- **Two Seerr instances on one relay URL keep their bursts apart.** A Seerr
-  event names no instance, so two Seerr servers posting to the same webhook
-  URL were merged into one digest. Each one's Application URL under
-  Settings → Monitoring → Inbound webhooks now tells them apart; with none
-  saved, nothing changes. (#351)
-
-### Fixed
-
-- **A season upgrade is one notification, not two.** Sonarr posts a delete
-  for the file each upgrade replaces beside the import, so an upgraded
-  season arrived as "Sonarr deleted 8 episodes of The Bear" next to "Sonarr
-  upgraded 8 episodes of The Bear". The delete now goes with the import,
-  which already says what it replaced; a delete whose import never arrives
-  still goes out on its own, and a manual delete is still its own news.
-  (#351)
-
-- **A daily series' episodes are named by their air date.** The digest's
-  range already read by date, but each episode in its list and in the
-  email's Episodes row still carried the code Sonarr makes of the year and
-  a running number — `S2026E271 "Day 1"`. Those now read `2026-10-01 "Day
-  1"`, the way Sonarr names the file, in a single event's report and in a
-  digest alike; an episode with no air date yet keeps its code, and every
-  other kind of series its codes. (#351)
-
-- **A season pack that replaced its files says Upgraded.** A single
-  season-pack import always read "Imported", while a single upgraded
-  episode reads "Upgraded" and a burst of upgraded packs did too. A pack
-  that was an upgrade now says so on its own. (#351)
-
-- **A private app shared with a member shows on a board upgraded from
-  2.x.** The upgrade split each apps widget into one hiding private apps and
-  a "Private Applications" one showing only them, and the second was left
-  off every page but an admin's. A member now gets it too, listing exactly
-  the private apps shared with them; a visitor still sees neither. (#451)
-
-## [3.1.0-rc.1] - 2026-11-01
-
-### Added
-
-- **Backups carry the accounts.** An export with secrets holds every
-  account as it is, password and second factor included; one without holds
-  the roster alone (name, role, groups), each account to be given a password
-  by an admin after a restore. A restore adds the accounts the instance
-  lacks and never changes or removes one it already has, the admin's
-  credential included. (#423)
 
 - **Accounts: more than one person can sign in.** Settings → Users adds
   accounts, each with its own password, role and groups: an *admin* runs
@@ -199,24 +25,40 @@ here.
   member finds it in the corner menu) for its password, second factor and
   sessions. (#423)
 
-- **A private board, app or bookmark can be shared with named accounts and
-  groups.** Each gets an *audience*: the accounts and the groups that may
-  see it besides the admins. A member who signs in sees the public boards
-  and items plus the private ones shared with them, and nothing else; one
-  with nothing shared yet is told so. The admin portal and its settings stay
-  admin-only, and a member signs out from the corner menu. Tick who may see
-  a private board under it in Settings → Home layout, and who may see a
-  private app or bookmark in its form; or set
-  `audience: { users: [sam], groups: [family] }` in `config.yaml`. (#423)
-
 - **Sign in with a username.** The login form asks for a username as well
   as the password; yours is `admin`, with the password you already use, and
   the browser remembers the name. The activity log in Settings → Security
   and the Security alerts now say which account signed in, changed its
-  password or its second factor, or had its sign-ins refused, and wrong
-  passwords are also counted per account, so a guessing run spread over
-  many addresses is bounded for each one. This is the first step toward
-  per-user logins; nothing else changes for a single admin. (#423)
+  password or its second factor, or had its sign-ins refused, and which
+  admin took an action such as restarting a container, changing an
+  integration or exporting the secrets. Wrong passwords are also counted per
+  account, so a guessing run spread over many addresses is bounded for each
+  one. For a single admin, nothing else changes. (#423)
+
+- **A private board, app or bookmark can be shared with named accounts and
+  groups.** Each gets an *audience*: the accounts and the groups that may
+  see it besides the admins; one you haven't shared stays admin-only, as it
+  was. A member who signs in sees the public boards and items plus the
+  private ones shared with them, and nothing else; one with nothing shared
+  yet is told so. The admin portal and its settings stay admin-only, and a
+  member signs out from the corner menu. Tick who may see a private board
+  under it in Settings → Home layout, and who may see a private app or
+  bookmark in its form; or set
+  `audience: { users: [sam], groups: [family] }` in `config.yaml`. (#423)
+
+- **Sign in from the corner menu.** Anyone not signed in finds *Sign in*
+  there, which opens the form at `/login` and brings them back to the board
+  they were on; `/admin/login` still works and still leads to the portal.
+  The username is prefilled with `admin` only while that is the one account;
+  with more, the field starts empty (the browser remembers the last name
+  used here) and says which account is the founding one. (#450)
+
+- **Backups carry the accounts.** An export with secrets holds every
+  account as it is, password and second factor included; one without holds
+  the roster alone (name, role, groups), each account to be given a password
+  by an admin after a restore. A restore adds the accounts the instance
+  lacks and never changes or removes one it already has, the admin's
+  credential included. (#423)
 
 - **Webhook emails can link back into Seerr.** Each service under
   Settings → Monitoring → Inbound webhooks now has an **Application URL**
@@ -225,8 +67,29 @@ here.
   emails had only the TMDB link), and a Sonarr or Radarr event falls back
   to it when the event carries no address, as it doesn't until the app's
   own Application URL is set. The push and chat channels get the same
-  link. Empty by default, so existing configs and backups are unaffected.
-  (#352)
+  link, and the preview beside the setting shows it as you type. Empty by
+  default, so existing configs and backups are unaffected. (#352)
+
+- **Webhook bursts still waiting when CtrlCenter restarts are sent once it
+  is back.** A burst held for its window — a season import, a run of
+  requests — was dropped with the process; a restart or an update in the
+  middle of one lost the notification. What is waiting is now kept in
+  `webhook-digest.json` beside the config, read back when the server
+  starts, and sent when it was due, and events arriving after the restart
+  join it as before. (#351)
+
+### Changed
+
+- **The corner menu offers the Admin portal and the Monitor to admins
+  only.** A visitor or a member no longer sees two entries that would only
+  send them to the sign-in form or straight back; a visitor has *Sign in*
+  there instead.
+
+- **Two Seerr instances on one relay URL keep their bursts apart.** A Seerr
+  event names no instance, so two Seerr servers posting to the same webhook
+  URL were merged into one digest. Each one's Application URL under
+  Settings → Monitoring → Inbound webhooks now tells them apart; with none
+  saved, nothing changes. (#351)
 
 ### Fixed
 
@@ -264,92 +127,59 @@ here.
   theme's Still level, and every scene reacts when the system's reduced
   motion setting changes while the page is open. (#395)
 
-- **A long Telegram message with a long link arrives instead of being
-  refused.** The text of a relayed notification was cut to leave room for
-  its link, but a link near the 2,048-character bound could still carry the
-  whole message past Telegram's 4,096-character cap, and Telegram then
-  dropped it whole. The text now makes room for the whole link, as it does
-  on Discord, and only a link too long to leave any room is cut with it.
-  The cuts made as an event is read — a name, a title, an overview — could
-  also end in the middle of an emoji; they now land between characters.
-  (#441)
-
-- **The theme builder's "Card opacity" makes cards more or less solid.** The
-  slider used to scale how much of the text color is mixed into a card's
-  fill, so it brightened a card on a dark theme and greyed it on a light
-  one, while the scene behind showed through exactly as before, and on the
-  opaque designs it changed nothing you could call opacity. It now does what
-  it says: below 100% a card fades toward see-through, above it the page
-  color builds up under the design's fill until the card is solid at 300%.
-  At 100% every design looks as it did. (#444)
+- **The theme builder's "Card opacity" runs from clear glass to a solid
+  card.** The slider used to scale how much of the text color is mixed into
+  a card's fill, so it brightened a card on a dark theme and greyed it on a
+  light one, while the scene behind showed through exactly as before, and on
+  the opaque designs it changed nothing you could call opacity. Now at 0% a
+  card is clear: no tint, no texture and no frost, so the scene or wallpaper
+  behind it shows through as it is. At 100% every design looks as it did,
+  with "Blur" still setting the frost on its own, and by 300% the card is
+  solid, in a card colour a shade apart from the page. (#444)
 
 - **"Scene glow" has a visible effect on every design and scene.** The
   slider could only dim the backdrop, and on the default Glass design it
   already sat at the maximum, so raising it did nothing; on Flat, Minimal,
   Bold, Paper and Stripe it did nothing at all, and the canvas scenes
-  (Starfield, Rain, …) never read it. It now dims the scene below 100%,
-  leaves the design untouched at 100%, and above it brings the scene to full
-  strength and brightens it, on every scene. (#445)
+  (Starfield, Rain, …) never read it. It now dims the scene below 100% and
+  leaves the design untouched at 100%. Above it the scene comes to full
+  strength, brightening and saturating, every glow scene scales its own
+  light with the knob, and the knob goes to 300%. (#445)
 
-- **A daily series' digest names the days, not episode codes.** Sonarr
-  numbers a daily series' episodes by year and order (S2026E274), so a
-  burst of them was summed up with a code range that means nothing to a
-  reader. The notification and the email now range over the air dates
-  instead — "Sonarr imported 7 episodes of The Daily Show (2026-10-01 -
-  2026-10-07)", or the one date when they all aired the same day — and an
-  episode with no air date yet leaves the range out rather than wrong.
-  (#351)
+- **Duplicating a theme with a long name no longer freezes the page.** In
+  Settings → Themes, duplicating a theme with a name of 40 characters, or a
+  name of 36 or more twice, hung the browser tab. The copy's name now makes
+  room for its number within the 40-character limit, so "Copy 2" and "Copy 3"
+  work at any length. A name one character short of the limit also no longer
+  gets a copy that looks just like it. (#458)
 
-- **A burst of upgrades says Upgraded.** A run of imports that each
-  replaced an existing file was labelled Imported, as a burst mixing new
-  files and upgrades still is; one made of nothing but upgrades now reads
-  "Sonarr upgraded 6 episodes of The Bear", in the email's subject and
-  label too. (#351)
+- **The header card keeps the clock beside the weather on a 13-inch
+  laptop.** On a 1280-pixel-wide window, a screen at 250% scaling, the
+  stock card is a few pixels under the width at which the two sat side by
+  side, so the clock dropped under the weather. The card now pairs them
+  from a narrower width, with slightly tighter spacing there, and never
+  clips either. (#453)
 
-- **A huge Portainer log tail shows its end instead of "Response too large".**
-  A container whose last 200 log lines ran past 4 MB — one writing enormous
-  lines — was refused outright since 3.0.1, where it used to show the last
-  256 KB. The tail is now read as it streams and only its last 256 KB are
-  kept, so the end of any tail shows, however much the container writes, and
-  the app never holds more than that in memory. A tail still running past
-  32 MB is refused as before, so a stream that never ends can't hold the
-  request. (#427)
+- **Undo during a drag no longer splits the drag in two.** Pressing Ctrl+Z
+  in the layout editor while an edge resize was in progress took back the
+  part already dragged, and the rest of the resize then counted as a
+  separate change, so one resize took two presses to undo and the first of
+  them also reverted something older. On a touch screen, a second finger
+  tapping the Undo or Redo button did the same. Undo and Redo, the hotkeys
+  and the buttons alike, now wait until the drag, the held stepper or the
+  card move is over. (#424, #432)
 
-- **A backup exported without secrets keeps the inbound webhooks'
-  Application URLs and subject prefix.** The whole inbound-webhook section
-  counted as secret, so an export without secrets blanked each service's
-  Application URL and the email subject prefix along with its token, and a
-  backup restored on another instance lost them for nothing. Only the tokens
-  are secret: a file without secrets still leaves them out (and a restore
-  onto this instance still fills them back in), while the rest of the
-  section now goes in as written. (#437)
+- **The sign-in form no longer hangs when CtrlCenter can't be reached.**
+  If the server was restarting or the connection dropped when you pressed
+  *Sign in*, the button stayed on "Signing in…" until the page was reloaded.
+  The form now says it couldn't reach CtrlCenter and can be sent again. (#462)
 
-- **The webhook preview shows the Application URL at work.** Under
-  Settings → Monitoring → Inbound webhooks, the preview and its Send sample
-  rendered the sample events without the Application URL saved for each
-  service, so the Seerr sample never showed its *Open in Seerr* button
-  after the address was filled in, and the Sonarr and Radarr samples carried
-  a made-up address of their own that the setting couldn't replace. Every
-  sample now links to the address saved for its service — as you type it,
-  for the preview — exactly as a real event from that service would, and
-  without one it shows no button, as such an event's email has none. (#436)
-
-- **A screen reader can tell two unnamed alert channels of one type apart.**
-  Two channels in Settings → Monitoring → Alerts with no name and the same
-  service — two webhooks, say — had their controls named alike ("Send test
-  from Webhook", "Remove Webhook"), as were their Send sample buttons under
-  Inbound webhooks. The second and later namesakes are now numbered by
-  their place in the list ("Send test from Webhook 2"); a named channel, and
-  one no other channel matches, keeps its plain name. Nothing visible
-  changes. (#434)
-
-- **A service named with an "@everyone" can't page a Discord channel from an
-  uptime alert.** Down and recovery alerts to a Discord webhook now carry the
-  same no-mentions setting and 2,000-character cut as relayed notifications,
-  so a mention in a service's name shows as plain text and an alert too long
-  for Discord is cut to fit instead of refused. The text cuts for Telegram,
-  Gotify, Pushover and Apprise also land between characters now, so a long
-  message never ends in half an emoji. (#433)
+- **One bad search bang in a hand-edited config no longer takes every page
+  down.** A `bangs` entry that wasn't a key and a URL, or a `bangs` value that
+  wasn't a list at all, made every page fail to load, the sign-in page
+  included. The bad entry is now skipped. In the same way, a countdown, world
+  clocks or system stats widget with one malformed row keeps its title and its
+  other rows instead of disappearing. (#459)
 
 - **A 2.x config with more feed cards than fit no longer locks every widget
   save.** CtrlCenter holds at most 8 RSS feed cards (and 20 API widgets), but
@@ -371,6 +201,21 @@ here.
   trim it down; adding one is refused with a message naming the limit.
   (#438)
 
+- **One malformed character code no longer breaks a whole RSS feed.** A
+  feed with a numeric character reference that names no character, such as
+  `&#x110000;`, showed as "Couldn't connect" and none of its items appeared.
+  That one character now shows as a replacement mark, and the rest of the feed
+  reads as normal. (#460)
+
+- **A huge Portainer log tail shows its end instead of "Response too large".**
+  A container whose last 200 log lines ran past 4 MB — one writing enormous
+  lines — was refused outright since 3.0.1, where it used to show the last
+  256 KB. The tail is now read as it streams and only its last 256 KB are
+  kept, so the end of any tail shows, however much the container writes, and
+  the app never holds more than that in memory. A tail still running past
+  32 MB is refused as before, so a stream that never ends can't hold the
+  request. (#427)
+
 - **The uptime history still shows from a read-only volume.** With the
   history database on a volume the app can't write to, the status pages
   started out empty after every restart: the file held the history, but the
@@ -380,13 +225,31 @@ here.
   saved history along with what has been checked since, and the log says the
   history is read-only rather than unavailable. (#428)
 
-- **A screen reader hears which set a theme-builder tile belongs to, and
-  which channel a Send test is for.** The design, font, heading-font, palette
-  and theme tiles in the theme builder are now named groups, announced with
-  the heading over them ("Palettes", "Your themes"), as the scene rows and
-  wallpaper patterns already were. In Settings → Monitoring → Alerts, each
-  channel's Send test button is named for its channel ("Send test from
-  Chat"), so two channels' buttons never sound alike. (#350)
+- **A season upgrade is one notification, not two.** Sonarr posts a delete
+  for the file each upgrade replaces beside the import, so an upgraded
+  season arrived as "Sonarr deleted 8 episodes of The Bear" next to "Sonarr
+  upgraded 8 episodes of The Bear". The delete now goes with the import,
+  which already says what it replaced; a delete whose import never arrives
+  still goes out on its own, and a manual delete is still its own news.
+  (#351)
+
+- **A daily series is named by its air dates, not episode codes.** Sonarr
+  numbers a daily series' episodes by year and order (S2026E274), so a
+  burst of them was summed up with a code range that means nothing to a
+  reader, and each episode was listed by that code — `S2026E271 "Day 1"`.
+  The notification and the email now range over the air dates instead —
+  "Sonarr imported 7 episodes of The Daily Show (2026-10-01 - 2026-10-07)",
+  or the one date when they all aired the same day — and each episode reads
+  `2026-10-01 "Day 1"`, the way Sonarr names the file, in a single event's
+  report and in a digest alike. An episode with no air date yet keeps its
+  code and leaves the range out rather than wrong. (#351)
+
+- **Upgrades say Upgraded.** A run of imports that each replaced an
+  existing file was labelled Imported, as a burst mixing new files and
+  upgrades still is; one made of nothing but upgrades now reads "Sonarr
+  upgraded 6 episodes of The Bear", in the email's subject and label too. A
+  single season pack that replaced its files says Upgraded as well, as a
+  single upgraded episode always did. (#351)
 
 - **Long relayed notifications reach Discord.** Discord takes at most 2,000
   characters in a message and refuses a longer one, so a relayed notification
@@ -394,19 +257,63 @@ here.
   — never arrived at all. The text is now cut to fit, ending in an ellipsis,
   and the link stays whole. (#425)
 
-- **Undo during a drag no longer splits the drag in two.** Pressing Ctrl+Z
-  in the layout editor while an edge resize was in progress took back the
-  part already dragged, and the rest of the resize then counted as a
-  separate change, so one resize took two presses to undo and the first of
-  them also reverted something older. Undo and Redo now wait until the drag,
-  the held stepper or the card move is over. (#424)
+- **A long Telegram message with a long link arrives instead of being
+  refused.** The text of a relayed notification was cut to leave room for
+  its link, but a link near the 2,048-character bound could still carry the
+  whole message past Telegram's 4,096-character cap, and Telegram then
+  dropped it whole. The text now makes room for the whole link, as it does
+  on Discord, and only a link too long to leave any room is cut with it.
+  The cuts made as an event is read — a name, a title, an overview — could
+  also end in the middle of an emoji; they now land between characters.
+  (#441)
 
-- **Tapping Undo mid-drag no longer splits the drag either.** On a touch
-  screen, a second finger could tap the layout editor's Undo or Redo button
-  while an edge resize or a held stepper was in progress, which took back
-  the part already dragged and left the rest as separate changes, one per
-  step of the drag. The two buttons now stand down until the gesture is
-  over, as the Ctrl+Z and Ctrl+Shift+Z hotkeys already do. (#432)
+- **A service named with an "@everyone" can't page a Discord channel from an
+  uptime alert.** Down and recovery alerts to a Discord webhook now carry the
+  same no-mentions setting and 2,000-character cut as relayed notifications,
+  so a mention in a service's name shows as plain text and an alert too long
+  for Discord is cut to fit instead of refused. The text cuts for Telegram,
+  Gotify, Pushover and Apprise also land between characters now, so a long
+  message never ends in half an emoji. (#433)
+
+- **A backup exported without secrets keeps the inbound webhooks'
+  Application URLs and subject prefix.** The whole inbound-webhook section
+  counted as secret, so an export without secrets blanked each service's
+  Application URL and the email subject prefix along with its token, and a
+  backup restored on another instance lost them for nothing. Only the tokens
+  are secret: a file without secrets still leaves them out (and a restore
+  onto this instance still fills them back in), while the rest of the
+  section now goes in as written. (#437)
+
+- **A screen reader hears which set a theme-builder tile belongs to, and
+  which channel a Send test is for.** The design, font, heading-font, palette
+  and theme tiles in the theme builder are now named groups, announced with
+  the heading over them ("Palettes", "Your themes"), as the scene rows and
+  wallpaper patterns already were. In Settings → Monitoring → Alerts, each
+  channel's Send test button is named for its channel ("Send test from
+  Chat"). Two channels with no name and the same service, two webhooks say,
+  are numbered by their place in the list ("Send test from Webhook 2",
+  "Remove Webhook 2"), as are their Send sample buttons under Inbound
+  webhooks, so no two controls sound alike. Nothing visible changes. (#350,
+  #434)
+
+### Security
+
+- **A calendar widget without a password no longer shows another widget's
+  private events.** When two calendar widgets used the same address, one with
+  a username and password and one without, the one without could show the
+  private calendar's events for several minutes after the other had loaded
+  them. Each set of credentials now has its own copy, and a widget without
+  any gets only what the calendar shows without signing in. (#461)
+
+- **Next.js and nodemailer updated past their latest advisories.** 3.0.1
+  shipped Next.js 16.4.3, and seven advisories against it were fixed in
+  16.4.5. None of them reaches
+  CtrlCenter: the image optimizer is switched off, and the app has no Edge
+  routes, no `use cache` functions and no route that passes a fetched
+  response through unchanged. The image now carries Next.js 16.4.6 all the
+  same, so a dependency audit of it comes back clean. nodemailer's fix for
+  alert email addresses that could be delivered to a different domain than
+  the one they name comes along, with the routine minor updates. (#499)
 
 ## [3.0.1] - 2026-11-01
 
@@ -3914,12 +3821,7 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.0-rc.5...HEAD
-[3.1.0-rc.5]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.0-rc.4...v3.1.0-rc.5
-[3.1.0-rc.4]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.0-rc.3...v3.1.0-rc.4
-[3.1.0-rc.3]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.0-rc.2...v3.1.0-rc.3
-[3.1.0-rc.2]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.0-rc.1...v3.1.0-rc.2
-[3.1.0-rc.1]: https://github.com/boostctrl/ctrlcenter/compare/v3.0.1...v3.1.0-rc.1
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v3.0.1...HEAD
 [3.0.1]: https://github.com/boostctrl/ctrlcenter/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.13.0...v3.0.0
 [2.13.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.12.0...v2.13.0
