@@ -103,6 +103,14 @@ here.
   showed twice in the labels and its last hour was counted in the next
   day's bar. That day now starts when the clocks do. (#475)
 
+- **Theme schedules switch at the right moment around daylight saving
+  changes, in every time zone.** A switch time inside the hour skipped when
+  the clocks go forward fired an hour before the skip in some zones, such as
+  New York, and just after it in others. It now always fires just after.
+  Likewise, a switch time inside the hour repeated when the clocks go back
+  now always fires the first time round; in some zones, such as Berlin, it
+  fired the second time. (#476)
+
 ## [3.1.1] - 2026-11-14
 
 ### Fixed

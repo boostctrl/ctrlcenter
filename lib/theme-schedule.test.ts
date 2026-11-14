@@ -19,6 +19,34 @@ describe("zoned time (#336)", () => {
     // An unknown zone reads as UTC rather than throwing.
     expect(zonedToUtc({ y: 2024, m: 1, d: 1, h: 0, min: 0 }, "Nowhere/Nope")).toBe(at("2024-01-01T00:00:00Z"));
   });
+
+  // #476: in a gap the two settling passes alternated between the offsets
+  // and stopped on the second, which was the later offset in New York.
+  it("puts a time inside a spring-forward gap just after it, in any zone", () => {
+    // 02:30 on 2024-03-10 doesn't exist in New York: 03:30 EDT.
+    expect(zonedToUtc({ y: 2024, m: 3, d: 10, h: 2, min: 30 }, NY)).toBe(at("2024-03-10T07:30:00Z"));
+    // 02:30 on 2024-03-31 doesn't exist in Berlin: 03:30 CEST.
+    expect(zonedToUtc({ y: 2024, m: 3, d: 31, h: 2, min: 30 }, "Europe/Berlin")).toBe(
+      at("2024-03-31T01:30:00Z")
+    );
+    // 00:30 on 2024-09-08 doesn't exist in Santiago: 01:30 (UTC-3).
+    expect(zonedToUtc({ y: 2024, m: 9, d: 8, h: 0, min: 30 }, "America/Santiago")).toBe(
+      at("2024-09-08T04:30:00Z")
+    );
+  });
+
+  it("takes the first of a time a fall-back shows twice, in any zone", () => {
+    // 01:30 on 2024-11-03 in New York: EDT first.
+    expect(zonedToUtc({ y: 2024, m: 11, d: 3, h: 1, min: 30 }, NY)).toBe(at("2024-11-03T05:30:00Z"));
+    // 02:30 on 2024-10-27 in Berlin: CEST first.
+    expect(zonedToUtc({ y: 2024, m: 10, d: 27, h: 2, min: 30 }, "Europe/Berlin")).toBe(
+      at("2024-10-27T00:30:00Z")
+    );
+    // 02:30 on 2024-04-07 in Sydney: AEDT first.
+    expect(zonedToUtc({ y: 2024, m: 4, d: 7, h: 2, min: 30 }, "Australia/Sydney")).toBe(
+      at("2024-04-06T15:30:00Z")
+    );
+  });
 });
 
 describe("scheduleState, fixed times (#336)", () => {

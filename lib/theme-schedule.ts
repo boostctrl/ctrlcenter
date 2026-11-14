@@ -81,16 +81,22 @@ export function zonedParts(at: number, timeZone: string): Parts {
 
 // The instant at which `timeZone` shows this wall-clock date and time. On a
 // spring-forward gap the instant after it; on a fall-back repeat, the first.
+// The time is tried with the zone's offset a day before and a day after,
+// which covers any change on the day. In a gap neither fits, and the offset
+// from before the gap puts it just after (#476); in a repeat both fit, and
+// the earlier is the first. Two settling passes from one guess instead
+// ended on whichever offset they reached second, so the answer depended on
+// the zone.
 export function zonedToUtc(p: Parts, timeZone: string): number {
   const asUtc = (q: Parts) => Date.UTC(q.y, q.m - 1, q.d, q.h, q.min);
-  let guess = asUtc(p);
-  for (let i = 0; i < 2; i++) {
-    const shown = zonedParts(guess, timeZone);
-    const diff = asUtc(p) - asUtc(shown);
-    if (diff === 0) break;
-    guess += diff;
-  }
-  return guess;
+  const wall = asUtc(p);
+  const offsetAt = (t: number) => asUtc(zonedParts(t, timeZone)) - t;
+  const fits = (t: number) => asUtc(zonedParts(t, timeZone)) === wall;
+  const before = wall - offsetAt(wall - MS_PER_DAY);
+  const after = wall - offsetAt(wall + MS_PER_DAY);
+  if (fits(before) && fits(after)) return Math.min(before, after);
+  if (fits(after)) return after;
+  return before;
 }
 
 // The calendar date `days` away from a wall-clock date.
