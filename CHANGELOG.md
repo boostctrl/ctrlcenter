@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [3.1.1] - 2026-11-14
+
 ### Fixed
 
 - **Escape clears the Change password form.** Pressing Escape closed the
@@ -3897,7 +3899,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.0...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.1...HEAD
+[3.1.1]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.0...v3.1.1
 [3.1.0]: https://github.com/boostctrl/ctrlcenter/compare/v3.0.1...v3.1.0
 [3.0.1]: https://github.com/boostctrl/ctrlcenter/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/boostctrl/ctrlcenter/compare/v2.13.0...v3.0.0
