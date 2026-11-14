@@ -15,6 +15,7 @@ import {
   formatClock,
   weatherCodeToIcon,
   weatherCodeLabel,
+  locationMinuteOfDay,
   type Forecast,
 } from "@/lib/weather";
 
@@ -94,7 +95,7 @@ function WindArrow({ deg }: { deg: number }) {
   );
 }
 
-// Sunrise → sunset arc with the sun positioned by the current local time.
+// Sunrise → sunset arc with the sun positioned by the location's current time.
 function SunArc({
   sunrise,
   sunset,
@@ -169,7 +170,7 @@ export default function WeatherDetails({
   const { location, units } = useLocalePrefs();
   const { surfaceIsLight, motion } = useLookPrefs();
   const [fetched, setFetched] = useState<Forecast | null>(null);
-  const [nowMin, setNowMin] = useState<number | null>(null);
+  const [now, setNow] = useState<number | null>(null);
 
   // Always refetch live on mount (and every 10 min) so the page stays current and
   // in sync with the header widget.
@@ -182,12 +183,9 @@ export default function WeatherDetails({
   );
   usePolling(loadForecast, 10 * 60 * 1000);
 
-  // Local minute-of-day for the sun arc, after mount (avoids SSR/clock mismatch).
+  // The clock for the sun arc, read after mount (avoids SSR/clock mismatch).
   useEffect(() => {
-    const tick = () => {
-      const d = new Date();
-      setNowMin(d.getHours() * 60 + d.getMinutes());
-    };
+    const tick = () => setNow(Date.now());
     tick();
     const timer = setInterval(tick, 60_000);
     return () => clearInterval(timer);
@@ -209,6 +207,8 @@ export default function WeatherDetails({
   const windUnit = windUnitLabel(units);
   const { current, hourly, daily } = forecast;
   const today = daily[0];
+  // In the location's time, like its sunrise and sunset (#486).
+  const nowMin = now == null ? null : locationMinuteOfDay(now, forecast.utcOffsetSeconds);
 
   const weekMin = Math.min(...daily.map((d) => d.min));
   const weekMax = Math.max(...daily.map((d) => d.max));

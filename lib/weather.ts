@@ -127,7 +127,20 @@ export type Forecast = {
   current: CurrentDetail;
   hourly: HourPoint[];
   daily: DayPoint[];
+  // The location's offset from UTC, in seconds, so "now" can be read in the
+  // location's own time like the times above (#486). Null if not reported.
+  utcOffsetSeconds: number | null;
 };
+
+// The location's minute of the day at `now`, given its UTC offset. Sunrise
+// and sunset come in the location's own time, so the sun arc can't use the
+// browser's clock when the two zones differ (#486). Without an offset it
+// falls back to the browser's zone.
+export function locationMinuteOfDay(now: number, utcOffsetSeconds: number | null): number {
+  const offset = utcOffsetSeconds ?? -new Date(now).getTimezoneOffset() * 60;
+  const local = new Date(now + offset * 1000);
+  return local.getUTCHours() * 60 + local.getUTCMinutes();
+}
 
 // Fuller forecast for the /weather page: current conditions, the next 24 hours,
 // and a 7-day outlook.
@@ -220,6 +233,8 @@ export async function fetchForecast(
       },
       hourly,
       daily,
+      utcOffsetSeconds:
+        typeof data.utc_offset_seconds === "number" ? data.utc_offset_seconds : null,
     };
   } catch (e) {
     if (signal?.aborted) return null;

@@ -8,6 +8,7 @@ import {
   unitSymbol,
   fetchWeather,
   fetchForecast,
+  locationMinuteOfDay,
 } from "./weather";
 
 describe("windDirectionLabel", () => {
@@ -140,5 +141,46 @@ describe("fetchForecast", () => {
     expect(f?.hourly.map((h) => h.time)).toEqual(hours.slice(1));
     expect(f?.current.uvIndex).toBe(2);
     expect(f?.current.precipProbability).toBe(20);
+  });
+});
+
+// #486: the sun arc placed "now" by the browser's clock against sunrise and
+// sunset in the location's own time.
+describe("locationMinuteOfDay", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("reads the time of day in the location's zone, not the browser's", () => {
+    // 14:00 UTC is 10:00 in New York (EDT, -4h) and 23:00 in Tokyo (+9h).
+    const at = Date.parse("2026-06-30T14:00:00Z");
+    expect(locationMinuteOfDay(at, -4 * 3600)).toBe(10 * 60);
+    expect(locationMinuteOfDay(at, 9 * 3600)).toBe(23 * 60);
+    // Wraps past midnight: 02:30 UTC is 22:30 the day before in New York.
+    expect(locationMinuteOfDay(Date.parse("2026-06-30T02:30:00Z"), -4 * 3600)).toBe(
+      22 * 60 + 30
+    );
+    // A half-hour zone: 14:00 UTC is 19:30 in India (+5:30).
+    expect(locationMinuteOfDay(at, 5.5 * 3600)).toBe(19 * 60 + 30);
+  });
+
+  it("falls back to the browser's zone without an offset", () => {
+    const at = Date.parse("2026-06-30T14:07:00Z");
+    const d = new Date(at);
+    expect(locationMinuteOfDay(at, null)).toBe(d.getHours() * 60 + d.getMinutes());
+  });
+
+  it("keeps the location's offset from the forecast", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          utc_offset_seconds: -14400,
+          current: { time: "2026-06-30T10:00", temperature_2m: 20, weather_code: 0 },
+          hourly: { time: [], temperature_2m: [], weather_code: [] },
+          daily: { time: [], weather_code: [], temperature_2m_max: [], temperature_2m_min: [] },
+        }),
+      })
+    );
+    expect((await fetchForecast(0, 0, "metric"))?.utcOffsetSeconds).toBe(-14400);
   });
 });

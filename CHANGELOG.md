@@ -28,6 +28,11 @@ here.
   wash behind it. It now uses the rain one, as its rain effect already did.
   (#485)
 
+- **The weather page's sun arc uses the location's time.** The sun was
+  placed on the sunrise-to-sunset arc by your device's clock, so when your
+  time zone differed from the weather location's it sat in the wrong spot or
+  at one end. It now follows the time at the location. (#486)
+
 ## [3.1.1] - 2026-11-14
 
 ### Fixed
