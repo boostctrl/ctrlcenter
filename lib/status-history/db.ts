@@ -8,6 +8,7 @@
 // The database (status-history.db) lives beside config.yaml, where the JSON
 // file used to. A file from an older build is imported once (see
 // ./store.ts) and left where it is.
+import { accessSync, chmodSync, constants, statSync } from "fs";
 import { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "url";
 
@@ -56,7 +57,16 @@ export type HistoryChanges = {
 
 const SCHEMA_VERSION = 1;
 
+// The writable open. SQLite opens a file it may not write read-only without
+// a word, and creates the -wal and -shm files beside it with the file's own
+// mode, so a 0444 file gave a handle every flush reused and failed on, and
+// side files that kept later opens read-only after the file was made
+// writable again (#439). So a file that can't be written is a failed open
+// before SQLite touches it, side files an earlier read-only open left behind
+// get the file's mode back, and a handle that still can't write is a failed
+// open too. The caller (./store.ts) retries a failed open on every flush.
 export function openHistoryDb(file: string): DatabaseSync {
+  checkWritable(file);
   const db = new DatabaseSync(file);
   try {
     // WAL keeps a crash mid-flush from tearing the file; NORMAL sync is the
@@ -92,10 +102,43 @@ export function openHistoryDb(file: string): DatabaseSync {
       `);
     }
     addMaintColumns(db);
+    // A write SQLite refuses on a read-only handle. BEGIN IMMEDIATE alone
+    // passes on one in WAL mode; the statement is what's checked. Closing
+    // after a failure rolls the transaction back.
+    db.exec("BEGIN IMMEDIATE; DELETE FROM meta WHERE 0; ROLLBACK;");
     return db;
   } catch (e) {
     db.close();
     throw e;
+  }
+}
+
+const isMissing = (e: unknown) => (e as NodeJS.ErrnoException).code === "ENOENT";
+
+// Throws SQLite's own read-only error for an existing file the app can't
+// write; a missing one is created by the open. For a file it can, makes the
+// side files writable again where a read-only open (before #439) created
+// them unwritable. One the app doesn't own stays as it is, and the open's
+// write check reports it.
+function checkWritable(file: string): void {
+  try {
+    accessSync(file, constants.W_OK);
+  } catch (e) {
+    if (isMissing(e)) return;
+    throw new Error("attempt to write a readonly database");
+  }
+  const mode = statSync(file).mode & 0o666;
+  for (const side of [`${file}-wal`, `${file}-shm`]) {
+    try {
+      accessSync(side, constants.W_OK);
+    } catch (e) {
+      if (isMissing(e)) continue;
+      try {
+        chmodSync(side, mode);
+      } catch {
+        // Not ours to change.
+      }
+    }
   }
 }
 

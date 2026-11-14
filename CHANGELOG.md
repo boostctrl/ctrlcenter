@@ -111,6 +111,16 @@ here.
   now always fires the first time round; in some zones, such as Berlin, it
   fired the second time. (#476)
 
+- **Status history resumes saving once a read-only history file is made
+  writable.** If `status-history.db` itself was read-only (for example mode
+  0444) in a folder the app could write to, the status page's history
+  loaded but new results weren't saved, and the "status history write
+  failed" warning kept coming back every hour until a restart. Making the
+  file writable often didn't fix it even then, because of read-only side
+  files left beside it. The app now treats such a file like a read-only
+  volume and starts saving again at the next check after the file becomes
+  writable, fixing the side files it left behind. (#439)
+
 ## [3.1.1] - 2026-11-14
 
 ### Fixed

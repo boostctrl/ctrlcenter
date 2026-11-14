@@ -1209,6 +1209,64 @@ describe("history on a volume the app can't write to (#428)", () => {
     }
   );
 
+  // #439: SQLite opened a 0444 file read-only without a word, every flush
+  // reused that handle, and the side files it made kept the file's mode.
+  it.skipIf(asRoot)(
+    "takes a read-only file for one it can't write, and writes once it can",
+    async () => {
+      const file = path.join(dir, "status-history.db");
+      recordResults([up("a"), up("a"), up("a"), down("a")], h + MIN);
+      await flush(h + MIN);
+      resetHistoryState();
+      await fs.chmod(file, 0o444);
+      await loadHistory();
+      expect(warn).toHaveBeenCalledWith(
+        "status history opened read-only; new readings stay in memory",
+        { reason: expect.stringContaining("readonly") }
+      );
+      expect(getHistory(["a"]).apps[0].uptime.d1).toBeCloseTo(75, 6);
+      // No side files made with the file's read-only mode.
+      await expect(fs.readdir(dir)).resolves.toEqual(["status-history.db"]);
+      recordResults([up("a")], h + 2 * MIN);
+      await flush(h + 2 * MIN);
+      expect(pending().readings).toHaveLength(1);
+      expect(warn).toHaveBeenLastCalledWith("status history write failed", {
+        reason: expect.stringContaining("readonly"),
+      });
+      // The file is made writable: the next flush opens it afresh and lands.
+      await fs.chmod(file, 0o644);
+      await flush(h + 3 * MIN);
+      expect(pending().readings).toHaveLength(0);
+      await reload();
+      expect(getHistory(["a"]).apps[0].uptime.d1).toBeCloseTo(80, 6);
+    }
+  );
+
+  it.skipIf(asRoot)(
+    "writes again past side files an earlier read-only open left unwritable",
+    async () => {
+      const file = path.join(dir, "status-history.db");
+      recordResults([up("a")], h + MIN);
+      await flush(h + MIN);
+      resetHistoryState();
+      // What an earlier build's open of a 0444 file left behind.
+      await fs.chmod(file, 0o444);
+      const { DatabaseSync } = await import("node:sqlite");
+      const before = new DatabaseSync(file);
+      before.prepare("SELECT count(*) FROM buckets").get();
+      before.close();
+      expect((await fs.stat(`${file}-shm`)).mode & 0o777).toBe(0o444);
+      await fs.chmod(file, 0o644);
+      await loadHistory();
+      recordResults([up("a")], h + 2 * MIN);
+      await flush(h + 2 * MIN);
+      expect(pending().readings).toHaveLength(0);
+      expect(warn).not.toHaveBeenCalled();
+      await reload();
+      expect(getHistory(["a"]).apps[0].uptime.h1).toBe(100);
+    }
+  );
+
   it("leaves a newer build's file alone", async () => {
     const { DatabaseSync } = await import("node:sqlite");
     const newer = new DatabaseSync(path.join(dir, "status-history.db"));
