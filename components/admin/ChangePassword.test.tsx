@@ -21,6 +21,24 @@ describe("ChangePassword", () => {
     expect(screen.getByLabelText("Current password")).toBeTruthy();
   });
 
+  // #489: Escape closed the popover but left both passwords typed in it.
+  it("clears the fields when Escape closes it, as Cancel does", async () => {
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <ChangePassword own />
+      </ToastProvider>
+    );
+    await user.click(screen.getByRole("button", { name: "Change password" }));
+    await user.type(screen.getByLabelText("Current password"), "old-secret");
+    await user.type(screen.getByLabelText("New password (min 12 characters)"), "new-secret");
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Change password" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Change password" }));
+    expect((screen.getByLabelText("Current password") as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText("New password (min 12 characters)") as HTMLInputElement).value).toBe("");
+  });
+
   it("keeps the admin portal's wording by default", () => {
     render(
       <ToastProvider>

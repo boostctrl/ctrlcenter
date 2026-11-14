@@ -20,19 +20,27 @@ export default function ChangePassword({ own = false }: { own?: boolean } = {}) 
   const toast = useToast();
   const trapRef = useFocusTrap<HTMLFormElement>(open);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open]);
-
+  // Every way out clears the fields, Escape included (#489), so no password
+  // is left typed into a closed popover for the next person at the screen.
   function close() {
     setOpen(false);
     setCurrent("");
     setNext("");
     setConfirm("");
   }
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      setCurrent("");
+      setNext("");
+      setConfirm("");
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();

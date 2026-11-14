@@ -12,6 +12,13 @@ here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Escape clears the Change password form.** Pressing Escape closed the
+  Change password popover but left the current and new passwords typed in
+  it, for the next person to open it to find; Cancel and a click outside
+  already cleared them, and now Escape does too. (#489)
+
 ## [3.1.0] - 2026-11-14
 
 ### Added
