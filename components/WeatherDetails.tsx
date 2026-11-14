@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useLocalePrefs, useLookPrefs } from "./PrefsProvider";
 import { useEdgeFade } from "./useEdgeFade";
 import { usePolling } from "./usePolling";
-import WeatherEffects from "./WeatherEffects";
+import WeatherEffects, { effectFor } from "./WeatherEffects";
 import {
   fetchForecast,
   unitSymbol,
@@ -40,18 +40,21 @@ function minutesOfDay(iso: string): number | null {
 // A subtle, accent-derived wash for the hero that shifts with the conditions and
 // day/night — bright top wash for clear day, deeper/cooler at night, muted under
 // storms/overcast. Built from --accent-from so it still honors the active theme.
-function conditionWash(code: number, isDay: boolean): string {
+// Storm, snow and rain are grouped as the hero's effects group them, so rain
+// showers (80–82) get the rain wash, not the snow one (#485).
+export function conditionWash(code: number, isDay: boolean): string {
   const a = (pct: number) =>
     `color-mix(in srgb, var(--accent-from) ${pct}%, transparent)`;
   if (!isDay)
     return `radial-gradient(130% 90% at 50% 120%, ${a(22)}, transparent 72%)`;
   if (code === 0 || code === 1)
     return `radial-gradient(130% 95% at 50% -25%, ${a(30)}, transparent 60%)`;
-  if (code === 95 || code === 96 || code === 99)
+  const kind = effectFor(code, isDay)?.kind;
+  if (kind === "storm")
     return `radial-gradient(110% 90% at 30% 115%, ${a(16)}, transparent 72%)`;
-  if (code >= 71 && code <= 86)
+  if (kind === "snow")
     return `radial-gradient(130% 95% at 50% -15%, ${a(24)}, transparent 62%)`;
-  if (code >= 51 && code <= 82)
+  if (kind === "rain")
     return `radial-gradient(130% 90% at 50% -10%, ${a(16)}, transparent 66%)`;
   return `radial-gradient(130% 90% at 50% -15%, ${a(11)}, transparent 64%)`;
 }

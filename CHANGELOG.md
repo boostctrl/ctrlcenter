@@ -23,6 +23,11 @@ here.
   title or location with a backslash followed by "n", such as `C:\new`, showed
   as `C:\ ew`. It now shows as written. (#478)
 
+- **Rain showers get the rain backdrop on the weather page.** During rain
+  showers, the current-conditions card on /weather used the brighter snow
+  wash behind it. It now uses the rain one, as its rain effect already did.
+  (#485)
+
 ## [3.1.1] - 2026-11-14
 
 ### Fixed
