@@ -7,6 +7,7 @@ import {
   formatClock,
   unitSymbol,
   fetchWeather,
+  fetchForecast,
 } from "./weather";
 
 describe("windDirectionLabel", () => {
@@ -101,5 +102,43 @@ describe("fetchWeather", () => {
       code: 1,
       isDay: true,
     });
+  });
+});
+
+describe("fetchForecast", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  // #466: Open-Meteo reports current.time on a 15-minute grid, and from :15
+  // the hour's own slot compared as already past, so the strip and the
+  // current UV and rain chance skipped to the next hour.
+  it("starts the hourly strip at the current hour after a quarter past", async () => {
+    const hours = ["2026-11-14T09:00", "2026-11-14T10:00", "2026-11-14T11:00"];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          current: { time: "2026-11-14T10:15", temperature_2m: 12, weather_code: 1 },
+          hourly: {
+            time: hours,
+            temperature_2m: [10, 11, 12],
+            weather_code: [1, 1, 1],
+            precipitation_probability: [10, 20, 30],
+            is_day: [1, 1, 1],
+            uv_index: [1, 2, 3],
+          },
+          daily: {
+            time: ["2026-11-14"],
+            weather_code: [1],
+            temperature_2m_max: [14],
+            temperature_2m_min: [8],
+          },
+        }),
+      })
+    );
+    const f = await fetchForecast(0, 0, "metric");
+    expect(f?.hourly.map((h) => h.time)).toEqual(hours.slice(1));
+    expect(f?.current.uvIndex).toBe(2);
+    expect(f?.current.precipProbability).toBe(20);
   });
 });

@@ -174,8 +174,11 @@ export async function fetchForecast(
 
     const num = (v: unknown): number => (typeof v === "number" ? v : 0);
 
-    // Trim the hourly series to the next 24 hours from "now".
-    const startRaw = h.time.findIndex((t: string) => t >= current.time);
+    // Trim the hourly series to the next 24 hours from "now". Compared at the
+    // hour: current.time is on a 15-minute grid ("…T10:15"), and the 10:00
+    // slot is still this hour's (#466).
+    const thisHour = String(current.time).slice(0, 13);
+    const startRaw = h.time.findIndex((t: string) => t >= thisHour);
     const start = startRaw === -1 ? 0 : startRaw;
     const hourly: HourPoint[] = h.time
       .slice(start, start + 24)

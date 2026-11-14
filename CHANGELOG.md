@@ -30,6 +30,11 @@ here.
   counts covered only the eight the card lists. They now add up every
   environment, and the card still lists the first eight. (#469)
 
+- **The weather page's hourly strip starts at the current hour all hour.**
+  From a quarter past each hour, the 24-hour strip started at the next hour,
+  and the current UV index and chance of rain were the next hour's. They now
+  stay on the current hour until it ends. (#466)
+
 ## [3.1.0] - 2026-11-14
 
 ### Added
