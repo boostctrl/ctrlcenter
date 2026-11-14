@@ -65,6 +65,11 @@ here.
   check that notices a session used from a new address. It's now dropped
   when the file is read. (#482)
 
+- **Revealing a webhook token says why it failed.** When revealing a
+  Sonarr, Radarr or Seerr webhook token failed, for example after too many
+  wrong passwords, the message always said "Couldn't reveal the token". It
+  now gives the reason. (#487)
+
 ## [3.1.1] - 2026-11-14
 
 ### Fixed

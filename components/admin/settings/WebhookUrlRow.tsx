@@ -45,7 +45,11 @@ export function WebhookUrlRow({
     setRevealing(true);
     try {
       const res = await fetchWithReauth(`/api/hooks/token?service=${service}`);
-      if (!res.ok) throw new Error(await apiErrorMessage(res, "Couldn't reveal the token"));
+      if (!res.ok) {
+        // The server's own reason (#487), read from the body.
+        const body: unknown = await res.json().catch(() => null);
+        throw new Error(apiErrorMessage(body, "Couldn't reveal the token"));
+      }
       setRevealed({ of: token, token: ((await res.json()) as { token: string }).token });
     } catch (e) {
       toast(e instanceof Error ? e.message : "Couldn't reveal the token", "error");
