@@ -81,6 +81,11 @@ here.
   cursor. The panel now opens when the form does if the app has a custom
   setting, and then stays open or closed as you leave it. (#495)
 
+- **The Traces backdrop is fully still with motion off.** With motion
+  turned off, or reduced motion set on your device, the Traces scene's still
+  frame still showed its glowing signal dots. It now shows only the traces
+  and their pads. (#492)
+
 ## [3.1.1] - 2026-11-14
 
 ### Fixed

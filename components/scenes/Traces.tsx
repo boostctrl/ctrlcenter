@@ -130,12 +130,13 @@ export default function Traces({ light, motion, accentFrom, accentTo }: ScenePro
         }
       }
 
-      // Travelling signal pulses (bright, glowing).
-      if (traces.length > 0) {
+      // Travelling signal pulses (bright, glowing). Motion only: the still
+      // frame is traces and pads alone (#492).
+      if (!still && traces.length > 0) {
         ctx.shadowColor = `rgba(${rgb}, 0.9)`;
         ctx.shadowBlur = dpr * 6;
         for (const pu of pulses) {
-          if (!still) pu.d += pu.speed;
+          pu.d += pu.speed;
           const t = traces[pu.ti] ?? traces[0];
           const p = pointAt(t, pu.d);
           ctx.beginPath();
