@@ -171,13 +171,15 @@ export default function AppsManager({
   const confirm = useConfirm();
   const { ref: formRef, reveal: revealForm } = useRevealForm<HTMLDivElement>();
 
-  function startEdit(app: AppItem) {
+  // `typedGroup` is the name just typed for a group the save created, which
+  // the group list doesn't carry until its refresh lands (#473).
+  function startEdit(app: AppItem, typedGroup?: string) {
     setEditingId(app.id);
     setMethodChosen(true);
     setForm({
       name: app.name,
       subtitle: app.subtitle,
-      groupName: app.group ? groupName(groups, app.group) : "",
+      groupName: app.group ? (typedGroup ?? groupName(groups, app.group)) : "",
       tags: app.tags.join(", "),
       url: app.url,
       icon: app.icon,
@@ -252,14 +254,16 @@ export default function AppsManager({
       }
       const saved: AppItem = await res.json();
       // Naming a group that didn't exist created it server-side.
-      if (saved.group && !groups.some((g) => g.id === saved.group)) void refreshGroups();
+      const newGroup = !!saved.group && !groups.some((g) => g.id === saved.group);
+      if (newGroup) void refreshGroups();
       const wasEditing = editingId;
       setApps((prev) =>
         wasEditing ? prev.map((a) => (a.id === wasEditing ? saved : a)) : [...prev, saved]
       );
       if (!wasEditing && saved.checkType === "push") {
-        // Stay on the new app so its freshly minted push URL shows (#294).
-        startEdit(saved);
+        // Stay on the new app so its freshly minted push URL shows (#294),
+        // with a new group still under the name typed for it, not its id.
+        startEdit(saved, newGroup ? form.groupName.trim() : undefined);
         toast("Application added — copy its push URL below");
       } else {
         resetForm();

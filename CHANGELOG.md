@@ -40,6 +40,12 @@ here.
   proxy in front of CtrlCenter, the button went back to its label and showed
   nothing. It now shows "✗ Unexpected response". (#470)
 
+- **A new push-check app keeps the group name you typed.** After adding an
+  app with the push check under a new group, the form stays open to show
+  the push URL, but its Group field showed a code like `g_abc123` instead of
+  the name, and saving it again created a group with that code for a name.
+  The field now keeps the name. (#473)
+
 ### Security
 
 - **A custom search bang can only lead to a web address.** A bang whose URL
