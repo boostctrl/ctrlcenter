@@ -9,9 +9,10 @@ import MonitorCard from "./MonitorCard";
 // domains. Read-only — toggling protection is a 2.6.0 action.
 
 // "45.2k" — compact, locale-independent count (locale formatting would
-// hydrate differently between server and client).
+// hydrate differently between server and client). Millions start where the
+// thousands would round up to "1000.0k" (#490).
 export function formatCount(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 999_950) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 10_000) return `${(n / 1_000).toFixed(1)}k`;
   return String(n);
 }

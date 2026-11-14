@@ -38,6 +38,10 @@ here.
   0.28% and 0.9% as 0.89%. They now show as they are, and an uptime short of
   perfect still never rounds up to 100%. (#481)
 
+- **The AdGuard card shows a count just under a million as "1.0M".** Query
+  and blocked counts from 999,950 to 999,999 showed as "1000.0k". They now
+  show as "1.0M". (#490)
+
 ## [3.1.1] - 2026-11-14
 
 ### Fixed
