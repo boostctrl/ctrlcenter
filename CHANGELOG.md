@@ -69,6 +69,16 @@ here.
   founding admin, whoever did it. These entries now name the admin who acted.
   (#457)
 
+- **Next.js and nodemailer updated past their latest advisories.** 3.0.1
+  and the earlier 3.1.0 candidates shipped Next.js 16.4.3, and seven
+  advisories against it were fixed in 16.4.5. None of them reaches
+  CtrlCenter: the image optimizer is switched off, and the app has no Edge
+  routes, no `use cache` functions and no route that passes a fetched
+  response through unchanged. The image now carries Next.js 16.4.6 all the
+  same, so a dependency audit of it comes back clean. nodemailer's fix for
+  alert email addresses that could be delivered to a different domain than
+  the one they name comes along, with the routine minor updates. (#499)
+
 ## [3.1.0-rc.4] - 2026-11-01
 
 ### Changed
