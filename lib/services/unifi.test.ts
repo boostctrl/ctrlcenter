@@ -253,5 +253,20 @@ describe("mapUnifiDevices", () => {
     const [d] = mapUnifiDevices([{ mac: "aa:bb", type: "mystery", state: 0 }]);
     expect(d).toEqual({ name: "aa:bb", kind: "mystery", up: false, clients: 0, uptime: null });
   });
+
+  // #468: the cap ran before the offline-first sort, so offline gear past
+  // the 40th device never showed.
+  it("keeps offline devices from past the cap", () => {
+    const many = Array.from({ length: UNIFI_DEVICE_CAP + 5 }, (_, i) => ({
+      name: `dev${i}`,
+      type: "uap",
+      state: i >= UNIFI_DEVICE_CAP ? 0 : 1,
+    }));
+    const shown = mapUnifiDevices(many);
+    expect(shown).toHaveLength(UNIFI_DEVICE_CAP);
+    expect(shown.slice(0, 5).map((d) => [d.name, d.up])).toEqual(
+      Array.from({ length: 5 }, (_, i) => [`dev${UNIFI_DEVICE_CAP + i}`, false])
+    );
+  });
 });
 

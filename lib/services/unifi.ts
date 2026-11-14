@@ -119,11 +119,12 @@ const DEVICE_KINDS: Record<string, string> = {
 };
 
 // Exported for the unit tests: fold stat/device into the detail's device list,
-// offline gear first so a downed device surfaces at the top.
+// offline gear first so a downed device surfaces at the top. Sorted before
+// the cap, so an offline device late in a big network's list still makes the
+// cut (#468).
 export function mapUnifiDevices(raw: unknown): UnifiDevice[] {
   const list = Array.isArray(raw) ? (raw as RawDevice[]) : [];
   return list
-    .slice(0, UNIFI_DEVICE_CAP)
     .map((d) => ({
       name: d.name?.trim() || d.model?.trim() || d.mac?.trim() || "device",
       kind: DEVICE_KINDS[d.type ?? ""] ?? (d.type?.trim() || "Device"),
@@ -131,7 +132,8 @@ export function mapUnifiDevices(raw: unknown): UnifiDevice[] {
       clients: int(d.num_sta),
       uptime: typeof d.uptime === "number" && d.uptime > 0 ? d.uptime : null,
     }))
-    .sort((a, b) => Number(a.up) - Number(b.up));
+    .sort((a, b) => Number(a.up) - Number(b.up))
+    .slice(0, UNIFI_DEVICE_CAP);
 }
 
 const SUBSYSTEM_LABELS: Record<string, string> = {

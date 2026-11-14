@@ -19,6 +19,12 @@ here.
   it, for the next person to open it to find; Cancel and a click outside
   already cleared them, and now Escape does too. (#489)
 
+- **The UniFi page lists offline devices on a big network.** The device
+  list, which puts offline gear first, only looked at the first 40 devices
+  the controller listed, so on a bigger network an offline device further
+  down never showed. Offline devices now come first from the whole list.
+  (#468)
+
 ## [3.1.0] - 2026-11-14
 
 ### Added
