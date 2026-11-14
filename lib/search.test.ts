@@ -75,6 +75,24 @@ describe("resolveBang", () => {
     expect(resolveBang("!yt")?.url).toBe("https://www.youtube.com");
   });
 
+  // #465: a custom bang was picked by key alone, so a `javascript:` one ran
+  // in the viewer's tab, and a bare one resolved to the string "null".
+  it("ignores a custom bang that doesn't lead to an http(s) address", () => {
+    const evil = [{ key: "x", url: "javascript:alert(1)//%s" }];
+    expect(resolveBang("!x hi", evil)).toBeNull();
+    expect(resolveBang("!x", evil)).toBeNull();
+    // A bad custom one falls through to the built-in it would override.
+    const shadow = [{ key: "yt", url: "data:text/html,<script>alert(1)</script>" }];
+    expect(resolveBang("!yt cats", shadow)?.url).toBe(
+      "https://www.youtube.com/results?search_query=cats"
+    );
+  });
+
+  it("keeps a custom bang without %s working as a plain link", () => {
+    const nas = [{ key: "nas", url: " https://nas.example.com/files " }];
+    expect(resolveBang("!nas", nas)?.url).toBe("https://nas.example.com");
+  });
+
   it("lets a custom bang override a built-in", () => {
     const hit = resolveBang("!gh thing", [
       { key: "gh", url: "https://my.git/search?q=%s" },

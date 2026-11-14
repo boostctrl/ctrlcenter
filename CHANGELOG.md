@@ -35,6 +35,14 @@ here.
   and the current UV index and chance of rain were the next hour's. They now
   stay on the current hour until it ends. (#466)
 
+### Security
+
+- **A custom search bang can only lead to a web address.** A bang whose URL
+  was a `javascript:` or `data:` address ran in the tab of whoever used it
+  in the search bar. Only an admin can set bangs, but one that doesn't start
+  with `http://` or `https://` is now ignored, and a built-in bang of the
+  same name works in its place. (#465)
+
 ## [3.1.0] - 2026-11-14
 
 ### Added

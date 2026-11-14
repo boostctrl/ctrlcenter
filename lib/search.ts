@@ -110,11 +110,13 @@ export type BangHit = { url: string; label: string; term?: string };
 
 function templateHit(template: string, label: string, term: string): BangHit {
   if (!term) {
-    let root = template;
+    // A URL with no origin of its own reports the string "null" (#465).
+    let root = template.replace("%s", "");
     try {
-      root = new URL(template).origin;
+      const origin = new URL(template).origin;
+      if (origin !== "null") root = origin;
     } catch {
-      root = template.replace("%s", "");
+      // Not a URL: the template minus its placeholder, as before.
     }
     return { url: root, label };
   }
@@ -132,7 +134,12 @@ export function resolveBang(
   const parsed = parseBang(query);
   if (!parsed) return null;
   const { key, term } = parsed;
-  const custom = customBangs.find((b) => b.key.toLowerCase() === key);
+  // A custom bang leads only to an http(s) address, so a `javascript:` or
+  // `data:` one can't run in a viewer's tab; a bad one falls through to the
+  // built-ins (#465). No `%s` is needed: a bang without one is a plain link.
+  const custom = customBangs.find(
+    (b) => b.key.toLowerCase() === key && /^https?:\/\//i.test(b.url.trim())
+  );
   if (custom) return templateHit(custom.url, custom.key, term);
   const builtin = BUILTIN_BANGS[key];
   if (builtin) return templateHit(builtin.url, builtin.label, term);
