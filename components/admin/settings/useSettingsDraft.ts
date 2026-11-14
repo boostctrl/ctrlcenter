@@ -421,9 +421,12 @@ export function useSettingsDraft(
       sceneMotion: undefined,
       sceneIntensityLight: undefined,
       sceneMotionLight: undefined,
-      // A pack's fonts when it carries them (#330); else the current ones stay.
+      // A pack's fonts when it carries them (#330); else the current ones stay,
+      // the heading font as well as the body font (#471). Light mode's own
+      // fonts are cleared, so light follows dark as the rest does.
       font: pack.font ?? theme.font,
-      headingFont: pack.headingFont,
+      headingFont: pack.headingFont ?? theme.headingFont,
+      fontLight: undefined,
       headingFontLight: undefined,
       density: undefined,
       densityLight: undefined,
@@ -451,6 +454,9 @@ export function useSettingsDraft(
         tuneLight: undefined,
         sceneIntensityLight: undefined,
         sceneMotionLight: undefined,
+        // A light pack's font goes too, or light keeps it rather than
+        // following the dark font (#471).
+        fontLight: undefined,
         headingFontLight: undefined,
         densityLight: undefined,
         statusLight: darkPack?.statusLight,

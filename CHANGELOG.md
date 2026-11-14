@@ -71,6 +71,13 @@ here.
   than one clock. Every click now adds its row, in Settings → Widgets and
   in a widget's own settings panel alike. (#163)
 
+- **The site default theme's fonts behave as expected.** In Settings →
+  Theme, setting the light-mode default back to "same as dark" left light
+  mode on the font of the light pack chosen before, instead of following the
+  dark font, and so did applying a new default theme. Applying a default
+  theme without fonts of its own also cleared your heading font while
+  keeping your body font; now both stay. (#471)
+
 ### Security
 
 - **A custom search bang can only lead to a web address.** A bang whose URL
