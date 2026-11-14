@@ -55,6 +55,10 @@ here.
   couldn't be told apart. The repeated one is now numbered past any name
   already in use: "Notes", "Notes 3", "Notes 2". (#484)
 
+- **Board and group ids never end in a dash.** A long board or group name
+  could get an id, the part of a board's address after `/b/`, that ended in
+  a dash where the name was cut short. The dash is now dropped. (#483)
+
 ## [3.1.1] - 2026-11-14
 
 ### Fixed
