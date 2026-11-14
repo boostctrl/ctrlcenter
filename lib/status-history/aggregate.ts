@@ -90,11 +90,17 @@ function zoneOffset(ms: number, timeZone: string): number {
 // The instant (ms) the local day containing `ms` begins in `timeZone`: its
 // calendar date's midnight, settled against the zone's offset in two passes
 // so a DST change on the day lands on the right side (lib/calendar's
-// zonedToUtc does the same for event times).
+// zonedToUtc does the same for event times). Where the clocks jump forward
+// at midnight (America/Santiago), that midnight never shows: the passes
+// settle on the later offset and land just before the jump, on the day
+// before. The day then begins where the jump ends, which is midnight read
+// with the earlier offset (#475).
 export function dayStartInZone(ms: number, timeZone: string): number {
   const w = wallFields(ms, timeZone);
   const guess = Date.UTC(w.year, w.month - 1, w.day);
-  return guess - zoneOffset(guess - zoneOffset(guess, timeZone), timeZone);
+  const start = guess - zoneOffset(guess - zoneOffset(guess, timeZone), timeZone);
+  if (wallFields(start, timeZone).day === w.day) return start;
+  return guess - zoneOffset(start, timeZone);
 }
 
 // The bar edges of a day-scale strip (#401): `bars` bars over the last `days`

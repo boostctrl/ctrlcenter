@@ -97,6 +97,12 @@ here.
   outage from before the restart was lost when the history was read in. It
   is now recorded, ending when the app was first seen up. (#474)
 
+- **Daily status bars line up on the day clocks skip midnight.** In time
+  zones where daylight saving time starts at midnight, such as Chile's, the
+  status page's day bars started that day an hour early, so the day before
+  showed twice in the labels and its last hour was counted in the next
+  day's bar. That day now starts when the clocks do. (#475)
+
 ## [3.1.1] - 2026-11-14
 
 ### Fixed

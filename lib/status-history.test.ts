@@ -12,6 +12,7 @@ import {
   fixedBarsFromReadings,
   fixedBarsFromBuckets,
   dayAlignedEdges,
+  localDayStr,
   extractOutages,
   loadHistory,
   flush,
@@ -358,6 +359,28 @@ describe("dayAlignedEdges (#401)", () => {
     expect(nov1).toBeGreaterThan(-1);
     expect(edges[nov1 + 1] - edges[nov1]).toBe(25 * HOUR);
     expect(edges[30]).toBe(Date.UTC(2026, 10, 4, 6)); // CST by now
+  });
+
+  // #475: Santiago's clocks jump from 00:00 to 01:00 on 2024-09-08, so that
+  // day starts at 01:00 local (04:00Z). It started at 03:00Z, 23:00 on the
+  // 7th, which gave the 7th two bars' labels and the 8th an hour of the 7th.
+  it("starts a day whose midnight a DST change skips where the change ends", () => {
+    const SANTIAGO = "America/Santiago";
+    const edges = dayAlignedEdges(Date.UTC(2024, 8, 10, 12), SANTIAGO, 30, 30);
+    const sep8 = edges.indexOf(Date.UTC(2024, 8, 8, 4));
+    expect(sep8).toBeGreaterThan(-1);
+    expect(edges[sep8 - 1]).toBe(Date.UTC(2024, 8, 7, 4)); // a whole 24-hour Sep 7
+    expect(edges[sep8 + 1]).toBe(Date.UTC(2024, 8, 9, 3)); // a 23-hour Sep 8
+    const days = edges.slice(0, -1).map((e) => localDayStr(e, SANTIAGO));
+    expect(new Set(days).size).toBe(days.length);
+  });
+
+  it("leaves a spring-forward day whose change isn't at midnight as it was", () => {
+    // Chicago jumps 02:00 → 03:00 on 2026-03-08: midnight is CST (06:00Z).
+    const edges = dayAlignedEdges(Date.UTC(2026, 2, 10, 12), CHICAGO, 30, 30);
+    const mar8 = edges.indexOf(Date.UTC(2026, 2, 8, 6));
+    expect(mar8).toBeGreaterThan(-1);
+    expect(edges[mar8 + 1] - edges[mar8]).toBe(23 * HOUR);
   });
 
   it("splits each day evenly with more bars than days, and groups whole days with fewer", () => {
