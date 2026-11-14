@@ -12,8 +12,8 @@
 //   group(key) instead, and only changes of one kind fold.
 // - Every other change is its own step, so Show, Hide, Fill or a move right
 //   after a resize can be undone on its own.
-// A new step clears the redo stack. The stacks are bounded; the oldest steps
-// fall off.
+// A new step clears the redo stack (a gesture that ends where it began puts
+// it back). The stacks are bounded; the oldest steps fall off.
 import { createContext, useCallback, useContext, useRef, useState } from "react";
 
 export const UNDO_LIMIT = 50;
@@ -32,8 +32,10 @@ function mergeSource(pending: string | null): MergeSource | null {
 export function useUndoHistory<T>() {
   const undoRef = useRef<T[]>([]);
   const redoRef = useRef<T[]>([]);
-  // The open pointer gesture, and whether it has opened its step yet.
-  const gestureRef = useRef<{ recorded: boolean } | null>(null);
+  // The open pointer gesture, and whether it has opened its step yet. Opening
+  // it clears the redo stack and can push the oldest step off; both are kept
+  // here, to put back if the gesture ends where it began (#488).
+  const gestureRef = useRef<{ recorded: boolean; redo?: T[]; dropped?: T } | null>(null);
   // Where the last change came from, and the kind named for the next one.
   const lastControlRef = useRef<MergeSource | null>(null);
   const pendingKeyRef = useRef<string | null>(null);
@@ -63,7 +65,11 @@ export function useUndoHistory<T>() {
       pendingKeyRef.current = null;
       if (!open) return;
       undoRef.current.push(before);
-      if (undoRef.current.length > UNDO_LIMIT) undoRef.current.shift();
+      const dropped = undoRef.current.length > UNDO_LIMIT ? undoRef.current.shift() : undefined;
+      if (gesture) {
+        gesture.redo = redoRef.current;
+        gesture.dropped = dropped;
+      }
       redoRef.current = [];
       sync();
     },
@@ -102,7 +108,8 @@ export function useUndoHistory<T>() {
     gestureRef.current = { recorded: false };
   }, []);
   // `current` is the value the gesture ended on: one that ends where it
-  // began (a drag out and back) leaves no step behind.
+  // began (a drag out and back) leaves no step behind, and the history is as
+  // it was before the gesture, Redo included (#488).
   const endGesture = useCallback(
     (current?: T) => {
       const gesture = gestureRef.current;
@@ -111,6 +118,8 @@ export function useUndoHistory<T>() {
       const top = undoRef.current.at(-1);
       if (gesture?.recorded && current !== undefined && top !== undefined && JSON.stringify(top) === JSON.stringify(current)) {
         undoRef.current.pop();
+        if (gesture.dropped !== undefined) undoRef.current.unshift(gesture.dropped);
+        if (gesture.redo && redoRef.current.length === 0) redoRef.current = gesture.redo;
         sync();
       }
     },
@@ -152,6 +161,12 @@ export function useUndoHistory<T>() {
       };
       undoRef.current = squash(undoRef.current);
       redoRef.current = squash(redoRef.current);
+      // What an open gesture kept to put back predates the rewrite; drop it
+      // rather than restore steps the rewrite would have changed.
+      if (gestureRef.current) {
+        gestureRef.current.redo = undefined;
+        gestureRef.current.dropped = undefined;
+      }
       sync();
     },
     [sync]

@@ -72,6 +72,34 @@ describe("useUndoHistory", () => {
     expect(h.value).toBe(0);
   });
 
+  // #488: the gesture's first change cleared Redo, and dropping its empty
+  // step didn't bring it back.
+  it("keeps Redo after a gesture that ends where it began", () => {
+    const h = setup();
+    h.change(1);
+    h.undo();
+    expect(h.result.current.canRedo).toBe(true);
+    act(() => h.result.current.beginGesture());
+    h.change(7);
+    h.change(0);
+    act(() => h.result.current.endGesture(h.value));
+    expect(h.result.current.canUndo).toBe(false);
+    expect(h.result.current.canRedo).toBe(true);
+    h.redo();
+    expect(h.value).toBe(1);
+  });
+
+  it("keeps the oldest step a no-op gesture pushed off a full stack", () => {
+    const h = setup();
+    for (let i = 1; i <= UNDO_LIMIT; i++) h.change(i);
+    act(() => h.result.current.beginGesture());
+    h.change(99);
+    h.change(UNDO_LIMIT);
+    act(() => h.result.current.endGesture(h.value));
+    for (let i = 0; i < UNDO_LIMIT; i++) h.undo();
+    expect(h.value).toBe(0);
+  });
+
   it("merges keyboard repeats only while focus stays on one control", () => {
     const h = setup();
     control(false);

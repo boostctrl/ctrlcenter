@@ -70,6 +70,11 @@ here.
   wrong passwords, the message always said "Couldn't reveal the token". It
   now gives the reason. (#487)
 
+- **Dragging a widget back where it was keeps Redo.** In the layout editor,
+  after an Undo, dragging a widget out and back to where it started and
+  letting go made Redo unavailable, though nothing had changed. Redo now
+  stays as it was. (#488)
+
 ## [3.1.1] - 2026-11-14
 
 ### Fixed
