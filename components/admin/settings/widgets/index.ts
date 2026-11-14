@@ -13,6 +13,7 @@ import type { WidgetType } from "@/lib/layout";
 import type { Group, InstanceOf } from "@/lib/schema";
 import type { FeedHealth } from "@/lib/feed";
 import type { SettingsDraft } from "../useSettingsDraft";
+import type { InstancePatch } from "../instancePatch";
 import SearchSettings from "./SearchSettings";
 import WeatherSettings from "./WeatherSettings";
 import CalendarSettings from "./CalendarSettings";
@@ -32,7 +33,7 @@ export type InstanceEditorProps<T extends WidgetType> = {
   w: InstanceOf<T>;
   // What the admin calls this instance, for row labels.
   label: string;
-  onChange: (patch: Partial<InstanceOf<T>>) => void;
+  onChange: (patch: InstancePatch<InstanceOf<T>>) => void;
   // Fetch health for the RSS feeds' URLs (read by the feed editor only).
   feedHealth?: Record<string, FeedHealth> | null;
   // The groups and app tags, for the apps and bookmarks filters (#299).

@@ -7,6 +7,7 @@ import { AddButton, Card, Hint, RemoveButton, Switch, fieldLabelClasses, subCard
 import { INSTANCE_GROUPS, SITE_SETTINGS } from "./widgets";
 import { integrationLabels } from "@/lib/services/ids";
 import type { SettingsDraft } from "./useSettingsDraft";
+import type { InstancePatch } from "./instancePatch";
 
 // The Widgets tab (#285): the site settings some widgets read, then every
 // content widget type with its instances (#297). Each instance has its own
@@ -70,7 +71,7 @@ export default function WidgetsSection({
                     <Editor
                       w={w as never}
                       label={label}
-                      onChange={(patch) => updateWidget(w.id, patch)}
+                      onChange={(patch) => updateWidget(w.id, patch as InstancePatch<typeof w>)}
                       feedHealth={feedHealth}
                       groups={groups}
                       tags={tags}

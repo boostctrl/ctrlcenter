@@ -35,6 +35,17 @@ const DISPLAY_LABELS: Record<Api["display"], string> = {
   list: "A list",
 };
 
+const BLANK_FIELD: Field = { label: "", path: "", unit: "" };
+
+// The two adds compose on the latest instance, so quick clicks batched in one
+// tick each add a row (#163).
+const addField = (prev: Api): Partial<Api> => {
+  const fields = prev.fields.length > 0 ? prev.fields : [BLANK_FIELD];
+  return fields.length < MAX_API_FIELDS ? { fields: [...fields, BLANK_FIELD] } : {};
+};
+const addHeader = (prev: Api): Partial<Api> =>
+  prev.headers.length < MAX_API_HEADERS ? { headers: [...prev.headers, { name: "", value: "" }] } : {};
+
 // An API widget's fields in admin Settings → Widgets (#302): where to fetch,
 // what to pick out with JSONPath, how to show it and who sees it — and a Test
 // button that shows the raw response beside what the paths pick.
@@ -94,7 +105,7 @@ export default function ApiSettings({ w, onChange }: InstanceEditorProps<"api">)
           </div>
         ))}
         {api.headers.length < MAX_API_HEADERS && (
-          <AddButton onClick={() => onChange({ headers: [...api.headers, { name: "", value: "" }] })}>
+          <AddButton onClick={() => onChange(addHeader)}>
             + Add header
           </AddButton>
         )}
@@ -183,7 +194,7 @@ export default function ApiSettings({ w, onChange }: InstanceEditorProps<"api">)
             </div>
           ))}
           {!single && fields.length < MAX_API_FIELDS && (
-            <AddButton onClick={() => onChange({ fields: [...fields, { label: "", path: "", unit: "" }] })}>
+            <AddButton onClick={() => onChange(addField)}>
               + Add row
             </AddButton>
           )}

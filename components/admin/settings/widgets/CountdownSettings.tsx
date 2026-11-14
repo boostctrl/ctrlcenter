@@ -8,7 +8,7 @@ type Item = { label: string; date: string };
 
 // A Countdown widget's fields in admin Settings → Widgets (#285, #297).
 export default function CountdownSettings({ w, label, onChange }: InstanceEditorProps<"countdown">) {
-  const setItems = (update: (prev: Item[]) => Item[]) => onChange({ items: update(w.items) });
+  const setItems = (update: (prev: Item[]) => Item[]) => onChange((prev) => ({ items: update(prev.items) }));
   const rows = useKeyedRows(w.items, setItems);
   const updateItem = (i: number, patch: Partial<Item>) =>
     setItems((items) => items.map((item, idx) => (idx === i ? { ...item, ...patch } : item)));

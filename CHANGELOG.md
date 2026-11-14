@@ -64,6 +64,13 @@ here.
   up in the window opened for another container. A list or a log now only
   shows if it's for what's open at the time it arrives. (#463)
 
+- **Adding several rows quickly keeps them all.** Pressing "+ Add" a few
+  times in a row in a widget's list (world clocks, countdown dates, system
+  stats disks, feed addresses, and an API widget's headers and rows) could
+  keep only one new row, so a World clocks card seemed unable to show more
+  than one clock. Every click now adds its row, in Settings → Widgets and
+  in a widget's own settings panel alike. (#163)
+
 ### Security
 
 - **A custom search bang can only lead to a web address.** A bang whose URL

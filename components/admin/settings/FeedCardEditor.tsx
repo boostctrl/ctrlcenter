@@ -1,6 +1,7 @@
 "use client";
 
 import type { InstanceOf } from "@/lib/schema";
+import type { InstancePatch } from "./instancePatch";
 import { MAX_FEED_URLS } from "@/lib/schema";
 import { AddButton, ListPanel, MoveButtons, NumberRow, RemoveButton, TextField, ToggleRow, controlClasses } from "../ui";
 import FeedTest from "../FeedTest";
@@ -23,9 +24,9 @@ export function FeedCardEditor({
   feed: InstanceOf<"feed">;
   label: string;
   health: Record<string, FeedHealth> | null;
-  onChange: (patch: Partial<InstanceOf<"feed">>) => void;
+  onChange: (patch: InstancePatch<InstanceOf<"feed">>) => void;
 }) {
-  const setUrls = (update: (prev: string[]) => string[]) => onChange({ urls: update(feed.urls) });
+  const setUrls = (update: (prev: string[]) => string[]) => onChange((prev) => ({ urls: update(prev.urls) }));
   const urlRows = useKeyedRows(feed.urls, setUrls);
   const updateUrl = (i: number, url: string) =>
     setUrls((urls) => urls.map((u, idx) => (idx === i ? url : u)));

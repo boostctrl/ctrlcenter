@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { newInstance, type InstanceOf } from "@/lib/schema";
+import { applyInstancePatch } from "../instancePatch";
 import ApiSettings from "./ApiSettings";
 
 type Api = InstanceOf<"api">;
@@ -19,8 +20,8 @@ function setup(patch: Partial<Api> = {}) {
         w={w}
         label="API 1"
         onChange={(p) => {
-          patches.push(p);
-          setW({ ...w, ...p });
+          patches.push(typeof p === "function" ? p(w) : p);
+          setW((prev) => applyInstancePatch(prev, p));
         }}
         groups={[]}
         tags={[]}

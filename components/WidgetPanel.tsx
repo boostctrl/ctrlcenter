@@ -21,6 +21,7 @@ import ReauthDialog from "./admin/ReauthDialog";
 import { useAutosave, SaveStatus } from "./admin/useAutosave";
 import { useFeedHealth } from "./admin/FeedHealth";
 import { INSTANCE_GROUPS } from "./admin/settings/widgets";
+import { applyInstancePatch, type InstancePatch } from "./admin/settings/instancePatch";
 import { Hint } from "./admin/ui";
 
 // Widget types whose settings are site-wide rather than per widget, and where
@@ -188,7 +189,7 @@ function WidgetEditor({
       <Editor
         w={widget as never}
         label={label}
-        onChange={(patch) => setWidget((w) => ({ ...w, ...(patch as object) }) as WidgetInstance)}
+        onChange={(patch) => setWidget((w) => applyInstancePatch(w, patch as InstancePatch<WidgetInstance>))}
         feedHealth={feedHealth}
         groups={context.groups}
         tags={context.tags}

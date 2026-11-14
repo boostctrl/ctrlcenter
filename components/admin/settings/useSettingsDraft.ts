@@ -16,6 +16,7 @@ import { packDesign, packScene, type ThemePack } from "@/lib/theme";
 import { newThemeId } from "@/lib/prefs";
 import { defaultSpanFor, resolveLayout, type WidgetType } from "@/lib/layout";
 import { instanceLabels } from "@/lib/widgets/labels";
+import { applyInstancePatch, type InstancePatch } from "./instancePatch";
 import { useConfirm } from "../Confirm";
 import { useAutosave, type SaveOptions, type SaveState } from "../useAutosave";
 import { settingsPatch } from "../settingsPatch";
@@ -288,10 +289,8 @@ export function useSettingsDraft(
   // The widget instances (#297).
   const widgetLabels = instanceLabels(widgets);
   const instancesOf = (type: WidgetType) => widgets.filter((w) => w.type === type);
-  const updateWidget = (id: string, patch: Partial<WidgetInstance>) =>
-    setWidgets((ws) =>
-      ws.map((w) => (w.id === id ? ({ ...w, ...patch } as WidgetInstance) : w))
-    );
+  const updateWidget = (id: string, patch: InstancePatch<WidgetInstance>) =>
+    setWidgets((ws) => ws.map((w) => (w.id === id ? applyInstancePatch(w, patch) : w)));
   // A new instance goes to the end of the list and onto the board, shown: the
   // admin asked for it, and an empty one renders nothing until filled in.
   const addWidget = (type: WidgetType) => {

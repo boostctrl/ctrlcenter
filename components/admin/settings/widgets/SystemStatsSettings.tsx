@@ -9,7 +9,7 @@ type Disk = { label: string; path: string };
 
 // A System stats widget's fields in admin Settings → Widgets (#285, #297).
 export default function SystemStatsSettings({ w, label, onChange }: InstanceEditorProps<"systemStats">) {
-  const setDisks = (update: (prev: Disk[]) => Disk[]) => onChange({ disks: update(w.disks) });
+  const setDisks = (update: (prev: Disk[]) => Disk[]) => onChange((prev) => ({ disks: update(prev.disks) }));
   const rows = useKeyedRows(w.disks, setDisks);
   const updateDisk = (i: number, patch: Partial<Disk>) =>
     setDisks((disks) => disks.map((d, idx) => (idx === i ? { ...d, ...patch } : d)));
