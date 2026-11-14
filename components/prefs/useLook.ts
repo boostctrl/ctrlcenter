@@ -594,15 +594,20 @@ export function useLook(
   // is filled (from `colors[mode]`), leaving the other mode untouched — this is
   // how a preset fills just the mode being edited. Without a `mode`, both modes
   // are replaced (restoring a complete saved theme). The colorset carries its own
-  // accent, so any standalone accent override is dropped in favor of it.
+  // accent, so the standalone accent override of each mode filled is dropped in
+  // favor of it; the other mode keeps its own (#477).
   const applyThemeColors = useCallback(
     (colors: ModeColors, mode?: Mode) => {
+      const s = latest();
       const look: ModeColors = mode
-        ? { ...(latest().activeLook ?? seedLook()), [mode]: colors[mode] }
+        ? { ...(s.activeLook ?? seedLook()), [mode]: colors[mode] }
         : colors;
-      update({ activeLook: look, accentOverride: NO_ACCENT_OVERRIDES });
+      const accentOverride: AccentOverrides = mode
+        ? { ...s.accentOverride, [mode]: null }
+        : NO_ACCENT_OVERRIDES;
+      update({ activeLook: look, accentOverride });
       saveActiveTheme(look);
-      saveAccentOverride(null);
+      saveAccentOverride(accentOverride);
       paintLook();
     },
     [latest, seedLook, update, paintLook]

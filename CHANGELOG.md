@@ -46,6 +46,12 @@ here.
   the name, and saving it again created a group with that code for a name.
   The field now keeps the name. (#473)
 
+- **Applying colours to one mode keeps the other mode's accent.** In the
+  theme builder, a pack or a colour set applied to dark mode alone also
+  dropped the accent you'd picked for light mode, and the other way round.
+  Each mode's accent is its own: applying colours to one mode now replaces
+  only that mode's accent. (#477)
+
 ### Security
 
 - **A custom search bang can only lead to a web address.** A bang whose URL
