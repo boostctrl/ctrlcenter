@@ -46,6 +46,32 @@ describe("parseICalDate", () => {
   it("returns null for junk", () => {
     expect(parseICalDate("not-a-date", {})).toBeNull();
   });
+
+  // #503: a time on a DST change resolved one way in New York and the other
+  // in Berlin. RFC 5545 §3.3.5: a time in the spring gap reads with the
+  // offset from before it, and a repeated autumn time is the first.
+  const at = (value: string, TZID: string) => parseICalDate(value, { TZID })?.ms;
+
+  it("reads a time in a spring-forward gap with the offset from before it", () => {
+    // 02:30 doesn't exist; read as EST/CET it's 03:30 EDT/CEST.
+    expect(at("20240310T023000", "America/New_York")).toBe(Date.parse("2024-03-10T07:30:00Z"));
+    expect(at("20240331T023000", "Europe/Berlin")).toBe(Date.parse("2024-03-31T01:30:00Z"));
+    // Santiago springs forward at midnight: 00:30 is 01:30 -03.
+    expect(at("20240908T003000", "America/Santiago")).toBe(Date.parse("2024-09-08T04:30:00Z"));
+  });
+
+  it("reads a repeated autumn time as its first occurrence", () => {
+    expect(at("20241103T013000", "America/New_York")).toBe(Date.parse("2024-11-03T05:30:00Z"));
+    expect(at("20241027T023000", "Europe/Berlin")).toBe(Date.parse("2024-10-27T00:30:00Z"));
+    expect(at("20240407T023000", "Australia/Sydney")).toBe(Date.parse("2024-04-06T15:30:00Z"));
+  });
+
+  it("reads the times either side of a change with their own offsets", () => {
+    expect(at("20240310T015900", "America/New_York")).toBe(Date.parse("2024-03-10T06:59:00Z"));
+    expect(at("20240310T030000", "America/New_York")).toBe(Date.parse("2024-03-10T07:00:00Z"));
+    expect(at("20241027T015900", "Europe/Berlin")).toBe(Date.parse("2024-10-26T23:59:00Z"));
+    expect(at("20241027T030000", "Europe/Berlin")).toBe(Date.parse("2024-10-27T02:00:00Z"));
+  });
 });
 
 const ICS = [
@@ -283,6 +309,28 @@ describe("expandRecurring", () => {
     for (const e of out) expect(localTime(e.start)).toBe("09:00");
     // EST(-05) → EDT(-04) across Mar 8, so consecutive instants aren't 7d apart.
     expect(out[1].start - out[0].start).not.toBe(7 * DAY);
+  });
+
+  it("moves a weekly occurrence in a spring-forward gap past it (#503)", () => {
+    const ics = [
+      "BEGIN:VCALENDAR",
+      "BEGIN:VEVENT",
+      "UID:gap",
+      "SUMMARY:Backup",
+      "DTSTART;TZID=America/New_York:20240303T023000",
+      "RRULE:FREQ=WEEKLY;COUNT=3",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+    const now = Date.parse("2024-03-01T00:00:00Z");
+    const out = expandRecurring(parseICS(ics), now, now + 30 * DAY).sort(
+      (a, b) => a.start - b.start
+    );
+    expect(out.map((e) => new Date(e.start).toISOString())).toEqual([
+      "2024-03-03T07:30:00.000Z", // 02:30 EST
+      "2024-03-10T07:30:00.000Z", // in the gap: 03:30 EDT
+      "2024-03-17T06:30:00.000Z", // 02:30 EDT
+    ]);
   });
 
   it("skips months without the start day for a monthly series", () => {

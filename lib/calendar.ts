@@ -131,7 +131,13 @@ function zoneOffset(utcMs: number, tz: string): number {
   return asUTC - utcMs;
 }
 
-// Convert a wall-clock time in `tz` to a UTC instant (two passes settle DST).
+// Convert a wall-clock time in `tz` to a UTC instant, read with the zone's
+// offset a day before and a day after. Away from a DST change the two agree.
+// On one, a time both fit happens twice and is the first, the earlier
+// instant; a time neither fits falls in the gap and reads with the offset
+// from before it, so 02:30 on a spring-forward night is 03:30 (RFC 5545
+// §3.3.5). Two settling passes from one guess instead ended on whichever
+// offset they reached second, so the answer depended on the zone (#503).
 function zonedToUtc(
   y: number,
   mo: number,
@@ -141,10 +147,14 @@ function zonedToUtc(
   s: number,
   tz: string
 ): number {
-  const guess = Date.UTC(y, mo, d, h, mi, s);
-  if (tz === "UTC") return guess; // nothing to settle; spare the Intl calls (#381)
-  const off = zoneOffset(guess - zoneOffset(guess, tz), tz);
-  return guess - off;
+  const wall = Date.UTC(y, mo, d, h, mi, s);
+  if (tz === "UTC") return wall; // nothing to settle; spare the Intl calls (#381)
+  const before = wall - zoneOffset(wall - DAY_MS, tz);
+  const after = wall - zoneOffset(wall + DAY_MS, tz);
+  if (before === after) return before;
+  const fits = (t: number) => t + zoneOffset(t, tz) === wall;
+  if (fits(before) && fits(after)) return Math.min(before, after);
+  return fits(after) ? after : before;
 }
 
 // Parse a DATE or DATE-TIME value into an instant + all-day flag. Handles

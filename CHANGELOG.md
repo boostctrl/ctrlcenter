@@ -132,6 +132,13 @@ here.
   run a couple above the client list UniFi Network shows. It now counts
   clients from that list on controllers that provide it. (#502)
 
+- **Calendar events on a daylight saving change land at the right time.**
+  An event at a time the clocks skip, such as 2:30 AM on a spring-forward
+  night, could show an hour early in some time zones, and one at a time
+  that happens twice in autumn could show at the second one. Both now
+  follow the calendar standard everywhere: a skipped time moves an hour
+  later, to 3:30 AM, and a repeated time is the first one. (#503)
+
 ## [3.1.1] - 2026-11-14
 
 ### Fixed
