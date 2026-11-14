@@ -1171,18 +1171,40 @@ function meanDiff(page, a, b) {
   );
 }
 
-// Signed in through the real form. The page is left to settle first: Enter
-// before React has hydrated the form submits it natively, to the login page
-// itself, and the wait below then runs out. WebKit's slow frame cadence in
-// CI (#448) lost that race on the run's second sign-in, hence the settle
-// and the longer budget.
+// Signed in through the real form. Enter before React has hydrated the form
+// submits it natively, to the login page itself, and the wait for /admin then
+// runs out. WebKit's slow frame cadence in CI lost that race (#448), and
+// waiting for the network to go idle wasn't enough on ubuntu-26.04 (#498), so
+// this waits for the form's own submit handler: React keeps an element's
+// props under a `__reactProps$…` key once it has hydrated it. A sign-in that
+// still doesn't arrive leaves signin-failed.png and says where the page stood.
 async function signIn(ctx) {
   const login = await ctx.newPage();
-  await login.goto(`${base}/admin/login`, { waitUntil: "networkidle" });
-  await login.fill('input[type="password"]', PASSWORD);
-  await login.keyboard.press("Enter");
-  await login.waitForURL((u) => u.pathname === "/admin", { timeout: 30_000 });
-  await login.close();
+  const errors = [];
+  login.on("pageerror", (e) => errors.push(e.message));
+  login.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+  try {
+    await login.goto(`${base}/admin/login`);
+    await login.waitForFunction(
+      () => {
+        const form = document.querySelector('input[type="password"]')?.form;
+        const key = form && Object.keys(form).find((k) => k.startsWith("__reactProps$"));
+        return !!key && typeof form[key].onSubmit === "function";
+      },
+      null,
+      { timeout: 30_000 }
+    );
+    await login.fill('input[type="password"]', PASSWORD);
+    await login.keyboard.press("Enter");
+    await login.waitForURL((u) => u.pathname === "/admin", { timeout: 30_000 });
+  } catch (e) {
+    await login.screenshot({ path: path.join(OUT, "signin-failed.png"), fullPage: true }).catch(() => {});
+    const alerts = await login.getByRole("alert").allInnerTexts().catch(() => []);
+    const seen = [`at ${login.url()}`, ...alerts.map((a) => `alert: ${a}`), ...errors.map((m) => `error: ${m}`)];
+    throw new Error(`sign-in didn't reach /admin (${seen.join("; ")}): ${String(e?.message ?? e).split("\n")[0]}`);
+  } finally {
+    await login.close();
+  }
 }
 
 // A port nothing listens on (bound then released).
