@@ -190,6 +190,28 @@ describe("session records (#365)", () => {
     expect((await getSession("legacy-forwarded", now))?.forwarded).toBeNull();
   });
 
+  // #482: the record's own spread kept a malformed list.
+  it("drops a malformed addresses list from the file and keeps a good one", async () => {
+    const now = Date.now();
+    const base = { createdAt: now, lastSeenAt: now, ip: "203.0.113.9", userAgent: "Mozilla/5.0 (test)" };
+    fs.writeFileSync(
+      path.join(dir, "sessions.json"),
+      JSON.stringify({
+        version: 2,
+        idleHours: 24,
+        sessions: [
+          { ...base, id: "mixed", addresses: [1, {}] },
+          { ...base, id: "string", addresses: "x" },
+          { ...base, id: "good", addresses: ["198.51.100.4"] },
+        ],
+      }),
+      "utf8"
+    );
+    expect(await getSession("mixed", now)).not.toHaveProperty("addresses");
+    expect(await getSession("string", now)).not.toHaveProperty("addresses");
+    expect((await getSession("good", now))?.addresses).toEqual(["198.51.100.4"]);
+  });
+
   it("starts empty from an unparseable file rather than failing", async () => {
     fs.writeFileSync(path.join(dir, "sessions.json"), "{not json", "utf8");
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);

@@ -125,18 +125,20 @@ function isRecord(v: unknown): v is SessionRecord {
 }
 
 // A stored record, with the fields an older file lacks (or got wrong)
-// defaulted.
+// defaulted. `addresses` is left out of the spread and put back only when
+// it's a list of strings, so a malformed one is dropped (#482).
 function normalize(r: SessionRecord, version: unknown): SessionRecord {
+  const { addresses, ...rest } = r;
   return {
-    ...r,
+    ...rest,
     https: r.https === true,
     forwarded:
       typeof version === "number" && version >= 2 && typeof r.forwarded === "boolean"
         ? r.forwarded
         : null,
     reauthAt: typeof r.reauthAt === "number" ? r.reauthAt : r.createdAt,
-    ...(Array.isArray(r.addresses) && r.addresses.every((a) => typeof a === "string")
-      ? { addresses: r.addresses }
+    ...(Array.isArray(addresses) && addresses.every((a) => typeof a === "string")
+      ? { addresses }
       : {}),
   };
 }

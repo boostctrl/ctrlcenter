@@ -59,6 +59,12 @@ here.
   could get an id, the part of a board's address after `/b/`, that ended in
   a dash where the name was cut short. The dash is now dropped. (#483)
 
+- **A damaged session file is cleaned up when it's read.** If a session in
+  `sessions.json` had a malformed list of the addresses it was used from,
+  for example after a hand edit, the bad value was kept and could trip the
+  check that notices a session used from a new address. It's now dropped
+  when the file is read. (#482)
+
 ## [3.1.1] - 2026-11-14
 
 ### Fixed
