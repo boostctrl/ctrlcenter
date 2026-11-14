@@ -53,7 +53,7 @@ export default function UnifiCard({
             </span>
           </div>
           <p className="text-xs text-ink-50">
-            {data.devices.adopted} device{data.devices.adopted === 1 ? "" : "s"} online
+            {data.devices.online} device{data.devices.online === 1 ? "" : "s"} online
             {data.devices.disconnected > 0 && (
               <span className="text-status-down">
                 {" "}

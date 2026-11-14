@@ -176,7 +176,7 @@ export const GLANCES: {
     const devices =
       d.devices.disconnected > 0
         ? `${plural(d.devices.disconnected, "device")} down`
-        : `${plural(d.devices.adopted, "device")} online`;
+        : `${plural(d.devices.online, "device")} online`;
     return {
       center: String(total),
       caption: "clients",
@@ -396,7 +396,7 @@ export const PUBLIC_GLANCES: {
         d.internet.up ? "Internet up" : "Internet down",
         d.devices.disconnected > 0
           ? `${plural(d.devices.disconnected, "device")} down`
-          : `${plural(d.devices.adopted, "device")} online`,
+          : `${plural(d.devices.online, "device")} online`,
       ],
     };
   },

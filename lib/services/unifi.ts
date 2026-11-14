@@ -51,7 +51,11 @@ export type UnifiSnapshot = {
     latencyMs: number | null;
   };
   clients: { total: number; wireless: number; wired: number; guests: number };
-  devices: { adopted: number; disconnected: number; pending: number };
+  // UniFi network gear: connected, adopted but out of reach, and waiting to
+  // be adopted. Counted device by device from stat/device (#467); the health
+  // summary's tallies, the fallback when that list can't be read, count
+  // roles, so a Dream Machine counts as a gateway and again as a switch.
+  devices: { online: number; disconnected: number; pending: number };
   // Derived health issues, most severe first, capped for the card.
   issues: { level: "warning" | "error"; message: string }[];
 };
@@ -99,7 +103,8 @@ type RawDevice = {
   model?: string;
   mac?: string;
   type?: string;
-  // 1 = connected/adopted; anything else is offline/provisioning.
+  adopted?: boolean;
+  // See deviceStatus.
   state?: number;
   num_sta?: number;
   uptime?: number;
@@ -118,6 +123,31 @@ const DEVICE_KINDS: Record<string, string> = {
   usg: "Gateway",
 };
 
+// Where a device stands, from stat/device's `state`: 1 connected, and 4
+// upgrading or 5 provisioning, which it does while connected; 2 pending and
+// 7 adopting, as is any device not adopted yet; the rest (0 disconnected,
+// 6 heartbeat missed, an inform or adoption error, isolated) out of reach.
+type DeviceStatus = "online" | "offline" | "pending";
+function deviceStatus(d: RawDevice): DeviceStatus {
+  if (d.adopted === false || d.state === 2 || d.state === 7) return "pending";
+  return d.state === 1 || d.state === 4 || d.state === 5 ? "online" : "offline";
+}
+
+// Exported for the unit tests: the device counts from stat/device (#467), or
+// null when it didn't come back as a list.
+export function countUnifiDevices(raw: unknown): UnifiSnapshot["devices"] | null {
+  if (!Array.isArray(raw)) return null;
+  const counts = { online: 0, disconnected: 0, pending: 0 };
+  for (const d of raw as RawDevice[]) {
+    if (!d || typeof d !== "object") continue;
+    const status = deviceStatus(d);
+    if (status === "online") counts.online += 1;
+    else if (status === "pending") counts.pending += 1;
+    else counts.disconnected += 1;
+  }
+  return counts;
+}
+
 // Exported for the unit tests: fold stat/device into the detail's device list,
 // offline gear first so a downed device surfaces at the top. Sorted before
 // the cap, so an offline device late in a big network's list still makes the
@@ -128,7 +158,7 @@ export function mapUnifiDevices(raw: unknown): UnifiDevice[] {
     .map((d) => ({
       name: d.name?.trim() || d.model?.trim() || d.mac?.trim() || "device",
       kind: DEVICE_KINDS[d.type ?? ""] ?? (d.type?.trim() || "Device"),
-      up: d.state === 1,
+      up: deviceStatus(d) === "online",
       clients: int(d.num_sta),
       uptime: typeof d.uptime === "number" && d.uptime > 0 ? d.uptime : null,
     }))
@@ -144,8 +174,9 @@ const SUBSYSTEM_LABELS: Record<string, string> = {
   vpn: "VPN",
 };
 
-// Exported for the unit tests: fold the health subsystems into the snapshot.
-export function mapUnifiHealth(raw: unknown): UnifiSnapshot {
+// Exported for the unit tests: fold the health subsystems into the snapshot,
+// with the device counts from stat/device when it was read.
+export function mapUnifiHealth(raw: unknown, rawDevices?: unknown): UnifiSnapshot {
   const subsystems = Array.isArray(raw) ? (raw as RawSubsystem[]) : [];
   const by = (name: string) => subsystems.find((s) => s.subsystem === name) ?? {};
   const wan = by("wan");
@@ -157,11 +188,12 @@ export function mapUnifiHealth(raw: unknown): UnifiSnapshot {
   const wired = int(lan.num_user) + int(lan.num_guest);
   const guests = int(wlan.num_guest) + int(lan.num_guest);
 
-  // UniFi gear lives on the wan (gateway), wlan (APs), and lan (switches)
-  // subsystems; sum their device tallies for the "is anything offline" line.
+  // Without the device list: UniFi gear lives on the wan (gateway), wlan
+  // (APs), and lan (switches) subsystems, and their tallies add up to a
+  // count of roles rather than devices.
   const infra = [wan, wlan, lan];
-  const devices = {
-    adopted: infra.reduce((n, s) => n + int(s.num_adopted), 0),
+  const devices = countUnifiDevices(rawDevices) ?? {
+    online: infra.reduce((n, s) => n + int(s.num_adopted), 0),
     disconnected: infra.reduce((n, s) => n + int(s.num_disconnected), 0),
     pending: infra.reduce((n, s) => n + int(s.num_pending), 0),
   };
@@ -328,32 +360,40 @@ function siteData<T>(text: string): T {
   return (env.data ?? []) as T;
 }
 
-export async function getUnifiSnapshot(cfg: UnifiConfig): Promise<UnifiSnapshot> {
-  const base = serviceBase(cfg.url);
-  const text = await unifiGet(
-    base,
-    cfg,
-    (prefix) => `${prefix}/api/s/${DEFAULT_SITE}/stat/health`
-  );
-  return mapUnifiHealth(siteData<RawSubsystem[]>(text));
-}
-
-// The detail read (#231): the health snapshot plus the adopted-device list. A
-// failed device fetch degrades to an empty list rather than blanking the page.
-export async function getUnifiDetail(cfg: UnifiConfig): Promise<UnifiDetail> {
+// The site's health summary, and its device list beside it: the card's
+// device counts (#467) and the detail page's list (#231). A device list that
+// fails or doesn't parse is null, and the card falls back to the health
+// summary's tallies rather than failing.
+async function readSite(
+  cfg: UnifiConfig
+): Promise<{ health: RawSubsystem[]; devices: RawDevice[] | null }> {
   const base = serviceBase(cfg.url);
   const [healthR, devicesR] = await Promise.allSettled([
     unifiGet(base, cfg, (p) => `${p}/api/s/${DEFAULT_SITE}/stat/health`),
     unifiGet(base, cfg, (p) => `${p}/api/s/${DEFAULT_SITE}/stat/device`),
   ]);
   if (healthR.status === "rejected") throw healthR.reason;
-  return {
-    ...mapUnifiHealth(siteData<RawSubsystem[]>(healthR.value)),
-    deviceList:
-      devicesR.status === "fulfilled"
-        ? mapUnifiDevices(siteData<RawDevice[]>(devicesR.value))
-        : [],
-  };
+  let devices: RawDevice[] | null = null;
+  if (devicesR.status === "fulfilled") {
+    try {
+      devices = siteData<RawDevice[]>(devicesR.value);
+    } catch {
+      // Not JSON: treated as unread.
+    }
+  }
+  return { health: siteData<RawSubsystem[]>(healthR.value), devices };
+}
+
+export async function getUnifiSnapshot(cfg: UnifiConfig): Promise<UnifiSnapshot> {
+  const { health, devices } = await readSite(cfg);
+  return mapUnifiHealth(health, devices);
+}
+
+// The detail read (#231): the health snapshot plus the adopted-device list. A
+// failed device fetch degrades to an empty list rather than blanking the page.
+export async function getUnifiDetail(cfg: UnifiConfig): Promise<UnifiDetail> {
+  const { health, devices } = await readSite(cfg);
+  return { ...mapUnifiHealth(health, devices), deviceList: mapUnifiDevices(devices ?? []) };
 }
 
 // Fresh reachability check for the admin's "Test connection" button: a real

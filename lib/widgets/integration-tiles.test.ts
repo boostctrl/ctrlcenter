@@ -69,7 +69,7 @@ const SNAPSHOTS: Record<ServiceId, unknown> = {
   unifi: {
     internet: { up: true, isp: L("isp"), wanIp: L("wan-ip"), latencyMs: 12 },
     clients: { total: 10, wireless: 7, wired: 3, guests: 1 },
-    devices: { adopted: 4, disconnected: 1, pending: 0 },
+    devices: { online: 4, disconnected: 1, pending: 0 },
     issues: [{ level: "warning", message: L("issue") }],
   },
 };

@@ -5,6 +5,7 @@ import {
   probeUnifi,
   mapUnifiHealth,
   mapUnifiDevices,
+  countUnifiDevices,
   UNIFI_ISSUE_CAP,
   UNIFI_DEVICE_CAP,
 } from "./unifi";
@@ -125,8 +126,9 @@ describe("getUnifiSnapshot", () => {
       latencyMs: 50,
     });
     expect(snap.clients).toEqual({ total: 25, wireless: 17, wired: 8, guests: 0 });
-    expect(snap.devices).toEqual({ adopted: 8, disconnected: 0, pending: 0 });
-    expect(snap.issues).toEqual([]);
+    // Counted from stat/device: the Garage AP is offline.
+    expect(snap.devices).toEqual({ online: 3, disconnected: 1, pending: 0 });
+    expect(snap.issues).toEqual([{ level: "error", message: "1 device disconnected" }]);
 
     // Logged in once, then fetched health with the returned cookie.
     const loginCall = fetchMock.mock.calls.find(([u]) =>
@@ -157,6 +159,43 @@ describe("getUnifiSnapshot", () => {
       "Login failed — check the username and password"
     );
   });
+
+  // #467: the card added up the health subsystems' num_adopted, which count
+  // roles. On a live controller with two Dream Machines (each a gateway and a
+  // switch or AP), that came to 8 for 6 devices.
+  it("counts devices, not the roles the health summary adds up", async () => {
+    const devices = ["udm", "udm", "uap", "uap", "usw", "usw"].map((type) => ({ type, state: 1 }));
+    stubUnifiOs({ devices });
+    const snap = await getUnifiSnapshot(CFG);
+    expect(snap.devices).toEqual({ online: 6, disconnected: 0, pending: 0 });
+    expect(snap.issues).toEqual([]);
+  });
+
+  it("falls back to the health summary's tallies when stat/device fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(async (input) => {
+        const url = String(input);
+        if (url.endsWith("/api/auth/login"))
+          return new Response("{}", { status: 200, headers: { "set-cookie": "TOKEN=jwt; Path=/" } });
+        if (url.includes("/stat/health")) return new Response(envelope(HEALTH));
+        if (url.includes("/stat/device")) return new Response("<html>oops</html>");
+        return new Response("not found", { status: 404 });
+      })
+    );
+    const snap = await getUnifiSnapshot(CFG);
+    expect(snap.devices).toEqual({ online: 8, disconnected: 0, pending: 0 });
+  });
+});
+
+describe("countUnifiDevices", () => {
+  it("sorts devices by state into online, offline and pending", () => {
+    const states = [1, 4, 5, 0, 6, 9, 11, 2, 7];
+    const devices = [...states.map((state) => ({ type: "uap", state })), { type: "usw", state: 1, adopted: false }];
+    expect(countUnifiDevices(devices)).toEqual({ online: 3, disconnected: 4, pending: 3 });
+    expect(countUnifiDevices([])).toEqual({ online: 0, disconnected: 0, pending: 0 });
+    expect(countUnifiDevices("nope")).toBeNull();
+  });
 });
 
 describe("mapUnifiHealth", () => {
@@ -175,7 +214,8 @@ describe("mapUnifiHealth", () => {
     ]);
     expect(snap.internet.up).toBe(false);
     expect(snap.clients.total).toBe(7);
-    expect(snap.devices).toEqual({ adopted: 6, disconnected: 1, pending: 2 });
+    // No device list: the health summary's tallies.
+    expect(snap.devices).toEqual({ online: 6, disconnected: 1, pending: 2 });
     // Errors sort ahead of warnings.
     expect(snap.issues[0]).toEqual({ level: "error", message: "WAN down" });
     expect(snap.issues).toContainEqual({ level: "error", message: "1 device disconnected" });

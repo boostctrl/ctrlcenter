@@ -121,6 +121,15 @@ here.
   volume and starts saving again at the next check after the file becomes
   writable, fixing the side files it left behind. (#439)
 
+- **The UniFi card counts devices, not their roles.** The "devices online"
+  count added up UniFi's per-role tallies, so a Dream Machine, which acts as
+  a gateway and also as a switch or access point, counted twice. The card
+  and its tile now count each device in the controller's device list once,
+  the same devices the UniFi page lists, and count devices that are
+  offline or waiting to be adopted from that list too. UniFi Network's own
+  device count can still be higher, since it can include devices that list
+  doesn't return. (#467)
+
 ## [3.1.1] - 2026-11-14
 
 ### Fixed
