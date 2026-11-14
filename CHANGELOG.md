@@ -52,6 +52,11 @@ here.
   Each mode's accent is its own: applying colours to one mode now replaces
   only that mode's accent. (#477)
 
+- **Retrying the setup's Apps step doesn't add apps twice.** When one of
+  the addresses pasted into the first-run setup couldn't be added, pressing
+  Save again added the ones before it a second time, so the dashboard showed
+  them twice. A retry now adds only what's still missing. (#464)
+
 ### Security
 
 - **A custom search bang can only lead to a web address.** A bang whose URL

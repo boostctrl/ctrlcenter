@@ -297,13 +297,22 @@ async function addApp(app: Record<string, unknown>) {
 function AppsStep({ onSave }: StepProps) {
   const [text, setText] = useState("");
   const [examples, setExamples] = useState(false);
+  // What this step has already added, so a retry after one add fails picks up
+  // where it stopped instead of adding the earlier apps a second time (#464).
+  const added = useRef(new Set<string>());
   const urls = parsePastedUrls(text);
+  const addOnce = async (key: string, app: Record<string, unknown>) => {
+    if (added.current.has(key)) return;
+    await addApp(app);
+    added.current.add(key);
+  };
   return (
     <StepForm
       onSubmit={() =>
         onSave(async () => {
-          for (const url of urls) await addApp({ name: appNameFromUrl(url), url });
-          if (examples) for (const app of EXAMPLE_APPS) await addApp({ ...app, monitor: false });
+          for (const url of urls) await addOnce(`url:${url}`, { name: appNameFromUrl(url), url });
+          if (examples)
+            for (const app of EXAMPLE_APPS) await addOnce(`example:${app.name}`, { ...app, monitor: false });
         })
       }
     >
