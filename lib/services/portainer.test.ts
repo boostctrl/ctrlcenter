@@ -133,6 +133,20 @@ describe("mapPortainerEndpoints", () => {
     expect(snap.endpoints[0].total).toBe(2);
   });
 
+  // #469: the totals were summed over the capped rows, so 10 environments
+  // of 5 running containers read 40 running, not 50.
+  it("totals every environment, not just the rows shown", () => {
+    const ten = Array.from({ length: 10 }, (_, i) => ({
+      Id: i + 1,
+      Snapshots: [
+        { RunningContainerCount: 5, StoppedContainerCount: 1, UnhealthyContainerCount: 1, TotalContainerCount: 6 },
+      ],
+    }));
+    const snap = mapPortainerEndpoints(ten);
+    expect(snap.endpoints).toHaveLength(PORTAINER_ENDPOINT_CAP);
+    expect(snap.totals).toEqual({ running: 50, stopped: 10, unhealthy: 10, total: 60 });
+  });
+
   it("names an unnamed environment and tolerates a non-array", () => {
     expect(mapPortainerEndpoints(null).endpoints).toEqual([]);
     expect(mapPortainerEndpoints([{ Snapshots: [{}] }]).endpoints[0].name).toBe(

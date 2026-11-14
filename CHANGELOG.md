@@ -25,6 +25,11 @@ here.
   down never showed. Offline devices now come first from the whole list.
   (#468)
 
+- **The Portainer card counts the containers in every environment.** With
+  more than eight environments, the running, stopped, unhealthy and total
+  counts covered only the eight the card lists. They now add up every
+  environment, and the card still lists the first eight. (#469)
+
 ## [3.1.0] - 2026-11-14
 
 ### Added

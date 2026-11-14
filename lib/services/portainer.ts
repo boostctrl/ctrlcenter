@@ -63,10 +63,12 @@ type RawDockerSnapshot = {
 const num = (v: unknown): number =>
   typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.round(v) : 0;
 
-// Exported for the unit tests: fold the endpoint list into the snapshot.
+// Exported for the unit tests: fold the endpoint list into the snapshot. The
+// headline totals count every environment; only the rows shown are capped
+// (#469).
 export function mapPortainerEndpoints(raw: unknown): PortainerSnapshot {
   const list = Array.isArray(raw) ? (raw as RawEndpoint[]) : [];
-  const endpoints = list.slice(0, PORTAINER_ENDPOINT_CAP).map((e, i) => {
+  const all = list.map((e, i) => {
     const snap = e.Snapshots?.[0];
     const running = num(snap?.RunningContainerCount);
     const stopped = num(snap?.StoppedContainerCount);
@@ -84,7 +86,7 @@ export function mapPortainerEndpoints(raw: unknown): PortainerSnapshot {
       hasSnapshot: snap !== undefined,
     };
   });
-  const totals = endpoints.reduce(
+  const totals = all.reduce(
     (acc, e) => ({
       running: acc.running + e.running,
       stopped: acc.stopped + e.stopped,
@@ -93,7 +95,7 @@ export function mapPortainerEndpoints(raw: unknown): PortainerSnapshot {
     }),
     { running: 0, stopped: 0, unhealthy: 0, total: 0 }
   );
-  return { endpoints, totals };
+  return { endpoints: all.slice(0, PORTAINER_ENDPOINT_CAP), totals };
 }
 
 // Portainer rejects a bad API key with 401 or 403; both mean the same thing.
