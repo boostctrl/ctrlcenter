@@ -19,6 +19,10 @@ here.
   subject, and a name containing "{status}" had that replaced with "down" or
   "up". The name now goes into the subject exactly as typed. (#480)
 
+- **Calendar events show backslashes before an "n" correctly.** An event
+  title or location with a backslash followed by "n", such as `C:\new`, showed
+  as `C:\ ew`. It now shows as written. (#478)
+
 ## [3.1.1] - 2026-11-14
 
 ### Fixed

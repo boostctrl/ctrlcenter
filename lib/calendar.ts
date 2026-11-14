@@ -58,13 +58,12 @@ function parseLine(
 }
 
 // Unescape the TEXT value type: \n \, \; \\ (RFC 5545 §3.3.11). Newlines are
-// collapsed to spaces so a multi-line summary stays on one row.
+// collapsed to spaces so a multi-line summary stays on one row. One pass, so
+// the second backslash of an escaped "\\" never pairs with what follows it:
+// "C:\\new" is "C:\new", not "C:\ ew" (#478).
 function unescapeText(v: string): string {
   return v
-    .replace(/\\n/gi, " ")
-    .replace(/\\,/g, ",")
-    .replace(/\\;/g, ";")
-    .replace(/\\\\/g, "\\")
+    .replace(/\\([\\;,nN])/g, (_, c: string) => (c === "n" || c === "N" ? " " : c))
     .trim();
 }
 

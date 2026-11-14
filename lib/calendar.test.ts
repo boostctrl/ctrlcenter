@@ -84,6 +84,17 @@ describe("parseICS", () => {
     );
   });
 
+  // #478: "\\n" was read as a backslash and then a newline.
+  it("reads an escaped backslash before an n as a backslash", () => {
+    const ics = [
+      "BEGIN:VEVENT",
+      "SUMMARY:C:\\\\new\\nline \\\\\\,\\Ndone",
+      "DTSTART:20260630T120000Z",
+      "END:VEVENT",
+    ].join("\r\n");
+    expect(parseICS(ics)[0].summary).toBe("C:\\new line \\, done");
+  });
+
   it("skips events missing a summary or start", () => {
     const ics = [
       "BEGIN:VEVENT",
