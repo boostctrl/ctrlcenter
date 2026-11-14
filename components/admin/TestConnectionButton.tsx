@@ -12,8 +12,8 @@ import { buttonClasses } from "@/lib/buttons";
 // request body, labels, and a renderer that turns the successful response into
 // its own ✓/✗ badges; an optional `renderExtra` renders a block beneath the row
 // (the RSS probe's autodiscovered-feed picker). A transport failure — a network
-// error or a non-2xx like an expired session's 401 — renders a standard ✗ badge
-// so no probe ever fails silently.
+// error, a non-2xx like an expired session's 401, or a 2xx whose body isn't a
+// JSON result — renders a standard ✗ badge so no probe ever fails silently.
 export default function TestConnectionButton<T>({
   endpoint,
   body,
@@ -57,6 +57,10 @@ export default function TestConnectionButton<T>({
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         setError((data as { error?: string } | null)?.error ?? "Request failed");
+      } else if (data === null || typeof data !== "object") {
+        // A 2xx that isn't a JSON result (an auth proxy's HTML page, say)
+        // would otherwise settle on nothing at all (#470).
+        setError("Unexpected response");
       } else {
         setResult(data as T);
       }

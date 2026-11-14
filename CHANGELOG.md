@@ -35,6 +35,11 @@ here.
   and the current UV index and chance of rain were the next hour's. They now
   stay on the current hour until it ends. (#466)
 
+- **A connection test always says how it went.** When a Test or Send test
+  button got a reply that wasn't a result, such as a sign-in page from a
+  proxy in front of CtrlCenter, the button went back to its label and showed
+  nothing. It now shows "✗ Unexpected response". (#470)
+
 ### Security
 
 - **A custom search bang can only lead to a web address.** A bang whose URL
