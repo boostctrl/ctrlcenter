@@ -6,7 +6,8 @@ import { useCallback, useEffect, useRef } from "react";
 // the status pages, the Monitor, the weather widgets — instead of each
 // hand-rolling setInterval:
 // - runs `task` on mount (unless `immediate: false`, for pages seeded with
-//   server data) and every `intervalMs` after that;
+//   server data, which skips only that first run) and every `intervalMs`
+//   after that;
 // - pauses while the tab is hidden, and on return runs right away if the last
 //   run is a full interval old (a quick tab flick doesn't refetch);
 // - hands each run an AbortSignal, aborted when the next run starts, when the
@@ -27,6 +28,11 @@ export function usePolling(
   const taskRef = useRef(task);
   const controller = useRef<AbortController | null>(null);
   const lastRun = useRef(0);
+  // The task the loop last started with: `immediate: false` skips the run
+  // for the seeded first task only, and a changed task always runs at once
+  // (#472). A ref, not a mount flag, so StrictMode's dev-only remount with
+  // the same task doesn't fetch over the seed either.
+  const startedWith = useRef<PollTask | null>(null);
   useEffect(() => {
     taskRef.current = task;
   });
@@ -60,7 +66,9 @@ export function usePolling(
       if (Date.now() - lastRun.current >= intervalMs) void run();
       start();
     };
-    if (immediate) void run();
+    const changed = startedWith.current !== null && startedWith.current !== task;
+    startedWith.current = task;
+    if (immediate || changed) void run();
     else lastRun.current = Date.now();
     if (!document.hidden) start();
     document.addEventListener("visibilitychange", onVisibility);

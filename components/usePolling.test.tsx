@@ -94,6 +94,33 @@ describe("usePolling", () => {
     expect(b).toHaveBeenCalledTimes(2);
   });
 
+  // #472: immediate: false was checked on every effect run, so a changed
+  // task waited for the next tick while its predecessor's run was aborted.
+  it("re-runs a changed task at once even when immediate is off", () => {
+    const a = vi.fn<PollTask>();
+    const b = vi.fn<PollTask>();
+    const { rerender } = renderHook(
+      ({ task }) => usePolling(task, 1000, { immediate: false }),
+      { initialProps: { task: a } }
+    );
+    expect(a).not.toHaveBeenCalled();
+    rerender({ task: b });
+    expect(b).toHaveBeenCalledTimes(1);
+    expect(a).not.toHaveBeenCalled();
+  });
+
+  it("doesn't run the seeded task early when only the interval changes", () => {
+    const task = vi.fn<PollTask>();
+    const { rerender } = renderHook(
+      ({ ms }) => usePolling(task, ms, { immediate: false }),
+      { initialProps: { ms: 1000 } }
+    );
+    rerender({ ms: 2000 });
+    expect(task).not.toHaveBeenCalled();
+    act(() => void vi.advanceTimersByTime(2000));
+    expect(task).toHaveBeenCalledTimes(1);
+  });
+
   it("refresh runs the task on demand and swallows its rejection", async () => {
     const task = vi.fn<PollTask>(async () => {
       throw new Error("boom");
