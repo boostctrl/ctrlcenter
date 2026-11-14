@@ -124,6 +124,30 @@ describe("getCdnIcon", () => {
     await expect(fs.access(path.join(iconsDir, "plex.svg"))).rejects.toBeTruthy();
   });
 
+  // #479: the whole body was buffered before the size cap was checked.
+  it("stops reading an oversized body once it passes the cap", async () => {
+    const chunk = new TextEncoder().encode(`<svg>${" ".repeat(64 * 1024 - 5)}`);
+    let pulled = 0;
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += 1;
+        controller.enqueue(chunk);
+        if (pulled === 128) controller.close(); // 8 MiB in all
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(body, { status: 200 })));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    expect(await cache.getCdnIcon("plex")).toBeNull();
+    expect(cancelled).toBe(true);
+    expect(pulled).toBeLessThan(16); // the 512 KiB cap is 8 chunks
+    await expect(fs.access(path.join(iconsDir, "plex.svg"))).rejects.toBeTruthy();
+    warn.mockRestore();
+  });
+
   it("degrades to null when the CDN is unreachable (offline)", async () => {
     const fetchMock = vi.fn(async () => {
       throw new Error("network down");

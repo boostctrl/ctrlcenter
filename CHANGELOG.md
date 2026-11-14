@@ -86,6 +86,11 @@ here.
   frame still showed its glowing signal dots. It now shows only the traces
   and their pads. (#492)
 
+- **An oversized icon download is cut off at the size limit.** When the icon
+  CDN sent back something far bigger than an icon, such as a large error
+  page, the server read all of it into memory before turning it down. It now
+  stops reading as soon as the response passes the 512 KiB limit. (#479)
+
 ## [3.1.1] - 2026-11-14
 
 ### Fixed

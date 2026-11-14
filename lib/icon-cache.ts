@@ -15,6 +15,7 @@
 import fs from "fs/promises";
 import path from "path";
 import { CONFIG_DIR } from "./config";
+import { readCappedBytes } from "./fetch-body";
 import { log, hostOf, errorReason } from "./log";
 import { globalSingleton } from "./singleton";
 
@@ -266,13 +267,15 @@ async function fetchAndStore(slug: string, file: string): Promise<Uint8Array | n
       rememberNegative(slug);
       return null;
     }
-    const bytes = new Uint8Array(await res.arrayBuffer());
     // Size + shape sanity: every icon in the set is a small SVG document. A
-    // CDN error page or truncated body must not be cached as an icon.
-    const head = new TextDecoder().decode(bytes.slice(0, 512)).trimStart();
+    // CDN error page or truncated body must not be cached as an icon. The
+    // body is read through the cap, so an oversized one is cancelled once it
+    // passes it rather than buffered whole first (#479).
+    const bytes: Uint8Array | null = await readCappedBytes(res, MAX_CDN_ICON_BYTES);
+    const head = bytes ? new TextDecoder().decode(bytes.subarray(0, 512)).trimStart() : "";
     if (
+      !bytes ||
       bytes.byteLength === 0 ||
-      bytes.byteLength > MAX_CDN_ICON_BYTES ||
       !(head.startsWith("<svg") || head.startsWith("<?xml"))
     ) {
       rememberNegative(slug);
