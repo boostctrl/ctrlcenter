@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [3.1.3] - 2026-11-14
+
 ### Added
 
 - **Require two-factor authentication for an account.** In Settings →
@@ -4087,7 +4089,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.2...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.3...HEAD
+[3.1.3]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.2...v3.1.3
 [3.1.2]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.1...v3.1.2
 [3.1.1]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.0...v3.1.1
 [3.1.0]: https://github.com/boostctrl/ctrlcenter/compare/v3.0.1...v3.1.0
