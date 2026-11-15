@@ -9,7 +9,8 @@
 // Every paint here reads the latest state (./lookState), never the render's:
 // a setter writes its slice, then calls paintLook/paintChrome, so a handler
 // that calls several setters in one click paints each from what the earlier
-// ones just set (#429). The site default a paint falls back to is resolved
+// ones just set (#429); one wrapped in `batch` paints each kind once, as it
+// ends (#440). The site default a paint falls back to is resolved
 // from that state too (the day/night schedule switch), through pure helpers
 // of the theme rather than this render's closures (#395).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -476,13 +477,13 @@ export function useLook(
   );
 
   // The two paints, and the only two: the colors, tune, effects, density,
-  // status colors and wallpaper (paintLook), and the design/scene/font/
-  // heading classes (paintChrome), each resolved for the mode on screen from
+  // status colors and wallpaper (drawLook), and the design/scene/font/
+  // heading classes (drawChrome), each resolved for the mode on screen from
   // the LATEST state — what the setters have written so far in this handler
   // — never from this render's, so no setter has to hand a paint the part it
   // just set (#363, #373, #394, #429). A setter writes, then paints. The
   // site default is resolved from that state too (the schedule switch).
-  const paintLook = useCallback(() => {
+  const drawLook = useCallback(() => {
     const s = latest();
     const dt = siteOf(s);
     const theme = s.previewMode ?? s.theme;
@@ -503,7 +504,7 @@ export function useLook(
       wallpaper: wallpaperOf(s.wallpapers, dt, dark),
     });
   }, [latest, siteOf]);
-  const paintChrome = useCallback(() => {
+  const drawChrome = useCallback(() => {
     const s = latest();
     const dt = siteOf(s);
     const dark = resolveDark(s.previewMode ?? s.theme);
@@ -512,6 +513,39 @@ export function useLook(
     applyFont(forMode(s.fonts, dark) ?? defFont(dt, dark));
     applyHeadingFont(headingOf(s.headings, dt, dark));
   }, [latest, siteOf]);
+
+  // A setter asks for a paint; it runs at once, or, inside `batch`, once
+  // when the batch ends. A handler that calls several setters (applyPack
+  // calls nine) then paints each kind once rather than once per setter
+  // (#440), and still before it returns, so the paint stays synchronous with
+  // the click as the no-flash contract and the tests expect.
+  const batchDepth = useRef(0);
+  const pending = useRef({ look: false, chrome: false });
+  const flush = useCallback(() => {
+    const { look, chrome } = pending.current;
+    pending.current = { look: false, chrome: false };
+    if (look) drawLook();
+    if (chrome) drawChrome();
+  }, [drawLook, drawChrome]);
+  const paintLook = useCallback(() => {
+    pending.current.look = true;
+    if (batchDepth.current === 0) flush();
+  }, [flush]);
+  const paintChrome = useCallback(() => {
+    pending.current.chrome = true;
+    if (batchDepth.current === 0) flush();
+  }, [flush]);
+  const batch = useCallback(
+    (run: () => void) => {
+      batchDepth.current++;
+      try {
+        run();
+      } finally {
+        if (--batchDepth.current === 0) flush();
+      }
+    },
+    [flush]
+  );
 
   // The seeded color set for a mode (seedFor above): `seedColorSet` from
   // this render's accents, for the builder's readers; `seedLook` both modes
@@ -702,17 +736,19 @@ export function useLook(
       const dark = mode === "dark";
       const status = (dark ? pack.status : pack.statusLight ?? pack.status) ?? "none";
       const wallpaper = (dark ? pack.wallpaper : pack.wallpaperLight ?? pack.wallpaper) ?? "none";
-      setDesign(packDesign(pack, dark), mode);
-      setScene(packScene(pack, dark), mode);
-      setTune(pack.tune ?? "none", mode);
-      setSceneFx("none", mode);
-      setFont(pack.font ?? null, mode);
-      setHeadingFont(pack.headingFont ?? null, mode);
-      setStatusColors(status, mode);
-      setWallpaper(wallpaper, mode);
-      // The colors paint last, with every part above: each paint reads the
-      // latest state, so the setters' values are what it paints (#363).
-      applyThemeColors({ dark: pack.dark, light: pack.light }, mode);
+      // One paint of each kind once every part is written (#440); each
+      // reads the latest state, so it paints the setters' values (#363).
+      batch(() => {
+        setDesign(packDesign(pack, dark), mode);
+        setScene(packScene(pack, dark), mode);
+        setTune(pack.tune ?? "none", mode);
+        setSceneFx("none", mode);
+        setFont(pack.font ?? null, mode);
+        setHeadingFont(pack.headingFont ?? null, mode);
+        setStatusColors(status, mode);
+        setWallpaper(wallpaper, mode);
+        applyThemeColors({ dark: pack.dark, light: pack.light }, mode);
+      });
       // Under "themes only" (#335) the choice is the pack's gallery key
       // (stable across a rename, #395): the parts above are what this visit
       // paints, but the next page load resolves the key against the site's
@@ -720,6 +756,7 @@ export function useLook(
       if (policy === "packs") savePackChoice({ ...loadPackChoice(), [mode]: packKey(pack) });
     },
     [
+      batch,
       policy,
       setDesign,
       setScene,
