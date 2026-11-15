@@ -42,6 +42,12 @@ here.
   through a rename, as board themes and the day and night schedule already
   did. (#446)
 
+- **Screen readers name the theme builder's color sets.** The Surface and
+  Status colors wells on the Colors tab now announce the set they belong
+  to, as the palettes already did. When visitors may only pick from the
+  site's themes, the theme panel no longer points at a tab that isn't
+  shown. (#435)
+
 ## [3.1.2] - 2026-11-14
 
 ### Fixed

@@ -52,10 +52,13 @@ export default function ThemesTab({
     savedActive,
   } = d;
   return (
+    // Under the packs-only policy there's no tab strip, so this is the
+    // builder's whole content rather than a tab's panel: no tabpanel role,
+    // and no label pointing at a tab that isn't there (#435).
     <div
-      role="tabpanel"
+      role={packsOnly ? undefined : "tabpanel"}
       id="tb-panel-themes"
-      aria-labelledby="tb-tab-themes"
+      aria-labelledby={packsOnly ? undefined : "tb-tab-themes"}
       className="space-y-4"
     >
       {/* The first sentence names the tile group for a screen reader (#350);

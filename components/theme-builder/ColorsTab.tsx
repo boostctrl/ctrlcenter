@@ -114,10 +114,12 @@ export default function ColorsTab({ d }: { d: ThemeDraft }) {
         </div>
         <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <span className="block text-[11px] font-medium text-ink-55">
+            <span id="tb-colors-surface" className="block text-[11px] font-medium text-ink-55">
               Surface — {editMode} theme only
             </span>
-            <div className="grid grid-cols-2 gap-2">
+            {/* Named groups, as the palettes are, so a screen reader hears
+                which set a color well belongs to (#435). */}
+            <div role="group" aria-labelledby="tb-colors-surface" className="grid grid-cols-2 gap-2">
               {BASE_FIELDS.map(({ key, label }) => (
                 <label
                   key={key}
@@ -256,7 +258,10 @@ export default function ColorsTab({ d }: { d: ThemeDraft }) {
       <div className="space-y-3 border-t border-fg/10 pt-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <span className="text-[10px] font-semibold tracking-[0.15em] text-ink-45 uppercase">
+            <span
+              id="tb-colors-status"
+              className="text-[10px] font-semibold tracking-[0.15em] text-ink-45 uppercase"
+            >
               Status colors — {editMode} theme only
             </span>
             <p className="text-xs text-ink-40">
@@ -275,7 +280,7 @@ export default function ColorsTab({ d }: { d: ThemeDraft }) {
             </button>
           )}
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div role="group" aria-labelledby="tb-colors-status" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {SEMANTIC_FIELDS.map((f) => (
             <label
               key={f.key}

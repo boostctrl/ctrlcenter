@@ -98,6 +98,27 @@ describe("the theme builder's option grids are named groups (#350)", () => {
     expect(within(group).getByRole("button", { name: "Mono" })).toBeTruthy();
   });
 
+  // #435: the color wells under Custom and Status colors weren't grouped.
+  it("names the surface and status color wells by their headings", () => {
+    renderTab((d) => <ColorsTab d={d} />);
+    const surface = screen.getByRole("group", { name: "Surface — dark theme only" });
+    expect(within(surface).getByLabelText("Background")).toBeTruthy();
+    const status = screen.getByRole("group", { name: "Status colors — dark theme only" });
+    expect(within(status).getAllByLabelText(/ color$/)).toHaveLength(4);
+  });
+
+  // #435: under the packs-only policy there's no tab strip, so the panel's
+  // label pointed at a tab that isn't rendered.
+  it("leaves the themes panel out of the tab pattern when there are no tabs", () => {
+    const { container, unmount } = renderTab((d) => <ThemesTab d={d} packs={THEME_PACKS} packsOnly />);
+    const panel = container.querySelector("#tb-panel-themes")!;
+    expect(panel.getAttribute("role")).toBeNull();
+    expect(panel.hasAttribute("aria-labelledby")).toBe(false);
+    unmount();
+    renderTab((d) => <ThemesTab d={d} packs={THEME_PACKS} />);
+    expect(screen.getByRole("tabpanel").getAttribute("aria-labelledby")).toBe("tb-tab-themes");
+  });
+
   it("names the theme packs by their first sentence and the saved themes by their heading", () => {
     renderTab((d) => <ThemesTab d={d} packs={THEME_PACKS} />);
     const packs = screen.getByRole("group", {
