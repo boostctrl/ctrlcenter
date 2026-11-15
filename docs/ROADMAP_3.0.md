@@ -7,7 +7,10 @@ competition (Homepage, Homarr, Dashy, Glance, Heimdall, Homer, Organizr,
 Flame, Uptime Kuma). Every confirmed defect is filed (#269–#279), and each
 release has a tracker issue with one sub-issue per item: 2.11 #280, 2.12 #281,
 2.13 #282, 3.0 #283, and the post-3.0 backlog #284. The theming project
-was added 2026-10-10 (see "3.0 — Theming depth", tracker #324)._
+was added 2026-10-10 (see "3.0 — Theming depth", tracker #324). The
+releases after 3.2 were planned on 2026-11-15 as theme-named milestones,
+each with a tracker: Accounts and sign-in #549, Alerts beyond uptime #550,
+Set up in minutes #551, Beyond the browser tab #552._
 
 ## Where things stand
 

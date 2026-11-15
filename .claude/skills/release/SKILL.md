@@ -17,7 +17,8 @@ around it.
    Cross-check against `git log v<last>..develop --oneline` — anything
    user-visible missing from the changelog gets added *before* releasing.
 3. Pick the version from the Unreleased content (SemVer): breaking → major,
-   any new feature → minor, fixes/tweaks only → patch.
+   any new feature → minor, fixes/tweaks only → patch. Planned milestones are
+   named for their theme, not a number, so the number follows the content.
 
 ## Cut
 
@@ -45,6 +46,9 @@ gh run list --workflow Release --limit 1
 gh run watch <id> --exit-status
 gh release view vX.Y.Z
 ```
+
+Then rename the release's milestone to `X.Y.Z` (keeping the theme in its
+description), close it, and close its tracker issue.
 
 If the workflow fails **before** the image is published, fix on `develop` and
 cut the next patch version — don't force-move or delete tags; a pushed tag may

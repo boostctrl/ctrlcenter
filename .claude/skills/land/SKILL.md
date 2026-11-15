@@ -28,7 +28,9 @@ the steps that get dropped at the end of a long, complex task.
 6. **Commit.** Imperative subject line ("Add …", "Fix …"). Closing keywords
    bind to one issue each: `Closes #12, Closes #34` — `Closes #12, #34` only
    closes the first. Put every issue the commit closes in the milestone of the
-   release it will ship in (create that version's milestone if it's missing).
+   release it will ship in. A planned release's milestone is named for its
+   theme ("Accounts and sign-in") and gets its version number when it's cut;
+   a patch's is named for its version. Create the milestone if it's missing.
 7. **Push and confirm.** Push `develop`, then check CI:
    `gh run list --branch develop --limit 1` (and `gh run watch <id>
    --exit-status` if in doubt). A push isn't landed until CI is green.
