@@ -90,3 +90,12 @@ export function uniqueChannelLabels(channels: AlertChannel[]): Map<string, strin
   }
   return labels;
 }
+
+// A namer for the channels of one list: each channel's label as
+// uniqueChannelLabels tells it from its namesakes, so the settings form, the
+// test and sample results and the log lines all call the second unnamed
+// webhook "Webhook 2" (#442). A channel not in the list keeps its plain label.
+export function channelNamer(channels: AlertChannel[]): (ch: AlertChannel) => string {
+  const labels = uniqueChannelLabels(channels);
+  return (ch) => labels.get(ch.id) ?? channelLabel(ch);
+}

@@ -595,6 +595,18 @@ describe("sendTestAlert", () => {
     expect(sendMailMock).toHaveBeenCalledTimes(1);
   });
 
+  // #442: two unnamed webhooks both came back as "Webhook".
+  it("labels each result as the channel list tells it from its namesakes", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 200 })));
+    const twins = alertsSchema.parse({
+      channels: [channel({ id: "a" }), channel({ id: "b", url: "https://hook.example.com/y" })],
+    });
+    const { results } = await sendTestAlert(twins);
+    expect(results.map((r) => r.label)).toEqual(["Webhook", "Webhook 2"]);
+    // One by id keeps its place in the list.
+    expect((await sendTestAlert(twins, "b")).results.map((r) => r.label)).toEqual(["Webhook 2"]);
+  });
+
   it("tests one channel by id, even while it's switched off", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);

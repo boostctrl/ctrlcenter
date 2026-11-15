@@ -66,11 +66,14 @@ describe("AlertChannelEditor's Send test (#350)", () => {
       "Send test from Webhook 2",
     ]);
     expect(buttons.map((b) => b.textContent)).toEqual(["Send test", "Send test"]);
-    // The second's other controls are told apart the same way, while both
-    // headings still read "Webhook".
+    // The second's other controls are told apart the same way, and so is
+    // its visible heading (#442).
     expect(screen.getByRole("switch", { name: "Webhook 2 enabled" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Remove Webhook 2" })).toBeTruthy();
     expect(screen.getByRole("group", { name: "Webhook 2: events" })).toBeTruthy();
-    expect(screen.getAllByText("Webhook", { selector: "span" })).toHaveLength(2);
+    expect(screen.getAllByText(/^Webhook( 2)?$/, { selector: "span" }).map((s) => s.textContent)).toEqual([
+      "Webhook",
+      "Webhook 2",
+    ]);
   });
 });

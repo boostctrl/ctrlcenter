@@ -1,7 +1,7 @@
 "use client";
 
 import { WEBHOOK_SERVICES } from "@/lib/schema";
-import { activeChannels, channelLabel } from "@/lib/alert-channels";
+import { activeChannels, channelNamer } from "@/lib/alert-channels";
 import { STATUS_RANGES } from "@/lib/status";
 import { withHttpScheme } from "@/lib/urls";
 import {
@@ -140,7 +140,7 @@ export default function MonitoringSection({
                   formatLabel={alertTypeLabel}
                   urlPlaceholder={alertUrlPlaceholder}
                   onChange={(patch) => updateChannel(ch.id, patch)}
-                  onRemove={() => removeChannel(ch.id, channelLabel(ch))}
+                  onRemove={() => removeChannel(ch.id, channelNamer(alerts.channels)(ch))}
                 />
               ))}
               <AddButton onClick={addChannel}>+ Add channel</AddButton>

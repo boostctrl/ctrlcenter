@@ -2,7 +2,7 @@
 
 import type { AlertChannel, AlertType } from "@/lib/schema";
 import { ALERT_TYPES, CHANNEL_TYPES } from "@/lib/schema";
-import { CHANNEL_LABELS, channelLabel, missingFields, uniqueChannelLabels } from "@/lib/alert-channels";
+import { CHANNEL_LABELS, channelNamer, missingFields } from "@/lib/alert-channels";
 import { ChipGroup, ChipToggles } from "@/components/ChipGroup";
 import {
   ControlRow,
@@ -53,11 +53,10 @@ export function AlertChannelEditor({
   onChange: (patch: Partial<AlertChannel>) => void;
   onRemove: () => void;
 }) {
-  const label = channelLabel(ch);
-  // What the controls are named for assistive tech (#434): the second
-  // unnamed webhook's are "Webhook 2 enabled", "Send test from Webhook 2",
-  // while the heading over it still reads "Webhook".
-  const name = uniqueChannelLabels(channels).get(ch.id) ?? label;
+  // Told from its namesakes (#434, #442): the second unnamed webhook's
+  // heading reads "Webhook 2", and its controls are "Webhook 2 enabled",
+  // "Send test from Webhook 2".
+  const name = channelNamer(channels)(ch);
   const missing = missingFields(ch);
   const smtp = (patch: Partial<AlertChannel["smtp"]>) => onChange({ smtp: { ...ch.smtp, ...patch } });
   // An app filter naming apps that no longer exist (deleted since) still
@@ -67,7 +66,7 @@ export function AlertChannelEditor({
   return (
     <div className={`${subCardClasses} flex flex-col gap-3 p-3`}>
       <div className="flex items-center justify-between gap-2">
-        <span className={`${fieldLabelClasses} truncate`}>{label}</span>
+        <span className={`${fieldLabelClasses} truncate`}>{name}</span>
         <div className="flex shrink-0 items-center gap-2">
           <label className="flex cursor-pointer items-center">
             <Switch

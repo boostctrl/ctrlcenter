@@ -29,6 +29,12 @@ here.
   overflowing or gained a link kept an extra Tab stop. It now follows its
   content. (#494)
 
+- **Two alert channels of the same kind are told apart everywhere.** With
+  two unnamed webhooks, only the screen-reader names said "Webhook 2"; the
+  channel's heading, its row in the webhook preview, the remove confirmation
+  and the test results all said "Webhook" for both, as did the server log.
+  They now all say "Webhook" and "Webhook 2". (#442)
+
 ## [3.1.2] - 2026-11-14
 
 ### Fixed

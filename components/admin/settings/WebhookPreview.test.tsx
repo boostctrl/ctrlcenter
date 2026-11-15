@@ -180,8 +180,9 @@ describe("WebhookPreview (#347)", () => {
       "Send sample",
       "Send sample",
     ]);
-    // The rows keep the plain label.
-    expect(screen.getAllByText("Webhook")).toHaveLength(2);
+    // The rows' visible labels are told apart too (#442).
+    expect(screen.getByText("Webhook")).toBeTruthy();
+    expect(screen.getByText("Webhook 2")).toBeTruthy();
     // Numbered by place among all the channels, so it matches the Alerts
     // card: with the first webhook not taking inbound webhooks, the one
     // listed is still "Webhook 2".

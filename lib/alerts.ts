@@ -1,7 +1,7 @@
 import type { AlertChannel, AlertConfig, AlertType, Settings, SmtpConfig } from "./schema";
 import {
   activeChannels,
-  channelLabel,
+  channelNamer,
   channelReady,
   wantsAlert,
 } from "./alert-channels";
@@ -559,11 +559,11 @@ function deliver(ch: AlertChannel, out: Outgoing): Promise<ChannelResult> {
 // or the webhook response, so failures are swallowed, but logged so an
 // undelivered alert can be traced. Only the host is logged: Telegram's URL
 // carries the bot token.
-async function deliverLogged(ch: AlertChannel, out: Outgoing): Promise<void> {
+async function deliverLogged(ch: AlertChannel, label: string, out: Outgoing): Promise<void> {
   const result = await deliver(ch, out);
   if (result.ok) return;
   log.warn("alert channel failed", {
-    channel: channelLabel(ch),
+    channel: label,
     host: ch.type === "email" ? ch.smtp.host : hostOf(requestFor(ch, out).url),
     reason: result.detail,
   });
@@ -582,8 +582,9 @@ export async function sendNotification(
   takes: (ch: AlertChannel) => boolean = (ch) => ch.onWebhooks
 ): Promise<void> {
   const channels = activeChannels(config).filter(takes);
+  const name = channelNamer(config.channels);
   await Promise.all(
-    channels.map((ch) => deliverLogged(ch, { kind: "notification", content: c, ctx }))
+    channels.map((ch) => deliverLogged(ch, name(ch), { kind: "notification", content: c, ctx }))
   );
 }
 
@@ -641,8 +642,9 @@ export async function sendTestAlert(
     app: { name: "CtrlCenter test alert", url: "" },
     at: Date.now(),
   };
+  const name = channelNamer(config.channels);
   const results = await Promise.all(
-    channels.map(async (ch) => ({ id: ch.id, label: channelLabel(ch), ...(await deliver(ch, out)) }))
+    channels.map(async (ch) => ({ id: ch.id, label: name(ch), ...(await deliver(ch, out)) }))
   );
   return { results };
 }
@@ -680,8 +682,9 @@ export async function sendSampleNotification(
       options: reportOptions(webhooks),
     },
   };
+  const name = channelNamer(alerts.channels);
   const results = await Promise.all(
-    channels.map(async (ch) => ({ id: ch.id, label: channelLabel(ch), ...(await deliver(ch, out)) }))
+    channels.map(async (ch) => ({ id: ch.id, label: name(ch), ...(await deliver(ch, out)) }))
   );
   return { results };
 }
@@ -715,6 +718,7 @@ export async function processAlerts(
   events.push(...warned.events);
   if (events.length === 0) return;
   const byId = new Map(apps.map((a) => [a.id, a]));
+  const name = channelNamer(config.channels);
   const at = Date.now();
   await Promise.all(
     events.flatMap((e) => {
@@ -724,7 +728,7 @@ export async function processAlerts(
       log.info("alert firing", {
         app: found.name,
         event: e.type,
-        channels: targets.map(channelLabel).join(", ") || "none",
+        channels: targets.map(name).join(", ") || "none",
       });
       const out: Outgoing = {
         kind: "alert",
@@ -732,7 +736,7 @@ export async function processAlerts(
         app: { name: found.name, url: found.url },
         at,
       };
-      return targets.map((ch) => deliverLogged(ch, out));
+      return targets.map((ch) => deliverLogged(ch, name(ch), out));
     })
   );
 }

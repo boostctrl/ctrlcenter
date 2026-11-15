@@ -2,7 +2,7 @@
 
 import { useDeferredValue, useMemo, useState } from "react";
 import type { AlertConfig, WebhooksConfig } from "@/lib/schema";
-import { CHANNEL_LABELS, activeChannels, channelLabel, uniqueChannelLabels } from "@/lib/alert-channels";
+import { CHANNEL_LABELS, activeChannels, channelNamer } from "@/lib/alert-channels";
 import { buildNotificationEmail, buildPreheader, cleanHeader } from "@/lib/webhook-email";
 import {
   SAMPLE_AT,
@@ -103,7 +103,7 @@ export default function WebhookPreview({
   const receivers = activeChannels(alerts).filter((ch) => ch.onWebhooks);
   // Over every channel, not only the receivers, so a channel is "Webhook 2"
   // here exactly when it is in the Alerts card above (#434).
-  const names = uniqueChannelLabels(alerts.channels);
+  const name = channelNamer(alerts.channels);
   const label = SAMPLE_LABELS[shown];
 
   return (
@@ -190,20 +190,21 @@ export default function WebhookPreview({
                 className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1"
               >
                 <span className="text-sm text-ink-80">
-                  {channelLabel(ch)}
+                  {name(ch)}
                   {ch.name.trim() && (
                     <span className="ml-2 text-xs text-ink-45">{CHANNEL_LABELS[ch.type]}</span>
                   )}
                 </span>
                 {/* Named per channel for assistive tech: the row's channel
                     name is a sibling, not part of the button's name. A
-                    namesake is told apart by its place in the list (#434). */}
+                    namesake is told apart by its place in the list (#434,
+                    #442). */}
                 <AlertTest
                   channel={ch.id}
                   sample={shown}
                   ready
                   saving={saving}
-                  ariaLabel={`Send sample to ${names.get(ch.id) ?? channelLabel(ch)}`}
+                  ariaLabel={`Send sample to ${name(ch)}`}
                 />
               </div>
             ))}
