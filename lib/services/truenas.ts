@@ -83,6 +83,14 @@ type RawPool = {
   size?: number | string | null;
   allocated?: number | string | null;
   free?: number | string | null;
+  // The last scrub or resilver, and the vdev tree the disks hang from.
+  scan?: {
+    function?: string;
+    state?: string;
+    end_time?: { $date?: number } | number | null;
+    errors?: number;
+  } | null;
+  topology?: Record<string, unknown>;
 };
 type RawAlert = {
   level?: string;
@@ -207,10 +215,19 @@ async function truenasJson<T>(
   path: string,
   maxBytes?: number
 ): Promise<T> {
+  return truenasCall<T>(cfg, path, {}, maxBytes);
+}
+
+async function truenasCall<T>(
+  cfg: TruenasConfig,
+  path: string,
+  init: RequestInit = {},
+  maxBytes?: number
+): Promise<T> {
   const base = serviceBase(cfg.url);
   const { res, text } = await serviceRequest(
     `${base}${path}`,
-    { headers: { Authorization: `Bearer ${cfg.apiKey}` } },
+    { ...init, headers: { ...(init.headers as Record<string, string> | undefined), Authorization: `Bearer ${cfg.apiKey}` } },
     maxBytes
   );
   throwForStatus(res, { 401: "Invalid API key", 403: "Invalid API key" });
@@ -239,6 +256,167 @@ export async function getTruenasSnapshot(
     pools: mapTruenasPools(poolsR.value),
     apps: appsR.status === "fulfilled" ? mapTruenasApps(appsR.value) : [],
     alerts: alertsR.status === "fulfilled" ? mapTruenasAlerts(alertsR.value) : [],
+  };
+}
+
+// --- The detail page's extras (#528): the system, each disk with its
+// temperature and pool, and each pool's size and last scrub. ---
+
+export type TruenasSystem = {
+  version: string;
+  hostname: string;
+  model: string;
+  uptimeSeconds: number | null;
+  cores: number | null;
+  // Bytes of memory.
+  memory: number | null;
+  // The 1, 5 and 15 minute load averages.
+  load: [number, number, number] | null;
+};
+export type TruenasDisk = {
+  name: string;
+  model: string;
+  size: number | null;
+  kind: "HDD" | "SSD" | "";
+  pool: string | null;
+  // Degrees Celsius, when TrueNAS reported one.
+  temperature: number | null;
+};
+export type TruenasPoolDetail = {
+  name: string;
+  size: number | null;
+  used: number | null;
+  // The last scrub or resilver: what ran, how it ended, when and the
+  // errors it found; null when the pool hasn't had one.
+  scan: { kind: string; state: string; at: number | null; errors: number } | null;
+};
+export type TruenasDetail = TruenasSnapshot & {
+  system: TruenasSystem | null;
+  disks: TruenasDisk[];
+  poolDetail: TruenasPoolDetail[];
+};
+export const TRUENAS_DISK_CAP = 48;
+
+type RawSystem = {
+  version?: string;
+  hostname?: string;
+  model?: string;
+  uptime_seconds?: number;
+  cores?: number;
+  physmem?: number;
+  loadavg?: unknown;
+};
+type RawDisk = { name?: string; model?: string; size?: number | string; type?: string; pool?: string | null };
+
+const text = (v: unknown, max = 80) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+const positive = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : null);
+
+export function mapTruenasSystem(raw: unknown): TruenasSystem | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as RawSystem;
+  const load = Array.isArray(r.loadavg) && r.loadavg.length >= 3 && r.loadavg.slice(0, 3).every((n) => typeof n === "number")
+    ? (r.loadavg.slice(0, 3) as [number, number, number])
+    : null;
+  return {
+    version: text(r.version),
+    hostname: text(r.hostname),
+    model: text(r.model),
+    uptimeSeconds: positive(r.uptime_seconds),
+    cores: positive(r.cores),
+    memory: positive(r.physmem),
+    load,
+  };
+}
+
+// The disk names under a pool's vdev tree: each leaf carries its device.
+function poolDisks(topology: unknown): string[] {
+  const out: string[] = [];
+  const walk = (node: unknown) => {
+    if (Array.isArray(node)) return node.forEach(walk);
+    if (!node || typeof node !== "object") return;
+    const n = node as { disk?: unknown; children?: unknown };
+    if (typeof n.disk === "string" && n.disk) out.push(n.disk);
+    if (n.children) walk(n.children);
+  };
+  if (topology && typeof topology === "object") Object.values(topology).forEach(walk);
+  return out;
+}
+
+// The scan's end, which TrueNAS gives as { $date: ms } or epoch seconds.
+function scanTime(v: unknown): number | null {
+  if (v && typeof v === "object" && typeof (v as { $date?: unknown }).$date === "number") return (v as { $date: number }).$date;
+  if (typeof v === "number" && v > 0) return v < 1e12 ? v * 1000 : v;
+  return null;
+}
+
+export function mapTruenasPoolDetail(raw: unknown): TruenasPoolDetail[] {
+  const list = Array.isArray(raw) ? (raw as RawPool[]) : [];
+  return list.slice(0, TRUENAS_POOL_CAP).map((p, i) => {
+    const scan = p.scan && typeof p.scan === "object" && p.scan.function ? p.scan : null;
+    return {
+      name: p.name?.trim() || `Pool ${i + 1}`,
+      size: bytes(p.size),
+      used: bytes(p.allocated),
+      scan: scan
+        ? {
+            kind: text(scan.function).toLowerCase(),
+            state: text(scan.state).toLowerCase(),
+            at: scanTime(scan.end_time),
+            errors: typeof scan.errors === "number" && scan.errors > 0 ? scan.errors : 0,
+          }
+        : null,
+    };
+  });
+}
+
+// The disks, each with its pool (from the pools' vdev trees, else the
+// disk's own field) and its temperature, hottest first.
+export function mapTruenasDisks(raw: unknown, pools: unknown, temperatures: unknown): TruenasDisk[] {
+  const owner = new Map<string, string>();
+  for (const p of Array.isArray(pools) ? (pools as RawPool[]) : []) {
+    for (const d of poolDisks(p.topology)) if (p.name) owner.set(d, p.name);
+  }
+  const temps = temperatures && typeof temperatures === "object" ? (temperatures as Record<string, unknown>) : {};
+  return (Array.isArray(raw) ? (raw as RawDisk[]) : [])
+    .filter((d) => typeof d?.name === "string" && d.name !== "")
+    .slice(0, TRUENAS_DISK_CAP)
+    .map((d): TruenasDisk => {
+      const name = d.name as string;
+      const t = temps[name];
+      const kind = text(d.type).toUpperCase();
+      return {
+        name,
+        model: text(d.model),
+        size: bytes(d.size),
+        kind: kind === "HDD" || kind === "SSD" ? kind : "",
+        pool: owner.get(name) ?? (text(d.pool) || null),
+        temperature: typeof t === "number" && Number.isFinite(t) && t > 0 && t < 120 ? Math.round(t) : null,
+      };
+    })
+    .sort((a, b) => (b.temperature ?? -1) - (a.temperature ?? -1) || a.name.localeCompare(b.name));
+}
+
+// The detail read: the snapshot, plus the system, disks and each pool's
+// scan, each best effort, so one TrueNAS won't answer leaves its part empty.
+export async function getTruenasDetail(cfg: TruenasConfig): Promise<TruenasDetail> {
+  const quiet = <T,>(path: string, init?: RequestInit) =>
+    truenasCall<T>(cfg, path, init).catch(() => null);
+  const [snapshot, system, pools, disks, temperatures] = await Promise.all([
+    getTruenasSnapshot(cfg),
+    quiet<unknown>("/api/v2.0/system/info"),
+    quiet<unknown>("/api/v2.0/pool"),
+    quiet<unknown>(`/api/v2.0/disk?limit=${TRUENAS_DISK_CAP}`),
+    quiet<unknown>("/api/v2.0/disk/temperatures", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ names: [] }),
+    }),
+  ]);
+  return {
+    ...snapshot,
+    system: mapTruenasSystem(system),
+    disks: mapTruenasDisks(disks, pools, temperatures),
+    poolDetail: mapTruenasPoolDetail(pools),
   };
 }
 

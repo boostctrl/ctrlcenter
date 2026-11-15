@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { PortainerContainer, PortainerEndpoint, PortainerSnapshot } from "@/lib/services/portainer";
+import type { PortainerContainer, PortainerDetail as PortainerDetailData, PortainerEndpoint } from "@/lib/services/portainer";
+import { formatBytes } from "@/lib/format";
 import { Button } from "@/components/admin/ui";
 import { useConfirm } from "@/components/admin/Confirm";
 import { fetchContainerLogs, fetchContainers, useMonitorAction, useMonitorIntegration } from "../actions";
-import { Dialog, Dot, EmptyRow, Glyph, GlyphBubble, Pill, Section, Stat, StatGrid, UsageBar, type Tone } from "../kit";
+import { Dialog, Donut, Dot, EmptyRow, Glyph, List, Row, GlyphBubble, Pill, Section, Stat, StatGrid, UsageBar, type Tone } from "../kit";
 
 // Portainer's page (#514), on the page kit (#508): container counts across
 // every environment, then each environment with its tallies. With actions
@@ -57,6 +58,19 @@ function LogModal({
       )}
     </Dialog>
   );
+}
+
+// "12 containers · 31 images · Docker 27.3.1 · 16 CPUs · 64 GB"
+function environmentLine(e: PortainerEndpoint, r: PortainerDetailData["resources"][number] | undefined): string {
+  return [
+    `${e.total} container${e.total === 1 ? "" : "s"}`,
+    r?.images ? `${r.images} images` : "",
+    r?.dockerVersion ? `Docker ${r.dockerVersion}` : "",
+    r?.cpus ? `${r.cpus} CPUs` : "",
+    r?.memory ? formatBytes(r.memory) : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 // An environment's tallies as chips.
@@ -138,7 +152,7 @@ export default function PortainerDetail({
   actionsAllowed,
   onActed,
 }: {
-  data: PortainerSnapshot;
+  data: PortainerDetailData;
   actionsAllowed: boolean;
   onActed?: () => void;
 }) {
@@ -242,9 +256,13 @@ export default function PortainerDetail({
 
   const t = data.totals;
   const noSnapshot = data.endpoints.filter((e) => !e.hasSnapshot).length;
+  const resourcesOf = (id: number) => data.resources.find((r) => r.endpointId === id);
+  const images = data.resources.reduce((sum, r) => sum + r.images, 0);
+  const volumes = data.resources.reduce((sum, r) => sum + r.volumes, 0);
+  const activeStacks = data.stacks.filter((st) => st.active).length;
   return (
     <div className="flex flex-col gap-6">
-      <StatGrid>
+      <StatGrid six>
         <Stat
           label="Running"
           value={t.running}
@@ -263,7 +281,48 @@ export default function PortainerDetail({
           value={data.endpoints.length}
           hint={noSnapshot ? `${noSnapshot} without a snapshot` : "All reporting"}
         />
+        <Stat label="Stacks" value={data.stacks.length} hint={data.stacks.length ? `${activeStacks} active` : "None deployed"} />
+        <Stat label="Images" value={images} hint={`${volumes} volume${volumes === 1 ? "" : "s"}`} />
       </StatGrid>
+
+      {t.total > 0 && (
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+          <Section title="Containers" description="Across every environment.">
+            <Donut
+              label="Containers by state"
+              center={String(t.total)}
+              caption="containers"
+              parts={[
+                { label: "Running", value: Math.max(0, t.running - t.unhealthy), color: 3 },
+                { label: "Unhealthy", value: t.unhealthy, color: "down" },
+                { label: "Stopped", value: t.stopped, color: "muted" },
+                // Created, paused or restarting: the rest of the total.
+                ...(t.total > t.running + t.stopped
+                  ? [{ label: "Other", value: t.total - t.running - t.stopped, color: 4 as const }]
+                  : []),
+              ]}
+            />
+          </Section>
+          <Section title="Stacks" count={data.stacks.length} flush>
+            {data.stacks.length > 0 ? (
+              <List>
+                {data.stacks.map((st) => (
+                  <Row
+                    key={`${st.environment}-${st.name}`}
+                    leading={<GlyphBubble name="box" tone={st.active ? "muted" : "muted"} />}
+                    primary={st.name}
+                    title={st.name}
+                    secondary={[st.environment, st.kind].filter(Boolean).join(" · ")}
+                    trailing={<Pill tone={st.active ? "up" : "muted"}>{st.active ? "Active" : "Inactive"}</Pill>}
+                  />
+                ))}
+              </List>
+            ) : (
+              <EmptyRow>No stacks, or this key can&apos;t list them.</EmptyRow>
+            )}
+          </Section>
+        </div>
+      )}
 
       <Section
         title="Environments"
@@ -293,7 +352,7 @@ export default function PortainerDetail({
                       {e.name}
                     </p>
                     <p className="truncate text-xs text-ink-50">
-                      {e.hasSnapshot ? `${e.total} container${e.total === 1 ? "" : "s"}` : "Not a Docker environment, or not reporting"}
+                      {e.hasSnapshot ? environmentLine(e, resourcesOf(e.id)) : "Not a Docker environment, or not reporting"}
                     </p>
                   </div>
                   <Tallies endpoint={e} />

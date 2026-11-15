@@ -44,6 +44,21 @@ here.
   most-blocked domains are the most-queried ones and the busiest clients.
   (#526)
 
+- **UniFi's page shows who is connected and how busy the line is.** The
+  internet connection's current download and upload speed, donuts of
+  clients by network and devices by kind, and the busiest clients with
+  their network, address, WiFi signal and the data they've moved. (#527)
+
+- **TrueNAS's page shows the system and every disk.** Uptime, version and
+  load beside the pools; a donut of space used by each pool and what's
+  free; each pool's last scrub or resilver and the errors it found; and
+  each disk with its model, size, pool and temperature, hottest first,
+  amber or red when it runs warm. (#528)
+
+- **Portainer's page shows stacks and images.** A donut of containers by
+  state, every stack with its environment and whether it's active, and
+  each environment's images, Docker version, CPUs and memory. (#529)
+
 ### Changed
 
 - **The Monitor dashboard opens on a command deck.** A status ring draws one

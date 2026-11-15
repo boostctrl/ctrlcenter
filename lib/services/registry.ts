@@ -27,9 +27,13 @@ import {
   getPortainerSnapshot,
   probePortainer,
   type PortainerSnapshot,
+  getPortainerDetail,
+  type PortainerDetail,
 } from "./portainer";
 import {
   getTruenasSnapshot,
+  getTruenasDetail,
+  type TruenasDetail,
   probeTruenas,
   type TruenasSnapshot,
 } from "./truenas";
@@ -77,7 +81,9 @@ export type ProbeFields = {
 // a richer detail read — qBittorrent (uncapped list + session totals),
 // Tautulli (activity + watch history), UniFi and Seerr (the requests waiting
 // for approval, #511).
-export type DetailData = Omit<ServiceSnapshotMap, "qbittorrent" | "tautulli" | "unifi" | "seerr" | "sonarr" | "radarr"> & {
+export type DetailData = Omit<ServiceSnapshotMap, "qbittorrent" | "tautulli" | "unifi" | "seerr" | "sonarr" | "radarr" | "truenas" | "portainer"> & {
+  portainer: PortainerDetail;
+  truenas: TruenasDetail;
   sonarr: ArrDetail;
   radarr: ArrDetail;
   qbittorrent: QbittorrentDetail;
@@ -130,12 +136,12 @@ export const SERVICES: {
   },
   portainer: {
     snapshot: (cfg) => getPortainerSnapshot(cfg),
-    detail: (cfg) => getPortainerSnapshot(cfg),
+    detail: (cfg) => getPortainerDetail(cfg),
     probe: ({ url, apiKey }) => probePortainer({ url, apiKey }),
   },
   truenas: {
     snapshot: (cfg) => getTruenasSnapshot(cfg),
-    detail: (cfg) => getTruenasSnapshot(cfg),
+    detail: (cfg) => getTruenasDetail(cfg),
     probe: ({ url, apiKey }) => probeTruenas({ url, apiKey }),
   },
   unifi: {

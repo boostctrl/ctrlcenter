@@ -53,6 +53,12 @@ type RawEndpoint = {
   Snapshots?: RawDockerSnapshot[];
 };
 type RawDockerSnapshot = {
+  ImageCount?: number;
+  VolumeCount?: number;
+  StackCount?: number;
+  DockerVersion?: string;
+  TotalCPU?: number;
+  TotalMemory?: number;
   RunningContainerCount?: number;
   StoppedContainerCount?: number;
   HealthyContainerCount?: number;
@@ -116,6 +122,76 @@ export async function getPortainerSnapshot(
   return mapPortainerEndpoints(
     await portainerJson<RawEndpoint[]>(cfg, "/api/endpoints")
   );
+}
+
+// --- The detail page's extras (#529): each environment's images,
+// volumes, stacks and engine, and the stacks themselves. ---
+
+export type PortainerResources = {
+  endpointId: number;
+  images: number;
+  volumes: number;
+  stacks: number;
+  dockerVersion: string;
+  cpus: number;
+  // Bytes of memory.
+  memory: number;
+};
+export type PortainerStack = {
+  name: string;
+  environment: string;
+  kind: "Compose" | "Swarm" | "Kubernetes" | "";
+  active: boolean;
+};
+export type PortainerDetail = PortainerSnapshot & {
+  resources: PortainerResources[];
+  stacks: PortainerStack[];
+};
+export const PORTAINER_STACK_CAP = 40;
+
+type RawStack = { Name?: string; Type?: number; EndpointId?: number; Status?: number };
+const STACK_KIND: Record<number, PortainerStack["kind"]> = { 1: "Swarm", 2: "Compose", 3: "Kubernetes" };
+
+// Exported for the unit tests: the resources from each environment's
+// snapshot, and the stacks named by their environment, active first.
+export function mapPortainerDetail(endpointsRaw: unknown, stacksRaw: unknown): PortainerDetail {
+  const list = Array.isArray(endpointsRaw) ? (endpointsRaw as RawEndpoint[]) : [];
+  const names = new Map(list.map((e, i) => [e.Id, e.Name?.trim() || `Environment ${i + 1}`]));
+  const resources = list.flatMap((e): PortainerResources[] => {
+    const snap = e.Snapshots?.[0];
+    if (!snap || typeof e.Id !== "number") return [];
+    return [
+      {
+        endpointId: e.Id,
+        images: num(snap.ImageCount),
+        volumes: num(snap.VolumeCount),
+        stacks: num(snap.StackCount),
+        dockerVersion: typeof snap.DockerVersion === "string" ? snap.DockerVersion.slice(0, 40) : "",
+        cpus: num(snap.TotalCPU),
+        memory: typeof snap.TotalMemory === "number" && snap.TotalMemory > 0 ? snap.TotalMemory : 0,
+      },
+    ];
+  });
+  const stacks = (Array.isArray(stacksRaw) ? (stacksRaw as RawStack[]) : [])
+    .filter((st) => typeof st?.Name === "string" && st.Name !== "")
+    .map((st) => ({
+      name: (st.Name as string).slice(0, 80),
+      environment: (typeof st.EndpointId === "number" && names.get(st.EndpointId)) || "",
+      kind: STACK_KIND[st.Type ?? 0] ?? "",
+      active: st.Status !== 2,
+    }))
+    .sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name))
+    .slice(0, PORTAINER_STACK_CAP);
+  return { ...mapPortainerEndpoints(list), resources, stacks };
+}
+
+export async function getPortainerDetail(cfg: PortainerConfig): Promise<PortainerDetail> {
+  const [endpoints, stacks] = await Promise.all([
+    portainerJson<RawEndpoint[]>(cfg, "/api/endpoints"),
+    // Best effort: a key that can't list stacks still shows the rest.
+    portainerJson<unknown>(cfg, "/api/stacks").catch(() => null),
+  ]);
+  return mapPortainerDetail(endpoints, stacks);
 }
 
 // Fresh reachability check for the admin's "Test connection" button. The

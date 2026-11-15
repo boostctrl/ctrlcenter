@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { PortainerContainer, PortainerSnapshot } from "@/lib/services/portainer";
+import type { PortainerContainer, PortainerDetail as PortainerDetailData } from "@/lib/services/portainer";
 import { ConfirmProvider } from "@/components/admin/Confirm";
 import PortainerDetail from "./PortainerDetail";
 
@@ -13,9 +13,11 @@ const env = (id: number, name: string) => ({
   id, name, running: 1, stopped: 0, unhealthy: 0, total: 1, hasSnapshot: true,
 });
 
-const data: PortainerSnapshot = {
+const data: PortainerDetailData = {
   endpoints: [env(1, "slow-env"), env(2, "fast-env")],
   totals: { running: 2, stopped: 0, unhealthy: 0, total: 2 },
+  resources: [],
+  stacks: [],
 };
 
 // The page with actions on, as the drill-down needs. It opens the first

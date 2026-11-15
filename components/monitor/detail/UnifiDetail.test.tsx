@@ -6,7 +6,9 @@ import UnifiDetail from "./UnifiDetail";
 // #467: other UniFi apps' devices (Protect cameras and the like) join the
 // list. They carry no client count or uptime, so their rows show neither.
 const data: UnifiDetailData = {
-  internet: { up: true, isp: null, wanIp: null, latencyMs: null },
+  internet: { up: true, isp: null, wanIp: null, latencyMs: null, downRate: null, upRate: null },
+  clientList: [],
+  networks: [],
   clients: { total: 20, wireless: 13, wired: 7, guests: 0 },
   devices: { online: 2, disconnected: 1, pending: 0 },
   issues: [],

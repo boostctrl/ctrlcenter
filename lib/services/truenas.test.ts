@@ -7,6 +7,9 @@ import {
   mapTruenasAlerts,
   TRUENAS_ALERT_CAP,
   TRUENAS_APP_CAP,
+  mapTruenasSystem,
+  mapTruenasPoolDetail,
+  mapTruenasDisks,
 } from "./truenas";
 
 const CFG = { url: "http://truenas.local/", apiKey: "1-abcdef" };
@@ -256,3 +259,54 @@ describe("probeTruenas", () => {
   });
 });
 
+describe("the TrueNAS detail's extras (#528)", () => {
+  const pools = [
+    {
+      name: "tank",
+      size: 100,
+      allocated: 60,
+      scan: { function: "SCRUB", state: "FINISHED", end_time: { $date: 1_700_000_000_000 }, errors: 0 },
+      topology: { data: [{ type: "MIRROR", children: [{ type: "DISK", disk: "sda" }, { type: "DISK", disk: "sdb" }] }], cache: [] },
+    },
+    { name: "fast", size: "50", allocated: "10", scan: { function: "RESILVER", state: "SCANNING", end_time: null, errors: 2 } },
+    { name: "cold" },
+  ];
+
+  it("reads the system, and each pool's size and last scrub", () => {
+    expect(mapTruenasSystem({ version: "TrueNAS-SCALE-25.04.1", hostname: "nas", uptime_seconds: 90, cores: 8, physmem: 64, loadavg: [1, 2, 3] })).toEqual({
+      version: "TrueNAS-SCALE-25.04.1",
+      hostname: "nas",
+      model: "",
+      uptimeSeconds: 90,
+      cores: 8,
+      memory: 64,
+      load: [1, 2, 3],
+    });
+    expect(mapTruenasSystem(null)).toBeNull();
+    expect(mapTruenasPoolDetail(pools)).toEqual([
+      { name: "tank", size: 100, used: 60, scan: { kind: "scrub", state: "finished", at: 1_700_000_000_000, errors: 0 } },
+      { name: "fast", size: 50, used: 10, scan: { kind: "resilver", state: "scanning", at: null, errors: 2 } },
+      { name: "cold", size: null, used: null, scan: null },
+    ]);
+  });
+
+  it("puts each disk in its pool with its temperature, hottest first", () => {
+    const disks = mapTruenasDisks(
+      [
+        { name: "sda", model: "WD Red", size: 8, type: "HDD" },
+        { name: "sdb", model: "WD Red", size: 8, type: "HDD" },
+        { name: "nvme0n1", model: "990 PRO", size: 2, type: "SSD", pool: "fast" },
+        { name: "sdz", type: "weird" },
+        { model: "no name" },
+      ],
+      pools,
+      { sda: 38, sdb: 51.6, nvme0n1: 0 }
+    );
+    expect(disks.map((d) => [d.name, d.pool, d.temperature, d.kind])).toEqual([
+      ["sdb", "tank", 52, "HDD"],
+      ["sda", "tank", 38, "HDD"],
+      ["nvme0n1", "fast", null, "SSD"],
+      ["sdz", null, null, ""],
+    ]);
+  });
+});

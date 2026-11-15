@@ -1,9 +1,28 @@
 "use client";
 
 import { useState } from "react";
-import type { TruenasApp, TruenasPool, TruenasSnapshot } from "@/lib/services/truenas";
+import type { TruenasApp, TruenasDetail as TruenasDetailData, TruenasDisk, TruenasPool, TruenasPoolDetail } from "@/lib/services/truenas";
 import { formatBytes } from "@/components/widgets/SystemStatsWidget";
-import { Dot, EmptyRow, Glyph, GlyphBubble, List, Notices, Pill, Row, Section, Stat, StatGrid, UsageBar, type Tone } from "../kit";
+import { useNow } from "@/components/useNow";
+import {
+  Donut,
+  Dot,
+  EmptyRow,
+  Glyph,
+  GlyphBubble,
+  List,
+  Notices,
+  Pill,
+  Row,
+  Section,
+  Stat,
+  StatGrid,
+  UsageBar,
+  ago,
+  useMounted,
+  type ChartColor,
+  type Tone,
+} from "../kit";
 
 // TrueNAS's page (#515), on the page kit (#508): its alerts, each pool's
 // health and how full it is, and the apps on its Docker engine (SCALE
@@ -29,8 +48,33 @@ function containerTone(state: string): Tone {
   return "warn";
 }
 
-function PoolRow({ pool }: { pool: TruenasPool }) {
+// "Scrubbed 3d ago · no errors": a pool's last scrub or resilver.
+function scanLine(scan: TruenasPoolDetail["scan"] | undefined, now: number | null): string {
+  if (!scan) return "";
+  const verb = scan.kind === "resilver" ? "Resilvered" : "Scrubbed";
+  if (scan.state === "scanning") return scan.kind === "resilver" ? "Resilvering now" : "Scrubbing now";
+  const when = scan.at !== null && now !== null ? ` ${ago(scan.at, now)}` : "";
+  const errors = scan.errors > 0 ? `${scan.errors} error${scan.errors === 1 ? "" : "s"}` : "no errors";
+  return `${verb}${when} · ${errors}`;
+}
+
+// A disk's temperature against where it gets uncomfortable: hard drives
+// warm past 45°C and run hot past 55°C, solid-state drives past 60 and 70.
+function heat(d: TruenasDisk): { tone: Tone | undefined; ratio: number } {
+  const t = d.temperature ?? 0;
+  const [warn, hot, top] = d.kind === "SSD" ? [60, 70, 85] : [45, 55, 65];
+  return { tone: t >= hot ? "down" : t >= warn ? "warn" : undefined, ratio: Math.min(1, t / top) };
+}
+
+function uptimeLabel(secs: number): string {
+  const d = Math.floor(secs / 86400);
+  const h = Math.floor((secs % 86400) / 3600);
+  return d > 0 ? `${d}d ${h}h` : `${h}h ${Math.floor((secs % 3600) / 60)}m`;
+}
+
+function PoolRow({ pool, scan, now }: { pool: TruenasPool; scan?: TruenasPoolDetail["scan"]; now: number | null }) {
   const used = pool.usedRatio;
+  const scanned = scanLine(scan, now);
   return (
     <Row
       leading={<GlyphBubble name="disk" tone={pool.healthy ? "muted" : "down"} />}
@@ -38,8 +82,8 @@ function PoolRow({ pool }: { pool: TruenasPool }) {
       title={pool.name}
       secondary={
         used !== null
-          ? `${Math.round(used * 100)}% used${pool.free !== null ? ` · ${formatBytes(pool.free)} free` : ""}`
-          : "Size not reported"
+          ? [`${Math.round(used * 100)}% used`, pool.free !== null ? `${formatBytes(pool.free)} free` : "", scanned].filter(Boolean).join(" · ")
+          : scanned || "Size not reported"
       }
       trailing={<Pill tone={pool.healthy ? "up" : "down"}>{pool.status.charAt(0) + pool.status.slice(1).toLowerCase()}</Pill>}
       below={used !== null ? <UsageBar ratio={used} tone={fullness(used)} /> : undefined}
@@ -102,7 +146,18 @@ function AppRow({ app }: { app: TruenasApp }) {
   );
 }
 
-export default function TruenasDetail({ data }: { data: TruenasSnapshot }) {
+export default function TruenasDetail({ data }: { data: TruenasDetailData }) {
+  const mounted = useMounted();
+  const clockNow = useNow(60_000);
+  const now = mounted ? clockNow : null;
+  const sys = data.system;
+  const load = sys?.load && sys.cores ? sys.load[0] / sys.cores : null;
+  const hottest = data.disks.find((d) => d.temperature !== null);
+  // Capacity: what each pool uses, then what's free across them all.
+  const capacity = data.poolDetail.filter((p) => p.size !== null && p.used !== null);
+  const totalSize = capacity.reduce((sum, p) => sum + (p.size ?? 0), 0);
+  const totalUsed = capacity.reduce((sum, p) => sum + (p.used ?? 0), 0);
+  const scanOf = (name: string) => data.poolDetail.find((p) => p.name === name)?.scan;
   const unhealthy = data.pools.filter((p) => !p.healthy).length;
   const free = data.pools.reduce((sum, p) => sum + (p.free ?? 0), 0);
   const fullest = data.pools.reduce<TruenasPool | null>(
@@ -121,7 +176,7 @@ export default function TruenasDetail({ data }: { data: TruenasSnapshot }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <StatGrid>
+      <StatGrid six>
         <Stat
           label="Pools"
           value={data.pools.length}
@@ -147,6 +202,24 @@ export default function TruenasDetail({ data }: { data: TruenasSnapshot }) {
           tone={critical ? "down" : data.alerts.length ? "warn" : undefined}
           hint={data.alerts.length ? (critical ? `${critical} critical` : "Warnings only") : "None active"}
         />
+        <Stat
+          label="Uptime"
+          value={sys?.uptimeSeconds ? uptimeLabel(sys.uptimeSeconds) : "—"}
+          hint={sys?.version ? sys.version.replace(/^TrueNAS-/, "") : undefined}
+        />
+        <Stat
+          label="Load"
+          value={sys?.load ? sys.load[0].toFixed(2) : "—"}
+          tone={load !== null && load >= 1 ? "warn" : undefined}
+          hint={
+            sys?.cores
+              ? `${sys.cores} cores${sys.memory ? ` · ${formatBytes(sys.memory)} memory` : ""}`
+              : hottest
+                ? `Hottest disk ${hottest.temperature}°C`
+                : undefined
+          }
+          visual={load !== null ? <UsageBar ratio={load} tone={load >= 1 ? "warn" : undefined} /> : undefined}
+        />
       </StatGrid>
 
       {alerts.length > 0 && (
@@ -161,16 +234,65 @@ export default function TruenasDetail({ data }: { data: TruenasSnapshot }) {
         </Section>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+        <Section
+          title="Capacity"
+          description={totalSize > 0 ? `${formatBytes(totalUsed)} used of ${formatBytes(totalSize)} across ${capacity.length} pool${capacity.length === 1 ? "" : "s"}.` : undefined}
+        >
+          {totalSize > 0 ? (
+            <Donut
+              label="Space by pool"
+              center={`${Math.round((totalUsed / totalSize) * 100)}%`}
+              caption="used"
+              parts={[
+                ...capacity.slice(0, 5).map((p, i) => ({
+                  label: `${p.name} used`,
+                  value: p.used ?? 0,
+                  color: (i + 1) as ChartColor,
+                  display: formatBytes(p.used ?? 0),
+                })),
+                { label: "Free", value: totalSize - totalUsed, color: "muted" as ChartColor, display: formatBytes(totalSize - totalUsed) },
+              ]}
+            />
+          ) : (
+            <p className="py-6 text-center text-sm text-ink-50">TrueNAS didn&apos;t report the pools&apos; sizes.</p>
+          )}
+        </Section>
+
         <Section title="Pools" count={data.pools.length} flush>
           {data.pools.length > 0 ? (
             <List>
               {data.pools.map((p, i) => (
-                <PoolRow key={`${p.name}-${i}`} pool={p} />
+                <PoolRow key={`${p.name}-${i}`} pool={p} scan={scanOf(p.name)} now={now} />
               ))}
             </List>
           ) : (
             <EmptyRow>No pools.</EmptyRow>
+          )}
+        </Section>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Section title="Disks" count={data.disks.length} description="Hottest first." flush>
+          {data.disks.length > 0 ? (
+            <List>
+              {data.disks.map((d) => {
+                const h = heat(d);
+                return (
+                  <Row
+                    key={d.name}
+                    leading={<GlyphBubble name="disk" tone={h.tone ?? "muted"} />}
+                    primary={<span className="font-mono text-[13px]">{d.name}</span>}
+                    title={d.model || d.name}
+                    secondary={[d.model, d.size !== null ? formatBytes(d.size) : "", d.kind, d.pool ? `in ${d.pool}` : "Not in a pool"].filter(Boolean).join(" · ")}
+                    trailing={d.temperature !== null ? <Pill tone={h.tone ?? "muted"}>{d.temperature}°C</Pill> : undefined}
+                    below={d.temperature !== null ? <UsageBar ratio={h.ratio} tone={h.tone} className="h-1" /> : undefined}
+                  />
+                );
+              })}
+            </List>
+          ) : (
+            <EmptyRow>TrueNAS didn&apos;t report its disks.</EmptyRow>
           )}
         </Section>
 

@@ -13,6 +13,7 @@ import {
   PORTAINER_ENDPOINT_CAP,
   PORTAINER_LOG_MAX_BYTES,
   PORTAINER_LOG_READ_MAX_BYTES,
+  mapPortainerDetail,
 } from "./portainer";
 
 const CFG = { url: "http://portainer.local:9443/", apiKey: "ptr_key" };
@@ -376,3 +377,29 @@ describe("probePortainer", () => {
   });
 });
 
+describe("mapPortainerDetail (#529)", () => {
+  it("reads each environment's resources and names the stacks by environment, active first", () => {
+    const out = mapPortainerDetail(
+      [
+        { Id: 1, Name: "local", Snapshots: [{ RunningContainerCount: 2, TotalContainerCount: 3, ImageCount: 31, VolumeCount: 18, StackCount: 2, DockerVersion: "27.3.1", TotalCPU: 16, TotalMemory: 1024 }] },
+        { Id: 3, Name: "edge", Snapshots: [] },
+      ],
+      [
+        { Name: "sync", Type: 2, EndpointId: 1, Status: 2 },
+        { Name: "media", Type: 2, EndpointId: 1, Status: 1 },
+        { Name: "swarmy", Type: 1, EndpointId: 9, Status: 1 },
+        { Type: 2 },
+      ]
+    );
+    expect(out.resources).toEqual([
+      { endpointId: 1, images: 31, volumes: 18, stacks: 2, dockerVersion: "27.3.1", cpus: 16, memory: 1024 },
+    ]);
+    expect(out.stacks).toEqual([
+      { name: "media", environment: "local", kind: "Compose", active: true },
+      { name: "swarmy", environment: "", kind: "Swarm", active: true },
+      { name: "sync", environment: "local", kind: "Compose", active: false },
+    ]);
+    expect(out.totals.total).toBe(3);
+    expect(mapPortainerDetail([], null).stacks).toEqual([]);
+  });
+});

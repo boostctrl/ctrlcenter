@@ -359,9 +359,20 @@ const CONTAINERS = [
 function portainer(path) {
   if (path === "/api/endpoints") {
     return [
-      { Id: 1, Name: "local", Snapshots: [{ RunningContainerCount: 9, StoppedContainerCount: 2, HealthyContainerCount: 3, UnhealthyContainerCount: 1, TotalContainerCount: 12 }] },
-      { Id: 2, Name: "nas-edge", Snapshots: [{ RunningContainerCount: 4, StoppedContainerCount: 0, HealthyContainerCount: 2, UnhealthyContainerCount: 0, TotalContainerCount: 4 }] },
+      { Id: 1, Name: "local", Snapshots: [{ RunningContainerCount: 9, StoppedContainerCount: 2, HealthyContainerCount: 3, UnhealthyContainerCount: 1, TotalContainerCount: 12, ImageCount: 31, VolumeCount: 18, StackCount: 5, DockerVersion: "27.3.1", TotalCPU: 16, TotalMemory: 64 * GB }] },
+      { Id: 2, Name: "nas-edge", Snapshots: [{ RunningContainerCount: 4, StoppedContainerCount: 0, HealthyContainerCount: 2, UnhealthyContainerCount: 0, TotalContainerCount: 4, ImageCount: 6, VolumeCount: 4, StackCount: 2, DockerVersion: "26.1.4", TotalCPU: 4, TotalMemory: 8 * GB }] },
       { Id: 3, Name: "offsite-backup", Snapshots: [] },
+    ];
+  }
+  if (path === "/api/stacks") {
+    return [
+      { Name: "media", Type: 2, EndpointId: 1, Status: 1 },
+      { Name: "monitoring", Type: 2, EndpointId: 1, Status: 1 },
+      { Name: "home-automation", Type: 2, EndpointId: 1, Status: 1 },
+      { Name: "a-stack-with-a-rather-long-descriptive-name", Type: 2, EndpointId: 1, Status: 2 },
+      { Name: "ingress", Type: 2, EndpointId: 1, Status: 1 },
+      { Name: "backup-agents", Type: 2, EndpointId: 2, Status: 1 },
+      { Name: "sync", Type: 2, EndpointId: 2, Status: 2 },
     ];
   }
   const list = /^\/api\/endpoints\/(\d+)\/docker\/containers\/json/.exec(path);
@@ -378,9 +389,21 @@ function portainer(path) {
 function truenas(path) {
   if (path === "/api/v2.0/pool") {
     return [
-      { name: "tank", status: "ONLINE", healthy: true, size: 43.6 * TB, allocated: 31.1 * TB, free: 12.5 * TB },
-      { name: "fast", status: "ONLINE", healthy: true, size: 1.8 * TB, allocated: 0.4 * TB, free: 1.4 * TB },
-      { name: "backup", status: "DEGRADED", healthy: false, size: 21.8 * TB, allocated: 19.9 * TB, free: 1.9 * TB },
+      {
+        name: "tank", status: "ONLINE", healthy: true, size: 43.6 * TB, allocated: 31.1 * TB, free: 12.5 * TB,
+        scan: { function: "SCRUB", state: "FINISHED", end_time: { $date: Date.now() - 3 * 24 * HOUR }, errors: 0 },
+        topology: { data: [{ type: "RAIDZ2", children: ["sda", "sdb", "sdc", "sdd", "sde", "sdf"].map((disk) => ({ type: "DISK", disk })) }] },
+      },
+      {
+        name: "fast", status: "ONLINE", healthy: true, size: 1.8 * TB, allocated: 0.4 * TB, free: 1.4 * TB,
+        scan: { function: "SCRUB", state: "FINISHED", end_time: { $date: Date.now() - 10 * 24 * HOUR }, errors: 0 },
+        topology: { data: [{ type: "MIRROR", children: [{ type: "DISK", disk: "nvme0n1" }, { type: "DISK", disk: "nvme1n1" }] }] },
+      },
+      {
+        name: "backup", status: "DEGRADED", healthy: false, size: 21.8 * TB, allocated: 19.9 * TB, free: 1.9 * TB,
+        scan: { function: "RESILVER", state: "FINISHED", end_time: { $date: Date.now() - 26 * HOUR }, errors: 3 },
+        topology: { data: [{ type: "MIRROR", children: [{ type: "DISK", disk: "sdg" }, { type: "DISK", disk: "sdh" }] }] },
+      },
     ];
   }
   if (path.startsWith("/api/v2.0/app")) {
@@ -412,7 +435,22 @@ function truenas(path) {
       { level: "WARNING", formatted: "A dismissed alert that should not show.", dismissed: true },
     ];
   }
-  if (path === "/api/v2.0/system/info") return { version: "TrueNAS-SCALE-25.04.1", hostname: "nas" };
+  if (path === "/api/v2.0/disk/temperatures") {
+    return { sda: 36, sdb: 37, sdc: 41, sdd: 38, sde: 47, sdf: 39, sdg: 52, sdh: 44, nvme0n1: 49, nvme1n1: 46 };
+  }
+  if (path.startsWith("/api/v2.0/disk")) {
+    return [
+      ...["sda", "sdb", "sdc", "sdd", "sde", "sdf"].map((name) => ({ name, model: "WDC WD80EFPX-68C4ZN0", size: 8 * TB, type: "HDD" })),
+      { name: "sdg", model: "ST12000VN0008-2YS101", size: 12 * TB, type: "HDD" },
+      { name: "sdh", model: "ST12000VN0008-2YS101", size: 12 * TB, type: "HDD" },
+      { name: "nvme0n1", model: "Samsung SSD 990 PRO 2TB", size: 2 * TB, type: "SSD" },
+      { name: "nvme1n1", model: "Samsung SSD 990 PRO 2TB", size: 2 * TB, type: "SSD" },
+      { name: "sdi", model: "Kingston DataTraveler (boot)", size: 64 * GB, type: "SSD" },
+    ];
+  }
+  if (path === "/api/v2.0/system/info") {
+    return { version: "TrueNAS-SCALE-25.04.1", hostname: "nas", model: "AMD Ryzen 7 5700G", uptime_seconds: 12 * 86400 + 4 * 3600, cores: 16, physmem: 64 * GB, loadavg: [2.41, 1.98, 1.76] };
+  }
   return undefined;
 }
 
@@ -461,7 +499,7 @@ function unifi(path) {
   if (path === "/proxy/network/api/s/default/stat/health") {
     return env([
       { subsystem: "wlan", status: "ok", num_user: 15, num_guest: 2, num_iot: 1, num_adopted: 3, num_disconnected: 0, num_pending: 0 },
-      { subsystem: "wan", status: "ok", num_gw: 1, num_adopted: 1, num_disconnected: 0, wan_ip: "203.0.113.24", isp_name: "Example Fiber", num_sta: 24 },
+      { subsystem: "wan", status: "ok", num_gw: 1, num_adopted: 1, num_disconnected: 0, wan_ip: "203.0.113.24", isp_name: "Example Fiber", num_sta: 24, "rx_bytes-r": 8.4e6, "tx_bytes-r": 1.1e6 },
       { subsystem: "www", status: "ok", latency: 11 },
       { subsystem: "lan", status: "ok", num_user: 7, num_guest: 0, num_adopted: 4, num_disconnected: 0, num_pending: 0 },
       { subsystem: "vpn", status: "ok" },
@@ -490,8 +528,27 @@ function unifi(path) {
   }
   if (path === "/proxy/network/v2/api/site/default/clients/active") {
     return [
-      ...Array.from({ length: 13 }, (_, i) => ({ type: "WIRELESS", is_wired: false, is_guest: i < 2 })),
-      ...Array.from({ length: 7 }, () => ({ type: "WIRED", is_wired: true, is_guest: false })),
+      ...Array.from({ length: 13 }, (_, i) => ({
+        type: "WIRELESS",
+        is_wired: false,
+        is_guest: i < 2,
+        display_name: ["Living Room TV", "Pixel 9", "iPad", "Work Laptop With A Rather Long Hostname", "Kitchen Speaker", "Thermostat"][i % 6] + (i > 5 ? ` ${i}` : ""),
+        ip: `192.168.1.${40 + i}`,
+        essid: i < 2 ? "Guest" : i % 4 === 0 ? "IoT" : "Home",
+        rx_bytes: (13 - i) * 3.1 * GB,
+        tx_bytes: (13 - i) * 0.4 * GB,
+        signal: -48 - i * 3,
+      })),
+      ...Array.from({ length: 7 }, (_, i) => ({
+        type: "WIRED",
+        is_wired: true,
+        is_guest: false,
+        display_name: ["NAS", "Proxmox", "Desktop", "Printer", "Hue Bridge", "Console", "Camera NVR"][i],
+        ip: `192.168.1.${10 + i}`,
+        network_name: "Default",
+        rx_bytes: (7 - i) * 21 * GB,
+        tx_bytes: (7 - i) * 9 * GB,
+      })),
     ];
   }
   if (path === "/proxy/network/api/s/default/stat/sysinfo") return env([{ version: "9.0.114" }]);

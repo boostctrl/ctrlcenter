@@ -49,6 +49,10 @@ export type UnifiSnapshot = {
     wanIp: string | null;
     // Internet latency in ms (the `www` subsystem), when reported.
     latencyMs: number | null;
+    // What the WAN is carrying now, in bytes a second; null when the
+    // gateway doesn't report it (#527).
+    downRate: number | null;
+    upRate: number | null;
   };
   // Counted from the active-client list UniFi Network's own pages read
   // (#502), else from the health summary, whose WiFi count can run higher.
@@ -82,7 +86,28 @@ export type UnifiDevice = {
 };
 
 // The detail payload: the health snapshot plus the device list.
-export type UnifiDetail = UnifiSnapshot & { deviceList: UnifiDevice[] };
+// One connected client, for the page's list (#527): what it's called, how
+// it's connected and how much it has moved since it connected.
+export type UnifiClient = {
+  name: string;
+  wired: boolean;
+  guest: boolean;
+  // The WiFi network's name, or the wired network's.
+  network: string;
+  ip: string;
+  // Bytes down and up together.
+  usage: number;
+  // WiFi signal in dBm, when wireless and reported.
+  signal: number | null;
+};
+export type UnifiDetail = UnifiSnapshot & {
+  deviceList: UnifiDevice[];
+  // The busiest clients, most data first, and every client's network for
+  // the page's split.
+  clientList: UnifiClient[];
+  networks: { name: string; clients: number }[];
+};
+export const UNIFI_CLIENT_CAP = 12;
 
 export const UNIFI_DEVICE_CAP = 40;
 
@@ -101,6 +126,8 @@ type RawSubsystem = {
   wan_ip?: string;
   isp_name?: string;
   latency?: number;
+  "rx_bytes-r"?: number;
+  "tx_bytes-r"?: number;
 };
 
 type RawDevice = {
@@ -123,7 +150,18 @@ type RawClient = {
   type?: string;
   is_wired?: boolean;
   is_guest?: boolean;
+  display_name?: string;
+  name?: string;
+  hostname?: string;
+  ip?: string;
+  essid?: string;
+  network_name?: string;
+  rx_bytes?: number;
+  tx_bytes?: number;
+  signal?: number;
 };
+
+const rate = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : null);
 
 const int = (v: unknown): number =>
   typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.round(v) : 0;
@@ -198,6 +236,31 @@ export function countUnifiClients(raw: unknown): UnifiSnapshot["clients"] | null
   }
   counts.total = counts.wireless + counts.wired;
   return counts;
+}
+
+// Exported for the unit tests: the busiest clients and the count on each
+// network, from the active-client list. Empty when it wasn't read.
+export function mapUnifiClients(raw: unknown): Pick<UnifiDetail, "clientList" | "networks"> {
+  const rows = Array.isArray(raw) ? (raw as RawClient[]).filter((c) => c && typeof c === "object") : [];
+  const text = (v: unknown) => (typeof v === "string" ? v.trim().slice(0, 80) : "");
+  const all = rows.map((c): UnifiClient => {
+    const wired = c.type === "WIRED" || (c.type === undefined && c.is_wired === true);
+    return {
+      name: text(c.display_name) || text(c.name) || text(c.hostname) || text(c.ip) || "(unnamed)",
+      wired,
+      guest: c.is_guest === true,
+      network: (wired ? text(c.network_name) : text(c.essid) || text(c.network_name)) || (wired ? "Wired" : "WiFi"),
+      ip: text(c.ip),
+      usage: int(c.rx_bytes) + int(c.tx_bytes),
+      signal: !wired && typeof c.signal === "number" && c.signal < 0 ? Math.round(c.signal) : null,
+    };
+  });
+  const tally = new Map<string, number>();
+  for (const c of all) tally.set(c.network, (tally.get(c.network) ?? 0) + 1);
+  return {
+    clientList: [...all].sort((a, b) => b.usage - a.usage).slice(0, UNIFI_CLIENT_CAP),
+    networks: [...tally.entries()].map(([name, clients]) => ({ name, clients })).sort((a, b) => b.clients - a.clients),
+  };
 }
 
 // Every UniFi device on the site (#467): the network gear from stat/device
@@ -319,6 +382,8 @@ export function mapUnifiHealth(
       isp: wan.isp_name?.trim() || null,
       wanIp: wan.wan_ip?.trim() || null,
       latencyMs: typeof www.latency === "number" ? www.latency : null,
+      downRate: rate(wan["rx_bytes-r"]),
+      upRate: rate(wan["tx_bytes-r"]),
     },
     clients,
     devices,
@@ -494,6 +559,7 @@ export async function getUnifiDetail(cfg: UnifiConfig): Promise<UnifiDetail> {
   return {
     ...mapUnifiHealth(health, devices, clients),
     deviceList: mapUnifiDevices(devices ?? []),
+    ...mapUnifiClients(clients),
   };
 }
 

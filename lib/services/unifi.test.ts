@@ -9,6 +9,7 @@ import {
   countUnifiClients,
   UNIFI_ISSUE_CAP,
   UNIFI_DEVICE_CAP,
+  mapUnifiClients,
 } from "./unifi";
 
 const CFG = {
@@ -137,6 +138,8 @@ describe("getUnifiSnapshot", () => {
       isp: "Metronet",
       wanIp: "149.154.36.47",
       latencyMs: 50,
+      downRate: null,
+      upRate: null,
     });
     expect(snap.clients).toEqual({ total: 25, wireless: 17, wired: 8, guests: 0 });
     // Counted from stat/device: the Garage AP is offline.
@@ -426,3 +429,23 @@ describe("mapUnifiDevices", () => {
   });
 });
 
+describe("mapUnifiClients (#527)", () => {
+  it("lists the busiest clients first and counts each network", () => {
+    const out = mapUnifiClients([
+      { type: "WIRELESS", display_name: "Pixel", ip: "10.0.0.5", essid: "Home", rx_bytes: 100, tx_bytes: 20, signal: -52.4 },
+      { type: "WIRED", hostname: "nas", ip: "10.0.0.2", network_name: "Default", rx_bytes: 900, tx_bytes: 300, signal: -1 },
+      { is_wired: false, is_guest: true, ip: "10.0.0.9", essid: "Home" },
+      null,
+    ]);
+    expect(out.clientList).toEqual([
+      { name: "nas", wired: true, guest: false, network: "Default", ip: "10.0.0.2", usage: 1200, signal: null },
+      { name: "Pixel", wired: false, guest: false, network: "Home", ip: "10.0.0.5", usage: 120, signal: -52 },
+      { name: "10.0.0.9", wired: false, guest: true, network: "Home", ip: "10.0.0.9", usage: 0, signal: null },
+    ]);
+    expect(out.networks).toEqual([
+      { name: "Home", clients: 2 },
+      { name: "Default", clients: 1 },
+    ]);
+    expect(mapUnifiClients(null)).toEqual({ clientList: [], networks: [] });
+  });
+});
