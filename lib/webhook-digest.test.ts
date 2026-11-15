@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
+  MAX_SPOOL_BYTES,
   holdForDigest,
   pendingWebhookDigests,
   resetWebhookDigest,
@@ -579,6 +580,45 @@ describe("the digest spool (#351)", () => {
     expect(pendingWebhookDigests()).toEqual([]);
     expect(vi.getTimerCount()).toBe(0);
     expect(send).not.toHaveBeenCalled();
+  });
+
+  // #506: each burst keeps two whole reports, so a sender with a valid
+  // token could fill the spool to tens of MB within the count caps.
+  it("spools the groups due soonest within a byte cap, keeping the rest in memory and saying so once", async () => {
+    const warn = vi.spyOn(log, "warn").mockImplementation(() => undefined);
+    // A season import of a hundred episodes with long titles: tens of KB.
+    const big = (sid: number) =>
+      parseArrWebhook("sonarr", {
+        eventType: "Download",
+        series: { id: sid, title: `Series ${sid} ${"x".repeat(200)}` },
+        episodes: Array.from({ length: 100 }, (_, i) => ({
+          id: sid * 1000 + i,
+          seasonNumber: 1,
+          episodeNumber: i + 1,
+          title: `${"t".repeat(200)} ${i}`,
+        })),
+        episodeFile: { quality: "WEBDL-1080p", size: 1024 ** 3 },
+      })!;
+    const send = sent();
+    // One group every 100 ms, all inside the first one's window, so the
+    // first held is the first due.
+    for (let sid = 1; sid <= 64; sid++) {
+      expect(holdForDigest(big(sid), { windowMs: MIN, send })).toBe(true);
+      await vi.advanceTimersByTimeAsync(100);
+    }
+    await webhookDigestSpooled();
+    const text = fs.readFileSync(spool(), "utf8");
+    expect(Buffer.byteLength(text)).toBeLessThanOrEqual(MAX_SPOOL_BYTES);
+    const kept = JSON.parse(text).groups.map((g: { key: string }) => g.key);
+    expect(kept.length).toBeGreaterThan(0);
+    expect(kept.length).toBeLessThan(64);
+    expect(kept).toEqual(Array.from({ length: kept.length }, (_, i) => `sonarr||Download|${i + 1}`));
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toMatch(/^webhook digest spool past 1048576 bytes: \d+ pending groups kept in memory only/);
+    // Every group is still sent when due.
+    expect(pendingWebhookDigests()).toHaveLength(64);
+    await vi.advanceTimersByTimeAsync(MIN);
+    expect(send).toHaveBeenCalledTimes(64);
   });
 
   it("holds on in memory when the spool can't be written, saying so once", async () => {

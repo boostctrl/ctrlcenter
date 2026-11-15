@@ -57,7 +57,7 @@ export type DigestSend = (c: WebhookNotification) => Promise<void>;
 // a few series importing at once, each its own group. Under a wider scope a
 // group holds several bursts, bounded the same way: past the burst cap a
 // new key inside it is relayed at once too. The spool is bounded by the
-// same caps, read back as well as written.
+// same caps, read back as well as written, and by its size (#506).
 const MAX_EVENT_ITEMS = 200;
 const MAX_ITEMS = 100;
 const MAX_DROPPED_IDS = 10 * MAX_ITEMS;
@@ -68,6 +68,13 @@ const MAX_CAP_MS = 10 * 60 * 1000;
 
 const FILE_NAME = "webhook-digest.json";
 const FILE_VERSION = 1;
+// The spool's size on disk (#506). The caps above bound what it holds, but
+// each burst carries two whole reports (its first event and its last), so a
+// fill by a sender with a valid token could still reach tens of MB; honest
+// backlogs are a few KB. Past this, the groups due soonest are spooled and
+// the rest stay in memory only: still sent when due, but not across a
+// restart, which is logged once.
+export const MAX_SPOOL_BYTES = 1024 * 1024;
 
 // One key's events inside a group.
 type Burst = {
@@ -103,6 +110,8 @@ const state = globalSingleton("__ctrlcenterWebhookDigest", () => ({
   writing: null as Promise<void> | null,
   dirty: false,
   persistFailed: false,
+  // Whether the last write left groups out for size (#506), so it's said once.
+  spoolTrimmed: false,
 }));
 
 // The group a burst key joins under a scope: its own, its sender's, or the
@@ -280,6 +289,25 @@ type SpoolBurst = {
 type SpoolGroup = { key: string; firstAt: number; due: number; bursts: SpoolBurst[] };
 type SpoolFile = { version: number; groups: SpoolGroup[] };
 
+// The spool's text: the whole snapshot, or past MAX_SPOOL_BYTES the groups
+// due soonest that fit (#506), with how many were left out.
+function spoolText(): { text: string; left: number } {
+  const full = snapshot();
+  const text = JSON.stringify(full);
+  if (Buffer.byteLength(text) <= MAX_SPOOL_BYTES) return { text, left: 0 };
+  const head = `{"version":${full.version},"groups":[`;
+  let size = Buffer.byteLength(head) + 2;
+  const kept: string[] = [];
+  for (const g of [...full.groups].sort((a, b) => a.due - b.due)) {
+    const part = JSON.stringify(g);
+    const add = Buffer.byteLength(part) + (kept.length ? 1 : 0);
+    if (size + add > MAX_SPOOL_BYTES) continue;
+    kept.push(part);
+    size += add;
+  }
+  return { text: `${head}${kept.join(",")}]}`, left: full.groups.length - kept.length };
+}
+
 function snapshot(): SpoolFile {
   return {
     version: FILE_VERSION,
@@ -324,8 +352,15 @@ async function writeSpool(): Promise<void> {
   try {
     if (state.groups.size) {
       await fs.mkdir(path.dirname(file), { recursive: true });
-      await fs.writeFile(tmp, JSON.stringify(snapshot()), { mode: 0o600 });
+      const { text, left } = spoolText();
+      await fs.writeFile(tmp, text, { mode: 0o600 });
       await fs.rename(tmp, file);
+      if (left && !state.spoolTrimmed) {
+        log.warn(
+          `webhook digest spool past ${MAX_SPOOL_BYTES} bytes: ${left} pending group${left === 1 ? "" : "s"} kept in memory only, not across a restart`
+        );
+      }
+      state.spoolTrimmed = left > 0;
     } else {
       await fs.rm(file, { force: true });
     }
@@ -495,4 +530,5 @@ export function resetWebhookDigest(): void {
   state.groups.clear();
   state.dirty = false;
   state.persistFailed = false;
+  state.spoolTrimmed = false;
 }

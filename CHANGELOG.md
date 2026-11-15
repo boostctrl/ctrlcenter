@@ -61,6 +61,16 @@ here.
   out.** It was meant to show in the warning color, but showed as a plain
   outlined box.
 
+### Security
+
+- **The file that holds pending webhook digests has a size limit.**
+  `webhook-digest.json`, where grouped Sonarr, Radarr and Seerr
+  notifications wait out their window, could grow to tens of MB if
+  something with a valid webhook token flooded it. It now stays under
+  1 MB: past that, the groups due soonest are saved and the rest are kept in
+  memory, still sent on time but not across a restart, and the log says
+  so. (#506)
+
 ## [3.1.2] - 2026-11-14
 
 ### Fixed
