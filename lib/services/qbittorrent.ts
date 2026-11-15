@@ -59,6 +59,13 @@ export type QbittorrentTorrent = {
   size: number;
   // Seconds remaining; null when idle or unknown.
   eta: number | null;
+  // Its category ("" when it has none), its tracker's host, the seeds and
+  // peers it's connected to, and when it was added (#524).
+  category: string;
+  tracker: string;
+  seeds: number;
+  peers: number;
+  addedAt: number | null;
 };
 
 export type QbittorrentSnapshot = {
@@ -338,6 +345,11 @@ type RawTorrent = {
   upspeed?: number;
   size?: number;
   eta?: number;
+  category?: string;
+  tracker?: string;
+  num_seeds?: number;
+  num_leechs?: number;
+  added_on?: number;
 };
 
 // One /sync/maindata response. A full sync (rid 0, or after the server drops
@@ -420,6 +432,17 @@ function syncMaindata(
 
 const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
 
+// A tracker's host from its announce address: the name, never the passkey
+// the address carries.
+export function trackerHost(raw: unknown): string {
+  if (typeof raw !== "string" || raw === "") return "";
+  try {
+    return new URL(raw).hostname.slice(0, 80);
+  } catch {
+    return "";
+  }
+}
+
 // Sort key: actively transferring first (fastest first), then unfinished
 // ahead of finished, then name — so the capped list surfaces what's moving.
 function interest(t: QbittorrentTorrent): number {
@@ -455,6 +478,11 @@ function summarize(state: QbitSyncState): {
         typeof t.eta === "number" && t.eta > 0 && t.eta < ETA_INFINITY
           ? t.eta
           : null,
+      category: typeof t.category === "string" ? t.category.slice(0, 60) : "",
+      tracker: trackerHost(t.tracker),
+      seeds: num(t.num_seeds),
+      peers: num(t.num_leechs),
+      addedAt: typeof t.added_on === "number" && t.added_on > 0 ? t.added_on * 1000 : null,
     })
   );
 

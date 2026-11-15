@@ -42,6 +42,11 @@ describe("the AdGuard tile's query count", () => {
         series: [],
         blockedSeries: [],
         topBlocked: [],
+        topQueried: [],
+        topClients: [],
+        safeBrowsing: 0,
+        parental: 0,
+        filters: null,
       },
     } as Parameters<typeof tileContent>[0];
     expect(tileContent(entry, 0, "admin").lines[0]).toBe("1.0M queries");

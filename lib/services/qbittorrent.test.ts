@@ -9,6 +9,7 @@ import {
   simplifyTorrentState,
   TORRENT_LIST_CAP,
   type QbitSyncState,
+  trackerHost,
 } from "./qbittorrent";
 
 const CFG = {
@@ -530,5 +531,15 @@ describe("applyMaindata", () => {
   it("carries the prior rid forward when a response omits it", () => {
     const prev = applyMaindata(null, { rid: 7, full_update: true, torrents: {} });
     expect(applyMaindata(prev, { torrents: {} }).rid).toBe(7);
+  });
+});
+
+describe("trackerHost (#524)", () => {
+  it("keeps the tracker's name and drops the passkey its address carries", () => {
+    expect(trackerHost("https://tracker.example:443/announce?passkey=s3cret")).toBe("tracker.example");
+    expect(trackerHost("udp://open.tracker.example:1337/a/s3cret/announce")).toBe("open.tracker.example");
+    expect(trackerHost("")).toBe("");
+    expect(trackerHost("not a url")).toBe("");
+    expect(trackerHost(undefined)).toBe("");
   });
 });

@@ -4,6 +4,7 @@ import {
   getTautulliDetail,
   probeTautulli,
   mapTautulliActivity,
+  mapTautulliStats,
   mapTautulliHistory,
   TAUTULLI_SESSION_CAP,
   TAUTULLI_HISTORY_CAP,
@@ -89,6 +90,8 @@ describe("getTautulliSnapshot", () => {
         playback: "direct",
         progress: 42,
         quality: "1080p",
+        player: "",
+        remote: false,
       },
       {
         user: "guest",
@@ -97,6 +100,8 @@ describe("getTautulliSnapshot", () => {
         playback: "transcode",
         progress: 87.5,
         quality: "720p",
+        player: "",
+        remote: false,
       },
     ]);
     // The key rides the query string; the trailing slash is trimmed.
@@ -137,6 +142,8 @@ describe("mapTautulliActivity", () => {
       playback: "direct",
       progress: 0,
       quality: "",
+      player: "",
+      remote: false,
     });
     // No stream_count in the payload — fall back to the session rows.
     expect(snap.streamCount).toBe(10);
@@ -209,3 +216,25 @@ describe("probeTautulli", () => {
   });
 });
 
+describe("mapTautulliStats (#525)", () => {
+  it("folds the home stats, libraries and plays by date, and is empty for whatever is missing", () => {
+    const stats = mapTautulliStats(
+      [
+        { stat_id: "top_users", rows: [{ friendly_name: "Alex", total_plays: "12", total_duration: "7200" }] },
+        { stat_id: "top_platforms", rows: [{ platform: "Apple TV", total_plays: 9 }] },
+      ],
+      [{ section_name: "Movies", section_type: "movie", count: "412" }],
+      { categories: ["2026-11-13", "2026-11-14"], series: [{ name: "TV", data: [3, 4] }, { name: "Movies", data: ["1", 0] }] }
+    );
+    expect(stats).toEqual({
+      topUsers: [{ name: "Alex", plays: 12, seconds: 7200 }],
+      platforms: [{ name: "Apple TV", plays: 9 }],
+      libraries: [{ name: "Movies", kind: "movie", count: 412 }],
+      playsByDay: [
+        { day: "2026-11-13", tv: 3, movies: 1, music: 0 },
+        { day: "2026-11-14", tv: 4, movies: 0, music: 0 },
+      ],
+    });
+    expect(mapTautulliStats(null, null, null)).toEqual({ topUsers: [], platforms: [], libraries: [], playsByDay: [] });
+  });
+});

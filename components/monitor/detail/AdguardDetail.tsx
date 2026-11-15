@@ -1,7 +1,7 @@
 "use client";
 
 import type { AdguardSnapshot } from "@/lib/services/adguard";
-import { EmptyRow, List, Pill, Row, Section, Sparkline, Stat, StatGrid, UsageBar, formatCount } from "../kit";
+import { Donut, EmptyRow, List, Pill, Row, Section, Sparkline, Stat, StatGrid, UsageBar, formatCount } from "../kit";
 
 // AdGuard Home's page (#516), on the page kit (#508): the query totals and
 // how many were blocked, a trend of both across the stats window (drawn from
@@ -96,7 +96,6 @@ function TrendChart({
 
 export default function AdguardDetail({ data }: { data: AdguardSnapshot }) {
   const pct = Math.round(data.blockedRatio * 1000) / 10;
-  const top = data.topBlocked[0]?.count ?? 0;
   return (
     <div className="flex flex-col gap-6">
       <StatGrid>
@@ -130,30 +129,74 @@ export default function AdguardDetail({ data }: { data: AdguardSnapshot }) {
         <Section title="Queries over time" description={data.windowLabel ? `The ${data.windowLabel}.` : undefined}>
           <TrendChart series={data.series} blockedSeries={data.blockedSeries} windowLabel={null} />
         </Section>
-
-        <Section title="Most blocked" count={data.topBlocked.length} flush>
-          {data.topBlocked.length > 0 ? (
-            <List>
-              {data.topBlocked.map((d, i) => (
-                <Row
-                  key={d.domain}
-                  leading={
-                    <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-fg/[0.06] text-sm font-semibold tabular-nums text-ink-60">
-                      {i + 1}
-                    </span>
-                  }
-                  primary={d.domain}
-                  title={d.domain}
-                  trailing={<Pill>{formatCount(d.count)}</Pill>}
-                  below={<UsageBar ratio={top ? d.count / top : 0} tone="down" className="h-1" />}
-                />
-              ))}
-            </List>
-          ) : (
-            <EmptyRow>Nothing blocked in this window.</EmptyRow>
-          )}
+        <Section
+          title="What happened to them"
+          description={
+            data.filters
+              ? `${data.filters.lists} filter list${data.filters.lists === 1 ? "" : "s"} · ${formatCount(data.filters.rules)} rules`
+              : undefined
+          }
+        >
+          <Donut
+            label="Queries by outcome"
+            center={formatCount(data.totalQueries)}
+            caption="queries"
+            parts={[
+              { label: "Allowed", value: Math.max(0, data.totalQueries - data.blocked - data.safeBrowsing - data.parental), color: 3 as const },
+              { label: "Blocked by filters", value: data.blocked, color: "down" as const },
+              { label: "Safe Browsing", value: data.safeBrowsing, color: 4 as const },
+              { label: "Parental control", value: data.parental, color: 5 as const },
+            ]
+              .filter((p, i) => i < 2 || p.value > 0)
+              .map((p) => ({ ...p, display: formatCount(p.value) }))}
+          />
         </Section>
       </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Ranked title="Most blocked" items={data.topBlocked.map((d) => ({ name: d.domain, count: d.count }))} tone="down" empty="Nothing blocked in this window." />
+        <Ranked title="Most queried" items={data.topQueried.map((d) => ({ name: d.domain, count: d.count }))} empty="No queries in this window." />
+        <Ranked title="Busiest clients" items={data.topClients} empty="No clients in this window." />
+      </div>
     </div>
+  );
+}
+
+// A ranked list: each name with its count and a bar against the first.
+function Ranked({
+  title,
+  items,
+  tone,
+  empty,
+}: {
+  title: string;
+  items: { name: string; count: number }[];
+  tone?: "down";
+  empty: string;
+}) {
+  const top = items[0]?.count ?? 0;
+  return (
+    <Section title={title} count={items.length} flush>
+      {items.length > 0 ? (
+        <List>
+          {items.map((d, i) => (
+            <Row
+              key={d.name}
+              leading={
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-fg/[0.06] text-sm font-semibold tabular-nums text-ink-60">
+                  {i + 1}
+                </span>
+              }
+              primary={d.name}
+              title={d.name}
+              trailing={<Pill>{formatCount(d.count)}</Pill>}
+              below={<UsageBar ratio={top ? d.count / top : 0} tone={tone} className="h-1" />}
+            />
+          ))}
+        </List>
+      ) : (
+        <EmptyRow>{empty}</EmptyRow>
+      )}
+    </Section>
   );
 }

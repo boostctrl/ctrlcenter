@@ -4,6 +4,8 @@ import { useState } from "react";
 import type { TautulliDetail as TautulliDetailData, TautulliSession } from "@/lib/services/tautulli";
 import { useNow } from "@/components/useNow";
 import {
+  BarChart,
+  Donut,
   EmptyRow,
   GlyphBubble,
   List,
@@ -16,6 +18,7 @@ import {
   UsageBar,
   ago,
   useMounted,
+  type ChartColor,
 } from "../kit";
 
 // Tautulli's page (#512), on the page kit (#508): who's watching now, with
@@ -44,6 +47,19 @@ export default function TautulliDetail({ data }: { data: TautulliDetailData }) {
   const clockNow = useNow(60_000);
   const now = mounted ? clockNow : null;
   const [allWatched, setAllWatched] = useState(false);
+  const stats = data.stats;
+  // "Nov 14" from the day Tautulli reports ("2026-11-14"), read as a plain
+  // date so the viewer's zone can't move it.
+  const plays = stats.playsByDay.map((d, i, all) => ({
+    label:
+      i === all.length - 1
+        ? "Today"
+        : i % 2 === all.length % 2
+          ? ""
+          : new Date(`${d.day}T12:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+    values: [d.tv, d.movies, d.music],
+  }));
+  const mostPlays = Math.max(...stats.topUsers.map((u) => u.plays), 1);
   const bw = bandwidth(data.totalBandwidthKbps);
   const paused = data.sessions.filter((s) => s.state === "paused").length;
   const viewers = new Set(data.history.map((h) => h.user)).size;
@@ -69,6 +85,38 @@ export default function TautulliDetail({ data }: { data: TautulliDetailData }) {
         />
       </StatGrid>
 
+      {(plays.length > 0 || stats.platforms.length > 0) && (
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+          <Section title="Plays per day" description="The last two weeks, by kind.">
+            {plays.length > 0 ? (
+              <BarChart
+                label="Plays per day over the last two weeks"
+                slots={plays}
+                series={[
+                  { label: "TV", color: 1 },
+                  { label: "Movies", color: 2 },
+                  { label: "Music", color: 3 },
+                ]}
+              />
+            ) : (
+              <p className="py-6 text-center text-sm text-ink-50">Tautulli didn&apos;t report its plays.</p>
+            )}
+          </Section>
+          <Section title="By platform" description="Where it was watched, over the last 30 days.">
+            {stats.platforms.length > 0 ? (
+              <Donut
+                label="Plays by platform"
+                center={String(stats.platforms.reduce((sum, p) => sum + p.plays, 0))}
+                caption="plays"
+                parts={stats.platforms.map((p, i) => ({ label: p.name, value: p.plays, color: (i + 1) as ChartColor }))}
+              />
+            ) : (
+              <p className="py-6 text-center text-sm text-ink-50">Nothing watched in the last 30 days.</p>
+            )}
+          </Section>
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-2">
         <Section title="Now playing" count={data.sessions.length} flush>
           {data.sessions.length > 0 ? (
@@ -79,7 +127,7 @@ export default function TautulliDetail({ data }: { data: TautulliDetailData }) {
                   leading={<GlyphBubble name={s.state === "paused" ? "pause" : "play"} tone={s.state === "playing" ? "up" : "muted"} />}
                   primary={s.title}
                   title={s.title}
-                  secondary={[s.user, STATE_LABEL[s.state], s.quality].filter(Boolean).join(" · ")}
+                  secondary={[s.user, STATE_LABEL[s.state], s.quality, s.player, s.remote ? "Remote" : ""].filter(Boolean).join(" · ")}
                   trailing={
                     <>
                       <Pill tone={s.playback === "transcode" ? "info" : "muted"}>
@@ -119,6 +167,46 @@ export default function TautulliDetail({ data }: { data: TautulliDetailData }) {
           )}
         </Section>
       </div>
+
+      {(stats.topUsers.length > 0 || stats.libraries.length > 0) && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Section title="Top viewers" description="By plays over the last 30 days." flush>
+            {stats.topUsers.length > 0 ? (
+              <List>
+                {stats.topUsers.map((u) => (
+                  <Row
+                    key={u.name}
+                    leading={<GlyphBubble name="user" />}
+                    primary={u.name}
+                    secondary={`${Math.round(u.seconds / 3600)} hours watched`}
+                    trailing={`${u.plays} plays`}
+                    below={<UsageBar ratio={u.plays / mostPlays} className="h-1" />}
+                  />
+                ))}
+              </List>
+            ) : (
+              <EmptyRow>Nobody watched anything in the last 30 days.</EmptyRow>
+            )}
+          </Section>
+          <Section title="Libraries" count={stats.libraries.length} flush>
+            {stats.libraries.length > 0 ? (
+              <List>
+                {stats.libraries.map((l) => (
+                  <Row
+                    key={l.name}
+                    leading={<GlyphBubble name={l.kind === "show" ? "tv" : l.kind === "movie" ? "film" : "server"} />}
+                    primary={l.name}
+                    title={l.name}
+                    trailing={`${l.count.toLocaleString()} ${l.kind === "show" ? "shows" : l.kind === "movie" ? "movies" : l.kind === "artist" ? "artists" : "items"}`}
+                  />
+                ))}
+              </List>
+            ) : (
+              <EmptyRow>Tautulli didn&apos;t report its libraries.</EmptyRow>
+            )}
+          </Section>
+        </div>
+      )}
     </div>
   );
 }

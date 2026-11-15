@@ -240,8 +240,8 @@ function tautulli(cmd, now) {
       stream_count: "3",
       total_bandwidth: 31200,
       sessions: [
-        { friendly_name: "Alex", full_title: "Severance - Cold Harbor", state: "playing", transcode_decision: "direct play", progress_percent: "64", quality_profile: "Original" },
-        { friendly_name: "Priya", full_title: "Dune: Part Two", state: "playing", transcode_decision: "transcode", progress_percent: "22", quality_profile: "8 Mbps 1080p" },
+        { friendly_name: "Alex", full_title: "Severance - Cold Harbor", state: "playing", transcode_decision: "direct play", progress_percent: "64", quality_profile: "Original", player: "Living Room", platform: "Apple TV", location: "lan" },
+        { friendly_name: "Priya", full_title: "Dune: Part Two", state: "playing", transcode_decision: "transcode", progress_percent: "22", quality_profile: "8 Mbps 1080p", player: "Pixel 9", platform: "Android", location: "wan" },
         { friendly_name: "Jordan Lee", full_title: "The Long and Winding Chronicles of the Northern Lighthouse Keepers - The Keeper's Daughter", state: "paused", transcode_decision: "copy", progress_percent: "91", quality_profile: "Original" },
       ],
     });
@@ -254,6 +254,31 @@ function tautulli(cmd, now) {
         date: Math.floor((now - (i * 3 + 1) * HOUR) / 1000),
         transcode_decision: ["direct play", "transcode", "copy"][i % 3],
       })),
+    });
+  }
+  if (cmd === "get_home_stats") {
+    return ok([
+      { stat_id: "top_users", rows: REQUESTERS.slice(0, 5).map((friendly_name, i) => ({ friendly_name, total_plays: 61 - i * 11, total_duration: (52 - i * 9) * 3600 })) },
+      { stat_id: "top_platforms", rows: [["Apple TV", 88], ["Chrome", 41], ["Android", 33], ["Roku", 19], ["iOS", 12]].map(([platform, total_plays]) => ({ platform, total_plays })) },
+    ]);
+  }
+  if (cmd === "get_libraries") {
+    return ok([
+      { section_name: "Movies", section_type: "movie", count: "412" },
+      { section_name: "TV Shows", section_type: "show", count: "84" },
+      { section_name: "Music", section_type: "artist", count: "230" },
+      { section_name: "Home Videos and Family Archive", section_type: "movie", count: "57" },
+    ]);
+  }
+  if (cmd === "get_plays_by_date") {
+    const days = Array.from({ length: 14 }, (_, i) => iso(now - (13 - i) * 24 * HOUR).slice(0, 10));
+    return ok({
+      categories: days,
+      series: [
+        { name: "TV", data: days.map((_, i) => 3 + ((i * 5) % 7)) },
+        { name: "Movies", data: days.map((_, i) => 1 + ((i * 3) % 4)) },
+        { name: "Music", data: days.map((_, i) => (i % 4 === 0 ? 2 : 0)) },
+      ],
     });
   }
   if (cmd === "get_tautulli_info") return ok({ tautulli_version: "v2.14.6" });
@@ -289,6 +314,11 @@ function qbittorrentMaindata() {
         upspeed: state === "uploading" ? 350_000 + i * 90_000 : 0,
         size: (2 + i * 3.5) * GB,
         eta: dlspeed > 0 ? Math.round(((1 - progress) * (2 + i * 3.5) * GB) / dlspeed) : 8640000,
+        category: ["movies", "tv", "linux", "tv", ""][i % 5],
+        tracker: `https://tracker-${i % 3}.example/announce?passkey=secret${i}`,
+        num_seeds: (i * 7) % 40,
+        num_leechs: (i * 3) % 11,
+        added_on: Math.round(Date.now() / 1000) - (i + 1) * 5400,
       },
     ])
   );
@@ -412,7 +442,14 @@ function adguard(path) {
       dns_queries: queries,
       blocked_filtering: blocked,
       top_blocked_domains: domains.map((d, i) => ({ [d]: Math.round(4200 / (i + 1)) })),
+      top_queried_domains: ["api.github.com", "push.apple.com", "connectivitycheck.gstatic.com", "time.cloudflare.com", "a-very-long-subdomain-name.cdn.streaming-provider.example", "plex.tv", "one.one.one.one", "ghcr.io"].map((d, i) => ({ [d]: Math.round(9100 / (i + 1.5)) })),
+      top_clients: ["living-room-tv", "192.168.1.42", "pixel-9", "nas", "work-laptop-with-a-long-hostname.lan", "ipad"].map((c, i) => ({ [c]: Math.round(12400 / (i + 1.2)) })),
+      num_replaced_safebrowsing: 37,
+      num_replaced_parental: 0,
     };
+  }
+  if (path === "/control/filtering/status") {
+    return { filters: [{ enabled: true, rules_count: 152340 }, { enabled: true, rules_count: 48211 }, { enabled: false, rules_count: 9000 }] };
   }
   return undefined;
 }

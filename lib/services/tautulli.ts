@@ -28,6 +28,9 @@ export type TautulliSession = {
   // Completion 0..100.
   progress: number;
   quality: string;
+  // The device and app playing it, and whether it's outside the network.
+  player: string;
+  remote: boolean;
 };
 
 export type TautulliSnapshot = {
@@ -53,7 +56,19 @@ export type TautulliHistoryItem = {
 // The detail payload: the live activity snapshot plus a page of recent history.
 export type TautulliDetail = TautulliSnapshot & {
   history: TautulliHistoryItem[];
+  // The last 30 days in numbers, each list empty when Tautulli didn't
+  // answer for it (#525).
+  stats: TautulliStats;
 };
+export type TautulliStats = {
+  topUsers: { name: string; plays: number; seconds: number }[];
+  platforms: { name: string; plays: number }[];
+  libraries: { name: string; kind: string; count: number }[];
+  // Plays per day over the last two weeks, oldest first.
+  playsByDay: { day: string; tv: number; movies: number; music: number }[];
+};
+export const TAUTULLI_STATS_DAYS = 30;
+const STAT_ROWS = 5;
 
 // How many recent history rows the detail page pulls.
 export const TAUTULLI_HISTORY_CAP = 15;
@@ -77,6 +92,9 @@ type RawSession = {
   transcode_decision?: string;
   progress_percent?: unknown;
   quality_profile?: string;
+  player?: string;
+  platform?: string;
+  location?: string;
 };
 type RawHistory = { data?: RawHistoryRow[] };
 type RawHistoryRow = {
@@ -110,6 +128,8 @@ export function mapTautulliActivity(raw: unknown): TautulliSnapshot {
       playback: s.transcode_decision === "transcode" ? "transcode" : "direct",
       progress: Math.min(100, Math.max(0, num(s.progress_percent) ?? 0)),
       quality: s.quality_profile?.trim() || "",
+      player: [s.player?.trim(), s.platform?.trim()].filter(Boolean).join(" · ").slice(0, 80),
+      remote: s.location === "wan",
     })
   );
   return {
@@ -135,6 +155,42 @@ export function mapTautulliHistory(raw: unknown): TautulliHistoryItem[] {
       playback: r.transcode_decision === "transcode" ? "transcode" : "direct",
     };
   });
+}
+
+// Exported for the unit tests: fold get_home_stats, get_libraries and
+// get_plays_by_date into the page's numbers. Anything missing is empty.
+export function mapTautulliStats(home: unknown, libraries: unknown, plays: unknown): TautulliStats {
+  const stat = (id: string): Record<string, unknown>[] => {
+    const hit = Array.isArray(home) ? (home as { stat_id?: string; rows?: unknown }[]).find((s) => s?.stat_id === id) : null;
+    return Array.isArray(hit?.rows) ? (hit.rows as Record<string, unknown>[]) : [];
+  };
+  const text = (v: unknown) => (typeof v === "string" ? v.trim().slice(0, 80) : "");
+  const series = (name: string): number[] => {
+    const all = (plays as { series?: { name?: string; data?: unknown }[] } | null)?.series;
+    const hit = Array.isArray(all) ? all.find((x) => x?.name === name) : null;
+    return Array.isArray(hit?.data) ? (hit.data as unknown[]).map((v) => num(v) ?? 0) : [];
+  };
+  const days = (plays as { categories?: unknown } | null)?.categories;
+  const [tv, movies, music] = [series("TV"), series("Movies"), series("Music")];
+  return {
+    topUsers: stat("top_users")
+      .slice(0, STAT_ROWS)
+      .map((r) => ({
+        name: text(r.friendly_name) || text(r.user) || "(unknown)",
+        plays: num(r.total_plays) ?? 0,
+        seconds: num(r.total_duration) ?? 0,
+      })),
+    platforms: stat("top_platforms")
+      .slice(0, STAT_ROWS)
+      .map((r) => ({ name: text(r.platform) || "(unknown)", plays: num(r.total_plays) ?? 0 })),
+    libraries: (Array.isArray(libraries) ? (libraries as Record<string, unknown>[]) : [])
+      .slice(0, 12)
+      .map((l) => ({ name: text(l.section_name) || "(unnamed)", kind: text(l.section_type), count: num(l.count) ?? 0 })),
+    playsByDay: (Array.isArray(days) ? (days as unknown[]) : []).slice(-14).map((d, i, kept) => {
+      const at = (xs: number[]) => xs[xs.length - kept.length + i] ?? 0;
+      return { day: text(d), tv: at(tv), movies: at(movies), music: at(music) };
+    }),
+  };
 }
 
 async function tautulliCmd<T>(cfg: TautulliConfig, cmd: string): Promise<T> {
@@ -167,19 +223,25 @@ export async function getTautulliSnapshot(
 export async function getTautulliDetail(
   cfg: TautulliConfig
 ): Promise<TautulliDetail> {
-  const [activity, history] = await Promise.allSettled([
+  const quiet = <T,>(cmd: string) => tautulliCmd<T>(cfg, cmd).catch(() => null);
+  const [activity, history, home, libraries, plays] = await Promise.allSettled([
     tautulliCmd<RawActivity>(cfg, "get_activity"),
     tautulliCmd<RawHistory>(
       cfg,
       `get_history&length=${TAUTULLI_HISTORY_CAP}&order_column=date&order_dir=desc`
     ),
+    quiet<unknown>(`get_home_stats&time_range=${TAUTULLI_STATS_DAYS}&stats_count=${STAT_ROWS}`),
+    quiet<unknown>("get_libraries"),
+    quiet<unknown>("get_plays_by_date&time_range=14"),
   ]);
+  const settled = (r: PromiseSettledResult<unknown>) => (r.status === "fulfilled" ? r.value : null);
   // If even the activity read failed, the service is down — surface that.
   if (activity.status === "rejected") throw activity.reason;
   return {
     ...mapTautulliActivity(activity.value),
     history:
       history.status === "fulfilled" ? mapTautulliHistory(history.value) : [],
+    stats: mapTautulliStats(settled(home), settled(libraries), settled(plays)),
   };
 }
 

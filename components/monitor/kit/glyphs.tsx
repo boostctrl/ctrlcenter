@@ -83,6 +83,12 @@ const PATHS = {
     </>
   ),
   chevron: <path d="m9 6 6 6-6 6" />,
+  user: (
+    <>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 20c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5" />
+    </>
+  ),
   play: <path d="M8 5.5v13l10.5-6.5L8 5.5Z" strokeLinejoin="round" />,
   pause: <path d="M8.5 5.5v13M15.5 5.5v13" />,
   film: (

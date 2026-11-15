@@ -29,6 +29,21 @@ here.
   the library into what's on disk, what's missing and the rest, with the
   number of series or movies and their size. (#523)
 
+- **qBittorrent's page charts its torrents.** Two donuts split them by
+  state and by how much each category holds on disk, and each torrent
+  shows its category, tracker, seeds and peers. (#524)
+
+- **Tautulli's page shows the last month at a glance.** Plays per day
+  over two weeks, split into TV, movies and music; a donut of plays by
+  platform; the top viewers with their hours; and each library's size.
+  A stream also names its player and says when it's remote. (#525)
+
+- **AdGuard Home's page shows where queries go.** A donut splits them
+  into allowed, blocked by filters and stopped by Safe Browsing or
+  parental control, with the filter lists and rules in use. Beside the
+  most-blocked domains are the most-queried ones and the busiest clients.
+  (#526)
+
 ### Changed
 
 - **The Monitor dashboard opens on a command deck.** A status ring draws one

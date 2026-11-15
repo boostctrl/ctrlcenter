@@ -12,6 +12,7 @@ import { formatEta, formatSpeed } from "@/lib/format";
 import { useMonitorAction } from "../actions";
 import {
   Dialog,
+  Donut,
   EmptyRow,
   GlyphBubble,
   List,
@@ -22,6 +23,7 @@ import {
   Stat,
   StatGrid,
   UsageBar,
+  type ChartColor,
   type GlyphName,
   type Tone,
 } from "../kit";
@@ -75,12 +77,39 @@ function sortTorrents(list: QbittorrentTorrent[], key: SortKey): QbittorrentTorr
 const SHOWN = 25;
 
 // The line under a torrent's name: its size, and what it's doing.
+// The donuts: each state in a fixed order and color, and the four largest
+// categories by size with the rest as Other.
+const STATE_ORDER: TorrentState[] = ["downloading", "seeding", "stalled", "queued", "checking", "paused", "error"];
+const STATE_COLOR: Record<TorrentState, ChartColor> = {
+  downloading: 1,
+  seeding: 3,
+  stalled: 4,
+  queued: 5,
+  checking: 2,
+  paused: "muted",
+  error: "down",
+};
+function categoryParts(torrents: QbittorrentTorrent[]) {
+  const sizes = new Map<string, number>();
+  for (const t of torrents) sizes.set(t.category || "No category", (sizes.get(t.category || "No category") ?? 0) + t.size);
+  const sorted = [...sizes.entries()].sort((a, b) => b[1] - a[1]);
+  const top = sorted.slice(0, 4);
+  const rest = sorted.slice(4).reduce((sum, [, v]) => sum + v, 0);
+  return [
+    ...top.map(([label, value], i) => ({ label, value, color: (i + 1) as ChartColor, display: formatBytes(value) })),
+    ...(rest > 0 ? [{ label: "Other", value: rest, color: "muted" as ChartColor, display: formatBytes(rest) }] : []),
+  ];
+}
+
 function torrentLine(t: QbittorrentTorrent): string {
   const parts = [formatBytes(t.size)];
+  if (t.category) parts.unshift(t.category);
   if (t.downSpeed > 0) parts.push(`↓ ${formatSpeed(t.downSpeed)}`);
   if (t.upSpeed > 0) parts.push(`↑ ${formatSpeed(t.upSpeed)}`);
   if ((t.state === "downloading" || t.state === "stalled") && t.eta !== null) parts.push(`${formatEta(t.eta)} left`);
   if (t.state === "seeding") parts.push(`ratio ${t.ratio.toFixed(2)}`);
+  if (t.state === "downloading" || t.state === "stalled") parts.push(`${t.seeds} seeds · ${t.peers} peers`);
+  if (t.tracker) parts.push(t.tracker);
   return parts.join(" · ");
 }
 
@@ -260,6 +289,31 @@ export default function QbittorrentDetail({
             .join(" · ")}
         />
       </StatGrid>
+
+      {c.total > 0 && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Section title="By state" description="What the torrents are doing now.">
+            <Donut
+              label="Torrents by state"
+              center={String(c.total)}
+              caption={c.total === 1 ? "torrent" : "torrents"}
+              parts={STATE_ORDER.map((st) => ({
+                label: STATE[st].label,
+                value: data.torrents.filter((t) => t.state === st).length,
+                color: STATE_COLOR[st],
+              })).filter((p) => p.value > 0)}
+            />
+          </Section>
+          <Section title="By category" description="How much each category holds on disk.">
+            <Donut
+              label="Size by category"
+              center={formatBytes(data.torrents.reduce((sum, t) => sum + t.size, 0))}
+              caption="in all"
+              parts={categoryParts(data.torrents)}
+            />
+          </Section>
+        </div>
+      )}
 
       <Section
         title="Torrents"

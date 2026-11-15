@@ -42,6 +42,15 @@ export type AdguardSnapshot = {
   // second line on the detail page's trend chart. Empty when absent.
   blockedSeries: number[];
   topBlocked: { domain: string; count: number }[];
+  // The most-queried domains and the busiest clients (#526).
+  topQueried: { domain: string; count: number }[];
+  topClients: { name: string; count: number }[];
+  // Queries stopped by Safe Browsing and by parental control, apart from
+  // the filter lists' `blocked`.
+  safeBrowsing: number;
+  parental: number;
+  // The filter lists in use and their rules; null when not reported.
+  filters: { lists: number; rules: number } | null;
 };
 
 export const ADGUARD_TOP_BLOCKED_CAP = 5;
@@ -59,7 +68,12 @@ type RawStats = {
   blocked_filtering?: unknown[];
   // AdGuard's shape: one { "domain.tld": count } object per entry.
   top_blocked_domains?: Record<string, unknown>[];
+  top_queried_domains?: Record<string, unknown>[];
+  top_clients?: Record<string, unknown>[];
+  num_replaced_safebrowsing?: number;
+  num_replaced_parental?: number;
 };
+type RawFiltering = { filters?: { enabled?: boolean; rules_count?: number }[] };
 
 const count = (v: unknown): number =>
   typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.round(v) : 0;
@@ -67,7 +81,8 @@ const count = (v: unknown): number =>
 // Exported for the unit tests: fold the two raw payloads into the snapshot.
 export function mapAdguardSnapshot(
   statusRaw: unknown,
-  statsRaw: unknown
+  statsRaw: unknown,
+  filteringRaw?: unknown
 ): AdguardSnapshot {
   const status = (statusRaw ?? {}) as RawStatus;
   const stats = (statsRaw ?? {}) as RawStats;
@@ -97,14 +112,22 @@ export function mapAdguardSnapshot(
         ? `last ${units} day${units === 1 ? "" : "s"}`
         : null;
 
-  const topBlocked: { domain: string; count: number }[] = [];
-  for (const entry of stats.top_blocked_domains ?? []) {
-    if (typeof entry !== "object" || entry === null) continue;
-    const [domain, hits] = Object.entries(entry)[0] ?? [];
-    if (typeof domain !== "string" || domain === "") continue;
-    topBlocked.push({ domain, count: count(hits) });
-    if (topBlocked.length >= ADGUARD_TOP_BLOCKED_CAP) break;
-  }
+  // AdGuard's ranked lists: one { name: count } object per entry.
+  const ranked = (list: unknown): [string, number][] => {
+    const out: [string, number][] = [];
+    for (const entry of Array.isArray(list) ? list : []) {
+      if (typeof entry !== "object" || entry === null) continue;
+      const [name, hits] = Object.entries(entry)[0] ?? [];
+      if (typeof name !== "string" || name === "") continue;
+      out.push([name.slice(0, 120), count(hits)]);
+      if (out.length >= ADGUARD_TOP_BLOCKED_CAP) break;
+    }
+    return out;
+  };
+  const topBlocked = ranked(stats.top_blocked_domains).map(([domain, n]) => ({ domain, count: n }));
+  const enabled = Array.isArray((filteringRaw as RawFiltering | null)?.filters)
+    ? (filteringRaw as RawFiltering).filters!.filter((f) => f?.enabled !== false)
+    : null;
 
   return {
     protectionEnabled: status.protection_enabled === true,
@@ -116,6 +139,11 @@ export function mapAdguardSnapshot(
     series,
     blockedSeries,
     topBlocked,
+    topQueried: ranked(stats.top_queried_domains).map(([domain, n]) => ({ domain, count: n })),
+    topClients: ranked(stats.top_clients).map(([name, n]) => ({ name, count: n })),
+    safeBrowsing: count(stats.num_replaced_safebrowsing),
+    parental: count(stats.num_replaced_parental),
+    filters: enabled ? { lists: enabled.length, rules: enabled.reduce((sum, f) => sum + count(f.rules_count), 0) } : null,
   };
 }
 
@@ -145,11 +173,13 @@ async function adguardJson<T>(cfg: AdguardConfig, path: string): Promise<T> {
 export async function getAdguardSnapshot(
   cfg: AdguardConfig
 ): Promise<AdguardSnapshot> {
-  const [status, stats] = await Promise.all([
+  const [status, stats, filtering] = await Promise.all([
     adguardJson<RawStatus>(cfg, "/control/status"),
     adguardJson<RawStats>(cfg, "/control/stats"),
+    // Best effort: the lists are a detail, not the service's health.
+    adguardJson<RawFiltering>(cfg, "/control/filtering/status").catch(() => null),
   ]);
-  return mapAdguardSnapshot(status, stats);
+  return mapAdguardSnapshot(status, stats, filtering);
 }
 
 // Fresh reachability check for the admin's "Test connection" button. The
