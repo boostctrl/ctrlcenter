@@ -10,6 +10,7 @@ import CommandDeck from "./CommandDeck";
 import Complication from "./Complication";
 import { sinceLabel, type ServiceState } from "./state";
 import { tileContent, type GlanceVisual } from "./glances";
+import { LiveDot } from "./kit";
 import { settingsCardId } from "@/lib/nav";
 import Link from "next/link";
 import { buttonClasses } from "@/lib/buttons";
@@ -27,7 +28,10 @@ import { useNow } from "@/components/useNow";
 // types nobody has set up share one quiet row at the end. The read-only
 // depth (full lists, actions) lives on /admin/monitor/[id].
 
-const REFRESH_MS = 45_000;
+// Every few seconds (#531): each service's snapshot is only refetched once
+// its own live rate has passed (lib/monitor.ts), so a quick poll costs the
+// slow services nothing.
+const REFRESH_MS = 5_000;
 // An off tile opens its integration's settings card (#277); a type not set
 // up links to the Integrations section to add one.
 const SETTINGS = "/admin?tab=settings&section=integrations";
@@ -69,10 +73,9 @@ export default function MonitorDashboard({
   // the relative dates ("in 3d") can mismatch on hydration; set after paint
   // and on every good refresh.
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
-  // A lighter clock so the freshness label re-ticks between polls rather than
-  // sitting frozen for a whole 45s refresh window. Client-time for relative
-  // dates; null until mount, and never behind the last refresh.
-  const clock = useNow(10_000);
+  // A clock for the relative dates ("in 3d") and the freshness label.
+  // Client-time; null until mount, and never behind the last refresh.
+  const clock = useNow(5_000);
   const now = updatedAt === null ? null : Math.max(clock, updatedAt);
 
   const load = useCallback(async (signal: AbortSignal) => {
@@ -114,11 +117,13 @@ export default function MonitorDashboard({
               Live status of the services you&apos;ve connected. Only admins see this page.
             </p>
           </div>
-          {/* The freshness read, as on the integration pages, with how often
-              it refreshes; no dot here, the command deck is the verdict. */}
+          {/* The freshness read, as on the integration pages: live, and how
+              long ago the last refresh came back. */}
           {updatedAt !== null && now !== null && (
-            <span className="inline-flex shrink-0 items-center rounded-full border border-fg/10 bg-fg/5 px-3.5 py-1.5 text-xs whitespace-nowrap text-ink-55">
-              Updated {sinceLabel(now - updatedAt)} · every {REFRESH_MS / 1000}s
+            <span className="inline-flex shrink-0 items-center gap-2 rounded-full border border-fg/10 bg-fg/5 px-3.5 py-1.5 text-xs whitespace-nowrap">
+              <LiveDot state={now - updatedAt > 3 * REFRESH_MS ? "stale" : "live"} />
+              <span className="font-medium text-ink-80">Live</span>
+              <span className="text-ink-40">· updated {sinceLabel(now - updatedAt)}</span>
             </span>
           )}
         </div>

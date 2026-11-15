@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { buttonClasses } from "@/lib/buttons";
 import { Glyph } from "./glyphs";
+import { STATE_DOT, type ServiceState } from "../state";
 
 // Can't be reached, and nothing to show from before.
 export function OfflineState({
@@ -50,5 +51,18 @@ export function StaleNotice({ error, since }: { error: string | null; since: str
         {error && <span className="text-ink-55"> {error}</span>}
       </span>
     </p>
+  );
+}
+
+// The status dot, pulsing while data is flowing so the page reads as live
+// (stilled with the rest of the app's motion).
+export function LiveDot({ state }: { state: ServiceState }) {
+  return (
+    <span aria-hidden className="relative flex h-2 w-2">
+      {state === "live" && (
+        <span className={`absolute inline-flex h-full w-full rounded-full opacity-60 motion-safe:animate-ping ${STATE_DOT[state]}`} />
+      )}
+      <span className={`relative inline-flex h-2 w-2 rounded-full ${STATE_DOT[state]}`} />
+    </span>
   );
 }

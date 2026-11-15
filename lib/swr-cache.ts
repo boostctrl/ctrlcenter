@@ -32,8 +32,10 @@ type SwrState<V> = {
 
 export type SwrCache<V> = {
   // The value for `key`, loading it if needed (see the semantics above).
-  // Undefined only when nothing has ever loaded. Never rejects.
-  get(key: string, load: SwrLoader<V>): Promise<V | undefined>;
+  // Undefined only when nothing has ever loaded. Never rejects. `ttlMs`
+  // overrides the cache's own for this read, for keys that go stale at
+  // different rates (the Monitor's services, #531).
+  get(key: string, load: SwrLoader<V>, ttlMs?: number): Promise<V | undefined>;
   // The current entry without loading anything.
   peek(key: string): SwrEntry<V> | undefined;
   // Drop one key (and fence off its in-flight refresh).
@@ -78,11 +80,11 @@ export function swrCache<V>(name: string, ttlMs: number): SwrCache<V> {
   }
 
   return {
-    async get(key, load) {
+    async get(key, load, ttl = ttlMs) {
       const cached = state.entries.get(key);
       if (!cached) {
         await refresh(key, load);
-      } else if (Date.now() - cached.at >= ttlMs) {
+      } else if (Date.now() - cached.at >= ttl) {
         void refresh(key, load);
       }
       return (state.entries.get(key) ?? cached)?.value;

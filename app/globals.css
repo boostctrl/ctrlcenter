@@ -1192,6 +1192,21 @@ select optgroup {
 [data-motion="off"] .animate-beams {
   animation: none;
 }
+/* The Monitor's bars, donuts and rings move to a new value rather than
+   jump, as the live refresh brings it (#531); never with reduced motion. */
+.chart-motion {
+  transition-property: width, height, stroke-dasharray, stroke-dashoffset, stroke;
+  transition-duration: 700ms;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .chart-motion {
+    transition: none;
+  }
+}
+[data-motion="off"] .chart-motion {
+  transition: none;
+}
 /* Tailwind's own animate-ping — the status dots' pulse (StatusProvider,
    StatusTimeline) — is applied motion-safe:, so the OS preference already
    stills it; the switch and the Still level must too (#395). */

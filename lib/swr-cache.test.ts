@@ -47,6 +47,23 @@ describe("swrCache", () => {
     expect(await cache.get("k", load)).toBe("new");
   });
 
+  it("takes a read's own TTL over the cache's (#531)", async () => {
+    const cache = fresh<string>(30_000);
+    const load = vi.fn(async () => "v");
+    await cache.get("k", load, 3_000);
+    vi.advanceTimersByTime(2_999);
+    await cache.get("k", load, 3_000);
+    expect(load).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(1);
+    await cache.get("k", load, 3_000);
+    await vi.runAllTimersAsync();
+    expect(load).toHaveBeenCalledTimes(2);
+    // Without one, the cache's own still holds.
+    vi.advanceTimersByTime(5_000);
+    await cache.get("k", load);
+    expect(load).toHaveBeenCalledTimes(2);
+  });
+
   it("shares one load between concurrent cold readers", async () => {
     const cache = fresh<number>();
     const { load, resolveNext } = deferredLoader<number>();

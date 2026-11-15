@@ -19,7 +19,7 @@ import {
   type ServiceId,
   type ServiceSnapshotMap,
 } from "./services/registry";
-import { integrationLabels } from "./services/ids";
+import { integrationLabels, SERVICE_META } from "./services/ids";
 import { resolveIntegration } from "./services/resolve";
 import { ServiceError } from "./services/http";
 import { log, errorReason } from "./log";
@@ -60,8 +60,10 @@ export type MonitorEntry = {
 // Every integration, in the configured order.
 export type MonitorSnapshot = MonitorEntry[];
 
-// Snappier than the feed cache's 5 minutes — this page is "what's happening
-// right now" — while still collapsing a burst of open tabs into one fetch.
+// Each service's snapshot stays fresh for its own live rate (SERVICE_META's
+// liveMs, #531): a few seconds for qBittorrent, half a minute for Sonarr.
+// This is the default for a read that names none; it still collapses a
+// burst of open tabs into one fetch.
 const MONITOR_TTL_MS = 30_000;
 
 // Keyed `${integration id}|${fingerprint}` — the fingerprint of the config
@@ -106,7 +108,8 @@ async function serviceStatus<T>(
   urlSet: boolean,
   actionsAllowed: boolean,
   key: string,
-  fetcher: () => Promise<T>
+  fetcher: () => Promise<T>,
+  ttlMs?: number
 ): Promise<ServiceStatus<T>> {
   if (!configured) {
     forgetService(id);
@@ -123,9 +126,7 @@ async function serviceStatus<T>(
   const cacheKey = servicePrefix(id) + key;
   // A previous config's snapshots are the wrong target's now.
   forgetService(id, cacheKey);
-  const now = await snapshots.get(cacheKey, (prev) =>
-    loadSnapshot(id, fetcher, prev)
-  );
+  const now = await snapshots.get(cacheKey, (prev) => loadSnapshot(id, fetcher, prev), ttlMs);
   return {
     configured: true,
     enabled,
@@ -158,7 +159,8 @@ function statusFor(integration: Integration, actionsEnabled: boolean): Promise<S
       // Every good snapshot is a reading for the charts (#530).
       recordSnapshot(integration.id, integration.type, data);
       return data;
-    }
+    },
+    SERVICE_META[integration.type].liveMs
   );
 }
 

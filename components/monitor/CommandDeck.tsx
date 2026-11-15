@@ -89,7 +89,7 @@ function StatusCore({
                 strokeDasharray={`${(slot - gap).toFixed(2)} ${(C - slot + gap).toFixed(2)}`}
                 strokeDashoffset={(-(i * slot) - gap / 2).toFixed(2)}
                 // Red where its tile's gauge is: answering, but with trouble.
-                className={e.alert ? "text-status-down" : STATE_ARC[e.state]}
+                className={`chart-motion ${e.alert ? "text-status-down" : STATE_ARC[e.state]}`}
               />
             ))
           )}

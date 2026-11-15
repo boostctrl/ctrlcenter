@@ -7,6 +7,7 @@
 // next couple of weeks of the calendar (upcoming episodes / movie releases),
 // the most recent grabs and imports from history, and any health warnings.
 
+import { swrCache } from "../swr-cache";
 import {
   serviceBase,
   serviceRequest,
@@ -509,23 +510,40 @@ export function mapLibrary(kind: ArrKind, raw: unknown): ArrLibrary | null {
   };
 }
 
+// The library is the largest read and the slowest to change, so it's kept
+// for ten minutes while the page refreshes the rest every half minute
+// (#531). Keyed by kind and address: a stale-while-revalidate entry, so a
+// failed refresh keeps the last library.
+const libraries = swrCache<ArrLibrary>("arrLibrary", 10 * 60_000);
+async function libraryOf(kind: ArrKind, cfg: ArrConfig): Promise<ArrLibrary | null> {
+  const key = `${kind}|${serviceBase(cfg.url)}`;
+  const value = await libraries.get(key, async () => {
+    try {
+      return mapLibrary(kind, await arrJson<unknown>(kind, cfg, kind === "sonarr" ? "/api/v3/series" : "/api/v3/movie")) ?? undefined;
+    } catch {
+      return undefined;
+    }
+  });
+  return value ?? null;
+}
+
 // The detail read: the snapshot with a deeper recent history and rows that
 // link into the service, plus the queue, what's missing and the disks. Each
 // extra is best effort: one that fails leaves its section empty.
 export async function getArrDetail(kind: ArrKind, cfg: ArrConfig): Promise<ArrDetail> {
   const base = serviceBase(cfg.url);
   const include = kind === "sonarr" ? "includeSeries=true&includeEpisode=true" : "includeMovie=true";
-  const [snapshot, queueR, missingR, diskR, libraryR] = await Promise.all([
+  const [snapshot, library, queueR, missingR, diskR] = await Promise.all([
     getArrSnapshot(kind, cfg, {
       recentCap: ARR_DETAIL_RECENT_CAP,
       historyPageSize: DETAIL_HISTORY_PAGE_SIZE,
       links: true,
     }),
+    libraryOf(kind, cfg),
     ...[
       `/api/v3/queue?page=1&pageSize=${ARR_QUEUE_CAP}&${include}`,
       `/api/v3/wanted/missing?page=1&pageSize=${ARR_MISSING_CAP}&sortKey=${kind === "sonarr" ? "airDateUtc" : "digitalRelease"}&sortDirection=descending&monitored=true${kind === "sonarr" ? "&includeSeries=true" : ""}`,
       "/api/v3/diskspace",
-      kind === "sonarr" ? "/api/v3/series" : "/api/v3/movie",
     ].map((path) => arrJson<unknown>(kind, cfg, path).catch(() => null)),
   ]);
   const queue = mapQueue(kind, queueR, base);
@@ -537,7 +555,7 @@ export async function getArrDetail(kind: ArrKind, cfg: ArrConfig): Promise<ArrDe
     missing,
     missingTotal: total(missingR, missing.length),
     disks: mapDisks(diskR),
-    library: mapLibrary(kind, libraryR),
+    library,
     links: { home: base, queue: `${base}/activity/queue`, missing: `${base}/wanted/missing` },
   };
 }

@@ -593,7 +593,9 @@ export default async function HelpPage() {
             list of what needs attention, each linking to the page that
             explains it. Under it sits a tile per service.
             Services you haven&apos;t connected wait in one row at the bottom.
-            The page refreshes itself while the tab is open.
+            Everything updates live while the tab is open: every few
+            seconds for the busiest services (qBittorrent, Tautulli), up to
+            half a minute for the slower ones (Sonarr, Radarr, TrueNAS).
           </P>
           <P>
             Open a tile for that service&apos;s own page: its headline

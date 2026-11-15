@@ -150,7 +150,7 @@ function Gauge({
           cy="18"
           r="15.9155"
           fill="none"
-          className={tone}
+          className={`chart-motion ${tone}`}
           stroke="currentColor"
           strokeWidth="2.5"
           strokeLinecap="round"

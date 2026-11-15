@@ -55,7 +55,7 @@ export function DayStrip({ values, className = "h-5 gap-1" }: { values: number[]
       {values.map((v, i) => (
         <span
           key={i}
-          className={`flex-1 rounded-sm ${v > 0 ? "bg-[var(--accent-from)]" : "bg-fg/15"}`}
+          className={`chart-motion flex-1 rounded-sm ${v > 0 ? "bg-[var(--accent-from)]" : "bg-fg/15"}`}
           style={{ height: `${v > 0 ? Math.max(20, (v / max) * 100) : 12}%` }}
         />
       ))}
@@ -84,7 +84,7 @@ export function SegmentBar({
         parts.map(
           (p, i) =>
             p.value > 0 && (
-              <span key={i} className={SEGMENT_BG[p.tone]} style={{ width: `${(p.value / total) * 100}%` }} />
+              <span key={i} className={`chart-motion ${SEGMENT_BG[p.tone]}`} style={{ width: `${(p.value / total) * 100}%` }} />
             )
         )}
     </div>
@@ -97,7 +97,7 @@ export function UsageBar({ ratio, tone, className = "h-1.5" }: { ratio: number; 
   return (
     <div aria-hidden className={`w-full overflow-hidden rounded-full bg-fg/10 ${className}`}>
       <div
-        className={`h-full rounded-full ${tone ? TONE_FILL[tone] : ""}`}
+        className={`chart-motion h-full rounded-full ${tone ? TONE_FILL[tone] : ""}`}
         style={{
           width: `${pct}%`,
           ...(tone ? {} : { backgroundImage: "linear-gradient(to right, var(--accent-from), var(--accent-to))" }),
@@ -190,6 +190,7 @@ export function Donut({
                 strokeWidth="11"
                 strokeDasharray={`${Math.max(0.5, len - gap).toFixed(2)} ${(C - Math.max(0.5, len - gap)).toFixed(2)}`}
                 strokeDashoffset={(-starts[i] - gap / 2).toFixed(2)}
+                className="chart-motion"
               >
                 <title>{`${p.label}: ${p.display ?? p.value.toLocaleString()}`}</title>
               </circle>
@@ -243,7 +244,7 @@ export function BarChart({
                   (slot.values[k] ?? 0) > 0 && (
                     <span
                       key={s.label}
-                      className={k === series.length - 1 || !slot.values.slice(k + 1).some((v) => v > 0) ? "rounded-t-[4px]" : ""}
+                      className={`chart-motion ${k === series.length - 1 || !slot.values.slice(k + 1).some((v) => v > 0) ? "rounded-t-[4px]" : ""}`}
                       style={{ height: `${((slot.values[k] ?? 0) / max) * 100}%`, background: chartColor(s.color) }}
                     />
                   )

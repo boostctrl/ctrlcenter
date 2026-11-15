@@ -12,6 +12,17 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **The Monitor updates live.** The dashboard and every integration's page
+  refresh on their own, as often as each service's numbers move: every 3
+  seconds for qBittorrent, 5 for Tautulli, up to 30 for Sonarr, Radarr and
+  TrueNAS. Before, the dashboard could show numbers over a minute old until
+  the page was reloaded. Bars, donuts and rings glide to their new values
+  (not with reduced motion), and a pulsing dot says the page is live. A
+  Sonarr or Radarr library is read every ten minutes rather than with each
+  refresh. (#531)
+
 ## [3.2.0-rc.2] - 2026-11-15
 
 ### Added

@@ -46,6 +46,9 @@ export type ServiceMeta = {
   tagline: string;
   // Its logo in the icon set (dashboard-icons slug).
   icon: string;
+  // How often the Monitor refreshes it while a page is open (#531): about as
+  // often as its numbers move, and no more than it can comfortably answer.
+  liveMs: number;
 };
 
 // The Monitor face's clusters, in order: the infrastructure leads, media
@@ -65,6 +68,7 @@ export const SERVICE_META: Record<ServiceId, ServiceMeta> = {
     group: "Media",
     tagline: "Downloads",
     icon: "qbittorrent",
+    liveMs: 3_000,
   },
   sonarr: {
     label: "Sonarr",
@@ -77,6 +81,7 @@ export const SERVICE_META: Record<ServiceId, ServiceMeta> = {
     group: "Media",
     tagline: "TV series",
     icon: "sonarr",
+    liveMs: 30_000,
   },
   radarr: {
     label: "Radarr",
@@ -89,6 +94,7 @@ export const SERVICE_META: Record<ServiceId, ServiceMeta> = {
     group: "Media",
     tagline: "Movies",
     icon: "radarr",
+    liveMs: 30_000,
   },
   adguard: {
     label: "AdGuard Home",
@@ -100,6 +106,7 @@ export const SERVICE_META: Record<ServiceId, ServiceMeta> = {
     group: "Network",
     tagline: "DNS filtering",
     icon: "adguard-home",
+    liveMs: 10_000,
   },
   tautulli: {
     label: "Tautulli",
@@ -113,6 +120,7 @@ export const SERVICE_META: Record<ServiceId, ServiceMeta> = {
     group: "Media",
     tagline: "Plex activity",
     icon: "tautulli",
+    liveMs: 5_000,
   },
   seerr: {
     label: "Seerr",
@@ -127,6 +135,7 @@ export const SERVICE_META: Record<ServiceId, ServiceMeta> = {
     group: "Media",
     tagline: "Media requests",
     icon: "seerr",
+    liveMs: 30_000,
   },
   portainer: {
     label: "Portainer",
@@ -141,6 +150,7 @@ export const SERVICE_META: Record<ServiceId, ServiceMeta> = {
     group: "Storage & Containers",
     tagline: "Containers",
     icon: "portainer",
+    liveMs: 15_000,
   },
   truenas: {
     label: "TrueNAS",
@@ -153,6 +163,7 @@ export const SERVICE_META: Record<ServiceId, ServiceMeta> = {
     group: "Storage & Containers",
     tagline: "Storage",
     icon: "truenas",
+    liveMs: 30_000,
   },
   unifi: {
     label: "UniFi",
@@ -166,6 +177,7 @@ export const SERVICE_META: Record<ServiceId, ServiceMeta> = {
     group: "Network",
     tagline: "Network",
     icon: "unifi",
+    liveMs: 10_000,
   },
 };
 

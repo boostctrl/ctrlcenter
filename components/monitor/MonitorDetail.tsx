@@ -9,7 +9,7 @@ import { MonitorIntegrationContext } from "./actions";
 import Icon from "@/components/Icon";
 import { settingsCardId } from "@/lib/nav";
 import { SERVICE_META } from "@/lib/services/ids";
-import { OfflineState, StaleNotice } from "./kit";
+import { LiveDot, OfflineState, StaleNotice } from "./kit";
 import { ConfirmProvider } from "@/components/admin/Confirm";
 import ReauthDialog from "@/components/admin/ReauthDialog";
 import PageNav from "@/components/PageNav";
@@ -18,7 +18,6 @@ import { useNow } from "@/components/useNow";
 import {
   serviceState,
   sinceLabel,
-  STATE_DOT,
   type ServiceState,
 } from "./state";
 import QbittorrentDetail from "./detail/QbittorrentDetail";
@@ -37,10 +36,10 @@ import TruenasDetail from "./detail/TruenasDetail";
 // the body is picked per service from the discriminated result, each built
 // on the page kit (components/monitor/kit).
 
-const REFRESH_MS = 30_000;
-// How often the masthead's "updated Xs ago" label re-ticks between polls, so
-// the freshness read feels live without waiting a full refresh cycle.
-const CLOCK_MS = 10_000;
+// The page refreshes at its service's live rate (SERVICE_META's liveMs,
+// #531), a few seconds for qBittorrent, half a minute for Sonarr. The
+// masthead's "updated Xs ago" label re-ticks between polls.
+const CLOCK_MS = 5_000;
 
 // The masthead's live status pill: the same dot vocabulary the cockpit tiles
 // use, a one-word health read, and — while data is flowing — how long ago it
@@ -63,7 +62,7 @@ function StatusPill({
       : null;
   return (
     <span className="inline-flex items-center gap-2 rounded-full border border-fg/10 bg-fg/5 px-3.5 py-1.5 text-xs">
-      <span aria-hidden className={`h-2 w-2 rounded-full ${STATE_DOT[state]}`} />
+      <LiveDot state={state} />
       <span className="font-medium text-ink-80">{label}</span>
       {since && <span className="text-ink-40">· updated {since}</span>}
     </span>
@@ -139,7 +138,7 @@ export default function MonitorDetail({
   );
   // Seeded with server data, so the first poll waits a full interval; a card
   // action calls `refresh` to reflect its change right away.
-  const refresh = usePolling(load, REFRESH_MS, { immediate: false });
+  const refresh = usePolling(load, SERVICE_META[initial.service].liveMs, { immediate: false });
 
   useEffect(() => {
     // After paint (not synchronously) so the relative freshness label appears

@@ -29,6 +29,9 @@ export const FAKE_USER = "fake-user";
 export const FAKE_PASSWORD = "fake-password";
 
 const iso = (ms) => new Date(ms).toISOString();
+// A factor between 0.6 and 1.4 that moves smoothly over about a minute: the
+// live numbers' wobble.
+const drift = (phase = 0) => 1 + 0.4 * Math.sin(Date.now() / 9_000 + phase);
 const slug = (title) => title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 // --- Sonarr and Radarr (/api/v3) ---
@@ -238,9 +241,9 @@ function tautulli(cmd, now) {
   if (cmd === "get_activity") {
     return ok({
       stream_count: "3",
-      total_bandwidth: 31200,
+      total_bandwidth: Math.round(31200 * drift(2)),
       sessions: [
-        { friendly_name: "Alex", full_title: "Severance - Cold Harbor", state: "playing", transcode_decision: "direct play", progress_percent: "64", quality_profile: "Original", player: "Living Room", platform: "Apple TV", location: "lan" },
+        { friendly_name: "Alex", full_title: "Severance - Cold Harbor", state: "playing", transcode_decision: "direct play", progress_percent: String(Math.floor(Date.now() / 6_000) % 100), quality_profile: "Original", player: "Living Room", platform: "Apple TV", location: "lan" },
         { friendly_name: "Priya", full_title: "Dune: Part Two", state: "playing", transcode_decision: "transcode", progress_percent: "22", quality_profile: "8 Mbps 1080p", player: "Pixel 9", platform: "Android", location: "wan" },
         { friendly_name: "Jordan Lee", full_title: "The Long and Winding Chronicles of the Northern Lighthouse Keepers - The Keeper's Daughter", state: "paused", transcode_decision: "copy", progress_percent: "91", quality_profile: "Original" },
       ],
@@ -310,8 +313,8 @@ function qbittorrentMaindata() {
         state,
         progress,
         ratio: progress === 1 ? 0.4 + i * 0.37 : 0.02 * i,
-        dlspeed,
-        upspeed: state === "uploading" ? 350_000 + i * 90_000 : 0,
+        dlspeed: Math.round(dlspeed * drift(i)),
+        upspeed: state === "uploading" ? Math.round((350_000 + i * 90_000) * drift(i + 1)) : 0,
         size: (2 + i * 3.5) * GB,
         eta: dlspeed > 0 ? Math.round(((1 - progress) * (2 + i * 3.5) * GB) / dlspeed) : 8640000,
         category: ["movies", "tv", "linux", "tv", ""][i % 5],
@@ -327,8 +330,9 @@ function qbittorrentMaindata() {
     full_update: true,
     torrents,
     server_state: {
-      dl_info_speed: 17.5e6,
-      up_info_speed: 1.9e6,
+      // Speeds that drift over a minute, so a live refresh shows (#531).
+      dl_info_speed: Math.round(17.5e6 * drift()),
+      up_info_speed: Math.round(1.9e6 * drift(1)),
       dl_info_data: 48 * GB,
       up_info_data: 12 * GB,
       alltime_dl: 18.2 * TB,
