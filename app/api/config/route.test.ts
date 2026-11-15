@@ -98,7 +98,10 @@ describe("/api/config", () => {
       widgets: { id: string; url?: string }[];
     };
     expect(onDisk.settings.title).toBe("Restored");
-    expect(onDisk.integrations[0].password).toBe("hunter2");
+    // Encrypted at rest (#370), and read back as it was; a reference stays.
+    expect(onDisk.integrations[0].password).toMatch(/^enc:v1:/);
+    const { readConfigInternal } = await import("@/lib/config");
+    expect((await readConfigInternal()).integrations[0].password).toBe("hunter2");
     expect(onDisk.integrations[1].apiKey).toBe("${SONARR_KEY}");
     expect(onDisk.apps[0].pushToken).toBe("tok-123");
     expect(onDisk.widgets.find((w) => w.id === "cal")?.url).toBe("https://cal.test/private-abc/basic.ics");

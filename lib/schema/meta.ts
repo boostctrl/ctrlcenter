@@ -237,3 +237,28 @@ export function restoreAdminSecrets<T>(schema: z.ZodType, incoming: T, stored: u
   }
   return incoming;
 }
+
+// `value` with `fn` applied to every string field marked `credential`: how
+// the stored credentials are encrypted on the way to config.yaml and
+// decrypted on the way back (#370, lib/config-crypto.ts). Everything else
+// passes through as it is.
+export function mapCredentials<T>(schema: z.ZodType, value: T, fn: (v: string) => string): T {
+  const stack = layers(schema);
+  for (const s of stack) {
+    if (secretFields.get(s)?.credential) return (typeof value === "string" ? fn(value) : value) as T;
+  }
+  const base = stack[stack.length - 1];
+  if (base instanceof z.ZodUnion) {
+    const option = (base.options as z.ZodType[]).find((o) => o.safeParse(value).success);
+    return option ? mapCredentials(option, value, fn) : value;
+  }
+  const item = lenientItems.get(base) ?? (base instanceof z.ZodArray ? (base.element as z.ZodType) : null);
+  if (item && Array.isArray(value)) return value.map((v) => mapCredentials(item, v, fn)) as T;
+  if (base instanceof z.ZodObject && isPlainObject(value)) {
+    const shape = base.shape as Record<string, z.ZodType>;
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [k, shape[k] ? mapCredentials(shape[k], v, fn) : v])
+    ) as T;
+  }
+  return value;
+}

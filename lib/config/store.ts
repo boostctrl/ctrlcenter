@@ -13,6 +13,7 @@ import { recordUpgrade } from "./upgrade";
 import { writeFileAtomic } from "./files";
 import { restoreImportSecrets, mergeImportedAccounts } from "./redact";
 import { withGroups } from "../account-groups";
+import { beginKeyRotation, decryptConfig, encryptConfig, finishKeyRotation } from "../config-crypto";
 import { globalSingleton } from "../singleton";
 import { CONFIG_SCHEMA_VERSION, configSchema, configReadSchema, type Config } from "../schema";
 
@@ -119,12 +120,23 @@ async function loadMigrated(): Promise<{
   const { value, changed } = migrateConfig(parseConfigYaml(raw));
   // Lenient read: a single malformed row is dropped rather than 500-ing every
   // page on a hand-edited file (see configReadSchema). Writes/imports stay strict.
-  return { config: configReadSchema.parse(value), changed, raw };
+  // The stored credentials are decrypted here (#370), so everything past the
+  // file sees them as typed.
+  return { config: await decryptConfig(configReadSchema.parse(value)), changed, raw };
 }
 
-// What the app loads from config text (the read path above, minus the file).
+// What config text holds, as the file has it: the read path above, minus
+// the file and minus the decryption. A write is compared and checked in this
+// form, so what lands in the file is the encrypted one.
 const readConfigText = (text: string): Config =>
   configReadSchema.parse(migrateConfig(parseConfigYaml(text)).value);
+
+// The config as config.yaml holds it, credentials encrypted: for the
+// at-rest status in Settings → Security (#370).
+export async function readConfigOnDisk(): Promise<Config> {
+  await ensureConfigExists();
+  return readConfigText(await fs.readFile(CONFIG_PATH, "utf8"));
+}
 
 // loadMigrated for the read path, minus the repeat work: a page render reads
 // the config several times (layout, page, proxy, each API call), and each read
@@ -223,29 +235,29 @@ function dump(value: unknown): string {
   return YAML.dump(value, { lineWidth: 100 });
 }
 
-// Write a config. Given the file it replaces (`previous`: its text and what
-// it read as before the edit), the change is applied onto that file so its
-// comments, key order and formatting survive, and keys it leaves to their
-// defaults stay out (#279; lib/config-yaml.ts). Without one — an import,
-// whose replaced config shouldn't inherit the old file's comments — or when
-// that can't be done safely, a plain dump.
-async function writeConfig(
-  config: Config,
-  previous?: { raw: string; config: Config }
-): Promise<void> {
+// Write a config. Given the file it replaces (`previous`: its text), the
+// change is applied onto that file so its comments, key order and formatting
+// survive, and keys it leaves to their defaults stay out (#279;
+// lib/config-yaml.ts). Without one — an import, whose replaced config
+// shouldn't inherit the old file's comments — or when that can't be done
+// safely, a plain dump. Either way the credentials go in encrypted (#370):
+// the change is worked out between the file as it stands and the encrypted
+// config, so a plaintext value in the file is replaced too.
+async function writeConfig(config: Config, previous?: { raw: string }): Promise<void> {
   // Whatever version the file was read at, it's written in this build's shape.
   const validated = configSchema.parse({
     ...config,
     schemaVersion: CONFIG_SCHEMA_VERSION,
   });
+  const onDisk = await encryptConfig(validated);
   let text: string | null = null;
   if (previous) {
     // Always (re)stamp the version, even into a file that left it implicit.
-    const before: Partial<Config> = { ...previous.config };
+    const before: Partial<Config> = readConfigText(previous.raw);
     delete before.schemaVersion;
-    text = updateYamlText(previous.raw, validated, readConfigText, before);
+    text = updateYamlText(previous.raw, onDisk, readConfigText, before);
   }
-  await writeFileAtomic(CONFIG_PATH, text ?? dump(validated));
+  await writeFileAtomic(CONFIG_PATH, text ?? dump(onDisk));
 }
 
 // Thrown by an item mutator when the target id/category isn't in the config, so
@@ -276,13 +288,34 @@ export async function mutate<T>(fn: (config: Config) => T): Promise<T> {
       const original = parseConfigYaml(raw);
       await recordUpgrade(raw, original, migrateConfig(original).value);
     }
-    const before = structuredClone(config);
     const out = fn(config);
-    await writeConfig(config, { raw, config: before });
+    await writeConfig(config, { raw });
     return out;
   });
   // Keep the queue alive even if this mutation failed, but don't let one
   // rejection take down all subsequent operations.
+  writes.queue = result.catch(() => undefined);
+  return result;
+}
+
+// Save the config as it is (#370): any credential still in plaintext goes
+// in encrypted, without waiting for the next edit.
+export async function resaveConfig(): Promise<void> {
+  await mutate(() => undefined);
+}
+
+// A new encryption key for the stored credentials (#370): the config is
+// re-saved under it inside the write queue, so no other write lands between
+// the steps (lib/config-crypto.ts says why a crash between them loses
+// nothing).
+export async function rotateConfigKey(): Promise<void> {
+  const result = writes.queue.then(async () => {
+    const { config, raw } = await loadMigrated();
+    await beginKeyRotation();
+    await writeConfig(config, { raw });
+    await finishKeyRotation();
+    writes.readCache = null;
+  });
   writes.queue = result.catch(() => undefined);
   return result;
 }

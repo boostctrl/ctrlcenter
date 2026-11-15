@@ -159,7 +159,7 @@ export async function recordUpgrade(raw: string, before: unknown, after: unknown
     );
   }
   try {
-    await fs.writeFile(path.join(dir, NOTICE_NAME), JSON.stringify(summary, null, 2), "utf8");
+    await fs.writeFile(path.join(/* turbopackIgnore: true */ dir, NOTICE_NAME), JSON.stringify(summary, null, 2), "utf8");
   } catch (e) {
     log.warn("couldn't save the upgrade notice", { reason: (e as Error).message });
   }
@@ -168,7 +168,7 @@ export async function recordUpgrade(raw: string, before: unknown, after: unknown
 // The admin's upgrade banner: what the upgrade did, until dismissed.
 export async function readUpgradeNotice(): Promise<UpgradeSummary | null> {
   try {
-    const parsed = JSON.parse(await fs.readFile(path.join(configDir(), NOTICE_NAME), "utf8"));
+    const parsed = JSON.parse(await fs.readFile(path.join(/* turbopackIgnore: true */ configDir(), NOTICE_NAME), "utf8"));
     return typeof parsed === "object" && parsed !== null && typeof parsed.to === "number" ? parsed : null;
   } catch {
     return null;
@@ -176,5 +176,5 @@ export async function readUpgradeNotice(): Promise<UpgradeSummary | null> {
 }
 
 export async function dismissUpgradeNotice(): Promise<void> {
-  await fs.rm(path.join(configDir(), NOTICE_NAME), { force: true });
+  await fs.rm(path.join(/* turbopackIgnore: true */ configDir(), NOTICE_NAME), { force: true });
 }

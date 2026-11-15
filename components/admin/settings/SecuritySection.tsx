@@ -7,6 +7,7 @@ import TwoFactor from "../TwoFactor";
 import Sessions from "../Sessions";
 import SecurityChecklist from "../SecurityChecklist";
 import SecurityActivity from "../SecurityActivity";
+import StoredCredentials from "../StoredCredentials";
 
 export default function SecuritySection({
   twoFactorEnabled,
@@ -53,6 +54,13 @@ export default function SecuritySection({
         intro="Where this portal is signed in. End a session you don't recognise, or sign out everywhere else after using a shared device."
       >
         <Sessions />
+      </Card>
+
+      <Card
+        title="Stored credentials"
+        intro="The passwords, keys and tokens the portal keeps for integrations, alert channels, inbound webhooks, API widgets and calendars, encrypted in config.yaml so a copy of the file on its own gives none of them away."
+      >
+        <StoredCredentials onChange={() => setVersion((v) => v + 1)} />
       </Card>
 
       <Card

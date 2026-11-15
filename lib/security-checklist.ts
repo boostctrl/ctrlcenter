@@ -14,6 +14,8 @@ import { persistedSessionSecret } from "./session-secret";
 import { getIdleHours, listSessions, sessionsPersisted } from "./sessions";
 import { TRUSTED_PROXY_HOPS, productionEntry } from "./rate-limit";
 import { NO_PASSWORD_MESSAGE } from "./auth";
+import { credentialStatus, type CredentialStatus } from "./config-crypto";
+import { readConfigOnDisk } from "./config";
 
 export type ChecklistLevel = "ok" | "warn" | "bad";
 
@@ -46,6 +48,9 @@ export type SecurityFacts = {
   // The labels of the integrations with "Allow actions from the dashboard" on.
   actionsOn: string[];
   idleHours: number;
+  // The credentials in config.yaml (#370): where the key comes from, and how
+  // many are encrypted, still plaintext, or under a key that isn't here.
+  credentials: CredentialStatus;
 };
 
 // A loopback or private-range address — one a plain-HTTP sign-in from is a
@@ -183,6 +188,38 @@ export function securityChecklist(f: SecurityFacts): ChecklistRow[] {
         }
   );
 
+  const c = f.credentials;
+  const n = (k: number) => `${k} stored credential${k === 1 ? "" : "s"}`;
+  rows.push(
+    c.unreadable > 0
+      ? {
+          id: "credentials",
+          level: "bad",
+          title: "Stored credentials",
+          detail: `${n(c.unreadable)} can't be opened with the current key, so ${c.unreadable === 1 ? "it doesn't" : "they don't"} work. Bring back the key ${c.unreadable === 1 ? "it was" : "they were"} saved with (config.key, or CONFIG_KEY as CONFIG_KEY_PREVIOUS), or enter ${c.unreadable === 1 ? "it" : "them"} again.`,
+        }
+      : c.source === "none"
+        ? {
+            id: "credentials",
+            level: "warn",
+            title: "Stored credentials",
+            detail: "Kept in plaintext: the config volume can't hold an encryption key. Set CONFIG_KEY, or make the volume writable.",
+          }
+        : c.plaintext > 0
+          ? {
+              id: "credentials",
+              level: "warn",
+              title: "Stored credentials",
+              detail: `${n(c.plaintext)} still in plaintext in config.yaml, encrypted at the next save. Encrypt them now below.`,
+            }
+          : {
+              id: "credentials",
+              level: "ok",
+              title: "Stored credentials",
+              detail: `Encrypted in config.yaml with ${c.source === "env" ? "the key in CONFIG_KEY" : "a key kept in config.key beside it"}.`,
+            }
+  );
+
   rows.push(
     f.sessionsPersisted
       ? { id: "sessions", level: "ok", title: "Session list", detail: "Kept in the config volume, so ending a session survives a restart." }
@@ -252,5 +289,6 @@ export async function collectSecurityFacts(
         : (await listSessions()).map((s) => ({ ip: s.ip, https: s.https, forwarded: s.forwarded })),
     actionsOn: config.integrations.filter((i) => i.allowActions).map((i) => labels[i.id]),
     idleHours: await getIdleHours(),
+    credentials: await credentialStatus(await readConfigOnDisk()),
   };
 }

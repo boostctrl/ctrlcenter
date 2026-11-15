@@ -44,6 +44,8 @@ export const SECURITY_EVENT_KINDS = [
   "password.reset",
   // A group added, renamed or removed (#505); `detail` says which.
   "group.changed",
+  // The key the stored credentials are encrypted with, replaced (#370).
+  "key.rotated",
 ] as const;
 export type SecurityEventKind = (typeof SECURITY_EVENT_KINDS)[number];
 
@@ -110,7 +112,7 @@ function storePath(): string {
   const configPath =
     process.env.CONFIG_PATH ||
     path.join(/* turbopackIgnore: true */ process.cwd(), "config", "config.yaml");
-  return path.join(path.dirname(configPath), FILE_NAME);
+  return path.join(/* turbopackIgnore: true */ path.dirname(configPath), FILE_NAME);
 }
 
 function isEvent(v: unknown): v is SecurityEvent {

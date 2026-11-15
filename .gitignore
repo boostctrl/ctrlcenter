@@ -43,8 +43,9 @@ next-env.d.ts
 
 # runtime data written into the config dir: the live config (real credentials),
 # its safety snapshot (written before an import or the one-time 2.0 shape
-# migration), uptime history, uploaded icons, the cached CDN icons, and the
-# generated session-signing secret. A sample is tracked as
+# migration), uptime history, uploaded icons, the cached CDN icons, the
+# generated session-signing secret, and the key the stored credentials are
+# encrypted with (#370). A sample is tracked as
 # config/config.example.yaml; the app creates config.yaml on first run.
 /config/config.yaml
 /config/config.yaml.bak
@@ -53,6 +54,8 @@ next-env.d.ts
 /config/uploads/
 /config/icons/
 /config/session-secret
+/config/config.key
+/config/config.key.new
 /config/sessions.json
 /config/security-events.jsonl
 /config/webhook-digest.json

@@ -28,6 +28,22 @@ here.
 - **The Add an account form fits a phone again.** Its fields ran off the
   right edge of the card at phone width. (#553)
 
+### Security
+
+- **Stored credentials are encrypted in config.yaml.** Integration
+  passwords and API keys, alert channel tokens and webhook addresses,
+  inbound webhook tokens, API widget header values, and the SMTP and
+  calendar passwords are now written encrypted, so a copy of the file on
+  its own gives none of them away. The key is `CONFIG_KEY` when
+  you set one, otherwise a random key kept in `config.key` beside the
+  config; back the two up together. Credentials already in the file are
+  encrypted at the next save, or at once with **Encrypt now** in
+  Settings → Security, where **Replace key** also saves them again under a
+  new key and a checklist row reports how many are encrypted. `${NAME}`
+  references stay readable. **Before going back to an older version,
+  export a backup with secrets:** older versions can't read the encrypted
+  values. (#370)
+
 ## [3.2.1] - 2026-11-15
 
 ### Added

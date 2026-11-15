@@ -30,7 +30,9 @@ function secretPath(): string {
   const configPath =
     process.env.CONFIG_PATH ||
     path.join(/* turbopackIgnore: true */ process.cwd(), "config", "config.yaml");
-  return path.join(path.dirname(configPath), FILE_NAME);
+  // Marked too: unmarked, the build matched the file name against the
+  // project and would ship a dev checkout's config/session-secret.
+  return path.join(/* turbopackIgnore: true */ path.dirname(configPath), FILE_NAME);
 }
 
 async function loadOrCreate(file: string): Promise<string | null> {

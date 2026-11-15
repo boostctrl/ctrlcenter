@@ -35,6 +35,7 @@ const LABEL: Record<SecurityEventKind, string> = {
   "account.deleted": "Account removed",
   "password.reset": "Password reset for an account",
   "group.changed": "Group changed",
+  "key.rotated": "Encryption key for stored credentials replaced",
 };
 
 // The entries that mean something went wrong, or that reshape the account.

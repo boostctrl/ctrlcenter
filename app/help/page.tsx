@@ -1142,9 +1142,26 @@ export default async function HelpPage() {
             what the app can see of your deployment — the second factor,
             where the password comes from, whether sign-ins arrive over
             HTTPS and through the proxy you configured, the session secret,
-            dashboard actions and the idle timeout — each green, amber or red
-            with the fix. Clear the red rows before putting the portal on a
-            public port; they are also logged when the server starts.
+            the stored credentials, dashboard actions and the idle timeout —
+            each green, amber or red with the fix. Clear the red rows before
+            putting the portal on a public port; they are also logged when the
+            server starts.
+          </P>
+          <P>
+            <strong>Stored credentials</strong> — the passwords, keys and
+            tokens kept for integrations, alert channels, inbound webhooks,
+            API widgets and calendars — are
+            encrypted in <Code>config.yaml</Code>, so a copy of the file on its
+            own gives none of them away. The key is <Code>CONFIG_KEY</Code> when
+            you set one, otherwise a random key kept in{" "}
+            <Code>config.key</Code> beside the config: back the two up
+            together. <strong>Encrypt now</strong> encrypts any still in
+            plaintext (a value typed into the file by hand works, and is
+            encrypted at the next save), and <strong>Replace key</strong> saves
+            every credential again under a new key. A <Code>{"${NAME}"}</Code>{" "}
+            reference stays as it is. An older version of ctrlcenter can&apos;t
+            read the encrypted values: export a backup with secrets before
+            going back to one.
           </P>
         </Card>
 

@@ -159,7 +159,7 @@ function spoolPath(): string {
   const configPath =
     process.env.CONFIG_PATH ||
     path.join(/* turbopackIgnore: true */ process.cwd(), "config", "config.yaml");
-  return path.join(path.dirname(configPath), FILE_NAME);
+  return path.join(/* turbopackIgnore: true */ path.dirname(configPath), FILE_NAME);
 }
 
 function scheduleSpool(): void {

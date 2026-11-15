@@ -124,7 +124,7 @@ function historyDir(): string {
 // The database for the current CONFIG_PATH, opened on first use. Throws when
 // it can't be opened (unwritable directory, a newer schema, a damaged file).
 function historyDb(): DatabaseSync {
-  const file = path.join(historyDir(), HISTORY_DB);
+  const file = path.join(/* turbopackIgnore: true */ historyDir(), HISTORY_DB);
   if (state.db?.file === file) return state.db.handle;
   state.db?.handle.close();
   state.db = undefined;
@@ -188,7 +188,7 @@ async function readHistory(): Promise<void> {
       return;
     }
     // A damaged file can't be read by anyone: set it aside, start afresh.
-    const file = path.join(historyDir(), HISTORY_DB);
+    const file = path.join(/* turbopackIgnore: true */ historyDir(), HISTORY_DB);
     state.db?.handle.close();
     state.db = undefined;
     const aside = `${file}.damaged-${Date.now()}`;
@@ -225,7 +225,7 @@ async function readHistory(): Promise<void> {
 function loadReadOnly(): boolean {
   let db: DatabaseSync;
   try {
-    db = openHistoryDbReadOnly(path.join(historyDir(), HISTORY_DB));
+    db = openHistoryDbReadOnly(path.join(/* turbopackIgnore: true */ historyDir(), HISTORY_DB));
   } catch {
     return false;
   }
@@ -340,7 +340,7 @@ async function importLegacyOnce(db: DatabaseSync): Promise<void> {
   let rows: HistoryRows = { buckets: [], readings: [], downSince: [], outages: [] };
   let found = false;
   try {
-    const raw = await fs.readFile(path.join(historyDir(), LEGACY_HISTORY_FILE), "utf8");
+    const raw = await fs.readFile(path.join(/* turbopackIgnore: true */ historyDir(), LEGACY_HISTORY_FILE), "utf8");
     rows = parseLegacyHistory(JSON.parse(raw), Date.now());
     found = true;
   } catch {

@@ -13,6 +13,7 @@ const GREEN: SecurityFacts = {
   sessions: [{ ip: "203.0.113.9", https: true, forwarded: true }],
   actionsOn: [],
   idleHours: 24,
+  credentials: { source: "file", encrypted: 3, plaintext: 0, unreadable: 0 },
 };
 
 const row = (facts: Partial<SecurityFacts>, id: string) => {
@@ -24,7 +25,7 @@ const row = (facts: Partial<SecurityFacts>, id: string) => {
 describe("securityChecklist (#367)", () => {
   it("is all green for a hardened deployment", () => {
     const rows = securityChecklist(GREEN);
-    expect(rows.map((r) => r.id)).toEqual(["totp", "password", "https", "proxy", "secret", "sessions", "actions", "idle"]);
+    expect(rows.map((r) => r.id)).toEqual(["totp", "password", "https", "proxy", "secret", "credentials", "sessions", "actions", "idle"]);
     expect(rows.every((r) => r.level === "ok")).toBe(true);
   });
 
@@ -133,6 +134,16 @@ describe("securityChecklist (#367)", () => {
       level: "bad",
       detail: expect.stringContaining("SESSION_SECRET"),
     });
+  });
+
+  it("grades the stored credentials at rest (#370)", () => {
+    const of = (credentials: Partial<SecurityFacts["credentials"]>) =>
+      row({ credentials: { ...GREEN.credentials, ...credentials } }, "credentials");
+    expect(of({}).detail).toContain("config.key");
+    expect(of({ source: "env" })).toMatchObject({ level: "ok", detail: expect.stringContaining("CONFIG_KEY") });
+    expect(of({ plaintext: 2 })).toMatchObject({ level: "warn", detail: expect.stringContaining("2 stored credentials still in plaintext") });
+    expect(of({ source: "none", encrypted: 0, plaintext: 2 })).toMatchObject({ level: "warn", detail: expect.stringContaining("can't hold") });
+    expect(of({ unreadable: 1 })).toMatchObject({ level: "bad", detail: expect.stringContaining("1 stored credential can't be opened") });
   });
 
   it("warns when the session list can't be persisted", () => {
