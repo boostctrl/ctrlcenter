@@ -44,7 +44,9 @@ describe("POST /api/login per account (#423)", () => {
     expect(sam?.lastSignInAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
-  it("refuses further wrong guesses for one account once its budget is spent, from any address, and says so once", async () => {
+  // Some forty password checks, each a deliberately slow hash: on a loaded
+  // machine that ran past vitest's 5 s default (#447).
+  it("refuses further wrong guesses for one account once its budget is spent, from any address, and says so once", { timeout: 30_000 }, async () => {
     const { PER_ACCOUNT_MAX_ATTEMPTS } = await import("@/lib/login-throttle");
     // Four per address, so no client trips its own lockout first; one wrong
     // guess for Sam was already made above.

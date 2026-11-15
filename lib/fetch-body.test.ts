@@ -42,9 +42,11 @@ describe("fetchWithTimeout", () => {
     expect(errorReason(err)).toBe("timeout");
   });
 
+  // The budget leaves the headers room to arrive on a loaded machine: at
+  // 50 ms they sometimes didn't, and the fetch itself aborted (#447).
   it("keeps the budget running through the body read", async () => {
     const url = await hangingServer(true);
-    const res = await fetchWithTimeout(url, {}, 50);
+    const res = await fetchWithTimeout(url, {}, 500);
     expect(res.status).toBe(200);
     const err = await res.text().catch((e) => e);
     expect(err.name).toBe("AbortError");
