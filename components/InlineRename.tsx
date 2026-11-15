@@ -83,7 +83,7 @@ export function RenameField({
           cancelled.current = false;
           return;
         }
-        onCommit(e.target.value);
+        onCommit(e.target.value.trim());
       }}
       className={className}
     />

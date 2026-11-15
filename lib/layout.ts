@@ -166,8 +166,10 @@ function coerceSpace(v: unknown): WidgetSpace | undefined {
 // The arrangement to render (#297): the saved rows in order, each bound to its
 // instance, then every instance no row places, appended hidden (the editor's
 // tray, where a widget added in Settings waits to be shown). A row naming an
-// instance that's gone, or one already placed, is skipped. Bad placement
-// values fall back to the type's defaults. Pure.
+// instance that's gone, or one already placed, is skipped. A bad span falls
+// back to the type's default; a missing or bad `hidden` means shown, not the
+// type's default, since the row places it (only a hand-edited file has such
+// a row); the other placement values are left out when bad. Pure.
 export function resolveLayout(
   sections: readonly Partial<Record<keyof LayoutSectionRow, unknown>>[] | undefined,
   instances: readonly { id: string; type: WidgetType }[]

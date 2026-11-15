@@ -380,8 +380,8 @@ export function useThemeDraft(promote?: { siteMode: "system" | "light" | "dark" 
   // failed write surfaces the same storage-blocked notice the save path uses.
   // RenameField suppresses the commit on an Escape cancel, so this only runs on
   // a real commit.
-  function commitRename(id: string, value: string) {
-    const next = value.trim();
+  // `next` comes trimmed from RenameField.
+  function commitRename(id: string, next: string) {
     if (next) setSaveFailed(!renameNamedTheme(id, next));
     setRenamingId(null);
   }

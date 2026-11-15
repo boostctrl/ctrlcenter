@@ -129,8 +129,8 @@ function OutageRow({
     setEditing(true);
   };
 
-  const commit = async (raw: string) => {
-    const note = raw.trim();
+  // `note` comes trimmed from RenameField.
+  const commit = async (note: string) => {
     setEditing(false);
     if (note === (outage.note ?? "")) return;
     if (note === "") {

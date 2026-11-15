@@ -225,8 +225,8 @@ export default function BookmarksManager({
   // write. RenameField suppresses the commit on an Escape cancel, so this only
   // runs on a real commit — and the confirm dialog ignores the Enter that
   // opened it (#146), so no local keystroke guard is needed here.
-  async function commitRename(id: string, value: string) {
-    const to = value.trim();
+  // `to` comes trimmed from RenameField.
+  async function commitRename(id: string, to: string) {
     const current = groups.find((g) => g.id === id);
     if (!current || !to || to === current.name) {
       setRenamingGroup(null);
