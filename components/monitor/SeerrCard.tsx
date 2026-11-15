@@ -18,7 +18,7 @@ import { useMonitorAction } from "./actions";
 // Approve and Deny (deny confirmed first).
 
 // The relative "added" label depends on the viewer's clock, so it renders
-// only after mount to avoid a hydration mismatch (matches ArrCard).
+// only after mount to avoid a hydration mismatch.
 const subscribeNever = () => () => {};
 function useMounted(): boolean {
   return useSyncExternalStore(

@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { STATE_DOT, type ServiceState } from "./MonitorCard";
-import type { GlanceVisual, SegmentTone } from "./glances";
+import type { GlanceVisual } from "./glances";
+import { DayStrip, SegmentBar, Sparkline } from "./kit/charts";
 
 // One service's complication on the Monitor face (#208, #223, #226): a compact
 // clickable tile with a headline on the left — a ring gauge where a real
@@ -184,87 +185,8 @@ function NumberBadge({
   );
 }
 
-const SEGMENT_BG: Record<SegmentTone, string> = {
-  pending: "bg-status-warning/80",
-  processing: "bg-status-info/70",
-  available: "bg-status-up/70",
-};
-
-// The purposeful bottom visual, chosen per service so it always means something.
 function Visual({ visual }: { visual: GlanceVisual }) {
-  if (visual.kind === "spark") return <Sparkline data={visual.values} />;
-  if (visual.kind === "days") return <DayStrip values={visual.values} />;
-  return <SegmentBar parts={visual.parts} />;
-}
-
-// A minimal trend line for a per-unit series (AdGuard query volume). Normalized
-// to its own max and drawn full-width under the readouts.
-function Sparkline({ data }: { data: number[] }) {
-  const pts = data.slice(-32);
-  const max = Math.max(...pts, 1);
-  const w = 100;
-  const h = 18;
-  const step = pts.length > 1 ? w / (pts.length - 1) : w;
-  const points = pts
-    .map((v, i) => `${(i * step).toFixed(1)},${(h - (v / max) * h).toFixed(1)}`)
-    .join(" ");
-  return (
-    <svg
-      viewBox={`0 0 ${w} ${h}`}
-      preserveAspectRatio="none"
-      aria-hidden
-      className="mt-1.5 h-4 w-full text-[var(--accent-from)]"
-    >
-      <polyline
-        points={points}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        vectorEffect="non-scaling-stroke"
-      />
-    </svg>
-  );
-}
-
-// A next-7-days bar strip (Sonarr/Radarr upcoming): one bar per day, height by
-// count; empty days are a faint baseline so the cadence reads at a glance.
-function DayStrip({ values }: { values: number[] }) {
-  const max = Math.max(...values, 1);
-  return (
-    <div aria-hidden className="mt-1.5 flex h-5 items-end gap-1">
-      {values.map((v, i) => (
-        <span
-          key={i}
-          className={`flex-1 rounded-sm ${v > 0 ? "bg-[var(--accent-from)]" : "bg-fg/15"}`}
-          style={{ height: `${v > 0 ? Math.max(20, (v / max) * 100) : 12}%` }}
-        />
-      ))}
-    </div>
-  );
-}
-
-// A stacked breakdown bar (Seerr pending/processing/available). A thin rail with
-// a colored segment per bucket, sized by share; an all-zero total shows the rail.
-function SegmentBar({ parts }: { parts: { value: number; tone: SegmentTone }[] }) {
-  const total = parts.reduce((sum, p) => sum + p.value, 0);
-  return (
-    <div
-      aria-hidden
-      className="mt-2 flex h-1.5 w-full overflow-hidden rounded-full bg-fg/10"
-    >
-      {total > 0 &&
-        parts.map(
-          (p, i) =>
-            p.value > 0 && (
-              <span
-                key={i}
-                className={SEGMENT_BG[p.tone]}
-                style={{ width: `${(p.value / total) * 100}%` }}
-              />
-            )
-        )}
-    </div>
-  );
+  if (visual.kind === "spark") return <Sparkline data={visual.values} className="mt-1.5 h-4 w-full" />;
+  if (visual.kind === "days") return <DayStrip values={visual.values} className="mt-1.5 h-5 gap-1" />;
+  return <SegmentBar parts={visual.parts} className="mt-2 h-1.5" />;
 }

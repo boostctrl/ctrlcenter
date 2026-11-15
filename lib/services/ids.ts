@@ -42,6 +42,10 @@ export type ServiceMeta = {
   insecureTls?: boolean;
   // The Monitor face's cluster.
   group: (typeof MONITOR_GROUPS)[number];
+  // What the service is, in a few words, under its name on its page (#508).
+  tagline: string;
+  // Its logo in the icon set (dashboard-icons slug).
+  icon: string;
 };
 
 // The Monitor face's clusters, in order: the infrastructure leads, media
@@ -59,6 +63,8 @@ export const SERVICE_META: Record<ServiceId, ServiceMeta> = {
     legacyEnv: "CTRLCENTER_QBITTORRENT_PASS",
     actions: true,
     group: "Media",
+    tagline: "Downloads",
+    icon: "qbittorrent",
   },
   sonarr: {
     label: "Sonarr",
@@ -69,6 +75,8 @@ export const SERVICE_META: Record<ServiceId, ServiceMeta> = {
     keyHint: "Sonarr → Settings → General → API Key.",
     legacyEnv: "CTRLCENTER_SONARR_KEY",
     group: "Media",
+    tagline: "TV series",
+    icon: "sonarr",
   },
   radarr: {
     label: "Radarr",
@@ -79,6 +87,8 @@ export const SERVICE_META: Record<ServiceId, ServiceMeta> = {
     keyHint: "Radarr → Settings → General → API Key.",
     legacyEnv: "CTRLCENTER_RADARR_KEY",
     group: "Media",
+    tagline: "Movies",
+    icon: "radarr",
   },
   adguard: {
     label: "AdGuard Home",
@@ -88,6 +98,8 @@ export const SERVICE_META: Record<ServiceId, ServiceMeta> = {
     placeholder: "http://192.168.1.10:3000",
     legacyEnv: "CTRLCENTER_ADGUARD_PASS",
     group: "Network",
+    tagline: "DNS filtering",
+    icon: "adguard-home",
   },
   tautulli: {
     label: "Tautulli",
@@ -99,6 +111,8 @@ export const SERVICE_META: Record<ServiceId, ServiceMeta> = {
     keyHint: "Tautulli → Settings → Web Interface → API Key.",
     legacyEnv: "CTRLCENTER_TAUTULLI_KEY",
     group: "Media",
+    tagline: "Plex activity",
+    icon: "tautulli",
   },
   seerr: {
     label: "Seerr",
@@ -111,6 +125,8 @@ export const SERVICE_META: Record<ServiceId, ServiceMeta> = {
     legacyEnv: "CTRLCENTER_SEERR_KEY",
     actions: true,
     group: "Media",
+    tagline: "Media requests",
+    icon: "seerr",
   },
   portainer: {
     label: "Portainer",
@@ -123,6 +139,8 @@ export const SERVICE_META: Record<ServiceId, ServiceMeta> = {
     legacyEnv: "CTRLCENTER_PORTAINER_KEY",
     actions: true,
     group: "Storage & Containers",
+    tagline: "Containers",
+    icon: "portainer",
   },
   truenas: {
     label: "TrueNAS",
@@ -133,6 +151,8 @@ export const SERVICE_META: Record<ServiceId, ServiceMeta> = {
     keyHint: "TrueNAS → Settings → API Keys → Add.",
     legacyEnv: "CTRLCENTER_TRUENAS_KEY",
     group: "Storage & Containers",
+    tagline: "Storage",
+    icon: "truenas",
   },
   unifi: {
     label: "UniFi",
@@ -144,6 +164,8 @@ export const SERVICE_META: Record<ServiceId, ServiceMeta> = {
     legacyEnv: "CTRLCENTER_UNIFI_PASS",
     insecureTls: true,
     group: "Network",
+    tagline: "Network",
+    icon: "unifi",
   },
 };
 

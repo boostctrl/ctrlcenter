@@ -12,6 +12,19 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **Integration pages on the Monitor have a new header and offline page.**
+  Each opens with the service's logo, name and what it is, beside its live
+  status. A service that can't be reached fills the page with what's wrong
+  and a link to its settings, and a refresh that fails keeps showing the last
+  data, marked stale, instead of emptying the page. (#508)
+
+- **The Sonarr and Radarr pages are redesigned.** Headline numbers across
+  the top (what's next, this week's grabs and imports, health, the last
+  import), health checks listed most severe first, the next two weeks by
+  date, and recent activity with the rest a click away. (#510)
+
 ## [3.1.3] - 2026-11-14
 
 ### Added

@@ -302,7 +302,9 @@ function arrGlance(d: ServiceSnapshotMap["sonarr"], now: number | null): Glance 
 // board tiles left at "Only me"). lib/widgets/integration-tiles.test.ts holds
 // every type to this with snapshots full of identifying strings.
 
-const days7 = (d: ServiceSnapshotMap["sonarr"], now: number | null): { thisWeek: number; values: number[] } => {
+// Grabs and imports per day over the last week, oldest first, and their sum:
+// the tile's strip and the integration page's (#508). Empty until mounted.
+export const arrWeek = (d: ServiceSnapshotMap["sonarr"], now: number | null): { thisWeek: number; values: number[] } => {
   const values = Array<number>(7).fill(0);
   let thisWeek = 0;
   if (now != null) {
@@ -320,7 +322,7 @@ const days7 = (d: ServiceSnapshotMap["sonarr"], now: number | null): { thisWeek:
 };
 
 const arrPublic = (d: ServiceSnapshotMap["sonarr"], now: number | null): Glance => {
-  const { thisWeek, values } = days7(d, now);
+  const { thisWeek, values } = arrWeek(d, now);
   return {
     center: String(thisWeek),
     caption: "this week",

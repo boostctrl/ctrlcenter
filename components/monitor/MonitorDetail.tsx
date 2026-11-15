@@ -6,6 +6,10 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import type { DetailResult } from "@/lib/monitor-detail";
 import type { ServiceStatus } from "@/lib/monitor";
 import { MonitorIntegrationContext } from "./actions";
+import Icon from "@/components/Icon";
+import { settingsCardId } from "@/lib/nav";
+import { SERVICE_META } from "@/lib/services/ids";
+import { OfflineState, StaleNotice } from "./kit";
 import { ConfirmProvider } from "@/components/admin/Confirm";
 import ReauthDialog from "@/components/admin/ReauthDialog";
 import PageNav from "@/components/PageNav";
@@ -22,7 +26,7 @@ import QbittorrentDetail from "./detail/QbittorrentDetail";
 import AdguardDetail from "./detail/AdguardDetail";
 import TautulliDetail from "./detail/TautulliDetail";
 import UnifiDetail from "./detail/UnifiDetail";
-import ArrCard from "./ArrCard";
+import ArrDetail from "./detail/ArrDetail";
 import SeerrCard from "./SeerrCard";
 import PortainerCard from "./PortainerCard";
 import TruenasCard from "./TruenasCard";
@@ -99,9 +103,8 @@ function renderBody(result: DetailResult, refresh: () => void): ReactNode {
         />
       );
     case "sonarr":
-      return <ArrCard title={result.label} status={asStatus(result)} />;
     case "radarr":
-      return <ArrCard title={result.label} status={asStatus(result)} />;
+      return result.data && <ArrDetail kind={result.service} data={result.data} />;
     case "adguard":
       return <AdguardDetail status={asStatus(result)} />;
     case "tautulli":
@@ -140,6 +143,12 @@ export default function MonitorDetail({
         if (!res.ok) return; // keep the last result; the body shows its own errors
         const next = (await res.json()) as DetailResult;
         if (signal.aborted) return;
+        // A failed refresh keeps what the page already shows, marked stale
+        // (#508), rather than blanking a page that was fine a moment ago.
+        if (next.data === null) {
+          setResult((prev) => (prev.data === null ? next : ({ ...prev, error: next.error } as DetailResult)));
+          return;
+        }
         setResult(next);
         setUpdatedAt(Date.now());
       } catch {
@@ -170,35 +179,60 @@ export default function MonitorDetail({
     error: result.error,
   });
 
+  const meta = SERVICE_META[result.service];
+  const settingsHref = `/admin?tab=settings&section=integrations#${settingsCardId(result.label)}`;
   return (
     <ConfirmProvider>
       {/* "Confirm it's you" for the destructive actions (#366). */}
       <ReauthDialog />
       <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-6 px-6 pt-12 pb-24 sm:px-10 lg:pt-16">
-        {/* The detail masthead: breadcrumb, then the service name paired with a
-            live status pill, so every service opens on the same designed header
-            instead of a bare title over an empty band. */}
-        <div className="flex flex-col gap-4">
+        {/* The page header (#508): the way back, then the service's logo,
+            name and what it is, with the live status pill across from them. */}
+        <div className="flex flex-col gap-5">
           <div>
             <PageNav current={null} {...nav} />
-            {/* Breadcrumb back to the cockpit — a plain text link, no arrow. */}
-            <Link
-              href="/admin/monitor"
-              className="mt-3 inline-block text-sm text-ink-50 transition-colors hover:text-ink-80"
-            >
-              Monitor
-            </Link>
+            <nav aria-label="Breadcrumb" className="mt-3 text-sm text-ink-50">
+              <Link href="/admin/monitor" className="transition-colors hover:text-ink-80">
+                Monitor
+              </Link>
+              <span aria-hidden className="mx-2 text-ink-30">/</span>
+              <span aria-current="page" className="text-ink-70">
+                {result.label}
+              </span>
+            </nav>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-            <h1 className="text-3xl font-bold">{result.label}</h1>
+            <div className="flex min-w-0 items-center gap-4">
+              <span className="glass-card flex h-14 w-14 shrink-0 items-center justify-center [--surface-lift:0px]">
+                <Icon icon={meta.icon} name={meta.label} size={30} />
+              </span>
+              <div className="min-w-0">
+                <h1 className="truncate text-3xl font-bold tracking-tight">{result.label}</h1>
+                <p className="text-sm text-ink-50">
+                  {result.label === meta.label ? meta.tagline : `${meta.label} · ${meta.tagline}`}
+                </p>
+              </div>
+            </div>
             <StatusPill state={state} updatedAt={updatedAt} now={now} />
           </div>
         </div>
-        <InDetailContext.Provider value={true}>
-          <MonitorIntegrationContext.Provider value={id}>
-            {renderBody(result, refresh)}
-          </MonitorIntegrationContext.Provider>
-        </InDetailContext.Provider>
+        {result.data === null ? (
+          <OfflineState label={result.label} error={result.error} settingsHref={settingsHref} />
+        ) : (
+          <>
+            {result.error && (
+              <StaleNotice
+                error={result.error}
+                since={updatedAt !== null && now !== null ? sinceLabel(now - updatedAt) : null}
+              />
+            )}
+            <InDetailContext.Provider value={true}>
+              <MonitorIntegrationContext.Provider value={id}>
+                {renderBody(result, refresh)}
+              </MonitorIntegrationContext.Provider>
+            </InDetailContext.Provider>
+          </>
+        )}
       </main>
     </ConfirmProvider>
   );
