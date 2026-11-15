@@ -912,7 +912,12 @@ async function sizedCells(ctx) {
 // times only every ten, and ResizeObserver callbacks and keyboard-scroll
 // animation steps run with those updates, so no step sleeps a fixed time:
 // each waits for a frame (nextFrame, untilFrame) or polls for its outcome
-// frame by frame (eventually), with a minute's budget. Keyboard scrolling is
+// frame by frame (eventually), with a minute's budget. On CI's runners a
+// frame comes far sooner (each wait 0.2–0.7 s, a scheme 8–16 s, over the
+// first runs in 3.2.0), but the minute stays for slower hosts, where single
+// frames took 24 s; it only costs time once a step has already failed
+// (#448). The shadow diff below has been 3.2–3.6 (dark) and 24–27 (light)
+// against its 0.5 threshold. Keyboard scrolling is
 // animated for as long as the key is held, so an arrow key is held until a
 // frame has run the animation; End chains to the page once the card is at
 // its bottom, so Home goes first. Only page errors count: the browser's

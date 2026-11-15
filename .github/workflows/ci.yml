@@ -37,7 +37,10 @@ jobs:
   # The sized-cell keyboard contract (#355) and clip-box geometry (#354) in
   # WebKit, Safari's engine, where they differ from Chromium (#430): the same
   # build, driven by scripts/smoke.mjs with SMOKE_BROWSER=webkit. Its own job,
-  # so the Chromium run above stays as long as it is.
+  # so the Chromium run above stays as long as it is. It builds for itself
+  # rather than taking verify's output: the build is ~30 s of a ~2 min job
+  # that runs beside verify (6–12 min), and waiting on verify's artifact
+  # would add a minute or two to every run to save those seconds (#448).
   smoke-webkit:
     runs-on: ubuntu-latest
     steps:
