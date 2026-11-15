@@ -1,6 +1,6 @@
 ---
 name: new-scene
-description: Add a new scene (animated or still backdrop) to the theme builder, or change what an existing scene id renders. Walks every registry a scene touches (ids, component, swatch, CSS stilling lists, counts in tests/README/help), the motion and colour contracts, and the smoke coverage. Candidates live in tracker issue #348.
+description: Add a new scene (animated or still backdrop) to the theme builder, or change what an existing scene id renders. Walks every registry a scene touches (ids, component, swatch, CSS stilling lists, counts in tests/README/help), the motion and colour contracts, and the smoke coverage. Unscheduled ideas live in the backlog tracker, issue #284.
 ---
 
 # Add a scene
@@ -135,4 +135,5 @@ nor the help page states a pack count).
 
 - CHANGELOG entry under `## [Unreleased]`, written for end users (what the
   scene looks like), with the issue reference (`(#NN)`). File and label the
-  issue first if it doesn't exist; check tracker #348.
+  issue first if it doesn't exist; check the backlog tracker #284, and
+  check the idea off there with a link to its issue.

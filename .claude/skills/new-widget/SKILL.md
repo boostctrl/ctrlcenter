@@ -1,6 +1,6 @@
 ---
 name: new-widget
-description: Add a new widget type to the home-page dashboard grid, or change what an existing widget id renders. Walks the widget registries (metadata, renderer, data loader, admin editor, help) and the config-migration traps. Candidates live in tracker issue #79.
+description: Add a new widget type to the home-page dashboard grid, or change what an existing widget id renders. Walks the widget registries (metadata, renderer, data loader, admin editor, help) and the config-migration traps. Unscheduled ideas live in the backlog tracker, issue #284.
 ---
 
 # Add a widget to the layout grid
@@ -118,7 +118,8 @@ contents automatically.
 
 - CHANGELOG entry under `## [Unreleased]`, written for end users, with the
   issue reference (`(#NN)`). File and label the issue first if it doesn't
-  exist; check tracker #79.
+  exist; check the backlog tracker #284, and check the idea off there
+  with a link to its issue.
 - Run the quality gate, then the **visual-verify** skill.
   - Check `/` with the widget enabled, hidden, and at narrow spans, in light
     and dark.
