@@ -698,8 +698,10 @@ export default async function HelpPage() {
             the poster, the key facts and a link back into the app. An{" "}
             <strong>Apprise</strong> channel gets the same report as
             Markdown with the poster attached, and Apprise renders it for
-            each service behind it: bold text and links on Discord, Slack
-            and Telegram, an HTML mail, Pushover with the poster. Every other
+            each service behind it: bold text and links on Discord, Slack,
+            Telegram and Nextcloud Talk, an HTML mail, Pushover with the
+            poster. A service Apprise can&apos;t send a file to, such as
+            Nextcloud Talk, gets the report without the poster. Every other
             channel gets a one-line summary.
           </P>
           <P>
@@ -709,7 +711,10 @@ export default async function HelpPage() {
             an embed, its edge coloured by the event — blue for a grab, green
             for an import, yellow for a warning, red for a failure. Should
             the Apprise server refuse the poster (attachments turned off, or
-            the image out of reach), the event goes again without it.
+            the image out of reach), the event goes again without it. A
+            mention in relayed text, such as a Seerr comment&apos;s{" "}
+            <code>@all</code>, reaches Apprise broken by an invisible space,
+            so it notifies no one.
           </P>
           <P>
             Turn on <strong>Settings → Monitoring → Inbound webhooks</strong>,

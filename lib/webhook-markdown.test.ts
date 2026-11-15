@@ -49,10 +49,17 @@ describe("escapeMarkdown (#533)", () => {
     );
   });
 
-  it("breaks the mentions Discord would page, but not a longer word", () => {
-    expect(quietMentions("@everyone @Here <@123> <@&9> <#7> <!date> me@here.com @heresy")).toBe(
-      "@\u200beveryone @\u200bHere <\u200b@123> <\u200b@&9> <\u200b#7> <\u200b!date> me@\u200bhere.com @heresy"
+  it("breaks every @ that opens a word, and Discord's own (#533, #535)", () => {
+    // Talk's "@all" and a user, Matrix's "@room", a quoted Talk mention, and
+    // one after the punctuation Talk still reads it behind.
+    expect(quietMentions('@all hi @alice, @room "@\"group/admins\"" (.@all)')).toBe(
+      '@\u200ball hi @\u200balice, @\u200broom "@\u200b\"group/admins\"" (.@\u200ball)'
     );
+    expect(quietMentions("@everyone x@Here <@123> <@&9> <#7> <!date>")).toBe(
+      "@\u200beveryone x@\u200bHere <\u200b@\u200b123> <\u200b@&9> <\u200b#7> <\u200b!date>"
+    );
+    // An address, or an @ alone, is no mention.
+    expect(quietMentions("mail me@example.com @ noon")).toBe("mail me@example.com @ noon");
   });
 });
 
@@ -106,7 +113,7 @@ describe("buildNotificationMarkdown (#532)", () => {
     );
     expect(md).toContain("**\\*\\*Bold\\*\\* @\u200beveryone**");
     expect(md).toContain("**By:** \\[me\\](https://evil.test)");
-    expect(md).toContain("> \\<\u200b@123> click \\[here\\](https://evil.test)");
+    expect(md).toContain("> \\<\u200b@\u200b123> click \\[here\\](https://evil.test)");
     expect(md).not.toMatch(/\]\(javascript:/);
   });
 

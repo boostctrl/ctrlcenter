@@ -9,7 +9,7 @@
 // Built from the same report and options as the email (lib/webhook-email.ts),
 // so the two never disagree. Client-safe, for the settings preview. Every
 // payload-derived string passes escapeMarkdown, so a title or a comment can
-// print but never format, link or page anyone (#533); only http(s) URLs
+// print but never format, link or page anyone (#533, #535); only http(s) URLs
 // become a link and only an https poster an attachment.
 
 import {
@@ -58,15 +58,21 @@ export type AppriseMessage = {
   attach?: string;
 };
 
-// Mentions that can't page anyone (#533): Apprise sets no allowed_mentions
-// on a plain Discord message, so Discord parses every mention in the text
-// it is handed. A zero-width space after the @ of "@everyone" and "@here",
-// and after the < of a "<@user>", "<@&role>", "<#channel>" or "<!…>", reads
-// the same but is no mention. For the title too, which a service with a
-// title field shows as it is (an escape would print), and one without
+// Mentions that can't page anyone. The services behind Apprise read them in
+// the text they are handed: Nextcloud Talk any @ that opens a word ("@all"
+// notifies the whole conversation, #535), Matrix "@room", Telegram and
+// Slack an "@name", and Discord — which Apprise sends no allowed_mentions —
+// "@everyone" and "@here" wherever they stand and its "<@user>",
+// "<@&role>", "<#channel>" and "<!…>" tags (#533). A zero-width space after
+// the @, or the <, reads the same but is no mention; an @ inside a word, as
+// in an email address, is left be. For the title too, which a service with
+// a title field shows as it is (an escape would print), and one without
 // folds into the Markdown.
 export function quietMentions(s: string): string {
-  return s.replace(/@(?=(everyone|here)\b)/gi, "@\u200b").replace(/<(?=[@#!])/g, "<\u200b");
+  return s
+    .replace(/(?<![\p{L}\p{N}_])@(?=[\p{L}\p{N}_"'.@-])/gu, "@\u200b")
+    .replace(/@(?=(everyone|here)\b)/gi, "@\u200b")
+    .replace(/<(?=[@#!])/g, "<\u200b");
 }
 
 // A line's opening that CommonMark (or Discord) reads as structure: a

@@ -950,7 +950,7 @@ describe("Apprise (#532)", () => {
     expect(up).toEqual({ title: "Plex recovered", body: "🟢 **Recovered**", type: "success" });
   });
 
-  it("keeps a service named to page a Discord channel from paging it (#533)", () => {
+  it("keeps a service named to page a channel from paging it (#533, #535)", () => {
     const m = appriseAlert({ id: "a", type: "down" }, { name: "@everyone <@&42>", url: "" });
     expect(m.title).toBe("@\u200beveryone <\u200b@&42> is down");
   });

@@ -22,7 +22,8 @@ here.
   - the poster, attached.
 
   Apprise renders it for each service behind it: bold text and links on
-  Discord, Slack and Telegram, an HTML mail, Pushover with the poster. The
+  Discord, Slack, Telegram and Nextcloud Talk, an HTML mail, Pushover with
+  the poster. Nextcloud Talk gets no poster: Apprise can't send it files. The
   event's level sets Apprise's type, so a service that colours by it shows
   a failure red and an import green. The Email report switches (now Email and Apprise report)
   and the subject prefix apply to it as well, and the preview shows the
@@ -34,13 +35,18 @@ here.
 
 ### Security
 
-- **A relayed "@everyone" no longer pings a Discord channel reached through
-  Apprise.** A direct Discord webhook already sent mentions as text
-  (#401), but Apprise's Discord connector doesn't. A Seerr user who wrote
-  "@everyone" in an issue comment could page the whole channel, and so
-  could a service named that way. Everything CtrlCenter sends to Apprise
-  now breaks `@everyone`, `@here` and Discord's `<@…>`, `<#…>` and `<!…>`
-  tags with an invisible space. (#533)
+- **A relayed mention no longer notifies anyone through Apprise.** A
+  direct Discord webhook already sent mentions as text (#401), but the
+  services behind Apprise read mentions in the text they're handed. A
+  Seerr user who wrote "@all" in an issue comment could notify a whole
+  Nextcloud Talk conversation, and "@everyone" a whole Discord channel. So
+  could "@room" on Matrix, or a service named that way. Everything
+  CtrlCenter sends to Apprise now breaks, with an invisible space:
+  - every `@` that starts a word;
+  - `@everyone` and `@here`, wherever they appear;
+  - Discord's `<@…>`, `<#…>` and `<!…>` tags.
+
+  An email address is left alone. (#533, #535)
 
 ## [3.2.0] - 2026-11-15
 
