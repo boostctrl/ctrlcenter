@@ -31,6 +31,8 @@ export type TautulliSession = {
   // The device and app playing it, and whether it's outside the network.
   player: string;
   remote: boolean;
+  // On the page only (#522): the item's page in Tautulli.
+  href?: string;
 };
 
 export type TautulliSnapshot = {
@@ -51,6 +53,7 @@ export type TautulliHistoryItem = {
   // When it was watched (epoch ms), or null when Tautulli omitted the date.
   at: number | null;
   playback: "direct" | "transcode";
+  href?: string;
 };
 
 // The detail payload: the live activity snapshot plus a page of recent history.
@@ -92,6 +95,7 @@ type RawSession = {
   transcode_decision?: string;
   progress_percent?: unknown;
   quality_profile?: string;
+  rating_key?: unknown;
   player?: string;
   platform?: string;
   location?: string;
@@ -104,6 +108,7 @@ type RawHistoryRow = {
   // Tautulli returns the watch time as a unix timestamp in seconds.
   date?: unknown;
   transcode_decision?: string;
+  rating_key?: unknown;
 };
 
 const num = (v: unknown): number | null => {
@@ -112,7 +117,13 @@ const num = (v: unknown): number | null => {
 };
 
 // Exported for the unit tests: fold get_activity's data into the snapshot.
-export function mapTautulliActivity(raw: unknown): TautulliSnapshot {
+// An item's page in Tautulli, from its Plex rating key.
+const infoLink = (base: string | undefined, key: unknown): { href?: string } => {
+  const k = typeof key === "number" ? String(key) : typeof key === "string" ? key.trim() : "";
+  return base && /^\d{1,12}$/.test(k) ? { href: `${base}/info?rating_key=${k}` } : {};
+};
+
+export function mapTautulliActivity(raw: unknown, base?: string): TautulliSnapshot {
   const data = (raw ?? {}) as RawActivity;
   const rows = Array.isArray(data.sessions) ? data.sessions : [];
   const sessions = rows.slice(0, TAUTULLI_SESSION_CAP).map(
@@ -130,6 +141,7 @@ export function mapTautulliActivity(raw: unknown): TautulliSnapshot {
       quality: s.quality_profile?.trim() || "",
       player: [s.player?.trim(), s.platform?.trim()].filter(Boolean).join(" · ").slice(0, 80),
       remote: s.location === "wan",
+      ...infoLink(base, s.rating_key),
     })
   );
   return {
@@ -142,7 +154,7 @@ export function mapTautulliActivity(raw: unknown): TautulliSnapshot {
 }
 
 // Exported for the unit tests: fold get_history's data into history rows.
-export function mapTautulliHistory(raw: unknown): TautulliHistoryItem[] {
+export function mapTautulliHistory(raw: unknown, base?: string): TautulliHistoryItem[] {
   const rows = Array.isArray((raw as RawHistory)?.data)
     ? ((raw as RawHistory).data as RawHistoryRow[])
     : [];
@@ -153,6 +165,7 @@ export function mapTautulliHistory(raw: unknown): TautulliHistoryItem[] {
       title: r.full_title?.trim() || "(unknown)",
       at: secs !== null ? secs * 1000 : null,
       playback: r.transcode_decision === "transcode" ? "transcode" : "direct",
+      ...infoLink(base, r.rating_key),
     };
   });
 }
@@ -238,9 +251,9 @@ export async function getTautulliDetail(
   // If even the activity read failed, the service is down — surface that.
   if (activity.status === "rejected") throw activity.reason;
   return {
-    ...mapTautulliActivity(activity.value),
+    ...mapTautulliActivity(activity.value, serviceBase(cfg.url)),
     history:
-      history.status === "fulfilled" ? mapTautulliHistory(history.value) : [],
+      history.status === "fulfilled" ? mapTautulliHistory(history.value, serviceBase(cfg.url)) : [],
     stats: mapTautulliStats(settled(home), settled(libraries), settled(plays)),
   };
 }

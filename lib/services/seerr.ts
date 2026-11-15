@@ -40,6 +40,9 @@ export type SeerrRequest = {
   status: SeerrRequestStatus;
   // When the request was made (epoch ms), or null.
   at: number | null;
+  // On the page only (#522): the title's poster, and its page in Seerr.
+  poster?: string;
+  href?: string;
 };
 
 export type SeerrSnapshot = {
@@ -143,28 +146,31 @@ async function seerrJson<T>(cfg: SeerrConfig, path: string): Promise<T> {
   return parseJson<T>(text);
 }
 
-// Resolve a request's media title from its tmdbId. Best-effort: a failed or
-// title-less lookup falls back to a stable placeholder, never failing the
-// whole snapshot over one unresolved item.
-async function resolveTitle(cfg: SeerrConfig, raw: RawRequest): Promise<string> {
+// Resolve a request's media title (and its poster, #522) from its tmdbId.
+// Best-effort: a failed or title-less lookup falls back to a stable
+// placeholder, never failing the whole snapshot over one unresolved item.
+async function resolveMedia(cfg: SeerrConfig, raw: RawRequest): Promise<{ title: string; poster?: string }> {
   const tmdbId = raw.media?.tmdbId;
   const type = raw.type === "tv" ? "tv" : "movie";
   if (typeof tmdbId !== "number") {
-    return type === "tv" ? "TV request" : "Movie request";
+    return { title: type === "tv" ? "TV request" : "Movie request" };
   }
   try {
-    const detail = await seerrJson<{ title?: string; name?: string }>(
+    const detail = await seerrJson<{ title?: string; name?: string; posterPath?: string }>(
       cfg,
       `/api/v1/${type}/${tmdbId}`
     );
     // Movies report `title`, TV reports `name`.
     const name = (detail.title ?? detail.name ?? "").trim();
-    if (name) return name;
+    // TMDB's public artwork, at a row's size.
+    const path = typeof detail.posterPath === "string" && /^\/[\w.-]+$/.test(detail.posterPath) ? detail.posterPath : "";
+    if (name) return { title: name, ...(path ? { poster: `https://image.tmdb.org/t/p/w154${path}` } : {}) };
   } catch {
     // fall through to the placeholder
   }
-  return `${type === "tv" ? "TV" : "Movie"} #${tmdbId}`;
+  return { title: `${type === "tv" ? "TV" : "Movie"} #${tmdbId}` };
 }
+const resolveTitle = async (cfg: SeerrConfig, raw: RawRequest) => (await resolveMedia(cfg, raw)).title;
 
 export async function getSeerrSnapshot(cfg: SeerrConfig): Promise<SeerrSnapshot> {
   const [count, page] = await Promise.all([
@@ -198,15 +204,28 @@ export async function getSeerrDetail(cfg: SeerrConfig): Promise<SeerrDetail> {
       `/api/v1/request?take=${SEERR_DETAIL_WAITING}&skip=0&sort=added&filter=pending`
     ),
   ]);
-  const titles = new Map<string, Promise<string>>();
-  const titleOf = (raw: RawRequest) => {
+  const base = serviceBase(cfg.url);
+  const media = new Map<string, Promise<{ title: string; poster?: string }>>();
+  const mediaOf = (raw: RawRequest) => {
     const key = `${raw.type === "tv" ? "tv" : "movie"}:${raw.media?.tmdbId ?? `request-${raw.id}`}`;
-    let title = titles.get(key);
-    if (!title) titles.set(key, (title = resolveTitle(cfg, raw)));
-    return title;
+    let found = media.get(key);
+    if (!found) media.set(key, (found = resolveMedia(cfg, raw)));
+    return found;
   };
   const rows = (p: RawRequestPage) => (Array.isArray(p.results) ? p.results : []);
-  const map = (list: RawRequest[]) => Promise.all(list.map(async (raw) => mapSeerrRequest(raw, await titleOf(raw))));
+  // Each row with its poster and its page in Seerr.
+  const map = (list: RawRequest[]) =>
+    Promise.all(
+      list.map(async (raw) => {
+        const { title, poster } = await mediaOf(raw);
+        const tmdbId = raw.media?.tmdbId;
+        return {
+          ...mapSeerrRequest(raw, title),
+          ...(poster ? { poster } : {}),
+          ...(typeof tmdbId === "number" ? { href: `${base}/${raw.type === "tv" ? "tv" : "movie"}/${tmdbId}` } : {}),
+        };
+      })
+    );
   const [requests, waiting] = await Promise.all([
     map(rows(page)),
     // Seerr's filter decides what's pending; the status check keeps a

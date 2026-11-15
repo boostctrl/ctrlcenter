@@ -10,6 +10,7 @@ import {
   GlyphBubble,
   List,
   Pill,
+  Poster,
   Row,
   Section,
   SegmentBar,
@@ -102,7 +103,8 @@ export default function SeerrDetail({
             {data.waiting.map((r) => (
               <Row
                 key={r.id}
-                leading={<GlyphBubble name={r.type === "tv" ? "tv" : "film"} tone="warn" />}
+                leading={r.poster ? <Poster src={r.poster} title={r.title} /> : <GlyphBubble name={r.type === "tv" ? "tv" : "film"} tone="warn" />}
+                href={r.href}
                 primary={r.title}
                 title={r.title}
                 secondary={line(r)}
@@ -146,7 +148,10 @@ export default function SeerrDetail({
             {recent.map((r) => (
               <Row
                 key={r.id}
-                leading={<GlyphBubble name={r.type === "tv" ? "tv" : "film"} tone={STATUS[r.status].tone} />}
+                leading={
+                  r.poster ? <Poster src={r.poster} title={r.title} /> : <GlyphBubble name={r.type === "tv" ? "tv" : "film"} tone={STATUS[r.status].tone} />
+                }
+                href={r.href}
                 primary={r.title}
                 title={r.title}
                 secondary={line(r)}

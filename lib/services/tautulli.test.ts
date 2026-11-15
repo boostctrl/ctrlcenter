@@ -238,3 +238,16 @@ describe("mapTautulliStats (#525)", () => {
     expect(mapTautulliStats(null, null, null)).toEqual({ topUsers: [], platforms: [], libraries: [], playsByDay: [] });
   });
 });
+
+describe("Tautulli links (#522)", () => {
+  it("links a stream and a watched item to its page in Tautulli, only with a base", () => {
+    const activity = { stream_count: "1", sessions: [{ full_title: "Arrival", rating_key: "4242" }] };
+    expect(mapTautulliActivity(activity, "http://tautulli.lan").sessions[0].href).toBe("http://tautulli.lan/info?rating_key=4242");
+    expect(mapTautulliActivity(activity).sessions[0]).not.toHaveProperty("href");
+    const history = { data: [{ full_title: "Arrival", rating_key: 77 }, { full_title: "Odd", rating_key: "../x" }] };
+    expect(mapTautulliHistory(history, "http://tautulli.lan").map((h) => h.href)).toEqual([
+      "http://tautulli.lan/info?rating_key=77",
+      undefined,
+    ]);
+  });
+});

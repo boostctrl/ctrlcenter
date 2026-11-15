@@ -206,4 +206,24 @@ describe("getSeerrDetail (#511)", () => {
     const lookups = fetchMock.mock.calls.filter(([u]) => /\/api\/v1\/(movie|tv)\/\d+/.test(String(u)));
     expect(lookups).toHaveLength(2);
   });
+
+  it("gives each row its poster and its page in Seerr (#522)", async () => {
+    const { getSeerrDetail, getSeerrSnapshot } = await import("./seerr");
+    stubApi({
+      titles: {
+        "movie/693134": { title: "Dune: Part Two", posterPath: "/abc123.jpg" },
+        "tv/95396": { name: "Severance", posterPath: "javascript:alert(1)" },
+      },
+    });
+    const detail = await getSeerrDetail(CFG);
+    expect(detail.requests.map((r) => [r.title, r.poster, r.href])).toEqual([
+      ["Dune: Part Two", "https://image.tmdb.org/t/p/w154/abc123.jpg", "http://seerr.local:5055/movie/693134"],
+      // A poster path that isn't one is left out.
+      ["Severance", undefined, "http://seerr.local:5055/tv/95396"],
+    ]);
+    // The tile's snapshot carries neither.
+    const snapshot = await getSeerrSnapshot(CFG);
+    expect(snapshot.requests[0]).not.toHaveProperty("href");
+    expect(snapshot.requests[0]).not.toHaveProperty("poster");
+  });
 });

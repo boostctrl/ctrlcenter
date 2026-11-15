@@ -21,8 +21,10 @@ here.
   on each folder. (#523)
 
 - **Monitor pages link into the service.** Every integration's page has an
-  "Open Sonarr"-style button, and on the Sonarr and Radarr pages each row
-  shows the poster and opens that series or movie in a new tab. (#522)
+  "Open Sonarr"-style button. On the Sonarr, Radarr and Seerr pages each
+  row shows the poster and opens that series, movie or request in a new
+  tab; on Tautulli's, each stream and watched title opens its page in
+  Tautulli. (#522)
 
 - **Charts on the Sonarr and Radarr pages.** A bar chart shows what was
   grabbed and imported on each of the last seven days, and a donut splits

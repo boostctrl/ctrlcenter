@@ -125,6 +125,7 @@ export default function TautulliDetail({ data }: { data: TautulliDetailData }) {
                 <Row
                   key={`${s.user}-${s.title}-${i}`}
                   leading={<GlyphBubble name={s.state === "paused" ? "pause" : "play"} tone={s.state === "playing" ? "up" : "muted"} />}
+                  href={s.href}
                   primary={s.title}
                   title={s.title}
                   secondary={[s.user, STATE_LABEL[s.state], s.quality, s.player, s.remote ? "Remote" : ""].filter(Boolean).join(" · ")}
@@ -152,6 +153,7 @@ export default function TautulliDetail({ data }: { data: TautulliDetailData }) {
                 <Row
                   key={`${h.title}-${h.at ?? i}-${i}`}
                   leading={<GlyphBubble name="check" />}
+                  href={h.href}
                   primary={h.title}
                   title={h.title}
                   secondary={[h.user, h.at !== null && now !== null ? ago(h.at, now) : null].filter(Boolean).join(" · ")}
