@@ -32,6 +32,9 @@ export type DetailResultFor<K extends ServiceId> = {
   service: K;
   label: string;
   actionsAllowed: boolean;
+  // The service's own address, for "Open Sonarr" (#522); null when it isn't
+  // a usable one. Any credentials in it are left out.
+  openUrl: string | null;
   data: DetailData[K] | null;
   error: string | null;
 };
@@ -41,6 +44,18 @@ export type DetailResultFor<K extends ServiceId> = {
 export type DetailResult = {
   [K in ServiceId]: DetailResultFor<K>;
 }[ServiceId];
+
+function openUrlOf(url: string): string | null {
+  try {
+    const u = new URL(url.trim());
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    u.username = "";
+    u.password = "";
+    return u.toString().replace(/\/+$/, "");
+  } catch {
+    return null;
+  }
+}
 
 // Fetch one configured integration's detail, by id (its Monitor URL, #300).
 // Returns null when there's no such integration or it isn't configured (the
@@ -55,14 +70,16 @@ export async function getServiceDetail(
 ): Promise<DetailResult | null> {
   const integration = integrations.find((i) => i.id === id);
   if (!integration || !isServiceConfigured(integration)) return null;
-  const base = {
+  const head = {
     id,
     service: integration.type,
     label: integrationLabels(integrations)[id],
     actionsAllowed: integration.allowActions === true && actionsEnabled,
   };
+  const resolved = resolveIntegration(integration);
+  const base = { ...head, openUrl: openUrlOf(resolved.url) };
   try {
-    const data = await SERVICES[integration.type].detail(resolveIntegration(integration));
+    const data = await SERVICES[integration.type].detail(resolved);
     return { ...base, data, error: null } as DetailResult;
   } catch (e) {
     const reason = e instanceof ServiceError ? e.message : "Detail failed";

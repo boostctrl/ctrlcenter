@@ -41,7 +41,7 @@ import {
   type QbittorrentDetail,
 } from "./qbittorrent";
 import { getTautulliDetail, type TautulliDetail } from "./tautulli";
-import { getArrDetail } from "./arr";
+import { getArrDetail, type ArrDetail } from "./arr";
 import { getUnifiDetail, type UnifiDetail } from "./unifi";
 import type { ResolvedIntegration } from "./resolve";
 
@@ -77,7 +77,9 @@ export type ProbeFields = {
 // a richer detail read — qBittorrent (uncapped list + session totals),
 // Tautulli (activity + watch history), UniFi and Seerr (the requests waiting
 // for approval, #511).
-export type DetailData = Omit<ServiceSnapshotMap, "qbittorrent" | "tautulli" | "unifi" | "seerr"> & {
+export type DetailData = Omit<ServiceSnapshotMap, "qbittorrent" | "tautulli" | "unifi" | "seerr" | "sonarr" | "radarr"> & {
+  sonarr: ArrDetail;
+  radarr: ArrDetail;
   qbittorrent: QbittorrentDetail;
   tautulli: TautulliDetail;
   unifi: UnifiDetail;

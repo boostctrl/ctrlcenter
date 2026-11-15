@@ -27,7 +27,11 @@ export type ArrUpcomingItem = {
   subtitle: string;
   // Air/release time (epoch ms), or null when the record had no usable date.
   at: number | null;
-};
+} & ArrArt;
+
+// A row's poster (the service's own https artwork address) and where it
+// opens in the service, when the record carried them (#522).
+export type ArrArt = { poster?: string; href?: string };
 
 // One row of the "recent" list: something grabbed or imported, newest first.
 export type ArrRecentItem = {
@@ -36,7 +40,7 @@ export type ArrRecentItem = {
   event: "grabbed" | "imported";
   // When the event happened (epoch ms), or null.
   at: number | null;
-};
+} & ArrArt;
 
 export type ArrHealthItem = { type: "notice" | "warning" | "error"; message: string };
 
@@ -59,16 +63,21 @@ const HISTORY_PAGE_SIZE = 25;
 
 // --- Raw API shapes (only the fields the snapshot uses) ---
 
+type RawImage = { coverType?: string; remoteUrl?: string };
+type RawSeries = { title?: string; titleSlug?: string; images?: RawImage[] };
+type RawMovie = { title?: string; year?: number; tmdbId?: number; images?: RawImage[] };
 type RawCalendarEpisode = {
   airDateUtc?: string;
   seasonNumber?: number;
   episodeNumber?: number;
   title?: string;
-  series?: { title?: string };
+  series?: RawSeries;
 };
 type RawCalendarMovie = {
   title?: string;
   year?: number;
+  tmdbId?: number;
+  images?: RawImage[];
   inCinemas?: string;
   digitalRelease?: string;
   physicalRelease?: string;
@@ -77,9 +86,9 @@ type RawHistoryPage = { records?: RawHistoryRecord[] };
 type RawHistoryRecord = {
   eventType?: string;
   date?: string;
-  series?: { title?: string };
+  series?: RawSeries;
   episode?: { seasonNumber?: number; episodeNumber?: number };
-  movie?: { title?: string; year?: number };
+  movie?: RawMovie;
 };
 type RawHealth = { type?: string; message?: string };
 
@@ -111,7 +120,33 @@ const seasonEp = (s?: number, e?: number): string =>
 const byAtAsc = (a: { at: number | null }, b: { at: number | null }) =>
   (a.at ?? Infinity) - (b.at ?? Infinity);
 
-export function mapSonarrCalendar(raw: unknown): ArrUpcomingItem[] {
+// The poster among a record's images: its public https address (the
+// service's own copy needs the API key, which never reaches the browser).
+function posterOf(images: unknown): string | undefined {
+  if (!Array.isArray(images)) return undefined;
+  const hit = (images as RawImage[]).find((i) => i?.coverType === "poster");
+  const url = typeof hit?.remoteUrl === "string" ? hit.remoteUrl : "";
+  return /^https:\/\//.test(url) && url.length <= 500 ? url : undefined;
+}
+// A series' or movie's poster and its page in the service. `base` is the
+// integration's address; without one (the tile's snapshot) there's no link.
+function seriesArt(series: RawSeries | undefined, base?: string): ArrArt {
+  const poster = posterOf(series?.images);
+  const slug = typeof series?.titleSlug === "string" ? series.titleSlug : "";
+  return {
+    ...(poster ? { poster } : {}),
+    ...(base && slug ? { href: `${base}/series/${encodeURIComponent(slug)}` } : {}),
+  };
+}
+function movieArt(movie: RawMovie | undefined, base?: string): ArrArt {
+  const poster = posterOf(movie?.images);
+  return {
+    ...(poster ? { poster } : {}),
+    ...(base && typeof movie?.tmdbId === "number" ? { href: `${base}/movie/${movie.tmdbId}` } : {}),
+  };
+}
+
+export function mapSonarrCalendar(raw: unknown, base?: string): ArrUpcomingItem[] {
   const arr = Array.isArray(raw) ? (raw as RawCalendarEpisode[]) : [];
   return arr
     .map(
@@ -119,13 +154,14 @@ export function mapSonarrCalendar(raw: unknown): ArrUpcomingItem[] {
         title: e.series?.title?.trim() || "(unknown series)",
         subtitle: seasonEp(e.seasonNumber, e.episodeNumber),
         at: toMs(e.airDateUtc),
+        ...seriesArt(e.series, base),
       })
     )
     .sort(byAtAsc)
     .slice(0, ARR_UPCOMING_CAP);
 }
 
-export function mapRadarrCalendar(raw: unknown): ArrUpcomingItem[] {
+export function mapRadarrCalendar(raw: unknown, base?: string): ArrUpcomingItem[] {
   const arr = Array.isArray(raw) ? (raw as RawCalendarMovie[]) : [];
   const now = Date.now();
   return arr
@@ -149,6 +185,7 @@ export function mapRadarrCalendar(raw: unknown): ArrUpcomingItem[] {
           .filter(Boolean)
           .join(" · "),
         at: pick?.at ?? null,
+        ...movieArt(m, base),
       };
     })
     .sort(byAtAsc)
@@ -167,7 +204,8 @@ const IMPORT_EVENTS = new Set([
 export function mapHistory(
   kind: ArrKind,
   raw: unknown,
-  cap: number = ARR_RECENT_CAP
+  cap: number = ARR_RECENT_CAP,
+  base?: string
 ): ArrRecentItem[] {
   const page = (raw ?? {}) as RawHistoryPage;
   const records = Array.isArray(page.records) ? page.records : [];
@@ -188,7 +226,13 @@ export function mapHistory(
         : r.movie?.year
           ? String(r.movie.year)
           : "";
-    out.push({ title, subtitle, event, at: toMs(r.date) });
+    out.push({
+      title,
+      subtitle,
+      event,
+      at: toMs(r.date),
+      ...(kind === "sonarr" ? seriesArt(r.series, base) : movieArt(r.movie, base)),
+    });
     if (out.length >= cap) break;
   }
   return out;
@@ -218,8 +262,10 @@ export async function getArrSnapshot(
   kind: ArrKind,
   cfg: ArrConfig,
   // The detail read pulls a deeper history; the glance snapshot stays lean.
-  opts: { recentCap?: number; historyPageSize?: number } = {}
+  opts: { recentCap?: number; historyPageSize?: number; links?: boolean } = {}
 ): Promise<ArrSnapshot> {
+  // Rows link into the service only on its own page (#522).
+  const base = opts.links ? serviceBase(cfg.url) : undefined;
   const recentCap = opts.recentCap ?? ARR_RECENT_CAP;
   const historyPageSize = opts.historyPageSize ?? HISTORY_PAGE_SIZE;
   const now = Date.now();
@@ -255,21 +301,172 @@ export async function getArrSnapshot(
   const upcoming =
     calR.status === "fulfilled"
       ? kind === "sonarr"
-        ? mapSonarrCalendar(calR.value)
-        : mapRadarrCalendar(calR.value)
+        ? mapSonarrCalendar(calR.value, base)
+        : mapRadarrCalendar(calR.value, base)
       : [];
   const recent =
-    histR.status === "fulfilled" ? mapHistory(kind, histR.value, recentCap) : [];
+    histR.status === "fulfilled" ? mapHistory(kind, histR.value, recentCap, base) : [];
   const health = healthR.status === "fulfilled" ? mapHealth(healthR.value) : [];
   return { upcoming, recent, health };
 }
 
-// The detail read: the same snapshot shape, but with a deeper recent history.
-export function getArrDetail(kind: ArrKind, cfg: ArrConfig): Promise<ArrSnapshot> {
-  return getArrSnapshot(kind, cfg, {
-    recentCap: ARR_DETAIL_RECENT_CAP,
-    historyPageSize: DETAIL_HISTORY_PAGE_SIZE,
-  });
+// --- The detail page's extras (#523): what's downloading, what's wanted
+// and missing, and the room left on each root folder. ---
+
+export type ArrQueueItem = {
+  title: string;
+  subtitle: string;
+  // 0–1 of the download, or null when the client hasn't reported a size.
+  progress: number | null;
+  // "downloading", "paused", "queued", "completed", "warning", "failed".
+  status: string;
+  // Time left as the service words it ("00:12:30"), or null.
+  timeLeft: string | null;
+  size: number | null;
+} & ArrArt;
+export type ArrMissingItem = { title: string; subtitle: string; at: number | null } & ArrArt;
+export type ArrDisk = { path: string; free: number; total: number | null };
+
+export type ArrDetail = ArrSnapshot & {
+  queue: ArrQueueItem[];
+  queueTotal: number;
+  missing: ArrMissingItem[];
+  missingTotal: number;
+  disks: ArrDisk[];
+  // The service's own pages, for "Open in Sonarr" (#522).
+  links: { home: string; queue: string; missing: string };
+};
+
+export const ARR_QUEUE_CAP = 20;
+export const ARR_MISSING_CAP = 8;
+const DISK_CAP = 8;
+
+type RawPage<T> = { totalRecords?: number; records?: T[] };
+type RawQueueRecord = {
+  title?: string;
+  status?: string;
+  trackedDownloadStatus?: string;
+  trackedDownloadState?: string;
+  size?: number;
+  sizeleft?: number;
+  timeleft?: string;
+  series?: RawSeries;
+  episode?: { seasonNumber?: number; episodeNumber?: number };
+  movie?: RawMovie;
+};
+type RawMissingRecord = {
+  title?: string;
+  airDateUtc?: string;
+  seasonNumber?: number;
+  episodeNumber?: number;
+  series?: RawSeries;
+  year?: number;
+  tmdbId?: number;
+  images?: RawImage[];
+  digitalRelease?: string;
+  physicalRelease?: string;
+  inCinemas?: string;
+};
+type RawDisk = { path?: string; freeSpace?: number; totalSpace?: number };
+
+const records = <T,>(raw: unknown): T[] => {
+  const page = (raw ?? {}) as RawPage<T>;
+  return Array.isArray(page.records) ? page.records : [];
+};
+const total = (raw: unknown, fallback: number): number => {
+  const n = ((raw ?? {}) as RawPage<unknown>).totalRecords;
+  return typeof n === "number" && n >= 0 ? n : fallback;
+};
+
+export function mapQueue(kind: ArrKind, raw: unknown, base?: string): ArrQueueItem[] {
+  return records<RawQueueRecord>(raw)
+    .slice(0, ARR_QUEUE_CAP)
+    .map((r): ArrQueueItem => {
+      const size = typeof r.size === "number" && r.size > 0 ? r.size : null;
+      const left = typeof r.sizeleft === "number" ? r.sizeleft : null;
+      // The tracked status says when an import is stuck; the plain status
+      // says what the download client is doing.
+      const tracked = (r.trackedDownloadStatus ?? "").toLowerCase();
+      const status = tracked === "warning" || tracked === "error" ? (tracked === "error" ? "failed" : "warning") : (r.status ?? "queued").toLowerCase();
+      return {
+        title:
+          (kind === "sonarr" ? r.series?.title?.trim() : r.movie?.title?.trim()) || r.title?.trim() || "(unknown)",
+        subtitle:
+          kind === "sonarr"
+            ? seasonEp(r.episode?.seasonNumber, r.episode?.episodeNumber)
+            : r.movie?.year
+              ? String(r.movie.year)
+              : "",
+        progress: size !== null && left !== null ? Math.min(1, Math.max(0, 1 - left / size)) : null,
+        status,
+        timeLeft: typeof r.timeleft === "string" && r.timeleft !== "" ? r.timeleft : null,
+        size,
+        ...(kind === "sonarr" ? seriesArt(r.series, base) : movieArt(r.movie, base)),
+      };
+    });
+}
+
+export function mapMissing(kind: ArrKind, raw: unknown, base?: string): ArrMissingItem[] {
+  return records<RawMissingRecord>(raw)
+    .slice(0, ARR_MISSING_CAP)
+    .map((r): ArrMissingItem =>
+      kind === "sonarr"
+        ? {
+            title: r.series?.title?.trim() || "(unknown series)",
+            subtitle: seasonEp(r.seasonNumber, r.episodeNumber),
+            at: toMs(r.airDateUtc),
+            ...seriesArt(r.series, base),
+          }
+        : {
+            title: r.title?.trim() || "(unknown movie)",
+            subtitle: r.year ? String(r.year) : "",
+            at: toMs(r.digitalRelease) ?? toMs(r.physicalRelease) ?? toMs(r.inCinemas),
+            ...movieArt(r, base),
+          }
+    );
+}
+
+export function mapDisks(raw: unknown): ArrDisk[] {
+  if (!Array.isArray(raw)) return [];
+  return (raw as RawDisk[])
+    .filter((d) => typeof d.path === "string" && d.path !== "" && typeof d.freeSpace === "number")
+    .slice(0, DISK_CAP)
+    .map((d) => ({
+      path: d.path as string,
+      free: d.freeSpace as number,
+      total: typeof d.totalSpace === "number" && d.totalSpace > 0 ? d.totalSpace : null,
+    }));
+}
+
+// The detail read: the snapshot with a deeper recent history and rows that
+// link into the service, plus the queue, what's missing and the disks. Each
+// extra is best effort: one that fails leaves its section empty.
+export async function getArrDetail(kind: ArrKind, cfg: ArrConfig): Promise<ArrDetail> {
+  const base = serviceBase(cfg.url);
+  const include = kind === "sonarr" ? "includeSeries=true&includeEpisode=true" : "includeMovie=true";
+  const [snapshot, queueR, missingR, diskR] = await Promise.all([
+    getArrSnapshot(kind, cfg, {
+      recentCap: ARR_DETAIL_RECENT_CAP,
+      historyPageSize: DETAIL_HISTORY_PAGE_SIZE,
+      links: true,
+    }),
+    ...[
+      `/api/v3/queue?page=1&pageSize=${ARR_QUEUE_CAP}&${include}`,
+      `/api/v3/wanted/missing?page=1&pageSize=${ARR_MISSING_CAP}&sortKey=${kind === "sonarr" ? "airDateUtc" : "digitalRelease"}&sortDirection=descending&monitored=true${kind === "sonarr" ? "&includeSeries=true" : ""}`,
+      "/api/v3/diskspace",
+    ].map((path) => arrJson<unknown>(kind, cfg, path).catch(() => null)),
+  ]);
+  const queue = mapQueue(kind, queueR, base);
+  const missing = mapMissing(kind, missingR, base);
+  return {
+    ...snapshot,
+    queue,
+    queueTotal: total(queueR, queue.length),
+    missing,
+    missingTotal: total(missingR, missing.length),
+    disks: mapDisks(diskR),
+    links: { home: base, queue: `${base}/activity/queue`, missing: `${base}/wanted/missing` },
+  };
 }
 
 // Fresh reachability check for the admin's "Test connection" button. The

@@ -29,6 +29,7 @@ export const FAKE_USER = "fake-user";
 export const FAKE_PASSWORD = "fake-password";
 
 const iso = (ms) => new Date(ms).toISOString();
+const slug = (title) => title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 // --- Sonarr and Radarr (/api/v3) ---
 
@@ -59,7 +60,7 @@ function sonarr(path, now) {
       seasonNumber: 1 + (i % 3),
       episodeNumber: 2 + i,
       title: `Episode ${2 + i}`,
-      series: { title },
+      series: { title, titleSlug: slug(title) },
     }));
   }
   if (path.startsWith("/api/v3/history")) {
@@ -68,7 +69,7 @@ function sonarr(path, now) {
       records: Array.from({ length: 25 }, (_, i) => ({
         eventType: events[i % events.length],
         date: iso(now - (i * 5 + 1) * HOUR),
-        series: { title: SERIES[i % SERIES.length] },
+        series: { title: SERIES[i % SERIES.length], titleSlug: slug(SERIES[i % SERIES.length]) },
         episode: { seasonNumber: 1 + (i % 2), episodeNumber: 1 + (i % 9) },
       })),
     };
@@ -77,6 +78,43 @@ function sonarr(path, now) {
     return [
       { type: "warning", message: "Indexer Nyaa is unavailable due to failures for more than 6 hours" },
       { type: "notice", message: "Update available: 4.0.11 is ready to install" },
+    ];
+  }
+  if (path.startsWith("/api/v3/queue")) {
+    const rows = [
+      ["Severance", 2, 3, "downloading", "ok", 0.62, "00:14:10"],
+      ["The Expanse", 6, 1, "downloading", "ok", 0.18, "01:42:00"],
+      ["Slow Horses", 4, 2, "completed", "warning", 1, null],
+      ["Andor", 2, 7, "queued", "ok", 0, null],
+    ];
+    return {
+      totalRecords: rows.length,
+      records: rows.map(([title, s, e, status, tracked, done, timeleft]) => ({
+        status,
+        trackedDownloadStatus: tracked,
+        size: 3.4 * GB,
+        sizeleft: 3.4 * GB * (1 - done),
+        timeleft,
+        series: { title, titleSlug: slug(title) },
+        episode: { seasonNumber: s, episodeNumber: e },
+      })),
+    };
+  }
+  if (path.startsWith("/api/v3/wanted/missing")) {
+    return {
+      totalRecords: 23,
+      records: SERIES.slice(0, 6).map((title, i) => ({
+        airDateUtc: iso(now - (i * 3 + 1) * 24 * HOUR),
+        seasonNumber: 1 + (i % 3),
+        episodeNumber: 4 + i,
+        series: { title, titleSlug: slug(title) },
+      })),
+    };
+  }
+  if (path === "/api/v3/diskspace") {
+    return [
+      { path: "/tv", freeSpace: 1.9 * TB, totalSpace: 21.8 * TB },
+      { path: "/downloads", freeSpace: 410 * GB, totalSpace: 1.8 * TB },
     ];
   }
   if (path === "/api/v3/system/status") return { appName: "Sonarr", version: "4.0.10.2544" };
@@ -108,6 +146,24 @@ function radarr(path, now) {
       { type: "error", message: "All download clients are unavailable due to failures" },
       { type: "warning", message: "Missing root folder: /data/media/movies-4k" },
     ];
+  }
+  if (path.startsWith("/api/v3/queue")) {
+    return {
+      totalRecords: 2,
+      records: [
+        { status: "downloading", trackedDownloadStatus: "ok", size: 58 * GB, sizeleft: 53 * GB, timeleft: "00:52:00", movie: { title: "Dune: Part Two", year: 2024, tmdbId: 693134 } },
+        { status: "paused", trackedDownloadStatus: "ok", size: 12 * GB, sizeleft: 9 * GB, timeleft: null, movie: { title: "Aftersun", year: 2022, tmdbId: 965150 } },
+      ],
+    };
+  }
+  if (path.startsWith("/api/v3/wanted/missing")) {
+    return {
+      totalRecords: 4,
+      records: MOVIES.slice(3, 7).map(([title, year], i) => ({ title, year, tmdbId: 1000 + i, digitalRelease: iso(now - (i * 20 + 9) * 24 * HOUR) })),
+    };
+  }
+  if (path === "/api/v3/diskspace") {
+    return [{ path: "/movies", freeSpace: 12.5 * TB, totalSpace: 43.6 * TB }];
   }
   if (path === "/api/v3/system/status") return { appName: "Radarr", version: "5.14.0.9383" };
   return undefined;

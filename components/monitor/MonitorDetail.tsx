@@ -2,6 +2,7 @@
 
 import type { NavPages } from "@/lib/nav";
 import Link from "next/link";
+import { buttonClasses } from "@/lib/buttons";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import type { DetailResult } from "@/lib/monitor-detail";
 import { MonitorIntegrationContext } from "./actions";
@@ -192,7 +193,20 @@ export default function MonitorDetail({
                 </p>
               </div>
             </div>
-            <StatusPill state={state} updatedAt={updatedAt} now={now} />
+            <div className="flex flex-wrap items-center gap-3">
+              {result.openUrl && (
+                <a
+                  href={result.openUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={buttonClasses("ghost", "sm")}
+                >
+                  Open {meta.label}
+                  <span className="sr-only"> in a new tab</span>
+                </a>
+              )}
+              <StatusPill state={state} updatedAt={updatedAt} now={now} />
+            </div>
           </div>
         </div>
         {result.data === null ? (

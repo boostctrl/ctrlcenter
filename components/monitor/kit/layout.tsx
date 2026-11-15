@@ -2,7 +2,7 @@
 // headline numbers, section cards, list rows, chips and markers. Every page
 // is composed from these, so the nine read as one family: the same type
 // scale, spacing, surfaces and status colors, in every design and scheme.
-import { useId, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { Glyph, type GlyphName } from "./glyphs";
 import { TONE_DOT, TONE_SOFT, TONE_TEXT, type Tone } from "./tone";
 
@@ -13,8 +13,11 @@ const SURFACE = "glass-card [--surface-lift:0px]";
 // --- Stats ---
 
 // The row of headline numbers under the page header.
-export function StatGrid({ children }: { children: ReactNode }) {
-  return <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{children}</div>;
+// Four across by default; `six` for a page with six headline numbers.
+export function StatGrid({ children, six = false }: { children: ReactNode; six?: boolean }) {
+  return (
+    <div className={`grid grid-cols-2 gap-3 ${six ? "md:grid-cols-3 2xl:grid-cols-6" : "lg:grid-cols-4"}`}>{children}</div>
+  );
 }
 
 export function Stat({
@@ -108,7 +111,10 @@ export function Row({
   trailing,
   below,
   title,
+  href,
 }: {
+  // Where the row's item opens in the service itself, in a new tab (#522).
+  href?: string;
   leading?: ReactNode;
   primary: ReactNode;
   secondary?: ReactNode;
@@ -123,7 +129,13 @@ export function Row({
         {leading && <span className="shrink-0">{leading}</span>}
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm text-ink-85" title={title}>
-            {primary}
+            {href ? (
+              <a href={href} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                {primary}
+              </a>
+            ) : (
+              primary
+            )}
           </p>
           {secondary && <p className="mt-0.5 truncate text-xs text-ink-50">{secondary}</p>}
         </div>
@@ -186,6 +198,31 @@ export function GlyphBubble({ name, tone = "muted" }: { name: GlyphName; tone?: 
   return (
     <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${TONE_SOFT[tone]}`}>
       <Glyph name={name} />
+    </span>
+  );
+}
+
+// A row's leading poster (#522): the service's artwork, or the title's
+// initial on a tint when it has none or it won't load. As wide as the other
+// markers, so `below` still lines up under the name.
+export function Poster({ src, title }: { src?: string; title: string }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <span className="flex h-[3.25rem] w-9 items-center justify-center overflow-hidden rounded-md bg-fg/[0.08] text-sm font-semibold text-ink-50">
+      {src && !failed ? (
+        // eslint-disable-next-line @next/next/no-img-element -- artwork on the service's own CDN, not known at build time
+        <img
+          src={src}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          referrerPolicy="no-referrer"
+          onError={() => setFailed(true)}
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <span aria-hidden>{title.trim().charAt(0).toUpperCase()}</span>
+      )}
     </span>
   );
 }

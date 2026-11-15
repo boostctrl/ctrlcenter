@@ -3,7 +3,11 @@ import {
   getArrSnapshot,
   probeArr,
   mapSonarrCalendar,
+  mapRadarrCalendar,
   mapHistory,
+  mapQueue,
+  mapMissing,
+  mapDisks,
   ARR_UPCOMING_CAP,
   ARR_RECENT_CAP,
 } from "./arr";
@@ -262,3 +266,68 @@ describe("probeArr", () => {
   });
 });
 
+describe("the detail page's extras (#522, #523)", () => {
+  const series = {
+    title: "Severance",
+    titleSlug: "severance",
+    images: [
+      { coverType: "banner", remoteUrl: "https://art.example/banner.jpg" },
+      { coverType: "poster", remoteUrl: "https://art.example/poster.jpg" },
+    ],
+  };
+
+  it("gives a row its poster and its page in the service, only with a base", () => {
+    const raw = [{ airDateUtc: "2026-11-20T02:00:00Z", seasonNumber: 2, episodeNumber: 7, series }];
+    expect(mapSonarrCalendar(raw, "http://sonarr.lan")[0]).toMatchObject({
+      poster: "https://art.example/poster.jpg",
+      href: "http://sonarr.lan/series/severance",
+    });
+    // The tile's snapshot carries no link into the service.
+    expect(mapSonarrCalendar(raw)[0]).not.toHaveProperty("href");
+    // Only https artwork: the service's own copy needs the API key.
+    const local = { ...series, images: [{ coverType: "poster", remoteUrl: "http://sonarr.lan/MediaCover/1/poster.jpg" }] };
+    expect(mapSonarrCalendar([{ ...raw[0], series: local }], "http://sonarr.lan")[0]).not.toHaveProperty("poster");
+    expect(mapRadarrCalendar([{ title: "Flow", year: 2024, tmdbId: 823219, digitalRelease: "2026-11-20" }], "http://radarr.lan")[0].href).toBe(
+      "http://radarr.lan/movie/823219"
+    );
+  });
+
+  it("maps the queue: progress from what's left, and a stuck import over the client's status", () => {
+    const out = mapQueue(
+      "sonarr",
+      {
+        records: [
+          { status: "downloading", trackedDownloadStatus: "ok", size: 1000, sizeleft: 250, timeleft: "00:10:00", series, episode: { seasonNumber: 2, episodeNumber: 3 } },
+          { status: "completed", trackedDownloadStatus: "warning", size: 1000, sizeleft: 0, series: { title: "Andor" }, episode: { seasonNumber: 1, episodeNumber: 5 } },
+          { status: "queued", size: 0, title: "Unparsed.Release" },
+        ],
+      },
+      "http://sonarr.lan"
+    );
+    expect(out).toEqual([
+      {
+        title: "Severance",
+        subtitle: "S02E03",
+        progress: 0.75,
+        status: "downloading",
+        timeLeft: "00:10:00",
+        size: 1000,
+        poster: "https://art.example/poster.jpg",
+        href: "http://sonarr.lan/series/severance",
+      },
+      { title: "Andor", subtitle: "S01E05", progress: 1, status: "warning", timeLeft: null, size: 1000 },
+      { title: "Unparsed.Release", subtitle: "", progress: null, status: "queued", timeLeft: null, size: null },
+    ]);
+    expect(mapQueue("sonarr", null)).toEqual([]);
+  });
+
+  it("maps what's missing and the disks", () => {
+    expect(mapMissing("radarr", { records: [{ title: "Flow", year: 2024, tmdbId: 9, digitalRelease: "2026-01-02T00:00:00Z" }] }, "http://r")).toEqual([
+      { title: "Flow", subtitle: "2024", at: Date.parse("2026-01-02T00:00:00Z"), href: "http://r/movie/9" },
+    ]);
+    expect(mapDisks([{ path: "/tv", freeSpace: 10, totalSpace: 100 }, { path: "", freeSpace: 1 }, { path: "/x" }])).toEqual([
+      { path: "/tv", free: 10, total: 100 },
+    ]);
+    expect(mapDisks("nope")).toEqual([]);
+  });
+});

@@ -12,6 +12,18 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Sonarr and Radarr pages show the download queue, what's missing and
+  disk space.** Each download has its progress, size and time left, and one
+  whose import is stuck is marked. Missing lists the monitored episodes or
+  movies not in the library, with the total, and Disk space shows the room
+  on each folder. (#523)
+
+- **Monitor pages link into the service.** Every integration's page has an
+  "Open Sonarr"-style button, and on the Sonarr and Radarr pages each row
+  shows the poster and opens that series or movie in a new tab. (#522)
+
 ### Changed
 
 - **The Monitor dashboard opens on a command deck.** A status ring draws one
