@@ -3,7 +3,7 @@
 import type { NavPages } from "@/lib/nav";
 import { useCallback, useEffect, useState } from "react";
 import type { MonitorEntry, MonitorSnapshot } from "@/lib/monitor";
-import { MONITOR_GROUPS, SERVICE_IDS, SERVICE_META, type ServiceId } from "@/lib/services/ids";
+import { MONITOR_GROUPS, SERVICE_IDS, SERVICE_META } from "@/lib/services/ids";
 import PageNav from "@/components/PageNav";
 import ReauthDialog from "@/components/admin/ReauthDialog";
 import SystemHealthBar from "./SystemHealthBar";
@@ -11,6 +11,8 @@ import Complication from "./Complication";
 import { sinceLabel, type ServiceState } from "./state";
 import { tileContent, type GlanceVisual } from "./glances";
 import { settingsCardId } from "@/lib/nav";
+import Link from "next/link";
+import { buttonClasses } from "@/lib/buttons";
 import { usePolling } from "@/components/usePolling";
 import { useNow } from "@/components/useNow";
 
@@ -19,15 +21,15 @@ import { useNow } from "@/components/useNow";
 // server-rendered from the shared snapshot cache and kept fresh by polling
 // /api/monitor (that same cache, so however many tabs are open the services see
 // one fetch per window). Every integration holds a tile in its type's cluster,
-// several of a type side by side (#300); a configured one drills into its
-// detail page, a switched-off one dims and points at its settings, and a type
-// with none set up keeps a dimmed "set up" slot — so the face reads as one
-// designed surface whether one service is in use or a dozen. The read-only
+// several of a type side by side (#300), in one three-column grid so tiles
+// line up from group to group (#509); a configured one drills into its
+// detail page, a switched-off one dims and points at its settings, and the
+// types nobody has set up share one quiet row at the end. The read-only
 // depth (full lists, actions) lives on /admin/monitor/[id].
 
 const REFRESH_MS = 45_000;
-// An off tile opens its integration's settings card (#277); a "set up" slot
-// opens the Integrations section to add one.
+// An off tile opens its integration's settings card (#277); a type not set
+// up links to the Integrations section to add one.
 const SETTINGS = "/admin?tab=settings&section=integrations";
 const settingsLink = (label: string) => `${SETTINGS}#${settingsCardId(label)}`;
 
@@ -53,16 +55,6 @@ function complicationFor(entry: MonitorEntry, now: number | null): ComplicationP
     href: offOrNew ? settingsLink(entry.label) : `/admin/monitor/${encodeURIComponent(entry.id)}`,
   };
 }
-
-// A type nobody has set up keeps a dimmed slot in its cluster.
-const setUpSlot = (type: ServiceId): ComplicationProps & { label: string } => ({
-  label: SERVICE_META[type].label,
-  state: "unconfigured",
-  href: SETTINGS,
-  center: "+",
-  caption: "set up",
-  lines: ["Not connected"],
-});
 
 export default function MonitorDashboard({
   initial,
@@ -105,64 +97,72 @@ export default function MonitorDashboard({
     return () => cancelAnimationFrame(raf);
   }, []);
 
+  // The types nobody has set up (#509): one quiet row at the end, rather
+  // than a dimmed tile in every group.
+  const unused = SERVICE_IDS.filter((t) => !snapshot.some((e) => e.type === t));
+
   return (
     <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-8xl flex-col gap-6 px-6 pt-12 pb-24 sm:px-10 lg:pt-16">
       {/* "Confirm it's you" for the destructive actions (#366). */}
       <ReauthDialog />
       <div>
         <PageNav current={null} {...nav} />
-        <div className="mt-3 flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
+        <div className="mt-3 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
           <div>
-            <h1 className="text-3xl font-bold">Monitor</h1>
-            <p className="mt-1 text-sm text-ink-45">
-              Live status of your connected services, plus any actions you&apos;ve
-              switched on for them. Only signed-in admins can see this page —
-              nothing here is ever shown to visitors.
+            <h1 className="text-3xl font-bold tracking-tight">Monitor</h1>
+            <p className="mt-1 text-sm text-ink-50">
+              Live status of the services you&apos;ve connected. Only admins see this page.
             </p>
           </div>
-          {/* A freshness read that mirrors the detail pages' status pill, so the
-              whole Monitor reads as one family. No status dot here — the health
-              hero below is the cockpit's verdict. */}
+          {/* The freshness read, as on the integration pages, with how often
+              it refreshes; no dot here, the health banner is the verdict. */}
           {updatedAt !== null && now !== null && (
-            <span className="inline-flex shrink-0 items-center rounded-full border border-fg/10 bg-fg/5 px-3.5 py-1.5 text-xs whitespace-nowrap text-ink-50">
-              Updated {sinceLabel(now - updatedAt)}
+            <span className="inline-flex shrink-0 items-center rounded-full border border-fg/10 bg-fg/5 px-3.5 py-1.5 text-xs whitespace-nowrap text-ink-55">
+              Updated {sinceLabel(now - updatedAt)} · every {REFRESH_MS / 1000}s
             </span>
           )}
         </div>
       </div>
 
-      {/* The health hero, then each domain cluster — every surface is a
-          glass-card, so the whole cockpit takes on the active design: pick a
-          glowing design like Cyber and the tiles read as a lit instrument
-          panel, pick Flat and they're clean cards. */}
-      <div className="flex flex-col gap-6">
-        <div className="glass-card p-6">
-          <SystemHealthBar snapshot={snapshot} />
-        </div>
+      {/* The health banner, then each domain's tiles in one three-column grid,
+          so the tiles line up from group to group. Every surface is a
+          glass-card, so the page takes on the active design. */}
+      <div className="flex flex-col gap-8">
+        <SystemHealthBar snapshot={snapshot} />
         {MONITOR_GROUPS.map((group) => {
-          const types = SERVICE_IDS.filter((t) => SERVICE_META[t].group === group);
           const entries = snapshot.filter((e) => SERVICE_META[e.type].group === group);
-          const unused = types.filter((t) => !entries.some((e) => e.type === t));
+          if (entries.length === 0) return null;
           return (
-            <section key={group} className="flex flex-col gap-4">
-              <p className="text-[11px] font-medium tracking-wide text-ink-40 uppercase">{group}</p>
-              <div className="flex flex-wrap gap-3">
+            <section key={group} aria-labelledby={`monitor-${group}`} className="flex flex-col gap-3">
+              <h2 id={`monitor-${group}`} className="text-[11px] font-semibold tracking-wide text-ink-50 uppercase">
+                {group}
+              </h2>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {entries.map((entry) => (
-                  <Complication key={entry.id} label={entry.label} {...complicationFor(entry, now)} />
-                ))}
-                {unused.map((type) => (
-                  <Complication key={`setup-${type}`} {...setUpSlot(type)} />
+                  <Complication key={entry.id} label={entry.label} fill {...complicationFor(entry, now)} />
                 ))}
               </div>
             </section>
           );
         })}
+        {unused.length > 0 && (
+          <section
+            aria-label="Not set up yet"
+            className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-[var(--surface-radius)] border border-dashed border-fg/15 px-5 py-4"
+          >
+            <p className="text-sm text-ink-60">
+              {snapshot.length === 0 ? "Connect a service to see it here." : "Not set up yet"}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {unused.map((type) => (
+                <Link key={type} href={SETTINGS} className={buttonClasses("ghost", "sm")}>
+                  + {SERVICE_META[type].label}
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
-
-      <p className="text-[11px] text-ink-45">
-        Refreshes automatically every {REFRESH_MS / 1000} seconds while this tab
-        is visible.
-      </p>
     </main>
   );
 }

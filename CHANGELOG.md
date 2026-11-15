@@ -20,6 +20,13 @@ here.
   and a link to its settings, and a refresh that fails keeps showing the last
   data, marked stale, instead of emptying the page. (#508)
 
+- **The Monitor dashboard is tidier.** The health banner is one compact row,
+  with each problem listed under it as a link to the page that shows it.
+  Tiles line up in a three-column grid in every group, a group with nothing
+  connected no longer shows, and the services you haven't set up share one
+  quiet row at the end instead of a tile each. The refresh interval moved
+  into the "Updated" pill at the top. (#509)
+
 - **Every integration's page on the Monitor is redesigned.** Each opens on
   its headline numbers in a row of tiles, then lays out what the service
   reports in titled sections, with the same rows, status chips and progress

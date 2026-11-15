@@ -1,8 +1,10 @@
 "use client";
 
 import type { ReactNode } from "react";
+import Link from "next/link";
 import type { MonitorEntry, MonitorSnapshot } from "@/lib/monitor";
 import { serviceState, STATE_DOT, type ServiceState } from "./state";
+import { Glyph, TONE_SOFT, TONE_TEXT } from "./kit";
 
 // The cockpit's master status bar (#208): the at-a-glance system-health read
 // that sits above the bento so the whole homelab resolves to a single line
@@ -37,7 +39,6 @@ export default function SystemHealthBar({
   const stale = n("stale");
   const offline = n("unreachable");
   const disabled = n("disabled");
-  const unconfigured = n("unconfigured");
   const connected = live + stale + offline;
 
   // Cross-service highlights — best effort, summed over every integration of
@@ -61,89 +62,93 @@ export default function SystemHealthBar({
         ? { dot: STATE_DOT.live, text: "All systems normal" }
         : { dot: STATE_DOT.disabled, text: "No integrations connected" };
 
-  // Under an "Attention needed" verdict the subtext names what's wrong — the
-  // actual alerts and any offline services — rather than the reassuring
-  // connected count that reads oddly next to a red dot.
-  const problems: string[] = [
-    ...alerts.map((a) => a.message),
-    ...snapshot.filter((e) => serviceState(e) === "unreachable").map((e) => `${e.label} offline`),
+  // What's wrong, each linking to the page that shows it: the TrueNAS
+  // alerts, then any integration that can't be reached (#509).
+  const page = (id: string) => `/admin/monitor/${encodeURIComponent(id)}`;
+  const problems: { tone: "down" | "warn"; message: string; source: string; href: string }[] = [
+    ...ofType("truenas").flatMap((e) =>
+      (e.data?.alerts ?? []).map((a) => ({
+        tone: a.level === "critical" ? ("down" as const) : ("warn" as const),
+        message: a.message,
+        source: e.label,
+        href: page(e.id),
+      }))
+    ),
+    ...snapshot
+      .filter((e) => serviceState(e) === "unreachable")
+      .map((e) => ({ tone: "down" as const, message: e.error ? `Can't reach it: ${e.error}` : "Can't reach it", source: e.label, href: page(e.id) })),
   ];
-  // Under "Attention needed" each problem gets its own line, so a long SMART
-  // message reads in full instead of being comma-joined into one clipped line.
-  const showProblems = attention && problems.length > 0;
+  const showProblems = (attention || stale > 0) && problems.length > 0;
   const PROBLEM_CAP = 5;
+  const summary = attention
+    ? [offline ? `${offline} offline` : null, alerts.length ? `${alerts.length} alert${alerts.length === 1 ? "" : "s"}` : null]
+        .filter(Boolean)
+        .join(" · ")
+    : connected === 0
+      ? "Connect a service in Settings to get started."
+      : `${connected} of ${snapshot.length} integrations connected`;
 
   return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-      <div className="flex items-start gap-3">
-        <span
-          aria-hidden
-          className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${overall.dot}`}
-        />
-        <div className="min-w-0">
-          <h2 className="text-lg font-semibold text-ink-90">{overall.text}</h2>
-          {showProblems ? (
-            <ul
-              className={`mt-1 space-y-0.5 text-xs ${
-                // Full strength, and amber's deepest light-mode shade: small
-                // text on the glass card needs 4.5:1 in both schemes.
-                criticalAlerts ? "text-status-down" : "text-status-warning"
-              }`}
-            >
-              {problems.slice(0, PROBLEM_CAP).map((p, i) => (
-                <li key={i}>{p}</li>
-              ))}
-              {problems.length > PROBLEM_CAP && (
-                <li className="text-ink-40">
-                  +{problems.length - PROBLEM_CAP} more
-                </li>
-              )}
-            </ul>
-          ) : (
-            <p className="text-xs text-ink-45">
-              {connected === 0
-                ? "Connect a service in Settings to get started."
-                : `${connected} of ${snapshot.length} integrations connected`}
-            </p>
+    <section aria-label="System health" className="glass-card flex flex-col [--surface-lift:0px]">
+      <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3.5">
+          <span
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+              attention ? TONE_SOFT.down : stale > 0 ? TONE_SOFT.warn : connected > 0 ? TONE_SOFT.up : TONE_SOFT.muted
+            }`}
+          >
+            <Glyph name={attention ? "alert" : stale > 0 ? "pulse" : connected > 0 ? "check" : "info"} />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-[15px] font-semibold text-ink-90">{overall.text}</h2>
+            <p className="truncate text-xs text-ink-55">{summary}</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {live > 0 && <Chip dot={STATE_DOT.live}>{live} live</Chip>}
+          {stale > 0 && <Chip dot={STATE_DOT.stale}>{stale} stale</Chip>}
+          {offline > 0 && <Chip dot={STATE_DOT.unreachable}>{offline} offline</Chip>}
+          {disabled > 0 && <Chip dot={STATE_DOT.disabled}>{disabled} off</Chip>}
+          {/* A thin divider before the activity highlights, when there are any. */}
+          {(downloading > 0 || streams > 0) && <span aria-hidden className="mx-1 h-4 w-px bg-fg/10" />}
+          {downloading > 0 && <Chip>{downloading} downloading</Chip>}
+          {streams > 0 && (
+            <Chip>
+              {streams} stream{streams === 1 ? "" : "s"}
+            </Chip>
           )}
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        {live > 0 && <Chip dot={STATE_DOT.live}>{live} live</Chip>}
-        {stale > 0 && <Chip dot={STATE_DOT.stale}>{stale} stale</Chip>}
-        {offline > 0 && <Chip dot={STATE_DOT.unreachable}>{offline} offline</Chip>}
-        {disabled > 0 && <Chip dot={STATE_DOT.disabled}>{disabled} off</Chip>}
-        {unconfigured > 0 && (
-          <Chip dot={STATE_DOT.unconfigured}>{unconfigured} to set up</Chip>
-        )}
-
-        {/* A thin divider before the activity highlights, when there are any. */}
-        {(downloading > 0 || streams > 0 || alerts.length > 0) && (
-          <span aria-hidden className="mx-1 h-4 w-px bg-fg/10" />
-        )}
-        {downloading > 0 && (
-          <Chip>
-            {downloading} downloading
-          </Chip>
-        )}
-        {streams > 0 && (
-          <Chip>
-            {streams} stream{streams === 1 ? "" : "s"}
-          </Chip>
-        )}
-        {alerts.length > 0 && (
-          <span
-            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${
-              criticalAlerts
-                ? "border-status-down/30 bg-status-down/10 text-status-down"
-                : "border-status-warning/30 bg-status-warning/10 text-status-warning/90"
-            }`}
-          >
-            {alerts.length} alert{alerts.length === 1 ? "" : "s"}
-          </span>
-        )}
-      </div>
-    </div>
+      {showProblems && (
+        <ul className="divide-y divide-fg/[0.07] border-t border-fg/[0.07]">
+          {problems.slice(0, PROBLEM_CAP).map((p, i) => (
+            <li key={`${p.href}-${i}`}>
+              <Link
+                href={p.href}
+                className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-fg/[0.03]"
+              >
+                <span className={`shrink-0 ${TONE_TEXT[p.tone]}`}>
+                  <Glyph name={p.tone === "down" ? "error" : "alert"} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="line-clamp-2 block text-sm text-ink-85" title={p.message}>
+                    {p.message}
+                  </span>
+                  <span className="block text-xs text-ink-50">{p.source}</span>
+                </span>
+                <span className="shrink-0 text-ink-40">
+                  <Glyph name="chevron" />
+                </span>
+              </Link>
+            </li>
+          ))}
+          {problems.length > PROBLEM_CAP && (
+            <li className="px-5 py-2.5 text-xs text-ink-50">and {problems.length - PROBLEM_CAP} more</li>
+          )}
+        </ul>
+      )}
+    </section>
   );
 }
