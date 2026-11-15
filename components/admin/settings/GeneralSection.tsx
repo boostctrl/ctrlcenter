@@ -28,9 +28,9 @@ export default function GeneralSection({
   const schedule = settings.themeSchedule;
   const updateSchedule = (patch: Partial<typeof schedule>) =>
     setSettings({ ...settings, themeSchedule: { ...schedule, ...patch } });
-  // A phase's pack is stored by its gallery key (#395), so a rename keeps
-  // it; a schedule saved before keys were stored names it, and still
-  // selects it here.
+  // A pack is stored by its gallery key (#395 for the schedule's phases,
+  // #446 for the default theme), so a rename keeps it; one saved before keys
+  // were stored names it, and still selects it here.
   const phasePackKey = (ref: string) => {
     const pack = packByRef(themePacks, ref);
     return pack ? packKey(pack) : "";
@@ -104,16 +104,16 @@ export default function GeneralSection({
 
         <SelectField
           label="Default theme"
-          value={theme.preset ?? ""}
+          value={phasePackKey(theme.preset ?? "")}
           onChange={(e) => applyDefaultTheme(e.target.value)}
         >
-          {!theme.preset && (
+          {!packByRef(themePacks, theme.preset) && (
             <option value="" disabled>
               Custom
             </option>
           )}
           {themePacks.map((p) => (
-            <option key={p.name} value={p.name}>
+            <option key={packKey(p)} value={packKey(p)}>
               {p.name}
             </option>
           ))}
@@ -121,7 +121,7 @@ export default function GeneralSection({
 
         <SelectField
           label="Light mode look"
-          value={theme.presetLight ?? ""}
+          value={phasePackKey(theme.presetLight ?? "")}
           onChange={(e) => applyLightDefault(e.target.value)}
           hint={
             <>
@@ -133,7 +133,7 @@ export default function GeneralSection({
         >
           <option value="">Same as default</option>
           {themePacks.map((p) => (
-            <option key={p.name} value={p.name}>
+            <option key={packKey(p)} value={packKey(p)}>
               {p.name}
             </option>
           ))}

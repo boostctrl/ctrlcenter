@@ -5,7 +5,7 @@
 // same answer.
 import { sunTimes } from "./solar";
 import type { ThemePack } from "./theme";
-import { packDesign, packScene } from "./theme";
+import { packDesign, packKey, packScene } from "./theme";
 
 export type ThemeSchedule = {
   enabled: boolean;
@@ -183,7 +183,7 @@ export function themeWithPack<
   return {
     ...theme,
     mode: mode ?? theme.mode,
-    preset: pack.name,
+    preset: packKey(pack),
     presetLight: undefined,
     design: pack.design,
     scene: pack.scene,

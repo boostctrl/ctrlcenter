@@ -35,6 +35,13 @@ here.
   and the test results all said "Webhook" for both, as did the server log.
   They now all say "Webhook" and "Webhook 2". (#442)
 
+- **Renaming a saved theme keeps it selected as the site's default.** The
+  Default theme and Light mode look pickers in Settings → General matched
+  saved themes by name, so renaming the theme in use left them blank (the
+  site's look itself didn't change). They now keep track of the theme
+  through a rename, as board themes and the day and night schedule already
+  did. (#446)
+
 ## [3.1.2] - 2026-11-14
 
 ### Fixed

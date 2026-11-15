@@ -48,12 +48,15 @@ export const wallpaperSchema = z.object({
 // custom default colors — when both are set they override the light/dark mode.
 export const themeSchema = z.object({
   mode: z.enum(["system", "light", "dark"]).default("system"),
-  // Name of the theme pack chosen as the site default (admin Settings). Purely a
-  // UI pointer for the picker — the concrete design/scene/colors below are what
-  // the layout/PrefsProvider actually apply.
+  // The theme pack chosen as the site default (admin Settings), by its
+  // gallery key so a rename keeps it (#446; a config from before names it,
+  // and packByRef still finds it). Purely a UI pointer for the picker — the
+  // concrete design/scene/colors below are what the layout/PrefsProvider
+  // actually apply.
   preset: z.string().optional(),
-  // The pack chosen for an independent light-mode default (admin Settings). When
-  // unset, light mode follows the dark default's light variant.
+  // The pack chosen for an independent light-mode default (admin Settings),
+  // the same way. When unset, light mode follows the dark default's light
+  // variant.
   presetLight: z.string().optional(),
   // `.catch` coerces an unknown id back to the default so a typo in a
   // hand-edited config doesn't fail the whole read. (Ids retired in 1.4 were

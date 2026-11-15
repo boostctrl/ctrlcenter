@@ -55,10 +55,13 @@ describe("boardDefaultTheme (#337)", () => {
       { key: "Circuit", builtin: "Circuit", name: "Wires" },
       { key: "custom-ab12cd34", name: "Mine", design: "paper", ...colors },
     ]).map((r) => r.pack);
-    // The built-in renamed: the pin (its key, the shipped name) holds.
-    expect(boardDefaultTheme(theme, { theme: "Circuit" }, gallery).preset).toBe("Wires");
+    // The built-in renamed: the pin (its key, the shipped name) holds, and
+    // the theme records the pack by that key too (#446).
+    const renamed = boardDefaultTheme(theme, { theme: "Circuit" }, gallery);
+    expect(renamed.design).toBe(THEME_PACKS.find((p) => p.name === "Circuit")!.design);
+    expect(renamed.preset).toBe("Circuit");
     // A pack of the admin's own by key, and by its name from an older config.
     expect(boardDefaultTheme(theme, { theme: "custom-ab12cd34" }, gallery).design).toBe("paper");
-    expect(boardDefaultTheme(theme, { theme: "Mine" }, gallery).design).toBe("paper");
+    expect(boardDefaultTheme(theme, { theme: "Mine" }, gallery).preset).toBe("custom-ab12cd34");
   });
 });

@@ -10,7 +10,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import type { Settings } from "@/lib/schema";
 import { alertChannelSchema, ALERT_TYPES, type AlertType } from "@/lib/schema";
-import type { ThemePack } from "@/lib/theme";
+import { packByRef, packKey, type ThemePack } from "@/lib/theme";
 import { appNameFromUrl, parsePastedUrls } from "@/lib/setup";
 import CitySearch from "./CitySearch";
 import TwoFactor from "./TwoFactor";
@@ -420,11 +420,15 @@ function SecurityStep({
 }
 
 function ThemeStep({ settings, onSave, packs }: StepProps & { packs: ThemePack[] }) {
-  const [chosen, setChosen] = useState(settings.theme.preset ?? "");
+  // By the pack's gallery key, as admin Settings records it (#446).
+  const [chosen, setChosen] = useState(() => {
+    const pack = packByRef(packs, settings.theme.preset);
+    return pack ? packKey(pack) : "";
+  });
   return (
     <StepForm
       onSubmit={() => {
-        const pack = packs.find((p) => p.name === chosen);
+        const pack = packByRef(packs, chosen);
         if (!pack) return void onSave(async () => {});
         // As admin Settings → General applies a pack: both modes from it.
         return void onSave(() =>
@@ -432,7 +436,7 @@ function ThemeStep({ settings, onSave, packs }: StepProps & { packs: ThemePack[]
             {
               theme: {
                 ...settings.theme,
-                preset: pack.name,
+                preset: packKey(pack),
                 design: pack.design,
                 scene: pack.scene,
                 accentFrom: pack.dark.accentFrom,
@@ -472,13 +476,13 @@ function ThemeStep({ settings, onSave, packs }: StepProps & { packs: ThemePack[]
       <div role="radiogroup" aria-label="Theme" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {packs.map((p) => (
           <button
-            key={p.name}
+            key={packKey(p)}
             type="button"
             role="radio"
-            aria-checked={chosen === p.name}
-            onClick={() => setChosen(p.name)}
+            aria-checked={chosen === packKey(p)}
+            onClick={() => setChosen(packKey(p))}
             className={`flex flex-col gap-2 rounded-xl border p-2 text-left text-sm transition-colors ${
-              chosen === p.name ? "border-[var(--accent-from)] ring-2 ring-[var(--accent-from)]/40" : "border-fg/10 hover:border-fg/30"
+              chosen === packKey(p) ? "border-[var(--accent-from)] ring-2 ring-[var(--accent-from)]/40" : "border-fg/10 hover:border-fg/30"
             }`}
           >
             <span aria-hidden className="flex h-10 overflow-hidden rounded-lg">

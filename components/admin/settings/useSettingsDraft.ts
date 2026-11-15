@@ -12,7 +12,7 @@ import {
   newBoardId,
   integrationSchema,
 } from "@/lib/schema";
-import { packDesign, packScene, type ThemePack } from "@/lib/theme";
+import { packByRef, packDesign, packKey, packScene, type ThemePack } from "@/lib/theme";
 import { newThemeId } from "@/lib/prefs";
 import { defaultSpanFor, resolveLayout, type WidgetType } from "@/lib/layout";
 import { instanceLabels } from "@/lib/widgets/labels";
@@ -396,11 +396,13 @@ export function useSettingsDraft(
   // surfaces) and clears any separate light-mode override, so light follows dark
   // unless the admin diverges it below. The light accent pair (only ever set by
   // promoting a saved theme, #142) is cleared for the same reason.
-  function applyDefaultTheme(name: string) {
-    const pack = themePacks.find((p) => p.name === name);
+  // Packs are picked and recorded by their gallery key (#446), so renaming
+  // one keeps it selected.
+  function applyDefaultTheme(ref: string) {
+    const pack = packByRef(themePacks, ref);
     if (!pack) return;
     updateTheme({
-      preset: pack.name,
+      preset: packKey(pack),
       design: pack.design,
       scene: pack.scene,
       accentFrom: pack.dark.accentFrom,
@@ -440,9 +442,9 @@ export function useSettingsDraft(
   // Give light mode a wholly independent look (design + scene + surfaces) from a
   // different pack. An empty name means "same as dark" — clear the override and
   // re-seed the light surfaces from the dark default's pack.
-  function applyLightDefault(name: string) {
-    if (!name) {
-      const darkPack = themePacks.find((p) => p.name === theme.preset);
+  function applyLightDefault(ref: string) {
+    if (!ref) {
+      const darkPack = packByRef(themePacks, theme.preset);
       updateTheme({
         presetLight: undefined,
         designLight: darkPack?.designLight,
@@ -464,10 +466,10 @@ export function useSettingsDraft(
       });
       return;
     }
-    const pack = themePacks.find((p) => p.name === name);
+    const pack = packByRef(themePacks, ref);
     if (!pack) return;
     updateTheme({
-      presetLight: pack.name,
+      presetLight: packKey(pack),
       designLight: packDesign(pack, false),
       sceneLight: packScene(pack, false),
       accentFromLight: undefined,
