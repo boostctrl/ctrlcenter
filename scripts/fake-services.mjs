@@ -1,0 +1,520 @@
+// Sample data for every integration (#507): one local HTTP server that
+// answers the API calls CtrlCenter's service clients make, each service under
+// its own path prefix (`/sonarr`, `/radarr`, …), with realistic data — long
+// names, many rows, warnings and errors, something offline — so the Monitor
+// dashboard and every integration page can be seen populated.
+//
+// It is never part of the app: the smoke run (scripts/smoke.mjs) starts it
+// and points its integrations at it, so the screenshots show real pages, and
+// the data goes through the same clients and parsing a real install uses.
+// Run on its own to look at the pages while developing:
+//
+//   node scripts/fake-services.mjs [port]
+//
+// prints the integrations to add (Settings → Integrations, or the JSON for
+// PUT /api/integrations). Every name, address and number here is invented.
+import http from "node:http";
+import { pathToFileURL } from "node:url";
+
+const MIN = 60_000;
+const HOUR = 60 * MIN;
+const DAY = 24 * HOUR;
+const GB = 1024 ** 3;
+const TB = 1024 ** 4;
+
+// The credentials each fake service expects; a wrong one answers as the real
+// service would, so a misconfigured integration shows its real error.
+export const FAKE_KEY = "fake-api-key";
+export const FAKE_USER = "fake-user";
+export const FAKE_PASSWORD = "fake-password";
+
+const iso = (ms) => new Date(ms).toISOString();
+
+// --- Sonarr and Radarr (/api/v3) ---
+
+const SERIES = [
+  "Severance",
+  "The Expanse",
+  "Slow Horses",
+  "Shōgun",
+  "Andor",
+  "The Long and Winding Chronicles of the Northern Lighthouse Keepers",
+  "Blue Eye Samurai",
+  "Silo",
+];
+const MOVIES = [
+  ["Dune: Part Two", 2024],
+  ["Past Lives", 2023],
+  ["The Zone of Interest", 2023],
+  ["Perfect Days", 2023],
+  ["A Very Long Title About an Expedition Across the Frozen Continent", 2025],
+  ["Arrival", 2016],
+  ["Aftersun", 2022],
+];
+
+function sonarr(path, now) {
+  if (path.startsWith("/api/v3/calendar")) {
+    return SERIES.map((title, i) => ({
+      airDateUtc: iso(now + (i * 37 + 5) * HOUR),
+      seasonNumber: 1 + (i % 3),
+      episodeNumber: 2 + i,
+      title: `Episode ${2 + i}`,
+      series: { title },
+    }));
+  }
+  if (path.startsWith("/api/v3/history")) {
+    const events = ["downloadFolderImported", "grabbed", "episodeFileRenamed", "grabbed", "downloadFolderImported"];
+    return {
+      records: Array.from({ length: 25 }, (_, i) => ({
+        eventType: events[i % events.length],
+        date: iso(now - (i * 5 + 1) * HOUR),
+        series: { title: SERIES[i % SERIES.length] },
+        episode: { seasonNumber: 1 + (i % 2), episodeNumber: 1 + (i % 9) },
+      })),
+    };
+  }
+  if (path === "/api/v3/health") {
+    return [
+      { type: "warning", message: "Indexer Nyaa is unavailable due to failures for more than 6 hours" },
+      { type: "notice", message: "Update available: 4.0.11 is ready to install" },
+    ];
+  }
+  if (path === "/api/v3/system/status") return { appName: "Sonarr", version: "4.0.10.2544" };
+  return undefined;
+}
+
+function radarr(path, now) {
+  if (path.startsWith("/api/v3/calendar")) {
+    return MOVIES.map(([title, year], i) => ({
+      title,
+      year,
+      inCinemas: iso(now - 90 * DAY + i * DAY),
+      digitalRelease: iso(now + (i * 2 + 1) * DAY),
+      physicalRelease: iso(now + (i * 3 + 20) * DAY),
+    }));
+  }
+  if (path.startsWith("/api/v3/history")) {
+    const events = ["grabbed", "downloadFolderImported", "movieFileDeleted"];
+    return {
+      records: Array.from({ length: 25 }, (_, i) => ({
+        eventType: events[i % events.length],
+        date: iso(now - (i * 9 + 2) * HOUR),
+        movie: { title: MOVIES[i % MOVIES.length][0], year: MOVIES[i % MOVIES.length][1] },
+      })),
+    };
+  }
+  if (path === "/api/v3/health") {
+    return [
+      { type: "error", message: "All download clients are unavailable due to failures" },
+      { type: "warning", message: "Missing root folder: /data/media/movies-4k" },
+    ];
+  }
+  if (path === "/api/v3/system/status") return { appName: "Radarr", version: "5.14.0.9383" };
+  return undefined;
+}
+
+// --- Seerr (/api/v1) ---
+
+const REQUESTERS = ["Alex", "Sam", "Jordan Lee", "Priya", "Morgan"];
+function seerr(path, now) {
+  if (path === "/api/v1/request/count") return { pending: 3, approved: 6, processing: 2, available: 41, total: 52 };
+  if (path.startsWith("/api/v1/request?")) {
+    // status 1 pending, 2 approved; media 2 pending, 3 processing, 5 available.
+    const rows = [
+      [1, 2, "movie"],
+      [1, 2, "tv"],
+      [1, 2, "movie"],
+      [2, 3, "tv"],
+      [2, 3, "movie"],
+      [2, 5, "movie"],
+      [2, 5, "tv"],
+      [2, 4, "tv"],
+      [2, 5, "movie"],
+      [3, 2, "movie"],
+    ];
+    return {
+      results: rows.map(([status, mediaStatus, type], i) => ({
+        id: 100 + i,
+        status,
+        type,
+        createdAt: iso(now - (i * 7 + 1) * HOUR),
+        media: { tmdbId: 5000 + i, mediaType: type, status: mediaStatus },
+        requestedBy: { displayName: REQUESTERS[i % REQUESTERS.length] },
+      })),
+    };
+  }
+  const detail = /^\/api\/v1\/(movie|tv)\/(\d+)$/.exec(path);
+  if (detail) {
+    const n = Number(detail[2]) - 5000;
+    return detail[1] === "tv" ? { name: SERIES[n % SERIES.length] } : { title: MOVIES[n % MOVIES.length][0] };
+  }
+  if (path === "/api/v1/status") return { version: "2.1.0" };
+  return undefined;
+}
+
+// --- Tautulli (/api/v2?cmd=) ---
+
+function tautulli(cmd, now) {
+  const ok = (data) => ({ response: { result: "success", message: null, data } });
+  if (cmd === "get_activity") {
+    return ok({
+      stream_count: "3",
+      total_bandwidth: 31200,
+      sessions: [
+        { friendly_name: "Alex", full_title: "Severance - Cold Harbor", state: "playing", transcode_decision: "direct play", progress_percent: "64", quality_profile: "Original" },
+        { friendly_name: "Priya", full_title: "Dune: Part Two", state: "playing", transcode_decision: "transcode", progress_percent: "22", quality_profile: "8 Mbps 1080p" },
+        { friendly_name: "Jordan Lee", full_title: "The Long and Winding Chronicles of the Northern Lighthouse Keepers - The Keeper's Daughter", state: "paused", transcode_decision: "copy", progress_percent: "91", quality_profile: "Original" },
+      ],
+    });
+  }
+  if (cmd === "get_history") {
+    return ok({
+      data: Array.from({ length: 10 }, (_, i) => ({
+        friendly_name: REQUESTERS[i % REQUESTERS.length],
+        full_title: i % 2 ? MOVIES[i % MOVIES.length][0] : `${SERIES[i % SERIES.length]} - Episode ${i + 1}`,
+        date: Math.floor((now - (i * 3 + 1) * HOUR) / 1000),
+        transcode_decision: ["direct play", "transcode", "copy"][i % 3],
+      })),
+    });
+  }
+  if (cmd === "get_tautulli_info") return ok({ tautulli_version: "v2.14.6" });
+  return { response: { result: "error", message: `Unknown command ${cmd}`, data: {} } };
+}
+
+// --- qBittorrent (/api/v2) ---
+
+const TORRENTS = [
+  ["Severance.S02E07.Chikhai.Bardo.1080p.ATVP.WEB-DL.DDP5.1.H.264", "downloading", 0.42, 6.1e6],
+  ["Dune.Part.Two.2024.2160p.UHD.BluRay.REMUX.HDR.HEVC.Atmos", "downloading", 0.08, 11.4e6],
+  ["The.Long.and.Winding.Chronicles.of.the.Northern.Lighthouse.Keepers.S01.COMPLETE.1080p.WEB-DL", "stalledDL", 0.71, 0],
+  ["Andor.S02E03.1080p.DSNP.WEB-DL", "queuedDL", 0, 0],
+  ["Past.Lives.2023.1080p.WEB-DL", "uploading", 1, 0],
+  ["Arrival.2016.1080p.BluRay.x264", "stalledUP", 1, 0],
+  ["debian-13.1.0-amd64-netinst.iso", "uploading", 1, 0],
+  ["Slow.Horses.S04.1080p.ATVP.WEB-DL", "pausedUP", 1, 0],
+  ["Aftersun.2022.1080p.MUBI.WEB-DL", "error", 0.33, 0],
+  ["Silo.S02E05.1080p.ATVP.WEB-DL", "checkingDL", 0.12, 0],
+  ["Blue.Eye.Samurai.S01.1080p.NF.WEB-DL", "stalledUP", 1, 0],
+  ["ubuntu-24.04.2-desktop-amd64.iso", "uploading", 1, 0],
+];
+function qbittorrentMaindata() {
+  const torrents = Object.fromEntries(
+    TORRENTS.map(([name, state, progress, dlspeed], i) => [
+      `hash${String(i).padStart(36, "0")}`,
+      {
+        name,
+        state,
+        progress,
+        ratio: progress === 1 ? 0.4 + i * 0.37 : 0.02 * i,
+        dlspeed,
+        upspeed: state === "uploading" ? 350_000 + i * 90_000 : 0,
+        size: (2 + i * 3.5) * GB,
+        eta: dlspeed > 0 ? Math.round(((1 - progress) * (2 + i * 3.5) * GB) / dlspeed) : 8640000,
+      },
+    ])
+  );
+  return {
+    rid: 1,
+    full_update: true,
+    torrents,
+    server_state: {
+      dl_info_speed: 17.5e6,
+      up_info_speed: 1.9e6,
+      dl_info_data: 48 * GB,
+      up_info_data: 12 * GB,
+      alltime_dl: 18.2 * TB,
+      alltime_ul: 9.7 * TB,
+      global_ratio: "0.53",
+      free_space_on_disk: 2.4 * TB,
+      connection_status: "connected",
+    },
+  };
+}
+
+// --- Portainer (/api) ---
+
+const CONTAINERS = [
+  ["/traefik", "running", "Up 12 days"],
+  ["/ctrlcenter", "running", "Up 2 hours (healthy)"],
+  ["/plex", "running", "Up 12 days"],
+  ["/sonarr", "running", "Up 3 days"],
+  ["/radarr", "running", "Up 3 days"],
+  ["/qbittorrent-behind-the-vpn-with-a-long-container-name", "running", "Up 3 days (unhealthy)"],
+  ["/gluetun", "running", "Up 3 days (healthy)"],
+  ["/tautulli", "running", "Up 12 days"],
+  ["/seerr", "exited", "Exited (1) 4 hours ago"],
+  ["/watchtower", "exited", "Exited (0) 2 days ago"],
+  ["/postgres", "running", "Up 12 days (healthy)"],
+  ["/redis", "restarting", "Restarting (1) 20 seconds ago"],
+];
+function portainer(path) {
+  if (path === "/api/endpoints") {
+    return [
+      { Id: 1, Name: "local", Snapshots: [{ RunningContainerCount: 9, StoppedContainerCount: 2, HealthyContainerCount: 3, UnhealthyContainerCount: 1, TotalContainerCount: 12 }] },
+      { Id: 2, Name: "nas-edge", Snapshots: [{ RunningContainerCount: 4, StoppedContainerCount: 0, HealthyContainerCount: 2, UnhealthyContainerCount: 0, TotalContainerCount: 4 }] },
+      { Id: 3, Name: "offsite-backup", Snapshots: [] },
+    ];
+  }
+  const list = /^\/api\/endpoints\/(\d+)\/docker\/containers\/json/.exec(path);
+  if (list) {
+    const rows = list[1] === "1" ? CONTAINERS : CONTAINERS.slice(0, 4);
+    return rows.map(([name, state, status], i) => ({ Id: `${list[1]}c${String(i).padStart(62, "0")}`, Names: [name], State: state, Status: status }));
+  }
+  if (/\/logs\?/.test(path)) return "logs";
+  return undefined;
+}
+
+// --- TrueNAS (/api/v2.0) ---
+
+function truenas(path) {
+  if (path === "/api/v2.0/pool") {
+    return [
+      { name: "tank", status: "ONLINE", healthy: true, size: 43.6 * TB, allocated: 31.1 * TB, free: 12.5 * TB },
+      { name: "fast", status: "ONLINE", healthy: true, size: 1.8 * TB, allocated: 0.4 * TB, free: 1.4 * TB },
+      { name: "backup", status: "DEGRADED", healthy: false, size: 21.8 * TB, allocated: 19.9 * TB, free: 1.9 * TB },
+    ];
+  }
+  if (path.startsWith("/api/v2.0/app")) {
+    const app = (name, state, containers, upgrade = false) => ({
+      name,
+      state,
+      upgrade_available: upgrade,
+      active_workloads: {
+        containers: containers.length,
+        container_details: containers.map((service_name, i) => ({ id: `${name}-${i}`, service_name, image: `ghcr.io/example/${service_name}:latest`, state: state === "RUNNING" ? "running" : "exited" })),
+      },
+    });
+    return [
+      app("immich", "RUNNING", ["server", "machine-learning", "redis", "postgres"], true),
+      app("nextcloud", "RUNNING", ["nextcloud", "cron", "postgres"]),
+      app("home-assistant", "RUNNING", ["home-assistant"]),
+      app("syncthing", "RUNNING", ["syncthing"], true),
+      app("minio", "STOPPED", ["minio"]),
+      app("paperless-ngx-with-a-long-application-name", "DEPLOYING", ["web", "broker"]),
+      app("jellyfin", "RUNNING", ["jellyfin"]),
+      app("vaultwarden", "CRASHED", ["vaultwarden"]),
+    ];
+  }
+  if (path === "/api/v2.0/alert/list") {
+    return [
+      { level: "CRITICAL", formatted: "Pool backup state is DEGRADED: One or more devices has been removed by the administrator.", dismissed: false },
+      { level: "WARNING", formatted: "Space usage for pool backup is 91%. Optimal pool performance requires used space remain below 80%.", dismissed: false },
+      { level: "INFO", formatted: "Update to TrueNAS 25.04.2 is available.", dismissed: false },
+      { level: "WARNING", formatted: "A dismissed alert that should not show.", dismissed: true },
+    ];
+  }
+  if (path === "/api/v2.0/system/info") return { version: "TrueNAS-SCALE-25.04.1", hostname: "nas" };
+  return undefined;
+}
+
+// --- AdGuard Home (/control) ---
+
+function adguard(path) {
+  if (path === "/control/status") return { version: "v0.107.57", protection_enabled: true };
+  if (path === "/control/stats") {
+    // 24 hourly points, a daytime curve; about one in six blocked.
+    const queries = Array.from({ length: 24 }, (_, h) => Math.round(900 + 1400 * Math.max(0, Math.sin(((h - 6) / 24) * Math.PI * 2)) + (h % 5) * 60));
+    const blocked = queries.map((q, h) => Math.round(q * (0.13 + (h % 4) * 0.02)));
+    const domains = [
+      "doubleclick.net",
+      "app-measurement.com",
+      "telemetry.example-smart-tv-vendor-with-a-very-long-domain.com",
+      "graph.facebook.com",
+      "ads.youtube.com",
+      "metrics.icloud.com",
+      "browser-intake-datadoghq.com",
+      "settings-win.data.microsoft.com",
+    ];
+    return {
+      time_units: "hours",
+      num_dns_queries: queries.reduce((a, b) => a + b, 0),
+      num_blocked_filtering: blocked.reduce((a, b) => a + b, 0),
+      avg_processing_time: 0.0123,
+      dns_queries: queries,
+      blocked_filtering: blocked,
+      top_blocked_domains: domains.map((d, i) => ({ [d]: Math.round(4200 / (i + 1)) })),
+    };
+  }
+  return undefined;
+}
+
+// --- UniFi Network (UniFi OS, /proxy/network) ---
+
+function unifi(path) {
+  const env = (data) => ({ meta: { rc: "ok" }, data });
+  if (path === "/proxy/network/api/s/default/stat/health") {
+    return env([
+      { subsystem: "wlan", status: "ok", num_user: 15, num_guest: 2, num_iot: 1, num_adopted: 3, num_disconnected: 0, num_pending: 0 },
+      { subsystem: "wan", status: "ok", num_gw: 1, num_adopted: 1, num_disconnected: 0, wan_ip: "203.0.113.24", isp_name: "Example Fiber", num_sta: 24 },
+      { subsystem: "www", status: "ok", latency: 11 },
+      { subsystem: "lan", status: "ok", num_user: 7, num_guest: 0, num_adopted: 4, num_disconnected: 0, num_pending: 0 },
+      { subsystem: "vpn", status: "ok" },
+    ]);
+  }
+  const devices = [
+    { name: "Dream Machine Pro", model: "UDMPRO", type: "udm", state: 1, num_sta: 24, uptime: 1_900_000 },
+    { name: "Living Room AP", type: "uap", state: 1, num_sta: 9, uptime: 860_000 },
+    { name: "Office AP", type: "uap", state: 1, num_sta: 6, uptime: 860_000 },
+    { name: "Garage AP (detached building)", type: "uap", state: 0, num_sta: 0, uptime: 0 },
+    { name: "Rack Switch 24 PoE", type: "usw", state: 1, num_sta: 11, uptime: 1_900_000 },
+    { name: "Desk Switch", type: "usw", state: 5, num_sta: 3, uptime: 4_200 },
+  ];
+  if (path === "/proxy/network/api/s/default/stat/device") return env(devices);
+  if (path === "/proxy/network/v2/api/site/default/device") {
+    return {
+      network_devices: devices,
+      protect_devices: [
+        { name: "Front Door", state: 1 },
+        { name: "Driveway", state: 1 },
+        { name: "Back Garden", state: 0 },
+      ],
+      access_devices: [],
+      unmanaged_devices: [{ name: "Printer", state: 0 }],
+    };
+  }
+  if (path === "/proxy/network/v2/api/site/default/clients/active") {
+    return [
+      ...Array.from({ length: 13 }, (_, i) => ({ type: "WIRELESS", is_wired: false, is_guest: i < 2 })),
+      ...Array.from({ length: 7 }, () => ({ type: "WIRED", is_wired: true, is_guest: false })),
+    ];
+  }
+  if (path === "/proxy/network/api/s/default/stat/sysinfo") return env([{ version: "9.0.114" }]);
+  return undefined;
+}
+
+// --- The server ---
+
+function send(res, status, body, headers = {}) {
+  const text = typeof body === "string" ? body : JSON.stringify(body);
+  res.writeHead(status, {
+    "content-type": typeof body === "string" ? "text/plain; charset=utf-8" : "application/json",
+    ...headers,
+  });
+  res.end(text);
+}
+
+// Whether a request carries the fake credentials the service expects.
+function authorized(service, req, url) {
+  const h = req.headers;
+  switch (service) {
+    case "sonarr":
+    case "radarr":
+    case "seerr":
+      return h["x-api-key"] === FAKE_KEY;
+    case "portainer":
+      return h["x-api-key"] === FAKE_KEY;
+    case "truenas":
+      return h.authorization === `Bearer ${FAKE_KEY}`;
+    case "tautulli":
+      return url.searchParams.get("apikey") === FAKE_KEY;
+    case "adguard":
+      return h.authorization === `Basic ${Buffer.from(`${FAKE_USER}:${FAKE_PASSWORD}`).toString("base64")}`;
+    case "qbittorrent":
+    case "unifi":
+      return /(?:^|;\s*)(SID|TOKEN)=fake-session/.test(h.cookie ?? "");
+    default:
+      return false;
+  }
+}
+
+function handle(req, res) {
+  const url = new URL(req.url ?? "/", "http://fake.local");
+  const [, service, ...rest] = url.pathname.split("/");
+  const path = `/${rest.join("/")}${url.search}`;
+  const bare = `/${rest.join("/")}`;
+  const now = Date.now();
+
+  // Sign-ins: qBittorrent's form login and UniFi OS's JSON one.
+  if (service === "qbittorrent" && bare === "/api/v2/auth/login") {
+    return send(res, 200, "Ok.", { "set-cookie": "SID=fake-session; HttpOnly; path=/" });
+  }
+  if (service === "unifi" && bare === "/api/auth/login") {
+    return send(res, 200, {}, { "set-cookie": "TOKEN=fake-session; Path=/; HttpOnly" });
+  }
+  if (!authorized(service, req, url)) return send(res, 401, { error: "Unauthorized" });
+
+  let body;
+  switch (service) {
+    case "sonarr":
+      body = sonarr(path, now);
+      break;
+    case "radarr":
+      body = radarr(path, now);
+      break;
+    case "seerr":
+      body = seerr(path, now);
+      break;
+    case "tautulli":
+      body = bare === "/api/v2" ? tautulli(url.searchParams.get("cmd") ?? "", now) : undefined;
+      break;
+    case "qbittorrent":
+      if (bare === "/api/v2/sync/maindata") body = qbittorrentMaindata();
+      else if (bare === "/api/v2/app/version") body = "v5.0.4";
+      break;
+    case "portainer":
+      body = portainer(path);
+      break;
+    case "truenas":
+      body = truenas(path);
+      break;
+    case "adguard":
+      body = adguard(bare);
+      break;
+    case "unifi":
+      body = unifi(bare);
+      break;
+  }
+  if (body === undefined) return send(res, 404, { error: "Not found" });
+  return send(res, 200, body);
+}
+
+// The integrations that use this server, in the shape PUT /api/integrations
+// takes: one of each type, named as a real install might.
+export function fakeIntegrations(base) {
+  const row = (id, type, name, over = {}) => ({
+    id,
+    type,
+    name,
+    enabled: true,
+    url: `${base}/${type}`,
+    username: "",
+    password: "",
+    apiKey: "",
+    allowInsecureTls: false,
+    allowActions: false,
+    ...over,
+  });
+  const key = { apiKey: FAKE_KEY };
+  const login = { username: FAKE_USER, password: FAKE_PASSWORD };
+  return [
+    row("sonarr", "sonarr", "", key),
+    row("radarr", "radarr", "", key),
+    row("seerr", "seerr", "", key),
+    row("tautulli", "tautulli", "", key),
+    row("qbittorrent", "qbittorrent", "", login),
+    row("portainer", "portainer", "", key),
+    row("truenas", "truenas", "", key),
+    row("adguard", "adguard", "", login),
+    row("unifi", "unifi", "", login),
+  ];
+}
+
+// Start the server on `port` (0 for any free one). Resolves to its base URL
+// and a close function.
+export function startFakeServices(port = 0, host = "127.0.0.1") {
+  const server = http.createServer(handle);
+  return new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(port, host, () => {
+      const { port: bound } = server.address();
+      resolve({ base: `http://${host}:${bound}`, close: () => new Promise((r) => server.close(() => r())) });
+    });
+  });
+}
+
+// On its own: serve until stopped, and say how to connect.
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  const { base } = await startFakeServices(Number(process.argv[2] ?? 4010));
+  console.log(`Fake services on ${base}. Add these integrations (PUT /api/integrations, or by hand in Settings → Integrations):`);
+  console.log(JSON.stringify(fakeIntegrations(base), null, 2));
+}

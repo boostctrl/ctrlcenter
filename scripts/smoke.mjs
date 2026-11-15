@@ -25,6 +25,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { launchBrowser, checkPage, axeScript } from "./page-check.mjs";
+import { startFakeServices, fakeIntegrations } from "./fake-services.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const STANDALONE = path.join(ROOT, ".next", "standalone");
@@ -106,6 +107,9 @@ let integrationUrl = "";
 let browser;
 // The status phase's local TLS target (see startTlsServer).
 let tlsServer;
+// The sample data every live integration reads (#507), and its base URL,
+// which must never reach a signed-out page either.
+let fakeServices;
 try {
   // Wait for /api/health.
   const deadline = Date.now() + 30_000;
@@ -142,6 +146,7 @@ try {
   await browser?.close();
   server.kill();
   tlsServer?.close();
+  await fakeServices?.close();
 }
 
 // The Chromium run: the public pages signed out, every built-in look, the
@@ -163,8 +168,8 @@ async function chromiumPhases(run) {
     if (scheme === "light") {
       const media = await (await fetch(`${base}/b/media`)).text();
       if (!media.includes("Sonarr 4K")) failures.push("/b/media: the public integration tile is missing");
-      if (integrationUrl && media.includes(integrationUrl.replace("http://", "")))
-        failures.push("/b/media: an integration URL reached a signed-out page");
+      const leaked = [integrationUrl, fakeServices?.base].filter((u) => u && media.includes(u.replace("http://", "")));
+      if (leaked.length) failures.push("/b/media: an integration URL reached a signed-out page");
       else console.log("ok    /b/media shows the public tile and no integration URL");
       if (!media.includes("App health")) failures.push("/b/media: the public API widget is missing");
       else if (media.includes("/api/health")) failures.push("/b/media: an API widget URL reached a signed-out page");
@@ -199,6 +204,11 @@ async function chromiumPhases(run) {
       ["/admin?tab=settings&section=layout", "admin-layout"],
       ["/admin?tab=settings&section=integrations", "admin-integrations"],
       ["/admin/monitor/sonarr-4k", "monitor-detail"],
+      // Every integration's page with its sample data (#507).
+      ...["sonarr", "radarr", "seerr", "tautulli", "qbittorrent", "portainer", "truenas", "adguard", "unifi"].map((id) => [
+        `/admin/monitor/${id}`,
+        `monitor-${id}`,
+      ]),
       ["/b/infra", "board-private"],
       ["/admin/monitor", "admin-monitor"],
       ["/?edit=1", "editor"],
@@ -537,14 +547,17 @@ async function addBoards() {
     data: groups.map((g, i) => ({ ...g, color: colors[i % colors.length], ...(i === 0 ? { icon: "amazon" } : {}) })),
   });
   if (!styled.ok()) throw new Error(`styling groups failed: HTTP ${styled.status()}`);
-  // Two of one integration type (#300), pointed at a closed local port so the
-  // Monitor renders their offline tiles without reaching anything real.
+  // One integration of every type reading the sample data (#507), so the
+  // Monitor and each integration's page render populated; and a second
+  // Sonarr (#300) pointed at a closed local port, for an offline tile and
+  // page, without reaching anything real.
+  fakeServices = await startFakeServices();
   const dead = `http://127.0.0.1:${await freePort()}`;
   integrationUrl = dead;
   const ints = await ctx.request.put(`${base}/api/integrations`, {
     headers: { Origin: base },
     data: [
-      { id: "sonarr", type: "sonarr", name: "", enabled: true, url: dead, username: "", password: "", apiKey: "k", allowInsecureTls: false, allowActions: false },
+      ...fakeIntegrations(fakeServices.base),
       { id: "sonarr-4k", type: "sonarr", name: "Sonarr 4K", enabled: true, url: dead, username: "", password: "", apiKey: "${SMOKE_KEY}", allowInsecureTls: false, allowActions: false },
     ],
   });

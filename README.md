@@ -537,6 +537,12 @@ Playwright WebKit (Safari's engine, `npx playwright-core install webkit`),
 where a scrollable card is only reachable by Tab because the app makes it so;
 CI runs both.
 
+To see the Monitor and every integration's page with data, without the
+services themselves, run `node scripts/fake-services.mjs`: it serves invented
+sample data on port 4010 the way each service's API would, and prints the
+integrations to add. The smoke run uses the same data for its Monitor
+screenshots.
+
 Work lands on `develop`; `main` only advances by fast-forward when a release
 is cut with `scripts/release.sh X.Y.Z`, whose `v*` tag push builds the image
 and publishes the GitHub release. The full workflow conventions — branching,
