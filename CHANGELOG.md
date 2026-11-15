@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [3.2.1] - 2026-11-15
+
 ### Added
 
 - **The poster in Nextcloud Talk, by way of a link preview.** Talk can't
@@ -4254,7 +4256,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v3.2.0...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v3.2.1...HEAD
+[3.2.1]: https://github.com/boostctrl/ctrlcenter/compare/v3.2.0...v3.2.1
 [3.2.0]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.3...v3.2.0
 [3.1.3]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.2...v3.1.3
 [3.1.2]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.1...v3.1.2
