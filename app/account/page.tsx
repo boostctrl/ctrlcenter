@@ -28,7 +28,11 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
             {account.name ? <span className="font-mono text-ink-45"> ({account.id})</span> : null}, {account.role === "admin" ? "an admin" : "a member"}.
           </p>
         </div>
-        <AccountPanels twoFactorEnabled={account.totp.enabled} mustChangePassword={query.change === "1" || account.mustChangePassword} />
+        <AccountPanels
+          twoFactorEnabled={account.totp.enabled}
+          twoFactorRequired={account.requireTwoFactor}
+          mustChangePassword={query.change === "1" || account.mustChangePassword}
+        />
       </main>
       {config.settings.settingsButton && <FloatingNav {...nav} />}
     </>

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import UsersSection from "./UsersSection";
 import { ToastProvider } from "../Toast";
 import { ConfirmProvider } from "../Confirm";
@@ -10,8 +10,8 @@ const listing = {
   current: "admin",
   groups: ["family"],
   accounts: [
-    { id: "admin", name: "", role: "admin", enabled: true, groups: [], totp: true, mustChangePassword: false, createdAt: "", lastSignInAt: "", sessions: 1 },
-    { id: "sam", name: "Sam", role: "member", enabled: true, groups: ["family"], totp: false, mustChangePassword: true, createdAt: "2026-11-01T00:00:00Z", lastSignInAt: "", sessions: 0 },
+    { id: "admin", name: "", role: "admin", enabled: true, groups: [], totp: true, mustChangePassword: false, requireTwoFactor: false, createdAt: "", lastSignInAt: "", sessions: 1 },
+    { id: "sam", name: "Sam", role: "member", enabled: true, groups: ["family"], totp: false, mustChangePassword: true, requireTwoFactor: false, createdAt: "2026-11-01T00:00:00Z", lastSignInAt: "", sessions: 0 },
   ],
 };
 const calls: { url: string; init?: RequestInit }[] = [];
@@ -52,6 +52,35 @@ describe("UsersSection", () => {
     expect(screen.queryByRole("button", { name: "Disable" })).not.toBeNull();
   });
 
+  // #449: an admin can require a second factor of an account.
+  it("requires two-factor of an account from its edit form", async () => {
+    mount();
+    await waitFor(() => expect(screen.queryByText("Sam")).not.toBeNull());
+    fireEvent.click(screen.getAllByRole("button", { name: "Edit" })[1]);
+    const form = screen.getByRole("button", { name: "Save" }).closest("form")!;
+    fireEvent.click(within(form).getByRole("switch", { name: "Require two-factor authentication" }));
+    fireEvent.click(within(form).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(calls.some((c) => c.init?.method === "PATCH")).toBe(true));
+    const patch = calls.find((c) => c.init?.method === "PATCH");
+    expect(patch?.url).toBe("/api/accounts/sam");
+    expect(JSON.parse(String(patch?.init?.body))).toMatchObject({ requireTwoFactor: true });
+  });
+
+  it("says when an account must still set up the second factor it's required to have", async () => {
+    const required = {
+      ...listing,
+      accounts: [
+        { ...listing.accounts[0], requireTwoFactor: true },
+        { ...listing.accounts[1], requireTwoFactor: true },
+      ],
+    };
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(required), { status: 200 })));
+    mount();
+    await waitFor(() => expect(screen.queryByText("Sam")).not.toBeNull());
+    expect(screen.getByText("2FA on, required")).toBeDefined();
+    expect(screen.getByText("Must set up 2FA at sign-in")).toBeDefined();
+  });
+
   it("adds an account with a first password and the must-change flag", async () => {
     mount();
     await waitFor(() => expect(screen.queryByText("Sam")).not.toBeNull());
@@ -69,6 +98,7 @@ describe("UsersSection", () => {
       groups: ["family", "ops"],
       password: "a-first-password-1",
       mustChangePassword: true,
+      requireTwoFactor: false,
     });
   });
 });

@@ -23,7 +23,9 @@ export type TotpAuth = z.infer<typeof totpAuthSchema>;
 // display name, the role, and its own credential — a password hash and a
 // TOTP enrollment, the shapes the single admin of 3.0 had. `groups` names
 // the groups the account belongs to (the visibility rules of 3.1 read them);
-// `mustChangePassword` makes the next sign-in set a new password first.
+// `mustChangePassword` makes the next sign-in set a new password first, and
+// `requireTwoFactor` keeps the account on its own page until it has a second
+// factor, and from turning that factor off (#449).
 // Timestamps are ISO strings, "" when unknown.
 export const USER_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/;
 export const userRoleSchema = z.enum(["admin", "member"]);
@@ -40,6 +42,7 @@ export const userSchema = z.object({
   totp: totpAuthSchema.default(totpAuthSchema.parse({})),
   groups: z.array(z.string()).max(64).default([]),
   mustChangePassword: z.boolean().default(false),
+  requireTwoFactor: z.boolean().default(false),
   createdAt: z.string().default(""),
   lastSignInAt: z.string().default(""),
 });
@@ -79,6 +82,7 @@ export const accountCreateSchema = z.object({
   password: z.string().min(12, "A password must be at least 12 characters"),
   // Make the first sign-in set a new password: on by default.
   mustChangePassword: z.boolean().default(true),
+  requireTwoFactor: z.boolean().default(false),
 });
 export const accountUpdateSchema = z.object({
   name: z.string().trim().max(80).optional(),
@@ -86,6 +90,7 @@ export const accountUpdateSchema = z.object({
   groups: groupList.optional(),
   enabled: z.boolean().optional(),
   mustChangePassword: z.boolean().optional(),
+  requireTwoFactor: z.boolean().optional(),
 });
 export const accountPasswordResetSchema = z.object({
   password: z.string().min(12, "A password must be at least 12 characters"),

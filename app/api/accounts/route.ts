@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
     groups: u.groups,
     totp: u.totp.enabled,
     mustChangePassword: u.mustChangePassword,
+    requireTwoFactor: u.requireTwoFactor,
     createdAt: u.createdAt,
     lastSignInAt: u.lastSignInAt,
     sessions: sessions.filter((s) => sessionAccount(s) === u.id).length,

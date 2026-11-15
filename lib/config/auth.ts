@@ -73,12 +73,15 @@ export async function resetAccountPassword(id: string, passwordHash: string, pas
 // The parts of an account the Users tab edits (#423). The founding admin
 // stays an enabled admin whatever is asked, so nobody can lock every admin
 // out of the portal.
-export type AccountPatch = Partial<Pick<User, "name" | "role" | "groups" | "enabled" | "mustChangePassword">>;
+export type AccountPatch = Partial<
+  Pick<User, "name" | "role" | "groups" | "enabled" | "mustChangePassword" | "requireTwoFactor">
+>;
 export async function updateAccount(id: string, patch: AccountPatch): Promise<User> {
   return mutateAccount(id, (account) => {
     if (patch.name !== undefined) account.name = patch.name;
     if (patch.groups !== undefined) account.groups = [...patch.groups];
     if (patch.mustChangePassword !== undefined) account.mustChangePassword = patch.mustChangePassword;
+    if (patch.requireTwoFactor !== undefined) account.requireTwoFactor = patch.requireTwoFactor;
     if (account.id !== FOUNDING_ACCOUNT_ID) {
       if (patch.role !== undefined) account.role = patch.role;
       if (patch.enabled !== undefined) account.enabled = patch.enabled;

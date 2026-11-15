@@ -46,6 +46,13 @@ export function passwordConfigured(account: Pick<User, "id" | "passwordHash">): 
   return Boolean(account.passwordHash) || usesEnvPassword(account);
 }
 
+// Whether an admin requires the account to have a second factor and it has
+// none yet (#449): until it sets one up, it may only reach its own page and
+// what that page calls (lib/two-factor-gate.ts).
+export function mustSetUpTwoFactor(account: Pick<User, "requireTwoFactor" | "totp">): boolean {
+  return account.requireTwoFactor && !account.totp.enabled;
+}
+
 // Whether the account may act as an admin: the role, and not disabled.
 export function isAdminAccount(account: Pick<User, "role" | "enabled">): boolean {
   return account.enabled && account.role === "admin";

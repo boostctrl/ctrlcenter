@@ -12,8 +12,8 @@ import { relativeTime } from "@/components/StatusTimeline";
 // Settings → Users (#423): every account, with what it is and what it holds,
 // and the admin's work on it — add, rename, change role and groups, enable
 // or disable, reset the password, sign out everywhere, drop a lost second
-// factor, remove. The steps that open a way in confirm the admin's password
-// first (fetchWithReauth).
+// factor, require one (#449), remove. The steps that open a way in confirm
+// the admin's password first (fetchWithReauth).
 type Account = {
   id: string;
   name: string;
@@ -22,6 +22,7 @@ type Account = {
   groups: string[];
   totp: boolean;
   mustChangePassword: boolean;
+  requireTwoFactor: boolean;
   createdAt: string;
   lastSignInAt: string;
   sessions: number;
@@ -32,13 +33,21 @@ const groupsText = (groups: string[]) => groups.join(", ");
 const parseGroups = (text: string) =>
   [...new Set(text.split(/[\s,]+/).map((g) => g.trim().toLowerCase()).filter(Boolean))];
 
-const emptyAdd = { id: "", name: "", role: "member" as "admin" | "member", groups: "", password: "", mustChangePassword: true };
+const emptyAdd = {
+  id: "",
+  name: "",
+  role: "member" as "admin" | "member",
+  groups: "",
+  password: "",
+  mustChangePassword: true,
+  requireTwoFactor: false,
+};
 
 export default function UsersSection() {
   const [listing, setListing] = useState<Listing | null>(null);
   const [add, setAdd] = useState(emptyAdd);
   const [editing, setEditing] = useState<string | null>(null);
-  const [edit, setEdit] = useState({ name: "", role: "member" as "admin" | "member", groups: "" });
+  const [edit, setEdit] = useState({ name: "", role: "member" as "admin" | "member", groups: "", requireTwoFactor: false });
   const [resetting, setResetting] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -97,7 +106,7 @@ export default function UsersSection() {
   }
   function startEdit(a: Account) {
     setEditing(a.id);
-    setEdit({ name: a.name, role: a.role, groups: groupsText(a.groups) });
+    setEdit({ name: a.name, role: a.role, groups: groupsText(a.groups), requireTwoFactor: a.requireTwoFactor });
   }
   async function saveEdit(e: FormEvent) {
     e.preventDefault();
@@ -199,6 +208,16 @@ export default function UsersSection() {
                           />
                         </div>
                       </div>
+                      <ToggleRow
+                        label="Require two-factor authentication"
+                        hint={
+                          a.totp
+                            ? "They can't turn their second factor off while this is on."
+                            : "Until they set it up, signing in takes them to their account page and nowhere else."
+                        }
+                        checked={edit.requireTwoFactor}
+                        onChange={(v) => setEdit({ ...edit, requireTwoFactor: v })}
+                      />
                       <div className="flex gap-2">
                         <Button type="submit" size="sm" disabled={busy}>Save</Button>
                         <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
@@ -212,7 +231,10 @@ export default function UsersSection() {
                         <span className="text-xs text-ink-60">{a.role === "admin" ? "Admin" : "Member"}</span>
                         {self && <span className="text-xs text-ink-45">(you)</span>}
                         {!a.enabled && <span className="text-xs text-status-down">Disabled</span>}
-                        {a.totp && <span className="text-xs text-ink-60">2FA on</span>}
+                        {a.totp && <span className="text-xs text-ink-60">{a.requireTwoFactor ? "2FA on, required" : "2FA on"}</span>}
+                        {!a.totp && a.requireTwoFactor && (
+                          <span className="text-xs text-status-warning">Must set up 2FA at sign-in</span>
+                        )}
                         {a.mustChangePassword && <span className="text-xs text-ink-60">Must set a password at sign-in</span>}
                       </div>
                       <p className="text-xs text-ink-45">
@@ -312,6 +334,12 @@ export default function UsersSection() {
             hint="Off only when you've agreed the password with them already."
             checked={add.mustChangePassword}
             onChange={(v) => setAdd({ ...add, mustChangePassword: v })}
+          />
+          <ToggleRow
+            label="Require two-factor authentication"
+            hint="They set it up at their first sign-in, and can't reach anything else until they have."
+            checked={add.requireTwoFactor}
+            onChange={(v) => setAdd({ ...add, requireTwoFactor: v })}
           />
           <div>
             <Button type="submit" disabled={busy || add.password.length < 12 || !add.id.trim()}>Add account</Button>

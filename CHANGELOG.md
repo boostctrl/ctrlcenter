@@ -12,6 +12,15 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Require two-factor authentication for an account.** In Settings →
+  Users, an admin can now require two-factor authentication when adding or
+  editing an account. Until the account has set it up, signing in takes it
+  to its account page, and the rest of the site stays closed to it. Once
+  it's on, the account can't turn it off itself; an admin still can, for a
+  lost device, and the account sets it up again at its next sign-in. (#449)
+
 ### Fixed
 
 - **A fixed-height app or bookmark grid keeps its fade right as it
@@ -47,6 +56,10 @@ here.
   to, as the palettes already did. When visitors may only pick from the
   site's themes, the theme panel no longer points at a tab that isn't
   shown. (#435)
+
+- **The "choose your own password" notice on the account page stands
+  out.** It was meant to show in the warning color, but showed as a plain
+  outlined box.
 
 ## [3.1.2] - 2026-11-14
 

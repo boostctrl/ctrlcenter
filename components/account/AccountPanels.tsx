@@ -13,9 +13,13 @@ import Sessions from "@/components/admin/Sessions";
 // uses, which act on the session's own account.
 export default function AccountPanels({
   twoFactorEnabled,
+  twoFactorRequired = false,
   mustChangePassword,
 }: {
   twoFactorEnabled: boolean;
+  // An admin requires a second factor of this account (#449): until it has
+  // one, this page is the only one it can open.
+  twoFactorRequired?: boolean;
   mustChangePassword: boolean;
 }) {
   const [twoFactor, setTwoFactor] = useState(twoFactorEnabled);
@@ -24,15 +28,21 @@ export default function AccountPanels({
       <ConfirmProvider>
         <div className="flex flex-col gap-6">
           {mustChangePassword && (
-            <p role="status" className="rounded-xl border border-status-warn/40 bg-status-warn/10 px-4 py-3 text-sm text-ink-90">
+            <p role="status" className="rounded-xl border border-status-warning/40 bg-status-warning/10 px-4 py-3 text-sm text-ink-90">
               The password you signed in with was set for you. Choose your own below before you go on.
+            </p>
+          )}
+          {twoFactorRequired && !twoFactor && (
+            <p role="status" className="rounded-xl border border-status-warning/40 bg-status-warning/10 px-4 py-3 text-sm text-ink-90">
+              An admin requires two-factor authentication for your account. Set it up below; until you do, the rest
+              of the site stays closed to you.
             </p>
           )}
           <Card title="Password" intro="The password you sign in with.">
             <ChangePassword own />
           </Card>
           <Card title="Two-factor authentication" intro="Add a time-based code from an authenticator app to your sign-in.">
-            <TwoFactor enabled={twoFactor} onChange={setTwoFactor} />
+            <TwoFactor enabled={twoFactor} onChange={setTwoFactor} required={twoFactorRequired} />
           </Card>
           <Card title="Sessions" intro="Where your account is signed in. End one you don't recognise, or sign out everywhere else.">
             <Sessions idleControl={false} signIn="/login" />

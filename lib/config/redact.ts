@@ -98,7 +98,16 @@ export function accountsForExport(auth: Config["auth"], withSecrets: boolean): U
   return accountsOf(auth).map((u) =>
     withSecrets
       ? u
-      : userSchema.parse({ id: u.id, name: u.name, role: u.role, enabled: u.enabled, groups: u.groups, createdAt: u.createdAt, mustChangePassword: true })
+      : userSchema.parse({
+          id: u.id,
+          name: u.name,
+          role: u.role,
+          enabled: u.enabled,
+          groups: u.groups,
+          createdAt: u.createdAt,
+          mustChangePassword: true,
+          requireTwoFactor: u.requireTwoFactor,
+        })
   );
 }
 

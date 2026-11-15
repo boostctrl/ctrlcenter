@@ -26,6 +26,7 @@ const formatSecret = (secret: string) =>
 export default function TwoFactor({
   enabled,
   onChange,
+  required = false,
 }: {
   // Controlled by the parent (#384): the card unmounts with its settings
   // section or setup step, and a state of its own came back as the page-load
@@ -34,6 +35,8 @@ export default function TwoFactor({
   // Told when the factor turns on or off, so the parent can keep what depends
   // on it in step: the security checklist, the actions opt-in (#367).
   onChange: (enabled: boolean) => void;
+  // An admin requires it of this account (#449): once on, it stays on.
+  required?: boolean;
 }) {
   const [step, setStep] = useState<Step | null>(null);
   const [setup, setSetup] = useState<SetupData | null>(null);
@@ -153,18 +156,22 @@ export default function TwoFactor({
         <span className="text-sm text-ink-70">Two-factor authentication</span>
         <p className="text-xs text-ink-40">
           {enabled
-            ? "On — a code from your authenticator app is required at sign-in."
+            ? required
+              ? "On, and required for your account by an admin — a code from your authenticator app is needed at sign-in."
+              : "On — a code from your authenticator app is required at sign-in."
             : "Require a time-based code from an authenticator app in addition to your password."}
         </p>
       </div>
-      <Button
-        type="button"
-        variant="ghost"
-        className="shrink-0"
-        onClick={() => (enabled ? setStep("disable") : startEnroll())}
-      >
-        {enabled ? "Disable" : "Enable"}
-      </Button>
+      {!(enabled && required) && (
+        <Button
+          type="button"
+          variant="ghost"
+          className="shrink-0"
+          onClick={() => (enabled ? setStep("disable") : startEnroll())}
+        >
+          {enabled ? "Disable" : "Enable"}
+        </Button>
+      )}
 
       {/* The setup, recovery-code and disable dialog goes to <body> (#409):
           this card is a glass surface (backdrop-filter, a hover lift), which

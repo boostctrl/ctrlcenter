@@ -75,7 +75,7 @@ describe("the account's first sign-in and its own changes", () => {
   it("signs in with the password it was given and is told to choose its own", async () => {
     const res = await signIn("sam", "sam-secret-12345");
     expect(res.status).toBe(200);
-    expect(await json(res)).toEqual({ ok: true, mustChangePassword: true });
+    expect(await json(res)).toEqual({ ok: true, mustChangePassword: true, mustSetUpTwoFactor: false });
   });
 
   it("changes its own password, which clears the flag and ends its other sessions", async () => {
@@ -87,7 +87,7 @@ describe("the account's first sign-in and its own changes", () => {
     expect(res.status).toBe(200);
     expect((await sessionsGet(request("/api/sessions", { session: other }))).status).toBe(401);
     const again = await signIn("sam", "sam-own-choice-98");
-    expect(await json(again)).toEqual({ ok: true, mustChangePassword: false });
+    expect(await json(again)).toEqual({ ok: true, mustChangePassword: false, mustSetUpTwoFactor: false });
     const listed = await json(await GET(request("/api/accounts", { session: admin })));
     expect((listed.accounts as Record<string, unknown>[]).find((a) => a.id === "sam")).toMatchObject({ mustChangePassword: false });
   });
@@ -137,7 +137,7 @@ describe("PATCH, DELETE and the admin's resets", () => {
     expect(res.status).toBe(200);
     expect((await sessionsGet(request("/api/sessions", { session: samSession }))).status).toBe(401);
     expect((await signIn("sam", "sam-own-choice-98")).status).toBe(401);
-    expect(await json(await signIn("sam", "handed-over-pass1"))).toEqual({ ok: true, mustChangePassword: true });
+    expect(await json(await signIn("sam", "handed-over-pass1"))).toEqual({ ok: true, mustChangePassword: true, mustSetUpTwoFactor: false });
     const own = await resetPassword(request("/api/accounts/admin/password", { method: "POST", body: { password: "whatever-pass-123" }, session: admin }), params({ id: "admin" }));
     expect(own.status).toBe(400);
   });

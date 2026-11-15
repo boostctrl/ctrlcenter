@@ -43,6 +43,15 @@ export async function POST(request: NextRequest) {
   if (!account.totp.enabled) {
     return NextResponse.json({ ok: true }); // already off
   }
+  // An admin requires it of this account (#449). An admin can still turn it
+  // off from the Users tab for a lost device, and the account sets it up
+  // again at its next sign-in.
+  if (account.requireTwoFactor) {
+    return NextResponse.json(
+      { error: "An admin requires two-factor authentication for your account, so it can't be turned off." },
+      { status: 403 }
+    );
+  }
   const { code } = parsed.data;
   const ok =
     (await verifyTotpOnce(account.totp.secret, code)) ||

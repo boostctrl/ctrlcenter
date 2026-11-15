@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { NO_PASSWORD_MESSAGE, issueSession, setSessionCookie } from "@/lib/auth";
-import { findAccount, passwordConfigured } from "@/lib/accounts";
+import { findAccount, mustSetUpTwoFactor, passwordConfigured } from "@/lib/accounts";
 import { noteSignIn, readConfigInternal } from "@/lib/config";
 import { verifyCredentials, type CredentialResult } from "@/lib/credentials";
 import { FOUNDING_ACCOUNT_ID, USER_ID_PATTERN } from "@/lib/schema";
@@ -169,8 +169,14 @@ export async function POST(request: NextRequest) {
   await noteSignIn(account.id);
   // In the audit log, and out through the channels when the address is new.
   notifySecurityEvent(await recordSecurityEvent("signin.ok", eventMeta(request, account.id)));
-  // An account whose password an admin set or reset picks its own first.
-  const response = NextResponse.json({ ok: true, mustChangePassword: account.mustChangePassword });
+  // An account whose password an admin set or reset picks its own first,
+  // and one an admin requires two-factor of sets it up (#449): both on the
+  // account page.
+  const response = NextResponse.json({
+    ok: true,
+    mustChangePassword: account.mustChangePassword,
+    mustSetUpTwoFactor: mustSetUpTwoFactor(account),
+  });
   setSessionCookie(response, request, token);
   return response;
 }

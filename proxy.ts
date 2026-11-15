@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHttps, sessionTokenFrom, verifySessionToken } from "@/lib/auth";
+import { isHttps, sessionTokenFrom, verifySession } from "@/lib/auth";
+import { mustSetUpTwoFactor } from "@/lib/accounts";
 import { readConfigInternal } from "@/lib/config";
+import { allowedBeforeTwoFactor, TWO_FACTOR_SETUP_PAGE } from "@/lib/two-factor-gate";
 import { contentSecurityPolicy } from "@/lib/csp";
 
 // Run on every routed request (HTML + API), excluding Next internals and static
@@ -76,16 +78,41 @@ export async function proxy(request: NextRequest) {
     withCsp(NextResponse.next({ request: { headers: requestHeaders } }));
 
   const { pathname } = request.nextUrl;
-  if (!needsAuth(pathname)) return pass();
-
   const token = sessionTokenFrom(request.cookies);
+  const isApi = pathname.startsWith("/api/");
+  // An account an admin requires two-factor of, and that has none yet, is
+  // held to its own page until it sets one up (#449): any other page sends
+  // it there, and an admin API refuses it (the rest judge it as a visitor,
+  // lib/api-auth.ts). Only a request that carries a session is looked at,
+  // so a visitor's costs nothing more.
+  const held = async (auth: Awaited<ReturnType<typeof readConfigInternal>>["auth"]) => {
+    const live = await verifySession(token, auth);
+    return { live, held: !!live && mustSetUpTwoFactor(live.account) && !allowedBeforeTwoFactor(pathname) };
+  };
+  const toSetup = () => {
+    if (isApi) {
+      return withCsp(
+        NextResponse.json({ error: "Set up two-factor authentication on your account page first" }, { status: 403 })
+      );
+    }
+    return withCsp(NextResponse.redirect(new URL(TWO_FACTOR_SETUP_PAGE, request.url)));
+  };
+
+  if (!needsAuth(pathname)) {
+    if (!token || isApi || allowedBeforeTwoFactor(pathname)) return pass();
+    const { auth } = await readConfigInternal();
+    return (await held(auth)).held ? toSetup() : pass();
+  }
+
   // Verify against the accounts' current password hashes so a password
   // change revokes that account's sessions (the proxy runs in the Node
   // runtime, so it can read config).
   const { auth } = await readConfigInternal();
-  if (await verifySessionToken(token, auth)) return pass();
+  const check = await held(auth);
+  if (check.held) return toSetup();
+  if (check.live) return pass();
 
-  if (pathname.startsWith("/api/")) {
+  if (isApi) {
     return withCsp(
       NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     );

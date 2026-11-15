@@ -1,8 +1,9 @@
 import type { NextRequest } from "next/server";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { sessionTokenFrom, verifySession, type LiveSession } from "./auth";
-import { isAdminAccount } from "./accounts";
+import { isAdminAccount, mustSetUpTwoFactor } from "./accounts";
+import { allowedBeforeTwoFactor } from "./two-factor-gate";
 import { visibleTo } from "./visibility";
 import { watchSessionAddress } from "./session-watch";
 import { readConfigInternal, stripAuth, stripSecrets } from "./config";
@@ -28,6 +29,9 @@ export async function viewerOf(request: NextRequest, auth?: AuthConfig): Promise
   if (!isSafeMethod(request.method) && !isSameOriginRequest(request)) return null;
   const live = await verifySession(sessionTokenFrom(request.cookies), await authOf(auth));
   if (!live) return null;
+  // An account that must set up two-factor first reaches only what its
+  // account page calls (#449); anywhere else it's a visitor.
+  if (mustSetUpTwoFactor(live.account) && !allowedBeforeTwoFactor(request.nextUrl.pathname)) return null;
   // A session used from a new address announces itself once (#382).
   await watchSessionAddress(request, live.session);
   return { ...live, isAdmin: isAdminAccount(live.account) };
@@ -38,7 +42,12 @@ export async function viewerOf(request: NextRequest, auth?: AuthConfig): Promise
 // call re-check the session themselves.
 export async function viewerFromCookies(auth?: AuthConfig): Promise<Viewer | null> {
   const live = await verifySession(sessionTokenFrom(await cookies()), await authOf(auth));
-  return live ? { ...live, isAdmin: isAdminAccount(live.account) } : null;
+  if (!live) return null;
+  // The proxy sends an account that must set up two-factor to its page
+  // (#449); should any other page render for it all the same, it renders as
+  // a visitor's would.
+  if (mustSetUpTwoFactor(live.account) && !allowedBeforeTwoFactor((await headers()).get("x-pathname") ?? "")) return null;
+  return { ...live, isAdmin: isAdminAccount(live.account) };
 }
 
 // Route-level admin check for endpoints the proxy's path-prefix allowlist can't

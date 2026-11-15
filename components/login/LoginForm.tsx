@@ -101,11 +101,11 @@ export default function LoginForm({
       // Not remembered, then.
     }
     // A password an admin set or reset is replaced before anything else
-    // (#423): the account page asks for a new one.
+    // (#423), and a second factor an admin requires is set up (#449): the
+    // account page asks for both.
     const signedIn = await res.json().catch(() => null);
-    if (signedIn?.mustChangePassword) {
-      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      window.location.href = "/account?change=1";
+    if (signedIn?.mustChangePassword || signedIn?.mustSetUpTwoFactor) {
+      window.location.href = signedIn.mustChangePassword ? "/account?change=1" : "/account";
       return;
     }
     // Hard navigation (not router.push): a full document load re-runs the auth
