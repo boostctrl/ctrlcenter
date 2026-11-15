@@ -997,6 +997,9 @@ describe("readConfigInternal stays off public surfaces", () => {
     "app/api/monitor/route.ts",
     // Admin-only per-service detail: same read-once-then-gate as the snapshot.
     "app/api/monitor/[id]/route.ts",
+    // Admin-only recorded history (#530): reads once to gate, then answers
+    // with numbers only.
+    "app/api/monitor/[id]/history/route.ts",
     // Auth itself: verifies the password / issues the session, and ends it
     // (logout reads `auth` only to verify the token it revokes, #365).
     "app/api/login/route.ts",

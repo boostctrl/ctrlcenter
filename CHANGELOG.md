@@ -61,6 +61,16 @@ here.
   state, every stack with its environment and whether it's active, and
   each environment's images, Docker version, CPUs and memory. (#529)
 
+- **The Monitor charts the last hour and the last day.** CtrlCenter now
+  takes a reading from each connected service once a minute, whether or
+  not the page is open, and keeps a day of them beside the config, so a
+  restart doesn't lose it. qBittorrent's speeds, Tautulli's streams and
+  bandwidth, UniFi's clients and internet, Portainer's containers,
+  TrueNAS's fullest pool and apps, and Seerr's requests are charted on
+  their pages; point at a chart, or focus it and use the arrow keys, to
+  read any moment. The totals on the command deck show their last hour as
+  a trend line. (#530)
+
 ### Changed
 
 - **The Monitor dashboard opens on a command deck.** A status ring draws one

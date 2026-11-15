@@ -7,6 +7,9 @@ import { Button } from "@/components/admin/ui";
 import { useConfirm } from "@/components/admin/Confirm";
 import { fetchContainerLogs, fetchContainers, useMonitorAction, useMonitorIntegration } from "../actions";
 import { Dialog, Donut, Dot, EmptyRow, Glyph, List, Row, GlyphBubble, Pill, Section, Stat, StatGrid, UsageBar, type Tone } from "../kit";
+import { HistoryCharts } from "../kit/timeline";
+
+const count = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
 
 // Portainer's page (#514), on the page kit (#508): container counts across
 // every environment, then each environment with its tallies. With actions
@@ -284,6 +287,20 @@ export default function PortainerDetail({
         <Stat label="Stacks" value={data.stacks.length} hint={data.stacks.length ? `${activeStacks} active` : "None deployed"} />
         <Stat label="Images" value={images} hint={`${volumes} volume${volumes === 1 ? "" : "s"}`} />
       </StatGrid>
+
+      <HistoryCharts
+        charts={[
+          {
+            title: "Containers",
+            metrics: [
+              { key: "running", label: "Running", color: 3 },
+              { key: "unhealthy", label: "Unhealthy", color: "down" },
+              { key: "stopped", label: "Stopped", color: "muted" },
+            ],
+            format: count,
+          },
+        ]}
+      />
 
       {t.total > 0 && (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">

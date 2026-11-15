@@ -608,6 +608,14 @@ export default async function HelpPage() {
             how old it is.
           </P>
           <P>
+            CtrlCenter takes a reading from each connected service once a
+            minute, whether or not the Monitor is open, and keeps the last
+            day of them, so the pages can chart speeds, streams, clients and
+            the like over the last hour or 24 hours, and the totals at the
+            top show their trend. Point at a chart, or focus it and use the
+            arrow keys, to read any moment.
+          </P>
+          <P>
             Everything about it is admin-only: the page, the data it polls,
             and the stored credentials all sit behind your sign-in, and
             nothing from an integration ever appears on the public dashboard.

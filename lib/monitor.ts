@@ -10,6 +10,7 @@
 // Everything here is admin-only data — the /api/monitor route and the
 // /admin/monitor page are the only consumers, both behind the session gate.
 
+import { recordSnapshot } from "./monitor-history";
 import type { Integration } from "./schema";
 import {
   SERVICES,
@@ -152,7 +153,12 @@ function statusFor(integration: Integration, actionsEnabled: boolean): Promise<S
     // without action support never render a control for it.
     configured && integration.allowActions === true && actionsEnabled,
     serviceFingerprint(integration),
-    (): Promise<unknown> => SERVICES[integration.type].snapshot(resolveIntegration(integration))
+    async (): Promise<unknown> => {
+      const data = await SERVICES[integration.type].snapshot(resolveIntegration(integration));
+      // Every good snapshot is a reading for the charts (#530).
+      recordSnapshot(integration.id, integration.type, data);
+      return data;
+    }
   );
 }
 

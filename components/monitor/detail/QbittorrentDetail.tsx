@@ -27,6 +27,7 @@ import {
   type GlyphName,
   type Tone,
 } from "../kit";
+import { HistoryCharts } from "../kit/timeline";
 
 // qBittorrent's page (#513), on the page kit (#508): transfer speeds and
 // totals, then every torrent with its progress, sortable, with pause,
@@ -289,6 +290,20 @@ export default function QbittorrentDetail({
             .join(" · ")}
         />
       </StatGrid>
+
+      <HistoryCharts
+        charts={[
+          {
+            title: "Speed",
+            metrics: [
+              { key: "down", label: "Download", color: 1 },
+              { key: "up", label: "Upload", color: 3 },
+            ],
+            format: formatSpeed,
+            binary: true,
+          },
+        ]}
+      />
 
       {c.total > 0 && (
         <div className="grid gap-6 lg:grid-cols-2">

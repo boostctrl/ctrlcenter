@@ -23,6 +23,9 @@ import {
   type ChartColor,
   type Tone,
 } from "../kit";
+import { HistoryCharts } from "../kit/timeline";
+
+const count = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
 
 // TrueNAS's page (#515), on the page kit (#508): its alerts, each pool's
 // health and how full it is, and the apps on its Docker engine (SCALE
@@ -221,6 +224,21 @@ export default function TruenasDetail({ data }: { data: TruenasDetailData }) {
           visual={load !== null ? <UsageBar ratio={load} tone={load >= 1 ? "warn" : undefined} /> : undefined}
         />
       </StatGrid>
+
+      <HistoryCharts
+        charts={[
+          {
+            title: "Fullest pool",
+            metrics: [{ key: "used", label: "Used", color: 1 }],
+            format: (r) => `${Math.round(r * 100)}%`,
+          },
+          {
+            title: "Apps running",
+            metrics: [{ key: "apps", label: "Running", color: 3 }],
+            format: count,
+          },
+        ]}
+      />
 
       {alerts.length > 0 && (
         <Section title="Alerts" count={alerts.length} flush>

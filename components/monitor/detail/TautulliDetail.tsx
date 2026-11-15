@@ -20,6 +20,9 @@ import {
   useMounted,
   type ChartColor,
 } from "../kit";
+import { HistoryCharts } from "../kit/timeline";
+
+const count = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
 
 // Tautulli's page (#512), on the page kit (#508): who's watching now, with
 // each stream's progress and whether the server is transcoding it, and what
@@ -84,6 +87,24 @@ export default function TautulliDetail({ data }: { data: TautulliDetailData }) {
           hint={data.history.length ? `by ${viewers} ${viewers === 1 ? "person" : "people"}` : "Nothing yet"}
         />
       </StatGrid>
+
+      <HistoryCharts
+        charts={[
+          {
+            title: "Streams",
+            metrics: [
+              { key: "streams", label: "Streams", color: 1 },
+              { key: "transcodes", label: "Transcoding", color: 2 },
+            ],
+            format: count,
+          },
+          {
+            title: "Bandwidth",
+            metrics: [{ key: "bandwidth", label: "Bandwidth", color: 3 }],
+            format: (kbps) => `${(kbps / 1000).toFixed(kbps >= 10_000 ? 0 : 1)} Mbps`,
+          },
+        ]}
+      />
 
       {(plays.length > 0 || stats.platforms.length > 0) && (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">

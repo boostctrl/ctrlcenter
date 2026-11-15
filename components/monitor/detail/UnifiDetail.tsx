@@ -3,6 +3,9 @@
 import type { UnifiDetail as UnifiDetailData, UnifiDevice } from "@/lib/services/unifi";
 import { formatBytes, formatSpeed } from "@/lib/format";
 import { Donut, EmptyRow, GlyphBubble, List, Notices, Pill, Row, Section, Stat, StatGrid, UsageBar, type ChartColor, type GlyphName } from "../kit";
+import { HistoryCharts } from "../kit/timeline";
+
+const count = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
 
 // UniFi's page (#517), on the page kit (#508): the internet connection, the
 // clients on the network, and every UniFi device (other UniFi apps' too,
@@ -78,6 +81,28 @@ export default function UnifiDetail({ data }: { data: UnifiDetailData }) {
           }
         />
       </StatGrid>
+
+      <HistoryCharts
+        charts={[
+          {
+            title: "Clients",
+            metrics: [
+              { key: "wifi", label: "WiFi", color: 1 },
+              { key: "wired", label: "Wired", color: 2 },
+            ],
+            format: count,
+          },
+          {
+            title: "Internet",
+            metrics: [
+              { key: "down", label: "Download", color: 1 },
+              { key: "up", label: "Upload", color: 3 },
+            ],
+            format: formatSpeed,
+            binary: true,
+          },
+        ]}
+      />
 
       {data.issues.length > 0 && (
         <Section title="Issues" count={data.issues.length} flush>

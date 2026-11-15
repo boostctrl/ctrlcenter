@@ -150,7 +150,8 @@ Built with Next.js 16, React 19, and Tailwind v4.
   for Seerr, who's streaming for Tautulli, every torrent for qBittorrent,
   environments and containers for Portainer, pools, alerts and apps for
   TrueNAS, the most-blocked domains for AdGuard Home, and clients and devices
-  for UniFi. Read-only by default;
+  for UniFi, with charts of the last hour and day from readings CtrlCenter
+  takes once a minute. Read-only by default;
   for **qBittorrent, Seerr, and Portainer** you can opt in per integration
   ("Allow actions from the dashboard") to act from the page — pause/resume/delete
   torrents, approve/deny requests, and start/stop/restart containers with a
@@ -501,7 +502,7 @@ for reuse. You can also paste a direct image URL or a `data:` URI.
 | --- | --- | --- |
 | `ADMIN_PASSWORD` | yes | Bootstrap password for the `admin` account at `/admin`. After you set one in **Settings → Reset password**, login uses that. **Special characters:** quote the value in `.env` and double any literal `$` as `$$` (docker compose interpolates `$`), or a complex password can be mangled before the app sees it. |
 | `SESSION_SECRET` | no | Secret used to sign session cookies. If unset, a random one is generated on first start and kept in the config volume (`session-secret`); only if that volume isn't writable does it fall back to deriving one from `ADMIN_PASSWORD`. Set it yourself to manage the secret explicitly (e.g. `openssl rand -base64 32`). |
-| `CONFIG_PATH` | no | Path to the config file (default `./config/config.yaml`; the container sets `/config/config.yaml`). The uptime history (`status-history.db`, a SQLite database), the admin session list (`sessions.json`), the security log (`security-events.jsonl`), the inbound webhooks still waiting to go out as one (`webhook-digest.json`) and uploaded custom icons (`uploads/`) are written beside it. |
+| `CONFIG_PATH` | no | Path to the config file (default `./config/config.yaml`; the container sets `/config/config.yaml`). The uptime history (`status-history.db`, a SQLite database), the admin session list (`sessions.json`), the security log (`security-events.jsonl`), the inbound webhooks still waiting to go out as one (`webhook-digest.json`), the Monitor's last day of readings for its charts (`monitor-history.json`) and uploaded custom icons (`uploads/`) are written beside it. |
 | `CTRLCENTER_SMTP_PASS` | no | Overrides the email-alert SMTP password, so the secret can stay out of `config.yaml`. |
 | `CTRLCENTER_CALDAV_PASS` | no | Overrides the private-calendar (CalDAV/WebDAV) password of the calendar widget with id `calendar` (the one a 2.x config migrates to), so that secret can stay out of `config.yaml` too. Other calendar widgets use only their own stored credentials. |
 | *any name* | no | Referenced as `${NAME}` from an integration — any of its fields (URL, username, password, API key) — or from an API widget's address and header values, instead of holding the value, e.g. `apiKey: "${SONARR_4K_KEY}"`. Read on the server at use time; never shown in the admin or sent to a browser. `ADMIN_PASSWORD` and `SESSION_SECRET` can't be referenced. |

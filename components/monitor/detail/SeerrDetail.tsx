@@ -20,6 +20,9 @@ import {
   useMounted,
   type Tone,
 } from "../kit";
+import { HistoryCharts } from "../kit/timeline";
+
+const count = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
 
 // Seerr's page (#511), on the page kit (#508): the request counts, what's
 // waiting for approval (with Approve and Deny when actions are on), and the
@@ -91,6 +94,19 @@ export default function SeerrDetail({
           }
         />
       </StatGrid>
+
+      <HistoryCharts
+        charts={[
+          {
+            title: "Requests",
+            metrics: [
+              { key: "pending", label: "Waiting", color: 4 },
+              { key: "processing", label: "Processing", color: 1 },
+            ],
+            format: count,
+          },
+        ]}
+      />
 
       <Section
         title="Waiting for approval"

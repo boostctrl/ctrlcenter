@@ -1,11 +1,14 @@
 "use client";
 
+import { useCallback, useState } from "react";
 import Link from "next/link";
+import type { History } from "@/lib/monitor-history";
+import { usePolling } from "@/components/usePolling";
 import type { MonitorEntry, MonitorSnapshot } from "@/lib/monitor";
 import { formatBytes, formatSpeed } from "@/lib/format";
 import { serviceState, STATE_DOT, type ServiceState } from "./state";
 import { arrWeek, tileContent } from "./glances";
-import { formatCount, Glyph, TONE_TEXT, type Tone } from "./kit";
+import { formatCount, Glyph, Sparkline, TONE_TEXT, type Tone } from "./kit";
 
 // The Monitor's command deck (#520, after the health bar of #208 and #509):
 // the whole homelab read at once, before the eye reaches any one tile. A
@@ -105,11 +108,77 @@ function StatusCore({
   );
 }
 
-type Vital = { label: string; value: string; sub?: string; tone?: Tone; href: string };
+type Vital = { label: string; value: string; sub?: string; tone?: Tone; href: string; trend?: number[] };
+
+// The reading each total's trend line follows over the last hour (#530),
+// summed across the integrations of its type (the fullest pool for TrueNAS).
+const TREND: Partial<Record<MonitorEntry["type"], { key: string; combine: "sum" | "max" }>> = {
+  qbittorrent: { key: "down", combine: "sum" },
+  tautulli: { key: "streams", combine: "sum" },
+  unifi: { key: "clients", combine: "sum" },
+  truenas: { key: "used", combine: "max" },
+  portainer: { key: "running", combine: "sum" },
+  seerr: { key: "pending", combine: "sum" },
+};
+type Trends = Partial<Record<MonitorEntry["type"], number[]>>;
+
+// The last hour of each trend, fetched once a minute for the integrations
+// that answer. Empty until the first fetch, and for a type with fewer than
+// two readings.
+function useTrends(snapshot: MonitorSnapshot): Trends {
+  const [trends, setTrends] = useState<Trends>({});
+  const wanted = snapshot.filter((e) => TREND[e.type] && e.data !== null).map((e) => `${e.type}:${e.id}`).join(",");
+  const load = useCallback(
+    async (signal: AbortSignal) => {
+      const pairs = wanted ? wanted.split(",").map((w) => w.split(":") as [MonitorEntry["type"], string]) : [];
+      const got = await Promise.all(
+        pairs.map(async ([type, id]) => {
+          try {
+            const res = await fetch(`/api/monitor/${encodeURIComponent(id)}/history?range=hour`, { signal });
+            return res.ok ? { type, history: (await res.json()) as History } : null;
+          } catch {
+            return null;
+          }
+        })
+      );
+      if (signal.aborted) return;
+      // Combined per minute; a minute nobody recorded stays empty rather
+      // than reading as zero.
+      const combined: Partial<Record<MonitorEntry["type"], (number | null)[]>> = {};
+      for (const hit of got) {
+        if (!hit) continue;
+        const rule = TREND[hit.type]!;
+        const values = hit.history.series[rule.key];
+        if (!values) continue;
+        const prev = combined[hit.type];
+        combined[hit.type] = values.map((v, i) => {
+          const p = prev?.[i] ?? null;
+          if (v === null) return p;
+          if (p === null) return v;
+          return rule.combine === "max" ? Math.max(p, v) : p + v;
+        });
+      }
+      // The line runs from the first reading to the last, holding its value
+      // over a gap; it needs two readings to say anything.
+      const next: Trends = {};
+      for (const [type, values] of Object.entries(combined) as [MonitorEntry["type"], (number | null)[]][]) {
+        const first = values.findIndex((v) => v !== null);
+        const last = values.length - 1 - [...values].reverse().findIndex((v) => v !== null);
+        if (first < 0 || last - first < 1) continue;
+        let held = values[first] as number;
+        next[type] = values.slice(first, last + 1).map((v) => (held = v ?? held));
+      }
+      setTrends(next);
+    },
+    [wanted]
+  );
+  usePolling(load, 60_000);
+  return trends;
+}
 
 // The totals across every integration of a type (#300), for the types that
 // have answered; each links to the first of its type.
-function vitalsOf(snapshot: MonitorSnapshot, now: number | null): Vital[] {
+function vitalsOf(snapshot: MonitorSnapshot, now: number | null, trends: Trends = {}): Vital[] {
   const ofType = <K extends MonitorEntry["type"]>(type: K) =>
     snapshot.filter((e): e is Extract<MonitorEntry, { type: K }> => e.type === type && e.data !== null);
   const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
@@ -123,6 +192,7 @@ function vitalsOf(snapshot: MonitorSnapshot, now: number | null): Vital[] {
       value: `↓ ${formatSpeed(sum(qb.map((e) => e.data!.downSpeed)))}`,
       sub: `↑ ${formatSpeed(sum(qb.map((e) => e.data!.upSpeed)))} · ${downloading} active`,
       href: page(qb[0].id),
+      trend: trends.qbittorrent,
     });
   }
   const tt = ofType("tautulli");
@@ -134,6 +204,7 @@ function vitalsOf(snapshot: MonitorSnapshot, now: number | null): Vital[] {
       value: String(streams),
       sub: streams === 0 ? "Nothing playing" : transcodes > 0 ? `${transcodes} transcoding` : "All direct",
       href: page(tt[0].id),
+      trend: trends.tautulli,
     });
   }
   const ag = ofType("adguard");
@@ -159,6 +230,7 @@ function vitalsOf(snapshot: MonitorSnapshot, now: number | null): Vital[] {
       sub: down ? "Internet down" : lost > 0 ? `${lost} device${lost === 1 ? "" : "s"} down` : "Internet up",
       tone: down ? "down" : lost > 0 ? "warn" : undefined,
       href: page(un[0].id),
+      trend: trends.unifi,
     });
   }
   const tn = ofType("truenas");
@@ -171,6 +243,7 @@ function vitalsOf(snapshot: MonitorSnapshot, now: number | null): Vital[] {
       sub: fullest !== null ? `Fullest pool ${Math.round(fullest * 100)}%` : undefined,
       tone: fullest !== null && fullest >= 0.9 ? "down" : fullest !== null && fullest >= 0.8 ? "warn" : undefined,
       href: page(tn[0].id),
+      trend: trends.truenas,
     });
   }
   const pt = ofType("portainer");
@@ -184,6 +257,7 @@ function vitalsOf(snapshot: MonitorSnapshot, now: number | null): Vital[] {
       sub: unhealthy > 0 ? `${unhealthy} unhealthy` : "running",
       tone: unhealthy > 0 ? "down" : undefined,
       href: page(pt[0].id),
+      trend: trends.portainer,
     });
   }
   const sr = ofType("seerr");
@@ -194,6 +268,7 @@ function vitalsOf(snapshot: MonitorSnapshot, now: number | null): Vital[] {
       value: `${pending} waiting`,
       sub: `${sum(sr.map((e) => e.data!.processing))} processing`,
       href: page(sr[0].id),
+      trend: trends.seerr,
     });
   }
   const arrs = [...ofType("sonarr"), ...ofType("radarr")];
@@ -264,7 +339,8 @@ export default function CommandDeck({ snapshot, now }: { snapshot: MonitorSnapsh
     : connected === 0
       ? "Connect a service in Settings to get started."
       : `${connected} of ${snapshot.length} integrations connected`;
-  const vitals = vitalsOf(snapshot, now);
+  const trends = useTrends(snapshot);
+  const vitals = vitalsOf(snapshot, now, trends);
   const legend: [ServiceState, number][] = [
     ["live", live],
     ["stale", stale],
@@ -318,6 +394,8 @@ export default function CommandDeck({ snapshot, now }: { snapshot: MonitorSnapsh
                     {v.sub && (
                       <span className={`block truncate text-xs ${v.tone ? TONE_TEXT[v.tone] : "text-ink-50"}`}>{v.sub}</span>
                     )}
+                    {/* The last hour, when there's a line to draw (#530). */}
+                    {v.trend && <Sparkline data={v.trend} points={60} area className="mt-1.5 h-5 w-full" />}
                   </Link>
                 </li>
               ))}

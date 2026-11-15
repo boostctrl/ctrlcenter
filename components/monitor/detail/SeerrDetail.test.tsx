@@ -48,8 +48,10 @@ describe("SeerrDetail", () => {
     // Each button names its request, for a screen reader going button to
     // button (#518).
     fireEvent.click(screen.getByRole("button", { name: "Approve Dune: Part Two" }));
-    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    // The page also fetches its history (#530); the approve is the action call.
+    const action = () => (fetchMock.mock.calls as unknown as [string, RequestInit][]).find(([u]) => u === "/api/monitor/action");
+    await waitFor(() => expect(action()).toBeDefined());
+    const [url, init] = action()!;
     expect(url).toBe("/api/monitor/action");
     expect(JSON.parse(String(init.body))).toEqual({ service: "seerr", action: "approve", id: 7, integration: "seerr" });
   });
