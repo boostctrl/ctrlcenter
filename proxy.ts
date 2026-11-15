@@ -41,6 +41,8 @@ const ADMIN_PREFIXES = [
   "/api/security",
   // The accounts list for the admin's pickers (#423).
   "/api/accounts",
+  // The groups list (#505).
+  "/api/account-groups",
   // Step-up confirmation (#366).
   "/api/reauth",
 ];

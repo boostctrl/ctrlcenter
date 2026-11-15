@@ -12,6 +12,22 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **Groups as a list.** Settings → Users has a new Groups section listing
+  every group, who is in it and what is shared with it. Add a group before
+  anyone is in it, rename one, or merge two by renaming one onto the other;
+  each change reaches every account and everything shared with the group.
+  Removing a group says first what it changes, and anything shared with
+  that group alone becomes visible to admins only. An account's groups are
+  now picked from the list instead of typed, so a typo can no longer start
+  a new group. (#505)
+
+### Fixed
+
+- **The Add an account form fits a phone again.** Its fields ran off the
+  right edge of the card at phone width. (#553)
+
 ## [3.2.1] - 2026-11-15
 
 ### Added

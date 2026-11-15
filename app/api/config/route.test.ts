@@ -48,8 +48,12 @@ describe("/api/config", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.settings.title).toBe("Before");
-    // The accounts travel as a roster only (#423): no hash, no second factor.
-    expect(body.auth).toEqual({ users: [expect.objectContaining({ id: "admin", role: "admin", passwordHash: "", mustChangePassword: true })] });
+    // The accounts travel as a roster only (#423): no hash, no second factor;
+    // the groups list (#505) with them.
+    expect(body.auth).toEqual({
+      users: [expect.objectContaining({ id: "admin", role: "admin", passwordHash: "", mustChangePassword: true })],
+      groups: [],
+    });
     expect(body.auth.users[0].totp).toMatchObject({ enabled: false, secret: "", recoveryCodes: [] });
   });
 

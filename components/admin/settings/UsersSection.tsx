@@ -8,12 +8,15 @@ import { apiErrorMessage } from "../apiError";
 import { fetchWithReauth } from "../reauth";
 import { forgetAccounts } from "../AudiencePicker";
 import { relativeTime } from "@/components/StatusTimeline";
+import { ChipToggles } from "@/components/ChipGroup";
 
 // Settings → Users (#423): every account, with what it is and what it holds,
 // and the admin's work on it — add, rename, change role and groups, enable
 // or disable, reset the password, sign out everywhere, drop a lost second
-// factor, require one (#449), remove. The steps that open a way in confirm
-// the admin's password first (fetchWithReauth).
+// factor, require one (#449), remove — and the groups list (#505): add,
+// rename or merge, remove, each changing every account and audience that
+// names the group. The steps that open a way in, or change who sees what,
+// confirm the admin's password first (fetchWithReauth).
 type Account = {
   id: string;
   name: string;
@@ -27,17 +30,27 @@ type Account = {
   lastSignInAt: string;
   sessions: number;
 };
-type Listing = { accounts: Account[]; groups: string[]; current: string };
+type GroupUsage = { id: string; members: string[]; boards: number; apps: number; bookmarks: number; only: number };
+type Listing = { accounts: Account[]; groups: string[]; groupUsage: GroupUsage[]; current: string };
 
 const groupsText = (groups: string[]) => groups.join(", ");
-const parseGroups = (text: string) =>
-  [...new Set(text.split(/[\s,]+/).map((g) => g.trim().toLowerCase()).filter(Boolean))];
+const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
+
+// "1 board, 2 apps", or null when nothing is shared with the group.
+function sharedText(g: GroupUsage): string | null {
+  const parts = [
+    g.boards ? plural(g.boards, "board") : "",
+    g.apps ? plural(g.apps, "app") : "",
+    g.bookmarks ? plural(g.bookmarks, "bookmark") : "",
+  ].filter(Boolean);
+  return parts.length ? parts.join(", ") : null;
+}
 
 const emptyAdd = {
   id: "",
   name: "",
   role: "member" as "admin" | "member",
-  groups: "",
+  groups: [] as string[],
   password: "",
   mustChangePassword: true,
   requireTwoFactor: false,
@@ -47,7 +60,10 @@ export default function UsersSection() {
   const [listing, setListing] = useState<Listing | null>(null);
   const [add, setAdd] = useState(emptyAdd);
   const [editing, setEditing] = useState<string | null>(null);
-  const [edit, setEdit] = useState({ name: "", role: "member" as "admin" | "member", groups: "", requireTwoFactor: false });
+  const [edit, setEdit] = useState({ name: "", role: "member" as "admin" | "member", groups: [] as string[], requireTwoFactor: false });
+  const [newGroup, setNewGroup] = useState("");
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [groupName, setGroupName] = useState("");
   const [resetting, setResetting] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -98,7 +114,7 @@ export default function UsersSection() {
       () =>
         fetchWithReauth("/api/accounts", {
           method: "POST",
-          ...json({ ...add, id: add.id.trim().toLowerCase(), groups: parseGroups(add.groups) }),
+          ...json({ ...add, id: add.id.trim().toLowerCase() }),
         }),
       `Added ${add.id.trim().toLowerCase()}`
     );
@@ -106,14 +122,14 @@ export default function UsersSection() {
   }
   function startEdit(a: Account) {
     setEditing(a.id);
-    setEdit({ name: a.name, role: a.role, groups: groupsText(a.groups), requireTwoFactor: a.requireTwoFactor });
+    setEdit({ name: a.name, role: a.role, groups: a.groups, requireTwoFactor: a.requireTwoFactor });
   }
   async function saveEdit(e: FormEvent) {
     e.preventDefault();
     if (!editing) return;
     const ok = await act(
       "save the account",
-      () => fetchWithReauth(`/api/accounts/${editing}`, { method: "PATCH", ...json({ ...edit, groups: parseGroups(edit.groups) }) }),
+      () => fetchWithReauth(`/api/accounts/${editing}`, { method: "PATCH", ...json(edit) }),
       "Account saved"
     );
     if (ok) setEditing(null);
@@ -167,7 +183,85 @@ export default function UsersSection() {
     await act("remove the account", () => fetchWithReauth(`/api/accounts/${a.id}`, { method: "DELETE" }), `Removed ${a.id}`);
   }
 
+  // The groups list (#505).
+  async function addGroup(e: FormEvent) {
+    e.preventDefault();
+    const id = newGroup.trim().toLowerCase();
+    const ok = await act(
+      "add the group",
+      () => fetch("/api/account-groups", { method: "POST", ...json({ id }) }),
+      `Added the group ${id}`
+    );
+    if (ok) setNewGroup("");
+  }
+  // A rename onto a name that's taken asks before merging the two.
+  async function submitRename(e: FormEvent) {
+    e.preventDefault();
+    if (!renaming) return;
+    const from = renaming;
+    const to = groupName.trim().toLowerCase();
+    const send = (merge: boolean) =>
+      fetchWithReauth(`/api/account-groups/${from}`, { method: "PATCH", ...json({ id: to, merge }) });
+    setBusy(true);
+    let res: Response;
+    try {
+      res = await send(false);
+    } catch {
+      toast("Couldn't rename the group", "error");
+      setBusy(false);
+      return;
+    }
+    setBusy(false);
+    if (res.status === 409) {
+      const merge = await confirm({
+        title: `Merge ${from} into ${to}?`,
+        message: `There's already a group called ${to}. Everyone in ${from} joins it, and everything shared with ${from} is shared with ${to}.`,
+        confirmLabel: "Merge",
+      });
+      if (!merge) return;
+      if (await act("merge the groups", () => send(true), `Merged ${from} into ${to}`)) setRenaming(null);
+      return;
+    }
+    if (!res.ok) {
+      toast(apiErrorMessage(await res.json().catch(() => null), "Couldn't rename the group"), "error");
+      return;
+    }
+    toast(`Renamed ${from} to ${to}`);
+    setRenaming(null);
+    await load();
+  }
+  async function removeGroup(g: GroupUsage) {
+    const effects = [
+      g.members.length ? `${plural(g.members.length, "account")} leave${g.members.length === 1 ? "s" : ""} it.` : "",
+      g.only
+        ? `${plural(g.only, "item")} shared with this group alone become${g.only === 1 ? "s" : ""} visible to admins only.`
+        : "",
+    ].filter(Boolean);
+    const ok = await confirm({
+      title: `Remove the group ${g.id}?`,
+      message: effects.length ? effects.join(" ") : "Nobody is in it and nothing is shared with it.",
+      confirmLabel: "Remove",
+      danger: true,
+    });
+    if (!ok) return;
+    await act("remove the group", () => fetchWithReauth(`/api/account-groups/${g.id}`, { method: "DELETE" }), `Removed the group ${g.id}`);
+  }
+
   const accounts = listing?.accounts ?? [];
+  const groups = listing?.groups ?? [];
+  const groupOptions = groups.map((g) => ({ value: g, label: g }));
+  // The groups an account is in, picked from the list; how to add one when
+  // there are none yet.
+  const groupPicker = (label: string, selected: string[], onChange: (next: string[]) => void) => (
+    <div className="flex flex-col gap-1.5">
+      <span className={fieldLabelClasses}>Groups</span>
+      {groups.length ? (
+        <ChipToggles label={label} options={groupOptions} selected={selected} onChange={(next) => onChange([...next].sort())} />
+      ) : (
+        <Hint>No groups yet. Add them under Groups, then pick them here.</Hint>
+      )}
+    </div>
+  );
   return (
     <>
       <Card
@@ -199,15 +293,8 @@ export default function UsersSection() {
                             <option value="admin">Admin</option>
                           </select>
                         </label>
-                        <div className="min-w-0 flex-1 basis-60">
-                          <TextField
-                            label="Groups"
-                            hint="Comma-separated, e.g. family, ops. A board or item can be shared with a whole group."
-                            value={edit.groups}
-                            onChange={(e) => setEdit({ ...edit, groups: e.target.value })}
-                          />
-                        </div>
                       </div>
+                      {groupPicker(`Groups for ${label}`, edit.groups, (next) => setEdit({ ...edit, groups: next }))}
                       <ToggleRow
                         label="Require two-factor authentication"
                         hint={
@@ -288,9 +375,98 @@ export default function UsersSection() {
         )}
       </Card>
 
+      <Card
+        title="Groups"
+        intro="Share a board, app or bookmark with a group instead of naming each account. Renaming or removing a group here changes it on every account and everything shared with it."
+      >
+        {listing === null ? (
+          <Hint>Loading groups…</Hint>
+        ) : (
+          <>
+            {listing.groupUsage.length > 0 && (
+              <ListPanel>
+                {listing.groupUsage.map((g) => {
+                  const shared = sharedText(g);
+                  return (
+                    <div key={g.id} className={`${subCardClasses} flex flex-col gap-2 p-3`}>
+                      {renaming === g.id ? (
+                        <form onSubmit={submitRename} className="flex flex-wrap items-end gap-2">
+                          <div className="min-w-0 flex-1 basis-60">
+                            <TextField
+                              label={`New name for ${g.id}`}
+                              hint="Lowercase letters, digits, dots, dashes or underscores. A name that's taken merges the two."
+                              autoCapitalize="off"
+                              autoComplete="off"
+                              spellCheck={false}
+                              value={groupName}
+                              onChange={(e) => setGroupName(e.target.value)}
+                            />
+                          </div>
+                          <Button type="submit" size="sm" disabled={busy || !groupName.trim() || groupName.trim().toLowerCase() === g.id}>
+                            Rename
+                          </Button>
+                          <Button type="button" size="sm" variant="ghost" onClick={() => setRenaming(null)}>Cancel</Button>
+                        </form>
+                      ) : (
+                        <>
+                          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                            <span className="font-medium text-ink-90">{g.id}</span>
+                            <span className="text-xs text-ink-60">
+                              {g.members.length
+                                ? `${plural(g.members.length, "member")}: ${g.members
+                                    .map((id) => accounts.find((a) => a.id === id)?.name || id)
+                                    .join(", ")}`
+                                : "No members"}
+                            </span>
+                          </div>
+                          <p className="text-xs text-ink-45">{shared ? `Shared with it: ${shared}` : "Nothing shared with it yet"}</p>
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setRenaming(g.id);
+                                setGroupName(g.id);
+                              }}
+                              disabled={busy}
+                            >
+                              Rename
+                            </Button>
+                            <Button type="button" size="sm" variant="danger" onClick={() => removeGroup(g)} disabled={busy}>
+                              Remove
+                            </Button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </ListPanel>
+            )}
+            <form onSubmit={addGroup} className="flex flex-wrap items-end gap-2">
+              <div className="min-w-0 flex-1 basis-60">
+                <TextField
+                  label="New group"
+                  hint="e.g. family or ops. Lowercase letters, digits, dots, dashes or underscores."
+                  autoCapitalize="off"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={newGroup}
+                  onChange={(e) => setNewGroup(e.target.value)}
+                />
+              </div>
+              <Button type="submit" size="sm" disabled={busy || !newGroup.trim()}>Add group</Button>
+            </form>
+          </>
+        )}
+      </Card>
+
       <Card title="Add an account" intro="A sign-in name, a role and a first password to hand over. They're asked to choose their own password the first time they sign in, unless you turn that off.">
         <form onSubmit={handleAdd} className="flex flex-col gap-3">
-          <div className="grid gap-3 sm:grid-cols-2">
+          {/* One column that shrinks to the card on a phone: the Role
+              options are long enough to push it wider otherwise. */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <TextField
               label="Sign-in name"
               hint="Lowercase letters, digits, dots, dashes or underscores; it can't be changed later."
@@ -302,23 +478,17 @@ export default function UsersSection() {
               onChange={(e) => setAdd({ ...add, id: e.target.value })}
             />
             <TextField label="Display name" value={add.name} onChange={(e) => setAdd({ ...add, name: e.target.value })} />
-            <label className="flex flex-col gap-1">
+            <label className="flex min-w-0 flex-col gap-1">
               <span className={fieldLabelClasses}>Role</span>
               <select
                 value={add.role}
                 onChange={(e) => setAdd({ ...add, role: e.target.value === "admin" ? "admin" : "member" })}
-                className={controlClasses}
+                className={`${controlClasses} min-w-0`}
               >
                 <option value="member">Member: sees what is shared with them</option>
                 <option value="admin">Admin: everything, this portal included</option>
               </select>
             </label>
-            <TextField
-              label="Groups"
-              hint="Comma-separated, e.g. family, ops."
-              value={add.groups}
-              onChange={(e) => setAdd({ ...add, groups: e.target.value })}
-            />
             <TextField
               label="First password"
               type="password"
@@ -329,6 +499,7 @@ export default function UsersSection() {
               onChange={(e) => setAdd({ ...add, password: e.target.value })}
             />
           </div>
+          {groupPicker("Groups for the new account", add.groups, (next) => setAdd({ ...add, groups: next }))}
           <ToggleRow
             label="Ask for a new password at the first sign-in"
             hint="Off only when you've agreed the password with them already."

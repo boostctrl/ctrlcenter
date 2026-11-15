@@ -50,8 +50,9 @@ export async function GET(request: NextRequest) {
   const outageNotes = exportOutageNotes();
   const body = {
     ...(withSecrets ? stripAuth(config) : stripExportSecrets(stripAuth(config))),
-    // The accounts (#423): whole with secrets, the roster without.
-    auth: { users: accountsForExport(config.auth, withSecrets) },
+    // The accounts (#423): whole with secrets, the roster without; and the
+    // groups list (#505), which holds no secret.
+    auth: { users: accountsForExport(config.auth, withSecrets), groups: config.auth.groups },
     ...(uploads.length > 0 ? { uploads } : {}),
     ...(outageNotes.length > 0 ? { outageNotes } : {}),
   };

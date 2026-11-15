@@ -2,6 +2,7 @@
 // write to config.auth goes through mutateAccount below.
 import { FOUNDING_ACCOUNT_ID, totpAuthSchema, userSchema, type TotpAuth, type User } from "../schema/auth";
 import { accountsOf } from "../accounts";
+import { accountGroups, removeGroup, renameGroup, withGroups } from "../account-groups";
 import { mutate, NotFoundError } from "./store";
 
 // Edit one account inside the write queue. The first write of any account
@@ -23,6 +24,8 @@ async function mutateAccount<T>(id: string, fn: (account: User) => T): Promise<T
     config.auth = {
       ...config.auth,
       users,
+      // A group given to the account joins the managed list (#505).
+      groups: withGroups(config.auth.groups, account.groups),
       ...(account.id === FOUNDING_ACCOUNT_ID
         ? { passwordHash: account.passwordHash, passwordSalt: account.passwordSalt, totp: account.totp }
         : {}),
@@ -39,7 +42,11 @@ export async function addAccount(user: User): Promise<void> {
   await mutate((config) => {
     const users = accountsOf(config.auth);
     if (users.some((u) => u.id === user.id)) throw new AccountExistsError(`An account "${user.id}" already exists`);
-    config.auth = { ...config.auth, users: [...users, userSchema.parse(user)] };
+    config.auth = {
+      ...config.auth,
+      users: [...users, userSchema.parse(user)],
+      groups: withGroups(config.auth.groups, user.groups),
+    };
   });
 }
 
@@ -98,6 +105,32 @@ export async function deleteAccount(id: string): Promise<void> {
     const users = accountsOf(config.auth);
     if (!users.some((u) => u.id === id)) throw new NotFoundError(`No account "${id}"`);
     config.auth = { ...config.auth, users: users.filter((u) => u.id !== id) };
+  });
+}
+
+// The groups list (#505): a new group, empty until an account joins it or
+// something is shared with it; a rename, which merges into a group that
+// exists only when asked to; a removal. Each rewrites every account and
+// audience naming the group in the one write.
+export class GroupExistsError extends Error {}
+export async function addAccountGroup(id: string): Promise<void> {
+  await mutate((config) => {
+    if (accountGroups(config).includes(id)) throw new GroupExistsError(`A group "${id}" already exists`);
+    config.auth = { ...config.auth, groups: withGroups(config.auth.groups, [id]) };
+  });
+}
+export async function renameAccountGroup(from: string, to: string, opts: { merge?: boolean } = {}): Promise<void> {
+  await mutate((config) => {
+    const known = accountGroups(config);
+    if (!known.includes(from)) throw new NotFoundError(`No group "${from}"`);
+    if (from !== to && known.includes(to) && !opts.merge) throw new GroupExistsError(`A group "${to}" already exists`);
+    renameGroup(config, from, to);
+  });
+}
+export async function removeAccountGroup(id: string): Promise<void> {
+  await mutate((config) => {
+    if (!accountGroups(config).includes(id)) throw new NotFoundError(`No group "${id}"`);
+    removeGroup(config, id);
   });
 }
 

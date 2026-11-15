@@ -53,6 +53,23 @@ export type User = z.infer<typeof userSchema>;
 // stands in for while it has no stored password.
 export const FOUNDING_ACCOUNT_ID = "admin";
 
+// The groups accounts belong to and items are shared with (#505), as a list
+// of names kept in one place: a group can exist before anyone is in it, and
+// is renamed or removed everywhere at once (lib/account-groups.ts). A name
+// that isn't a slug is dropped on read, so a hand edit can't fail the load.
+export const MAX_ACCOUNT_GROUPS = 256;
+export const groupNameSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(USER_ID_PATTERN, "A group name is 1–64 lowercase letters, digits, dots, dashes or underscores");
+const storedGroups = z
+  .array(z.unknown())
+  .catch([])
+  .transform((a) =>
+    [...new Set(a.filter((s): s is string => typeof s === "string" && USER_ID_PATTERN.test(s)))].slice(0, MAX_ACCOUNT_GROUPS)
+  );
+
 // The accounts and their credentials (PBKDF2). Kept as a top-level key (not
 // under settings) so it's never rendered into public pages.
 export const authSchema = z.object({
@@ -67,6 +84,10 @@ export const authSchema = z.object({
   // Every account (#423). Empty in a file 3.0 wrote: the founding admin is
   // then the legacy credential above, as one account (lib/accounts.ts).
   users: z.array(userSchema).default([]),
+  // The managed list of groups (#505). Groups an account or a shared item
+  // names count too (accountGroups), so a file from before the list loses
+  // none.
+  groups: storedGroups.default([]),
 });
 export type AuthConfig = z.infer<typeof authSchema>;
 

@@ -42,6 +42,8 @@ export const SECURITY_EVENT_KINDS = [
   "account.changed",
   "account.deleted",
   "password.reset",
+  // A group added, renamed or removed (#505); `detail` says which.
+  "group.changed",
 ] as const;
 export type SecurityEventKind = (typeof SECURITY_EVENT_KINDS)[number];
 

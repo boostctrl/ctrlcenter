@@ -1092,6 +1092,11 @@ export default async function HelpPage() {
             runs this portal, a <em>member</em> signs in to see the boards, apps
             and bookmarks shared with them. Every account keeps its own
             password, second factor and sessions at <strong>/account</strong>.
+            Under <strong>Groups</strong> on the same tab you keep the list of
+            groups an account can join and a board or item can be shared
+            with. Renaming a group, or merging it into another, changes it on
+            every account and everything shared with it; removing one makes
+            what was shared with that group alone visible to admins only.
             Set or change the admin password from the portal. If none is set,
             login falls back to the <Code>ADMIN_PASSWORD</Code> environment
             variable. Changing the password signs out every other session.

@@ -475,7 +475,13 @@ auth:
       enabled: true
       passwordHash: …      # set from Settings → Users or /account, never by hand
       passwordSalt: …
+  groups: [family, ops]    # the groups list, kept from Settings → Users → Groups
 ```
+
+Groups are kept as a list on the same tab, so a group can exist before
+anyone is in it. Renaming or merging one there rewrites every account and
+every audience that names it; removing one leaves what was shared with that
+group alone visible to admins only.
 
 `ADMIN_PASSWORD` stands in for the `admin` account only, and only while it
 has no password of its own. A backup carries the accounts: with secrets,

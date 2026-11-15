@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { viewerOf } from "@/lib/api-auth";
 import { addAccount, AccountExistsError, readConfigInternal } from "@/lib/config";
 import { accountsOf } from "@/lib/accounts";
+import { groupUsage } from "@/lib/account-groups";
 import { hashPassword } from "@/lib/auth";
 import { requireRecentAuth } from "@/lib/reauth";
 import { accountCreateSchema, userSchema } from "@/lib/schema";
@@ -12,7 +13,9 @@ import { notifySecurityEvent } from "@/lib/security-alerts";
 // The accounts and the groups they belong to (#423), for the admin's
 // pickers and the Users tab: names, roles, groups, whether each is enabled,
 // has a second factor, must change its password, when it last signed in and
-// how many sessions it holds. Never a credential or a secret.
+// how many sessions it holds. Never a credential or a secret. `groups` is
+// the whole managed list (#505), empty groups included, and `groupUsage`
+// what each holds.
 export async function GET(request: NextRequest) {
   const config = await readConfigInternal();
   const viewer = await viewerOf(request, config.auth);
@@ -33,10 +36,15 @@ export async function GET(request: NextRequest) {
     lastSignInAt: u.lastSignInAt,
     sessions: sessions.filter((s) => sessionAccount(s) === u.id).length,
   }));
-  const groups = [...new Set(accounts.flatMap((a) => a.groups))].sort();
+  const usage = groupUsage(config);
   // `current`: the asking admin's own account, which the Users tab treats
   // with care (no disabling or removing oneself).
-  return NextResponse.json({ accounts, groups, current: viewer.account.id });
+  return NextResponse.json({
+    accounts,
+    groups: usage.map((g) => g.id),
+    groupUsage: usage,
+    current: viewer.account.id,
+  });
 }
 
 // A new account (#423), with the first password the admin hands over and,
