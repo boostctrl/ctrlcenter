@@ -12,26 +12,15 @@ here.
 
 ## [Unreleased]
 
-### Changed
-
-- **The Monitor updates live.** The dashboard and every integration's page
-  refresh on their own, as often as each service's numbers move: every 3
-  seconds for qBittorrent, 5 for Tautulli, up to 30 for Sonarr, Radarr and
-  TrueNAS. Before, the dashboard could show numbers over a minute old until
-  the page was reloaded. Bars, donuts and rings glide to their new values
-  (not with reduced motion), and a pulsing dot says the page is live. A
-  Sonarr or Radarr library is read every ten minutes rather than with each
-  refresh. (#531)
-
-## [3.2.0-rc.2] - 2026-11-15
-
 ### Added
 
-- **Sonarr and Radarr pages show the download queue, what's missing and
-  disk space.** Each download has its progress, size and time left, and one
-  whose import is stuck is marked. Missing lists the monitored episodes or
-  movies not in the library, with the total, and Disk space shows the room
-  on each folder. (#523)
+- **The Monitor charts the last hour and the last day.** CtrlCenter takes
+  a reading from each connected service once a minute, whether or not the
+  page is open, and keeps a day of them beside the config, so a restart
+  doesn't lose it. qBittorrent's speeds, Tautulli's streams and bandwidth,
+  UniFi's clients and internet, Portainer's containers, TrueNAS's fullest
+  pool and apps, and Seerr's requests are charted on their pages; point at
+  a chart, or focus it and use the arrow keys, to read any moment. (#530)
 
 - **Monitor pages link into the service.** Every integration's page has an
   "Open Sonarr"-style button. On the Sonarr, Radarr and Seerr pages each
@@ -39,116 +28,82 @@ here.
   tab; on Tautulli's, each stream and watched title opens its page in
   Tautulli. (#522)
 
-- **Charts on the Sonarr and Radarr pages.** A bar chart shows what was
-  grabbed and imported on each of the last seven days, and a donut splits
-  the library into what's on disk, what's missing and the rest, with the
-  number of series or movies and their size. (#523)
-
-- **qBittorrent's page charts its torrents.** Two donuts split them by
-  state and by how much each category holds on disk, and each torrent
-  shows its category, tracker, seeds and peers. (#524)
-
-- **Tautulli's page shows the last month at a glance.** Plays per day
-  over two weeks, split into TV, movies and music; a donut of plays by
-  platform; the top viewers with their hours; and each library's size.
-  A stream also names its player and says when it's remote. (#525)
-
-- **AdGuard Home's page shows where queries go.** A donut splits them
-  into allowed, blocked by filters and stopped by Safe Browsing or
-  parental control, with the filter lists and rules in use. Beside the
-  most-blocked domains are the most-queried ones and the busiest clients.
-  (#526)
-
-- **UniFi's page shows who is connected and how busy the line is.** The
-  internet connection's current download and upload speed, donuts of
-  clients by network and devices by kind, and the busiest clients with
-  their network, address, WiFi signal and the data they've moved. (#527)
-
-- **TrueNAS's page shows the system and every disk.** Uptime, version and
-  load beside the pools; a donut of space used by each pool and what's
-  free; each pool's last scrub or resilver and the errors it found; and
-  each disk with its model, size, pool and temperature, hottest first,
-  amber or red when it runs warm. (#528)
-
-- **Portainer's page shows stacks and images.** A donut of containers by
-  state, every stack with its environment and whether it's active, and
-  each environment's images, Docker version, CPUs and memory. (#529)
-
-- **The Monitor charts the last hour and the last day.** CtrlCenter now
-  takes a reading from each connected service once a minute, whether or
-  not the page is open, and keeps a day of them beside the config, so a
-  restart doesn't lose it. qBittorrent's speeds, Tautulli's streams and
-  bandwidth, UniFi's clients and internet, Portainer's containers,
-  TrueNAS's fullest pool and apps, and Seerr's requests are charted on
-  their pages; point at a chart, or focus it and use the arrow keys, to
-  read any moment. The totals on the command deck show their last hour as
-  a trend line. (#530)
-
 ### Changed
 
-- **The Monitor dashboard opens on a command deck.** A status ring draws one
-  arc per service, green when it's fine and red when it needs a look, around
-  the count that are answering. Beside it sit the verdict and the totals
-  across your services: download and upload speed, streams, DNS queries,
-  network clients, free storage, containers, requests and this week's
-  imports, each linking to its page. Problems are still listed under it.
-  The tiles now fill the width in one flow, so no group leaves an empty
-  column beside it. (#520)
+- **The Monitor dashboard opens on a command deck.** A status ring draws
+  one arc per service, green when it's fine and red when it needs a look,
+  around the count that are answering. Beside it sit the verdict and the
+  totals across your services: download and upload speed, streams, DNS
+  queries, network clients, free storage, containers, requests and this
+  week's imports, each with its last hour as a trend line and linking to
+  its page. Whatever needs attention is listed under it, each problem
+  linking to the page that shows it. The tiles fill the width in one flow,
+  and the services you haven't set up share one quiet row at the end
+  instead of a tile each. (#509, #520)
 
-- **Integration pages on the Monitor are better balanced.** Cards that sit
-  side by side now end on the same line, and Tautulli's Recently watched
-  shows six titles with a Show all, so it no longer runs far past the
-  streams beside it. (#521)
-
-## [3.2.0-rc.1] - 2026-11-14
-
-### Changed
-
-- **Integration pages on the Monitor have a new header and offline page.**
-  Each opens with the service's logo, name and what it is, beside its live
-  status. A service that can't be reached fills the page with what's wrong
-  and a link to its settings, and a refresh that fails keeps showing the last
-  data, marked stale, instead of emptying the page. (#508)
-
-- **The Monitor dashboard is tidier.** The health banner is one compact row,
-  with each problem listed under it as a link to the page that shows it.
-  Tiles line up in a three-column grid in every group, a group with nothing
-  connected no longer shows, and the services you haven't set up share one
-  quiet row at the end instead of a tile each. The refresh interval moved
-  into the "Updated" pill at the top. (#509)
-
-- **Every integration's page on the Monitor is redesigned.** Each opens on
-  its headline numbers in a row of tiles, then lays out what the service
-  reports in titled sections, with the same rows, status chips and progress
-  bars throughout:
-  - **Sonarr and Radarr:** what's next, this week's grabs and imports,
-    health checks most severe first, the next two weeks by date, and recent
-    activity. (#510)
+- **Every integration's page on the Monitor is redesigned.** Each opens
+  with the service's logo, name and what it is beside its live status,
+  then its headline numbers in a row of tiles, charts, and titled sections
+  with the same rows, status chips and progress bars throughout; cards side
+  by side end on the same line. A service that can't be reached fills the
+  page with what's wrong and a link to its settings, and a refresh that
+  fails keeps showing the last data, marked stale, instead of emptying the
+  page. (#508, #521) Each page shows more of its service than before:
+  - **Sonarr and Radarr:** what's next; this week's grabs and imports, day
+    by day; health checks most severe first; what's downloading, with its
+    progress and time left, and any import that's stuck; the next two
+    weeks by date; recent activity; what's missing; the room on each disk;
+    and a donut of the library: what's on disk, what's missing and the
+    rest. (#510, #523)
   - **Seerr:** the requests waiting for approval in a section of their own,
     with Approve and Deny when actions are on, apart from the other recent
     requests. (#511)
-  - **Tautulli:** each stream's progress, and whether it's playing direct or
-    transcoding, beside what was watched lately. (#512)
-  - **qBittorrent:** speeds and totals, then every torrent with its state,
-    progress and, past 25, a Show all. (#513)
-  - **Portainer:** container counts across every environment, and each
-    environment opening to its containers when actions are on. (#514)
-  - **TrueNAS:** alerts first, each pool colored by how full it is, and apps
-    opening to their containers. (#515)
-  - **AdGuard Home:** queries and blocked share, the trend over the stats
-    window, and the most blocked domains. (#516)
-  - **UniFi:** the internet connection, clients, and every device with its
-    kind, clients and uptime, offline ones first. (#517)
+  - **Tautulli:** each stream's progress, player, and whether it's playing
+    direct, transcoding or remote; plays per day over two weeks by TV,
+    movies and music; a donut of plays by platform; the top viewers with
+    their hours; each library's size; and what was watched lately. (#512,
+    #525)
+  - **qBittorrent:** speeds and totals, donuts of the torrents by state and
+    of the space each category holds, then every torrent with its state,
+    progress, category, tracker, seeds and peers and, past 25, a Show all.
+    (#513, #524)
+  - **Portainer:** container counts and a donut of them by state, every
+    stack with its environment and whether it's active, and each
+    environment with its images, Docker version, CPUs and memory, opening
+    to its containers when actions are on. (#514, #529)
+  - **TrueNAS:** alerts first; uptime, version and load; a donut of the
+    space each pool uses and what's free; each pool colored by how full it
+    is, with its last scrub or resilver and the errors it found; every disk
+    with its model, pool and temperature, hottest first; and apps opening
+    to their containers. (#515, #528)
+  - **AdGuard Home:** queries and blocked share, their trend over the stats
+    window, a donut of what happened to them (allowed, blocked by filters,
+    stopped by Safe Browsing or parental control) with the filter lists in
+    use, and the most-blocked domains, most-queried domains and busiest
+    clients. (#516, #526)
+  - **UniFi:** the internet connection and how busy it is, donuts of
+    clients by network and devices by kind, the busiest clients with their
+    network, address, signal and data moved, and every device with its
+    kind, clients and uptime, offline ones first. (#517, #527)
+
+- **The Monitor updates live.** The dashboard and every integration's page
+  refresh on their own, as often as each service's numbers move: every 3
+  seconds for qBittorrent, 5 for Tautulli, up to 30 for Sonarr, Radarr and
+  TrueNAS. Before, the dashboard could show numbers over a minute old until
+  the page was reloaded. Bars, donuts and rings glide to their new values
+  (not with reduced motion), and a pulsing dot says the page is live.
+  (#531)
 
 - **The Monitor reads better with a screen reader.** Action buttons name
   what they act on ("Pause Dune.Part.Two…", "Approve Silo"), a tile names
   its service before its numbers and says when its data is stale, the
-  health banner says how serious each problem is, and the containers of a
-  TrueNAS app show their state in words as well as by color. (#518)
+  dashboard says how serious each problem is, the containers of a TrueNAS
+  app show their state in words as well as by color, and every chart says
+  what it shows. (#518)
 
 - **The help page describes the new Monitor:** the dashboard, what each
-  integration's page shows, and that actions need two-factor sign-in.
-  (#518)
+  integration's page shows, the charts and the readings behind them, how
+  often it updates, and that actions need two-factor sign-in. (#518)
 
 - **Inbound webhook notifications tie up three loose ends.** A Radarr
   upgrade arrives as one notification, as a Sonarr one does, instead of an
@@ -4248,9 +4203,7 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v3.2.0-rc.2...HEAD
-[3.2.0-rc.2]: https://github.com/boostctrl/ctrlcenter/compare/v3.2.0-rc.1...v3.2.0-rc.2
-[3.2.0-rc.1]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.3...v3.2.0-rc.1
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.3...HEAD
 [3.1.3]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.2...v3.1.3
 [3.1.2]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.1...v3.1.2
 [3.1.1]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.0...v3.1.1
