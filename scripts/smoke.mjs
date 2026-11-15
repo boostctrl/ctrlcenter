@@ -832,6 +832,38 @@ async function sizedCells(ctx) {
     // on those (the stock Glass among them) the box is marked but unmasked (#356).
     if (t.overflow !== "auto" || !t.scrolls || !t.marked || (t.mask === "none") !== t.frosted)
       throw new Error(`the tile box doesn't scroll and fade as its design should: ${JSON.stringify(t)}`);
+    // Content that changes inside a cell of fixed height, which keeps the
+    // box itself the same size (#493, #494): the short card grown past its
+    // 300px becomes a Tab stop and stops being one when the content goes, and
+    // the apps tile box drops its fade while its rows are hidden.
+    const parkingCard = () =>
+      page.evaluate(() => {
+        const card = document.querySelector("main .grid").children[3].querySelector(":scope > section > .glass-card");
+        return { scrolls: card.scrollHeight > card.clientHeight, tabindex: card.getAttribute("tabindex") };
+      });
+    await page.evaluate(() => {
+      const extra = document.createElement("div");
+      extra.id = "smoke-grown";
+      extra.style.height = "800px";
+      document.querySelector("main .grid").children[3].querySelector(":scope > section > .glass-card").append(extra);
+    });
+    const filled = await eventually(page, parkingCard, (c) => c.scrolls && c.tabindex === "0", 5_000);
+    if (!filled.ok) throw new Error(`content grown past the short card left it without a Tab stop: ${JSON.stringify(filled.state)}`);
+    await page.evaluate(() => document.getElementById("smoke-grown").remove());
+    const emptied = await eventually(page, parkingCard, (c) => !c.scrolls && c.tabindex === null, 5_000);
+    if (!emptied.ok) throw new Error(`the short card kept its Tab stop once the content went: ${JSON.stringify(emptied.state)}`);
+    const appsTiles = (display) =>
+      page.evaluate((display) => {
+        const tiles = document.querySelector("main .grid").children[2].querySelector(":scope > section > .widget-tiles");
+        if (display !== null) for (const row of tiles.children) row.style.display = display;
+        return { scrolls: tiles.scrollHeight > tiles.clientHeight, marked: tiles.hasAttribute("data-overflow") };
+      }, display);
+    await appsTiles("none");
+    const hidden = await eventually(page, () => appsTiles(null), (b) => !b.scrolls && !b.marked, 5_000);
+    if (!hidden.ok) throw new Error(`with its rows hidden, the tile box keeps its fade: ${JSON.stringify(hidden.state)}`);
+    await appsTiles("");
+    const shown = await eventually(page, () => appsTiles(null), (b) => b.scrolls && b.marked, 5_000);
+    if (!shown.ok) throw new Error(`with its rows back, the tile box has no fade: ${JSON.stringify(shown.state)}`);
     // The editor's preview of the apps card is the same 220px.
     await page.goto(`${base}/b/infra?edit=1`);
     const frame = page.locator('main .grid > [data-widget-id="apps"]');
@@ -841,7 +873,7 @@ async function sizedCells(ctx) {
     await page.getByRole("toolbar", { name: /controls$/ }).waitFor({ timeout: 5_000 });
     const preview = await frame.locator("[inert]").evaluate((el) => Math.round(el.getBoundingClientRect().height));
     if (preview !== 220) throw new Error(`the editor's preview of the apps card is ${preview}px tall, not 220`);
-    console.log("ok    sized cells keep their height, fill or scroll inside the card or tile box, and preview the same in the editor");
+    console.log("ok    sized cells keep their height, fill or scroll inside the card or tile box, follow their content, and preview the same in the editor");
   } catch (e) {
     failures.push(`sized cells: ${e instanceof Error ? e.message.split("\n")[0] : e}`);
   } finally {
@@ -1014,6 +1046,20 @@ async function webkitSizedCells() {
         if (at.card) throw new Error(`a Tab sweep landed on a card that fits its cell (${at.label}, press ${sweep + 1})`);
         if (at.body) break;
       }
+      // Content grown past the card at that height makes it a Tab stop
+      // without the cell resizing, and it stops being one when the content
+      // goes (#494).
+      await page.evaluate(() => {
+        const extra = document.createElement("div");
+        extra.id = "smoke-grown";
+        extra.style.height = "1200px";
+        document.querySelectorAll("main .grid > *")[1].querySelector(":scope > section > .glass-card").append(extra);
+      });
+      const filled = await eventually(page, notesCard, (s) => s.scrolls && s.tabindex === "0" && s.role === "region");
+      if (!filled.ok) throw new Error(`content grown past the card left it without a Tab stop: ${JSON.stringify(filled.state)}`);
+      await page.evaluate(() => document.getElementById("smoke-grown").remove());
+      const emptied = await eventually(page, notesCard, (s) => !s.scrolls && s.tabindex === null);
+      if (!emptied.ok) throw new Error(`the card kept its Tab stop once the content went: ${JSON.stringify(emptied.state)}`);
       await resize("200px");
       const shrunk = await eventually(page, notesCard, (s) => s.scrolls && s.tabindex === "0");
       if (!shrunk.ok) throw new Error(`cut short again, the card has no Tab stop: ${JSON.stringify(shrunk.state)}`);

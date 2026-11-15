@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
+import { watchContent } from "./watchContent";
 
 // The focusable descendants a keyboard user could already Tab to, which
 // scroll the box into view on their own.
@@ -14,8 +15,10 @@ const FOCUSABLE = 'a[href], button, input, select, textarea, [tabindex]:not([tab
 // so a keyboard user can scroll it in every browser: Chrome and Firefox do
 // this for such scrollers on their own, Safari does not (#355). A box whose
 // rows fit, or one with links or buttons inside, gets no extra stop.
-// Measured with a ResizeObserver, like TilesBox; re-checked on every render
-// in case the widget swapped its box.
+// Measured whenever the box or its content changes, like TilesBox (#494): a
+// card at a fixed height keeps its size while its content grows, shrinks or
+// gains a link. Re-checked on every render too, which also finds a box the
+// widget swapped.
 export default function SizedCell({
   className,
   style,
@@ -28,16 +31,19 @@ export default function SizedCell({
   [data: `data-${string}`]: string | number | undefined;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const watched = useRef<{ box: HTMLElement; stop: () => void } | null>(null);
+  const watched = useRef<{ box: HTMLElement; measure: () => void; stop: () => void } | null>(null);
   useEffect(() => {
     const cell = ref.current;
     const box = cell?.querySelector<HTMLElement>(":scope > section > .glass-card, :scope > section > .widget-tiles") ?? null;
-    if (watched.current?.box === box) return;
+    if (watched.current?.box === box) {
+      watched.current.measure();
+      return;
+    }
     watched.current?.stop();
     watched.current = null;
     if (!cell || !box) return;
-    const heading = cell.querySelector("section h2, section h3")?.textContent?.trim();
     const measure = () => {
+      const heading = cell.querySelector("section h2, section h3")?.textContent?.trim();
       const scrolls = box.scrollHeight > box.clientHeight + 1 && !box.querySelector(FOCUSABLE);
       if (scrolls) {
         box.setAttribute("tabindex", "0");
@@ -50,9 +56,7 @@ export default function SizedCell({
       }
     };
     measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(box);
-    watched.current = { box, stop: () => ro.disconnect() };
+    watched.current = { box, measure, stop: watchContent(box, measure) };
   });
   useEffect(() => () => watched.current?.stop(), []);
   return (

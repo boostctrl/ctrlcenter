@@ -12,6 +12,23 @@ here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A fixed-height app or bookmark grid keeps its fade right as it
+  changes.** When the tiles in a grid set to a fixed height changed, for
+  example when a search narrowed them, the fade at the bottom stayed on after
+  every row fit, or stayed off once rows were cut off. On the frosted designs
+  the stale fade also took the blur off the tiles. It now updates as the
+  tiles change. (#493)
+
+- **Safari keyboard users can scroll a fixed-height card whose content
+  grows.** A card set to a fixed height with nothing to click inside, such as
+  Notes, System stats or Countdown, only became reachable with Tab if its
+  content was already cut off when the page loaded. If it grew later, Safari
+  keyboard users couldn't reach it to scroll it, and a card that stopped
+  overflowing or gained a link kept an extra Tab stop. It now follows its
+  content. (#494)
+
 ## [3.1.2] - 2026-11-14
 
 ### Fixed

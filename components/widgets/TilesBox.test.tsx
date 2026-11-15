@@ -6,16 +6,20 @@ import TilesBox from "./TilesBox";
 // overflow it — the fade is a mask, and a masked box costs the frosted
 // designs their blur, so a grid that fits must stay unmarked.
 let resize: (() => void)[] = [];
+let observed: Element[] = [];
 
 beforeEach(() => {
   resize = [];
+  observed = [];
   vi.stubGlobal(
     "ResizeObserver",
     class {
       constructor(cb: () => void) {
         resize.push(cb);
       }
-      observe() {}
+      observe(el: Element) {
+        observed.push(el);
+      }
       disconnect() {}
     }
   );
@@ -49,6 +53,36 @@ describe("TilesBox", () => {
 
     sized(box, 180, 180);
     act(() => resize[0]());
+    expect(box.hasAttribute("data-overflow")).toBe(false);
+  });
+
+  // #493: at an explicit height the box keeps its size while a search
+  // narrows its rows, so watching only the box left the fade stale.
+  it("re-measures when its rows change while the box keeps its size", async () => {
+    const rows = (n: number) => (
+      <TilesBox>
+        <div className="grid">
+          {Array.from({ length: n }, (_, i) => (
+            <a key={i} href={`#${i}`}>
+              tile {i}
+            </a>
+          ))}
+        </div>
+      </TilesBox>
+    );
+    const { container, rerender } = render(rows(2));
+    const box = container.firstElementChild as HTMLElement;
+    // The rows themselves are watched, so one resizing re-measures.
+    expect(observed).toContain(box.firstElementChild);
+
+    sized(box, 480, 180);
+    rerender(rows(12));
+    await act(async () => {});
+    expect(box.hasAttribute("data-overflow")).toBe(true);
+
+    sized(box, 120, 180);
+    rerender(rows(3));
+    await act(async () => {});
     expect(box.hasAttribute("data-overflow")).toBe(false);
   });
 });
