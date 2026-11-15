@@ -12,6 +12,22 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **The Monitor dashboard opens on a command deck.** A status ring draws one
+  arc per service, green when it's fine and red when it needs a look, around
+  the count that are answering. Beside it sit the verdict and the totals
+  across your services: download and upload speed, streams, DNS queries,
+  network clients, free storage, containers, requests and this week's
+  imports, each linking to its page. Problems are still listed under it.
+  The tiles now fill the width in one flow, so no group leaves an empty
+  column beside it. (#520)
+
+- **Integration pages on the Monitor are better balanced.** Cards that sit
+  side by side now end on the same line, and Tautulli's Recently watched
+  shows six titles with a Show all, so it no longer runs far past the
+  streams beside it. (#521)
+
 ## [3.2.0-rc.1] - 2026-11-14
 
 ### Changed

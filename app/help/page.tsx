@@ -587,9 +587,11 @@ export default async function HelpPage() {
             run, each with its own name and a test-connection button — and the
             private{" "}
             <A href="/admin/monitor">Monitor</A> page shows them at a glance.
-            A banner at the top says whether anything needs attention, with
-            each problem linking to the page that explains it; under it, a
-            tile per service, grouped into network, storage and media.
+            A command deck at the top reads the whole system at once: a ring
+            with one arc per service, green when it&apos;s fine and red when
+            it needs a look, beside the totals across your services and a
+            list of what needs attention, each linking to the page that
+            explains it. Under it sits a tile per service.
             Services you haven&apos;t connected wait in one row at the bottom.
             The page refreshes itself while the tab is open.
           </P>

@@ -6,7 +6,7 @@ import type { MonitorEntry, MonitorSnapshot } from "@/lib/monitor";
 import { MONITOR_GROUPS, SERVICE_IDS, SERVICE_META } from "@/lib/services/ids";
 import PageNav from "@/components/PageNav";
 import ReauthDialog from "@/components/admin/ReauthDialog";
-import SystemHealthBar from "./SystemHealthBar";
+import CommandDeck from "./CommandDeck";
 import Complication from "./Complication";
 import { sinceLabel, type ServiceState } from "./state";
 import { tileContent, type GlanceVisual } from "./glances";
@@ -20,9 +20,9 @@ import { useNow } from "@/components/useNow";
 // system-health hero over domain-grouped clusters of clickable complications,
 // server-rendered from the shared snapshot cache and kept fresh by polling
 // /api/monitor (that same cache, so however many tabs are open the services see
-// one fetch per window). Every integration holds a tile in its type's cluster,
-// several of a type side by side (#300), in one three-column grid so tiles
-// line up from group to group (#509); a configured one drills into its
+// one fetch per window). Every integration holds a tile, ordered by its type's
+// cluster, several of a type side by side (#300), in one flow that fills the
+// width (#520); a configured one drills into its
 // detail page, a switched-off one dims and points at its settings, and the
 // types nobody has set up share one quiet row at the end. The read-only
 // depth (full lists, actions) lives on /admin/monitor/[id].
@@ -115,7 +115,7 @@ export default function MonitorDashboard({
             </p>
           </div>
           {/* The freshness read, as on the integration pages, with how often
-              it refreshes; no dot here, the health banner is the verdict. */}
+              it refreshes; no dot here, the command deck is the verdict. */}
           {updatedAt !== null && now !== null && (
             <span className="inline-flex shrink-0 items-center rounded-full border border-fg/10 bg-fg/5 px-3.5 py-1.5 text-xs whitespace-nowrap text-ink-55">
               Updated {sinceLabel(now - updatedAt)} · every {REFRESH_MS / 1000}s
@@ -124,27 +124,25 @@ export default function MonitorDashboard({
         </div>
       </div>
 
-      {/* The health banner, then each domain's tiles in one three-column grid,
-          so the tiles line up from group to group. Every surface is a
-          glass-card, so the page takes on the active design. */}
-      <div className="flex flex-col gap-8">
-        <SystemHealthBar snapshot={snapshot} />
-        {MONITOR_GROUPS.map((group) => {
-          const entries = snapshot.filter((e) => SERVICE_META[e.type].group === group);
-          if (entries.length === 0) return null;
-          return (
-            <section key={group} aria-labelledby={`monitor-${group}`} className="flex flex-col gap-3">
-              <h2 id={`monitor-${group}`} className="text-[11px] font-semibold tracking-wide text-ink-50 uppercase">
-                {group}
-              </h2>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {entries.map((entry) => (
-                  <Complication key={entry.id} label={entry.label} fill {...complicationFor(entry, now)} />
-                ))}
-              </div>
-            </section>
-          );
-        })}
+      {/* The command deck, then every integration's tile in one flow that
+          fills the width (#520): ordered by domain, three to a row, the last
+          row's tiles growing to close it, so no group leaves a hole beside
+          it. Every surface is a glass-card, so the page takes on the active
+          design. */}
+      <div className="flex flex-col gap-6">
+        <CommandDeck snapshot={snapshot} now={now} />
+        {snapshot.length > 0 && (
+          <section aria-labelledby="monitor-services" className="flex flex-wrap gap-3">
+            <h2 id="monitor-services" className="sr-only">
+              Services
+            </h2>
+            {MONITOR_GROUPS.flatMap((group) => snapshot.filter((e) => SERVICE_META[e.type].group === group)).map(
+              (entry) => (
+                <Complication key={entry.id} label={entry.label} {...complicationFor(entry, now)} />
+              )
+            )}
+          </section>
+        )}
         {unused.length > 0 && (
           <section
             aria-label="Not set up yet"

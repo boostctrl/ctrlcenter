@@ -126,7 +126,7 @@ export default function AdguardDetail({ data }: { data: AdguardSnapshot }) {
         />
       </StatGrid>
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <Section title="Queries over time" description={data.windowLabel ? `The ${data.windowLabel}.` : undefined}>
           <TrendChart series={data.series} blockedSeries={data.blockedSeries} windowLabel={null} />
         </Section>

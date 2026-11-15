@@ -96,7 +96,7 @@ export default function ArrDetail({ kind, data }: { kind: "sonarr" | "radarr"; d
         </Section>
       )}
 
-      <div className="grid items-start gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2">
         <Section title="Coming up" description="The next two weeks of the calendar." flush>
           {data.upcoming.length > 0 ? (
             <List>

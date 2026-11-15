@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import type { TautulliDetail as TautulliDetailData, TautulliSession } from "@/lib/services/tautulli";
 import { useNow } from "@/components/useNow";
 import {
   EmptyRow,
   GlyphBubble,
   List,
+  MoreButton,
   Pill,
   Row,
   Section,
@@ -27,6 +29,10 @@ function bandwidth(kbps: number | null): { value: string; unit: string } {
   return { value: String(Math.round(kbps)), unit: "kbps" };
 }
 
+// How many watched titles show before "Show all": about the height of a
+// few streams beside them, so the two cards end near each other (#521).
+const WATCHED_SHOWN = 6;
+
 const STATE_LABEL: Record<TautulliSession["state"], string> = {
   playing: "Playing",
   paused: "Paused",
@@ -37,6 +43,7 @@ export default function TautulliDetail({ data }: { data: TautulliDetailData }) {
   const mounted = useMounted();
   const clockNow = useNow(60_000);
   const now = mounted ? clockNow : null;
+  const [allWatched, setAllWatched] = useState(false);
   const bw = bandwidth(data.totalBandwidthKbps);
   const paused = data.sessions.filter((s) => s.state === "paused").length;
   const viewers = new Set(data.history.map((h) => h.user)).size;
@@ -62,7 +69,7 @@ export default function TautulliDetail({ data }: { data: TautulliDetailData }) {
         />
       </StatGrid>
 
-      <div className="grid items-start gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2">
         <Section title="Now playing" count={data.sessions.length} flush>
           {data.sessions.length > 0 ? (
             <List>
@@ -93,7 +100,7 @@ export default function TautulliDetail({ data }: { data: TautulliDetailData }) {
         <Section title="Recently watched" count={data.history.length} flush>
           {data.history.length > 0 ? (
             <List>
-              {data.history.map((h, i) => (
+              {(allWatched ? data.history : data.history.slice(0, WATCHED_SHOWN)).map((h, i) => (
                 <Row
                   key={`${h.title}-${h.at ?? i}-${i}`}
                   leading={<GlyphBubble name="check" />}
@@ -106,6 +113,9 @@ export default function TautulliDetail({ data }: { data: TautulliDetailData }) {
             </List>
           ) : (
             <EmptyRow>Nothing watched lately.</EmptyRow>
+          )}
+          {data.history.length > WATCHED_SHOWN && (
+            <MoreButton expanded={allWatched} total={data.history.length} onToggle={() => setAllWatched((v) => !v)} />
           )}
         </Section>
       </div>
