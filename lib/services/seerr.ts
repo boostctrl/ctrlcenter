@@ -52,6 +52,12 @@ export type SeerrSnapshot = {
 
 export const SEERR_REQUEST_CAP = 6;
 
+// The page's read (#511): the requests waiting for approval, which are what
+// ask something of the admin, and a longer run of the latest.
+export type SeerrDetail = SeerrSnapshot & { waiting: SeerrRequest[] };
+export const SEERR_DETAIL_RECENT = 15;
+export const SEERR_DETAIL_WAITING = 20;
+
 // --- Raw API shapes (only the fields the snapshot uses) ---
 
 type RawCount = {
@@ -178,6 +184,42 @@ export async function getSeerrSnapshot(cfg: SeerrConfig): Promise<SeerrSnapshot>
     available: num(count.available),
     totalRequests: num(count.total),
     requests,
+  };
+}
+
+// The page's read (#511). One title lookup per media, however many of the
+// requests shown name it.
+export async function getSeerrDetail(cfg: SeerrConfig): Promise<SeerrDetail> {
+  const [count, page, pending] = await Promise.all([
+    seerrJson<RawCount>(cfg, "/api/v1/request/count"),
+    seerrJson<RawRequestPage>(cfg, `/api/v1/request?take=${SEERR_DETAIL_RECENT}&skip=0&sort=added`),
+    seerrJson<RawRequestPage>(
+      cfg,
+      `/api/v1/request?take=${SEERR_DETAIL_WAITING}&skip=0&sort=added&filter=pending`
+    ),
+  ]);
+  const titles = new Map<string, Promise<string>>();
+  const titleOf = (raw: RawRequest) => {
+    const key = `${raw.type === "tv" ? "tv" : "movie"}:${raw.media?.tmdbId ?? `request-${raw.id}`}`;
+    let title = titles.get(key);
+    if (!title) titles.set(key, (title = resolveTitle(cfg, raw)));
+    return title;
+  };
+  const rows = (p: RawRequestPage) => (Array.isArray(p.results) ? p.results : []);
+  const map = (list: RawRequest[]) => Promise.all(list.map(async (raw) => mapSeerrRequest(raw, await titleOf(raw))));
+  const [requests, waiting] = await Promise.all([
+    map(rows(page)),
+    // Seerr's filter decides what's pending; the status check keeps a
+    // version that ignores the filter from listing everything here.
+    map(rows(pending).filter((raw) => requestStatus(raw) === "pending")),
+  ]);
+  return {
+    pending: num(count.pending),
+    processing: num(count.processing),
+    available: num(count.available),
+    totalRequests: num(count.total),
+    requests,
+    waiting,
   };
 }
 

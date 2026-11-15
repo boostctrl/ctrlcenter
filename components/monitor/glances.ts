@@ -6,6 +6,7 @@
 // doesn't. No tile shows a decorative ring around a bare count. The face stays
 // glanceable; the full depth is one click away on /admin/monitor/[id].
 
+import { formatCount } from "./kit/format";
 import type { ServiceId } from "@/lib/services/ids";
 import type { ServiceSnapshotMap } from "@/lib/services/registry";
 import type { MonitorEntry } from "@/lib/monitor";
@@ -39,14 +40,6 @@ export type Glance = {
   lines: string[];
   visual?: GlanceVisual;
 };
-
-// "45.2k" — compact, locale-independent (locale formatting hydrates differently
-// between server and client).
-function compact(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 10_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
-}
 
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
@@ -159,7 +152,7 @@ export const GLANCES: {
     ring: d.blockedRatio,
     alert: !d.protectionEnabled,
     lines: [
-      d.protectionEnabled ? `${compact(d.totalQueries)} queries` : "⚠ Protection off",
+      d.protectionEnabled ? `${formatCount(d.totalQueries)} queries` : "⚠ Protection off",
       ...(d.avgProcessingMs != null
         ? [`${d.avgProcessingMs.toFixed(0)} ms avg`]
         : d.topBlocked[0]
@@ -381,7 +374,7 @@ export const PUBLIC_GLANCES: {
     ring: d.blockedRatio,
     alert: !d.protectionEnabled,
     lines: [
-      d.protectionEnabled ? `${compact(d.totalQueries)} queries` : "Protection off",
+      d.protectionEnabled ? `${formatCount(d.totalQueries)} queries` : "Protection off",
       ...(d.avgProcessingMs != null ? [`${d.avgProcessingMs.toFixed(0)} ms avg`] : []),
     ],
     visual: d.series.length > 1 ? { kind: "spark", values: d.series } : undefined,

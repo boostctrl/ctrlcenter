@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ServiceStatus } from "@/lib/monitor";
 import type { PortainerContainer, PortainerSnapshot } from "@/lib/services/portainer";
-import PortainerCard from "./PortainerCard";
+import { ConfirmProvider } from "@/components/admin/Confirm";
+import PortainerDetail from "./PortainerDetail";
 
 // #463: a slow reply landed whenever it arrived, so one environment's late
 // container list filled another's row (and its buttons then acted on the
@@ -13,18 +13,20 @@ const env = (id: number, name: string) => ({
   id, name, running: 1, stopped: 0, unhealthy: 0, total: 1, hasSnapshot: true,
 });
 
-const status: ServiceStatus<PortainerSnapshot> = {
-  configured: true,
-  enabled: true,
-  urlSet: true,
-  actionsAllowed: true,
-  data: {
-    endpoints: [env(1, "slow-env"), env(2, "fast-env")],
-    totals: { running: 2, stopped: 0, unhealthy: 0, total: 2 },
-  },
-  error: null,
-  at: 0,
+const data: PortainerSnapshot = {
+  endpoints: [env(1, "slow-env"), env(2, "fast-env")],
+  totals: { running: 2, stopped: 0, unhealthy: 0, total: 2 },
 };
+
+// The page with actions on, as the drill-down needs. It opens the first
+// environment by itself (#234), so slow-env's list is already on its way.
+const mount = () =>
+  render(
+    <ConfirmProvider>
+      <PortainerDetail data={data} actionsAllowed />
+    </ConfirmProvider>
+  );
+const opened = (name: string) => screen.getByRole("button", { name: new RegExp(`^${name}`) }).getAttribute("aria-expanded");
 
 const box = (name: string): PortainerContainer => ({
   id: name, name, state: "running", status: "Up 2 hours",
@@ -48,14 +50,14 @@ function deferredFetch() {
   };
 }
 
-describe("PortainerCard", () => {
+describe("PortainerDetail (#514)", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("doesn't show a late list under the environment opened since", async () => {
     const user = userEvent.setup();
     const answer = deferredFetch();
-    render(<PortainerCard status={status} />);
-    await user.click(screen.getByRole("button", { name: /^slow-env/ }));
+    mount();
+    await vi.waitFor(() => expect(opened("slow-env")).toBe("true"));
     await user.click(screen.getByRole("button", { name: /^fast-env/ }));
     await answer("endpoint 2", { containers: [box("fast-app")] });
     await answer("endpoint 1", { containers: [box("slow-app")] });
@@ -66,7 +68,8 @@ describe("PortainerCard", () => {
   it("doesn't show a late log tail in another container's modal", async () => {
     const user = userEvent.setup();
     const answer = deferredFetch();
-    render(<PortainerCard status={status} />);
+    mount();
+    await vi.waitFor(() => expect(opened("slow-env")).toBe("true"));
     await user.click(screen.getByRole("button", { name: /^fast-env/ }));
     await answer("endpoint 2", { containers: [box("app-a"), box("app-b")] });
     const logsOf = (name: string) =>

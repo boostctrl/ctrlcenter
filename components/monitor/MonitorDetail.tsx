@@ -4,7 +4,6 @@ import type { NavPages } from "@/lib/nav";
 import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import type { DetailResult } from "@/lib/monitor-detail";
-import type { ServiceStatus } from "@/lib/monitor";
 import { MonitorIntegrationContext } from "./actions";
 import Icon from "@/components/Icon";
 import { settingsCardId } from "@/lib/nav";
@@ -16,28 +15,26 @@ import PageNav from "@/components/PageNav";
 import { usePolling } from "@/components/usePolling";
 import { useNow } from "@/components/useNow";
 import {
-  InDetailContext,
   serviceState,
   sinceLabel,
   STATE_DOT,
   type ServiceState,
-} from "./MonitorCard";
+} from "./state";
 import QbittorrentDetail from "./detail/QbittorrentDetail";
 import AdguardDetail from "./detail/AdguardDetail";
 import TautulliDetail from "./detail/TautulliDetail";
 import UnifiDetail from "./detail/UnifiDetail";
 import ArrDetail from "./detail/ArrDetail";
-import SeerrCard from "./SeerrCard";
-import PortainerCard from "./PortainerCard";
-import TruenasCard from "./TruenasCard";
+import SeerrDetail from "./detail/SeerrDetail";
+import PortainerDetail from "./detail/PortainerDetail";
+import TruenasDetail from "./detail/TruenasDetail";
 
-// The client shell for a service's detail page (#208): the shared chrome
-// (back-to-Monitor breadcrumb, title) plus a poll of /api/monitor/[id] that
-// keeps the body fresh, and hands the body a `refresh` so a completed action
-// reflects at once. The body is picked per service from the discriminated
-// result — qBittorrent has a purpose-built rich body; every other service's
-// full card renders here as its detail (the depth that left the glance face),
-// which also relocates the Seerr/Portainer actions onto the detail page.
+// The client shell for a service's page (#208): the shared header
+// (breadcrumb, logo, name, status, #508) plus a poll of /api/monitor/[id]
+// that keeps the body fresh, and hands the body a `refresh` so a completed
+// action reflects at once. With no data it shows the offline state; else
+// the body is picked per service from the discriminated result, each built
+// on the page kit (components/monitor/kit).
 
 const REFRESH_MS = 30_000;
 // How often the masthead's "updated Xs ago" label re-ticks between polls, so
@@ -72,51 +69,33 @@ function StatusPill({
   );
 }
 
-// Reconstruct a ServiceStatus for a card body. A detail page only renders for a
-// configured service (getServiceDetail 404s otherwise), so the config flags are
-// fixed true; data/error/actionsAllowed carry the live read.
-function asStatus<T>(r: {
-  actionsAllowed: boolean;
-  data: T | null;
-  error: string | null;
-}): ServiceStatus<T> {
-  return {
-    configured: true,
-    enabled: true,
-    urlSet: true,
-    actionsAllowed: r.actionsAllowed,
-    data: r.data,
-    error: r.error,
-    at: null,
-  };
-}
-
 function renderBody(result: DetailResult, refresh: () => void): ReactNode {
   switch (result.service) {
     case "qbittorrent":
       return (
-        <QbittorrentDetail
-          data={result.data}
-          error={result.error}
-          actionsAllowed={result.actionsAllowed}
-          onActed={refresh}
-        />
+        result.data && (
+          <QbittorrentDetail data={result.data} actionsAllowed={result.actionsAllowed} onActed={refresh} />
+        )
       );
     case "sonarr":
     case "radarr":
       return result.data && <ArrDetail kind={result.service} data={result.data} />;
     case "adguard":
-      return <AdguardDetail status={asStatus(result)} />;
+      return result.data && <AdguardDetail data={result.data} />;
     case "tautulli":
-      return <TautulliDetail status={asStatus(result)} />;
+      return result.data && <TautulliDetail data={result.data} />;
     case "seerr":
-      return <SeerrCard status={asStatus(result)} onActed={refresh} />;
+      return (
+        result.data && <SeerrDetail data={result.data} actionsAllowed={result.actionsAllowed} onActed={refresh} />
+      );
     case "portainer":
-      return <PortainerCard status={asStatus(result)} onActed={refresh} />;
+      return (
+        result.data && <PortainerDetail data={result.data} actionsAllowed={result.actionsAllowed} onActed={refresh} />
+      );
     case "truenas":
-      return <TruenasCard status={asStatus(result)} />;
+      return result.data && <TruenasDetail data={result.data} />;
     case "unifi":
-      return <UnifiDetail status={asStatus(result)} />;
+      return result.data && <UnifiDetail data={result.data} />;
   }
 }
 
@@ -226,11 +205,9 @@ export default function MonitorDetail({
                 since={updatedAt !== null && now !== null ? sinceLabel(now - updatedAt) : null}
               />
             )}
-            <InDetailContext.Provider value={true}>
-              <MonitorIntegrationContext.Provider value={id}>
-                {renderBody(result, refresh)}
-              </MonitorIntegrationContext.Provider>
-            </InDetailContext.Provider>
+            <MonitorIntegrationContext.Provider value={id}>
+              {renderBody(result, refresh)}
+            </MonitorIntegrationContext.Provider>
           </>
         )}
       </main>

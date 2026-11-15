@@ -10,32 +10,35 @@ import type {
 import { Button } from "@/components/admin/ui";
 import { useFocusTrap } from "@/components/admin/useFocusTrap";
 import { formatBytes } from "@/components/widgets/SystemStatsWidget";
-import { Meter, formatEta, formatSpeed } from "../MonitorCard";
+import { formatEta, formatSpeed } from "@/lib/format";
 import { useMonitorAction } from "../actions";
+import {
+  EmptyRow,
+  GlyphBubble,
+  List,
+  MoreButton,
+  Pill,
+  Row,
+  Section,
+  Stat,
+  StatGrid,
+  UsageBar,
+  type GlyphName,
+  type Tone,
+} from "../kit";
 
-// qBittorrent's detail page body (#208): the full transfer overview and the
-// torrent list with per-row actions — the depth the glance card sheds. The
-// action machinery (pause/resume/delete, the keep-vs-remove-data modal) moved
-// here from the card unchanged; the card is now a summary that links here.
+// qBittorrent's page (#513), on the page kit (#508): transfer speeds and
+// totals, then every torrent with its progress, sortable, with pause,
+// resume and delete when actions are on (#201).
 
-const STATE_LABELS: Record<TorrentState, string> = {
-  downloading: "downloading",
-  seeding: "seeding",
-  paused: "paused",
-  queued: "queued",
-  checking: "checking",
-  stalled: "stalled",
-  error: "error",
-};
-
-const STATE_TONES: Record<TorrentState, string> = {
-  downloading: "text-status-up/90",
-  seeding: "text-status-info/80",
-  paused: "text-ink-40",
-  queued: "text-ink-40",
-  checking: "text-status-warning/80",
-  stalled: "text-status-warning/80",
-  error: "text-status-down",
+const STATE: Record<TorrentState, { label: string; tone: Tone; glyph: GlyphName }> = {
+  downloading: { label: "Downloading", tone: "info", glyph: "download" },
+  seeding: { label: "Seeding", tone: "up", glyph: "upload" },
+  paused: { label: "Paused", tone: "muted", glyph: "pause" },
+  queued: { label: "Queued", tone: "muted", glyph: "clock" },
+  checking: { label: "Checking", tone: "warn", glyph: "pulse" },
+  stalled: { label: "Stalled", tone: "warn", glyph: "alert" },
+  error: { label: "Error", tone: "down", glyph: "error" },
 };
 
 // Torrent ordering the list can be sorted by (#231). "Activity" keeps the
@@ -60,20 +63,26 @@ const STATUS_RANK: Record<TorrentState, number> = {
   error: 6,
 };
 
-function sortTorrents(
-  list: QbittorrentTorrent[],
-  key: SortKey
-): QbittorrentTorrent[] {
+function sortTorrents(list: QbittorrentTorrent[], key: SortKey): QbittorrentTorrent[] {
   if (key === "activity") return list;
   const sorted = [...list];
-  if (key === "status")
-    sorted.sort(
-      (a, b) => STATUS_RANK[a.state] - STATUS_RANK[b.state] || b.progress - a.progress
-    );
-  else if (key === "name")
-    sorted.sort((a, b) => a.name.localeCompare(b.name));
+  if (key === "status") sorted.sort((a, b) => STATUS_RANK[a.state] - STATUS_RANK[b.state] || b.progress - a.progress);
+  else if (key === "name") sorted.sort((a, b) => a.name.localeCompare(b.name));
   else sorted.sort((a, b) => b.progress - a.progress);
   return sorted;
+}
+
+// How many torrents show before "Show all".
+const SHOWN = 25;
+
+// The line under a torrent's name: its size, and what it's doing.
+function torrentLine(t: QbittorrentTorrent): string {
+  const parts = [formatBytes(t.size)];
+  if (t.downSpeed > 0) parts.push(`↓ ${formatSpeed(t.downSpeed)}`);
+  if (t.upSpeed > 0) parts.push(`↑ ${formatSpeed(t.upSpeed)}`);
+  if ((t.state === "downloading" || t.state === "stalled") && t.eta !== null) parts.push(`${formatEta(t.eta)} left`);
+  if (t.state === "seeding") parts.push(`ratio ${t.ratio.toFixed(2)}`);
+  return parts.join(" · ");
 }
 
 function TorrentRow({
@@ -87,58 +96,40 @@ function TorrentRow({
     onDelete: (t: QbittorrentTorrent) => void;
   };
 }) {
-  const pct = torrent.progress * 100;
-  const transferring = torrent.downSpeed + torrent.upSpeed > 0;
-  const detail =
-    torrent.state === "downloading" || torrent.state === "stalled"
-      ? `${pct.toFixed(0)}%${torrent.eta !== null ? ` · ${formatEta(torrent.eta)}` : ""}`
-      : torrent.state === "seeding"
-        ? `ratio ${torrent.ratio.toFixed(2)}`
-        : `${pct.toFixed(0)}%`;
-  const paused = torrent.state === "paused";
+  const state = STATE[torrent.state];
   const busy = actions?.busy === torrent.hash;
   return (
-    <li className="flex flex-col gap-1.5 py-2.5 first:pt-0 last:pb-0">
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="min-w-0 truncate text-sm text-ink-80" title={torrent.name}>
-          {torrent.name}
-        </span>
-        <span className="flex shrink-0 items-baseline gap-2 text-xs tabular-nums">
-          {transferring && (
-            <span className="text-ink-50">
-              {torrent.downSpeed > 0
-                ? `↓ ${formatSpeed(torrent.downSpeed)}`
-                : `↑ ${formatSpeed(torrent.upSpeed)}`}
+    <Row
+      leading={<GlyphBubble name={state.glyph} tone={state.tone} />}
+      primary={torrent.name}
+      title={torrent.name}
+      secondary={torrentLine(torrent)}
+      trailing={
+        <>
+          <Pill tone={state.tone}>{state.label}</Pill>
+          <span>{Math.floor(torrent.progress * 100)}%</span>
+        </>
+      }
+      below={
+        <div className="flex items-center gap-3">
+          <UsageBar
+            ratio={torrent.progress}
+            tone={torrent.state === "error" ? "down" : torrent.state === "paused" ? "muted" : undefined}
+            className="h-1 flex-1"
+          />
+          {actions && (
+            <span className="flex shrink-0 gap-2">
+              <Button variant="ghost" size="sm" disabled={busy} onClick={() => actions.onPauseResume(torrent)}>
+                {torrent.state === "paused" ? "Resume" : "Pause"}
+              </Button>
+              <Button variant="danger" size="sm" disabled={busy} onClick={() => actions.onDelete(torrent)}>
+                Delete
+              </Button>
             </span>
           )}
-          <span className={STATE_TONES[torrent.state]}>
-            {STATE_LABELS[torrent.state]}
-          </span>
-          <span className="text-ink-60">{detail}</span>
-        </span>
-      </div>
-      <Meter percent={pct} />
-      {actions && (
-        <div className="mt-0.5 flex justify-end gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={busy}
-            onClick={() => actions.onPauseResume(torrent)}
-          >
-            {paused ? "Resume" : "Pause"}
-          </Button>
-          <Button
-            variant="danger"
-            size="sm"
-            disabled={busy}
-            onClick={() => actions.onDelete(torrent)}
-          >
-            Delete
-          </Button>
         </div>
-      )}
-    </li>
+      }
+    />
   );
 }
 
@@ -194,43 +185,21 @@ function DeleteTorrentModal({
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-lg font-semibold tabular-nums text-ink-90">{value}</span>
-      <span className="text-[11px] tracking-wide text-ink-40 uppercase">{label}</span>
-    </div>
-  );
-}
-
 export default function QbittorrentDetail({
   data,
-  error,
   actionsAllowed,
   onActed,
 }: {
-  data: QbittorrentDetailData | null;
-  error: string | null;
+  data: QbittorrentDetailData;
   actionsAllowed: boolean;
   onActed?: () => void;
 }) {
   const { busy, error: actionError, run } = useMonitorAction(onActed);
-  const [pendingDelete, setPendingDelete] = useState<QbittorrentTorrent | null>(
-    null
-  );
+  const [pendingDelete, setPendingDelete] = useState<QbittorrentTorrent | null>(null);
   const [sortBy, setSortBy] = useState<SortKey>("activity");
+  const [all, setAll] = useState(false);
 
-  if (!data) {
-    return (
-      <section className="glass-card flex flex-col items-center gap-2 p-8 text-center">
-        <p className="text-sm text-ink-55">Can’t reach qBittorrent</p>
-        {error && <p className="text-xs text-ink-45">{error}</p>}
-      </section>
-    );
-  }
-
-  // Actions render only when the integration's opt-in is on (#201), exactly as
-  // the card gated them before they moved here.
+  // Actions render only when the integration's opt-in is on (#201).
   const actions = actionsAllowed
     ? {
         busy,
@@ -256,74 +225,72 @@ export default function QbittorrentDetail({
   };
 
   const s = data.session;
+  const c = data.counts;
+  const sorted = sortTorrents(data.torrents, sortBy);
   return (
-    <div className="flex flex-col gap-4">
-      <section className="glass-card flex flex-col gap-4 p-6">
-        <div className="flex flex-wrap items-baseline gap-x-8 gap-y-1">
-          <span className="text-2xl font-semibold tabular-nums text-ink-90">
-            ↓ {formatSpeed(data.downSpeed)}
-          </span>
-          <span className="text-2xl font-semibold tabular-nums text-ink-90">
-            ↑ {formatSpeed(data.upSpeed)}
-          </span>
-          {s.connection && (
-            <span className="text-xs text-ink-50">{s.connection}</span>
-          )}
-        </div>
-        <div className="grid grid-cols-2 gap-4 border-t border-fg/10 pt-4 sm:grid-cols-4">
-          <Stat label="Session ↓" value={formatBytes(s.sessionDown)} />
-          <Stat label="Session ↑" value={formatBytes(s.sessionUp)} />
-          <Stat label="All-time ↓" value={formatBytes(s.allTimeDown)} />
-          <Stat label="All-time ↑" value={formatBytes(s.allTimeUp)} />
-          {s.ratio !== null && <Stat label="Ratio" value={s.ratio.toFixed(2)} />}
-          {s.freeSpace !== null && (
-            <Stat label="Free space" value={formatBytes(s.freeSpace)} />
-          )}
-        </div>
-        <p className="text-xs text-ink-50">
-          {data.counts.total} torrent{data.counts.total === 1 ? "" : "s"} —{" "}
-          {data.counts.downloading} downloading · {data.counts.seeding} seeding ·{" "}
-          {data.counts.paused} paused
-          {data.counts.errored > 0 && (
-            <span className="text-status-down"> · {data.counts.errored} errored</span>
-          )}
-        </p>
-        {actionError && <p className="text-xs text-status-down">{actionError}</p>}
-      </section>
+    <div className="flex flex-col gap-6">
+      <StatGrid>
+        <Stat
+          label="Download"
+          value={formatSpeed(data.downSpeed)}
+          hint={`${formatBytes(s.sessionDown)} this session · ${formatBytes(s.allTimeDown)} in all`}
+        />
+        <Stat
+          label="Upload"
+          value={formatSpeed(data.upSpeed)}
+          hint={`${formatBytes(s.sessionUp)} this session · ${formatBytes(s.allTimeUp)} in all`}
+        />
+        <Stat
+          label="Ratio"
+          value={s.ratio !== null ? s.ratio.toFixed(2) : "—"}
+          hint={s.freeSpace !== null ? `${formatBytes(s.freeSpace)} free on disk` : undefined}
+        />
+        <Stat
+          label="Torrents"
+          value={c.total}
+          tone={c.errored > 0 ? "down" : undefined}
+          hint={[`${c.downloading} downloading`, `${c.seeding} seeding`, c.errored ? `${c.errored} errored` : null]
+            .filter(Boolean)
+            .join(" · ")}
+        />
+      </StatGrid>
 
-      <section className="glass-card flex flex-col gap-3 p-6">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-[15px] font-semibold text-ink-90">Torrents</h2>
-          {data.torrents.length > 1 && (
-            <div className="flex items-center gap-1 text-xs">
-              <span className="mr-1 text-ink-40">Sort</span>
+      <Section
+        title="Torrents"
+        count={data.torrents.length}
+        description={actionError ? <span className="text-status-down">{actionError}</span> : undefined}
+        actions={
+          data.torrents.length > 1 && (
+            <div role="group" aria-label="Sort torrents" className="flex items-center gap-1 text-xs">
               {SORT_OPTIONS.map((opt) => (
                 <button
                   key={opt.key}
                   type="button"
+                  aria-pressed={sortBy === opt.key}
                   onClick={() => setSortBy(opt.key)}
                   className={`rounded-full px-2.5 py-1 transition-colors ${
-                    sortBy === opt.key
-                      ? "bg-fg/10 text-ink-90"
-                      : "text-ink-50 hover:text-ink-80"
+                    sortBy === opt.key ? "bg-fg/10 text-ink-90" : "text-ink-55 hover:text-ink-85"
                   }`}
                 >
                   {opt.label}
                 </button>
               ))}
             </div>
-          )}
-        </div>
-        {data.torrents.length > 0 ? (
-          <ul className="divide-y divide-fg/10">
-            {sortTorrents(data.torrents, sortBy).map((t, i) => (
+          )
+        }
+        flush
+      >
+        {sorted.length > 0 ? (
+          <List>
+            {(all ? sorted : sorted.slice(0, SHOWN)).map((t, i) => (
               <TorrentRow key={`${t.hash}-${i}`} torrent={t} actions={actions} />
             ))}
-          </ul>
+          </List>
         ) : (
-          <p className="text-sm text-ink-40">No torrents.</p>
+          <EmptyRow>No torrents.</EmptyRow>
         )}
-      </section>
+        {sorted.length > SHOWN && <MoreButton expanded={all} total={sorted.length} onToggle={() => setAll((v) => !v)} />}
+      </Section>
 
       {pendingDelete && (
         <DeleteTorrentModal

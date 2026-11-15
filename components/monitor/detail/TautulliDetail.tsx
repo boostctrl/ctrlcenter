@@ -1,77 +1,114 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
-import type { ServiceStatus } from "@/lib/monitor";
-import type { TautulliDetail as TautulliDetailData } from "@/lib/services/tautulli";
-import TautulliCard from "../TautulliCard";
+import type { TautulliDetail as TautulliDetailData, TautulliSession } from "@/lib/services/tautulli";
+import { useNow } from "@/components/useNow";
+import {
+  EmptyRow,
+  GlyphBubble,
+  List,
+  Pill,
+  Row,
+  Section,
+  Stat,
+  StatGrid,
+  UsageBar,
+  ago,
+  useMounted,
+} from "../kit";
 
-// Tautulli's detail page body (#223): the card's live "who's watching now"
-// summary plus a page of recent watch history — who watched what and when, and
-// whether it was a transcode. The history is the depth the glance sheds.
+// Tautulli's page (#512), on the page kit (#508): who's watching now, with
+// each stream's progress and whether the server is transcoding it, and what
+// was watched lately.
 
-// A hydration-safe mounted flag (false on the server, true once mounted) so the
-// relative "2h ago" times — which depend on the viewer's clock — render only on
-// the client and never mismatch the server HTML.
-const subscribeNever = () => () => {};
-function useMounted(): boolean {
-  return useSyncExternalStore(
-    subscribeNever,
-    () => true,
-    () => false
-  );
+// Tautulli reports bandwidth in kbps.
+function bandwidth(kbps: number | null): { value: string; unit: string } {
+  if (kbps === null || kbps <= 0) return { value: "0", unit: "Mbps" };
+  if (kbps >= 1000) return { value: (kbps / 1000).toFixed(1), unit: "Mbps" };
+  return { value: String(Math.round(kbps)), unit: "kbps" };
 }
 
-function relTime(at: number | null): string {
-  if (at === null) return "";
-  const secs = Math.max(0, Math.round((Date.now() - at) / 1000));
-  if (secs < 60) return "just now";
-  const mins = Math.round(secs / 60);
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.round(hours / 24)}d ago`;
-}
+const STATE_LABEL: Record<TautulliSession["state"], string> = {
+  playing: "Playing",
+  paused: "Paused",
+  buffering: "Buffering",
+};
 
-export default function TautulliDetail({
-  status,
-}: {
-  status: ServiceStatus<TautulliDetailData>;
-}) {
+export default function TautulliDetail({ data }: { data: TautulliDetailData }) {
   const mounted = useMounted();
-  const history = status.data?.history ?? [];
+  const clockNow = useNow(60_000);
+  const now = mounted ? clockNow : null;
+  const bw = bandwidth(data.totalBandwidthKbps);
+  const paused = data.sessions.filter((s) => s.state === "paused").length;
+  const viewers = new Set(data.history.map((h) => h.user)).size;
+
   return (
-    // Now-playing and history side by side on wide screens, so the page fills
-    // the width instead of stacking two half-empty bands.
-    <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
-      <TautulliCard status={status} />
-      {status.data && (
-        <section className="glass-card flex flex-col gap-3 p-6">
-          <h2 className="text-[15px] font-semibold text-ink-90">Recently watched</h2>
-          {history.length > 0 ? (
-            <ul className="divide-y divide-fg/10">
-              {history.map((h, i) => (
-                <li
-                  key={`${h.title}-${h.at ?? i}-${i}`}
-                  className="flex items-baseline justify-between gap-3 py-2 first:pt-0 last:pb-0"
-                >
-                  <span className="min-w-0 truncate text-sm text-ink-80" title={h.title}>
-                    {h.title}
-                    <span className="text-ink-45"> · {h.user}</span>
-                  </span>
-                  <span className="flex shrink-0 items-baseline gap-2 text-xs tabular-nums text-ink-50">
-                    {h.playback === "transcode" && (
-                      <span className="text-status-warning/80">transcode</span>
-                    )}
-                    {mounted && <span>{relTime(h.at)}</span>}
-                  </span>
-                </li>
+    <div className="flex flex-col gap-6">
+      <StatGrid>
+        <Stat
+          label="Streaming now"
+          value={data.streamCount}
+          hint={data.streamCount === 0 ? "Nobody is watching" : paused ? `${paused} paused` : "All playing"}
+        />
+        <Stat
+          label="Transcoding"
+          value={data.transcodeCount}
+          hint={data.transcodeCount === 0 ? "Everything plays direct" : "The server is converting these"}
+        />
+        <Stat label="Bandwidth" value={bw.value} unit={bw.unit} hint="Across every stream" />
+        <Stat
+          label="Watched lately"
+          value={data.history.length}
+          hint={data.history.length ? `by ${viewers} ${viewers === 1 ? "person" : "people"}` : "Nothing yet"}
+        />
+      </StatGrid>
+
+      <div className="grid items-start gap-6 lg:grid-cols-2">
+        <Section title="Now playing" count={data.sessions.length} flush>
+          {data.sessions.length > 0 ? (
+            <List>
+              {data.sessions.map((s, i) => (
+                <Row
+                  key={`${s.user}-${s.title}-${i}`}
+                  leading={<GlyphBubble name={s.state === "paused" ? "pause" : "play"} tone={s.state === "playing" ? "up" : "muted"} />}
+                  primary={s.title}
+                  title={s.title}
+                  secondary={[s.user, STATE_LABEL[s.state], s.quality].filter(Boolean).join(" · ")}
+                  trailing={
+                    <>
+                      <Pill tone={s.playback === "transcode" ? "info" : "muted"}>
+                        {s.playback === "transcode" ? "Transcode" : "Direct"}
+                      </Pill>
+                      <span>{Math.round(s.progress)}%</span>
+                    </>
+                  }
+                  below={<UsageBar ratio={s.progress / 100} tone={s.state === "playing" ? undefined : "muted"} className="h-1" />}
+                />
               ))}
-            </ul>
+            </List>
           ) : (
-            <p className="text-sm text-ink-40">No recent history.</p>
+            <EmptyRow>Nobody is watching right now.</EmptyRow>
           )}
-        </section>
-      )}
+        </Section>
+
+        <Section title="Recently watched" count={data.history.length} flush>
+          {data.history.length > 0 ? (
+            <List>
+              {data.history.map((h, i) => (
+                <Row
+                  key={`${h.title}-${h.at ?? i}-${i}`}
+                  leading={<GlyphBubble name="check" />}
+                  primary={h.title}
+                  title={h.title}
+                  secondary={[h.user, h.at !== null && now !== null ? ago(h.at, now) : null].filter(Boolean).join(" · ")}
+                  trailing={h.playback === "transcode" ? <Pill tone="info">Transcode</Pill> : undefined}
+                />
+              ))}
+            </List>
+          ) : (
+            <EmptyRow>Nothing watched lately.</EmptyRow>
+          )}
+        </Section>
+      </div>
     </div>
   );
 }

@@ -1,13 +1,12 @@
 "use client";
 
-import type { ServiceStatus } from "@/lib/monitor";
 import type { AdguardSnapshot } from "@/lib/services/adguard";
-import AdguardCard, { formatCount } from "../AdguardCard";
+import { EmptyRow, List, Pill, Row, Section, Sparkline, Stat, StatGrid, UsageBar, formatCount } from "../kit";
 
-// AdGuard's detail page body (#223): the card's current-state summary (protection,
-// totals, top-blocked) plus a trend chart of query volume and blocked queries
-// across the stats window — drawn from the per-unit series AdGuard already
-// returns in its stats payload, so it costs no extra request.
+// AdGuard Home's page (#516), on the page kit (#508): the query totals and
+// how many were blocked, a trend of both across the stats window (drawn from
+// the per-unit series AdGuard already returns, so it costs no extra
+// request), and the domains it blocks most.
 
 const W = 320;
 const H = 96;
@@ -32,7 +31,7 @@ function TrendChart({
   windowLabel: string | null;
 }) {
   if (series.length < 2) {
-    return <p className="text-sm text-ink-40">Not enough data yet for a trend.</p>;
+    return <p className="text-sm text-ink-50">Not enough data yet for a trend.</p>;
   }
   const max = Math.max(...series, 1);
   const peak = Math.max(...series);
@@ -95,27 +94,66 @@ function TrendChart({
   );
 }
 
-export default function AdguardDetail({
-  status,
-}: {
-  status: ServiceStatus<AdguardSnapshot>;
-}) {
-  const data = status.data;
+export default function AdguardDetail({ data }: { data: AdguardSnapshot }) {
+  const pct = Math.round(data.blockedRatio * 1000) / 10;
+  const top = data.topBlocked[0]?.count ?? 0;
   return (
-    // Summary and trend sit side by side on wide screens so the page fills the
-    // width with content rather than stacking two half-empty bands.
-    <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
-      <AdguardCard status={status} />
-      {data && (
-        <section className="glass-card flex flex-col gap-3 p-6">
-          <h2 className="text-[15px] font-semibold text-ink-90">Query activity</h2>
-          <TrendChart
-            series={data.series}
-            blockedSeries={data.blockedSeries}
-            windowLabel={data.windowLabel}
-          />
-        </section>
-      )}
+    <div className="flex flex-col gap-6">
+      <StatGrid>
+        <Stat
+          label="Queries"
+          value={formatCount(data.totalQueries)}
+          hint={data.windowLabel ?? undefined}
+          visual={data.series.length > 1 ? <Sparkline data={data.series} area className="h-6 w-full" /> : undefined}
+        />
+        <Stat
+          label="Blocked"
+          value={formatCount(data.blocked)}
+          hint={`${pct}% of queries`}
+          visual={<UsageBar ratio={data.blockedRatio} />}
+        />
+        <Stat
+          label="Average lookup"
+          value={data.avgProcessingMs !== null ? data.avgProcessingMs.toFixed(1) : "—"}
+          unit={data.avgProcessingMs !== null ? "ms" : undefined}
+          hint="Time to answer a query"
+        />
+        <Stat
+          label="Protection"
+          value={data.protectionEnabled ? "On" : "Off"}
+          tone={data.protectionEnabled ? "up" : "warn"}
+          hint={data.protectionEnabled ? "Filtering every query" : "Nothing is being blocked"}
+        />
+      </StatGrid>
+
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <Section title="Queries over time" description={data.windowLabel ? `The ${data.windowLabel}.` : undefined}>
+          <TrendChart series={data.series} blockedSeries={data.blockedSeries} windowLabel={null} />
+        </Section>
+
+        <Section title="Most blocked" count={data.topBlocked.length} flush>
+          {data.topBlocked.length > 0 ? (
+            <List>
+              {data.topBlocked.map((d, i) => (
+                <Row
+                  key={d.domain}
+                  leading={
+                    <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-fg/[0.06] text-sm font-semibold tabular-nums text-ink-60">
+                      {i + 1}
+                    </span>
+                  }
+                  primary={d.domain}
+                  title={d.domain}
+                  trailing={<Pill>{formatCount(d.count)}</Pill>}
+                  below={<UsageBar ratio={top ? d.count / top : 0} tone="down" className="h-1" />}
+                />
+              ))}
+            </List>
+          ) : (
+            <EmptyRow>Nothing blocked in this window.</EmptyRow>
+          )}
+        </Section>
+      </div>
     </div>
   );
 }

@@ -119,7 +119,9 @@ const REQUESTERS = ["Alex", "Sam", "Jordan Lee", "Priya", "Morgan"];
 function seerr(path, now) {
   if (path === "/api/v1/request/count") return { pending: 3, approved: 6, processing: 2, available: 41, total: 52 };
   if (path.startsWith("/api/v1/request?")) {
-    // status 1 pending, 2 approved; media 2 pending, 3 processing, 5 available.
+    const filter = new URL(path, "http://x").searchParams.get("filter");
+    // status 1 pending, 2 approved, 3 declined; media 2 pending, 3
+    // processing, 4 partly available, 5 available.
     const rows = [
       [1, 2, "movie"],
       [1, 2, "tv"],
@@ -133,7 +135,10 @@ function seerr(path, now) {
       [3, 2, "movie"],
     ];
     return {
-      results: rows.map(([status, mediaStatus, type], i) => ({
+      results: rows
+        .map((row, i) => [row, i])
+        .filter(([[status]]) => filter !== "pending" || status === 1)
+        .map(([[status, mediaStatus, type], i]) => ({
         id: 100 + i,
         status,
         type,

@@ -8,7 +8,7 @@ import PageNav from "@/components/PageNav";
 import ReauthDialog from "@/components/admin/ReauthDialog";
 import SystemHealthBar from "./SystemHealthBar";
 import Complication from "./Complication";
-import { sinceLabel, type ServiceState } from "./MonitorCard";
+import { sinceLabel, type ServiceState } from "./state";
 import { tileContent, type GlanceVisual } from "./glances";
 import { settingsCardId } from "@/lib/nav";
 import { usePolling } from "@/components/usePolling";

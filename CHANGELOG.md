@@ -20,10 +20,34 @@ here.
   and a link to its settings, and a refresh that fails keeps showing the last
   data, marked stale, instead of emptying the page. (#508)
 
-- **The Sonarr and Radarr pages are redesigned.** Headline numbers across
-  the top (what's next, this week's grabs and imports, health, the last
-  import), health checks listed most severe first, the next two weeks by
-  date, and recent activity with the rest a click away. (#510)
+- **Every integration's page on the Monitor is redesigned.** Each opens on
+  its headline numbers in a row of tiles, then lays out what the service
+  reports in titled sections, with the same rows, status chips and progress
+  bars throughout:
+  - **Sonarr and Radarr:** what's next, this week's grabs and imports,
+    health checks most severe first, the next two weeks by date, and recent
+    activity. (#510)
+  - **Seerr:** the requests waiting for approval in a section of their own,
+    with Approve and Deny when actions are on, apart from the other recent
+    requests. (#511)
+  - **Tautulli:** each stream's progress, and whether it's playing direct or
+    transcoding, beside what was watched lately. (#512)
+  - **qBittorrent:** speeds and totals, then every torrent with its state,
+    progress and, past 25, a Show all. (#513)
+  - **Portainer:** container counts across every environment, and each
+    environment opening to its containers when actions are on. (#514)
+  - **TrueNAS:** alerts first, each pool colored by how full it is, and apps
+    opening to their containers. (#515)
+  - **AdGuard Home:** queries and blocked share, the trend over the stats
+    window, and the most blocked domains. (#516)
+  - **UniFi:** the internet connection, clients, and every device with its
+    kind, clients and uptime, offline ones first. (#517)
+
+### Fixed
+
+- **The AdGuard Home tile reads a million queries as 1.0M.** 3.1.2 fixed
+  this on AdGuard's own page, but the Monitor tile still showed 999,950 and
+  more as "1000.0k". (#490)
 
 ## [3.1.3] - 2026-11-14
 

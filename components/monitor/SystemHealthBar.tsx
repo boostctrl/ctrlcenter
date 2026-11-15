@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import type { MonitorEntry, MonitorSnapshot } from "@/lib/monitor";
-import { serviceState, STATE_DOT, type ServiceState } from "./MonitorCard";
+import { serviceState, STATE_DOT, type ServiceState } from "./state";
 
 // The cockpit's master status bar (#208): the at-a-glance system-health read
 // that sits above the bento so the whole homelab resolves to a single line

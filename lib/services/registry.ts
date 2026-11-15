@@ -22,7 +22,7 @@ import {
   probeTautulli,
   type TautulliSnapshot,
 } from "./tautulli";
-import { getSeerrSnapshot, probeSeerr, type SeerrSnapshot } from "./seerr";
+import { getSeerrDetail, getSeerrSnapshot, probeSeerr, type SeerrDetail, type SeerrSnapshot } from "./seerr";
 import {
   getPortainerSnapshot,
   probePortainer,
@@ -75,11 +75,13 @@ export type ProbeFields = {
 
 // Each type's detail payload (#208): the snapshot type, except the types with
 // a richer detail read — qBittorrent (uncapped list + session totals),
-// Tautulli (activity + watch history) and UniFi.
-export type DetailData = Omit<ServiceSnapshotMap, "qbittorrent" | "tautulli" | "unifi"> & {
+// Tautulli (activity + watch history), UniFi and Seerr (the requests waiting
+// for approval, #511).
+export type DetailData = Omit<ServiceSnapshotMap, "qbittorrent" | "tautulli" | "unifi" | "seerr"> & {
   qbittorrent: QbittorrentDetail;
   tautulli: TautulliDetail;
   unifi: UnifiDetail;
+  seerr: SeerrDetail;
 };
 
 export type ServiceDefinition<T, D> = {
@@ -121,7 +123,7 @@ export const SERVICES: {
   },
   seerr: {
     snapshot: (cfg) => getSeerrSnapshot(cfg),
-    detail: (cfg) => getSeerrSnapshot(cfg),
+    detail: (cfg) => getSeerrDetail(cfg),
     probe: ({ url, apiKey }) => probeSeerr({ url, apiKey }),
   },
   portainer: {

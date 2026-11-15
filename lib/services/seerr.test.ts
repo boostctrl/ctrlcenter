@@ -189,3 +189,21 @@ describe("probeSeerr", () => {
   });
 });
 
+
+describe("getSeerrDetail (#511)", () => {
+  it("lists what's waiting for approval apart from the latest, looking each title up once", async () => {
+    const { getSeerrDetail } = await import("./seerr");
+    // A Seerr that ignores the filter: the pending read returns everything,
+    // and only the pending rows are listed as waiting.
+    const fetchMock = stubApi({});
+    const detail = await getSeerrDetail(CFG);
+    expect(detail.waiting.map((r) => r.id)).toEqual([101]);
+    expect(detail.requests.map((r) => r.id)).toEqual([101, 102]);
+    expect(detail.pending).toBe(3);
+    const pendingCall = fetchMock.mock.calls.find(([u]) => String(u).includes("filter=pending"));
+    expect(String(pendingCall?.[0])).toContain("/api/v1/request?take=20&skip=0&sort=added&filter=pending");
+    // Both reads name the same two media: one lookup each.
+    const lookups = fetchMock.mock.calls.filter(([u]) => /\/api\/v1\/(movie|tv)\/\d+/.test(String(u)));
+    expect(lookups).toHaveLength(2);
+  });
+});

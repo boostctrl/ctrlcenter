@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { STATE_DOT, type ServiceState } from "./MonitorCard";
+import { STATE_DOT, type ServiceState } from "./state";
 import type { GlanceVisual } from "./glances";
 import { DayStrip, SegmentBar, Sparkline } from "./kit/charts";
 

@@ -99,7 +99,8 @@ export function List({ children }: { children: ReactNode }) {
 
 // One row: an optional marker, the name and a line under it, and what sits
 // at the right (a time, a chip, a number). `below` takes a progress bar or
-// actions across the row's width.
+// actions, run from under the name to the row's right edge, so the bars of
+// a list line up whatever sits at the right of each row.
 export function Row({
   leading,
   primary,
@@ -117,20 +118,23 @@ export function Row({
   title?: string;
 }) {
   return (
-    <li className="flex items-center gap-3 px-5 py-3">
-      {leading && <span className="shrink-0">{leading}</span>}
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm text-ink-85" title={title}>
-          {primary}
-        </p>
-        {secondary && <p className="mt-0.5 truncate text-xs text-ink-50">{secondary}</p>}
-        {below && <div className="mt-2">{below}</div>}
-      </div>
-      {trailing && (
-        <div className="flex shrink-0 flex-col items-end gap-1 text-right text-xs tabular-nums text-ink-55">
-          {trailing}
+    <li className="px-5 py-3">
+      <div className="flex items-center gap-3">
+        {leading && <span className="shrink-0">{leading}</span>}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm text-ink-85" title={title}>
+            {primary}
+          </p>
+          {secondary && <p className="mt-0.5 truncate text-xs text-ink-50">{secondary}</p>}
         </div>
-      )}
+        {trailing && (
+          <div className="flex shrink-0 flex-col items-end gap-1 text-right text-xs tabular-nums text-ink-55">
+            {trailing}
+          </div>
+        )}
+      </div>
+      {/* Under the name: the leading marker is 2.25rem wide, with a 0.75rem gap. */}
+      {below && <div className={`mt-2.5 ${leading ? "pl-12" : ""}`}>{below}</div>}
     </li>
   );
 }

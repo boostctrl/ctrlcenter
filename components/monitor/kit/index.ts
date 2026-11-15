@@ -5,3 +5,4 @@ export * from "./glyphs";
 export * from "./charts";
 export * from "./layout";
 export * from "./states";
+export * from "./format";
