@@ -181,6 +181,14 @@ describe("the upgrade summary", () => {
     ]);
     const few = { schemaVersion: 2, settings: { feeds: feeds.slice(0, 3) } };
     expect(summarizeUpgrade(few, migrateConfig(few).value).widgetsPastCap).toEqual([]);
+    // Rows the stored read drops (of an unknown type) don't count toward the
+    // cap on the whole list, nor get named past it (#443).
+    const odd = Array.from({ length: 5 }, (_, n) => ({ id: `gone-${n + 1}`, type: "no-such-widget" }));
+    const notes = Array.from({ length: MAX_WIDGET_INSTANCES + 1 }, (_, n) => ({ id: `note-${n + 1}`, type: "notes" }));
+    const mixed = { schemaVersion: 2, settings: {}, widgets: [...odd, ...notes] };
+    expect(summarizeUpgrade(mixed, migrateConfig(mixed).value).widgetsPastCap).toEqual([
+      { label: "widgets", max: MAX_WIDGET_INSTANCES, ids: [`note-${MAX_WIDGET_INSTANCES + 1}`] },
+    ]);
   });
 
   it("names the widgets past the cap on the whole list, ahead of those past a kind's (#438)", () => {

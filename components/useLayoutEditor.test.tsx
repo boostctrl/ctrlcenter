@@ -12,7 +12,8 @@ vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("./admin/settingsApi", () => ({ saveBoardLayout: vi.fn(async () => {}) }));
 
 // The layout editor's state hook (#290): the editing hotkeys around a drag,
-// its autosave after a gesture, and the undo edge cases (#400).
+// its autosave after a gesture, the undo edge cases (#400), and the
+// toolbar's Undo and Redo ignored during a gesture or a move (#432).
 const initial: EditableLayout = {
   sections: [
     { id: "notes-1", type: "notes", span: 24, hidden: false },

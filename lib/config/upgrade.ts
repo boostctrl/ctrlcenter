@@ -14,7 +14,7 @@ import { configVersion } from "../config-migrate";
 import { v2Categories } from "../config-migrate-v3";
 import { log } from "../log";
 import { MAX_GROUPS } from "../schema/groups";
-import { WIDGET_CAPS, WIDGET_TOTAL_CAP } from "../schema/instances";
+import { WIDGET_CAPS, WIDGET_TOTAL_CAP, widgetInstanceSchema } from "../schema/instances";
 import { writeFileOnce } from "./files";
 
 export const V2_BACKUP_NAME = "config.v2.bak.yaml";
@@ -65,15 +65,17 @@ const count = (v: unknown, key: string): number => {
 };
 
 // The ids past the cap on the whole list in the upgraded file (#438), then
-// for each kind of widget past its cap, the ids past it (#426). Only rows
-// with an id count: the stored read drops the others.
+// for each kind of widget past its cap, the ids past it (#426). Only the rows
+// the stored read keeps count (#443): it drops one without an id, of an
+// unknown type or with content it can't read, as lenientArray does.
 function pastCaps(after: unknown): NonNullable<UpgradeSummary["widgetsPastCap"]> {
   const rows = typeof after === "object" && after !== null ? (after as Record<string, unknown>).widgets : undefined;
-  const widgets = (Array.isArray(rows) ? rows : []).map((w) =>
-    typeof w === "object" && w !== null ? (w as { id?: unknown; type?: unknown }) : {}
-  );
-  const past = ({ max, label }: { max: number; label: string }, of: (w: { type?: unknown }) => boolean) => {
-    const ids = widgets.flatMap((w) => (of(w) && typeof w.id === "string" ? [w.id] : [])).slice(max);
+  const widgets = (Array.isArray(rows) ? rows : []).flatMap((w) => {
+    const parsed = widgetInstanceSchema.safeParse(w);
+    return parsed.success ? [parsed.data] : [];
+  });
+  const past = ({ max, label }: { max: number; label: string }, of: (w: { type: string }) => boolean) => {
+    const ids = widgets.flatMap((w) => (of(w) ? [w.id] : [])).slice(max);
     return ids.length > 0 ? [{ label, max, ids }] : [];
   };
   return [...past(WIDGET_TOTAL_CAP, () => true), ...WIDGET_CAPS.flatMap((cap) => past(cap, (w) => w.type === cap.type))];

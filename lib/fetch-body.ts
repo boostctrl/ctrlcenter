@@ -65,7 +65,14 @@ export async function streamCapped(
       });
       return false;
     }
-    sink(value);
+    // A sink that throws leaves the body unread: cancel it, rather than
+    // leave the stream open until the timeout aborts it (#443).
+    try {
+      sink(value);
+    } catch (e) {
+      await reader.cancel().catch(() => undefined);
+      throw e;
+    }
   }
 }
 

@@ -8,10 +8,12 @@ import { z } from "zod";
 // imported config turning the widget into an unbounded outbound-request source.
 export const MAX_FEED_URLS = 10;
 
-// Cap on how many feed cards (instances) the board can carry. Each is its own
-// widget on the grid with its own URL list, so the real fan-out ceiling is
-// MAX_FEED_CARDS × MAX_FEED_URLS — bounded like the URL list, against a
-// hand-edited or imported config spawning unbounded cards.
+// Cap on how many feed cards (instances) a save holds the board to, against
+// a hand-edited or imported config spawning unbounded cards. It bounds what
+// can be added, not one render's fan-out: a list stored past it (a 2.x file
+// hand-edited past it and upgraded, #426, #438) renders every card. Each
+// card's URLs are cut to MAX_FEED_URLS when fetched (lib/feed.ts); the
+// stored list isn't cut on read.
 export const MAX_FEED_CARDS = 8;
 
 // One feed card (RSS/Atom/JSON Feed) fed by one or more public feed URLs,

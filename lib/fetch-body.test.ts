@@ -93,6 +93,26 @@ describe("streamCapped", () => {
     warn.mockRestore();
   });
 
+  // #443: a sink that threw left the body open until the timeout.
+  it("cancels the body when the sink throws, and passes the error on", async () => {
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(new Uint8Array(2));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const boom = new Error("sink full");
+    await expect(
+      streamCapped(new Response(stream), 100, () => {
+        throw boom;
+      })
+    ).rejects.toBe(boom);
+    expect(cancelled).toBe(true);
+  });
+
   it("treats a body-less response as empty, not too large", async () => {
     expect(await streamCapped(new Response(null), 10, () => undefined)).toBe(true);
     expect(await readCappedBytes(new Response(null), 10)).toEqual(Buffer.alloc(0));

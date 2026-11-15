@@ -13,7 +13,8 @@ export const mergeRules = z.registry<{ merge: "replace" }>();
 // Fields a signed-out visitor must never receive (#157). "blank" empties a
 // string; "all" neutralizes a whole section — every string blanked, every
 // boolean off — for sections where even which parts are switched on is
-// private (integrations, inbound webhooks). Applied by stripSecrets. A backup
+// private (the inbound webhooks; the integrations are kept from visitors by
+// hand, in lib/config/redact.ts). Applied by stripSecrets. A backup
 // without secrets (redactForExport) goes by the "blank" marks alone: the
 // secrets inside an "all" section carry their own, and the rest of it — the
 // inbound webhooks' switches, Application URLs and subject prefix — is kept
