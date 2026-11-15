@@ -8,6 +8,7 @@ import {
   mapQueue,
   mapMissing,
   mapDisks,
+  mapLibrary,
   ARR_UPCOMING_CAP,
   ARR_RECENT_CAP,
 } from "./arr";
@@ -329,5 +330,33 @@ describe("the detail page's extras (#522, #523)", () => {
       { path: "/tv", free: 10, total: 100 },
     ]);
     expect(mapDisks("nope")).toEqual([]);
+  });
+
+  it("sums the library into the parts of a whole", () => {
+    expect(
+      mapLibrary("sonarr", [
+        { statistics: { episodeFileCount: 8, episodeCount: 10, totalEpisodeCount: 16, sizeOnDisk: 100 } },
+        { statistics: { episodeFileCount: 5, episodeCount: 5, totalEpisodeCount: 5, sizeOnDisk: 50 } },
+        {},
+      ])
+    ).toEqual({
+      count: 3,
+      size: 150,
+      unit: "episodes",
+      parts: [
+        { label: "On disk", value: 13 },
+        { label: "Missing", value: 2 },
+        { label: "Unaired or unmonitored", value: 6 },
+      ],
+    });
+    expect(
+      mapLibrary("radarr", [
+        { hasFile: true, monitored: true, isAvailable: true, sizeOnDisk: 10 },
+        { hasFile: false, monitored: true, isAvailable: true },
+        { hasFile: false, monitored: true, isAvailable: false },
+        { hasFile: false, monitored: false, isAvailable: true },
+      ])?.parts.map((p) => p.value)
+    ).toEqual([1, 1, 1, 1]);
+    expect(mapLibrary("sonarr", { message: "Unauthorized" })).toBeNull();
   });
 });

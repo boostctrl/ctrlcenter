@@ -125,6 +125,14 @@
   --status-down: #ff6568;
   --status-warning: #fcbb00;
   --status-info: #00bcfe;
+  /* The Monitor's chart series (#522 stage E): five hues in a fixed order,
+     checked for color-blind separation against this surface; a legend
+     always names them, so color is never the only cue. */
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-4: #c98500;
+  --chart-5: #d55181;
   --group-violet: #c4b4ff;
   --group-sky: #77d4ff;
   --group-emerald: #5ee9b5;
@@ -527,6 +535,11 @@
      one shade lighter. */
   --status-warning: #953d00;
   --status-info: #0069a4;
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-4: #eda100;
+  --chart-5: #e87ba4;
   --group-violet: #5d0ec0;
   --group-sky: #005986;
   --group-emerald: #005f46;

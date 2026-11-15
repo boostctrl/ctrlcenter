@@ -24,6 +24,11 @@ here.
   "Open Sonarr"-style button, and on the Sonarr and Radarr pages each row
   shows the poster and opens that series or movie in a new tab. (#522)
 
+- **Charts on the Sonarr and Radarr pages.** A bar chart shows what was
+  grabbed and imported on each of the last seven days, and a donut splits
+  the library into what's on disk, what's missing and the rest, with the
+  number of series or movies and their size. (#523)
+
 ### Changed
 
 - **The Monitor dashboard opens on a command deck.** A status ring draws one

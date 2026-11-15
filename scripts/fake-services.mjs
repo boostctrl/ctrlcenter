@@ -117,6 +117,16 @@ function sonarr(path, now) {
       { path: "/downloads", freeSpace: 410 * GB, totalSpace: 1.8 * TB },
     ];
   }
+  if (path === "/api/v3/series") {
+    return Array.from({ length: 84 }, (_, i) => ({
+      statistics: {
+        episodeFileCount: 20 + ((i * 7) % 60),
+        episodeCount: 22 + ((i * 7) % 60) + (i % 5 === 0 ? 4 : 0),
+        totalEpisodeCount: 30 + ((i * 7) % 60) + (i % 3) * 6,
+        sizeOnDisk: (40 + (i % 9) * 22) * GB,
+      },
+    }));
+  }
   if (path === "/api/v3/system/status") return { appName: "Sonarr", version: "4.0.10.2544" };
   return undefined;
 }
@@ -164,6 +174,14 @@ function radarr(path, now) {
   }
   if (path === "/api/v3/diskspace") {
     return [{ path: "/movies", freeSpace: 12.5 * TB, totalSpace: 43.6 * TB }];
+  }
+  if (path === "/api/v3/movie") {
+    return Array.from({ length: 412 }, (_, i) => ({
+      hasFile: i % 9 !== 0 && i % 14 !== 0,
+      monitored: i % 14 !== 0,
+      isAvailable: i % 27 !== 0,
+      sizeOnDisk: i % 9 !== 0 && i % 14 !== 0 ? (6 + (i % 11) * 4) * GB : 0,
+    }));
   }
   if (path === "/api/v3/system/status") return { appName: "Radarr", version: "5.14.0.9383" };
   return undefined;

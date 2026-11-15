@@ -333,8 +333,21 @@ export type ArrDetail = ArrSnapshot & {
   missing: ArrMissingItem[];
   missingTotal: number;
   disks: ArrDisk[];
+  // The library as parts of a whole, for the page's donut; null when the
+  // service didn't answer for it.
+  library: ArrLibrary | null;
   // The service's own pages, for "Open in Sonarr" (#522).
   links: { home: string; queue: string; missing: string };
+};
+
+export type ArrLibrary = {
+  // Series or movies in the library.
+  count: number;
+  // Bytes on disk.
+  size: number;
+  // What "parts" counts: episodes for Sonarr, movies for Radarr.
+  unit: "episodes" | "movies";
+  parts: { label: string; value: number }[];
 };
 
 export const ARR_QUEUE_CAP = 20;
@@ -438,13 +451,71 @@ export function mapDisks(raw: unknown): ArrDisk[] {
     }));
 }
 
+type RawLibrarySeries = {
+  statistics?: { episodeFileCount?: number; episodeCount?: number; totalEpisodeCount?: number; sizeOnDisk?: number };
+};
+type RawLibraryMovie = { hasFile?: boolean; monitored?: boolean; isAvailable?: boolean; sizeOnDisk?: number };
+const n = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0);
+
+// Sonarr: episodes on disk, aired and monitored but missing, and the rest
+// (not aired yet, or not monitored). Radarr: movies downloaded, missing,
+// not out yet, and not monitored.
+export function mapLibrary(kind: ArrKind, raw: unknown): ArrLibrary | null {
+  if (!Array.isArray(raw)) return null;
+  if (kind === "sonarr") {
+    let onDisk = 0;
+    let missing = 0;
+    let rest = 0;
+    let size = 0;
+    for (const s of raw as RawLibrarySeries[]) {
+      const st = s?.statistics ?? {};
+      const have = n(st.episodeFileCount);
+      const wanted = Math.max(n(st.episodeCount), have);
+      onDisk += have;
+      missing += wanted - have;
+      rest += Math.max(0, n(st.totalEpisodeCount) - wanted);
+      size += n(st.sizeOnDisk);
+    }
+    return {
+      count: raw.length,
+      size,
+      unit: "episodes",
+      parts: [
+        { label: "On disk", value: onDisk },
+        { label: "Missing", value: missing },
+        { label: "Unaired or unmonitored", value: rest },
+      ],
+    };
+  }
+  const tally = { downloaded: 0, missing: 0, unreleased: 0, unmonitored: 0 };
+  let size = 0;
+  for (const m of raw as RawLibraryMovie[]) {
+    size += n(m?.sizeOnDisk);
+    if (m?.hasFile) tally.downloaded += 1;
+    else if (!m?.monitored) tally.unmonitored += 1;
+    else if (m?.isAvailable) tally.missing += 1;
+    else tally.unreleased += 1;
+  }
+  return {
+    count: raw.length,
+    size,
+    unit: "movies",
+    parts: [
+      { label: "Downloaded", value: tally.downloaded },
+      { label: "Missing", value: tally.missing },
+      { label: "Not out yet", value: tally.unreleased },
+      { label: "Not monitored", value: tally.unmonitored },
+    ],
+  };
+}
+
 // The detail read: the snapshot with a deeper recent history and rows that
 // link into the service, plus the queue, what's missing and the disks. Each
 // extra is best effort: one that fails leaves its section empty.
 export async function getArrDetail(kind: ArrKind, cfg: ArrConfig): Promise<ArrDetail> {
   const base = serviceBase(cfg.url);
   const include = kind === "sonarr" ? "includeSeries=true&includeEpisode=true" : "includeMovie=true";
-  const [snapshot, queueR, missingR, diskR] = await Promise.all([
+  const [snapshot, queueR, missingR, diskR, libraryR] = await Promise.all([
     getArrSnapshot(kind, cfg, {
       recentCap: ARR_DETAIL_RECENT_CAP,
       historyPageSize: DETAIL_HISTORY_PAGE_SIZE,
@@ -454,6 +525,7 @@ export async function getArrDetail(kind: ArrKind, cfg: ArrConfig): Promise<ArrDe
       `/api/v3/queue?page=1&pageSize=${ARR_QUEUE_CAP}&${include}`,
       `/api/v3/wanted/missing?page=1&pageSize=${ARR_MISSING_CAP}&sortKey=${kind === "sonarr" ? "airDateUtc" : "digitalRelease"}&sortDirection=descending&monitored=true${kind === "sonarr" ? "&includeSeries=true" : ""}`,
       "/api/v3/diskspace",
+      kind === "sonarr" ? "/api/v3/series" : "/api/v3/movie",
     ].map((path) => arrJson<unknown>(kind, cfg, path).catch(() => null)),
   ]);
   const queue = mapQueue(kind, queueR, base);
@@ -465,6 +537,7 @@ export async function getArrDetail(kind: ArrKind, cfg: ArrConfig): Promise<ArrDe
     missing,
     missingTotal: total(missingR, missing.length),
     disks: mapDisks(diskR),
+    library: mapLibrary(kind, libraryR),
     links: { home: base, queue: `${base}/activity/queue`, missing: `${base}/wanted/missing` },
   };
 }

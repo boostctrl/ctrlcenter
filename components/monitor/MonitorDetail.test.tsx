@@ -35,6 +35,7 @@ const sonarr = (over: Partial<DetailResult> = {}) =>
       missing: [],
       missingTotal: 0,
       disks: [],
+  library: null,
       links: { home: "http://sonarr.lan:8989", queue: "", missing: "" },
     },
     error: null,

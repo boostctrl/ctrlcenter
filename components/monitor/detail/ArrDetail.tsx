@@ -6,8 +6,10 @@ import { formatBytes } from "@/lib/format";
 import { useNow } from "@/components/useNow";
 import { arrWeek } from "../glances";
 import {
+  BarChart,
   DateBadge,
   DayStrip,
+  Donut,
   EmptyRow,
   GlyphBubble,
   List,
@@ -23,7 +25,9 @@ import {
   ago,
   clock,
   dayName,
+  formatCount,
   useMounted,
+  type ChartColor,
   type Tone,
 } from "../kit";
 
@@ -43,6 +47,15 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 const WEEK = 7 * 86_400_000;
 // How many recent rows show before "Show all".
 const RECENT_SHOWN = 8;
+
+// The library donut's parts, in order: what's there, what's missing, then
+// the rest, quieter.
+const LIBRARY_COLORS: ChartColor[] = [3, 2, 1, "muted"];
+const DAY = 86_400_000;
+const startOfDay = (ms: number) => {
+  const d = new Date(ms);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+};
 
 // A queue row's state, in the page's tones.
 const QUEUE: Record<string, { tone: Tone; label: string }> = {
@@ -83,6 +96,17 @@ export default function ArrDetail({ kind, data }: { kind: "sonarr" | "radarr"; d
   const warnings = count("warning");
   const notices = count("notice");
   const health = [...data.health].sort((a, b) => HEALTH[a.type].rank - HEALTH[b.type].rank);
+  // The last seven days, oldest first, each split into imports and grabs.
+  // Empty until mounted: the days are the viewer's.
+  const days = Array.from({ length: 7 }, (_, i) => {
+    if (now === null) return { label: "", values: [0, 0] };
+    const day = startOfDay(now) - (6 - i) * DAY;
+    const on = data.recent.filter((r) => r.at !== null && startOfDay(r.at) === day);
+    return {
+      label: i === 6 ? "Today" : new Date(day).toLocaleDateString(undefined, { weekday: "short" }),
+      values: [on.filter((r) => r.event === "imported").length, on.filter((r) => r.event === "grabbed").length],
+    };
+  });
   const stuck = data.queue.filter((q) => q.status === "warning" || q.status === "failed").length;
   // The disk with the least room is the one to watch.
   const tightest = [...data.disks].sort((a, b) => a.free - b.free)[0];
@@ -146,6 +170,38 @@ export default function ArrDetail({ kind, data }: { kind: "sonarr" | "radarr"; d
           <Notices items={health.map((h) => ({ tone: HEALTH[h.type].tone, label: HEALTH[h.type].label, message: h.message }))} />
         </Section>
       )}
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <Section title="This week" description="What was grabbed and imported each day.">
+          <BarChart
+            label="Grabbed and imported over the last seven days"
+            slots={days}
+            series={[
+              { label: "Imported", color: 3 },
+              { label: "Grabbed", color: 1 },
+            ]}
+          />
+        </Section>
+        <Section
+          title="Library"
+          description={
+            data.library
+              ? `${data.library.count.toLocaleString()} ${kind === "sonarr" ? "series" : "movies"} · ${formatBytes(data.library.size)} on disk`
+              : undefined
+          }
+        >
+          {data.library ? (
+            <Donut
+              label={`The library's ${data.library.unit}`}
+              center={formatCount(data.library.parts.reduce((sum, p) => sum + p.value, 0))}
+              caption={data.library.unit}
+              parts={data.library.parts.map((p, i) => ({ ...p, color: LIBRARY_COLORS[i] ?? "muted" }))}
+            />
+          ) : (
+            <p className="py-6 text-center text-sm text-ink-50">The service didn&apos;t report its library.</p>
+          )}
+        </Section>
+      </div>
 
       {data.queue.length > 0 && (
         <Section

@@ -12,6 +12,7 @@ const extras = {
   missing: [],
   missingTotal: 0,
   disks: [],
+  library: null,
   links: { home: "http://sonarr.lan", queue: "http://sonarr.lan/activity/queue", missing: "http://sonarr.lan/wanted/missing" },
 };
 const data: ArrDetailData = {
