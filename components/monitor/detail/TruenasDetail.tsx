@@ -92,6 +92,8 @@ function AppRow({ app }: { app: TruenasApp }) {
               <Dot tone={containerTone(c.state)} />
               <span className="min-w-0 flex-1 truncate text-sm text-ink-80">{c.name}</span>
               {c.image && <span className="min-w-0 truncate font-mono text-xs text-ink-50">{c.image}</span>}
+              {/* In words too: the dot's color alone doesn't say it (#518). */}
+              <span className="shrink-0 text-xs text-ink-50">{c.state}</span>
             </li>
           ))}
         </ul>

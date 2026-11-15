@@ -35,7 +35,7 @@ describe("SeerrDetail", () => {
     mount(false);
     const waiting = screen.getByRole("region", { name: /Waiting for approval/ });
     expect(within(waiting).getByText("Pending")).toBeDefined();
-    expect(within(waiting).queryByRole("button", { name: "Approve" })).toBeNull();
+    expect(within(waiting).queryByRole("button", { name: /^Approve/ })).toBeNull();
     const recent = screen.getByRole("region", { name: /Recent requests/ });
     // The waiting request isn't listed twice.
     expect(within(recent).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["SiloSeries · SamAvailable"]);
@@ -45,7 +45,9 @@ describe("SeerrDetail", () => {
     const fetchMock = vi.fn(async () => Response.json({ ok: true }));
     vi.stubGlobal("fetch", fetchMock);
     mount(true);
-    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    // Each button names its request, for a screen reader going button to
+    // button (#518).
+    fireEvent.click(screen.getByRole("button", { name: "Approve Dune: Part Two" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("/api/monitor/action");

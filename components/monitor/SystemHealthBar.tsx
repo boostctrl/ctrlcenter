@@ -134,6 +134,8 @@ export default function SystemHealthBar({
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="line-clamp-2 block text-sm text-ink-85" title={p.message}>
+                    {/* The icon's color says how bad; a screen reader hears it (#518). */}
+                    <span className="sr-only">{p.tone === "down" ? "Critical: " : "Warning: "}</span>
                     {p.message}
                   </span>
                   <span className="block text-xs text-ink-50">{p.source}</span>

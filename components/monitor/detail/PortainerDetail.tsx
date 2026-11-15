@@ -1,13 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import type { PortainerContainer, PortainerEndpoint, PortainerSnapshot } from "@/lib/services/portainer";
 import { Button } from "@/components/admin/ui";
 import { useConfirm } from "@/components/admin/Confirm";
-import { useFocusTrap } from "@/components/admin/useFocusTrap";
 import { fetchContainerLogs, fetchContainers, useMonitorAction, useMonitorIntegration } from "../actions";
-import { Dot, EmptyRow, Glyph, GlyphBubble, Pill, Section, Stat, StatGrid, UsageBar, type Tone } from "../kit";
+import { Dialog, Dot, EmptyRow, Glyph, GlyphBubble, Pill, Section, Stat, StatGrid, UsageBar, type Tone } from "../kit";
 
 // Portainer's page (#514), on the page kit (#508): container counts across
 // every environment, then each environment with its tallies. With actions
@@ -20,8 +18,8 @@ function containerTone(state: string): Tone {
   return "warn"; // restarting, paused, removing, …
 }
 
-// Read-only, scrollable, capped log tail. Portaled to the body: a card is a
-// glass surface (backdrop-filter), which would otherwise trap this overlay.
+// Read-only, scrollable, capped log tail, in the kit's dialog (portaled to
+// the body: a card is a glass surface, which would otherwise trap it).
 function LogModal({
   name,
   logs,
@@ -35,37 +33,29 @@ function LogModal({
   error: string | null;
   onClose: () => void;
 }) {
-  const trapRef = useFocusTrap<HTMLDivElement>(true);
-  if (typeof document === "undefined") return null;
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onMouseDown={onClose}>
-      <div
-        ref={trapRef}
-        role="dialog"
-        aria-label={`Logs — ${name}`}
-        className="glass-card flex h-[70vh] w-full max-w-3xl flex-col gap-3 p-5"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-baseline justify-between gap-3">
-          <h3 className="truncate font-semibold" title={name}>
-            Logs — {name}
-          </h3>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            Close
-          </Button>
-        </div>
-        {loading ? (
-          <p className="text-sm text-ink-50">Loading…</p>
-        ) : error ? (
-          <p className="text-sm text-status-down">{error}</p>
-        ) : (
-          <pre className="min-h-0 flex-1 overflow-auto rounded-lg bg-black/70 p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap text-neutral-200">
-            {logs.trim() ? logs : "No log output."}
-          </pre>
-        )}
-      </div>
-    </div>,
-    document.body
+  const closeRef = useRef<HTMLButtonElement>(null);
+  return (
+    <Dialog
+      title={`Logs — ${name}`}
+      wide
+      onClose={onClose}
+      initialFocus={closeRef}
+      actions={
+        <Button ref={closeRef} variant="ghost" size="sm" onClick={onClose}>
+          Close
+        </Button>
+      }
+    >
+      {loading ? (
+        <p className="text-sm text-ink-50">Loading…</p>
+      ) : error ? (
+        <p className="text-sm text-status-down">{error}</p>
+      ) : (
+        <pre className="min-h-0 flex-1 overflow-auto rounded-lg bg-black/70 p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap text-neutral-200">
+          {logs.trim() ? logs : "No log output."}
+        </pre>
+      )}
+    </Dialog>
   );
 }
 
@@ -105,19 +95,37 @@ function ContainerRow({
       <span className="flex shrink-0 gap-2">
         {running ? (
           <>
-            <Button variant="ghost" size="sm" disabled={busy} onClick={() => onAction("restart", container)}>
+            <Button
+              aria-label={`Restart ${container.name}`}
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              onClick={() => onAction("restart", container)}
+            >
               Restart
             </Button>
-            <Button variant="danger" size="sm" disabled={busy} onClick={() => onAction("stop", container)}>
+            <Button
+              aria-label={`Stop ${container.name}`}
+              variant="danger"
+              size="sm"
+              disabled={busy}
+              onClick={() => onAction("stop", container)}
+            >
               Stop
             </Button>
           </>
         ) : (
-          <Button variant="ghost" size="sm" disabled={busy} onClick={() => onAction("start", container)}>
+          <Button
+            aria-label={`Start ${container.name}`}
+            variant="ghost"
+            size="sm"
+            disabled={busy}
+            onClick={() => onAction("start", container)}
+          >
             Start
           </Button>
         )}
-        <Button variant="ghost" size="sm" onClick={() => onLogs(container)}>
+        <Button aria-label={`Logs for ${container.name}`} variant="ghost" size="sm" onClick={() => onLogs(container)}>
           Logs
         </Button>
       </span>

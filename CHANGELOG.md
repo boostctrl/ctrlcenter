@@ -50,11 +50,28 @@ here.
   - **UniFi:** the internet connection, clients, and every device with its
     kind, clients and uptime, offline ones first. (#517)
 
+- **The Monitor reads better with a screen reader.** Action buttons name
+  what they act on ("Pause Dune.Part.Two…", "Approve Silo"), a tile names
+  its service before its numbers and says when its data is stale, the
+  health banner says how serious each problem is, and the containers of a
+  TrueNAS app show their state in words as well as by color. (#518)
+
+- **The help page describes the new Monitor:** the dashboard, what each
+  integration's page shows, and that actions need two-factor sign-in.
+  (#518)
+
 ### Fixed
 
 - **The AdGuard Home tile reads a million queries as 1.0M.** 3.1.2 fixed
   this on AdGuard's own page, but the Monitor tile still showed 999,950 and
   more as "1000.0k". (#490)
+
+- **The Monitor's dialogs work from the keyboard and read in light mode.**
+  qBittorrent's delete confirmation and Portainer's log viewer now take
+  focus when they open (Cancel first, for the delete), close with Escape,
+  and give focus back to the button that opened them. Both sat as a
+  see-through card over the dark backdrop, which left the delete
+  confirmation's text unreadable in light mode. (#518)
 
 ## [3.1.3] - 2026-11-14
 

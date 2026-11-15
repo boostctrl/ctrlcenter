@@ -586,12 +586,24 @@ export default async function HelpPage() {
             <strong>Settings → Integrations</strong> — as many of each as you
             run, each with its own name and a test-connection button — and the
             private{" "}
-            <A href="/admin/monitor">Monitor</A> page shows what they&apos;re
-            doing: transfer speeds and the busiest torrents for qBittorrent,
-            and — for Sonarr and Radarr — what&apos;s coming up (upcoming
-            episodes and movie releases), what was recently grabbed or
-            imported, and any health warnings. It refreshes itself while the
-            tab is open.
+            <A href="/admin/monitor">Monitor</A> page shows them at a glance.
+            A banner at the top says whether anything needs attention, with
+            each problem linking to the page that explains it; under it, a
+            tile per service, grouped into network, storage and media.
+            Services you haven&apos;t connected wait in one row at the bottom.
+            The page refreshes itself while the tab is open.
+          </P>
+          <P>
+            Open a tile for that service&apos;s own page: its headline
+            numbers, then the detail. That&apos;s what&apos;s coming up and
+            what was recently grabbed or imported for Sonarr and Radarr;
+            requests waiting for approval for Seerr; who&apos;s streaming
+            for Tautulli; every torrent for qBittorrent; environments and
+            their containers for Portainer; pools, alerts and apps for
+            TrueNAS; the query trend and most-blocked domains for AdGuard
+            Home; and clients and devices for UniFi. If a service stops
+            answering, its page keeps showing the last data it had and says
+            how old it is.
           </P>
           <P>
             Everything about it is admin-only: the page, the data it polls,
@@ -609,9 +621,10 @@ export default async function HelpPage() {
             <strong>Allow actions from the dashboard</strong> per integration
             to control them from the page — pause, resume, or delete torrents;
             approve or deny requests; start, stop, or restart containers and
-            read their logs. Actions stay off until you enable them, ask before
-            anything destructive, and are logged on the server. Leave the
-            switch off and the dashboard can look but never touch.
+            read their logs. Actions stay off until you enable them, need
+            two-factor sign-in turned on, ask before anything destructive, and
+            are logged on the server. Leave the switch off and the dashboard
+            can look but never touch.
           </P>
         </Card>
 

@@ -6,3 +6,4 @@ export * from "./charts";
 export * from "./layout";
 export * from "./states";
 export * from "./format";
+export * from "./dialog";

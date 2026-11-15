@@ -143,10 +143,14 @@ Built with Next.js 16, React 19, and Tailwind v4.
   Home, Tautulli, Seerr, Portainer, TrueNAS and UniFi** — as many of each as you
   run, say a 4K Sonarr beside an HD one — (Admin → Settings → Integrations,
   each with a test-connection button) and a
-  signed-in-only **/admin/monitor** page shows their live state: transfer
-  speeds and the active torrent list for qBittorrent, and — for Sonarr and
-  Radarr — what's coming up (upcoming episodes and movie releases), what was
-  recently grabbed or imported, and any health warnings. Read-only by default;
+  signed-in-only **/admin/monitor** page shows them at a glance: a health
+  banner that links each problem to the page explaining it, then a tile per
+  service. Each service has its own page as well — what's coming up and what
+  was recently imported for Sonarr and Radarr, requests waiting for approval
+  for Seerr, who's streaming for Tautulli, every torrent for qBittorrent,
+  environments and containers for Portainer, pools, alerts and apps for
+  TrueNAS, the most-blocked domains for AdGuard Home, and clients and devices
+  for UniFi. Read-only by default;
   for **qBittorrent, Seerr, and Portainer** you can opt in per integration
   ("Allow actions from the dashboard") to act from the page — pause/resume/delete
   torrents, approve/deny requests, and start/stop/restart containers with a
@@ -172,10 +176,11 @@ Built with Next.js 16, React 19, and Tailwind v4.
 | **Theme builder** — one-tap themes, then colors, design, scene and font tabs with a live preview. ![The theme builder's Themes tab](docs/screenshots/theme-builder.png) | **Scene tab** — the scene in use with its intensity and motion, the scenes by family, and a wallpaper behind them. ![The theme builder's Scene tab](docs/screenshots/scene-tab.png) |
 | **Layout editor** — drag, resize and arrange every card on the page itself. ![The home page in edit mode](docs/screenshots/layout-editor.png) | **Status page** — uptime, response times and a 90-day timeline per service. ![The status page](docs/screenshots/status.png) |
 | **Weather** — current conditions, hourly and 7-day forecasts, sun and detail tiles. ![The weather page in light mode](docs/screenshots/weather.png) | **Admin: Themes** — the gallery visitors pick from, each card previewed in its own look. ![The admin Themes tab](docs/screenshots/admin-themes.png) |
+| **Monitor** — a health banner, then a tile per connected service, grouped by kind. ![The Monitor page: a health banner listing two TrueNAS alerts, then tiles for AdGuard Home, UniFi, Portainer, TrueNAS, Sonarr, Radarr and Seerr](docs/screenshots/monitor.png) | **An integration's page** — Sonarr's next episode, its week, health checks, the calendar and recent activity. ![Sonarr's page on the Monitor](docs/screenshots/monitor-sonarr.png) |
 | **Admin: Inbound webhooks** — Sonarr, Radarr and Seerr events relayed out, grouped into one notification, previewed as the email before it arrives. ![The inbound webhooks settings with the email preview](docs/screenshots/inbound-webhooks.png) | |
 
-Taken from the production build with the sample configuration, in the
-default theme.
+Taken from the production build with the sample configuration (and, for the
+Monitor, the sample integration data below), in the default theme.
 
 ## AI disclaimer
 

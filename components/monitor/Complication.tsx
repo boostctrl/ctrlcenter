@@ -58,13 +58,11 @@ export default function Complication({
   const className = `glass-card flex min-h-[7rem] items-center gap-4 p-4 ${sizing} ${
     dim ? "[--surface-bg:transparent] [--surface-border-style:dashed] [--surface-shadow:none]" : ""
   }`;
+  // The name and lines come first in the markup and the gauge is drawn
+  // before them, so a screen reader announces the service before its
+  // numbers: "Portainer, 2 stopped …, 13 running" (#518).
   const body = (
     <>
-      {ring !== undefined ? (
-        <Gauge state={state} center={center} caption={caption} ring={ring} alert={alert} />
-      ) : (
-        <NumberBadge center={center} caption={caption} alert={alert} />
-      )}
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex items-center gap-1.5">
           <span
@@ -74,6 +72,12 @@ export default function Complication({
           <span className="truncate text-[11px] font-medium tracking-wide text-ink-40 uppercase">
             {label}
           </span>
+          {/* The dot's amber alone doesn't say it (#518). */}
+          {state === "stale" && (
+            <span className="shrink-0 text-[11px] font-medium tracking-wide text-status-warning uppercase">
+              · Stale
+            </span>
+          )}
         </span>
         {lines.map((text, i) => (
           <span
@@ -88,6 +92,13 @@ export default function Complication({
         ))}
         {visual && <Visual visual={visual} />}
       </div>
+      <span className="order-first flex shrink-0">
+        {ring !== undefined ? (
+          <Gauge state={state} center={center} caption={caption} ring={ring} alert={alert} />
+        ) : (
+          <NumberBadge center={center} caption={caption} alert={alert} />
+        )}
+      </span>
     </>
   );
   return href ? (

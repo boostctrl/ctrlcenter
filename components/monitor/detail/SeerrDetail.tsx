@@ -109,10 +109,22 @@ export default function SeerrDetail({
                 trailing={
                   actionsAllowed ? (
                     <span className="flex gap-2">
-                      <Button variant="ghost" size="sm" disabled={busy === String(r.id)} onClick={() => approve(r)}>
+                      <Button
+                        aria-label={`Approve ${r.title}`}
+                        variant="ghost"
+                        size="sm"
+                        disabled={busy === String(r.id)}
+                        onClick={() => approve(r)}
+                      >
                         Approve
                       </Button>
-                      <Button variant="danger" size="sm" disabled={busy === String(r.id)} onClick={() => deny(r)}>
+                      <Button
+                        aria-label={`Deny ${r.title}`}
+                        variant="danger"
+                        size="sm"
+                        disabled={busy === String(r.id)}
+                        onClick={() => deny(r)}
+                      >
                         Deny
                       </Button>
                     </span>

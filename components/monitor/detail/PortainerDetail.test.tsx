@@ -73,7 +73,7 @@ describe("PortainerDetail (#514)", () => {
     await user.click(screen.getByRole("button", { name: /^fast-env/ }));
     await answer("endpoint 2", { containers: [box("app-a"), box("app-b")] });
     const logsOf = (name: string) =>
-      within(screen.getByText(name).closest("li")!).getByRole("button", { name: "Logs" });
+      within(screen.getByText(name).closest("li")!).getByRole("button", { name: `Logs for ${name}` });
     await user.click(logsOf("app-a"));
     await user.keyboard("{Escape}");
     await user.click(logsOf("app-b"));

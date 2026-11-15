@@ -33,8 +33,9 @@ describe("MonitorDashboard", () => {
     expect(within(health).getByRole("heading", { name: "Attention needed" })).toBeDefined();
     const links = within(health).getAllByRole("link");
     expect(links.map((a) => [a.textContent, a.getAttribute("href")])).toEqual([
-      ["Pool tank is DEGRADEDTrueNAS", "/admin/monitor/nas"],
-      ["Can't reach it: Couldn't connectSonarr 4K", "/admin/monitor/sonarr-4k"],
+      // How bad each is, in words for a screen reader as well as the icon's color.
+      ["Critical: Pool tank is DEGRADEDTrueNAS", "/admin/monitor/nas"],
+      ["Critical: Can't reach it: Couldn't connectSonarr 4K", "/admin/monitor/sonarr-4k"],
     ]);
   });
 

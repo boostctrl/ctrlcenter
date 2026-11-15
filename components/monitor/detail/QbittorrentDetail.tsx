@@ -1,18 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import { createPortal } from "react-dom";
+import { useRef, useState } from "react";
 import type {
   QbittorrentDetail as QbittorrentDetailData,
   QbittorrentTorrent,
   TorrentState,
 } from "@/lib/services/qbittorrent";
 import { Button } from "@/components/admin/ui";
-import { useFocusTrap } from "@/components/admin/useFocusTrap";
 import { formatBytes } from "@/components/widgets/SystemStatsWidget";
 import { formatEta, formatSpeed } from "@/lib/format";
 import { useMonitorAction } from "../actions";
 import {
+  Dialog,
   EmptyRow,
   GlyphBubble,
   List,
@@ -119,10 +118,22 @@ function TorrentRow({
           />
           {actions && (
             <span className="flex shrink-0 gap-2">
-              <Button variant="ghost" size="sm" disabled={busy} onClick={() => actions.onPauseResume(torrent)}>
+              <Button
+                aria-label={`${torrent.state === "paused" ? "Resume" : "Pause"} ${torrent.name}`}
+                variant="ghost"
+                size="sm"
+                disabled={busy}
+                onClick={() => actions.onPauseResume(torrent)}
+              >
                 {torrent.state === "paused" ? "Resume" : "Pause"}
               </Button>
-              <Button variant="danger" size="sm" disabled={busy} onClick={() => actions.onDelete(torrent)}>
+              <Button
+                aria-label={`Delete ${torrent.name}`}
+                variant="danger"
+                size="sm"
+                disabled={busy}
+                onClick={() => actions.onDelete(torrent)}
+              >
                 Delete
               </Button>
             </span>
@@ -134,7 +145,8 @@ function TorrentRow({
 }
 
 // The keep-vs-remove-data delete confirmation (#201): two distinct destructive
-// outcomes spelled out rather than hidden behind a checkbox.
+// outcomes spelled out rather than hidden behind a checkbox. Focus starts on
+// Cancel, so a reflexive Enter backs out (#269).
 function DeleteTorrentModal({
   torrent,
   busy,
@@ -146,42 +158,36 @@ function DeleteTorrentModal({
   onConfirm: (deleteFiles: boolean) => void;
   onCancel: () => void;
 }) {
-  const trapRef = useFocusTrap<HTMLDivElement>(true);
-  if (typeof document === "undefined") return null;
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-      onMouseDown={onCancel}
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  return (
+    <Dialog
+      title="Delete torrent"
+      alert
+      onClose={() => {
+        if (!busy) onCancel();
+      }}
+      initialFocus={cancelRef}
+      description={
+        <>
+          Remove <span className="text-ink-80">{torrent.name}</span> from qBittorrent. Choose whether to also delete the
+          files it downloaded — deleting the data can’t be undone.
+        </>
+      }
     >
-      <div
-        ref={trapRef}
-        role="alertdialog"
-        aria-label="Delete torrent"
-        className="glass-card w-full max-w-sm space-y-4 p-5"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <h3 className="font-semibold">Delete torrent</h3>
-        <p className="text-sm break-words text-ink-60">
-          Remove <span className="text-ink-80">{torrent.name}</span> from
-          qBittorrent. Choose whether to also delete the files it downloaded —
-          deleting the data can’t be undone.
-        </p>
-        <div className="flex flex-col gap-2">
-          <Button variant="primary" disabled={busy} onClick={() => onConfirm(false)}>
-            Remove torrent, keep files
-          </Button>
-          <Button variant="danger" disabled={busy} onClick={() => onConfirm(true)}>
-            Delete torrent and data
-          </Button>
-        </div>
-        <div className="flex justify-end">
-          <Button variant="ghost" size="sm" disabled={busy} onClick={onCancel}>
-            Cancel
-          </Button>
-        </div>
+      <div className="flex flex-col gap-2">
+        <Button variant="primary" disabled={busy} onClick={() => onConfirm(false)}>
+          Remove torrent, keep files
+        </Button>
+        <Button variant="danger" disabled={busy} onClick={() => onConfirm(true)}>
+          Delete torrent and data
+        </Button>
       </div>
-    </div>,
-    document.body
+      <div className="flex justify-end">
+        <Button ref={cancelRef} variant="ghost" size="sm" disabled={busy} onClick={onCancel}>
+          Cancel
+        </Button>
+      </div>
+    </Dialog>
   );
 }
 
