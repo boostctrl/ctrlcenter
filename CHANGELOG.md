@@ -12,6 +12,36 @@ here.
 
 ## [Unreleased]
 
+### Changed
+
+- **Apprise gets the whole report, not a one-liner.** A Sonarr, Radarr or
+  Seerr event relayed to an Apprise channel now carries what the email
+  shows, as Markdown:
+  - the subject line as its title, then the headline;
+  - the facts, the synopsis and a link back into the app;
+  - the poster, attached.
+
+  Apprise renders it for each service behind it: bold text and links on
+  Discord, Slack and Telegram, an HTML mail, Pushover with the poster. The
+  event's level sets Apprise's type, so a service that colours by it shows
+  a failure red and an import green. The Email report switches (now Email and Apprise report)
+  and the subject prefix apply to it as well, and the preview shows the
+  Markdown once you have an Apprise channel. Uptime alerts go as Markdown
+  too, with the status in bold and a link to the app. If the Apprise
+  server refuses the poster, because attachments are off or the image is
+  out of reach, the event goes again without it. ntfy and Gotify render
+  the Markdown once `?format=markdown` is on their Apprise URL. (#532)
+
+### Security
+
+- **A relayed "@everyone" no longer pings a Discord channel reached through
+  Apprise.** A direct Discord webhook already sent mentions as text
+  (#401), but Apprise's Discord connector doesn't. A Seerr user who wrote
+  "@everyone" in an issue comment could page the whole channel, and so
+  could a service named that way. Everything CtrlCenter sends to Apprise
+  now breaks `@everyone`, `@here` and Discord's `<@…>`, `<#…>` and `<!…>`
+  tags with an invisible space. (#533)
+
 ## [3.2.0] - 2026-11-15
 
 ### Added

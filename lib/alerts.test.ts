@@ -10,6 +10,8 @@ import {
   sendTestAlert,
   sendSampleNotification,
   buildServiceRequest,
+  buildAppriseRequest,
+  appriseAlert,
   plainAlert,
   plainNotification,
   processAlerts,
@@ -181,10 +183,7 @@ describe("describeAlert", () => {
     expect(generic).toMatchObject({ status: "warning", detail: "Certificate expires in 3 days" });
     expect(buildEmailMessage(e, app, 0).subject).toBe("Plex: Certificate expires in 3 days");
     expect(buildEmailMessage(e, app, 0, "{service} is {status}").subject).toBe("Plex is warning");
-    const apprise = buildServiceRequest(
-      { type: "apprise", url: "http://a.test", token: "", chatId: "", userKey: "" },
-      plainAlert(e, app)
-    );
+    const apprise = buildAppriseRequest("http://a.test", appriseAlert(e, app));
     expect(JSON.parse(apprise.init.body as string).type).toBe("warning");
   });
 });
@@ -452,12 +451,6 @@ describe("buildServiceRequest", () => {
     });
   });
 
-  it("apprise posts title, body and a notification type", () => {
-    const req = buildServiceRequest({ ...ch, type: "apprise", url: "http://apprise:8000/notify/cc" }, down);
-    expect(req.url).toBe("http://apprise:8000/notify/cc");
-    expect(JSON.parse(req.init.body as string)).toMatchObject({ title: "Plex is down", type: "failure" });
-  });
-
   it("puts a notification's title in the text for services without a title field", () => {
     const m = plainNotification({ title: "Sonarr: grabbed", body: "Show S01E02", url: "" });
     expect(m).toMatchObject({ title: "Sonarr: grabbed", body: "Show S01E02", text: "Sonarr: grabbed\nShow S01E02" });
@@ -486,14 +479,12 @@ describe("buildServiceRequest", () => {
       expect(title.endsWith(`${emoji}…`)).toBe(true);
     });
 
-    it("gotify and apprise: the generic clip counts characters", () => {
+    it("gotify: the generic clip counts characters", () => {
       const got = buildServiceRequest({ ...ch, type: "gotify", url: "https://gotify.test", token: "tok" }, m);
       const message = JSON.parse(got.init.body as string).message as string;
       expect(Array.from(message).length).toBe(3500);
       expect(message.endsWith(`${emoji}…`)).toBe(true);
       expect(message.isWellFormed()).toBe(true);
-      const app = buildServiceRequest({ ...ch, type: "apprise", url: "http://apprise:8000/notify/cc" }, m);
-      expect(JSON.parse(app.init.body as string).body).toBe(message);
     });
 
     it("telegram: counts UTF-16 units and steps the cut off a surrogate pair", () => {
@@ -939,5 +930,86 @@ describe("sendNotification", () => {
     expect(mail).toMatchObject({ from: "a@x", to: "b@y", subject: "[Sonarr] Grabbed: The Bear S04E03" });
     expect(mail.html).toContain("CtrlCenter</span> · Home");
     expect(mail.text).toContain("SONARR · GRABBED");
+  });
+});
+
+describe("Apprise (#532)", () => {
+  const app = { name: "Plex", url: "https://plex.test/" };
+
+  it("posts an uptime alert as Markdown: the status in bold over a link to the app", () => {
+    const req = buildAppriseRequest(" http://apprise:8000/notify/cc ", appriseAlert({ id: "a", type: "down" }, app));
+    expect(req.url).toBe("http://apprise:8000/notify/cc");
+    expect(req.unattached).toBeUndefined();
+    expect(JSON.parse(req.init.body as string)).toEqual({
+      title: "Plex is down",
+      body: "🔴 **Service down**  \n[plex.test](https://plex.test/)",
+      type: "failure",
+      format: "markdown",
+    });
+    const up = appriseAlert({ id: "a", type: "up" }, { name: "Plex", url: "" });
+    expect(up).toEqual({ title: "Plex recovered", body: "🟢 **Recovered**", type: "success" });
+  });
+
+  it("keeps a service named to page a Discord channel from paging it (#533)", () => {
+    const m = appriseAlert({ id: "a", type: "down" }, { name: "@everyone <@&42>", url: "" });
+    expect(m.title).toBe("@\u200beveryone <\u200b@&42> is down");
+  });
+
+  it("asks the server to attach the poster, with a twin without it", () => {
+    const req = buildAppriseRequest("http://apprise/notify", { title: "T", body: "B", type: "info", attach: "https://img.test/p.jpg" });
+    expect(JSON.parse(req.init.body as string)).toEqual({ title: "T", body: "B", type: "info", format: "markdown", attach: "https://img.test/p.jpg" });
+    expect(JSON.parse(req.unattached!.init.body as string)).toEqual({ title: "T", body: "B", type: "info", format: "markdown" });
+  });
+
+  describe("delivery", () => {
+    afterEach(() => vi.unstubAllGlobals());
+    const config = alertsSchema.parse({ channels: [channel({ id: "ap", type: "apprise", url: "http://apprise.test/notify/cc" })] });
+    // A Radarr grab, with its poster.
+    const grab = parseArrWebhook("radarr", {
+      eventType: "Grab",
+      instanceName: "Radarr",
+      movie: { title: "Arrival", year: 2016, images: [{ coverType: "poster", remoteUrl: "https://image.tmdb.org/t/p/original/arrival.jpg" }] },
+      release: { quality: "Bluray-1080p", size: 1024 ** 3 * 9, releaseTitle: "Arrival.2016.1080p.BluRay-GRP" },
+    });
+    const sent = (fetchMock: ReturnType<typeof vi.fn>) =>
+      fetchMock.mock.calls.map((c) => JSON.parse((c[1] as RequestInit).body as string) as Record<string, unknown>);
+
+    it("relays a report as Markdown with its subject, level and poster", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+      vi.stubGlobal("fetch", fetchMock);
+      await sendNotification(config, grab!, { at: 0, timeZone: "UTC", siteTitle: "Lab" });
+      const [body] = sent(fetchMock);
+      expect(body).toMatchObject({
+        title: "[Radarr] Grabbed: Arrival (2016)",
+        type: "info",
+        format: "markdown",
+        attach: "https://image.tmdb.org/t/p/original/arrival.jpg",
+      });
+      expect(body.body).toContain("**Arrival**");
+      expect(body.body).toContain("`Arrival.2016.1080p.BluRay-GRP`");
+    });
+
+    it("sends again without the poster when the server refuses it, and never after a partial send", async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(new Response("Bad Attachment", { status: 400 }))
+        .mockResolvedValueOnce(new Response(null, { status: 200 }));
+      vi.stubGlobal("fetch", fetchMock);
+      await sendNotification(config, grab!);
+      expect(sent(fetchMock).map((b) => b.attach)).toEqual(["https://image.tmdb.org/t/p/original/arrival.jpg", undefined]);
+
+      // 424: some service already took it — sending again would repeat it.
+      const partial = vi.fn().mockResolvedValue(new Response(null, { status: 424 }));
+      vi.stubGlobal("fetch", partial);
+      await sendNotification(config, grab!);
+      expect(partial).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves the poster off when the email report does", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+      vi.stubGlobal("fetch", fetchMock);
+      await sendNotification(config, grab!, { at: 0, timeZone: "UTC", siteTitle: "Lab", options: { poster: false } });
+      expect(sent(fetchMock)[0]).not.toHaveProperty("attach");
+    });
   });
 });

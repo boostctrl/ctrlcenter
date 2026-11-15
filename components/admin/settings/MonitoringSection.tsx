@@ -269,19 +269,21 @@ export default function MonitoringSection({
               );
             })}
 
-            {/* What the email report carries (#347). The push and chat
+            {/* What the report carries (#347): the email's, and the Markdown
+                an Apprise channel gets (#532). The other push and chat
                 channels get the one-line summary whatever is set here. */}
             <div className="flex flex-col gap-3 border-t border-fg/10 pt-4">
               <div className="flex flex-col gap-1">
-                <span className={fieldLabelClasses}>Email report</span>
+                <span className={fieldLabelClasses}>Email and Apprise report</span>
                 <Hint>
-                  What an email channel shows for an event. Every other
+                  What an email channel shows for an event, and an Apprise
+                  channel as far as the services behind it can. Every other
                   channel gets the one-line summary.
                 </Hint>
               </div>
               <ToggleRow
                 label="Poster"
-                hint="The show or movie poster. Your mail client fetches it from TheTVDB or TMDB when the email is opened."
+                hint="The show or movie poster. Your mail client fetches it from TheTVDB or TMDB when the email is opened; an Apprise server fetches it to attach."
                 checked={webhooks.poster}
                 onChange={(poster) => updateWebhooks({ poster })}
               />
@@ -299,7 +301,7 @@ export default function MonitoringSection({
               />
               <TextField
                 label="Subject prefix"
-                hint="Put in front of every webhook email subject, e.g. a tag your mail rules file on. Counts toward the 78-character limit."
+                hint="Put in front of every webhook email subject and Apprise title, e.g. a tag your mail rules file on. Counts toward the 78-character limit."
                 maxLength={40}
                 placeholder="[Home]"
                 autoComplete="off"

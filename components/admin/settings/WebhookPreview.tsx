@@ -4,6 +4,7 @@ import { useDeferredValue, useMemo, useState } from "react";
 import type { AlertConfig, WebhooksConfig } from "@/lib/schema";
 import { CHANNEL_LABELS, activeChannels, channelNamer } from "@/lib/alert-channels";
 import { buildNotificationEmail, buildPreheader, cleanHeader } from "@/lib/webhook-email";
+import { appriseNotification } from "@/lib/webhook-markdown";
 import {
   SAMPLE_AT,
   SAMPLE_IDS,
@@ -36,8 +37,9 @@ type Scheme = "light" | "dark";
 // What a relayed event looks like before it arrives (#347): the real
 // renderer run in the browser over the DRAFT options — every keystroke in
 // the subject prefix shows at once, ahead of the autosave — into a
-// sandboxed frame, plus the one-liner the push channels get and a Send
-// sample per channel that takes inbound webhooks. The frame is `srcdoc`
+// sandboxed frame, plus the Markdown an Apprise channel gets (#532) when
+// there is one, the one-liner the other channels get, and a Send sample
+// per channel that takes inbound webhooks. The frame is `srcdoc`
 // with an empty sandbox: the email's inline styles apply under the page's
 // own policy, nothing in it can run or navigate, and its links are inert.
 export default function WebhookPreview({
@@ -85,6 +87,21 @@ export default function WebhookPreview({
         options: { poster, facts, synopsis, subjectPrefix },
       }),
     [notification, timeZone, siteTitle, poster, facts, synopsis, subjectPrefix]
+  );
+  // What an Apprise channel gets, shown only once there is one: the
+  // Markdown as sent, which each service behind it renders its own way.
+  const hasApprise = alerts.channels.some((ch) => ch.type === "apprise");
+  const apprise = useMemo(
+    () =>
+      hasApprise
+        ? appriseNotification(notification, {
+            at: SAMPLE_AT,
+            timeZone,
+            siteTitle,
+            options: { poster, facts, synopsis, subjectPrefix },
+          })
+        : null,
+    [hasApprise, notification, timeZone, siteTitle, poster, facts, synopsis, subjectPrefix]
   );
   // Dark is forced through Outlook.com's [data-ogsc] hook the template
   // already styles for, so the frame shows the dark rules whatever the
@@ -169,9 +186,24 @@ export default function WebhookPreview({
           </pre>
         </details>
 
+        {apprise && (
+          <details className="text-xs">
+            <summary className="cursor-pointer text-ink-50 transition-colors hover:text-ink-80">
+              Apprise version (Markdown)
+            </summary>
+            <pre className="mt-2 overflow-x-auto font-mono text-xs whitespace-pre-wrap text-ink-80">
+              {`${apprise.title}\n\n${apprise.body}`}
+            </pre>
+            <p className="mt-2 text-ink-45">
+              Each service behind Apprise renders it in its own way; a real
+              event with a poster{poster ? " attaches it" : " goes without it while Poster is off"}.
+            </p>
+          </details>
+        )}
+
         <div className="flex flex-col gap-1.5">
           <div className="flex flex-wrap items-center gap-2 text-xs text-ink-45">
-            <span>Push channels get</span>
+            <span>{apprise ? "Other push and chat channels get" : "Push channels get"}</span>
             <span className="rounded-full border border-fg/15 px-2.5 py-1 text-xs text-ink-80">
               {notification.title}
             </span>

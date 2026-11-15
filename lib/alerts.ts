@@ -8,8 +8,15 @@ import {
 import { log, hostOf, errorReason } from "./log";
 import { resolveSecret } from "./secrets";
 import { ServiceError, serviceFetch } from "./services/http";
-import { reportOptions, type NotificationContext, type WebhookNotification } from "./webhooks";
+import { displayUrl, reportOptions, type NotificationContext, type WebhookNotification } from "./webhooks";
 import { buildNotificationEmail, escapeHtml } from "./webhook-email";
+import {
+  appriseNotification,
+  escapeMarkdown,
+  markdownLink,
+  quietMentions,
+  type AppriseMessage,
+} from "./webhook-markdown";
 import { sampleNotification, type SampleId } from "./notification-samples";
 
 // Outbound uptime alerting. The background poller (lib/status-poller.ts) feeds
@@ -104,7 +111,9 @@ export function evaluateWarnings(
 }
 
 export type AlertApp = { name: string; url: string };
-export type AlertRequest = { url: string; init: RequestInit };
+// `unattached` is the same message without its attachment, sent when the
+// server refuses the attachment itself (an Apprise poster, #532).
+export type AlertRequest = { url: string; init: RequestInit; unattached?: AlertRequest };
 
 // The words and look of one event, shared by every format. `status` is what
 // the email subject's {status} becomes.
@@ -357,9 +366,10 @@ function jsonReq(url: string, payload: unknown): AlertRequest {
 const ALERT_TIMEOUT_MS = 5000;
 
 // What the services without a webhook-style payload get (Telegram, Gotify,
-// Pushover, Apprise): a title, a body for services that show the title
-// separately, the whole text for those that don't, an optional link, and
-// how urgent it is.
+// Pushover): a title, a body for services that show the title separately,
+// the whole text for those that don't, an optional link, and how urgent it
+// is. Apprise gets Markdown instead (#532, appriseAlert below and
+// lib/webhook-markdown.ts).
 export type PlainMessage = {
   title: string;
   body: string;
@@ -386,8 +396,8 @@ export function plainNotification(c: NotificationContent): PlainMessage {
   };
 }
 
-// Gotify and Apprise set no cap of their own; their body gets this bound,
-// counted as characters, with the link appended whole.
+// Gotify sets no cap of its own; its body gets this bound, counted as
+// characters, with the link appended whole.
 const MAX_TEXT = 3500;
 
 // Telegram caps a message at 4,096 characters, counted as UTF-16 units (an
@@ -420,12 +430,14 @@ function telegramText(words: string, link: string): string {
 
 const withLink = (s: string, url?: string) => (url ? `${s}\n${url}` : s);
 
+// The channels a PlainMessage goes to.
+type ServiceChannel = Pick<AlertChannel, "url" | "token" | "chatId" | "userKey"> & {
+  type: "telegram" | "gotify" | "pushover";
+};
+
 // Shape a message into the request one of the native services expects (#291).
 // Pure, so each service's payload is unit-tested.
-export function buildServiceRequest(
-  ch: Pick<AlertChannel, "type" | "url" | "token" | "chatId" | "userKey">,
-  m: PlainMessage
-): AlertRequest {
+export function buildServiceRequest(ch: ServiceChannel, m: PlainMessage): AlertRequest {
   switch (ch.type) {
     case "telegram":
       // Plain text: no parse_mode, so names with * or _ need no escaping.
@@ -447,7 +459,8 @@ export function buildServiceRequest(
           }),
         },
       };
-    case "pushover": {
+    case "pushover":
+    default: {
       // Pushover's caps count characters: 250 for the title, 1,024 for the
       // message. Cut by characters too, so neither ends in half an emoji.
       const form = new URLSearchParams({
@@ -467,16 +480,30 @@ export function buildServiceRequest(
         },
       };
     }
-    case "apprise":
-    default:
-      // The Apprise API's /notify endpoint: it fans out to whatever services
-      // its URL (a stateless /notify or a saved /notify/<key>) points at.
-      return jsonReq(ch.url.trim(), {
-        title: m.title,
-        body: withLink(clipChars(m.body, MAX_TEXT), m.url),
-        type: { down: "failure", warning: "warning", up: "success", info: "info" }[m.level],
-      });
   }
+}
+
+// An uptime alert for Apprise (#532): the event as the title, as the other
+// services get it, over its status in bold and a link to the app.
+export function appriseAlert(event: AlertEvent, app: AlertApp): AppriseMessage {
+  const { title, emoji, label } = describeAlert(event, app);
+  const url = app.url.trim();
+  return {
+    title: quietMentions(title),
+    body: [`${emoji} **${escapeMarkdown(label)}**`, url ? markdownLink(displayUrl(url), url) : ""].filter(Boolean).join("  \n"),
+    type: event.type === "down" ? "failure" : event.type === "warning" ? "warning" : "success",
+  };
+}
+
+// The Apprise API's /notify request (#532): it fans out to whatever services
+// its URL (a stateless /notify or a saved /notify/<key>) points at, turning
+// the Markdown into each one's own formatting, and fetches the poster to
+// forward when there is one. Should the server refuse that, the same
+// message goes again without it.
+export function buildAppriseRequest(url: string, m: AppriseMessage): AlertRequest {
+  const { attach, ...message } = m;
+  const bare = jsonReq(url.trim(), { ...message, format: "markdown" });
+  return attach ? { ...jsonReq(url.trim(), { ...message, format: "markdown", attach }), unattached: bare } : bare;
 }
 
 // One thing to deliver: an uptime transition, or a relayed notification.
@@ -484,18 +511,31 @@ type Outgoing =
   | { kind: "alert"; event: AlertEvent; app: AlertApp; at: number }
   | { kind: "notification"; content: NotificationContent; ctx: NotificationContext };
 
-// The HTTP request for one channel and one message (every type but email).
+// The HTTP request for one channel and one message (every type but email,
+// which deliver() sends over SMTP).
 function requestFor(ch: AlertChannel, out: Outgoing): AlertRequest {
-  if (ch.type === "webhook") {
-    const url = ch.url.trim();
-    return out.kind === "alert"
-      ? buildAlertRequest(ch.format, url, out.event, out.app, out.at)
-      : buildNotificationRequest(ch.format, url, out.content);
+  switch (ch.type) {
+    case "webhook": {
+      const url = ch.url.trim();
+      return out.kind === "alert"
+        ? buildAlertRequest(ch.format, url, out.event, out.app, out.at)
+        : buildNotificationRequest(ch.format, url, out.content);
+    }
+    case "apprise":
+      return buildAppriseRequest(
+        ch.url,
+        out.kind === "alert" ? appriseAlert(out.event, out.app) : appriseNotification(out.content, out.ctx)
+      );
+    case "telegram":
+    case "gotify":
+    case "pushover":
+      return buildServiceRequest(
+        { ...ch, type: ch.type },
+        out.kind === "alert" ? plainAlert(out.event, out.app) : plainNotification(out.content)
+      );
+    case "email":
+      throw new Error("an email channel sends over SMTP");
   }
-  return buildServiceRequest(
-    ch,
-    out.kind === "alert" ? plainAlert(out.event, out.app) : plainNotification(out.content)
-  );
 }
 
 // One channel's delivery outcome, reported so a test can show it. `detail` is a
@@ -510,13 +550,39 @@ export type ChannelResult = { ok: boolean; detail: string };
 // header across hosts, and Gotify's app token rides in X-Gotify-Key, so a
 // Gotify URL that answered 307/308 to another host handed the token to it. A
 // refused redirect is the channel's result, as a failed status would be.
-async function runRequest(req: AlertRequest): Promise<ChannelResult> {
+async function fire(req: AlertRequest): Promise<ChannelResult & { status?: number }> {
   try {
     const res = await serviceFetch(req.url, req.init, ALERT_TIMEOUT_MS);
-    return { ok: res.ok, detail: `HTTP ${res.status}` };
+    return { ok: res.ok, detail: `HTTP ${res.status}`, status: res.status };
   } catch (e) {
     return { ok: false, detail: e instanceof ServiceError ? e.message : errorReason(e) };
   }
+}
+
+// The answers that mean the attachment itself was refused, before anything
+// went out (#532): the Apprise API says 400 when it can't fetch one, or has
+// attachments turned off, and a proxy in front of it 413 to a body it finds
+// too large. A 424 means some service already took the message, so it is
+// never sent twice.
+const REFUSED_ATTACHMENT = new Set([400, 413]);
+
+// Channels already told, once a process, that their server refuses the
+// poster, so a server set never to take one doesn't log every event.
+const refusedOnce = new Set<string>();
+
+// Send a request, and its unattached twin should the attachment be refused.
+async function runRequest(req: AlertRequest, channel = ""): Promise<ChannelResult> {
+  const first = await fire(req);
+  if (first.ok || !req.unattached || first.status === undefined || !REFUSED_ATTACHMENT.has(first.status)) {
+    return { ok: first.ok, detail: first.detail };
+  }
+  const second = await fire(req.unattached);
+  if (!second.ok) return { ok: false, detail: second.detail };
+  if (channel && !refusedOnce.has(channel)) {
+    refusedOnce.add(channel);
+    log.warn("alert channel refused the poster; sent without it", { channel, reason: first.detail });
+  }
+  return { ok: true, detail: `${second.detail}, without the poster: ${first.detail} with it` };
 }
 
 // Build a time-boxed SMTP transport. nodemailer is imported lazily so it never
@@ -551,8 +617,8 @@ async function runEmail(cfg: SmtpConfig, out: Outgoing): Promise<ChannelResult> 
 }
 
 // Deliver to one channel. Never throws.
-function deliver(ch: AlertChannel, out: Outgoing): Promise<ChannelResult> {
-  return ch.type === "email" ? runEmail(ch.smtp, out) : runRequest(requestFor(ch, out));
+function deliver(ch: AlertChannel, out: Outgoing, label = ""): Promise<ChannelResult> {
+  return ch.type === "email" ? runEmail(ch.smtp, out) : runRequest(requestFor(ch, out), label);
 }
 
 // Deliver best-effort: a failed or slow channel must never disturb the poller
@@ -560,7 +626,7 @@ function deliver(ch: AlertChannel, out: Outgoing): Promise<ChannelResult> {
 // undelivered alert can be traced. Only the host is logged: Telegram's URL
 // carries the bot token.
 async function deliverLogged(ch: AlertChannel, label: string, out: Outgoing): Promise<void> {
-  const result = await deliver(ch, out);
+  const result = await deliver(ch, out, label);
   if (result.ok) return;
   log.warn("alert channel failed", {
     channel: label,

@@ -66,8 +66,9 @@ Built with Next.js 16, React 19, and Tailwind v4.
   webhooks** let **Sonarr, Radarr and Seerr** push their own events — a
   grab, an import, a request awaiting approval, a health issue — out through
   the same channels: email gets a short report with the poster and the key
-  facts, everything else a one-liner, and a burst (a season's episodes, a
-  busy minute across apps) goes out as one notification.
+  facts, Apprise the same report as Markdown with the poster attached,
+  everything else a one-liner, and a burst (a season's episodes, a busy
+  minute across apps) goes out as one notification.
 
 - **Theming.** A builder with a live preview, built on independent axes you
   combine and save:

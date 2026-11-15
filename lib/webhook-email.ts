@@ -35,7 +35,7 @@ export function cleanHeader(s: string): string {
   return s.replace(/[\p{Cc}\s]+/gu, " ").trim();
 }
 
-const isHttp = (u: string | undefined): u is string => !!u && /^https?:\/\//i.test(u);
+export const isHttp = (u: string | undefined): u is string => !!u && /^https?:\/\//i.test(u);
 const isHttps = (u: string | undefined): u is string => !!u && /^https:\/\//i.test(u);
 // A poster is an https image, or an inline raster/SVG data URL: the admin
 // preview (#347) shows a placeholder tile that way so it fetches nothing.
@@ -258,7 +258,7 @@ function buttonHtml(link: WebhookReport["link"]): string {
 
 // The local time of the event, and the ISO instant for a tooltip and the
 // text part. An unknown zone degrades to UTC (lib/datetime.ts).
-function whenOf(ctx: NotificationContext): { local: string; iso: string } {
+export function whenOf(ctx: NotificationContext): { local: string; iso: string } {
   const d = new Date(ctx.at);
   return {
     local: normalizeIntlSpaces(
@@ -276,21 +276,21 @@ function whenOf(ctx: NotificationContext): { local: string; iso: string } {
 }
 
 // "relayed from Sonarr (Sonarr 4K)" — the instance only when it says more.
-function relayOf(r: WebhookReport): string {
+export function relayOf(r: WebhookReport): string {
   return r.instance && r.instance !== r.app ? `${r.app} (${r.instance})` : r.app;
 }
 
 // What the sheet renders: a report, or the stand-in made from a notification
 // that carries none.
-type Sheet = Omit<WebhookReport, "service" | "eventType">;
+export type Sheet = Omit<WebhookReport, "service" | "eventType">;
 
 // What the synopsis switch hides: the plot overview, the one message that
 // can spoil (the parsers label only that "Overview"). A failure reason, a
 // health message, update notes, an issue's description or comment stay —
 // they are the point of their event.
-const spoiler = (r: Sheet, o: ReportOptions) => o.synopsis === false && r.messageLabel === "Overview";
+export const spoiler = (r: Sheet, o: ReportOptions) => o.synopsis === false && r.messageLabel === "Overview";
 
-function sheetOf(c: WebhookNotification): Sheet {
+export function sheetOf(c: WebhookNotification): Sheet {
   if (c.report) return c.report;
   return {
     app: "CtrlCenter",

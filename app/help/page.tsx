@@ -695,8 +695,21 @@ export default async function HelpPage() {
             Overseerr or Jellyseerr install from before they merged into
             Seerr sends the same events. An email channel gets the event as
             a short report — subject <code>[App] Event: Title</code>, with
-            the poster, the key facts and a link back into the app; every
-            other channel gets a one-line summary.
+            the poster, the key facts and a link back into the app. An{" "}
+            <strong>Apprise</strong> channel gets the same report as
+            Markdown with the poster attached, and Apprise renders it for
+            each service behind it: bold text and links on Discord, Slack
+            and Telegram, an HTML mail, Pushover with the poster. Every other
+            channel gets a one-line summary.
+          </P>
+          <P>
+            Apprise passes Markdown to ntfy and Gotify as plain text unless
+            their URL asks for it: add <code>?format=markdown</code> to it in
+            Apprise. On a Discord URL the same switch turns the message into
+            an embed, its edge coloured by the event — blue for a grab, green
+            for an import, yellow for a warning, red for a failure. Should
+            the Apprise server refuse the poster (attachments turned off, or
+            the image out of reach), the event goes again without it.
           </P>
           <P>
             Turn on <strong>Settings → Monitoring → Inbound webhooks</strong>,
@@ -738,14 +751,16 @@ export default async function HelpPage() {
             like.
           </P>
           <P>
-            <strong>Email report</strong> chooses what an email channel
-            shows: the poster, the facts table and the synopsis can each be
-            switched off, and a <strong>Subject prefix</strong> goes in front
-            of every subject for a mail rule to file on. The{" "}
+            <strong>Email and Apprise report</strong> chooses what an email
+            or Apprise channel shows: the poster, the facts table and the
+            synopsis can each be switched off, and a{" "}
+            <strong>Subject prefix</strong> goes in front of every subject
+            and Apprise title for a mail rule to file on. The{" "}
             <strong>Preview</strong> at the foot of the card renders a sample event —
             a season import, a movie grab, a request, a health warning — as
-            the email and as the one-liner the push channels get, in light
-            and dark mode, changing as you type. <strong>Send sample</strong>{" "}
+            the email, as the Markdown an Apprise channel gets (once you have
+            one) and as the one-liner the other channels get, in light and
+            dark mode, changing as you type. <strong>Send sample</strong>{" "}
             delivers that event through a channel for real, with the options
             as saved.
           </P>
