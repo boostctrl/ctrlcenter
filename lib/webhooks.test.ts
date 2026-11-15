@@ -151,6 +151,38 @@ describe("parseArrWebhook (Sonarr/Radarr)", () => {
     expect(fact(weekly?.report, "Episodes")?.value).toBe('S04E03 "Scrap"\nS04E04 "Replicants"');
   });
 
+  it("titles a daily series' event by air date too, and its subtitle (#452)", () => {
+    const show = { id: 3, title: "The Daily Show", type: "daily" };
+    const day = (d: number, airDate = `2026-10-0${d}`) => ({
+      id: 300 + d,
+      seasonNumber: 2026,
+      episodeNumber: 270 + d,
+      title: `Day ${d}`,
+      airDate,
+    });
+    const one = parseArrWebhook("sonarr", { eventType: "Download", series: show, episodes: [day(1)], episodeFile: {} });
+    expect(one?.title).toBe("Sonarr imported: The Daily Show 2026-10-01");
+    expect(one?.report?.summary).toBe("The Daily Show 2026-10-01");
+    expect(one?.report?.subtitle).toBe("Aired Oct 1, 2026");
+    // Out of order, a range; the subtitle counts them.
+    const two = parseArrWebhook("sonarr", { eventType: "Grab", series: show, episodes: [day(3), day(1)] });
+    expect(two?.title).toBe("Sonarr grabbed: The Daily Show 2026-10-01 - 2026-10-03");
+    expect(two?.report?.subtitle).toBe("2 episodes · Aired Oct 1, 2026 – Oct 3, 2026");
+    // A season pack of them names its dates where a series' names its season.
+    const file = { quality: "WEBDL-1080p", size: 1024 ** 3 };
+    const pack = parseArrWebhook("sonarr", {
+      eventType: "Download",
+      series: show,
+      episodes: [day(1), day(2)],
+      episodeFiles: [file, file],
+    });
+    expect(pack?.title).toBe("Sonarr imported: The Daily Show 2026-10-01 - 2026-10-02 (2 episodes)");
+    // One with no date yet keeps them all on their codes.
+    const tba = parseArrWebhook("sonarr", { eventType: "Grab", series: show, episodes: [day(1), day(2, "TBA")] });
+    expect(tba?.title).toBe("Sonarr grabbed: The Daily Show S2026E271-E272");
+    expect(tba?.report?.subtitle).toBe("Season 2026 · Episodes 271–272");
+  });
+
   it("folds a season pack's episodeFiles[] into counts and a summed size", () => {
     const file = { quality: "Bluray-1080p", size: 1024 ** 3 };
     const n = parseArrWebhook("sonarr", {
@@ -186,6 +218,9 @@ describe("parseArrWebhook (Sonarr/Radarr)", () => {
     // each item marked, so a burst of nothing but upgrades still says so.
     expect(upgraded?.digest).toMatchObject({ event: "Imported" });
     expect(upgraded?.digest?.items.every((it) => it.upgrade)).toBe(true);
+    // What it replaced, as a single episode's report says (#452).
+    expect(fact(upgraded?.report, "Replaced")?.value).toBe("WEBDL-1080p");
+    expect(upgraded?.report?.chips).toContain("was WEBDL-1080p");
     expect(pack({ isUpgrade: false })?.title).toBe("Sonarr imported: The Bear S04 (3 episodes)");
     expect(pack({})?.report?.event).toBe("Imported");
   });
@@ -1035,15 +1070,23 @@ describe("digest membership (#346)", () => {
     expect(imported(3, { isUpgrade: true }).digest).toMatchObject({ folds: "sonarr|Sonarr|EpisodeFileDelete|1" });
     expect(grabbed(1).digest).not.toHaveProperty("folds");
     expect(grabbed(1).digest).not.toHaveProperty("foldInto");
-    // A Radarr upgrade's delete is still its own event.
-    const movie = parseArrWebhook("radarr", {
-      eventType: "MovieFileDelete",
-      movie: { id: 7, title: "Flow", year: 2024 },
-      movieFile: { relativePath: "Flow (2024).mkv" },
-      deleteReason: "Upgrade",
+    // Radarr's are paired the same way, by movie (#452).
+    const movieDeleted = (deleteReason: string) =>
+      parseArrWebhook("radarr", {
+        eventType: "MovieFileDelete",
+        movie: { id: 7, title: "Flow", year: 2024 },
+        movieFile: { relativePath: "Flow (2024).mkv" },
+        deleteReason,
+      })?.digest;
+    expect(movieDeleted("Upgrade")).toMatchObject({
+      key: "radarr||MovieFileDelete",
+      foldInto: "radarr||Download",
+      items: [{ id: "movie:7", upgrade: true }],
     });
-    expect(movie?.digest).not.toHaveProperty("foldInto");
-    expect(movieImported(7).digest).not.toHaveProperty("folds");
+    expect(movieDeleted("Manual")).not.toHaveProperty("foldInto");
+    expect(movieDeleted("Manual")?.items[0]).not.toHaveProperty("upgrade");
+    expect(movieImported(7).digest).toMatchObject({ key: "radarr||Download", folds: "radarr||MovieFileDelete" });
+    expect(movieImported(7).digest?.items[0].id).toBe("movie:7");
   });
 
   it("keeps every key segment free of control characters and short, whatever the sender sends", () => {

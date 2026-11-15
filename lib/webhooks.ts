@@ -489,6 +489,9 @@ type Media = {
   subtitle?: string;
   image?: WebhookReport["image"];
   episodes: Episode[];
+  // A daily series' episodes by air date, "2026-10-01 - 2026-10-03", when
+  // every one has a date (see arrMedia).
+  aired?: string;
 };
 
 // The series or movie an arr event is about, in the words every event shares.
@@ -518,21 +521,40 @@ function arrMedia(service: ArrService, p: Record<string, unknown>): Media {
   const genres = strs(series.genres).slice(0, 3);
   const type = SERIES_TYPES[str(series.type).toLowerCase()] ?? "Series";
   const episodes = episodesOf(p);
-  const codes = episodeCodes(episodes);
+  // A daily series' episodes go by their air dates, not the codes Sonarr
+  // makes of the year and a running number (S2026E271), as their lines and
+  // the digest already do (#351): in the title and summary (ASCII, see
+  // episodeCodes) and the subtitle. One with no date yet keeps them all on
+  // their codes (#452).
+  const days = episodes.map((e) => (e.daily ? isoDate(e.airDate) : "")).sort();
+  const aired = episodes.length && days.every(Boolean) ? dateRange(days, "-") : "";
+  const codes = aired || episodeCodes(episodes);
   return {
     title,
     year,
     genres,
     type,
     summary: codes ? [title, codes].filter(Boolean).join(" ") : title && year ? `${title} (${year})` : title,
-    subtitle: episodes.length
-      ? episodeSubtitle(episodes)
-      : title
-        ? [year ? String(year) : "", type, genres.join(", ")].filter(Boolean).join(" · ")
-        : undefined,
+    subtitle: aired
+      ? dailySubtitle(episodes.length, unique(days))
+      : episodes.length
+        ? episodeSubtitle(episodes)
+        : title
+          ? [year ? String(year) : "", type, genres.join(", ")].filter(Boolean).join(" · ")
+          : undefined,
     image: arrImage(series.images, title),
     episodes,
+    ...(aired ? { aired } : {}),
   };
+}
+
+// "Aired Oct 1, 2026", or "3 episodes · Aired Oct 1, 2026 – Oct 3, 2026":
+// a daily series' subtitle, from its episodes' sorted air dates (#452).
+function dailySubtitle(count: number, days: string[]): string {
+  const first = fmtDate(days[0]);
+  const last = fmtDate(days[days.length - 1]);
+  const when = first === last ? first : `${first} – ${last}`;
+  return [count > 1 ? `${count} episodes` : "", `Aired ${when}`].filter(Boolean).join(" · ");
 }
 
 // "WEBDL-1080p · Proper" — a repack/proper bumps the quality's version.
@@ -628,8 +650,9 @@ export function keyForLog(key: string): string {
 // The Daily Show (2026-10-01 - 2026-10-07)"; anything else groups by
 // instance and event alone — Radarr's payload names no collection — with
 // the series or movie as the item. An event with no subject joins nothing.
-// A series' import names the delete burst it folds, and the delete of a
-// file an upgrade replaced the import burst it folds into (#351).
+// A series' or movie's import names the delete burst it folds, and the
+// delete of a file an upgrade replaced the import burst it folds into
+// (#351, #452).
 function arrDigest(
   service: ArrService,
   p: Record<string, unknown>,
@@ -674,18 +697,25 @@ function arrDigest(
   }
   const movie = service === "radarr";
   const subject = asRecord(movie ? p.movie : p.series);
+  const keyOf = (eventType: string) => `${service}|${instanceKey(r)}|${keyPart(eventType)}`;
+  // Radarr pairs an upgrade's delete with its import as Sonarr does: the
+  // movie is the item on both sides (#452).
+  const upgradeDelete = movie && r.eventType === "MovieFileDelete" && str(p.deleteReason).toLowerCase() === "upgrade";
   return digestOf({
-    key: `${service}|${instanceKey(r)}|${keyPart(r.eventType)}`,
+    key: keyOf(r.eventType),
     sender: `${service}|${instanceKey(r)}`,
     lead: digestLead(r.app, r.event, movie ? "movies" : "series"),
     headline: r.app,
     event: r.event,
     noun: movie ? "movies" : "series",
+    ...(movie && r.eventType === "Download" ? { folds: keyOf("MovieFileDelete") } : {}),
+    ...(upgradeDelete ? { foldInto: keyOf("Download") } : {}),
     items: [
       {
         id: `${movie ? "movie" : "series"}:${num(subject.id) ?? keyPart(media.title)}`,
         label: media.summary,
         ...file,
+        ...(upgradeDelete ? { upgrade: true } : {}),
         ...shared,
       },
     ],
@@ -779,13 +809,16 @@ export function parseArrWebhook(
         const bytes = files.reduce((sum, f) => sum + (num(f.size) ?? 0), 0);
         const size = fmtBytes(bytes);
         const indexer = str(release.indexer);
+        // What an upgraded pack replaced, as a single file's report says (#452).
+        const replaced = unique(list(p.deletedFiles).map((f) => str(asRecord(f).quality))).join(", ");
         const seasons = unique(media.episodes.map((e) => String(e.season)));
         const n = media.episodes.length || count;
-        const code = seasons.length === 1 ? ` S${pad2(Number(seasons[0]))}` : "";
+        const code = media.aired ? ` ${media.aired}` : seasons.length === 1 ? ` S${pad2(Number(seasons[0]))}` : "";
         push(facts, "Episodes", episodeLines(media.episodes));
         push(facts, "Files", String(count));
         push(facts, "Quality", quality);
         push(facts, "Size", size);
+        push(facts, "Replaced", replaced);
         push(facts, "Indexer", indexer);
         push(facts, "Download client", clientOf(p));
         push(facts, "Release", str(release.releaseTitle), { mono: true });
@@ -796,7 +829,7 @@ export function parseArrWebhook(
             ...base,
             event: upgrade ? "Upgraded" : "Imported",
             summary: `${media.title || "Untitled"}${code} (${n} episodes)`,
-            chips: [quality, size, `${count} files`, indexer].filter(Boolean),
+            chips: [quality, size, `${count} files`, indexer, replaced ? `was ${replaced}` : ""].filter(Boolean),
             facts,
           },
           arrDigest(service, p, base, media, {

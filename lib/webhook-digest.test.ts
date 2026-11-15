@@ -52,6 +52,21 @@ const grabbed = (ep: number) =>
   })!;
 const movie = (id: number) =>
   parseArrWebhook("radarr", { eventType: "Grab", movie: { id, title: `Movie ${id}`, year: 2026 }, release: {} })!;
+// A Radarr upgrade: the import, and the delete of the file it replaced.
+const movieUpgraded = (id: number) =>
+  parseArrWebhook("radarr", {
+    eventType: "Download",
+    movie: { id, title: `Movie ${id}`, year: 2026 },
+    movieFile: { quality: "Bluray-2160p" },
+    isUpgrade: true,
+    deletedFiles: [{ quality: "Bluray-1080p" }],
+  })!;
+const movieDeleted = (id: number) =>
+  parseArrWebhook("radarr", {
+    eventType: "MovieFileDelete",
+    movie: { id, title: `Movie ${id}`, year: 2026 },
+    deleteReason: "Upgrade",
+  })!;
 
 beforeEach(() => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), "ctrl-digest-"));
@@ -415,6 +430,18 @@ describe("holdForDigest folds an upgrade's delete into its import (#351)", () =>
     expect(send).toHaveBeenCalledTimes(1);
     // The import alone was one event about one item: it goes out unchanged.
     expect(send.mock.calls[0][0]).toBe(only);
+  });
+
+  it("folds a Radarr upgrade's delete into its import the same way (#452)", async () => {
+    const send = sent();
+    for (const id of [1, 2]) {
+      expect(holdForDigest(movieDeleted(id), { windowMs: MIN, send })).toBe(true);
+      expect(holdForDigest(movieUpgraded(id), { windowMs: MIN, send })).toBe(true);
+    }
+    expect(pendingWebhookDigests()).toEqual([{ key: "radarr||Download", count: 2 }]);
+    await vi.advanceTimersByTimeAsync(MIN);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0][0]).toMatchObject({ title: "Radarr upgraded 2 movies" });
   });
 
   it("relays a delete whose import never comes, and a manual one beside an import, on their own", async () => {

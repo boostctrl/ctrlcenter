@@ -18,9 +18,10 @@
 // channels or config, and the tests run it on fake timers and a scratch
 // directory.
 //
-// An upgrade's delete folds into its import (#351): Sonarr deletes the file
-// an upgrade replaces and posts that (EpisodeFileDelete, reason Upgrade)
-// beside the import, which already says what it replaced. The parser pairs
+// An upgrade's delete folds into its import (#351): Sonarr and Radarr
+// delete the file an upgrade replaces and post that (EpisodeFileDelete or
+// MovieFileDelete, reason Upgrade, #452) beside the import, which already
+// says what it replaced. The parser pairs
 // the two by key (`digest.foldInto` on the delete, `digest.folds` on the
 // import); here a delete whose import is already pending is dropped, and an
 // import's arrival takes the deletes it covers out of their burst, so a

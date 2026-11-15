@@ -60,6 +60,14 @@ here.
   integration's page shows, and that actions need two-factor sign-in.
   (#518)
 
+- **Inbound webhook notifications tie up three loose ends.** A Radarr
+  upgrade arrives as one notification, as a Sonarr one does, instead of an
+  "Upgraded" beside a "Deleted" for the file it replaced. A daily show's
+  notification is titled by air date ("The Daily Show 2026-10-01") rather
+  than Sonarr's year-and-number code (S2026E271), as its episode list
+  already was. An upgraded season pack says what it replaced, as a single
+  episode does. (#452)
+
 ### Fixed
 
 - **The AdGuard Home tile reads a million queries as 1.0M.** 3.1.2 fixed
