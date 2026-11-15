@@ -90,18 +90,19 @@ export default function WebhookPreview({
   );
   // What an Apprise channel gets, shown only once there is one: the
   // Markdown as sent, which each service behind it renders its own way.
+  // With the TMDB link (#536) when any Apprise channel adds it.
   const hasApprise = alerts.channels.some((ch) => ch.type === "apprise");
+  const tmdbLink = alerts.channels.some((ch) => ch.type === "apprise" && ch.tmdbLink);
   const apprise = useMemo(
     () =>
       hasApprise
-        ? appriseNotification(notification, {
-            at: SAMPLE_AT,
-            timeZone,
-            siteTitle,
-            options: { poster, facts, synopsis, subjectPrefix },
-          })
+        ? appriseNotification(
+            notification,
+            { at: SAMPLE_AT, timeZone, siteTitle, options: { poster, facts, synopsis, subjectPrefix } },
+            { tmdbLink }
+          )
         : null,
-    [hasApprise, notification, timeZone, siteTitle, poster, facts, synopsis, subjectPrefix]
+    [hasApprise, tmdbLink, notification, timeZone, siteTitle, poster, facts, synopsis, subjectPrefix]
   );
   // Dark is forced through Outlook.com's [data-ogsc] hook the template
   // already styles for, so the frame shows the dark rules whatever the

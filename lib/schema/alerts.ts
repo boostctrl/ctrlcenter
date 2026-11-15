@@ -73,6 +73,11 @@ export const alertChannelSchema = z.object({
   chatId: secret(),
   // Pushover user (or group) key.
   userKey: credential(),
+  // Apprise: end a relayed event with the title's TMDB page as a plain link
+  // (#536), whose link preview shows the poster where no image can go
+  // (Nextcloud Talk). Off by default: the server's other destinations would
+  // preview it too.
+  tmdbLink: z.boolean().catch(false).default(false),
   smtp: smtpSchema.default(smtpSchema.parse({})),
 });
 export type AlertChannel = z.infer<typeof alertChannelSchema>;

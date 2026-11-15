@@ -705,6 +705,19 @@ export default async function HelpPage() {
             channel gets a one-line summary.
           </P>
           <P>
+            Nextcloud Talk can still show the poster as a link preview.
+            Turn on the Apprise channel&apos;s{" "}
+            <strong>TMDB link for a poster preview</strong> and each relayed
+            movie or series ends with its TMDB page as a plain link; Talk
+            previews the first plain link in a message as a card with the
+            poster, the title and TMDB&apos;s overview. Your Nextcloud server
+            fetches the preview, so it needs to reach themoviedb.org. The
+            link is left out while the report&apos;s Poster or Synopsis
+            switch is off, and the switch is off by default: the link goes
+            to every service behind the Apprise URL, and Discord and Slack
+            preview it too.
+          </P>
+          <P>
             Apprise passes Markdown to ntfy and Gotify as plain text unless
             their URL asks for it: add <code>?format=markdown</code> to it in
             Apprise. On a Discord URL the same switch turns the message into

@@ -155,6 +155,61 @@ describe("buildNotificationMarkdown (#532)", () => {
   });
 });
 
+describe("the TMDB link (#536)", () => {
+  const page = "https://www.themoviedb.org/movie/329865";
+  const linked = report({ page });
+  const on = { tmdbLink: true };
+
+  it("follows the link as a plain URL in a block of its own, when the channel asks", () => {
+    expect(buildNotificationMarkdown(linked, ctx, on)).toContain(
+      `[Open in Radarr](https://radarr.lan/movie/arrival)\n\n${page}\n\nCtrlCenter · Lab`
+    );
+    expect(buildNotificationMarkdown(linked, ctx)).toBe(buildNotificationMarkdown(report(), ctx));
+    expect(appriseNotification(linked, ctx, on).body).toContain(`\n\n${page}\n\n`);
+  });
+
+  it("follows the Poster and Synopsis switches, as the preview shows both", () => {
+    for (const options of [{ poster: false }, { synopsis: false }]) {
+      expect(buildNotificationMarkdown(linked, { ...ctx, options }, on)).not.toContain("themoviedb");
+    }
+  });
+
+  it("links nothing but a TMDB page, and nothing without one", () => {
+    const other = report({ page: "https://evil.test/movie/1" });
+    expect(buildNotificationMarkdown(other, ctx, on)).not.toContain("evil.test");
+    expect(buildNotificationMarkdown(report(), ctx, on)).toBe(buildNotificationMarkdown(report(), ctx));
+  });
+
+  it("stands in for Seerr's TMDB fact rather than list the page twice", () => {
+    const n = sampleNotification("seerr-request", { posterUrl: "https://img.test/p.jpg" });
+    expect(buildNotificationMarkdown(n, ctx)).toContain("**TMDB:** [themoviedb.org/movie/402431]");
+    const md = buildNotificationMarkdown(n, ctx, on);
+    expect(md).not.toContain("**TMDB:**");
+    expect(md.match(/themoviedb\.org/g)).toHaveLength(1);
+    expect(md).toContain("\n\nhttps://www.themoviedb.org/movie/402431\n\n");
+  });
+
+  it("links the title whose poster a burst shows, within the cap", () => {
+    const opts = { digest: true, scope: "all", posterUrl: "https://img.test/p.jpg" } as const;
+    const pageOf = (id: Parameters<typeof sampleNotification>[0]) => {
+      const md = buildNotificationMarkdown(sampleNotification(id, opts), ctx, on);
+      expect(size(md)).toBeLessThanOrEqual(MARKDOWN_MAX);
+      return /\n\n(https:\/\/www\.themoviedb\.org\/\S+)\n\n/.exec(md)?.[1];
+    };
+    expect(pageOf("sonarr-import")).toBe("https://www.themoviedb.org/tv/136315");
+    expect(pageOf("radarr-grab")).toBe("https://www.themoviedb.org/movie/1170608");
+    expect(pageOf("busy-minute")).toMatch(/^https:\/\/www\.themoviedb\.org\//);
+    // A health message has no title, so no page.
+    expect(pageOf("sonarr-health")).toBeUndefined();
+  });
+
+  it("goes with a sample sent for real, which has no poster to attach", () => {
+    const sent = appriseNotification(sampleNotification("radarr-grab"), ctx, on);
+    expect(sent).not.toHaveProperty("attach");
+    expect(sent.body).toContain("\n\nhttps://www.themoviedb.org/movie/1170608\n\n");
+  });
+});
+
 describe("appriseNotification (#532)", () => {
   it("titles it with the email's subject, types it by level, and attaches the https poster", () => {
     expect(appriseNotification(report(), { ...ctx, options: { subjectPrefix: "[Lab]" } })).toMatchObject({

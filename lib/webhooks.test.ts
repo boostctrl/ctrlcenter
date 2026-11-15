@@ -376,6 +376,26 @@ describe("parseArrWebhook (Sonarr/Radarr)", () => {
       .toBeUndefined();
   });
 
+  it("carries the title's TMDB page, for a link preview (#536)", () => {
+    const images = [{ coverType: "poster", remoteUrl: "https://image.tmdb.org/t/p/original/p.jpg" }];
+    const radarr = (p: Record<string, unknown>) =>
+      parseArrWebhook("radarr", { eventType: "Grab", movie: { title: "Arrival", images }, ...p })?.report?.page;
+    const sonarr = (series: Record<string, unknown>) =>
+      parseArrWebhook("sonarr", { eventType: "Grab", series: { title: "Silo", images, ...series } })?.report?.page;
+    expect(radarr({ movie: { title: "Arrival", images, tmdbId: 329865 } })).toBe("https://www.themoviedb.org/movie/329865");
+    // A grab's remoteMovie stands in for a movie without the id.
+    expect(radarr({ remoteMovie: { tmdbId: 329865 } })).toBe("https://www.themoviedb.org/movie/329865");
+    expect(sonarr({ tmdbId: 125988 })).toBe("https://www.themoviedb.org/tv/125988");
+    // Even without artwork: the page has its own.
+    expect(sonarr({ tmdbId: 125988, images: [] })).toBe("https://www.themoviedb.org/tv/125988");
+    // Sonarr's 0 for a series TMDB doesn't know, or no id at all: no page.
+    expect(sonarr({ tmdbId: 0 })).toBeUndefined();
+    expect(radarr({})).toBeUndefined();
+    // An event about no title has none.
+    expect(parseArrWebhook("sonarr", { eventType: "Health", level: "warning", message: "x", series: { tmdbId: 1 } })?.report?.page)
+      .toBeUndefined();
+  });
+
   it("uses a short instanceName as the app and keeps a long one for the footer", () => {
     const short = parseArrWebhook("sonarr", { eventType: "Test", instanceName: "Sonarr 4K" });
     expect(short?.report).toMatchObject({ app: "Sonarr 4K", instance: "Sonarr 4K" });
@@ -437,6 +457,8 @@ describe("parseSeerrWebhook", () => {
       messageLabel: "Overview",
       image: { url: "https://image.tmdb.org/t/p/w600_and_h900_bestv2/wicked.jpg", alt: "Wicked (2024) poster" },
     });
+    // The page the TMDB fact links, for a link preview (#536).
+    expect(n?.report?.page).toBe("https://www.themoviedb.org/movie/402431");
     expect(n?.report?.link).toBeUndefined();
     expect(labels(n?.report)).toEqual(["Requested by", "Type", "Status", "TMDB"]);
     expect(fact(n?.report, "TMDB")).toEqual({
@@ -975,7 +997,7 @@ describe("digest membership (#346)", () => {
       headline: "Seerr",
       noun: "requests",
     });
-    expect(pending.digest?.items).toEqual([{ id: "req:128", label: "Wicked (2024) by Sam", requester: "Sam", image: undefined }]);
+    expect(pending.digest?.items).toEqual([{ id: "req:128", label: "Wicked (2024) by Sam", requester: "Sam", image: undefined, page: "https://www.themoviedb.org/movie/128" }]);
     const available = parseSeerrWebhook({ notification_type: "MEDIA_AVAILABLE", subject: "Flow", request: { requestedBy_username: "Sam" } });
     expect(available?.digest).toMatchObject({ lead: "Seerr: {n} requests now available" });
     expect(available?.digest?.items[0]).toMatchObject({ id: "req:Flow", label: "Flow" });

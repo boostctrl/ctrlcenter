@@ -244,10 +244,21 @@ function ChannelFields({
         </>
       );
     case "apprise":
-      return url(
-        "Apprise API URL",
-        "http://apprise:8000/notify/ctrlcenter",
-        "The notify endpoint of an Apprise API server, which forwards to the services set up there."
+      return (
+        <>
+          {url(
+            "Apprise API URL",
+            "http://apprise:8000/notify/ctrlcenter",
+            "The notify endpoint of an Apprise API server, which forwards to the services set up there."
+          )}
+          {/* The poster by way of a link preview (#536). */}
+          <ToggleRow
+            label="TMDB link for a poster preview"
+            hint="Ends relayed events with the title's TMDB page. Nextcloud Talk takes no image, but its preview of this link shows the poster. Discord and Slack preview it too."
+            checked={ch.tmdbLink}
+            onChange={(tmdbLink) => onChange({ tmdbLink })}
+          />
+        </>
       );
     case "email":
       return (

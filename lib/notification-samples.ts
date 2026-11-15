@@ -64,6 +64,7 @@ function sonarrImport(n: number): unknown {
       id: 12,
       title: "The Bear",
       year: 2022,
+      tmdbId: 136315,
       type: "standard",
       genres: ["Comedy", "Drama"],
       images: [{ coverType: "poster", url: "/MediaCover/12/poster.jpg", remoteUrl: POSTER_STAND_IN }],
@@ -111,6 +112,7 @@ const RADARR_GRAB = {
     id: 86,
     title: "Dune: Part Three",
     year: 2026,
+    tmdbId: 1170608,
     overview:
       "The third chapter of the saga. Paul Atreides, now Emperor, reckons with the holy war waged in his name as the Fremen armies spread across the known worlds, while Chani and the last of the Atreides loyalists search for a path that avoids the future he has seen.",
     genres: ["Science Fiction", "Adventure"],

@@ -524,7 +524,9 @@ function requestFor(ch: AlertChannel, out: Outgoing): AlertRequest {
     case "apprise":
       return buildAppriseRequest(
         ch.url,
-        out.kind === "alert" ? appriseAlert(out.event, out.app) : appriseNotification(out.content, out.ctx)
+        out.kind === "alert"
+          ? appriseAlert(out.event, out.app)
+          : appriseNotification(out.content, out.ctx, { tmdbLink: ch.tmdbLink })
       );
     case "telegram":
     case "gotify":

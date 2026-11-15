@@ -50,6 +50,12 @@ export const APPRISE_TYPE: Record<NotificationLevel, AppriseType> = {
   error: "failure",
 };
 
+// Per channel, beside the report options every channel shares.
+export type MarkdownOptions = {
+  // The title's TMDB page as a plain link (#536).
+  tmdbLink?: boolean;
+};
+
 export type AppriseMessage = {
   title: string;
   body: string;
@@ -149,6 +155,10 @@ const block = (lines: string[]) => lines.join("  \n");
 
 const size = (s: string) => Array.from(s).length;
 
+// What a TMDB page the parsers build looks like: nothing else goes out as a
+// bare link, unescaped.
+const TMDB_PAGE = /^https:\/\/www\.themoviedb\.org\/(movie|tv)\/[1-9]\d*$/;
+
 // The synopsis under its label, a quote line per line of it.
 function quote(label: string, text: string): string {
   const lines = text.split("\n").map((l) => l.trim());
@@ -161,19 +171,31 @@ function quote(label: string, text: string): string {
 // it. Past MARKDOWN_MAX the synopsis gives way first, shortened and then
 // dropped, then the facts a line at a time from the end, so nothing is cut
 // through the middle of a link or a code span.
-export function buildNotificationMarkdown(c: WebhookNotification, ctx: NotificationContext): string {
+//
+// With `tmdbLink`, the title's TMDB page follows the link as a plain URL
+// (#536): Nextcloud Talk takes no image, but it previews the first plain
+// link in a message — a Markdown link is none — with the page's poster,
+// title and overview, so the line follows the Poster and Synopsis switches.
+// A fact linking the same page (Seerr's) gives way to it.
+export function buildNotificationMarkdown(
+  c: WebhookNotification,
+  ctx: NotificationContext,
+  m: MarkdownOptions = {}
+): string {
   const r = sheetOf(c);
   const o: ReportOptions = ctx.options ?? {};
   const when = whenOf(ctx);
+  const page =
+    m.tmdbLink && o.poster !== false && o.synopsis !== false && TMDB_PAGE.test(r.page ?? "") ? r.page : undefined;
 
   const head = block([`**${escapeMarkdown(r.headline)}**`, ...(r.subtitle ? [escapeMarkdown(r.subtitle)] : [])]);
   const link = r.link?.url ? markdownLink(r.link.label, r.link.url) : "";
   const relay = c.report ? ` · relayed from ${relayOf(c.report)}` : "";
   const footer = escapeMarkdown(`CtrlCenter · ${ctx.siteTitle}${relay} · ${when.local}`);
   const assemble = (facts: string[], message: string) =>
-    [head, block(facts), message, link, footer].filter(Boolean).join("\n\n");
+    [head, block(facts), message, link, page, footer].filter(Boolean).join("\n\n");
 
-  let facts = o.facts === false ? [] : r.facts.flatMap(factLines);
+  let facts = o.facts === false ? [] : r.facts.filter((f) => !page || f.href !== page).flatMap(factLines);
   const label = r.messageLabel ?? "Message";
   let text = !spoiler(r, o) && r.message ? clamp(r.message, MESSAGE_MAX) : "";
   const body = () => assemble(facts, text ? quote(label, text) : "");
@@ -195,13 +217,17 @@ export function buildNotificationMarkdown(c: WebhookNotification, ctx: Notificat
 // What an Apprise channel sends for a relayed notification: the email's
 // subject line as the title, the Markdown body, the level as Apprise's
 // type, and the poster when the email would show one.
-export function appriseNotification(c: WebhookNotification, ctx: NotificationContext): AppriseMessage {
+export function appriseNotification(
+  c: WebhookNotification,
+  ctx: NotificationContext,
+  m: MarkdownOptions = {}
+): AppriseMessage {
   const r = sheetOf(c);
   const o: ReportOptions = ctx.options ?? {};
   const poster = o.poster !== false && r.image?.url && /^https:\/\//i.test(r.image.url) ? r.image.url : undefined;
   return {
     title: quietMentions(buildSubject(c, o.subjectPrefix)),
-    body: buildNotificationMarkdown(c, ctx),
+    body: buildNotificationMarkdown(c, ctx, m),
     type: APPRISE_TYPE[r.level],
     ...(poster ? { attach: poster } : {}),
   };

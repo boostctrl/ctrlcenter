@@ -12,6 +12,18 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **The poster in Nextcloud Talk, by way of a link preview.** Talk can't
+  take an image from Apprise, but it previews the first plain link in a
+  message. Turn on an Apprise channel's new **TMDB link for a poster
+  preview** switch, and each relayed Sonarr, Radarr or Seerr event ends
+  with the title's TMDB page; Talk shows it as a card with the poster. The
+  card also shows TMDB's overview, so the link is left out while the Poster
+  or Synopsis switch is off. It's off by default because the link reaches
+  every service behind the Apprise URL, and Discord and Slack preview it
+  too. (#536)
+
 ### Changed
 
 - **Apprise gets the whole report, not a one-liner.** A Sonarr, Radarr or
@@ -23,7 +35,8 @@ here.
 
   Apprise renders it for each service behind it: bold text and links on
   Discord, Slack, Telegram and Nextcloud Talk, an HTML mail, Pushover with
-  the poster. Nextcloud Talk gets no poster: Apprise can't send it files. The
+  the poster. Nextcloud Talk can't take the poster from Apprise; the new
+  TMDB link (under Added) shows it in a link preview instead. The
   event's level sets Apprise's type, so a service that colours by it shows
   a failure red and an import green. The Email report switches (now Email and Apprise report)
   and the subject prefix apply to it as well, and the preview shows the

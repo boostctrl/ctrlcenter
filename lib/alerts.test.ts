@@ -968,7 +968,12 @@ describe("Apprise (#532)", () => {
     const grab = parseArrWebhook("radarr", {
       eventType: "Grab",
       instanceName: "Radarr",
-      movie: { title: "Arrival", year: 2016, images: [{ coverType: "poster", remoteUrl: "https://image.tmdb.org/t/p/original/arrival.jpg" }] },
+      movie: {
+        title: "Arrival",
+        year: 2016,
+        tmdbId: 329865,
+        images: [{ coverType: "poster", remoteUrl: "https://image.tmdb.org/t/p/original/arrival.jpg" }],
+      },
       release: { quality: "Bluray-1080p", size: 1024 ** 3 * 9, releaseTitle: "Arrival.2016.1080p.BluRay-GRP" },
     });
     const sent = (fetchMock: ReturnType<typeof vi.fn>) =>
@@ -1003,6 +1008,21 @@ describe("Apprise (#532)", () => {
       vi.stubGlobal("fetch", partial);
       await sendNotification(config, grab!);
       expect(partial).toHaveBeenCalledTimes(1);
+    });
+
+    it("ends the report with the TMDB page on a channel that asks for it (#536)", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+      vi.stubGlobal("fetch", fetchMock);
+      const linked = alertsSchema.parse({
+        channels: [channel({ id: "ap", type: "apprise", url: "http://apprise.test/notify/cc", tmdbLink: true })],
+      });
+      await sendNotification(linked, grab!, { at: 0, timeZone: "UTC", siteTitle: "Lab" });
+      await sendNotification(config, grab!, { at: 0, timeZone: "UTC", siteTitle: "Lab" });
+      const [on, off] = sent(fetchMock).map((b) => b.body as string);
+      expect(on).toContain("\n\nhttps://www.themoviedb.org/movie/329865\n\nCtrlCenter · Lab");
+      expect(off).not.toContain("themoviedb");
+      // Off unless asked for.
+      expect(config.channels[0].tmdbLink).toBe(false);
     });
 
     it("leaves the poster off when the email report does", async () => {

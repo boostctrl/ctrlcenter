@@ -58,6 +58,10 @@ export type WebhookReport = {
   message?: string;
   // https only — a plain-http poster would be blocked or mixed-content.
   image?: { url: string; alt: string };
+  // The title's TMDB page, whose link preview shows its poster where no
+  // image can go (Nextcloud Talk, #536). A burst keeps the one of the title
+  // whose poster it shows.
+  page?: string;
   // The one button; a non-http(s) URL renders as text.
   link?: { label: string; url: string };
   // The hidden inbox preview; the renderer derives summary + chips when absent.
@@ -84,6 +88,7 @@ export type DigestItem = {
   client?: string;
   requester?: string;
   image?: WebhookReport["image"];
+  page?: string;
   link?: WebhookReport["link"];
 };
 
@@ -229,6 +234,12 @@ const idOf = (v: unknown): string => {
   return /^\d+$/.test(s) ? s : "";
 };
 const pad2 = (n: number) => String(n).padStart(2, "0");
+// A title's TMDB page from its id (#536): Sonarr sends 0 for a series TMDB
+// doesn't know.
+const tmdbPage = (kind: "movie" | "tv", v: unknown): string | undefined => {
+  const id = idOf(v);
+  return /^[1-9]/.test(id) ? `https://www.themoviedb.org/${kind}/${id}` : undefined;
+};
 const lowerFirst = (s: string) => (s ? s[0].toLowerCase() + s.slice(1) : s);
 const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
@@ -488,6 +499,7 @@ type Media = {
   summary: string;
   subtitle?: string;
   image?: WebhookReport["image"];
+  page?: string;
   episodes: Episode[];
   // A daily series' episodes by air date, "2026-10-01 - 2026-10-03", when
   // every one has a date (see arrMedia).
@@ -512,6 +524,7 @@ function arrMedia(service: ArrService, p: Record<string, unknown>): Media {
         ? [year ? String(year) : "", "Movie", genres.join(", ")].filter(Boolean).join(" · ")
         : undefined,
       image: arrImage(movie.images, title),
+      page: tmdbPage("movie", movie.tmdbId) ?? tmdbPage("movie", remote.tmdbId),
       episodes: [],
     };
   }
@@ -543,6 +556,7 @@ function arrMedia(service: ArrService, p: Record<string, unknown>): Media {
           ? [year ? String(year) : "", type, genres.join(", ")].filter(Boolean).join(" · ")
           : undefined,
     image: arrImage(series.images, title),
+    page: tmdbPage("tv", series.tmdbId),
     episodes,
     ...(aired ? { aired } : {}),
   };
@@ -656,12 +670,12 @@ export function keyForLog(key: string): string {
 function arrDigest(
   service: ArrService,
   p: Record<string, unknown>,
-  r: Pick<WebhookReport, "app" | "instance" | "eventType" | "event" | "image" | "link">,
+  r: Pick<WebhookReport, "app" | "instance" | "eventType" | "event" | "image" | "page" | "link">,
   media: Media,
   file: Pick<DigestItem, "quality" | "sizeBytes" | "indexer" | "client" | "upgrade">
 ): WebhookDigest | undefined {
   if (!media.title) return undefined;
-  const shared = { image: r.image, link: r.link };
+  const shared = { image: r.image, page: r.page, link: r.link };
   if (service === "sonarr" && media.episodes.length) {
     const series = asRecord(p.series);
     const sid = num(series.id) ?? num(series.tvdbId) ?? media.title;
@@ -747,6 +761,7 @@ export function parseArrWebhook(
     subtitle: media.subtitle,
     summary: media.summary || "Untitled",
     image: media.image,
+    page: media.page,
     link: url ? { label: `Open in ${app}`, url } : undefined,
   };
   const facts: ReportFact[] = [];
@@ -761,6 +776,7 @@ export function parseArrWebhook(
         subtitle: undefined,
         summary: "Webhook connected",
         image: undefined,
+        page: undefined,
         facts,
         message: TEST_MESSAGE,
         messageLabel: "Message",
@@ -940,6 +956,7 @@ export function parseArrWebhook(
         subtitle: undefined,
         summary: headline,
         image: undefined,
+        page: undefined,
         facts,
         // The headline carries a short message whole; a long one shows in
         // full below its clamped lead.
@@ -962,6 +979,7 @@ export function parseArrWebhook(
         // and ntfy's Title header goes only when that is ASCII-safe.
         summary: prev && next ? `${prev} to ${next}` : next || message || event,
         image: undefined,
+        page: undefined,
         facts,
         message: message || undefined,
         messageLabel: message ? "Message" : undefined,
@@ -1125,11 +1143,8 @@ export function parseSeerrWebhook(payload: unknown, opts: ParseOptions = {}): We
   // A comment's message is the issue's description; the new comment is the
   // message of the report.
   if (nt === "ISSUE_COMMENT") push(facts, "Description", clamp(message, 300));
-  const tmdb = idOf(media.tmdbId);
-  if (tmdb && (mediaType === "movie" || mediaType === "tv")) {
-    const href = `https://www.themoviedb.org/${mediaType}/${tmdb}`;
-    push(facts, "TMDB", displayUrl(href), { href });
-  }
+  const page = mediaType === "movie" || mediaType === "tv" ? tmdbPage(mediaType, media.tmdbId) : undefined;
+  if (page) push(facts, "TMDB", displayUrl(page), { href: page });
 
   const text = nt === "ISSUE_COMMENT" ? prose(comment.comment_message) : message;
   const url = httpsUrl(p.image);
@@ -1155,6 +1170,7 @@ export function parseSeerrWebhook(payload: unknown, opts: ParseOptions = {}): We
               label: subject + by,
               requester: requester || undefined,
               image,
+              page,
               link,
             },
           ],
@@ -1172,6 +1188,7 @@ export function parseSeerrWebhook(payload: unknown, opts: ParseOptions = {}): We
       message: text || undefined,
       messageLabel: text ? (nt === "ISSUE_COMMENT" ? "Comment" : isIssue ? "Description" : "Overview") : undefined,
       image,
+      page,
     },
     digest
   );
@@ -1254,6 +1271,8 @@ export function mergeDigest(g: DigestGroup): WebhookNotification {
       ? [...g.items].sort((a, b) => (a.season ?? 0) - (b.season ?? 0) || (a.episode ?? 0) - (b.episode ?? 0))
       : g.items;
   const dates = items.map((it) => it.airDate ?? "");
+  // The poster, and the TMDB page of its title (#536).
+  const pic = items.find((it) => it.image);
   // The title's range is ASCII — an en dash would cost ntfy its Title header
   // (see episodeCodes) — and the report's reads as prose.
   const range = dated
@@ -1309,7 +1328,7 @@ export function mergeDigest(g: DigestGroup): WebhookNotification {
       summary: range ? `${d.headline} ${prose}` : `${n} ${d.noun}`,
       chips: [quality, size, indexer].filter(Boolean),
       facts,
-      image: items.find((it) => it.image)?.image ?? r.image,
+      ...(pic ? { image: pic.image, page: pic.page } : { image: r.image, page: r.page }),
       link,
     },
   };
@@ -1336,6 +1355,8 @@ export function mergeDigests(groups: DigestGroup[]): WebhookNotification {
   if (groups.length === 1) return mergeDigest(groups[0]);
   const subs = groups.map(mergeDigest);
   const reports = subs.flatMap((s) => (s.report ? [s.report] : []));
+  // The first poster, and the TMDB page of its title (#536).
+  const pic = reports.find((r) => r.image);
   const apps = unique(reports.map((r) => r.app));
   const names = joinNames(apps);
   const n = subs.length;
@@ -1383,7 +1404,8 @@ export function mergeDigests(groups: DigestGroup[]): WebhookNotification {
       summary: clamp(several ? `${n} updates from ${names}` : `${n} updates`, MAX_HEAD),
       chips: unique(reports.map((r) => r.event)),
       facts,
-      image: reports.find((r) => r.image)?.image,
+      image: pic?.image,
+      page: pic?.page,
       link,
     },
   };
