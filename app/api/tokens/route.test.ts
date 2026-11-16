@@ -99,7 +99,9 @@ describe("using a token", () => {
   it("never reaches the settings, and a wrong or revoked token is no one", async () => {
     const { token, record } = await (await make({ name: "x" }, admin)).json();
     expect((await settings(request("/api/settings", bearer(token)))).status).toBe(401);
-    expect((await apps(request("/api/apps", bearer(token.slice(0, -1) + "0")))).status).toBe(401);
+    // One character off: changed to something it isn't, whatever it was.
+    const wrong = token.slice(0, -1) + (token.endsWith("0") ? "1" : "0");
+    expect((await apps(request("/api/apps", bearer(wrong)))).status).toBe(401);
     await DELETE(request(`/api/tokens/${record.id}`, { method: "DELETE", session: admin }), { params: Promise.resolve({ id: record.id }) });
     expect((await apps(request("/api/apps", bearer(token)))).status).toBe(401);
   });
