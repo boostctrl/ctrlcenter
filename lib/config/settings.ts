@@ -89,10 +89,11 @@ function deepMerge(base: unknown, patch: unknown): unknown {
   return out;
 }
 
-// The provider sign-in settings (#504), saved whole: they're edited apart
-// from the settings save (/api/sign-in), behind a recent confirmation.
-export async function setSignIn(signIn: Settings["signIn"]): Promise<void> {
+// The sign-in settings (#504), each way of signing in saved whole: they're
+// edited apart from the settings save (/api/sign-in), behind a recent
+// confirmation.
+export async function setSignIn(patch: Partial<Settings["signIn"]>): Promise<void> {
   await mutate((config) => {
-    config.settings = { ...config.settings, signIn };
+    config.settings = { ...config.settings, signIn: { ...config.settings.signIn, ...patch } };
   });
 }

@@ -31,11 +31,13 @@ const PUBLIC_ROUTES = [
   "app/api/login/route.ts",
   "app/api/logout/route.ts",
   // Signing in through a provider (#504): leaving for it, coming back, the
-  // second factor that may follow (each checks its own signed flow), and
-  // which provider the sign-in prompts offer.
+  // second factor that may follow (each checks its own signed flow), which
+  // provider the sign-in prompts offer, and the reverse proxy's headers
+  // (believed only from the proxy's own address).
   "app/api/auth/oidc/start/route.ts",
   "app/api/auth/oidc/callback/route.ts",
-  "app/api/auth/oidc/code/route.ts",
+  "app/api/auth/code/route.ts",
+  "app/api/auth/forward/route.ts",
   "app/api/auth/providers/route.ts",
   // Inbound webhooks (#204): authenticated by a per-service URL token.
   "app/api/hooks/[service]/route.ts",

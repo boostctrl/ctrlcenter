@@ -6,14 +6,18 @@ import { NextResponse, type NextRequest } from "next/server";
 import { isHttps } from "./auth";
 import { OIDC_FLOW_COOKIE, publicOrigin } from "./oidc";
 
-// A sign-in that passed its provider and waits for the account's own
-// second factor, for five minutes.
-export const OIDC_CODE_COOKIE = "ctrlcenter_oidc_code";
-export const OIDC_CODE_TTL = 300;
-export type PendingOidcSignIn = { account: string; groups: string[]; next: string; popup: boolean };
-
 // Why a provider sign-in didn't end in a session, as the sign-in form says it.
-export type OidcFailure = "off" | "expired" | "denied" | "provider" | "name" | "no-account" | "disabled" | "mismatch";
+// "no-header": the reverse proxy didn't say who this is, or isn't trusted.
+export type OidcFailure =
+  | "off"
+  | "expired"
+  | "denied"
+  | "provider"
+  | "name"
+  | "no-account"
+  | "disabled"
+  | "mismatch"
+  | "no-header";
 
 export function flowCookieOptions(request: NextRequest, maxAge: number, path = "/api/auth/oidc") {
   return { httpOnly: true, secure: isHttps(request), sameSite: "lax" as const, path, maxAge };

@@ -1113,6 +1113,20 @@ export default async function HelpPage() {
             the provider says it used one or you tell CtrlCenter the provider
             requires one. &ldquo;Confirm it&apos;s you&rdquo; can go through
             the provider too.
+          </P>
+          <P>
+            <strong>Sign in through the reverse proxy</strong>, below it, is
+            for a proxy that signs people in itself — Authelia, Authentik,
+            oauth2-proxy — and passes who they are in headers
+            (<Code>Remote-User</Code>, <Code>Remote-Groups</Code>). A page
+            load then signs in to the account of that name. The headers are
+            believed only on a connection from the proxy&apos;s own address,
+            which you add there (the card shows the address the page came
+            from), so nobody reaching CtrlCenter another way can send them;
+            this needs the Docker image. Signing out goes to the proxy&apos;s
+            sign-out address when you set one; otherwise the headers
+            don&apos;t sign anyone back in until they choose{" "}
+            <strong>Continue as &hellip;</strong> on the sign-in page.
             Set or change the admin password from the portal. If none is set,
             login falls back to the <Code>ADMIN_PASSWORD</Code> environment
             variable. Changing the password signs out every other session.

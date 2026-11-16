@@ -51,6 +51,9 @@ export type SecurityFacts = {
   // The credentials in config.yaml (#370): where the key comes from, and how
   // many are encrypted, still plaintext, or under a key that isn't here.
   credentials: CredentialStatus;
+  // Signing in from the reverse proxy's headers (#504), and the addresses
+  // they're believed from.
+  forwardAuth: { enabled: boolean; proxies: string[] };
 };
 
 // A loopback or private-range address — one a plain-HTTP sign-in from is a
@@ -188,6 +191,32 @@ export function securityChecklist(f: SecurityFacts): ChecklistRow[] {
         }
   );
 
+  // Only when forward-auth is on: whether the headers can ever be believed.
+  if (f.forwardAuth.enabled) {
+    rows.push(
+      !f.productionEntry
+        ? {
+            id: "forward",
+            level: "warn",
+            title: "Sign-in from proxy headers",
+            detail: "On, but outside the Docker image the app can't see which address a request came from, so the headers are never believed.",
+          }
+        : f.forwardAuth.proxies.length === 0
+          ? {
+              id: "forward",
+              level: "warn",
+              title: "Sign-in from proxy headers",
+              detail: "On, but no proxy address is set, so the headers are never believed. Add the address your reverse proxy connects from in Settings → Users.",
+            }
+          : {
+              id: "forward",
+              level: "ok",
+              title: "Sign-in from proxy headers",
+              detail: `Believed only from ${f.forwardAuth.proxies.join(", ")}: anyone reaching the app another way can't sign in with them.`,
+            }
+    );
+  }
+
   const c = f.credentials;
   const n = (k: number) => `${k} stored credential${k === 1 ? "" : "s"}`;
   rows.push(
@@ -266,7 +295,7 @@ export function securityChecklist(f: SecurityFacts): ChecklistRow[] {
 // Gather the facts from the config, the environment and (unless `sessions`
 // is false, as at boot) the live session list.
 export async function collectSecurityFacts(
-  config: Pick<Config, "auth" | "integrations">,
+  config: Pick<Config, "auth" | "integrations" | "settings">,
   opts: { sessions?: boolean } = {}
 ): Promise<SecurityFacts> {
   const labels = integrationLabels(config.integrations);
@@ -290,5 +319,9 @@ export async function collectSecurityFacts(
     actionsOn: config.integrations.filter((i) => i.allowActions).map((i) => labels[i.id]),
     idleHours: await getIdleHours(),
     credentials: await credentialStatus(await readConfigOnDisk()),
+    forwardAuth: {
+      enabled: config.settings.signIn.forwardAuth.enabled,
+      proxies: config.settings.signIn.forwardAuth.proxies,
+    },
   };
 }

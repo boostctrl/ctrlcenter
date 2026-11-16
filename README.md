@@ -509,6 +509,20 @@ Nextcloud enforces two-factor for everyone, turn on **The provider requires
 two-factor authentication** instead. The client secret can come from
 `CTRLCENTER_OIDC_CLIENT_SECRET` rather than the config.
 
+#### Signing in through the reverse proxy (forward-auth)
+
+For a proxy that signs people in itself (Authelia, Authentik, oauth2-proxy)
+and passes who they are in headers, Settings → Users → **Sign in through the
+reverse proxy** signs each page load in to the account the user header names
+(`Remote-User`), with the groups header's (`Remote-Groups`) names that are on
+the groups list. The headers are believed only on a connection from one of
+the **proxy addresses** you list (IP addresses or CIDR ranges; the card shows
+the address the page came from), so a client that reaches CtrlCenter around
+the proxy can't send them. That check needs the Docker image's entry, which
+sees the real connecting address. Set a **sign-out address** (Authelia's
+`/logout`, say) to sign out of the proxy too; without one, signing out holds
+the headers off until **Continue as …** on the sign-in page.
+
 `ADMIN_PASSWORD` stands in for the `admin` account only, and only while it
 has no password of its own. A backup carries the accounts: with secrets,
 whole; without, the roster alone, each to be given a password after a

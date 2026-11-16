@@ -18,6 +18,8 @@ export function oidcFailureMessage(error: string | null | undefined, name?: stri
       return "That account is disabled.";
     case "mismatch":
       return "That was a different account from the one signed in here.";
+    case "no-header":
+      return "Your reverse proxy didn't say who you are, or CtrlCenter doesn't trust it yet.";
     default:
       return "Couldn't sign in through the provider. Try again, or use your password.";
   }

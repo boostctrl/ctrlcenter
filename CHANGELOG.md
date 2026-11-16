@@ -37,6 +37,17 @@ here.
   or comes from `CTRLCENTER_OIDC_CLIENT_SECRET`. The README walks through
   setting it up with Nextcloud. (#504)
 
+- **Sign in through your reverse proxy (forward-auth).** For a proxy that
+  signs people in itself (Authelia, Authentik, oauth2-proxy), Settings →
+  Users → **Sign in through the reverse proxy** signs each page load in to
+  the account its `Remote-User` header names, with the `Remote-Groups`
+  names that are on your groups list. The headers are believed only on a
+  connection from the proxy addresses you list (the card shows where the
+  page came from), so nobody reaching CtrlCenter another way can send
+  them; this needs the Docker image. Signing out can go to the proxy's
+  sign-out page, and a checklist row says whether the headers can be
+  believed. (#504)
+
 ### Fixed
 
 - **The Add an account form fits a phone again.** Its fields ran off the

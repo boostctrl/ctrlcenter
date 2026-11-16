@@ -23,12 +23,15 @@ export default function LoginForm({
   singleAccount,
   fallback = "/admin",
   provider = null,
+  forwardUser = null,
 }: {
   passwordConfigured: boolean;
   singleAccount: boolean;
   fallback?: string;
   // The provider's button (#504): "Sign in with Nextcloud", or null.
   provider?: string | null;
+  // Who the reverse proxy says this is (#504), to continue as; or null.
+  forwardUser?: string | null;
 }) {
   const searchParams = useSearchParams();
   // Back from the provider with the account's own second factor to enter
@@ -40,6 +43,7 @@ export default function LoginForm({
       singleAccount={singleAccount}
       fallback={fallback}
       provider={provider}
+      forwardUser={forwardUser}
     />
   );
 }
@@ -49,11 +53,13 @@ function PasswordForm({
   singleAccount,
   fallback,
   provider,
+  forwardUser,
 }: {
   passwordConfigured: boolean;
   singleAccount: boolean;
   fallback: string;
   provider: string | null;
+  forwardUser: string | null;
 }) {
   const searchParams = useSearchParams();
   // Back from the provider without a session: why (#504).
@@ -220,16 +226,22 @@ function PasswordForm({
       <Button type="submit" disabled={loading}>
         {loading ? "Signing in..." : needCode ? "Verify" : "Sign in"}
       </Button>
+      {(provider || forwardUser) && !needCode && <p className="text-center text-xs text-ink-45">or</p>}
+      {forwardUser && !needCode && (
+        <a
+          href={`/api/auth/forward${searchParams.get("next") ? `?next=${encodeURIComponent(searchParams.get("next") ?? "")}` : ""}`}
+          className={`${buttonClasses("ghost")} text-center`}
+        >
+          Continue as {forwardUser}
+        </a>
+      )}
       {provider && !needCode && (
-        <>
-          <p className="text-center text-xs text-ink-45">or</p>
-          <a
-            href={`/api/auth/oidc/start${searchParams.get("next") ? `?next=${encodeURIComponent(searchParams.get("next") ?? "")}` : ""}`}
-            className={`${buttonClasses("ghost")} text-center`}
-          >
-            {provider}
-          </a>
-        </>
+        <a
+          href={`/api/auth/oidc/start${searchParams.get("next") ? `?next=${encodeURIComponent(searchParams.get("next") ?? "")}` : ""}`}
+          className={`${buttonClasses("ghost")} text-center`}
+        >
+          {provider}
+        </a>
       )}
     </form>
   );
@@ -251,7 +263,7 @@ function ProviderCodeForm({ fallback }: { fallback: string }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/auth/oidc/code", {
+      const res = await fetch("/api/auth/code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ totp: code }),

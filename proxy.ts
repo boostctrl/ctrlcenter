@@ -3,6 +3,7 @@ import { isHttps, sessionTokenFrom, verifySession } from "@/lib/auth";
 import { sessionNeedsTwoFactor } from "@/lib/accounts";
 import { readConfigInternal } from "@/lib/config";
 import { allowedBeforeTwoFactor, TWO_FACTOR_SETUP_PAGE } from "@/lib/two-factor-gate";
+import { SIGNED_OUT_COOKIE, forwardIdentity, shouldSignInFromHeaders } from "@/lib/forward-auth";
 import { contentSecurityPolicy } from "@/lib/csp";
 
 // Run on every routed request (HTML + API), excluding Next internals and static
@@ -101,6 +102,32 @@ export async function proxy(request: NextRequest) {
     }
     return withCsp(NextResponse.redirect(new URL(TWO_FACTOR_SETUP_PAGE, request.url)));
   };
+
+  // Signing in from the reverse proxy's headers (#504): a page load whose
+  // headers name someone the browser isn't signed in as goes through
+  // /api/auth/forward first. Only with forward-auth on and the request from
+  // the proxy's own address (lib/forward-auth.ts).
+  if (request.method === "GET" && !isApi) {
+    const config = await readConfigInternal();
+    const identity = forwardIdentity(request.headers, config.settings.signIn.forwardAuth);
+    if (identity) {
+      const live = token ? await verifySession(token, config.auth) : null;
+      if (
+        shouldSignInFromHeaders({
+          method: request.method,
+          pathname,
+          headers: request.headers,
+          identity,
+          signedOut: request.cookies.has(SIGNED_OUT_COOKIE),
+          sessionAccount: live?.account.id ?? null,
+        })
+      ) {
+        const to = new URL("/api/auth/forward", request.url);
+        to.searchParams.set("next", pathname + request.nextUrl.search);
+        return withCsp(NextResponse.redirect(to));
+      }
+    }
+  }
 
   if (!needsAuth(pathname)) {
     if (!token || isApi || allowedBeforeTwoFactor(pathname)) return pass();

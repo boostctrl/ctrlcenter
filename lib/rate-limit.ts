@@ -130,6 +130,13 @@ const PEER_HEADER = "x-ctrlcenter-peer";
 // X-Forwarded-For, "0" when it didn't (#383). Trusted on the same terms.
 const FORWARDED_HEADER = "x-ctrlcenter-forwarded";
 
+// The TCP peer the request came from — the one address a client can't
+// forge — or null outside the Docker image's entry, where it can't be told
+// (#504: forward-auth headers are believed only from the proxy's address).
+export function peerAddress(headers: Headers): string | null {
+  return productionEntry() ? headers.get(PEER_HEADER)?.trim() || null : null;
+}
+
 // Whether scripts/server-entry.mjs is running, so the headers it stamps can be
 // trusted.
 export function productionEntry(): boolean {

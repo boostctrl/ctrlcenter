@@ -14,6 +14,7 @@ const GREEN: SecurityFacts = {
   actionsOn: [],
   idleHours: 24,
   credentials: { source: "file", encrypted: 3, plaintext: 0, unreadable: 0 },
+  forwardAuth: { enabled: false, proxies: [] },
 };
 
 const row = (facts: Partial<SecurityFacts>, id: string) => {
@@ -134,6 +135,15 @@ describe("securityChecklist (#367)", () => {
       level: "bad",
       detail: expect.stringContaining("SESSION_SECRET"),
     });
+  });
+
+  it("grades sign-in from proxy headers only when it's on (#504)", () => {
+    expect(securityChecklist(GREEN).some((r) => r.id === "forward")).toBe(false);
+    const on = (forwardAuth: SecurityFacts["forwardAuth"], productionEntry = true) =>
+      row({ forwardAuth, productionEntry }, "forward");
+    expect(on({ enabled: true, proxies: ["172.18.0.2"] })).toMatchObject({ level: "ok", detail: expect.stringContaining("172.18.0.2") });
+    expect(on({ enabled: true, proxies: [] })).toMatchObject({ level: "warn", detail: expect.stringContaining("no proxy address") });
+    expect(on({ enabled: true, proxies: ["172.18.0.2"] }, false)).toMatchObject({ level: "warn", detail: expect.stringContaining("Docker image") });
   });
 
   it("grades the stored credentials at rest (#370)", () => {

@@ -48,7 +48,7 @@ describe("/api/sign-in", () => {
     await staleSession(stale);
     expect((await save(OIDC, stale)).status).toBe(403);
     expect((await save(OIDC)).status).toBe(200);
-    expect(await latestAuditEntry()).toMatchObject({ kind: "signin.provider", detail: "on" });
+    expect(await latestAuditEntry()).toMatchObject({ kind: "signin.provider", detail: "provider on" });
     const body = await read();
     expect(body.oidc).toMatchObject({ enabled: true, label: "Nextcloud", issuer: OP, clientSecret: "••••••••" });
     expect(body.redirectUri).toBe(`${TEST_ORIGIN}/api/auth/oidc/callback`);
@@ -71,6 +71,36 @@ describe("/api/sign-in", () => {
     expect((await read("?check=1")).check).toEqual({ ok: true });
     vi.stubGlobal("fetch", async () => new Response("no", { status: 404 }));
     expect((await read("?check=1")).check).toMatchObject({ ok: false });
+  });
+
+  it("saves the proxy headers' settings apart, refusing what isn't an address", async () => {
+    const fa = {
+      enabled: true,
+      userHeader: "Remote-User",
+      groupsHeader: "Remote-Groups",
+      proxies: ["172.18.0.2", "proxy.lan"],
+      createAccounts: false,
+      enforcesTwoFactor: false,
+      logoutUrl: "",
+    };
+    const put = (forwardAuth: unknown) => PUT(request("/api/sign-in", { method: "PUT", body: { forwardAuth }, session: admin }));
+    const bad = await put(fa);
+    expect(bad.status).toBe(400);
+    expect((await bad.json()).error).toMatch(/proxy\.lan/);
+    expect((await put({ ...fa, proxies: ["172.18.0.2", "10.0.0.0/8"] })).status).toBe(200);
+    const stored = (await config.readConfigInternal()).settings.signIn;
+    expect(stored.forwardAuth.proxies).toEqual(["172.18.0.2", "10.0.0.0/8"]);
+    // The provider's settings are left as they were.
+    expect(stored.oidc.label).toBe("Cloud");
+    expect(await latestAuditEntry()).toMatchObject({ detail: "proxy headers on" });
+  });
+
+  it("shows where this request came from and who the proxy says it is, to set it up by", async () => {
+    expect((await read()).proxy).toEqual({ peer: null, productionEntry: false, fromProxy: false, seen: null });
+    vi.stubEnv("CTRLCENTER_PEER_HEADER", "1");
+    const res = await GET(request("/api/sign-in", { session: admin, headers: { "x-ctrlcenter-peer": "172.18.0.2", "Remote-User": "Sam" } }));
+    expect((await res.json()).proxy).toEqual({ peer: "172.18.0.2", productionEntry: true, fromProxy: true, seen: "Sam" });
+    vi.stubEnv("CTRLCENTER_PEER_HEADER", "");
   });
 
   it("keeps the provider's settings from a visitor", async () => {

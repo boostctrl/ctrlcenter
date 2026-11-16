@@ -5,6 +5,8 @@ import { accountsOf } from "@/lib/accounts";
 import BackHome from "@/components/BackHome";
 import LoginForm from "./LoginForm";
 import { oidcButtonLabel, oidcReady } from "@/lib/oidc";
+import { forwardIdentity } from "@/lib/forward-auth";
+import { headers } from "next/headers";
 
 // The sign-in screen: at /login for everyone (#450) and at /admin/login,
 // where the proxy sends a signed-out visit to an admin page. Rendered per
@@ -24,6 +26,7 @@ export default async function LoginScreen({ fallback }: { fallback: string }) {
           singleAccount={accountsOf(auth).length === 1}
           fallback={fallback}
           provider={oidcReady(o) ? oidcButtonLabel(o) : null}
+          forwardUser={forwardIdentity(await headers(), settings.signIn.forwardAuth)?.raw ?? null}
         />
       </Suspense>
       <BackHome />

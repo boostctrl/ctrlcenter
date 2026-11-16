@@ -42,7 +42,7 @@ export type SessionRecord = {
   // wrote, which is the founding admin's (sessionAccount).
   account?: string;
   // How it signed in, when not with a password (#504): through an OpenID
-  // Connect provider. The provider's groups that are on the groups list,
+  // Connect provider, or the reverse proxy's headers. The provider's groups that are on the groups list,
   // added to the account's own for what this session sees; and whether the
   // provider vouched for a second factor.
   via?: SessionVia;
@@ -50,8 +50,8 @@ export type SessionRecord = {
   twoFactor?: boolean;
 };
 
-export type SessionVia = "oidc";
-export const SESSION_VIAS: readonly SessionVia[] = ["oidc"];
+export type SessionVia = "oidc" | "forward";
+export const SESSION_VIAS: readonly SessionVia[] = ["oidc", "forward"];
 
 export type SessionMeta = {
   ip: string | null;

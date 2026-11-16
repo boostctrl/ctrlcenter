@@ -8,7 +8,7 @@ import { mockProvider, OP, CLIENT_ID, CLIENT_SECRET } from "@/lib/testing/oidc";
 // maps onto, the second factor that may follow, and a confirmation.
 let start: typeof import("./start/route").GET;
 let callback: typeof import("./callback/route").GET;
-let code: typeof import("./code/route").POST;
+let code: typeof import("../code/route").POST;
 let config: typeof import("@/lib/config");
 let auth: typeof import("@/lib/auth");
 let oidc: typeof import("@/lib/oidc");
@@ -20,7 +20,7 @@ beforeAll(async () => {
   await useScratchConfig(YAML.dump({ settings: { signIn: { oidc: OIDC } }, auth: { groups: ["family"] } }));
   ({ GET: start } = await import("./start/route"));
   ({ GET: callback } = await import("./callback/route"));
-  ({ POST: code } = await import("./code/route"));
+  ({ POST: code } = await import("../code/route"));
   config = await import("@/lib/config");
   auth = await import("@/lib/auth");
   oidc = await import("@/lib/oidc");
@@ -152,9 +152,9 @@ describe("an account with its own second factor", () => {
     const res = await signInAs({ userinfo: { preferred_username: "kim" } }, { next: "/boards/home" });
     expect(res.headers.get("location")).toMatch(/\/login\?code=provider&next=%2Fboards%2Fhome$/);
     expect(setCookies(res).homepage_admin_session).toBeUndefined();
-    const pending = setCookies(res).ctrlcenter_oidc_code;
+    const pending = setCookies(res).ctrlcenter_signin_code;
     const post = (totp: string) =>
-      code(request("/api/auth/oidc/code", { method: "POST", body: { totp }, headers: { cookie: `ctrlcenter_oidc_code=${pending}` } }));
+      code(request("/api/auth/code", { method: "POST", body: { totp }, headers: { cookie: `ctrlcenter_signin_code=${pending}` } }));
     expect((await post("000000")).status).toBe(401);
     const { totpCode } = await import("@/lib/totp");
     const ok = await post(await totpCode(secret));
@@ -176,7 +176,7 @@ describe("an account with its own second factor", () => {
   });
 
   it("can't use a code step it wasn't given", async () => {
-    const res = await code(request("/api/auth/oidc/code", { method: "POST", body: { totp: "123456" } }));
+    const res = await code(request("/api/auth/code", { method: "POST", body: { totp: "123456" } }));
     expect(res.status).toBe(401);
     expect(await res.json()).toMatchObject({ expired: true });
   });

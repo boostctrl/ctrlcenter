@@ -3,15 +3,20 @@ import { viewerOf } from "@/lib/api-auth";
 import { readConfigInternal, setSignIn } from "@/lib/config";
 import { forgetOidcDiscovery, oidcConfiguration, oidcRedirectUri } from "@/lib/oidc";
 import { requireRecentAuth } from "@/lib/reauth";
-import { SECRET_PLACEHOLDER, signInSchema, signInUpdateSchema } from "@/lib/schema";
+import { SECRET_PLACEHOLDER, forwardAuthSchema, oidcSchema, signInUpdateSchema } from "@/lib/schema";
+import { badProxyEntries, forwardIdentity, fromProxy } from "@/lib/forward-auth";
+import { peerAddress, productionEntry } from "@/lib/rate-limit";
 import { eventMeta, recordSecurityEvent } from "@/lib/security-events";
 import { notifySecurityEvent } from "@/lib/security-alerts";
 import { errorReason } from "@/lib/log";
 
-// Signing in through a provider (#504), for Settings → Users: the settings
-// with the client secret as a placeholder, the redirect address to register
-// with the provider, and whether the secret comes from the environment.
-// `?check=1` also tries the provider's discovery with what is saved.
+// Signing in through a provider or the reverse proxy (#504), for Settings →
+// Users: the settings with the client secret as a placeholder, the redirect
+// address to register with the provider, whether the secret comes from the
+// environment; and, to help set forward-auth up, the address this request
+// came from, whether that is one of the proxy's, and who the proxy says
+// this is. `?check=1` also tries the provider's discovery with what is
+// saved.
 export async function GET(request: NextRequest) {
   const config = await readConfigInternal();
   const viewer = await viewerOf(request, config.auth);
@@ -27,11 +32,21 @@ export async function GET(request: NextRequest) {
       check = { ok: false, error: errorReason(e) };
     }
   }
+  const fa = config.settings.signIn.forwardAuth;
+  const peer = peerAddress(request.headers);
   return NextResponse.json({
     oidc: { ...o, clientSecret: o.clientSecret ? SECRET_PLACEHOLDER : "" },
     redirectUri: oidcRedirectUri(request),
     secretFromEnv: Boolean(process.env.CTRLCENTER_OIDC_CLIENT_SECRET?.trim()),
     ...(check ? { check } : {}),
+    forwardAuth: fa,
+    proxy: {
+      // Null outside the Docker image, where the address can't be told.
+      peer,
+      productionEntry: productionEntry(),
+      fromProxy: fromProxy(peer, fa.proxies),
+      seen: forwardIdentity(request.headers, { ...fa, enabled: true })?.raw ?? null,
+    },
   });
 }
 
@@ -47,15 +62,31 @@ export async function PUT(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request" }, { status: 400 });
   }
+  const { oidc, forwardAuth } = parsed.data;
+  if (forwardAuth) {
+    const bad = badProxyEntries(forwardAuth.proxies);
+    if (bad.length) {
+      return NextResponse.json({ error: `Not an address or a range: ${bad.join(", ")}` }, { status: 400 });
+    }
+  }
   const stored = config.settings.signIn.oidc;
-  const oidc = {
-    ...parsed.data.oidc,
-    clientSecret: parsed.data.oidc.clientSecret === SECRET_PLACEHOLDER ? stored.clientSecret : parsed.data.oidc.clientSecret,
-  };
-  await setSignIn(signInSchema.parse({ oidc }));
-  forgetOidcDiscovery();
-  notifySecurityEvent(
-    await recordSecurityEvent("signin.provider", eventMeta(request, viewer.account.id), oidc.enabled ? "on" : "off")
-  );
+  await setSignIn({
+    ...(oidc
+      ? {
+          oidc: oidcSchema.parse({
+            ...oidc,
+            clientSecret: oidc.clientSecret === SECRET_PLACEHOLDER ? stored.clientSecret : oidc.clientSecret,
+          }),
+        }
+      : {}),
+    ...(forwardAuth
+      ? { forwardAuth: forwardAuthSchema.parse({ ...forwardAuth, proxies: forwardAuth.proxies.filter((p) => p !== "") }) }
+      : {}),
+  });
+  if (oidc) forgetOidcDiscovery();
+  const detail = [oidc && `provider ${oidc.enabled ? "on" : "off"}`, forwardAuth && `proxy headers ${forwardAuth.enabled ? "on" : "off"}`]
+    .filter(Boolean)
+    .join(", ");
+  notifySecurityEvent(await recordSecurityEvent("signin.provider", eventMeta(request, viewer.account.id), detail));
   return NextResponse.json({ ok: true });
 }

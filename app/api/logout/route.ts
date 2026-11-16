@@ -4,6 +4,7 @@ import { isSameOriginRequest } from "@/lib/api-auth";
 import { readConfigInternal } from "@/lib/config";
 import { revokeSession } from "@/lib/sessions";
 import { oidcEndSessionUrl, oidcReady } from "@/lib/oidc";
+import { SIGNED_OUT_COOKIE } from "@/lib/forward-auth";
 import { log, errorReason } from "@/lib/log";
 import { eventMeta, recordSecurityEvent } from "@/lib/security-events";
 
@@ -18,6 +19,9 @@ export async function POST(request: NextRequest) {
   // Where to go next: the provider's sign-out page, for a session that came
   // from a provider set to sign out there too (#504).
   let redirect: string | null = null;
+  // A session from the proxy's headers with no proxy sign-out to go to: the
+  // headers would sign the browser straight back in, so hold that off.
+  let holdHeaders = false;
   if (token) {
     const { auth, settings } = await readConfigInternal();
     const live = await verifySession(token, auth);
@@ -31,9 +35,15 @@ export async function POST(request: NextRequest) {
           return null;
         });
       }
+      if (live.session.via === "forward") {
+        const fa = settings.signIn.forwardAuth;
+        if (fa.logoutUrl) redirect = fa.logoutUrl;
+        else holdHeaders = true;
+      }
     }
   }
   const response = NextResponse.json({ ok: true, ...(redirect ? { redirect } : {}) });
+  if (holdHeaders) response.cookies.set(SIGNED_OUT_COOKIE, "1", { httpOnly: true, sameSite: "lax", path: "/" });
   clearSessionCookie(response);
   return response;
 }

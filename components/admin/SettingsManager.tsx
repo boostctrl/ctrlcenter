@@ -23,6 +23,7 @@ import AnnouncementsSection from "./settings/AnnouncementsSection";
 import SecuritySection from "./settings/SecuritySection";
 import UsersSection from "./settings/UsersSection";
 import SignInProvider from "./settings/SignInProvider";
+import ForwardAuth from "./settings/ForwardAuth";
 
 // The admin settings page: a section nav rail beside the open section's cards.
 // The draft settings object and its autosave live in useSettingsDraft; each
@@ -194,6 +195,7 @@ export default function SettingsManager({
           <>
             <UsersSection />
             <SignInProvider />
+            <ForwardAuth />
           </>
         )}
         {section === "security" && (

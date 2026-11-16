@@ -1009,7 +1009,8 @@ describe("readConfigInternal stays off public surfaces", () => {
     // Signing in through a provider (#504): the provider's settings and the
     // accounts, read to issue a session; and the settings for its card.
     "app/api/auth/oidc/callback/route.ts",
-    "app/api/auth/oidc/code/route.ts",
+    "app/api/auth/code/route.ts",
+    "app/api/auth/forward/route.ts",
     "app/api/auth/oidc/start/route.ts",
     "app/api/auth/providers/route.ts",
     "app/api/sign-in/route.ts",
