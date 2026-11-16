@@ -31,8 +31,12 @@ describe("encryptValue and decryptValue", () => {
     const sealed = encryptValue("s3cret", key);
     expect(decryptValue(sealed, [other, key])?.key.equals(key)).toBe(true);
     expect(decryptValue(sealed, [other])).toBeNull();
-    // Altered by one character: the tag no longer matches.
-    const tampered = sealed.slice(0, -2) + (sealed.endsWith("A") ? "B" : "A") + sealed.slice(-1);
+    // Altered by one character — the second to last, whose bits are all
+    // data (the last may carry only padding) — changed to one it isn't: the
+    // tag no longer matches.
+    const at = sealed.length - 2;
+    const tampered = sealed.slice(0, at) + (sealed[at] === "A" ? "B" : "A") + sealed.slice(at + 1);
+    expect(tampered).not.toBe(sealed);
     expect(decryptValue(tampered, [key])).toBeNull();
     expect(decryptValue(`${ENC_PREFIX}short`, [key])).toBeNull();
   });
