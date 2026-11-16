@@ -1014,6 +1014,9 @@ describe("readConfigInternal stays off public surfaces", () => {
     "app/api/auth/oidc/start/route.ts",
     "app/api/auth/providers/route.ts",
     "app/api/sign-in/route.ts",
+    // Personal API tokens (#538): the account's own, or an admin's view.
+    "app/api/tokens/[id]/route.ts",
+    "app/api/tokens/route.ts",
     // Admin-only security checklist (#367): reads once, then gates on the hash.
     "app/api/security/credentials/route.ts",
     "app/api/security/route.ts",

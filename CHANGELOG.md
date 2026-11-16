@@ -48,6 +48,15 @@ here.
   sign-out page, and a checklist row says whether the headers can be
   believed. (#504)
 
+- **Personal API tokens.** Every account can make tokens on its account
+  page, for a script, Home Assistant or an assistant to read CtrlCenter as
+  that account (`Authorization: Bearer cct_…`): the status APIs, the
+  Monitor's data and the app and bookmark lists, seeing what the account
+  sees. An admin's token can also take the dashboard actions. Tokens never
+  reach settings, accounts or backups, are shown once, can expire, and are
+  stored only as hashes; Settings → Users lists every account's for an
+  admin to revoke, and a first use from a new address is announced. (#538)
+
 ### Fixed
 
 - **The Add an account form fits a phone again.** Its fields ran off the

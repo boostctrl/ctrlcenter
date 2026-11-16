@@ -5,6 +5,7 @@ import { findAccount } from "@/lib/accounts";
 import { requireRecentAuth } from "@/lib/reauth";
 import { accountUpdateSchema, FOUNDING_ACCOUNT_ID } from "@/lib/schema";
 import { revokeSessions } from "@/lib/sessions";
+import { revokeAccountTokens } from "@/lib/api-tokens";
 import { eventMeta, recordSecurityEvent } from "@/lib/security-events";
 import { notifySecurityEvent } from "@/lib/security-alerts";
 
@@ -64,6 +65,8 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   if (!recent.ok) return recent.response;
   await deleteAccount(id);
   await revokeSessions(undefined, id);
+  // Its API tokens (#538) go with it.
+  await revokeAccountTokens(id);
   notifySecurityEvent(await recordSecurityEvent("account.deleted", eventMeta(request, viewer.account.id), id));
   return new NextResponse(null, { status: 204 });
 }

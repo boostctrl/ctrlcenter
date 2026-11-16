@@ -48,6 +48,11 @@ export const SECURITY_EVENT_KINDS = [
   "key.rotated",
   // Signing in through a provider set up, changed or turned off (#504).
   "signin.provider",
+  // Personal API tokens (#538): made, revoked, first used from an address.
+  // `detail` names the token.
+  "token.created",
+  "token.revoked",
+  "token.used",
 ] as const;
 export type SecurityEventKind = (typeof SECURITY_EVENT_KINDS)[number];
 

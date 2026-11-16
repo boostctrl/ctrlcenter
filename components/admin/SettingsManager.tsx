@@ -24,6 +24,8 @@ import SecuritySection from "./settings/SecuritySection";
 import UsersSection from "./settings/UsersSection";
 import SignInProvider from "./settings/SignInProvider";
 import ForwardAuth from "./settings/ForwardAuth";
+import ApiTokens from "./ApiTokens";
+import { Card } from "./ui";
 
 // The admin settings page: a section nav rail beside the open section's cards.
 // The draft settings object and its autosave live in useSettingsDraft; each
@@ -196,6 +198,12 @@ export default function SettingsManager({
             <UsersSection />
             <SignInProvider />
             <ForwardAuth />
+            <Card
+              title="API tokens"
+              intro="Every account's personal API tokens. Each account makes its own on its account page; revoke any here."
+            >
+              <ApiTokens all />
+            </Card>
           </>
         )}
         {section === "security" && (

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { viewerOf } from "./api-auth";
 import { passwordConfigured } from "./accounts";
 import { readConfigInternal } from "./config";
+import { tokenActionRoute } from "./token-routes";
 import type { AuthConfig } from "./schema/auth";
 
 // Step-up re-authentication (#366). A signed-in session is enough for
@@ -37,6 +38,14 @@ export async function requireRecentAuth(
   }
   const { session } = viewer;
   const sessionId = session.id;
+  // A token (#538) has no password to re-prove: one with the actions scope
+  // is the credential for the actions it may take, and confirms nothing
+  // else.
+  if (viewer.token) {
+    return viewer.token.scope === "actions" && tokenActionRoute(request.method, request.nextUrl.pathname)
+      ? { ok: true, sessionId }
+      : { ok: false, response: NextResponse.json({ error: "A token can't confirm this" }, { status: 403 }) };
+  }
   if (now - session.reauthAt > REAUTH_WINDOW_MS) {
     // A session from a provider (#504) can confirm there instead: the
     // dialog offers it by name, and the password only when the account has

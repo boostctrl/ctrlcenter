@@ -32,6 +32,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
           twoFactorEnabled={account.totp.enabled}
           twoFactorRequired={account.requireTwoFactor}
           mustChangePassword={query.change === "1" || account.mustChangePassword}
+          isAdmin={viewer.isAdmin}
         />
       </main>
       {config.settings.settingsButton && <FloatingNav {...nav} />}

@@ -4,6 +4,7 @@ import { sessionNeedsTwoFactor } from "@/lib/accounts";
 import { readConfigInternal } from "@/lib/config";
 import { allowedBeforeTwoFactor, TWO_FACTOR_SETUP_PAGE } from "@/lib/two-factor-gate";
 import { SIGNED_OUT_COOKIE, forwardIdentity, shouldSignInFromHeaders } from "@/lib/forward-auth";
+import { bearerOf, tokenAllowed } from "@/lib/token-routes";
 import { contentSecurityPolicy } from "@/lib/csp";
 
 // Run on every routed request (HTML + API), excluding Next internals and static
@@ -142,6 +143,9 @@ export async function proxy(request: NextRequest) {
   const check = await held(auth);
   if (check.held) return toSetup();
   if (check.live) return pass();
+  // A personal API token (#538) on a route tokens may use goes on to the
+  // route, which checks the token itself.
+  if (isApi && bearerOf(request.headers) && tokenAllowed(request.method, pathname)) return pass();
 
   if (isApi) {
     return withCsp(

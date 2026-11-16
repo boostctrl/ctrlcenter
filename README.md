@@ -509,6 +509,26 @@ Nextcloud enforces two-factor for everyone, turn on **The provider requires
 two-factor authentication** instead. The client secret can come from
 `CTRLCENTER_OIDC_CLIENT_SECRET` rather than the config.
 
+#### API tokens
+
+Each account can make **personal API tokens** on its account page, for a
+script, Home Assistant or an assistant to read CtrlCenter as that account:
+
+```bash
+curl -H "Authorization: Bearer cct_…" https://ctrlcenter.example.com/api/status
+```
+
+A token sees what its account sees, and only on the status APIs
+(`/api/status`, `/api/status/history`), the Monitor's data (`/api/monitor`,
+`/api/monitor/<id>`, its `/history`) and the app and bookmark lists.
+An admin's token can also be given **Read and act**, which adds the dashboard
+actions (`POST /api/monitor/action`) under the same opt-ins as the page. A
+token never reaches settings, accounts, tokens or backups. It is shown once
+when made; only its hash is kept (`api-tokens.json` beside the config). Each
+can expire, and every account's are listed in Settings → Users for an admin to
+revoke. A first use from a new address is recorded, and announced on the
+channels with Security on.
+
 #### Signing in through the reverse proxy (forward-auth)
 
 For a proxy that signs people in itself (Authelia, Authentik, oauth2-proxy)

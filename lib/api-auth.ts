@@ -1,8 +1,14 @@
 import type { NextRequest } from "next/server";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { sessionTokenFrom, verifySession, type LiveSession } from "./auth";
-import { isAdminAccount, sessionNeedsTwoFactor } from "./accounts";
+import { isHttps, sessionTokenFrom, verifySession, type LiveSession } from "./auth";
+import { findAccount, isAdminAccount, sessionNeedsTwoFactor } from "./accounts";
+import { touchToken, verifyToken, type TokenScope } from "./api-tokens";
+import { bearerOf, tokenAllowed } from "./token-routes";
+import { clientIp, clientKey, rateLimit, refundRateLimit } from "./rate-limit";
+import { eventMeta, recordSecurityEvent } from "./security-events";
+import { notifySecurityEvent } from "./security-alerts";
+import type { SessionRecord } from "./sessions";
 import { allowedBeforeTwoFactor } from "./two-factor-gate";
 import { visibleTo } from "./visibility";
 import { watchSessionAddress } from "./session-watch";
@@ -12,7 +18,9 @@ import type { AuthConfig, Config } from "./schema";
 // Who is asking (#423): the live session and its account, and whether that
 // account may act as an admin. The one resolver behind every admin check
 // below, so a request is judged the same way everywhere.
-export type Viewer = LiveSession & { isAdmin: boolean };
+// A request made with a personal API token (#538) carries no session: it
+// gets a stand-in record and says which token, with what scope.
+export type Viewer = LiveSession & { isAdmin: boolean; token?: { id: string; scope: TokenScope } };
 
 const authOf = async (auth?: AuthConfig) => auth ?? (await readConfigInternal()).auth;
 
@@ -27,6 +35,10 @@ const authOf = async (auth?: AuthConfig) => auth ?? (await readConfigInternal())
 // double read adds up.
 export async function viewerOf(request: NextRequest, auth?: AuthConfig): Promise<Viewer | null> {
   if (!isSafeMethod(request.method) && !isSameOriginRequest(request)) return null;
+  // A personal API token (#538) speaks for itself: a request carrying one
+  // is judged by it alone, never by a cookie that rides along.
+  const bearer = bearerOf(request.headers);
+  if (bearer !== null) return tokenViewer(request, bearer, await authOf(auth));
   const live = await verifySession(sessionTokenFrom(request.cookies), await authOf(auth));
   if (!live) return null;
   // An account that must set up two-factor first reaches only what its
@@ -35,6 +47,45 @@ export async function viewerOf(request: NextRequest, auth?: AuthConfig): Promise
   // A session used from a new address announces itself once (#382).
   await watchSessionAddress(request, live.session);
   return { ...live, isAdmin: isAdminAccount(live.account) };
+}
+
+// Wrong tokens from one address are cut off after this many in the window;
+// a good token, past this many requests a minute.
+const TOKEN_FAILURES = 30;
+const TOKEN_FAILURE_WINDOW_MS = 10 * 60 * 1000;
+const TOKEN_REQUESTS_PER_MINUTE = 600;
+
+// The viewer a personal API token (#538) stands for: its account, on the
+// routes tokens may use (lib/token-routes.ts) with its scope, while the
+// account is enabled. A first use from an address is recorded and
+// announced, as a session's is (#382).
+async function tokenViewer(request: NextRequest, token: string, auth: AuthConfig): Promise<Viewer | null> {
+  const failKey = clientKey(request, "token");
+  if (!rateLimit(failKey, TOKEN_FAILURES, TOKEN_FAILURE_WINDOW_MS).allowed) return null;
+  const record = await verifyToken(token);
+  if (!record) return null;
+  refundRateLimit(failKey);
+  if (!tokenAllowed(request.method, request.nextUrl.pathname, record.scope)) return null;
+  const account = findAccount(auth, record.account);
+  if (!account?.enabled) return null;
+  if (!rateLimit(`token-use:${record.id}`, TOKEN_REQUESTS_PER_MINUTE, 60 * 1000).allowed) return null;
+  const ip = clientIp(request);
+  if (await touchToken(record.id, ip)) {
+    notifySecurityEvent(await recordSecurityEvent("token.used", eventMeta(request, account.id), record.name));
+  }
+  const now = Date.now();
+  const session: SessionRecord = {
+    id: `token:${record.id}`,
+    createdAt: record.createdAt,
+    lastSeenAt: now,
+    ip,
+    userAgent: (request.headers.get("user-agent") ?? "").slice(0, 300),
+    https: isHttps(request),
+    forwarded: null,
+    reauthAt: 0,
+    account: account.id,
+  };
+  return { session, account, isAdmin: isAdminAccount(account), token: { id: record.id, scope: record.scope } };
 }
 
 // The same for server components (no NextRequest there — the cookie comes

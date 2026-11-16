@@ -37,6 +37,9 @@ const LABEL: Record<SecurityEventKind, string> = {
   "group.changed": "Group changed",
   "key.rotated": "Encryption key for stored credentials replaced",
   "signin.provider": "Sign-in provider changed",
+  "token.created": "API token made",
+  "token.revoked": "API token revoked",
+  "token.used": "API token used from a new address",
 };
 
 // The entries that mean something went wrong, or that reshape the account.

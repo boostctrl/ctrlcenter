@@ -1132,6 +1132,16 @@ export default async function HelpPage() {
             variable. Changing the password signs out every other session.
           </P>
           <P>
+            <strong>API tokens</strong>, on each account&apos;s page, let a
+            script, Home Assistant or an assistant read CtrlCenter as that
+            account with <Code>Authorization: Bearer &lt;token&gt;</Code>: the
+            status APIs, the Monitor&apos;s data and the app and bookmark
+            lists, seeing what the account sees. An admin&apos;s token can
+            also take the dashboard actions. A token never changes settings
+            or accounts, is shown once when made, and can expire; Settings →
+            Users lists every account&apos;s for an admin to revoke.
+          </P>
+          <P>
             <strong>Sessions</strong>, in <strong>Settings → Security</strong>,
             lists every browser the portal is signed in on and lets you end
             any of them, or sign out everywhere else after using a shared
