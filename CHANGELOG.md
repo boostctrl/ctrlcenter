@@ -12,6 +12,8 @@ here.
 
 ## [Unreleased]
 
+## [3.3.1] - 2026-11-16
+
 ### Security
 
 - **Signing in through a provider reaches only the account connected to
@@ -4367,7 +4369,8 @@ Initial release.
 - Vitest test suite covering config read/write and merge semantics, schema
   validation, authentication, and login rate limiting.
 
-[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v3.3.0...HEAD
+[Unreleased]: https://github.com/boostctrl/ctrlcenter/compare/v3.3.1...HEAD
+[3.3.1]: https://github.com/boostctrl/ctrlcenter/compare/v3.3.0...v3.3.1
 [3.3.0]: https://github.com/boostctrl/ctrlcenter/compare/v3.2.1...v3.3.0
 [3.2.1]: https://github.com/boostctrl/ctrlcenter/compare/v3.2.0...v3.2.1
 [3.2.0]: https://github.com/boostctrl/ctrlcenter/compare/v3.1.3...v3.2.0
