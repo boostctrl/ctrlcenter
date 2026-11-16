@@ -29,6 +29,13 @@ export async function verifyCredentials(
     ? await verifyPasswordHash(password, account.passwordHash, account.passwordSalt)
     : usesEnvPassword(account) && verifyEnvPassword(password);
   if (!ok) return { ok: false, reason: "password" };
+  return verifySecondFactor(account, totpCode);
+}
+
+// The second factor alone, for an account that has proved who it is some
+// other way: the password above, or a provider's sign-in that didn't vouch
+// for a second factor (#504). Passes when the account has none.
+export async function verifySecondFactor(account: User, totpCode: unknown): Promise<CredentialResult> {
   if (!account.totp.enabled) return { ok: true };
   const code = typeof totpCode === "string" ? totpCode.trim() : "";
   if (code === "") return { ok: false, reason: "totp-required" };

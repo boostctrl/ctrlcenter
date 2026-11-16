@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { useEditMode } from "./EditMode";
 import type { NavPages } from "@/lib/nav";
 import Icon from "./Icon";
+import { signOut } from "@/lib/sign-out";
 
 // The floating corner control — the old settings gear, evolved into a small menu
 // that links to every enabled page so navigation is reachable from anywhere
@@ -109,11 +110,7 @@ export default function FloatingNav({ boards, weather, status, calendar, member,
               type="button"
               onClick={async () => {
                 setOpen(false);
-                await fetch("/api/logout", { method: "POST" }).catch(() => {});
-                // A full load, so the page re-renders as a visitor (the admin
-                // portal's Log out does the same).
-                // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-                window.location.href = "/";
+                await signOut();
               }}
               className="border-t border-fg/10 px-4 py-2 text-left text-sm text-ink-70 transition-colors hover:bg-fg/10 hover:text-fg"
             >

@@ -46,6 +46,8 @@ export const SECURITY_EVENT_KINDS = [
   "group.changed",
   // The key the stored credentials are encrypted with, replaced (#370).
   "key.rotated",
+  // Signing in through a provider set up, changed or turned off (#504).
+  "signin.provider",
 ] as const;
 export type SecurityEventKind = (typeof SECURITY_EVENT_KINDS)[number];
 

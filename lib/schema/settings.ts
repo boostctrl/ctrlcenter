@@ -16,6 +16,7 @@ import {
   statusAnnouncementsUpdateSchema,
 } from "./announcements";
 import { layoutSchema, layoutUpdateSchema } from "./layout";
+import { signInSchema } from "./sign-in";
 
 export const settingsSchema = z.object({
   title: z.string().default("Home"),
@@ -60,6 +61,10 @@ export const settingsSchema = z.object({
   // The first-run setup (#304) has been finished or skipped. A fresh install
   // starts without it; an upgraded 2.x install had it set by the migration.
   setupComplete: z.boolean().default(false),
+  // Signing in through a provider (#504). Private wholesale from a visitor;
+  // edited through /api/sign-in only, never the settings save, so it is
+  // left out of the input below.
+  signIn: signInSchema.default(signInSchema.parse({})).register(secretFields, { redact: "all" }),
 });
 
 export type Settings = z.infer<typeof settingsSchema>;

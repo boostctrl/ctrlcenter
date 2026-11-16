@@ -35,6 +35,7 @@ import ReauthDialog from "./ReauthDialog";
 import { fetchWithReauth } from "./reauth";
 import { useFocusTrap } from "./useFocusTrap";
 import type { UpgradeSummary } from "@/lib/config/upgrade";
+import { signOut } from "@/lib/sign-out";
 
 type Tab = "apps" | "bookmarks" | "themes" | "settings";
 
@@ -170,11 +171,7 @@ function AdminBody({
   }
 
   async function handleLogout() {
-    await fetch("/api/logout", { method: "POST" });
-    // A full load on purpose: it drops the admin's client state and router
-    // cache, which a soft router.push would keep alive after sign-out.
-    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-    window.location.href = "/";
+    await signOut();
   }
 
   async function handleExport(e: FormEvent) {

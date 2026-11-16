@@ -1097,6 +1097,22 @@ export default async function HelpPage() {
             with. Renaming a group, or merging it into another, changes it on
             every account and everything shared with it; removing one makes
             what was shared with that group alone visible to admins only.
+          </P>
+          <P>
+            <strong>Sign in with a provider</strong>, further down the same
+            tab, puts a &ldquo;Sign in with &hellip;&rdquo; button on the
+            sign-in page through an OpenID Connect provider — Nextcloud&apos;s
+            OIDC Identity Provider app, Authentik, Authelia, Pocket ID.
+            Register CtrlCenter there as a client with the redirect address
+            the card shows, then fill in the issuer (for Nextcloud, its own
+            address), the client ID and the secret. It signs people in to the
+            accounts here by sign-in name, and only to those, unless you let
+            it make a member account for a new name. The provider&apos;s
+            groups that are on the groups list count for that sign-in. An
+            account with its own second factor still enters its code, unless
+            the provider says it used one or you tell CtrlCenter the provider
+            requires one. &ldquo;Confirm it&apos;s you&rdquo; can go through
+            the provider too.
             Set or change the admin password from the portal. If none is set,
             login falls back to the <Code>ADMIN_PASSWORD</Code> environment
             variable. Changing the password signs out every other session.

@@ -483,6 +483,32 @@ anyone is in it. Renaming or merging one there rewrites every account and
 every audience that names it; removing one leaves what was shared with that
 group alone visible to admins only.
 
+#### Signing in through a provider
+
+Settings → Users → **Sign in with a provider** adds a "Sign in with …"
+button beside the password form, through any OpenID Connect provider. It
+signs people in to the accounts here, matched by sign-in name
+(`preferred_username` by default), and adds the provider's groups that are on
+the groups list for that sign-in. A name with no account is refused unless
+**Make an account for a new name** is on. Passwords keep working.
+
+With **Nextcloud** (the *OIDC Identity Provider* app):
+
+1. Install *OIDC Identity Provider* from Nextcloud's app store.
+2. In **Administration settings → OIDC**, add a client: the redirect URI is
+   the one the CtrlCenter card shows (`https://<ctrlcenter>/api/auth/oidc/callback`).
+   Limit the client to a Nextcloud group to choose who may sign in. For
+   **Signing out here also signs out of the provider**, add CtrlCenter's own
+   address (`https://<ctrlcenter>/`) as the client's post-logout redirect URI.
+3. In CtrlCenter, the issuer is your Nextcloud address; paste the client ID
+   and secret, and **Check the provider**.
+
+Nextcloud doesn't say whether its sign-in used a second factor, so an
+account with CtrlCenter two-factor enters its code after Nextcloud too. If
+Nextcloud enforces two-factor for everyone, turn on **The provider requires
+two-factor authentication** instead. The client secret can come from
+`CTRLCENTER_OIDC_CLIENT_SECRET` rather than the config.
+
 `ADMIN_PASSWORD` stands in for the `admin` account only, and only while it
 has no password of its own. A backup carries the accounts: with secrets,
 whole; without, the roster alone, each to be given a password after a
@@ -512,6 +538,7 @@ for reuse. You can also paste a direct image URL or a `data:` URI.
 | `SESSION_SECRET` | no | Secret used to sign session cookies. If unset, a random one is generated on first start and kept in the config volume (`session-secret`); only if that volume isn't writable does it fall back to deriving one from `ADMIN_PASSWORD`. Set it yourself to manage the secret explicitly (e.g. `openssl rand -base64 32`). |
 | `CONFIG_PATH` | no | Path to the config file (default `./config/config.yaml`; the container sets `/config/config.yaml`). The uptime history (`status-history.db`, a SQLite database), the admin session list (`sessions.json`), the security log (`security-events.jsonl`), the inbound webhooks still waiting to go out as one (`webhook-digest.json`), the Monitor's last day of readings for its charts (`monitor-history.json`) and uploaded custom icons (`uploads/`) are written beside it. |
 | `CONFIG_KEY` | no | Key for the stored credentials in `config.yaml` (integration passwords and API keys, alert channel tokens and webhook addresses, inbound webhook tokens, API widget header values, the SMTP and calendar passwords), which are encrypted at rest. If unset, a random key is generated on first start and kept beside the config (`config.key`); back it up with `config.yaml`. Set it to keep the key out of the volume (e.g. `openssl rand -base64 32`). To change it, set the new one and move the old one to `CONFIG_KEY_PREVIOUS` until the next save. |
+| `CTRLCENTER_OIDC_CLIENT_SECRET` | no | The sign-in provider's client secret (Settings → Users → Sign in with a provider), kept out of `config.yaml`; it wins over the stored one. |
 | `CONFIG_KEY_PREVIOUS` | no | The `CONFIG_KEY` before the current one, accepted for reading while credentials move to the new key. |
 | `CTRLCENTER_SMTP_PASS` | no | Overrides the email-alert SMTP password, so the secret can stay out of `config.yaml`. |
 | `CTRLCENTER_CALDAV_PASS` | no | Overrides the private-calendar (CalDAV/WebDAV) password of the calendar widget with id `calendar` (the one a 2.x config migrates to), so that secret can stay out of `config.yaml` too. Other calendar widgets use only their own stored credentials. |

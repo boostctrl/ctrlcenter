@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { TextField, Button } from "@/components/admin/ui";
 import { safeNextPath } from "@/lib/urls";
+import { buttonClasses } from "@/lib/buttons";
+import { oidcFailureMessage } from "@/lib/oidc-messages";
 
 // The sign-in name last used in this browser (#423), so it needn't be
 // retyped; until one is, `admin` while that is the only account (#450),
@@ -20,12 +22,42 @@ export default function LoginForm({
   passwordConfigured,
   singleAccount,
   fallback = "/admin",
+  provider = null,
 }: {
   passwordConfigured: boolean;
   singleAccount: boolean;
   fallback?: string;
+  // The provider's button (#504): "Sign in with Nextcloud", or null.
+  provider?: string | null;
 }) {
   const searchParams = useSearchParams();
+  // Back from the provider with the account's own second factor to enter
+  // (#504): that step alone.
+  if (searchParams.get("code") === "provider") return <ProviderCodeForm fallback={fallback} />;
+  return (
+    <PasswordForm
+      passwordConfigured={passwordConfigured}
+      singleAccount={singleAccount}
+      fallback={fallback}
+      provider={provider}
+    />
+  );
+}
+
+function PasswordForm({
+  passwordConfigured,
+  singleAccount,
+  fallback,
+  provider,
+}: {
+  passwordConfigured: boolean;
+  singleAccount: boolean;
+  fallback: string;
+  provider: string | null;
+}) {
+  const searchParams = useSearchParams();
+  // Back from the provider without a session: why (#504).
+  const providerError = searchParams.get("error") ? oidcFailureMessage(searchParams.get("error"), searchParams.get("name")) : null;
   const [username, setUsername] = useState(singleAccount ? DEFAULT_NAME : "");
   // Focus starts in the password field when the name is known (prefilled
   // or remembered), else in the username field.
@@ -180,9 +212,100 @@ export default function LoginForm({
         </>
       )}
       {error && <p className="text-sm text-status-down">{error}</p>}
+      {!error && providerError && (
+        <p role="alert" className="text-sm text-status-down">
+          {providerError}
+        </p>
+      )}
       <Button type="submit" disabled={loading}>
         {loading ? "Signing in..." : needCode ? "Verify" : "Sign in"}
       </Button>
+      {provider && !needCode && (
+        <>
+          <p className="text-center text-xs text-ink-45">or</p>
+          <a
+            href={`/api/auth/oidc/start${searchParams.get("next") ? `?next=${encodeURIComponent(searchParams.get("next") ?? "")}` : ""}`}
+            className={`${buttonClasses("ghost")} text-center`}
+          >
+            {provider}
+          </a>
+        </>
+      )}
+    </form>
+  );
+}
+
+// The second step of a provider sign-in (#504): the provider vouched for
+// who it is, and the account's own authenticator code (or a recovery code)
+// finishes it. In a popup, the page that opened it is told and the popup
+// closes; else on to where the sign-in was going.
+function ProviderCodeForm({ fallback }: { fallback: string }) {
+  const searchParams = useSearchParams();
+  const [code, setCode] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [expired, setExpired] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/auth/oidc/code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ totp: code }),
+      });
+      const data = (await res.json().catch(() => null)) as { error?: string; expired?: boolean; next?: string; popup?: boolean } | null;
+      if (!res.ok) {
+        setExpired(data?.expired === true);
+        setError(data?.error || "Invalid code");
+        return;
+      }
+      if (data?.popup) {
+        const message = { type: "ctrlcenter:oidc", ok: true };
+        try {
+          new BroadcastChannel("ctrlcenter-oidc").postMessage(message);
+        } catch {
+          // postMessage alone, then.
+        }
+        window.opener?.postMessage(message, window.location.origin);
+        window.close();
+        return;
+      }
+      window.location.assign(safeNextPath(data?.next ?? searchParams.get("next"), window.location.origin, fallback));
+    } catch {
+      setError("Couldn't reach CtrlCenter. Check the connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="glass-card flex w-full max-w-sm flex-col gap-4 p-8">
+      <h1 className="text-2xl font-bold">Sign in</h1>
+      <p className="text-sm text-ink-60">
+        Signed in through the provider. Your account here also has two-factor authentication: enter the 6-digit code
+        from your authenticator app, or a recovery code.
+      </p>
+      <TextField
+        label="Authentication code"
+        autoFocus
+        required
+        autoComplete="one-time-code"
+        value={code}
+        onChange={(e) => setCode(e.target.value)}
+      />
+      {error && <p className="text-sm text-status-down">{error}</p>}
+      {expired ? (
+        <a href="/login" className={`${buttonClasses("ghost")} text-center`}>
+          Start again
+        </a>
+      ) : (
+        <Button type="submit" disabled={loading}>
+          {loading ? "Signing in..." : "Verify"}
+        </Button>
+      )}
     </form>
   );
 }

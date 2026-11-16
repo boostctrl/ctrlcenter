@@ -7,6 +7,7 @@ import { ConfirmProvider } from "@/components/admin/Confirm";
 import ChangePassword from "@/components/admin/ChangePassword";
 import TwoFactor from "@/components/admin/TwoFactor";
 import Sessions from "@/components/admin/Sessions";
+import { signOut } from "@/lib/sign-out";
 
 // A signed-in account's own page (#423): its password, its second factor,
 // its sessions, and a way out. The same cards the admin's Security section
@@ -51,11 +52,7 @@ export default function AccountPanels({
             <Button
               type="button"
               variant="ghost"
-              onClick={async () => {
-                await fetch("/api/logout", { method: "POST" }).catch(() => {});
-                // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-                window.location.href = "/";
-              }}
+              onClick={() => void signOut()}
             >
               Sign out
             </Button>

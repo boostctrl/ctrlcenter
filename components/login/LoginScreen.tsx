@@ -4,6 +4,7 @@ import { adminPasswordConfigured } from "@/lib/auth";
 import { accountsOf } from "@/lib/accounts";
 import BackHome from "@/components/BackHome";
 import LoginForm from "./LoginForm";
+import { oidcButtonLabel, oidcReady } from "@/lib/oidc";
 
 // The sign-in screen: at /login for everyone (#450) and at /admin/login,
 // where the proxy sends a signed-out visit to an admin page. Rendered per
@@ -12,7 +13,9 @@ import LoginForm from "./LoginForm";
 // with no `next` lands: the portal from the admin address, the dashboard
 // from the plain one.
 export default async function LoginScreen({ fallback }: { fallback: string }) {
-  const { auth } = await readConfigInternal();
+  const { auth, settings } = await readConfigInternal();
+  // Signing in through a provider (#504), when it's set up.
+  const o = settings.signIn.oidc;
   return (
     <main id="main-content" className="flex min-h-screen flex-col items-center justify-center gap-6 px-6">
       <Suspense>
@@ -20,6 +23,7 @@ export default async function LoginScreen({ fallback }: { fallback: string }) {
           passwordConfigured={adminPasswordConfigured(auth)}
           singleAccount={accountsOf(auth).length === 1}
           fallback={fallback}
+          provider={oidcReady(o) ? oidcButtonLabel(o) : null}
         />
       </Suspense>
       <BackHome />

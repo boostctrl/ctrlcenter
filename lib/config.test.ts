@@ -1006,6 +1006,13 @@ describe("readConfigInternal stays off public surfaces", () => {
     // (logout reads `auth` only to verify the token it revokes, #365).
     "app/api/login/route.ts",
     "app/api/logout/route.ts",
+    // Signing in through a provider (#504): the provider's settings and the
+    // accounts, read to issue a session; and the settings for its card.
+    "app/api/auth/oidc/callback/route.ts",
+    "app/api/auth/oidc/code/route.ts",
+    "app/api/auth/oidc/start/route.ts",
+    "app/api/auth/providers/route.ts",
+    "app/api/sign-in/route.ts",
     // Admin-only security checklist (#367): reads once, then gates on the hash.
     "app/api/security/credentials/route.ts",
     "app/api/security/route.ts",

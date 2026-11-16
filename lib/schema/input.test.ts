@@ -56,8 +56,13 @@ describe("derived input schemas", () => {
   });
 
   it("accept every stored settings section, so a new one can't be silently dropped", () => {
+    // Saved through their own route, never the settings save: the provider
+    // sign-in (#504, /api/sign-in, behind a recent confirmation).
+    const editedElsewhere = ["signIn"];
     expect(Object.keys(settingsInputSchema.shape).sort()).toEqual(
-      Object.keys(settingsSchema.shape).sort()
+      Object.keys(settingsSchema.shape)
+        .filter((k) => !editedElsewhere.includes(k))
+        .sort()
     );
   });
 });

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isHttps, sessionTokenFrom, verifySession } from "@/lib/auth";
-import { mustSetUpTwoFactor } from "@/lib/accounts";
+import { sessionNeedsTwoFactor } from "@/lib/accounts";
 import { readConfigInternal } from "@/lib/config";
 import { allowedBeforeTwoFactor, TWO_FACTOR_SETUP_PAGE } from "@/lib/two-factor-gate";
 import { contentSecurityPolicy } from "@/lib/csp";
@@ -43,6 +43,8 @@ const ADMIN_PREFIXES = [
   "/api/accounts",
   // The groups list (#505).
   "/api/account-groups",
+  // Signing in through a provider: its settings (#504).
+  "/api/sign-in",
   // Step-up confirmation (#366).
   "/api/reauth",
 ];
@@ -89,7 +91,7 @@ export async function proxy(request: NextRequest) {
   // so a visitor's costs nothing more.
   const held = async (auth: Awaited<ReturnType<typeof readConfigInternal>>["auth"]) => {
     const live = await verifySession(token, auth);
-    return { live, held: !!live && mustSetUpTwoFactor(live.account) && !allowedBeforeTwoFactor(pathname) };
+    return { live, held: !!live && sessionNeedsTwoFactor(live.account, live.session) && !allowedBeforeTwoFactor(pathname) };
   };
   const toSetup = () => {
     if (isApi) {

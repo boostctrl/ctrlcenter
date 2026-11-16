@@ -14,7 +14,10 @@
 // fresh sign-in after the session ended or idled out (401, #399), which
 // keeps the admin's draft and retries the save once they're back in.
 export type ReauthMode = "confirm" | "signin";
-type Prompt = (totpRequired: boolean, mode: ReauthMode) => Promise<boolean>;
+// A session from a provider (#504): its name, to confirm there, and
+// whether the account has a password to confirm with instead.
+export type ReauthOptions = { provider?: string; password?: boolean };
+type Prompt = (totpRequired: boolean, mode: ReauthMode, options: ReauthOptions) => Promise<boolean>;
 
 let prompt: Prompt | null = null;
 let pending: Promise<boolean> | null = null;
@@ -26,17 +29,21 @@ export function registerReauthPrompt(p: Prompt | null): void {
 // Ask the admin to confirm their credentials. Concurrent callers (two
 // autosaves in flight) share one dialog. False when there's no dialog
 // mounted or the admin cancelled.
-export function requestReauth(totpRequired = false, mode: ReauthMode = "confirm"): Promise<boolean> {
+export function requestReauth(
+  totpRequired = false,
+  mode: ReauthMode = "confirm",
+  options: ReauthOptions = {}
+): Promise<boolean> {
   if (!prompt) return Promise.resolve(false);
   if (!pending) {
-    pending = prompt(totpRequired, mode).finally(() => {
+    pending = prompt(totpRequired, mode, options).finally(() => {
       pending = null;
     });
   }
   return pending;
 }
 
-type ReauthBody = { reauthRequired?: boolean; totpRequired?: boolean };
+type ReauthBody = { reauthRequired?: boolean; totpRequired?: boolean; provider?: string; password?: boolean };
 
 export async function fetchWithReauth(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const res = await fetch(input, init);
@@ -54,7 +61,10 @@ export async function fetchWithReauth(input: RequestInfo | URL, init?: RequestIn
     .json()
     .catch(() => null)) as ReauthBody | null;
   if (!body?.reauthRequired) return res;
-  const ok = await requestReauth(body.totpRequired === true);
+  const ok = await requestReauth(body.totpRequired === true, "confirm", {
+    ...(typeof body.provider === "string" ? { provider: body.provider } : {}),
+    ...(body.password === false ? { password: false } : {}),
+  });
   if (!ok) return res;
   return fetch(input, init);
 }

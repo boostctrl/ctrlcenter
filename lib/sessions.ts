@@ -41,7 +41,17 @@ export type SessionRecord = {
   // The account the session belongs to (#423). Absent in a record 3.0
   // wrote, which is the founding admin's (sessionAccount).
   account?: string;
+  // How it signed in, when not with a password (#504): through an OpenID
+  // Connect provider. The provider's groups that are on the groups list,
+  // added to the account's own for what this session sees; and whether the
+  // provider vouched for a second factor.
+  via?: SessionVia;
+  groups?: string[];
+  twoFactor?: boolean;
 };
+
+export type SessionVia = "oidc";
+export const SESSION_VIAS: readonly SessionVia[] = ["oidc"];
 
 export type SessionMeta = {
   ip: string | null;
@@ -49,6 +59,9 @@ export type SessionMeta = {
   https?: boolean;
   forwarded?: boolean | null;
   account?: string;
+  via?: SessionVia;
+  groups?: string[];
+  twoFactor?: boolean;
 };
 
 // The account a session belongs to: its record's, else the founding
@@ -128,9 +141,12 @@ function isRecord(v: unknown): v is SessionRecord {
 // defaulted. `addresses` is left out of the spread and put back only when
 // it's a list of strings, so a malformed one is dropped (#482).
 function normalize(r: SessionRecord, version: unknown): SessionRecord {
-  const { addresses, ...rest } = r;
+  const { addresses, via, groups, twoFactor, ...rest } = r;
   return {
     ...rest,
+    ...(SESSION_VIAS.includes(via as SessionVia) ? { via } : {}),
+    ...(Array.isArray(groups) && groups.every((g) => typeof g === "string") ? { groups } : {}),
+    ...(twoFactor === true ? { twoFactor } : {}),
     https: r.https === true,
     forwarded:
       typeof version === "number" && version >= 2 && typeof r.forwarded === "boolean"
@@ -252,6 +268,9 @@ export async function createSession(meta: SessionMeta, now = Date.now()): Promis
     forwarded: meta.forwarded ?? null,
     reauthAt: now,
     ...(meta.account ? { account: meta.account } : {}),
+    ...(meta.via ? { via: meta.via } : {}),
+    ...(meta.groups?.length ? { groups: meta.groups } : {}),
+    ...(meta.twoFactor ? { twoFactor: true } : {}),
   });
   prune(store, now);
   await persist(store);

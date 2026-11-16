@@ -20,7 +20,7 @@ describe("fetchWithReauth", () => {
     const init = { method: "PUT", body: "{}" };
     const res = await fetchWithReauth("/api/settings", init);
     expect(res.status).toBe(200);
-    expect(prompt).toHaveBeenCalledWith(false, "signin");
+    expect(prompt).toHaveBeenCalledWith(false, "signin", {});
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls[1]).toEqual(["/api/settings", init]);
   });
@@ -41,7 +41,21 @@ describe("fetchWithReauth", () => {
       .mockResolvedValueOnce(Response.json({ ok: true }));
     vi.stubGlobal("fetch", second);
     expect((await fetchWithReauth("/api/config?secrets=1")).status).toBe(200);
-    expect(confirm).toHaveBeenCalledWith(true, "confirm");
+    expect(confirm).toHaveBeenCalledWith(true, "confirm", {});
+  });
+
+  it("passes on a provider session's way to confirm (#504)", async () => {
+    const confirm = vi.fn(async () => true);
+    registerReauthPrompt(confirm);
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(Response.json({ reauthRequired: true, provider: "Nextcloud", password: false }, { status: 403 }))
+        .mockResolvedValueOnce(Response.json({ ok: true }))
+    );
+    expect((await fetchWithReauth("/api/sign-in", { method: "PUT" })).status).toBe(200);
+    expect(confirm).toHaveBeenCalledWith(false, "confirm", { provider: "Nextcloud", password: false });
   });
 
   it("returns the response untouched when no dialog is mounted", async () => {

@@ -23,6 +23,20 @@ here.
   now picked from the list instead of typed, so a typo can no longer start
   a new group. (#505)
 
+- **Sign in through Nextcloud or another OpenID Connect provider.**
+  Settings → Users → **Sign in with a provider** puts a "Sign in with …"
+  button on the sign-in page, for Nextcloud's OIDC Identity Provider app,
+  Authentik, Authelia, Pocket ID and the like. It signs people in to the
+  accounts you've added, matched by sign-in name, and the provider's groups
+  that are on your groups list count for that sign-in. Optionally it makes
+  a member account for a new name, and signing out can sign out of the
+  provider too. An account with its own two-factor still enters its code
+  after the provider, unless the provider reports a second factor or you
+  say it requires one. "Confirm it's you" can go through the provider in a
+  popup. Passwords keep working, and the client secret is stored encrypted
+  or comes from `CTRLCENTER_OIDC_CLIENT_SECRET`. The README walks through
+  setting it up with Nextcloud. (#504)
+
 ### Fixed
 
 - **The Add an account form fits a phone again.** Its fields ran off the

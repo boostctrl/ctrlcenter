@@ -1,7 +1,7 @@
 import { SignJWT, decodeJwt, jwtVerify } from "jose";
 import type { NextRequest } from "next/server";
 import { persistedSessionSecret } from "./session-secret";
-import { createSession, sessionAccount, touchSession, type SessionRecord } from "./sessions";
+import { createSession, sessionAccount, touchSession, type SessionMeta, type SessionRecord } from "./sessions";
 import { arrivedForwarded, clientIp } from "./rate-limit";
 import { findAccount, foundingAccount } from "./accounts";
 import { FOUNDING_ACCOUNT_ID, type AuthConfig, type User } from "./schema/auth";
@@ -210,11 +210,34 @@ export async function createSessionToken(
     .sign(key);
 }
 
+// A short-lived value the server hands the browser and reads back, signed so
+// it can't be forged or carried over to another purpose: a provider
+// sign-in's state between leaving for the provider and coming back, and a
+// sign-in waiting for its second factor (#504).
+export async function signFlow(payload: Record<string, unknown>, purpose: string, ttlSeconds: number): Promise<string> {
+  return new SignJWT(payload)
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime(`${ttlSeconds}s`)
+    .sign(await getSecretKey(`flow:${purpose}`));
+}
+export async function verifyFlow<T>(token: string | undefined, purpose: string): Promise<T | null> {
+  if (!token) return null;
+  try {
+    return (await jwtVerify(token, await getSecretKey(`flow:${purpose}`))).payload as T;
+  } catch {
+    return null;
+  }
+}
+
 // Start a session for this request — the record (with the client address
 // and browser, for the active-sessions list) and the token for the cookie.
 export async function issueSession(
   request: NextRequest,
-  account: Pick<User, "id" | "passwordHash">
+  account: Pick<User, "id" | "passwordHash">,
+  // A provider's sign-in (#504): how, its groups, whether it vouched for a
+  // second factor.
+  provider: Pick<SessionMeta, "via" | "groups" | "twoFactor"> = {}
 ): Promise<{ token: string; id: string }> {
   const id = await createSession({
     ip: clientIp(request),
@@ -222,6 +245,7 @@ export async function issueSession(
     https: isHttps(request),
     forwarded: arrivedForwarded(request),
     account: account.id,
+    ...provider,
   });
   return { token: await createSessionToken(account, id), id };
 }
@@ -254,7 +278,10 @@ export async function verifySession(token: string | undefined, auth: AuthConfig)
   if (!jti) return null;
   const session = await touchSession(jti);
   if (!session || sessionAccount(session) !== account.id) return null;
-  return { session, account };
+  // A provider's groups (#504) count for this session beside the account's
+  // own: every visibility check reads the account it gets here.
+  const extra = session.groups?.filter((g) => !account.groups.includes(g)) ?? [];
+  return { session, account: extra.length ? { ...account, groups: [...account.groups, ...extra] } : account };
 }
 
 // The id of the live session a token names, or null (see verifySession).

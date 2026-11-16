@@ -46,6 +46,12 @@ export function passwordConfigured(account: Pick<User, "id" | "passwordHash">): 
   return Boolean(account.passwordHash) || usesEnvPassword(account);
 }
 
+// The same for a live session (#504): a provider that vouched for a second
+// factor at sign-in has stood in for it.
+export function sessionNeedsTwoFactor(account: User, session: { twoFactor?: boolean }): boolean {
+  return mustSetUpTwoFactor(account) && session.twoFactor !== true;
+}
+
 // Whether an admin requires the account to have a second factor and it has
 // none yet (#449): until it sets one up, it may only reach its own page and
 // what that page calls (lib/two-factor-gate.ts).

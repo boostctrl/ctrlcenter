@@ -9,7 +9,7 @@
 const PAGES = ["/account", "/login", "/admin/login"];
 
 // The APIs the account page uses.
-const APIS = ["/api/2fa", "/api/password", "/api/sessions", "/api/reauth", "/api/login", "/api/logout"];
+const APIS = ["/api/2fa", "/api/password", "/api/sessions", "/api/reauth", "/api/login", "/api/logout", "/api/auth"];
 
 const under = (pathname: string, prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
 

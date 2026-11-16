@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { viewerOf } from "./api-auth";
+import { passwordConfigured } from "./accounts";
+import { readConfigInternal } from "./config";
 import type { AuthConfig } from "./schema/auth";
 
 // Step-up re-authentication (#366). A signed-in session is enough for
@@ -36,10 +38,18 @@ export async function requireRecentAuth(
   const { session } = viewer;
   const sessionId = session.id;
   if (now - session.reauthAt > REAUTH_WINDOW_MS) {
+    // A session from a provider (#504) can confirm there instead: the
+    // dialog offers it by name, and the password only when the account has
+    // one (an account the provider made has none).
+    const o = session.via === "oidc" ? (await readConfigInternal()).settings.signIn.oidc : null;
     return {
       ok: false,
       response: NextResponse.json(
-        { error: "Confirm it's you to continue", reauthRequired: true },
+        {
+          error: "Confirm it's you to continue",
+          reauthRequired: true,
+          ...(o?.enabled ? { provider: o.label.trim() || "single sign-on", password: passwordConfigured(viewer.account) } : {}),
+        },
         { status: 403 }
       ),
     };

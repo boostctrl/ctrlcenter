@@ -30,6 +30,13 @@ const PUBLIC_ROUTES = [
   // Auth itself: issuing and clearing the session.
   "app/api/login/route.ts",
   "app/api/logout/route.ts",
+  // Signing in through a provider (#504): leaving for it, coming back, the
+  // second factor that may follow (each checks its own signed flow), and
+  // which provider the sign-in prompts offer.
+  "app/api/auth/oidc/start/route.ts",
+  "app/api/auth/oidc/callback/route.ts",
+  "app/api/auth/oidc/code/route.ts",
+  "app/api/auth/providers/route.ts",
   // Inbound webhooks (#204): authenticated by a per-service URL token.
   "app/api/hooks/[service]/route.ts",
   // Push checks (#294): authenticated by a per-app URL token.
