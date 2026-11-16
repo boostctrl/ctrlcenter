@@ -1,6 +1,6 @@
 // The accounts' credentials and TOTP enrollments (#290 split, #423): every
 // write to config.auth goes through mutateAccount below.
-import { FOUNDING_ACCOUNT_ID, totpAuthSchema, userSchema, type TotpAuth, type User } from "../schema/auth";
+import { FOUNDING_ACCOUNT_ID, MAX_PASSKEYS, totpAuthSchema, userSchema, type Passkey, type TotpAuth, type User } from "../schema/auth";
 import { accountsOf } from "../accounts";
 import { accountGroups, removeGroup, renameGroup, withGroups } from "../account-groups";
 import { mutate, NotFoundError } from "./store";
@@ -17,6 +17,7 @@ async function mutateAccount<T>(id: string, fn: (account: User) => T): Promise<T
       ...u,
       totp: { ...u.totp, recoveryCodes: [...u.totp.recoveryCodes] },
       groups: [...u.groups],
+      passkeys: [...u.passkeys],
     }));
     const account = users.find((u) => u.id === id);
     if (!account) throw new NotFoundError(`No account "${id}"`);
@@ -105,6 +106,29 @@ export async function deleteAccount(id: string): Promise<void> {
     const users = accountsOf(config.auth);
     if (!users.some((u) => u.id === id)) throw new NotFoundError(`No account "${id}"`);
     config.auth = { ...config.auth, users: users.filter((u) => u.id !== id) };
+  });
+}
+
+// An account's passkeys (#537): one added (refused past MAX_PASSKEYS, or
+// when its id is taken), one removed, one used — its counter and when.
+export class PasskeyLimitError extends Error {}
+export async function addPasskey(id: string, passkey: Passkey): Promise<void> {
+  await mutateAccount(id, (account) => {
+    if (account.passkeys.length >= MAX_PASSKEYS) throw new PasskeyLimitError(`An account can have ${MAX_PASSKEYS} passkeys at most`);
+    if (account.passkeys.some((p) => p.id === passkey.id)) throw new PasskeyLimitError("That passkey is already added");
+    account.passkeys = [...account.passkeys, passkey];
+  });
+}
+export async function removePasskey(id: string, passkeyId: string): Promise<boolean> {
+  return mutateAccount(id, (account) => {
+    const before = account.passkeys.length;
+    account.passkeys = account.passkeys.filter((p) => p.id !== passkeyId);
+    return account.passkeys.length < before;
+  });
+}
+export async function notePasskeyUse(id: string, passkeyId: string, counter: number, at = Date.now()): Promise<void> {
+  await mutateAccount(id, (account) => {
+    account.passkeys = account.passkeys.map((p) => (p.id === passkeyId ? { ...p, counter, lastUsedAt: at } : p));
   });
 }
 

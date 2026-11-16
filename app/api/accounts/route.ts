@@ -32,6 +32,8 @@ export async function GET(request: NextRequest) {
     totp: u.totp.enabled,
     mustChangePassword: u.mustChangePassword,
     requireTwoFactor: u.requireTwoFactor,
+    // How many passkeys it has (#537); never the keys.
+    passkeys: u.passkeys.length,
     createdAt: u.createdAt,
     lastSignInAt: u.lastSignInAt,
     sessions: sessions.filter((s) => sessionAccount(s) === u.id).length,

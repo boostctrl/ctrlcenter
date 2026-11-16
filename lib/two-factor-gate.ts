@@ -9,7 +9,8 @@
 const PAGES = ["/account", "/login", "/admin/login"];
 
 // The APIs the account page uses.
-const APIS = ["/api/2fa", "/api/password", "/api/sessions", "/api/reauth", "/api/login", "/api/logout", "/api/auth"];
+// A passkey (#537) is a second factor too: an account held for one may add it.
+const APIS = ["/api/2fa", "/api/password", "/api/sessions", "/api/reauth", "/api/login", "/api/logout", "/api/auth", "/api/passkeys"];
 
 const under = (pathname: string, prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
 

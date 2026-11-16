@@ -50,8 +50,8 @@ export type SessionRecord = {
   twoFactor?: boolean;
 };
 
-export type SessionVia = "oidc" | "forward";
-export const SESSION_VIAS: readonly SessionVia[] = ["oidc", "forward"];
+export type SessionVia = "oidc" | "forward" | "passkey";
+export const SESSION_VIAS: readonly SessionVia[] = ["oidc", "forward", "passkey"];
 
 export type SessionMeta = {
   ip: string | null;

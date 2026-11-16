@@ -40,6 +40,8 @@ const LABEL: Record<SecurityEventKind, string> = {
   "token.created": "API token made",
   "token.revoked": "API token revoked",
   "token.used": "API token used from a new address",
+  "passkey.added": "Passkey added",
+  "passkey.removed": "Passkey removed",
 };
 
 // The entries that mean something went wrong, or that reshape the account.

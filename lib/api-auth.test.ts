@@ -39,6 +39,9 @@ const PUBLIC_ROUTES = [
   "app/api/auth/code/route.ts",
   "app/api/auth/forward/route.ts",
   "app/api/auth/providers/route.ts",
+  // Signing in with a passkey (#537): its options, and the answer.
+  "app/api/auth/passkey/options/route.ts",
+  "app/api/auth/passkey/route.ts",
   // Inbound webhooks (#204): authenticated by a per-service URL token.
   "app/api/hooks/[service]/route.ts",
   // Push checks (#294): authenticated by a per-app URL token.

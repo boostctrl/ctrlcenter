@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { browserSupportsWebAuthn, browserSupportsWebAuthnAutofill, startAuthentication } from "@simplewebauthn/browser";
 import { useSearchParams } from "next/navigation";
 import { TextField, Button } from "@/components/admin/ui";
 import { safeNextPath } from "@/lib/urls";
@@ -89,6 +90,46 @@ function PasswordForm({
   const [needCode, setNeedCode] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Signing in with a passkey (#537): a button, and the browser's own
+  // offer in the username field where it can make one. Known after mount.
+  const [passkeys, setPasskeys] = useState(false);
+  const signInWithPasskey = useCallback(
+    async (autofill: boolean): Promise<string | null> => {
+      const opts = await fetch("/api/auth/passkey/options", { method: "POST" }).catch(() => null);
+      if (!opts?.ok) return autofill ? null : "Couldn't reach CtrlCenter. Check the connection and try again.";
+      let response;
+      try {
+        response = await startAuthentication({ optionsJSON: await opts.json(), useBrowserAutofill: autofill });
+      } catch (e) {
+        // Cancelled, or set aside for the other way of asking.
+        const name = (e as Error).name;
+        return autofill || name === "NotAllowedError" || name === "AbortError" ? null : "The browser couldn't use a passkey.";
+      }
+      const res = await fetch("/api/auth/passkey", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ response }),
+      }).catch(() => null);
+      const data = (await res?.json().catch(() => null)) as { error?: string; mustChangePassword?: boolean } | null;
+      if (!res?.ok) return data?.error || "Couldn't sign in with that passkey.";
+      window.location.assign(
+        data?.mustChangePassword ? "/account?change=1" : safeNextPath(searchParams.get("next"), window.location.origin, fallback)
+      );
+      return null;
+    },
+    [searchParams, fallback]
+  );
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- what the browser can do, known only after mount
+    setPasskeys(browserSupportsWebAuthn());
+    let live = true;
+    void browserSupportsWebAuthnAutofill().then((ok) => {
+      if (ok && live) void signInWithPasskey(true).then((err) => err && setError(err));
+    });
+    return () => {
+      live = false;
+    };
+  }, [signInWithPasskey]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -183,7 +224,7 @@ function PasswordForm({
             label="Username"
             hint={singleAccount ? undefined : <>The founding account is <strong>admin</strong>.</>}
             autoFocus={!singleAccount}
-            autoComplete="username"
+            autoComplete="username webauthn"
             autoCapitalize="off"
             spellCheck={false}
             required
@@ -226,7 +267,20 @@ function PasswordForm({
       <Button type="submit" disabled={loading}>
         {loading ? "Signing in..." : needCode ? "Verify" : "Sign in"}
       </Button>
-      {(provider || forwardUser) && !needCode && <p className="text-center text-xs text-ink-45">or</p>}
+      {(provider || forwardUser || passkeys) && !needCode && <p className="text-center text-xs text-ink-45">or</p>}
+      {passkeys && !needCode && (
+        <Button
+          type="button"
+          variant="ghost"
+          disabled={loading}
+          onClick={async () => {
+            setError(null);
+            setError(await signInWithPasskey(false));
+          }}
+        >
+          Sign in with a passkey
+        </Button>
+      )}
       {forwardUser && !needCode && (
         <a
           href={`/api/auth/forward${searchParams.get("next") ? `?next=${encodeURIComponent(searchParams.get("next") ?? "")}` : ""}`}

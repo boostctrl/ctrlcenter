@@ -509,6 +509,16 @@ Nextcloud enforces two-factor for everyone, turn on **The provider requires
 two-factor authentication** instead. The client secret can come from
 `CTRLCENTER_OIDC_CLIENT_SECRET` rather than the config.
 
+#### Passkeys
+
+Each account can add **passkeys** on its account page and then sign in with a
+fingerprint, face or device PIN instead of its password and code; the sign-in
+form offers them, and supporting browsers suggest one in the username field.
+A passkey asks for user verification, so it counts as two-factor on its own
+(an account an admin requires two-factor of can use one for that). Each is
+tied to the address it was added at, and the password stays as the way back
+in.
+
 #### API tokens
 
 Each account can make **personal API tokens** on its account page, for a

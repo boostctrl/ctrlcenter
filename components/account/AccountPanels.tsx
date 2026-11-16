@@ -8,6 +8,7 @@ import ChangePassword from "@/components/admin/ChangePassword";
 import TwoFactor from "@/components/admin/TwoFactor";
 import Sessions from "@/components/admin/Sessions";
 import ApiTokens from "@/components/admin/ApiTokens";
+import Passkeys from "@/components/admin/Passkeys";
 import ReauthDialog from "@/components/admin/ReauthDialog";
 import { signOut } from "@/lib/sign-out";
 
@@ -51,6 +52,12 @@ export default function AccountPanels({
           </Card>
           <Card title="Two-factor authentication" intro="Add a time-based code from an authenticator app to your sign-in.">
             <TwoFactor enabled={twoFactor} onChange={setTwoFactor} required={twoFactorRequired} />
+          </Card>
+          <Card
+            title="Passkeys"
+            intro="Sign in with your fingerprint, face or device PIN instead of a password and code. A passkey counts as two-factor on its own; your password stays as the way back in."
+          >
+            <Passkeys />
           </Card>
           <Card title="Sessions" intro="Where your account is signed in. End one you don't recognise, or sign out everywhere else.">
             <Sessions idleControl={false} signIn="/login" />

@@ -26,6 +26,7 @@ type Account = {
   totp: boolean;
   mustChangePassword: boolean;
   requireTwoFactor: boolean;
+  passkeys?: number;
   createdAt: string;
   lastSignInAt: string;
   sessions: number;
@@ -323,6 +324,9 @@ export default function UsersSection() {
                           <span className="text-xs text-status-warning">Must set up 2FA at sign-in</span>
                         )}
                         {a.mustChangePassword && <span className="text-xs text-ink-60">Must set a password at sign-in</span>}
+                        {(a.passkeys ?? 0) > 0 && (
+                          <span className="text-xs text-ink-60">{a.passkeys === 1 ? "1 passkey" : `${a.passkeys} passkeys`}</span>
+                        )}
                       </div>
                       <p className="text-xs text-ink-45">
                         {a.groups.length ? `Groups: ${groupsText(a.groups)} · ` : ""}

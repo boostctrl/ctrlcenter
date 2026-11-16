@@ -28,6 +28,23 @@ export type TotpAuth = z.infer<typeof totpAuthSchema>;
 // factor, and from turning that factor off (#449).
 // Timestamps are ISO strings, "" when unknown.
 export const USER_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/;
+
+// A passkey (#537): the credential's id and public key (base64url), its
+// signature counter, how the browser reaches it, the host it was made on
+// (a passkey works there only), the name its owner gave it, and when it was
+// made and last used (epoch ms). Nothing in it opens a way in by itself.
+export const MAX_PASSKEYS = 20;
+export const passkeySchema = z.object({
+  id: z.string().min(1).max(1024),
+  publicKey: z.string().min(1).max(2048),
+  counter: z.number().int().min(0).catch(0).default(0),
+  transports: z.array(z.string().max(20)).max(10).catch([]).default([]),
+  rpId: z.string().min(1).max(253),
+  name: z.string().max(60).catch("").default(""),
+  createdAt: z.number().catch(0).default(0),
+  lastUsedAt: z.number().nullable().catch(null).default(null),
+});
+export type Passkey = z.infer<typeof passkeySchema>;
 export const userRoleSchema = z.enum(["admin", "member"]);
 export type UserRole = z.infer<typeof userRoleSchema>;
 export const userSchema = z.object({
@@ -45,6 +62,15 @@ export const userSchema = z.object({
   requireTwoFactor: z.boolean().default(false),
   createdAt: z.string().default(""),
   lastSignInAt: z.string().default(""),
+  // Its passkeys (#537); a malformed one is dropped on read.
+  passkeys: z
+    .array(z.unknown())
+    .catch([])
+    .default([])
+    .transform((list) => list.flatMap((p) => {
+      const r = passkeySchema.safeParse(p);
+      return r.success ? [r.data] : [];
+    }).slice(0, MAX_PASSKEYS)),
 });
 export type User = z.infer<typeof userSchema>;
 

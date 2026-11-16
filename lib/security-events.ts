@@ -53,6 +53,9 @@ export const SECURITY_EVENT_KINDS = [
   "token.created",
   "token.revoked",
   "token.used",
+  // Passkeys (#537): added or removed; `detail` names the passkey.
+  "passkey.added",
+  "passkey.removed",
 ] as const;
 export type SecurityEventKind = (typeof SECURITY_EVENT_KINDS)[number];
 

@@ -1132,6 +1132,15 @@ export default async function HelpPage() {
             variable. Changing the password signs out every other session.
           </P>
           <P>
+            <strong>Passkeys</strong>, on each account&apos;s page, sign in
+            with a fingerprint, face or device PIN instead of the password and
+            code: add one there, then choose <strong>Sign in with a
+            passkey</strong> (or the browser&apos;s offer in the username
+            field). A passkey counts as two-factor on its own, works at the
+            address it was added at, and the password stays as the way back
+            in.
+          </P>
+          <P>
             <strong>API tokens</strong>, on each account&apos;s page, let a
             script, Home Assistant or an assistant read CtrlCenter as that
             account with <Code>Authorization: Bearer &lt;token&gt;</Code>: the

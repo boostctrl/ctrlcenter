@@ -57,6 +57,15 @@ here.
   stored only as hashes; Settings → Users lists every account's for an
   admin to revoke, and a first use from a new address is announced. (#538)
 
+- **Passkeys.** Add a passkey on your account page and sign in with your
+  fingerprint, face or device PIN instead of a password and code; the
+  sign-in form has a button for it, and supporting browsers offer your
+  passkey right in the username field. A passkey counts as two-factor on its
+  own, so it also meets an admin's "require two-factor". Each works at the
+  address it was added at, adding or removing one asks for your password
+  again and is announced, and your password stays as the way back in.
+  Settings → Users shows how many passkeys each account has. (#537)
+
 ### Fixed
 
 - **The Add an account form fits a phone again.** Its fields ran off the

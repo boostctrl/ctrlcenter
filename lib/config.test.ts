@@ -1013,6 +1013,11 @@ describe("readConfigInternal stays off public surfaces", () => {
     "app/api/auth/forward/route.ts",
     "app/api/auth/oidc/start/route.ts",
     "app/api/auth/providers/route.ts",
+    "app/api/auth/passkey/route.ts",
+    // An account's own passkeys (#537).
+    "app/api/passkeys/[id]/route.ts",
+    "app/api/passkeys/options/route.ts",
+    "app/api/passkeys/route.ts",
     "app/api/sign-in/route.ts",
     // Personal API tokens (#538): the account's own, or an admin's view.
     "app/api/tokens/[id]/route.ts",
