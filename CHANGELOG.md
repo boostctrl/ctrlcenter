@@ -12,6 +12,25 @@ here.
 
 ## [Unreleased]
 
+### Security
+
+- **Signing in through a provider reaches only the account connected to
+  it.** In 3.3.0 a "Sign in with …" provider signed in to whichever account
+  here shared the provider's username, admins included. With a provider
+  that lets people choose their own username (self-registration, or
+  changing it), someone could have taken a name like `admin` there and
+  signed in to that account here. Accounts now connect to their provider
+  account once, from the account page (**Connect …**, after confirming
+  it's you), and the provider sign-in and "Confirm it's you" match only on
+  the provider's own stable id for the person. **After upgrading, connect
+  your account once** before using the provider's button: sign in with your
+  password, then choose **Connect** on your account page. An account the
+  provider made for a new name in 3.3.0 has no password: an admin resets
+  one for it first. New accounts made by **Make an account for a new name**
+  are connected as they're made, and a name that's already an account here
+  is refused rather than taken. Settings → Users shows which accounts are
+  connected, and an admin can disconnect one. (#555)
+
 ## [3.3.0] - 2026-11-15
 
 ### Added

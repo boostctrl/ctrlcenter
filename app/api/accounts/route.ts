@@ -34,6 +34,8 @@ export async function GET(request: NextRequest) {
     requireTwoFactor: u.requireTwoFactor,
     // How many passkeys it has (#537); never the keys.
     passkeys: u.passkeys.length,
+    // The provider account it is connected to (#555), by the name it had.
+    provider: u.provider ? { name: u.provider.name } : null,
     createdAt: u.createdAt,
     lastSignInAt: u.lastSignInAt,
     sessions: sessions.filter((s) => sessionAccount(s) === u.id).length,

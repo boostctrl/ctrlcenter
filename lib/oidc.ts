@@ -20,10 +20,11 @@ export const OIDC_CALLBACK_PATH = "/api/auth/oidc/callback";
 export const OIDC_FLOW_COOKIE = "ctrlcenter_oidc";
 export const OIDC_FLOW_TTL = 600;
 
-// What a sign-in is for: a new session, or a step-up confirmation of the
-// session that started it (#366). `popup`: it runs in a window the page
+// What a sign-in is for: a new session, a step-up confirmation of the
+// session that started it (#366), or connecting the session's account to
+// this provider identity (#555). `popup`: it runs in a window the page
 // opened, and answers that page instead of navigating.
-export type OidcPurpose = "signin" | "reauth";
+export type OidcPurpose = "signin" | "reauth" | "link";
 export type OidcFlow = {
   state: string;
   nonce: string;
@@ -41,6 +42,14 @@ export function oidcClientSecret(o: OidcConfig): string {
 // Whether the provider is set up enough to offer its button.
 export function oidcReady(o: OidcConfig): boolean {
   return o.enabled && o.issuer.trim() !== "" && o.clientId.trim() !== "";
+}
+
+// The provider's name for an account page (#555), when sign-in through it
+// is on: what a page needs, and nothing else from the settings.
+export async function providerName(): Promise<string | null> {
+  const { readConfigInternal } = await import("./config");
+  const o = (await readConfigInternal()).settings.signIn.oidc;
+  return oidcReady(o) ? o.label.trim() || "single sign-on" : null;
 }
 
 // "Sign in with Nextcloud"; a generic name until one is set.
@@ -126,16 +135,22 @@ export async function startOidc(
     code_challenge_method: "S256",
     state,
     nonce,
-    ...(flow.purpose === "reauth" ? { prompt: "login", max_age: "0" } : {}),
+    // A confirmation, or a connection, asks for a fresh sign-in at the
+    // provider, not one it remembers: it is about who is at it now.
+    ...(flow.purpose !== "signin" ? { prompt: "login", max_age: "0" } : {}),
   });
   return { url, flow: { ...flow, state, nonce, verifier } };
 }
 
-// Who signed in: the account name the configured claim gives (lowercased,
-// and only when it could be a sign-in name), their display name, the
-// groups claim's names, and whether the provider says a second factor was
-// used (`amr`) — or is trusted to have required one.
+// Who signed in: the provider's stable identity for them (the ID token's
+// issuer and subject, which an account is matched on, #555); the name the
+// configured claim gives (lowercased, and only when it could be a sign-in
+// name), used for a new account and for display, never to match; their
+// display name, the groups claim's names, and whether the provider says a
+// second factor was used (`amr`) — or is trusted to have required one.
 export type OidcIdentity = {
+  iss: string;
+  sub: string;
   username: string | null;
   name: string;
   groups: string[];
@@ -155,6 +170,8 @@ export function identityOf(o: OidcConfig, claims: Record<string, unknown>, amr: 
   const username = typeof raw === "string" ? raw.trim().toLowerCase() : "";
   const name = typeof claims.name === "string" ? claims.name.trim().slice(0, 80) : "";
   return {
+    iss: typeof claims.iss === "string" ? claims.iss : "",
+    sub: typeof claims.sub === "string" ? claims.sub : "",
     username: USER_ID_PATTERN.test(username) ? username : null,
     name,
     groups: o.groupsClaim.trim() ? namesOf(claims[o.groupsClaim.trim()]) : [],
@@ -177,14 +194,16 @@ export async function finishOidc(o: OidcConfig, request: NextRequest, flow: Oidc
     expectedState: flow.state,
     expectedNonce: flow.nonce,
     idTokenExpected: true,
-    ...(flow.purpose === "reauth" ? { maxAge: 300 } : {}),
+    ...(flow.purpose !== "signin" ? { maxAge: 300 } : {}),
   });
   const idClaims = (tokens.claims() ?? {}) as Record<string, unknown>;
   let userinfo: Record<string, unknown> = {};
   if (config.serverMetadata().userinfo_endpoint && typeof idClaims.sub === "string") {
     userinfo = (await client.fetchUserInfo(config, tokens.access_token, idClaims.sub)) as Record<string, unknown>;
   }
-  return identityOf(o, { ...idClaims, ...userinfo, sub: idClaims.sub }, idClaims.amr);
+  // The issuer and subject are the ID token's, checked above; UserInfo can't
+  // change them.
+  return identityOf(o, { ...idClaims, ...userinfo, iss: idClaims.iss, sub: idClaims.sub }, idClaims.amr);
 }
 
 // Where to send the browser to sign out of the provider too, back to this

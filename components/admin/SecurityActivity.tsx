@@ -40,6 +40,8 @@ const LABEL: Record<SecurityEventKind, string> = {
   "token.created": "API token made",
   "token.revoked": "API token revoked",
   "token.used": "API token used from a new address",
+  "provider.linked": "Sign-in provider connected",
+  "provider.unlinked": "Sign-in provider disconnected",
   "passkey.added": "Passkey added",
   "passkey.removed": "Passkey removed",
 };

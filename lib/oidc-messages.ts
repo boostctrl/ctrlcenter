@@ -18,6 +18,14 @@ export function oidcFailureMessage(error: string | null | undefined, name?: stri
       return "That account is disabled.";
     case "mismatch":
       return "That was a different account from the one signed in here.";
+    case "not-linked":
+      return "No account here is connected to that provider account yet. Sign in with your password, then connect it on your account page.";
+    case "taken":
+      return name
+        ? `There's already an account named ${name} here. Sign in to it with its password and connect your provider account from its page.`
+        : "There's already an account with that name here. Sign in to it with its password and connect your provider account from its page.";
+    case "in-use":
+      return "That provider account is already connected to another account here.";
     case "no-header":
       return "Your reverse proxy didn't say who you are, or CtrlCenter doesn't trust it yet.";
     default:

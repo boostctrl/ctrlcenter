@@ -1,7 +1,8 @@
 // Signing in through another service (#504): an OpenID Connect provider
 // (Nextcloud's OIDC Identity Provider app, Authentik, Authelia, Pocket ID,
 // …) beside the password form. Every way in maps onto the accounts that
-// exist (#423) — matched by sign-in name — and adds the provider's groups
+// exist (#423) — the one connected to the provider identity, by issuer and
+// subject, never by username (#555) — and adds the provider's groups
 // that are on the groups list (#505) to the session; nothing else about
 // who sees what changes.
 //
@@ -14,7 +15,8 @@
 import { z } from "zod";
 import { secretFields } from "./meta";
 
-// What the provider's claims are read for: the sign-in name, the groups.
+// What the provider's claims are read for: a name (for a new account and
+// for display, never to match an account), the groups.
 export const OIDC_DEFAULT_SCOPES = "openid profile email groups";
 
 export const oidcSchema = z.object({

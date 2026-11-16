@@ -5,6 +5,7 @@ import { navPages } from "@/lib/nav";
 import PageNav from "@/components/PageNav";
 import FloatingNav from "@/components/FloatingNav";
 import AccountPanels from "@/components/account/AccountPanels";
+import { providerName } from "@/lib/oidc";
 
 export const metadata: Metadata = { title: "Your account" };
 export const dynamic = "force-dynamic";
@@ -17,6 +18,11 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   if (!viewer) redirect("/login?next=/account");
   const { account } = viewer;
   const nav = navPages(config, viewer);
+  // The sign-in provider, when it's on, and this account's connection (#555).
+  const label = await providerName();
+  const provider = label
+    ? { label, connected: account.provider ? { name: account.provider.name, linkedAt: account.provider.linkedAt } : null }
+    : null;
   return (
     <>
       <main id="main-content" className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-8 px-6 pt-12 pb-24 sm:px-10 lg:pt-16">
@@ -33,6 +39,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
           twoFactorRequired={account.requireTwoFactor}
           mustChangePassword={query.change === "1" || account.mustChangePassword}
           isAdmin={viewer.isAdmin}
+          provider={provider}
         />
       </main>
       {config.settings.settingsButton && <FloatingNav {...nav} />}

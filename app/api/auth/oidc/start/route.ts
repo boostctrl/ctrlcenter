@@ -4,7 +4,8 @@ import { viewerOf } from "@/lib/api-auth";
 import { readConfigInternal } from "@/lib/config";
 import { log, errorReason } from "@/lib/log";
 import { OIDC_FLOW_COOKIE, OIDC_FLOW_TTL, oidcReady, publicOrigin, startOidc } from "@/lib/oidc";
-import { failSignIn, flowCookieOptions } from "@/lib/oidc-responses";
+import { failLink, failSignIn, flowCookieOptions } from "@/lib/oidc-responses";
+import { REAUTH_WINDOW_MS } from "@/lib/reauth";
 import { safeNextPath } from "@/lib/urls";
 
 // Leave for the provider (#504): a sign-in from the form's button, or —
@@ -14,11 +15,19 @@ import { safeNextPath } from "@/lib/urls";
 // cookie (lib/oidc.ts).
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
-  const purpose = params.get("purpose") === "reauth" ? "reauth" : "signin";
+  const asked = params.get("purpose");
+  const purpose = asked === "reauth" || asked === "link" ? asked : "signin";
   const popup = params.get("popup") === "1";
   const next = safeNextPath(params.get("next"), publicOrigin(request), "/");
   const config = await readConfigInternal();
   const o = config.settings.signIn.oidc;
+  if (purpose === "link") {
+    // Connecting an account (#555): the session's own, confirmed just now
+    // (the account page asks first).
+    if (!oidcReady(o)) return failLink(request, "off");
+    const viewer = await viewerOf(request, config.auth);
+    if (!viewer || viewer.token || Date.now() - viewer.session.reauthAt > REAUTH_WINDOW_MS) return failLink(request, "expired");
+  }
   if (!oidcReady(o)) return failSignIn(request, "off", { popup, next });
   // A confirmation is of the session asking for it.
   if (purpose === "reauth" && !(await viewerOf(request, config.auth))) {
@@ -31,6 +40,6 @@ export async function GET(request: NextRequest) {
     return res;
   } catch (e) {
     log.warn("couldn't reach the sign-in provider", { reason: errorReason(e) });
-    return failSignIn(request, "provider", { popup, next });
+    return purpose === "link" ? failLink(request, "provider") : failSignIn(request, "provider", { popup, next });
   }
 }

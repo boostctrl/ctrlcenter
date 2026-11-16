@@ -9,6 +9,8 @@ import TwoFactor from "@/components/admin/TwoFactor";
 import Sessions from "@/components/admin/Sessions";
 import ApiTokens from "@/components/admin/ApiTokens";
 import Passkeys from "@/components/admin/Passkeys";
+import ProviderLink from "./ProviderLink";
+import { Suspense } from "react";
 import ReauthDialog from "@/components/admin/ReauthDialog";
 import { signOut } from "@/lib/sign-out";
 
@@ -20,7 +22,11 @@ export default function AccountPanels({
   twoFactorRequired = false,
   mustChangePassword,
   isAdmin = false,
+  provider = null,
 }: {
+  // The sign-in provider, when it's on (#555), and this account's
+  // connection to it.
+  provider?: { label: string; connected: { name: string; linkedAt: number } | null } | null;
   twoFactorEnabled: boolean;
   // An admin's tokens can be given the actions scope (#538).
   isAdmin?: boolean;
@@ -53,6 +59,16 @@ export default function AccountPanels({
           <Card title="Two-factor authentication" intro="Add a time-based code from an authenticator app to your sign-in.">
             <TwoFactor enabled={twoFactor} onChange={setTwoFactor} required={twoFactorRequired} />
           </Card>
+          {provider && (
+            <Card
+              title={`Sign in with ${provider.label}`}
+              intro={`Connect your ${provider.label} account to sign in with it. Only the account connected here can.`}
+            >
+              <Suspense>
+                <ProviderLink label={provider.label} connected={provider.connected} />
+              </Suspense>
+            </Card>
+          )}
           <Card
             title="Passkeys"
             intro="Sign in with your fingerprint, face or device PIN instead of a password and code. A passkey counts as two-factor on its own; your password stays as the way back in."

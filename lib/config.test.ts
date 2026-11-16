@@ -988,6 +988,8 @@ describe("readConfigInternal stays off public surfaces", () => {
     "app/admin/setup/page.tsx",
     "app/api/account-groups/[id]/route.ts",
     "app/api/account-groups/route.ts",
+    "app/api/accounts/[id]/provider/route.ts",
+    "app/api/provider-link/route.ts",
     "app/api/accounts/route.ts",
     "app/api/accounts/[id]/password/route.ts",
     "app/api/accounts/[id]/route.ts",

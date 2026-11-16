@@ -8,7 +8,13 @@ import { OIDC_FLOW_COOKIE, publicOrigin } from "./oidc";
 
 // Why a provider sign-in didn't end in a session, as the sign-in form says it.
 // "no-header": the reverse proxy didn't say who this is, or isn't trusted.
+// "not-linked": no account here is connected to that provider identity;
+// "taken": a new account's name is already an account here (#555);
+// "in-use": connecting, an identity another account here holds.
 export type OidcFailure =
+  | "not-linked"
+  | "taken"
+  | "in-use"
   | "off"
   | "expired"
   | "denied"
@@ -37,6 +43,16 @@ export function popupResult(request: NextRequest, result: { ok: boolean; error?:
   const text = result.ok ? "Done. You can close this window." : "That didn't work. You can close this window and try again.";
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>CtrlCenter</title></head><body style="font-family:system-ui,sans-serif;padding:2rem"><p>${escapeHtml(text)}</p><script nonce="${escapeHtml(nonce)}">var m=${message};try{new BroadcastChannel("ctrlcenter-oidc").postMessage(m)}catch(e){}try{if(window.opener)window.opener.postMessage(m,location.origin)}catch(e){}window.close();</script></body></html>`;
   const res = new NextResponse(html, { status: 200, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
+  res.cookies.delete({ name: OIDC_FLOW_COOKIE, path: "/api/auth/oidc" });
+  return res;
+}
+
+// Back to the account page from connecting a provider (#555), saying why it
+// didn't.
+export function failLink(request: NextRequest, error: OidcFailure): NextResponse {
+  const url = new URL("/account", publicOrigin(request));
+  url.searchParams.set("providerError", error);
+  const res = NextResponse.redirect(url, 303);
   res.cookies.delete({ name: OIDC_FLOW_COOKIE, path: "/api/auth/oidc" });
   return res;
 }

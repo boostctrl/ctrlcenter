@@ -487,10 +487,16 @@ group alone visible to admins only.
 
 Settings → Users → **Sign in with a provider** adds a "Sign in with …"
 button beside the password form, through any OpenID Connect provider. It
-signs people in to the accounts here, matched by sign-in name
-(`preferred_username` by default), and adds the provider's groups that are on
-the groups list for that sign-in. A name with no account is refused unless
-**Make an account for a new name** is on. Passwords keep working.
+signs in to the account **connected** to that provider account, by the
+provider's own stable id for the person (issuer and subject), never by
+username: some providers let people choose their username. Each account
+connects once, from its account page (**Connect …**, after confirming it's
+you). The provider's groups that are on the groups list count for that
+sign-in. A provider account connected to nothing here is refused, unless
+**Make an account for a new name** is on: then it gets a new member account,
+connected as it's made, as long as that name isn't an account here already.
+Passwords keep working, and an admin can disconnect an account in
+Settings → Users.
 
 With **Nextcloud** (the *OIDC Identity Provider* app):
 
@@ -502,6 +508,9 @@ With **Nextcloud** (the *OIDC Identity Provider* app):
    address (`https://<ctrlcenter>/`) as the client's post-logout redirect URI.
 3. In CtrlCenter, the issuer is your Nextcloud address; paste the client ID
    and secret, and **Check the provider**.
+4. Each person signs in with their password once, opens their account page
+   and chooses **Connect Nextcloud**. From then on the Nextcloud button signs
+   them in.
 
 Nextcloud doesn't say whether its sign-in used a second factor, so an
 account with CtrlCenter two-factor enters its code after Nextcloud too. If

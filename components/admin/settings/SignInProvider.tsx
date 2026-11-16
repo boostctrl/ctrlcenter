@@ -79,7 +79,7 @@ export default function SignInProvider() {
   return (
     <Card
       title="Sign in with a provider"
-      intro="Offer a “Sign in with …” button beside the password form, through an OpenID Connect provider such as Nextcloud's OIDC Identity Provider app. It signs people in to the accounts here, matched by sign-in name; the provider's groups that are on the list above count too."
+      intro="Offer a “Sign in with …” button beside the password form, through an OpenID Connect provider such as Nextcloud's OIDC Identity Provider app. It signs in to the account connected to that provider account, which each person does once from their account page, never to one that only shares its username; the provider's groups that are on the list above count too."
     >
       <form onSubmit={save} className="flex flex-col gap-3">
         <ToggleRow
@@ -131,7 +131,7 @@ export default function SignInProvider() {
         </div>
         <ToggleRow
           label="Make an account for a new name"
-          hint="Off: only accounts added here can sign in. On: anyone the provider signs in gets a member account on first sign-in, so limit who the provider lets use this client."
+          hint="Off: only accounts connected from their account page can sign in. On: a provider account connected to nothing gets a new member account on first sign-in, when its name isn't taken here, so limit who the provider lets use this client."
           checked={draft.createAccounts}
           onChange={(createAccounts) => set({ createAccounts })}
         />
@@ -156,7 +156,8 @@ export default function SignInProvider() {
               onChange={(e) => set({ scopes: e.target.value })}
             />
             <TextField
-              label="Sign-in name claim"
+              label="Name claim"
+              hint="Names a new account and shows who is connected; never used to match."
               placeholder="preferred_username"
               value={draft.usernameClaim}
               onChange={(e) => set({ usernameClaim: e.target.value })}

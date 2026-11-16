@@ -1105,9 +1105,12 @@ export default async function HelpPage() {
             OIDC Identity Provider app, Authentik, Authelia, Pocket ID.
             Register CtrlCenter there as a client with the redirect address
             the card shows, then fill in the issuer (for Nextcloud, its own
-            address), the client ID and the secret. It signs people in to the
-            accounts here by sign-in name, and only to those, unless you let
-            it make a member account for a new name. The provider&apos;s
+            address), the client ID and the secret. Each person then connects
+            their account once, from its account page, and the button signs
+            in to the account connected to that provider account, never to
+            one that merely shares its username. A provider account connected
+            to nothing is refused, unless you let it make a member account for
+            a new name that isn&apos;t taken here. The provider&apos;s
             groups that are on the groups list count for that sign-in. An
             account with its own second factor still enters its code, unless
             the provider says it used one or you tell CtrlCenter the provider

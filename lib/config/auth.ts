@@ -1,6 +1,6 @@
 // The accounts' credentials and TOTP enrollments (#290 split, #423): every
 // write to config.auth goes through mutateAccount below.
-import { FOUNDING_ACCOUNT_ID, MAX_PASSKEYS, totpAuthSchema, userSchema, type Passkey, type TotpAuth, type User } from "../schema/auth";
+import { FOUNDING_ACCOUNT_ID, MAX_PASSKEYS, totpAuthSchema, userSchema, type Passkey, type ProviderLink, type TotpAuth, type User } from "../schema/auth";
 import { accountsOf } from "../accounts";
 import { accountGroups, removeGroup, renameGroup, withGroups } from "../account-groups";
 import { mutate, NotFoundError } from "./store";
@@ -129,6 +129,21 @@ export async function removePasskey(id: string, passkeyId: string): Promise<bool
 export async function notePasskeyUse(id: string, passkeyId: string, counter: number, at = Date.now()): Promise<void> {
   await mutateAccount(id, (account) => {
     account.passkeys = account.passkeys.map((p) => (p.id === passkeyId ? { ...p, counter, lastUsedAt: at } : p));
+  });
+}
+
+// The provider identity an account is connected to (#555): set — refused
+// when another account already holds it — or cleared.
+export class ProviderLinkTakenError extends Error {}
+export async function setProviderLink(id: string, link: ProviderLink | null): Promise<void> {
+  // One write: the check and the change can't be split by another link.
+  await mutate((config) => {
+    const users = accountsOf(config.auth);
+    if (!users.some((u) => u.id === id)) throw new NotFoundError(`No account "${id}"`);
+    if (link && users.some((u) => u.id !== id && u.provider?.iss === link.iss && u.provider?.sub === link.sub)) {
+      throw new ProviderLinkTakenError("That provider account is already connected to another account here");
+    }
+    config.auth = { ...config.auth, users: users.map((u) => (u.id === id ? { ...u, provider: link } : u)) };
   });
 }
 

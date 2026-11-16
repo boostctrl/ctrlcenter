@@ -4,8 +4,10 @@ import { useScratchConfig, request, memberSession, latestAuditEntry, TEST_ORIGIN
 import { mockProvider, OP, CLIENT_ID, CLIENT_SECRET } from "@/lib/testing/oidc";
 
 // Signing in through an OpenID Connect provider (#504), end to end against a
-// stand-in provider: leaving for it, coming back, the accounts and groups it
-// maps onto, the second factor that may follow, and a confirmation.
+// stand-in provider: leaving for it, coming back, the accounts it reaches —
+// only the one connected to the provider identity, never by username (#555)
+// — and their groups, connecting an account, the second factor that may
+// follow, and a confirmation.
 let start: typeof import("./start/route").GET;
 let callback: typeof import("./callback/route").GET;
 let code: typeof import("../code/route").POST;
@@ -15,6 +17,10 @@ let oidc: typeof import("@/lib/oidc");
 let provider: Awaited<ReturnType<typeof mockProvider>>;
 
 const OIDC = { enabled: true, label: "Nextcloud", issuer: OP, clientId: CLIENT_ID, clientSecret: CLIENT_SECRET };
+// Connect an account to a provider identity, as its owner would from its page.
+const link = (id: string, sub: string) => config.setProviderLink(id, { iss: OP, sub, name: id, linkedAt: Date.now() });
+const setOidc = async (patch: Record<string, unknown>) =>
+  config.setSignIn({ oidc: { ...(await config.readConfigInternal()).settings.signIn.oidc, ...patch } });
 
 beforeAll(async () => {
   await useScratchConfig(YAML.dump({ settings: { signIn: { oidc: OIDC } }, auth: { groups: ["family"] } }));
@@ -25,6 +31,7 @@ beforeAll(async () => {
   auth = await import("@/lib/auth");
   oidc = await import("@/lib/oidc");
   await memberSession("sam", ["ops"]);
+  await link("sam", "u-sam");
 });
 beforeEach(async () => {
   provider = await mockProvider({ endSession: true });
@@ -88,8 +95,8 @@ describe("leaving for the provider", () => {
 });
 
 describe("coming back", () => {
-  it("signs in to the account of that name, with the provider's groups that are on the list", async () => {
-    const res = await signInAs({ userinfo: { preferred_username: "Sam", groups: ["family", "admins"] } }, { next: "/boards/home" });
+  it("signs in to the account connected to that identity, with its groups that are on the list", async () => {
+    const res = await signInAs({ sub: "u-sam", userinfo: { preferred_username: "Sam", groups: ["family", "admins"] } }, { next: "/boards/home" });
     expect(res.status).toBe(303);
     expect(new URL(res.headers.get("location") ?? "").pathname).toBe("/boards/home");
     const live = await session(res);
@@ -103,22 +110,41 @@ describe("coming back", () => {
     expect((await config.readConfigInternal()).auth.users.find((u) => u.id === "sam")?.groups).toEqual(["ops"]);
   });
 
-  it("refuses a name with no account, unless the admin lets the provider make one", async () => {
-    const res = await signInAs({ userinfo: { preferred_username: "newbie" } });
-    expect(res.headers.get("location")).toMatch(/\/login\?error=no-account&name=newbie$/);
-    expect(setCookies(res).homepage_admin_session).toBeUndefined();
-
-    await config.setSignIn({ oidc: { ...(await config.readConfigInternal()).settings.signIn.oidc, createAccounts: true } });
-    const made = await signInAs({ userinfo: { preferred_username: "newbie", name: "New Bie" } });
-    expect((await session(made))?.account).toMatchObject({ id: "newbie", name: "New Bie", role: "member", passwordHash: "" });
-    await config.setSignIn({ oidc: { ...(await config.readConfigInternal()).settings.signIn.oidc, createAccounts: false } });
+  it("never reaches an account by username, whatever name the provider gives (#555)", async () => {
+    for (const name of ["sam", "admin"]) {
+      const res = await signInAs({ sub: "u-evil", userinfo: { preferred_username: name } });
+      expect(res.headers.get("location")).toMatch(/\/login\?error=not-linked$/);
+      expect(setCookies(res).homepage_admin_session).toBeUndefined();
+    }
   });
 
-  it("refuses a disabled account, a name that can't be one, and a callback without its flow", async () => {
+  it("makes a connected member for a new identity only when allowed, and never takes a name that's here", async () => {
+    expect((await signInAs({ sub: "u-new", userinfo: { preferred_username: "newbie" } })).headers.get("location")).toMatch(/error=not-linked/);
+    await setOidc({ createAccounts: true });
+    const made = await signInAs({ sub: "u-new", userinfo: { preferred_username: "newbie", name: "New Bie" } });
+    expect((await session(made))?.account).toMatchObject({
+      id: "newbie",
+      name: "New Bie",
+      role: "member",
+      passwordHash: "",
+      provider: { iss: OP, sub: "u-new", name: "newbie" },
+    });
+    // The same identity again: the same account.
+    expect((await session(await signInAs({ sub: "u-new", userinfo: { preferred_username: "renamed" } })))?.account.id).toBe("newbie");
+    // Another identity with a name that's here, connected or not: refused.
+    for (const name of ["newbie", "sam", "admin"]) {
+      expect((await signInAs({ sub: "u-other", userinfo: { preferred_username: name } })).headers.get("location")).toMatch(
+        new RegExp(`error=taken&name=${name}$`)
+      );
+    }
+    expect((await signInAs({ sub: "u-other", userinfo: { preferred_username: "Not A Name" } })).headers.get("location")).toMatch(/error=name/);
+    await setOidc({ createAccounts: false });
+  });
+
+  it("refuses a disabled account, and a callback without its flow", async () => {
     await config.updateAccount("sam", { enabled: false });
-    expect((await signInAs({ userinfo: { preferred_username: "sam" } })).headers.get("location")).toMatch(/error=disabled/);
+    expect((await signInAs({ sub: "u-sam" })).headers.get("location")).toMatch(/error=disabled/);
     await config.updateAccount("sam", { enabled: true });
-    expect((await signInAs({ userinfo: { preferred_username: "Not A Name" } })).headers.get("location")).toMatch(/error=name/);
     const stray = await callback(request("/api/auth/oidc/callback?code=x&state=y"));
     expect(stray.headers.get("location")).toMatch(/error=expired/);
   });
@@ -126,7 +152,7 @@ describe("coming back", () => {
   it("refuses a forged state", async () => {
     const away = await start(request("/api/auth/oidc/start"));
     const flow = setCookies(away).ctrlcenter_oidc;
-    const { code: c } = provider.signIn(away.headers.get("location") ?? "", { userinfo: { preferred_username: "sam" } });
+    const { code: c } = provider.signIn(away.headers.get("location") ?? "", { sub: "u-sam" });
     const res = await callback(request(`/api/auth/oidc/callback?code=${c}&state=forged`, { headers: { cookie: `ctrlcenter_oidc=${flow}` } }));
     expect(res.headers.get("location")).toMatch(/error=provider/);
   });
@@ -139,17 +165,51 @@ describe("coming back", () => {
   });
 });
 
+describe("connecting an account (#555)", () => {
+  it("connects the session's own account, confirmed just now, to the identity that signs in", async () => {
+    const cookie = `homepage_admin_session=${await memberSession("kim")}`;
+    const away = await start(request("/api/auth/oidc/start?purpose=link", { headers: { cookie } }));
+    expect(new URL(away.headers.get("location") ?? "").searchParams.get("prompt")).toBe("login");
+    const res = await signInAs({ sub: "u-kim", userinfo: { preferred_username: "kimberly" } }, { purpose: "link", cookie });
+    expect(res.headers.get("location")).toMatch(/\/account\?provider=connected$/);
+    expect((await config.readConfigInternal()).auth.users.find((u) => u.id === "kim")?.provider).toMatchObject({
+      iss: OP,
+      sub: "u-kim",
+      name: "kimberly",
+    });
+    expect(await latestAuditEntry()).toMatchObject({ kind: "provider.linked", detail: "kimberly" });
+    expect((await session(await signInAs({ sub: "u-kim" })))?.account.id).toBe("kim");
+  });
+
+  it("won't connect without a fresh confirmation, or without a session", async () => {
+    const { staleSession } = await import("@/lib/testing/routes");
+    const stale = await memberSession("kim");
+    await staleSession(stale);
+    const res = await start(request("/api/auth/oidc/start?purpose=link", { headers: { cookie: `homepage_admin_session=${stale}` } }));
+    expect(res.headers.get("location")).toMatch(/\/account\?providerError=expired$/);
+    expect((await start(request("/api/auth/oidc/start?purpose=link"))).headers.get("location")).toMatch(/providerError=expired/);
+  });
+
+  it("won't connect an identity another account here holds", async () => {
+    const cookie = `homepage_admin_session=${await memberSession("pat")}`;
+    const res = await signInAs({ sub: "u-sam" }, { purpose: "link", cookie });
+    expect(res.headers.get("location")).toMatch(/providerError=in-use/);
+    expect((await config.readConfigInternal()).auth.users.find((u) => u.id === "pat")?.provider).toBeNull();
+  });
+});
+
 describe("an account with its own second factor", () => {
   let secret: string;
   beforeAll(async () => {
     const { generateTotpSecret } = await import("@/lib/totp");
     secret = generateTotpSecret();
-    await memberSession("kim");
-    await config.activateTotp("kim", secret, []);
+    await memberSession("tfa");
+    await config.activateTotp("tfa", secret, []);
+    await link("tfa", "u-tfa");
   });
 
   it("enters its code after the provider, when the provider didn't vouch for one", async () => {
-    const res = await signInAs({ userinfo: { preferred_username: "kim" } }, { next: "/boards/home" });
+    const res = await signInAs({ sub: "u-tfa" }, { next: "/boards/home" });
     expect(res.headers.get("location")).toMatch(/\/login\?code=provider&next=%2Fboards%2Fhome$/);
     expect(setCookies(res).homepage_admin_session).toBeUndefined();
     const pending = setCookies(res).ctrlcenter_signin_code;
@@ -160,19 +220,18 @@ describe("an account with its own second factor", () => {
     const ok = await post(await totpCode(secret));
     expect(ok.status).toBe(200);
     expect(await ok.json()).toEqual({ ok: true, next: "/boards/home", popup: false });
-    expect((await session(ok))?.account.id).toBe("kim");
+    expect((await session(ok))?.account.id).toBe("tfa");
   });
 
   it("goes straight in when the provider says a second factor was used", async () => {
-    const res = await signInAs({ idClaims: { amr: ["pwd", "otp"] }, userinfo: { preferred_username: "kim" } });
+    const res = await signInAs({ sub: "u-tfa", idClaims: { amr: ["pwd", "otp"] } });
     expect((await session(res))?.session.twoFactor).toBe(true);
   });
 
   it("goes straight in when the admin says the provider requires one", async () => {
-    await config.setSignIn({ oidc: { ...(await config.readConfigInternal()).settings.signIn.oidc, enforcesTwoFactor: true } });
-    const res = await signInAs({ userinfo: { preferred_username: "kim" } });
-    expect((await session(res))?.account.id).toBe("kim");
-    await config.setSignIn({ oidc: { ...(await config.readConfigInternal()).settings.signIn.oidc, enforcesTwoFactor: false } });
+    await setOidc({ enforcesTwoFactor: true });
+    expect((await session(await signInAs({ sub: "u-tfa" })))?.account.id).toBe("tfa");
+    await setOidc({ enforcesTwoFactor: false });
   });
 
   it("can't use a code step it wasn't given", async () => {
@@ -184,23 +243,21 @@ describe("an account with its own second factor", () => {
 
 describe("confirming a session at the provider", () => {
   it("asks the provider for a fresh sign-in, and confirms the session it came from", async () => {
-    const token = await memberSession("sam");
-    const cookie = `homepage_admin_session=${token}`;
+    const cookie = `homepage_admin_session=${await memberSession("sam")}`;
     const away = await start(request("/api/auth/oidc/start?purpose=reauth&popup=1", { headers: { cookie } }));
     const to = new URL(away.headers.get("location") ?? "");
     expect(to.searchParams.get("prompt")).toBe("login");
     expect(to.searchParams.get("max_age")).toBe("0");
 
-    const res = await signInAs({ userinfo: { preferred_username: "sam" } }, { purpose: "reauth", popup: true, cookie });
+    const res = await signInAs({ sub: "u-sam" }, { purpose: "reauth", popup: true, cookie });
     expect(res.headers.get("content-type")).toMatch(/text\/html/);
     expect(await res.text()).toContain('"ok":true');
     expect(await latestAuditEntry()).toMatchObject({ kind: "reauth.ok" });
   });
 
-  it("won't confirm a session as someone else", async () => {
-    await memberSession("kim");
+  it("won't confirm a session with another identity, even one giving the account's name (#555)", async () => {
     const cookie = `homepage_admin_session=${await memberSession("sam")}`;
-    const res = await signInAs({ userinfo: { preferred_username: "kim" } }, { purpose: "reauth", popup: true, cookie });
+    const res = await signInAs({ sub: "u-evil", userinfo: { preferred_username: "sam" } }, { purpose: "reauth", popup: true, cookie });
     expect(await res.text()).toContain('"error":"mismatch"');
   });
 
@@ -217,15 +274,15 @@ describe("signing out", () => {
       const token = setCookies(res).homepage_admin_session;
       return (await logout(request("/api/logout", { method: "POST", headers: { cookie: `homepage_admin_session=${token}` } }))).json();
     };
-    expect(await out(await signInAs({ userinfo: { preferred_username: "sam" } }))).toEqual({ ok: true });
+    expect(await out(await signInAs({ sub: "u-sam" }))).toEqual({ ok: true });
 
-    await config.setSignIn({ oidc: { ...(await config.readConfigInternal()).settings.signIn.oidc, endProviderSession: true } });
-    const body = await out(await signInAs({ userinfo: { preferred_username: "sam" } }));
+    await setOidc({ endProviderSession: true });
+    const body = await out(await signInAs({ sub: "u-sam" }));
     const to = new URL(body.redirect);
     expect(to.origin + to.pathname).toBe(`${OP}/logout`);
     expect(to.searchParams.get("client_id")).toBe(CLIENT_ID);
     expect(to.searchParams.get("post_logout_redirect_uri")).toBe(`${TEST_ORIGIN}/`);
-    await config.setSignIn({ oidc: { ...(await config.readConfigInternal()).settings.signIn.oidc, endProviderSession: false } });
+    await setOidc({ endProviderSession: false });
   });
 });
 
@@ -233,15 +290,15 @@ describe("a confirmation for a provider's session", () => {
   it("offers the provider by name, and the password only to an account that has one", async () => {
     const { requireRecentAuth } = await import("@/lib/reauth");
     const { staleSession } = await import("@/lib/testing/routes");
-    const asked = async (name: string) => {
-      const token = setCookies(await signInAs({ userinfo: { preferred_username: name } })).homepage_admin_session;
+    const asked = async (sub: string) => {
+      const token = setCookies(await signInAs({ sub })).homepage_admin_session;
       await staleSession(token);
       const r = await requireRecentAuth(request("/api/x", { headers: { cookie: `homepage_admin_session=${token}` } }));
       if (r.ok) throw new Error("expected a confirmation");
       return r.response.json();
     };
-    expect(await asked("sam")).toMatchObject({ reauthRequired: true, provider: "Nextcloud", password: true });
+    expect(await asked("u-sam")).toMatchObject({ reauthRequired: true, provider: "Nextcloud", password: true });
     // Made by the provider earlier in this file: no password of its own.
-    expect(await asked("newbie")).toMatchObject({ provider: "Nextcloud", password: false });
+    expect(await asked("u-new")).toMatchObject({ provider: "Nextcloud", password: false });
   });
 });

@@ -53,6 +53,10 @@ export const SECURITY_EVENT_KINDS = [
   "token.created",
   "token.revoked",
   "token.used",
+  // An account connected to a provider identity, or disconnected (#555);
+  // `detail` says which.
+  "provider.linked",
+  "provider.unlinked",
   // Passkeys (#537): added or removed; `detail` names the passkey.
   "passkey.added",
   "passkey.removed",

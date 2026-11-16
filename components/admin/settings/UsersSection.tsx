@@ -27,6 +27,7 @@ type Account = {
   mustChangePassword: boolean;
   requireTwoFactor: boolean;
   passkeys?: number;
+  provider?: { name: string } | null;
   createdAt: string;
   lastSignInAt: string;
   sessions: number;
@@ -172,6 +173,17 @@ export default function UsersSection() {
     });
     if (!ok) return;
     await act("turn their second factor off", () => fetchWithReauth(`/api/accounts/${a.id}/totp`, { method: "DELETE" }), "Second factor turned off");
+  }
+  // A provider account that isn't this person's any more (#555).
+  async function unlinkProvider(a: Account) {
+    const ok = await confirm({
+      title: `Disconnect ${a.name || a.id} from the sign-in provider?`,
+      message: "Signing in through the provider stops reaching this account until they connect it again from their account page.",
+      confirmLabel: "Disconnect",
+      danger: true,
+    });
+    if (!ok) return;
+    await act("disconnect the provider", () => fetchWithReauth(`/api/accounts/${a.id}/provider`, { method: "DELETE" }), "Disconnected");
   }
   async function remove(a: Account) {
     const ok = await confirm({
@@ -324,6 +336,11 @@ export default function UsersSection() {
                           <span className="text-xs text-status-warning">Must set up 2FA at sign-in</span>
                         )}
                         {a.mustChangePassword && <span className="text-xs text-ink-60">Must set a password at sign-in</span>}
+                        {a.provider && (
+                          <span className="text-xs text-ink-60">
+                            {a.provider.name ? `Provider: ${a.provider.name}` : "Provider connected"}
+                          </span>
+                        )}
                         {(a.passkeys ?? 0) > 0 && (
                           <span className="text-xs text-ink-60">{a.passkeys === 1 ? "1 passkey" : `${a.passkeys} passkeys`}</span>
                         )}
@@ -361,6 +378,11 @@ export default function UsersSection() {
                           )}
                           {a.sessions > 0 && (
                             <Button type="button" size="sm" variant="ghost" onClick={() => endSessions(a)} disabled={busy}>Sign out everywhere</Button>
+                          )}
+                          {a.provider && (
+                            <Button type="button" size="sm" variant="ghost" onClick={() => void unlinkProvider(a)} disabled={busy}>
+                              Disconnect provider
+                            </Button>
                           )}
                           {!self && a.totp && (
                             <Button type="button" size="sm" variant="ghost" onClick={() => dropTotp(a)} disabled={busy}>Turn 2FA off</Button>

@@ -45,6 +45,19 @@ export const passkeySchema = z.object({
   lastUsedAt: z.number().nullable().catch(null).default(null),
 });
 export type Passkey = z.infer<typeof passkeySchema>;
+
+// The sign-in provider identity an account is connected to (#555): the
+// issuer and the provider's own stable id for the person (`sub`), which a
+// provider sign-in and its confirmations are matched on — never the
+// username, which some providers let people choose. `name` is the username
+// it had when connected, for display; `linkedAt` epoch ms.
+export const providerLinkSchema = z.object({
+  iss: z.string().min(1).max(500),
+  sub: z.string().min(1).max(255),
+  name: z.string().max(80).catch("").default(""),
+  linkedAt: z.number().catch(0).default(0),
+});
+export type ProviderLink = z.infer<typeof providerLinkSchema>;
 export const userRoleSchema = z.enum(["admin", "member"]);
 export type UserRole = z.infer<typeof userRoleSchema>;
 export const userSchema = z.object({
@@ -62,6 +75,8 @@ export const userSchema = z.object({
   requireTwoFactor: z.boolean().default(false),
   createdAt: z.string().default(""),
   lastSignInAt: z.string().default(""),
+  // The provider identity it is connected to (#555), or none.
+  provider: providerLinkSchema.nullable().catch(null).default(null),
   // Its passkeys (#537); a malformed one is dropped on read.
   passkeys: z
     .array(z.unknown())

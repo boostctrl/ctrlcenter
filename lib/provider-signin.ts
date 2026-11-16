@@ -6,10 +6,10 @@
 // vouch for one.
 import { NextResponse, type NextRequest } from "next/server";
 import { issueSession, setSessionCookie, signFlow } from "./auth";
-import { findAccount, sessionNeedsTwoFactor } from "./accounts";
+import { accountsOf, findAccount, sessionNeedsTwoFactor } from "./accounts";
 import { accountGroups } from "./account-groups";
 import { AccountExistsError, addAccount, noteSignIn, readConfigInternal } from "./config";
-import { OIDC_FLOW_COOKIE, publicOrigin } from "./oidc";
+import { OIDC_FLOW_COOKIE, publicOrigin, type OidcIdentity } from "./oidc";
 import { popupResult, type OidcFailure } from "./oidc-responses";
 import { userSchema, type Config, type User } from "./schema";
 import type { SessionVia } from "./sessions";
@@ -25,7 +25,57 @@ export type PendingSignIn = { account: string; groups: string[]; next: string; p
 
 export type ProviderIdentity = { username: string | null; name: string; groups: string[] };
 
-// The account a provider's identity signs in to, or why there is none.
+// The account an OpenID Connect identity signs in to (#555): the one
+// connected to it, by issuer and subject — never by username, which some
+// providers let people choose. With none connected: a new member, connected
+// as it is made, when the admin allows it and the name is free here; else
+// refused. An account that exists is never taken over by name: its owner
+// connects it from its own page.
+export async function oidcAccount(
+  request: NextRequest,
+  config: Config,
+  identity: OidcIdentity,
+  createAccounts: boolean
+): Promise<{ account: User } | { error: OidcFailure; name?: string }> {
+  if (!identity.iss || !identity.sub) return { error: "provider" };
+  const meta = eventMeta(request, identity.username ?? undefined);
+  const linked = accountsOf(config.auth).find((u) => u.provider?.iss === identity.iss && u.provider?.sub === identity.sub);
+  if (linked) {
+    if (linked.enabled) return { account: linked };
+    await recordSecurityEvent("signin.fail", meta);
+    return { error: "disabled" };
+  }
+  if (!createAccounts) {
+    await recordSecurityEvent("signin.fail", meta);
+    return { error: "not-linked" };
+  }
+  if (!identity.username) return { error: "name" };
+  if (findAccount(config.auth, identity.username)) {
+    await recordSecurityEvent("signin.fail", meta);
+    return { error: "taken", name: identity.username };
+  }
+  const made = userSchema.parse({
+    id: identity.username,
+    name: identity.name,
+    role: "member",
+    createdAt: new Date().toISOString(),
+    provider: { iss: identity.iss, sub: identity.sub, name: identity.username, linkedAt: Date.now() },
+  });
+  try {
+    await addAccount(made);
+    notifySecurityEvent(await recordSecurityEvent("account.created", meta, made.id));
+  } catch (e) {
+    // Two first sign-ins at once: the other made it.
+    if (!(e instanceof AccountExistsError)) throw e;
+  }
+  const account = accountsOf((await readConfigInternal()).auth).find(
+    (u) => u.provider?.iss === identity.iss && u.provider?.sub === identity.sub
+  );
+  return account ? { account } : { error: "taken", name: identity.username };
+}
+
+// The account the reverse proxy's headers sign in to (#504), or why there
+// is none: by name, which is the proxy's own identity for the person.
 export async function providerAccount(
   request: NextRequest,
   config: Config,
