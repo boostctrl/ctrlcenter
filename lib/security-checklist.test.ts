@@ -15,6 +15,7 @@ const GREEN: SecurityFacts = {
   idleHours: 24,
   credentials: { source: "file", encrypted: 3, plaintext: 0, unreadable: 0 },
   forwardAuth: { enabled: false, proxies: [] },
+  provider: { enabled: false, http: false },
 };
 
 const row = (facts: Partial<SecurityFacts>, id: string) => {
@@ -134,6 +135,15 @@ describe("securityChecklist (#367)", () => {
     expect(row({ sessionSecret: "password" }, "secret")).toMatchObject({
       level: "bad",
       detail: expect.stringContaining("SESSION_SECRET"),
+    });
+  });
+
+  it("warns about a sign-in provider reached over plain http, only when it's on (#558)", () => {
+    expect(securityChecklist(GREEN).some((r) => r.id === "provider")).toBe(false);
+    expect(row({ provider: { enabled: true, http: false } }, "provider")).toMatchObject({ level: "ok" });
+    expect(row({ provider: { enabled: true, http: true } }, "provider")).toMatchObject({
+      level: "warn",
+      detail: expect.stringContaining("plain http"),
     });
   });
 

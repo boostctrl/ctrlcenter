@@ -120,6 +120,7 @@ export default function ForwardAuth() {
           <TextField
             label="User header"
             placeholder="Remote-User"
+            hint="Your proxy must set or remove it on every request it passes on, including paths it lets through without signing in; otherwise anyone could send their own through it."
             value={draft.userHeader}
             onChange={(e) => set({ userHeader: e.target.value })}
           />

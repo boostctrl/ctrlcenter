@@ -1126,7 +1126,10 @@ export default async function HelpPage() {
             believed only on a connection from the proxy&apos;s own address,
             which you add there (the card shows the address the page came
             from), so nobody reaching CtrlCenter another way can send them;
-            this needs the Docker image. Signing out goes to the proxy&apos;s
+            this needs the Docker image. The proxy must set or remove these
+            headers on every request it passes on, paths it lets through
+            without signing in included, or anyone could send their own
+            through it. Signing out goes to the proxy&apos;s
             sign-out address when you set one; otherwise the headers
             don&apos;t sign anyone back in until they choose{" "}
             <strong>Continue as &hellip;</strong> on the sign-in page.

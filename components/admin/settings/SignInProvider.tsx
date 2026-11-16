@@ -103,7 +103,16 @@ export default function SignInProvider() {
           <TextField
             label="Issuer"
             placeholder="https://cloud.example.com"
-            hint="The provider's address; for Nextcloud, its own address."
+            hint={
+              /^http:\/\//i.test(draft.issuer.trim()) ? (
+                <span className="text-status-warning">
+                  Plain http: anyone on the network between CtrlCenter and the provider could answer for it and sign in
+                  to any connected account. Use its https address.
+                </span>
+              ) : (
+                "The provider's address; for Nextcloud, its own address."
+              )
+            }
             autoCapitalize="off"
             spellCheck={false}
             value={draft.issuer}

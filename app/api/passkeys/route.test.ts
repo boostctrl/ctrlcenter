@@ -93,6 +93,31 @@ describe("adding a passkey", () => {
   });
 });
 
+describe("one account per credential id (#557)", () => {
+  it("refuses a credential id another account holds", async () => {
+    const { res } = await addPasskey(await memberSession("lee"), "cred-1", "Copy");
+    expect(res.status).toBe(409);
+    expect((await config.readConfigInternal()).auth.users.find((u) => u.id === "lee")?.passkeys).toEqual([]);
+  });
+
+  it("tries every account holding an id until one's key checks out", async () => {
+    const { verifyAuthentication } = await import("@/lib/passkeys");
+    const sam = (await config.readConfigInternal()).auth.users.find((u) => u.id === "sam")!;
+    // As a file 3.3.0 wrote could hold it: the same id on two accounts.
+    const twin = { ...sam, id: "twin", passkeys: sam.passkeys.map((p) => ({ ...p, publicKey: "AAAA" })) };
+    verifyAuthenticationResponse
+      .mockRejectedValueOnce(new Error("signature"))
+      .mockResolvedValueOnce({ verified: true, authenticationInfo: { newCounter: 3 } });
+    const found = await verifyAuthentication(
+      request("/api/auth/passkey", { method: "POST" }),
+      { id: "cred-1" } as never,
+      "challenge",
+      [twin, sam]
+    );
+    expect(found?.account.id).toBe("sam");
+  });
+});
+
 describe("signing in with a passkey", () => {
   async function useIt(id: string, host?: string) {
     const headers: Record<string, string> = host ? { host } : {};

@@ -54,6 +54,9 @@ export type SecurityFacts = {
   // Signing in from the reverse proxy's headers (#504), and the addresses
   // they're believed from.
   forwardAuth: { enabled: boolean; proxies: string[] };
+  // Signing in through a provider (#504), and whether its address is plain
+  // http (#558).
+  provider: { enabled: boolean; http: boolean };
 };
 
 // A loopback or private-range address — one a plain-HTTP sign-in from is a
@@ -191,6 +194,22 @@ export function securityChecklist(f: SecurityFacts): ChecklistRow[] {
         }
   );
 
+  // Only when provider sign-in is on: whether it is over https (#558). The
+  // ID token is taken on the strength of the TLS connection, so over plain
+  // http anyone on the network path could answer for the provider.
+  if (f.provider.enabled) {
+    rows.push(
+      f.provider.http
+        ? {
+            id: "provider",
+            level: "warn",
+            title: "Sign-in provider",
+            detail: "Reached over plain http, so anyone on the network between CtrlCenter and the provider could answer for it and sign in to any connected account. Use its https address.",
+          }
+        : { id: "provider", level: "ok", title: "Sign-in provider", detail: "Reached over https." }
+    );
+  }
+
   // Only when forward-auth is on: whether the headers can ever be believed.
   if (f.forwardAuth.enabled) {
     rows.push(
@@ -322,6 +341,10 @@ export async function collectSecurityFacts(
     forwardAuth: {
       enabled: config.settings.signIn.forwardAuth.enabled,
       proxies: config.settings.signIn.forwardAuth.proxies,
+    },
+    provider: {
+      enabled: config.settings.signIn.oidc.enabled,
+      http: /^http:\/\//i.test(config.settings.signIn.oidc.issuer.trim()),
     },
   };
 }

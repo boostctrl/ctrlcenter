@@ -89,7 +89,10 @@ export async function authenticationOptions(request: NextRequest) {
 // The account and passkey the browser's answer is from, when it holds: the
 // passkey made on this host, its signature over this ceremony's challenge,
 // and a counter that hasn't gone backwards. The new counter comes back to
-// be stored.
+// be stored. Every account holding the id is tried until one's key checks
+// out (#557): a credential id is one account's alone now, but a file 3.3.0
+// wrote may hold the same id twice, and the first holder mustn't block the
+// one whose key signed.
 export async function verifyAuthentication(
   request: NextRequest,
   response: AuthenticationResponseJSON,
@@ -100,15 +103,20 @@ export async function verifyAuthentication(
   for (const account of accounts) {
     const passkey = account.passkeys.find((p) => p.id === response.id && p.rpId === rpId);
     if (!passkey) continue;
-    const result = await verifyAuthenticationResponse({
-      response,
-      expectedChallenge: challenge,
-      expectedOrigin: origin,
-      expectedRPID: rpId,
-      credential: { id: passkey.id, publicKey: bytes(passkey.publicKey), counter: passkey.counter, transports: passkey.transports },
-      requireUserVerification: true,
-    });
-    return result.verified ? { account, passkey, counter: result.authenticationInfo.newCounter } : null;
+    let result;
+    try {
+      result = await verifyAuthenticationResponse({
+        response,
+        expectedChallenge: challenge,
+        expectedOrigin: origin,
+        expectedRPID: rpId,
+        credential: { id: passkey.id, publicKey: bytes(passkey.publicKey), counter: passkey.counter, transports: passkey.transports },
+        requireUserVerification: true,
+      });
+    } catch {
+      continue;
+    }
+    if (result.verified) return { account, passkey, counter: result.authenticationInfo.newCounter };
   }
   return null;
 }

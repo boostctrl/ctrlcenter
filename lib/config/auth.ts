@@ -111,12 +111,23 @@ export async function deleteAccount(id: string): Promise<void> {
 
 // An account's passkeys (#537): one added (refused past MAX_PASSKEYS, or
 // when its id is taken), one removed, one used — its counter and when.
+// A credential id is one account's alone (#557): a member who learned
+// another's could otherwise add it under their own key, and get in the way
+// of that account's passkey sign-ins. Checked in the one write that adds it.
 export class PasskeyLimitError extends Error {}
 export async function addPasskey(id: string, passkey: Passkey): Promise<void> {
-  await mutateAccount(id, (account) => {
+  await mutate((config) => {
+    const users = accountsOf(config.auth);
+    const account = users.find((u) => u.id === id);
+    if (!account) throw new NotFoundError(`No account "${id}"`);
     if (account.passkeys.length >= MAX_PASSKEYS) throw new PasskeyLimitError(`An account can have ${MAX_PASSKEYS} passkeys at most`);
-    if (account.passkeys.some((p) => p.id === passkey.id)) throw new PasskeyLimitError("That passkey is already added");
-    account.passkeys = [...account.passkeys, passkey];
+    if (users.some((u) => u.passkeys.some((p) => p.id === passkey.id))) {
+      throw new PasskeyLimitError("That passkey is already added here");
+    }
+    config.auth = {
+      ...config.auth,
+      users: users.map((u) => (u.id === id ? { ...u, passkeys: [...u.passkeys, passkey] } : u)),
+    };
   });
 }
 export async function removePasskey(id: string, passkeyId: string): Promise<boolean> {

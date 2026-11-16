@@ -31,6 +31,21 @@ here.
   is refused rather than taken. Settings → Users shows which accounts are
   connected, and an admin can disconnect one. (#555)
 
+- **One passkey, one account.** A passkey's id can now belong to one
+  account only. Before, a member who learned another account's passkey id
+  could add it under their own key and stop that account's passkey sign-ins
+  from working (never sign in to it). Signing in also tries every account
+  that already holds an id, so a duplicate from 3.3.0 blocks no one. (#557)
+- **A warning for a sign-in provider on plain http.** The Sign in with a
+  provider card and the security checklist now say when the provider's
+  address is `http://`: over plain http anyone on the network between
+  CtrlCenter and the provider could answer for it. (#558)
+- **Forward-auth: the proxy must own the headers.** The README, the help
+  page and the card now say that the reverse proxy must set or remove
+  `Remote-User` and `Remote-Groups` on every request, including paths it
+  lets through without signing in, or anyone could send their own through
+  it. (#556)
+
 ## [3.3.0] - 2026-11-15
 
 ### Added

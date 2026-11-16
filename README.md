@@ -562,6 +562,16 @@ sees the real connecting address. Set a **sign-out address** (Authelia's
 `/logout`, say) to sign out of the proxy too; without one, signing out holds
 the headers off until **Continue as …** on the sign-in page.
 
+**The proxy must set or remove these headers on every request it passes to
+CtrlCenter, including paths it lets through without signing in** (an
+Authelia `bypass` rule for `/api/hooks`, say). CtrlCenter believes them from
+the proxy's address, so a proxy that forwards a client's own `Remote-User` on
+such a path lets anyone sign in under any name. Some proxies copy the headers
+from the auth server only when it sends them and pass the client's own
+otherwise: check yours, or have it clear them first. On nginx, set them with
+`proxy_set_header` in every location that reaches CtrlCenter; an empty value
+removes the header.
+
 `ADMIN_PASSWORD` stands in for the `admin` account only, and only while it
 has no password of its own. A backup carries the accounts: with secrets,
 whole; without, the roster alone, each to be given a password after a
