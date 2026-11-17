@@ -1,7 +1,7 @@
 "use client";
 
 import { WEBHOOK_SERVICES } from "@/lib/schema";
-import { activeChannels, channelNamer } from "@/lib/alert-channels";
+import { activeChannels, alertingWidgets, channelNamer, widgetAlertName } from "@/lib/alert-channels";
 import { STATUS_RANGES } from "@/lib/status";
 import { withHttpScheme } from "@/lib/urls";
 import {
@@ -45,7 +45,11 @@ export default function MonitoringSection({
     confirm,
     alertTypeLabel,
     alertUrlPlaceholder,
+    widgets,
+    widgetLabels,
   } = d;
+  // The API widgets that send alerts (#539), for the channels' filters.
+  const alertWidgets = alertingWidgets(widgets).map((w) => ({ id: w.id, name: widgetAlertName(w, widgetLabels) }));
   // A Send test waits out a pending autosave so it never tests old values.
   const saving = status === "saving";
   return (
@@ -104,7 +108,7 @@ export default function MonitoringSection({
 
       <Card
         title="Alerts"
-        intro="Notify you when an app goes down or recovers, through as many channels as you like. Requires the status checks to be on."
+        intro="Notify you when an app goes down or recovers, or an API widget crosses its thresholds, through as many channels as you like. An app's alerts need the status checks on."
         toggle={{
           checked: alerts.enabled,
           onChange: (enabled) => updateAlerts({ enabled }),
@@ -114,7 +118,7 @@ export default function MonitoringSection({
           <>
             <NumberRow
               label="Confirmations before down"
-              hint="Consecutive failed checks required first."
+              hint="Consecutive failed checks required first, or readings past an API widget's threshold."
               min={1}
               max={10}
               value={alerts.confirmations}
@@ -136,6 +140,7 @@ export default function MonitoringSection({
                   channel={ch}
                   channels={alerts.channels}
                   apps={apps}
+                  widgets={alertWidgets}
                   saving={saving}
                   formatLabel={alertTypeLabel}
                   urlPlaceholder={alertUrlPlaceholder}

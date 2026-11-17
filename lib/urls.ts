@@ -9,6 +9,16 @@ export function withHttpScheme(input: string): string {
   return `http://${value.replace(/^\/+/, "")}`;
 }
 
+// A page of this site as a full address, for a message read away from it (an
+// alert, #539): `path` ("/", "/b/infra") under the site address the admin
+// gave (settings.siteUrl), or "" while there isn't one. A trailing slash on
+// the address is dropped, so one under a path ("https://x/home/") works too.
+export function siteLink(siteUrl: string, path: string): string {
+  const base = siteUrl.trim().replace(/\/+$/, "");
+  if (!/^https?:\/\/[^/]/i.test(base) || !URL.canParse(base)) return "";
+  return `${base}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
 // Ports whose service doesn't speak HTTP, so a bare "host:port" on one of them
 // is better watched by opening a TCP connection than by an HTTP request.
 const TCP_PORTS = new Set([

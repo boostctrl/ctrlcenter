@@ -192,6 +192,26 @@ describe("describeAlert", () => {
     const apprise = buildAppriseRequest("http://a.test", appriseAlert(e, app));
     expect(JSON.parse(apprise.init.body as string).type).toBe("warning");
   });
+
+  // A widget's events each say where its number stands (#539).
+  it("titles any event that carries a detail with it, and calls a widget's down critical", () => {
+    const pool = { kind: "widget" as const, id: "pool", name: "Pool used on Infra", url: "" };
+    const down = { id: "pool", type: "down" as const, detail: "92 % (critical ≥ 90)" };
+    expect(describeAlert(down, pool)).toMatchObject({
+      title: "Pool used on Infra: 92 % (critical ≥ 90)",
+      emoji: "🔴",
+      label: "Critical",
+    });
+    expect(describeAlert({ id: "pool", type: "up", detail: "75 %, back under 90" }, pool).title).toBe(
+      "Pool used on Infra: 75 %, back under 90"
+    );
+    expect(describeAlert({ id: "pool", type: "cleared", detail: "75 %, back under 80" }, pool).title).toBe(
+      "Pool used on Infra: 75 %, back under 80"
+    );
+    expect(describeAlert({ id: "a", type: "down" }, app).label).toBe("Service down");
+    expect(buildEmailMessage(down, pool, 0).subject).toBe("Pool used on Infra: 92 % (critical ≥ 90)");
+    expect(buildEmailMessage(down, pool, 0, "{service} is {status}").subject).toBe("Pool used on Infra is down");
+  });
 });
 
 describe("buildAlertRequest", () => {

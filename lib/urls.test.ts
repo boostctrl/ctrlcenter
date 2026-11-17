@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { guessCheckType, safeNextPath, withHttpScheme } from "./urls";
+import { guessCheckType, safeNextPath, siteLink, withHttpScheme } from "./urls";
 
 describe("withHttpScheme (#277)", () => {
   it("prefixes bare hosts with http://", () => {
@@ -76,5 +76,17 @@ describe("safeNextPath (#23)", () => {
     expect(next(null)).toBe("/admin");
     expect(next("")).toBe("/admin");
     expect(fromQuery("")).toBe("/admin");
+  });
+});
+
+describe("siteLink (#539)", () => {
+  it("puts a page under the site address, or gives nothing without one", () => {
+    expect(siteLink("https://home.example", "/b/infra")).toBe("https://home.example/b/infra");
+    expect(siteLink(" https://home.example/ ", "/")).toBe("https://home.example/");
+    expect(siteLink("https://x.example/home/", "/b/infra")).toBe("https://x.example/home/b/infra");
+    expect(siteLink("https://home.example", "b/infra")).toBe("https://home.example/b/infra");
+    for (const none of ["", "  ", "home.example", "javascript:alert(1)", "https://"]) {
+      expect(siteLink(none, "/")).toBe("");
+    }
   });
 });

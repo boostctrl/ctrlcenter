@@ -123,7 +123,7 @@ const apiContent = {
   refresh: z.number().int().min(MIN_API_REFRESH).max(MAX_API_REFRESH).catch(60).default(60),
   visibility: z.enum(INTEGRATION_WIDGET_VISIBILITIES).catch("admin").default("admin"),
   // Tint the headline number (stat, gauge) amber past `warn`, red past
-  // `critical`, counting up ("above") or down ("below"). Feeds alerts in 3.1.
+  // `critical`, counting up ("above") or down ("below").
   thresholds: z
     .object({
       warn: z.number().nullable().catch(null).default(null),
@@ -132,6 +132,12 @@ const apiContent = {
     })
     .catch({ warn: null, critical: null, direction: "above" })
     .default({ warn: null, critical: null, direction: "above" }),
+  // Alert when the headline number crosses the thresholds (#539): past warn
+  // a warning, past critical a down alert, back a recovery, checked on the
+  // server (lib/widget-alerts.ts). Optional, so a widget saved without it
+  // (by 3.3 or a script) still saves, and one that doesn't alert stores
+  // nothing.
+  alerts: z.boolean().optional().catch(undefined),
 };
 
 // The header card's own switch for its date/time row (was the site-wide

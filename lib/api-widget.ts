@@ -123,26 +123,60 @@ export type ApiResult = { view: ApiView | null; error: string | null };
 // while editing the fields or display just rebuilds the view from the cache.
 const fingerprint = (w: ApiWidget) => JSON.stringify([w.url, w.method, w.headers, w.body]);
 
-type Cached = { data: unknown; error: string | null };
+// `at` is when `data` was fetched: a failed refresh keeps the last good data
+// and its time, with the error beside it.
+type Cached = { data: unknown; error: string | null; at: number };
 
-// The widget's view, through the cache keyed by widget and fingerprint, with
-// the widget's refresh as the TTL. A failed refresh keeps the last good data
-// with the error beside it.
-export async function getApiView(w: ApiWidget): Promise<ApiResult> {
+// The widget's last fetch, through the cache keyed by widget and
+// fingerprint, with the widget's refresh as the TTL: the page and the alert
+// check (#539) share one fetch.
+function readCached(w: ApiWidget): Promise<Cached | undefined> {
   const cache = swrCache<Cached>(`api-widget:${w.refresh}`, w.refresh * 1000);
   const key = `${w.id}|${fingerprint(w)}`;
-  const entry = await cache.get(key, async (prev) => {
+  return cache.get(key, async (prev) => {
     try {
-      return { data: await fetchApiJson(w), error: null };
+      return { data: await fetchApiJson(w), error: null, at: Date.now() };
     } catch (e) {
       if (!(e instanceof ServiceError)) log.warn("api widget fetch error", { widget: w.id, reason: errorReason(e) });
-      return { data: prev?.value.data ?? null, error: e instanceof ServiceError ? e.message : "Fetch failed" };
+      return {
+        data: prev?.value.data ?? null,
+        error: e instanceof ServiceError ? e.message : "Fetch failed",
+        at: prev?.value.at ?? 0,
+      };
     }
   });
+}
+
+// The widget's view. A failed refresh shows the last good data with the
+// error beside it.
+export async function getApiView(w: ApiWidget): Promise<ApiResult> {
+  const entry = await readCached(w);
   if (!entry || entry.data === null) return { view: null, error: entry?.error ?? "No data" };
   try {
     return { view: buildApiView(w, entry.data), error: entry.error };
   } catch (e) {
     return { view: null, error: e instanceof ServiceError ? e.message : "Couldn't read the response" };
   }
+}
+
+// The headline number as the alert check reads it (#539): a stat's or a
+// gauge's first field from the last fetch, as shown ("92 %"), and when that
+// fetch was, so the check counts each reading once. Null while the last
+// fetch failed (the last good data isn't a new reading) or the value isn't a
+// number: either leaves the alert state as it was.
+export type ApiHeadline = { at: number; value: number; text: string };
+export async function getApiHeadline(w: ApiWidget): Promise<ApiHeadline | null> {
+  if (w.display !== "stat" && w.display !== "gauge") return null;
+  const entry = await readCached(w);
+  if (!entry || entry.error !== null || entry.data === null) return null;
+  const field = w.fields[0] ?? { label: "", path: "$", unit: "" };
+  let raw: unknown;
+  try {
+    raw = pick(entry.data, field.path, "Field");
+  } catch {
+    return null;
+  }
+  const value = asNumber(raw);
+  if (value === null) return null;
+  return { at: entry.at, value, text: `${formatApiValue(raw)}${field.unit ? ` ${field.unit}` : ""}` };
 }

@@ -107,3 +107,25 @@ describe("API widget number fields keep what is typed (#397)", () => {
     expect(refresh.value).toBe("60");
   });
 });
+
+// The widget's own alert switch (#539), off by default.
+describe("API widget alerts (#539)", () => {
+  it("switches alerts on for a stat, saying what it sends", async () => {
+    const { user, stored } = setup({ thresholds: { warn: 80, critical: 90, direction: "above" } });
+    const toggle = screen.getByRole("switch", { name: "Send alerts" }) as HTMLInputElement;
+    expect(toggle.checked).toBe(false);
+    expect(screen.getByText(/past critical a down alert/)).toBeTruthy();
+    await user.click(toggle);
+    expect(stored().alerts).toBe(true);
+  });
+
+  it("asks for a threshold first", () => {
+    setup();
+    expect(screen.getByText("Set a warn or critical threshold to alert on.")).toBeTruthy();
+  });
+
+  it("has no switch for rows", () => {
+    setup({ display: "kv" });
+    expect(screen.queryByRole("switch", { name: "Send alerts" })).toBeNull();
+  });
+});

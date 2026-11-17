@@ -18,10 +18,17 @@ import {
 import { layoutSchema, layoutUpdateSchema } from "./layout";
 import { signInSchema } from "./sign-in";
 
+export const MAX_SITE_URL = 2000;
+
 export const settingsSchema = z.object({
   title: z.string().default("Home"),
   favicon: z.string().default(""),
   timezone: z.string().default("UTC"),
+  // Where people open the site (#539), e.g. https://home.example.com: what
+  // an alert links to when it's about something on a board. The server
+  // can't tell it from a background check, and a request's Host header is
+  // whatever the sender wrote. Blank: such alerts carry no link.
+  siteUrl: z.string().max(MAX_SITE_URL).catch("").default(""),
   // Replaced whole on save: omitting an optional custom color clears it.
   theme: themeSchema.default(themeSchema.parse({})).register(mergeRules, { merge: "replace" }),
   // What visitors may change about the theme (#335); admins always may.
@@ -73,6 +80,14 @@ export const settingsInputSchema = z.object({
   title: z.string().optional(),
   favicon: z.string().optional(),
   timezone: z.string().optional(),
+  siteUrl: z
+    .string()
+    .trim()
+    .max(MAX_SITE_URL)
+    .refine((v) => v === "" || (/^https?:\/\//i.test(v) && URL.canParse(v)), {
+      message: "The site address must start with http:// or https://",
+    })
+    .optional(),
   theme: themeInputSchema.optional(),
   visitorTheming: z.enum(VISITOR_THEMING_IDS).optional(),
   themeSchedule: themeScheduleSchema.optional(),

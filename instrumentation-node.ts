@@ -1,9 +1,12 @@
 // The Node side of the startup hook (see instrumentation.ts): start the
 // background uptime poller so /status history accrues independent of page
-// views, and the Monitor's sampler so its charts do too (#530), make the config files private, send the webhook digests the last
-// process left pending, and log the security checklist's red rows.
+// views, the Monitor's sampler so its charts do too (#530), and the API
+// widgets' threshold check (#539), make the config files private, send the
+// webhook digests the last process left pending, and log the security
+// checklist's red rows.
 import { startStatusPoller } from "./lib/status-poller";
 import { startMonitorSampler } from "./lib/monitor-sampler";
+import { startWidgetAlerts } from "./lib/widget-alerts";
 import { CONFIG_FILE } from "./lib/config/store";
 import { tightenPrivateFiles } from "./lib/config/files";
 import { readConfigInternal } from "./lib/config";
@@ -15,6 +18,7 @@ import { log, errorReason } from "./lib/log";
 export async function registerNode() {
   startStatusPoller();
   startMonitorSampler();
+  startWidgetAlerts();
   await tightenConfigFiles();
   await restorePendingDigests();
   await logSecurityWarnings();

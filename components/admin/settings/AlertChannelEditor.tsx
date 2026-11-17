@@ -2,7 +2,7 @@
 
 import type { AlertChannel, AlertType } from "@/lib/schema";
 import { ALERT_TYPES, CHANNEL_TYPES } from "@/lib/schema";
-import { CHANNEL_LABELS, channelNamer, missingFields } from "@/lib/alert-channels";
+import { CHANNEL_LABELS, channelNamer, missingFields, subjectFilterKey } from "@/lib/alert-channels";
 import { ChipGroup, ChipToggles } from "@/components/ChipGroup";
 import {
   ControlRow,
@@ -36,6 +36,7 @@ export function AlertChannelEditor({
   channel: ch,
   channels,
   apps,
+  widgets = [],
   saving,
   formatLabel,
   urlPlaceholder,
@@ -45,8 +46,10 @@ export function AlertChannelEditor({
   channel: AlertChannel;
   // The whole list, for a name that tells this channel from a namesake.
   channels: AlertChannel[];
-  // The monitored apps, for the app filter.
+  // The monitored apps, and the API widgets that send alerts (#539), for
+  // the filter.
   apps: { id: string; name: string }[];
+  widgets?: { id: string; name: string }[];
   saving: boolean;
   formatLabel: Record<AlertType, string>;
   urlPlaceholder: Record<AlertType, string>;
@@ -62,6 +65,11 @@ export function AlertChannelEditor({
   // An app filter naming apps that no longer exist (deleted since) still
   // counts as "only some", so the chips show and the stale ids can be cleared.
   const someApps = ch.apps.length > 0;
+  // A widget is named in the filter by its kind and id (subjectFilterKey).
+  const subjects = [
+    ...apps.map((a) => ({ value: a.id, label: a.name })),
+    ...widgets.map((w) => ({ value: subjectFilterKey({ kind: "widget", id: w.id }), label: w.name })),
+  ];
 
   return (
     <div className={`${subCardClasses} flex flex-col gap-3 p-3`}>
@@ -119,7 +127,14 @@ export function AlertChannelEditor({
         />
       </div>
 
-      <ControlRow label="Apps" hint="Which apps' outages reach this channel.">
+      <ControlRow
+        label={widgets.length > 0 ? "Apps & widgets" : "Apps"}
+        hint={
+          widgets.length > 0
+            ? "Which apps' outages and widgets' thresholds reach this channel."
+            : "Which apps' outages reach this channel."
+        }
+      >
         <ChipGroup
           label={`${name}: apps`}
           shrink
@@ -129,15 +144,15 @@ export function AlertChannelEditor({
           ]}
           value={someApps ? "some" : "all"}
           onChange={(v) =>
-            // "Only some" starts with the first app picked, so the choice sticks.
-            onChange({ apps: v === "all" ? [] : apps.slice(0, 1).map((a) => a.id) })
+            // "Only some" starts with the first one picked, so the choice sticks.
+            onChange({ apps: v === "all" ? [] : subjects.slice(0, 1).map((o) => o.value) })
           }
         />
       </ControlRow>
       {someApps && (
         <ChipToggles
           label={`${name}: alert for`}
-          options={apps.map((a) => ({ value: a.id, label: a.name }))}
+          options={subjects}
           selected={ch.apps}
           onChange={(ids) => onChange({ apps: ids })}
         />

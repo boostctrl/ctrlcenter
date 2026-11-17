@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { apiTone, buildApiView, fetchApiJson, formatApiValue, getApiView } from "./api-widget";
+import { apiTone, buildApiView, fetchApiJson, formatApiValue, getApiHeadline, getApiView } from "./api-widget";
 import { newInstance, widgetInstancesUpdateSchema, type InstanceOf } from "./schema";
 import { withoutEnvSecrets } from "./secrets";
 import { swrCache } from "./swr-cache";
@@ -141,11 +141,68 @@ describe("fetching", () => {
   });
 });
 
+// What the alert check reads (#539): the number, as shown, and when it was
+// fetched, so the check can tell a new reading from the same one read again.
+describe("getApiHeadline", () => {
+  it("reads the first field's number and its fetch time from the shared cache", async () => {
+    swrCache("api-widget:60", 0).deleteWhere(() => true);
+    let status = 200;
+    const fetchMock = vi.fn(async () => (status === 200 ? Response.json(DATA) : new Response("no", { status })));
+    vi.stubGlobal("fetch", fetchMock);
+    const w = api({ id: "headline", fields: [{ label: "Used", path: "$.pool.used_pct", unit: "%" }] });
+    const first = await getApiHeadline(w);
+    expect(first).toEqual({ at: expect.any(Number), value: 91.256, text: "91.26 %" });
+    // The page reads the same fetch, and a second read is the same reading.
+    expect((await getApiView(w)).view).toMatchObject({ value: "91.26" });
+    expect(await getApiHeadline(w)).toEqual(first);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // A failed refresh is no reading at all, though the page keeps the last
+    // good data.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(Date.now() + 61_000);
+      status = 500;
+      await getApiHeadline(w);
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      await vi.waitFor(async () => expect(await getApiHeadline(w)).toBeNull());
+      expect((await getApiView(w)).view).toMatchObject({ value: "91.26" });
+      // The next good fetch is a new reading.
+      vi.setSystemTime(Date.now() + 61_000);
+      status = 200;
+      await getApiHeadline(w);
+      await vi.waitFor(async () => expect((await getApiHeadline(w))?.at).toBeGreaterThan(first!.at));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("has nothing for a value that isn't a number, a bad path, or rows and lists", async () => {
+    swrCache("api-widget:60", 0).deleteWhere(() => true);
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json(DATA)));
+    const one = (path: string) => api({ id: "headline-none", fields: [{ label: "", path, unit: "" }] });
+    expect(await getApiHeadline(one("$.pool.name"))).toBeNull();
+    expect(await getApiHeadline(one("$.missing"))).toBeNull();
+    expect(await getApiHeadline(one("$["))).toBeNull();
+    expect(await getApiHeadline({ ...one("$.pool.used_pct"), display: "kv" })).toBeNull();
+    expect(await getApiHeadline(one("$.disks[1].temp"))).toMatchObject({ value: 41, text: "41" });
+  });
+});
+
 describe("limits", () => {
   it("caps API widgets and checks their URL scheme", () => {
     const many = Array.from({ length: 21 }, (_, i) => ({ ...newInstance("api", `a${i}`) }));
     expect(widgetInstancesUpdateSchema.safeParse(many).success).toBe(false);
     expect(widgetInstancesUpdateSchema.safeParse([{ ...newInstance("api", "a"), url: "ftp://x" }]).success).toBe(false);
     expect(widgetInstancesUpdateSchema.safeParse([{ ...newInstance("api", "a"), url: "https://x" }]).success).toBe(true);
+  });
+
+  // A widget saved as 3.3 shaped it, without the alert switch (#539), still
+  // saves, and stores no switch.
+  it("takes a widget without the alert switch", () => {
+    const { alerts, ...older } = { ...newInstance("api", "a"), alerts: true };
+    void alerts;
+    expect(widgetInstancesUpdateSchema.safeParse([older]).success).toBe(true);
+    expect(widgetInstancesUpdateSchema.safeParse([{ ...older, alerts: "yes" }]).success).toBe(false);
+    expect("alerts" in newInstance("api", "a")).toBe(false);
   });
 });

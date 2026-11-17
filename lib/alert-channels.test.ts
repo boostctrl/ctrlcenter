@@ -1,6 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { channelReady, missingFields, subjectFilterKey, uniqueChannelLabels, wantsAlert } from "./alert-channels";
-import { alertChannelSchema, alertsSchema } from "./schema";
+import {
+  alertingWidgets,
+  channelReady,
+  missingFields,
+  subjectFilterKey,
+  uniqueChannelLabels,
+  wantsAlert,
+  widgetAlertName,
+} from "./alert-channels";
+import { alertChannelSchema, alertsSchema, newInstance, type InstanceOf } from "./schema";
 
 const channel = (over: Record<string, unknown>) =>
   alertChannelSchema.parse({ id: "c", type: "webhook", ...over });
@@ -56,6 +64,34 @@ describe("subjectFilterKey", () => {
     expect(subjectFilterKey({ kind: "app", id: "plex" })).toBe("plex");
     expect(subjectFilterKey({ kind: "widget", id: "w1" })).toBe("widget:w1");
     expect(subjectFilterKey({ kind: "integration", id: "truenas" })).toBe("integration:truenas");
+  });
+});
+
+describe("alertingWidgets / widgetAlertName (#539)", () => {
+  const api = (id: string, over: Partial<InstanceOf<"api">> = {}): InstanceOf<"api"> => ({
+    ...newInstance("api", id),
+    alerts: true,
+    thresholds: { warn: 80, critical: null, direction: "above" },
+    ...over,
+  });
+
+  it("takes the API widgets showing one number, switched on, with a threshold", () => {
+    const widgets = [
+      api("stat"),
+      api("gauge", { display: "gauge" }),
+      api("off", { alerts: false }),
+      api("rows", { display: "kv" }),
+      api("none", { thresholds: { warn: null, critical: null, direction: "above" } }),
+      newInstance("notes", "notes"),
+    ];
+    expect(alertingWidgets(widgets).map((w) => w.id)).toEqual(["stat", "gauge"]);
+  });
+
+  it("names one by its title, its field's label, or what the admin calls it", () => {
+    const labels = { w: "API 2" };
+    expect(widgetAlertName(api("w", { title: " Pool " }), labels)).toBe("Pool");
+    expect(widgetAlertName(api("w", { fields: [{ label: "Used", path: "$.u", unit: "%" }] }), labels)).toBe("Used");
+    expect(widgetAlertName(api("w"), labels)).toBe("API 2");
   });
 });
 

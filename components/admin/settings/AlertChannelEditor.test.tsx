@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { alertsSchema, type AlertChannel } from "@/lib/schema";
 import { AlertChannelEditor } from "./AlertChannelEditor";
 
@@ -75,5 +76,40 @@ describe("AlertChannelEditor's Send test (#350)", () => {
       "Webhook",
       "Webhook 2",
     ]);
+  });
+});
+
+// A channel's filter offers the API widgets that send alerts beside the
+// apps, each named by its kind and id (#539).
+describe("AlertChannelEditor's filter", () => {
+  const filter = (channel: AlertChannel, widgets?: { id: string; name: string }[]) => {
+    const onChange = vi.fn();
+    render(
+      <AlertChannelEditor
+        channel={channel}
+        channels={channels}
+        apps={[{ id: "plex", name: "Plex" }]}
+        widgets={widgets}
+        saving={false}
+        formatLabel={formatLabel}
+        urlPlaceholder={urlPlaceholder}
+        onChange={onChange}
+        onRemove={() => {}}
+      />
+    );
+    return onChange;
+  };
+
+  it("names only apps while no widget sends alerts", () => {
+    filter({ ...chat, apps: ["plex"] });
+    expect(screen.getByText("Apps")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Pool used" })).toBeNull();
+  });
+
+  it("offers the widgets that send alerts, as widget:<id>", async () => {
+    const onChange = filter({ ...chat, apps: ["plex"] }, [{ id: "pool", name: "Pool used" }]);
+    expect(screen.getByText("Apps & widgets")).toBeTruthy();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Pool used" }));
+    expect(onChange).toHaveBeenLastCalledWith({ apps: ["plex", "widget:pool"] });
   });
 });

@@ -50,6 +50,14 @@ export default function GeneralSection({
           value={settings.favicon}
           onChange={(favicon) => setSettings({ ...settings, favicon })}
         />
+        <TextField
+          label="Site address"
+          type="url"
+          placeholder="https://home.example.com"
+          value={settings.siteUrl}
+          onChange={(e) => setSettings({ ...settings, siteUrl: e.target.value })}
+          hint="Where you open CtrlCenter. An alert about a widget links to its board here; leave blank for no link."
+        />
         <label className="flex flex-col gap-1.5 text-sm">
           <span className={fieldLabelClasses}>Default time zone</span>
           <input

@@ -1,8 +1,8 @@
 // Alert state that has to outlast the process (#559), kept in
 // `alert-state.json` beside config.yaml. Each source of alerts keeps a book
-// of its own, keyed by what it watches: today the apps' warnings (#310),
-// which were announced once more after every restart or upgrade; next the
-// widgets' thresholds (#539) and the integrations' health (#540). An app's
+// of its own, keyed by what it watches: the apps' warnings (#310), which
+// were announced once more after every restart or upgrade, and the API
+// widgets' thresholds (#539); next the integrations' health (#540). An app's
 // down/up state isn't here: it's rebuilt from the uptime history (#391,
 // seedState in lib/alerts.ts).
 //
@@ -23,8 +23,9 @@ const FILE_VERSION = 1;
 // a source that watches more than it should.
 export const MAX_BOOK_ENTRIES = 2000;
 
-// The books, one per source of alerts.
-export type AlertBook = "warnings";
+// The books, one per source of alerts: the apps' warnings, and the API
+// widgets' thresholds (lib/widget-alerts.ts).
+export type AlertBook = "warnings" | "thresholds";
 
 type State = {
   // Each book as plain JSON, as it was read or last written, and its text,

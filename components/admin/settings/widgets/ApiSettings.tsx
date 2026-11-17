@@ -21,6 +21,7 @@ import {
   SelectField,
   TextArea,
   TextField,
+  ToggleRow,
   controlClasses,
 } from "../../ui";
 import type { InstanceEditorProps } from "./index";
@@ -244,6 +245,18 @@ export default function ApiSettings({ w, onChange }: InstanceEditorProps<"api">)
             <option value="below">Down (at or below)</option>
           </SelectField>
         </div>
+      )}
+      {single && (
+        <ToggleRow
+          label="Send alerts"
+          hint={
+            api.thresholds.warn === null && api.thresholds.critical === null
+              ? "Set a warn or critical threshold to alert on."
+              : "Past warn sends a warning, past critical a down alert, and coming back a recovery, through the channels in Monitoring → Alerts. Checked on the server at each refresh, whether or not a page is open."
+          }
+          checked={api.alerts === true}
+          onChange={(alerts) => onChange({ alerts: alerts || undefined })}
+        />
       )}
 
       <div className="grid gap-4 sm:grid-cols-2">

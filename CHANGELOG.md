@@ -14,6 +14,18 @@ here.
 
 ### Added
 
+- **An API widget can send alerts when its number crosses its thresholds.**
+  Turn on **Send alerts** in the widget's settings: going past warn sends a
+  warning, past critical a down alert, and coming back a recovery, through
+  your alert channels and their Warnings, Down and Recovered switches. The
+  server checks it at the widget's refresh, whether or not a page is open,
+  and it takes as many readings in a row as an outage takes failed checks.
+  An alert reads like "Pool used on Infra: 92 % (critical ≥ 90)". A channel
+  narrowed to some apps lists these widgets beside them. Off by default.
+  (#539)
+- **A site address in Settings → General.** Where you open CtrlCenter,
+  such as `https://home.example.com`. An alert about a widget links to its
+  board there; left blank, it carries no link. (#539)
 - **The generic webhook says what an alert is about.** Its JSON gains
   `kind` (`app` for now) and `id`, the app's id, which stays the same when
   the app is renamed. Every field it sent before is unchanged. (#559)

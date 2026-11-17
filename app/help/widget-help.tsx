@@ -116,7 +116,9 @@ export const WIDGET_HELP: Partial<Record<WidgetType, { title: string; body: Reac
           A header value can name an environment variable — write{" "}
           <code>Bearer ${"{"}API_TOKEN{"}"}</code> — to keep a token out of the
           config file; it&apos;s only sent to the widget&apos;s saved URL.
-          Warning and critical thresholds tint a stat or gauge amber or red.
+          Warning and critical thresholds tint a stat or gauge amber or red,
+          and with <strong>Send alerts</strong> on, crossing them sends an
+          alert through your channels.
         </P>
         <P>
           A widget is yours alone by default. Set it to{" "}

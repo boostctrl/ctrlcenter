@@ -1,7 +1,7 @@
 // The alert channel list (#291) as both the server and the admin form see it:
 // whether a channel has enough set to send, and which events it wants. Pure,
 // so the form can show the same readiness the poller acts on.
-import type { AlertChannel, AlertConfig, ChannelType } from "./schema";
+import type { AlertChannel, AlertConfig, ChannelType, InstanceOf, WidgetInstance } from "./schema";
 
 export const CHANNEL_LABELS: Record<ChannelType, string> = {
   webhook: "Webhook",
@@ -77,6 +77,26 @@ export function wantsAlert(
   }[type];
   if (!wanted) return false;
   return ch.apps.length === 0 || ch.apps.includes(subjectFilterKey(subject));
+}
+
+// The API widgets that send alerts (#539): showing one number, with the
+// switch on and a threshold to cross. The server checks these, and a
+// channel's filter offers them.
+type ApiWidget = InstanceOf<"api">;
+export function alertingWidgets(widgets: readonly WidgetInstance[]): ApiWidget[] {
+  return widgets.filter(
+    (w): w is ApiWidget =>
+      w.type === "api" &&
+      w.alerts === true &&
+      (w.display === "stat" || w.display === "gauge") &&
+      (w.thresholds.warn !== null || w.thresholds.critical !== null)
+  );
+}
+
+// What an alert calls such a widget: its title, else its field's label,
+// else what the admin calls it (`labels`, lib/widgets/labels.ts: "API 2").
+export function widgetAlertName(w: ApiWidget, labels: Record<string, string>): string {
+  return w.title.trim() || w.fields[0]?.label.trim() || labels[w.id] || "API widget";
 }
 
 export function channelLabel(ch: AlertChannel): string {

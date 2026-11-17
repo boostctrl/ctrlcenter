@@ -61,8 +61,10 @@ Built with Next.js 16, React 19, and Tailwind v4.
   service goes down or recovers, to as many channels as you like: a **webhook**
   (generic JSON, Discord, Slack, or ntfy), **email** over SMTP (works with
   SMTP2GO, Gmail, Fastmail, any relay), **Telegram**, **Gotify**, **Pushover**,
-  or an **Apprise** API server. Each channel picks its events and apps, and
-  flap-dampening confirmations keep a single blip quiet. **Inbound
+  or an **Apprise** API server. An **API widget** can alert too, when its
+  number crosses its warn or critical threshold. Each channel picks its
+  events and what it hears about, and flap-dampening confirmations keep a
+  single blip quiet. **Inbound
   webhooks** let **Sonarr, Radarr and Seerr** push their own events — a
   grab, an import, a request awaiting approval, a health issue — out through
   the same channels: email gets a short report with the poster and the key
@@ -271,6 +273,8 @@ schemaVersion: 3            # written for you; older files migrate on first star
 settings:
   title: ctrlcenter         # browser tab title
   timezone: America/Chicago # IANA timezone, used for the date + greeting
+  siteUrl: https://home.example.com  # where you open it; what an alert about a
+                            # widget links to (blank: no link)
   theme:                    # site-wide default (visitors can override in /settings)
     mode: system            # system | light | dark
     design: glass           # glass aero flat soft minimal bold cyber clay frost outline paper gradient aura emboss carve stripe sketch console
@@ -317,9 +321,11 @@ settings:
     longitude: -77.0369
     units: imperial         # imperial | metric
     ipLocation: true        # first visit: the browser asks ipwho.is for a rough location from its IP
-  alerts:                   # notify when a service goes down / recovers
+  alerts:                   # notify when a service goes down / recovers, or an
+                            # API widget with alerts: true crosses its thresholds
     enabled: false
-    confirmations: 2        # consecutive failed checks before "down" (flap dampening)
+    confirmations: 2        # consecutive failed checks (or readings past a
+                            # widget's threshold) before alerting (flap dampening)
     channels:               # any number; each type reads only its own fields
       - id: discord
         type: webhook       # webhook | email | telegram | gotify | pushover | apprise
@@ -330,7 +336,7 @@ settings:
         token: ""           # from @BotFather
         chatId: ""
         onRecovery: false   # also onDown, onWarning, onWebhooks (inbound events); all default true
-        apps: [plex]        # only these app ids; leave out for every app
+        apps: [plex, "widget:nas"]  # only these app ids and widget:<id>s; leave out for all
       - id: mail
         type: email
         smtp:
@@ -414,7 +420,8 @@ widgets:                    # every widget, with its content; any type can
   - { id: nas, type: api, title: NAS, url: "http://nas.lan/api/pool",
       headers: [{ name: Authorization, value: "Bearer ${NAS_TOKEN}" }],
       display: gauge, fields: [{ label: Used, path: $.used_pct, unit: "%" }],
-      thresholds: { warn: 80, critical: 95 } }   # visibility: public to share
+      thresholds: { warn: 80, critical: 95 },
+      alerts: true }        # alert when it crosses them; visibility: public to share
   # …and the other types: clock, weather, status, search, feed, countdown,
   # worldClocks, systemStats, favorites, integration. A widget without a
   # row on a board waits, hidden, in that board's layout editor tray.

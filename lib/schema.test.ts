@@ -286,6 +286,18 @@ describe("settingsInputSchema", () => {
     expect(settingsInputSchema.parse({ statusChecks: true })).toEqual({ statusChecks: true });
     expect(settingsInputSchema.parse({}).statusChecks).toBeUndefined();
   });
+
+  // What an alert about a widget links to (#539).
+  it("takes a site address that is http(s) or blank, trimmed", () => {
+    expect(settingsInputSchema.parse({ siteUrl: " https://home.example " }).siteUrl).toBe("https://home.example");
+    expect(settingsInputSchema.parse({ siteUrl: "" }).siteUrl).toBe("");
+    for (const bad of ["home.example", "javascript:alert(1)", "https://", "ftp://home.example"]) {
+      expect(settingsInputSchema.safeParse({ siteUrl: bad }).success).toBe(false);
+    }
+    // A stored one that won't do reads as none.
+    expect(settingsSchema.parse({ siteUrl: 5 }).siteUrl).toBe("");
+    expect(settingsSchema.parse({}).siteUrl).toBe("");
+  });
 });
 
 describe("layoutSchema topGap", () => {

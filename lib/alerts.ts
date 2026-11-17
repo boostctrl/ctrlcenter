@@ -5,6 +5,7 @@ import {
   channelReady,
   wantsAlert,
   type AlertSubject,
+  type AlertSubjectKind,
 } from "./alert-channels";
 import { loadAlertState, readBook, writeBook } from "./alert-state";
 import { log, hostOf, errorReason } from "./log";
@@ -30,8 +31,9 @@ import { sampleNotification, type SampleId } from "./notification-samples";
 
 // "warning" and "cleared" are an up app entering and leaving the warning
 // state (#310), e.g. a certificate near expiry; `detail` carries the text.
-// `id` is the key the event's source keeps its state under: for an app,
-// its id.
+// Another source's events may carry a detail of any type: a widget's says
+// where its number stands (#539). `id` is the key the event's source keeps
+// its state under: for an app, its id.
 export type AlertEventType = "down" | "up" | "warning" | "cleared";
 export type AlertEvent = { id: string; type: AlertEventType; detail?: string };
 
@@ -115,33 +117,58 @@ export function evaluateWarnings(
   return { next, events };
 }
 
-export type AlertApp = { name: string; url: string };
+// What an alert's words need of its subject (lib/alert-channels.ts):
+// `kind` is left out by callers that only ever describe an app.
+export type AlertApp = { name: string; url: string; kind?: AlertSubjectKind };
 // `unattached` is the same message without its attachment, sent when the
 // server refuses the attachment itself (an Apprise poster, #532).
 export type AlertRequest = { url: string; init: RequestInit; unattached?: AlertRequest };
 
 // The words and look of one event, shared by every format. `status` is what
-// the email subject's {status} becomes.
+// the email subject's {status} becomes. An event with a detail is titled
+// "name: detail" whatever its type: an app's down, recovery and cleared
+// events carry none, so they keep their words.
 export function describeAlert(
   event: AlertEvent,
   app: AlertApp
 ): { title: string; emoji: string; status: string; label: string; accent: string } {
+  const detailed = event.detail ? `${app.name}: ${event.detail}` : "";
   switch (event.type) {
     case "down":
-      return { title: `${app.name} is down`, emoji: "🔴", status: "down", label: "Service down", accent: "#dc2626" };
+      return {
+        title: detailed || `${app.name} is down`,
+        emoji: "🔴",
+        status: "down",
+        // Something other than an app isn't a service that went down: a
+        // widget past its critical threshold, say (#539).
+        label: app.kind && app.kind !== "app" ? "Critical" : "Service down",
+        accent: "#dc2626",
+      };
     case "warning":
       return {
-        title: `${app.name}: ${event.detail || "warning"}`,
+        title: detailed || `${app.name}: warning`,
         emoji: "🟠",
         status: "warning",
         label: "Warning",
         accent: "#d97706",
       };
     case "cleared":
-      return { title: `${app.name}: warning cleared`, emoji: "🟢", status: "up", label: "Cleared", accent: "#16a34a" };
+      return {
+        title: detailed || `${app.name}: warning cleared`,
+        emoji: "🟢",
+        status: "up",
+        label: "Cleared",
+        accent: "#16a34a",
+      };
     case "up":
     default:
-      return { title: `${app.name} recovered`, emoji: "🟢", status: "up", label: "Recovered", accent: "#16a34a" };
+      return {
+        title: detailed || `${app.name} recovered`,
+        emoji: "🟢",
+        status: "up",
+        label: "Recovered",
+        accent: "#16a34a",
+      };
   }
 }
 
@@ -342,9 +369,10 @@ export function buildEmailMessage(
 ): { subject: string; text: string; html: string } {
   const { title, emoji, status, label, accent } = describeAlert(event, app);
   const when = new Date(at).toISOString();
-  // A warning's subject leads with its detail; a custom template still wins.
+  // A warning's subject leads with its detail, and so does any event that
+  // carries one (a widget's, #539); a custom template still wins.
   const subject =
-    event.type === "warning" || event.type === "cleared"
+    event.type === "warning" || event.type === "cleared" || event.detail
       ? renderSubject(subjectTemplate || title, app, status)
       : renderSubject(subjectTemplate, app, status);
   const text = `${emoji} ${title}` + (app.url ? `\n${app.url}` : "") + `\n\nAt ${when}`;

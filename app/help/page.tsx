@@ -679,6 +679,16 @@ export default async function HelpPage() {
             through it straight away.
           </P>
           <P>
+            An <strong>API widget</strong> can alert too: turn on its{" "}
+            <strong>Send alerts</strong> switch and its number going past the
+            warn threshold sends a warning, past critical a down alert, and
+            coming back a recovery, checked on the server whether or not a
+            page is open. It takes as many readings in a row as an outage
+            takes failed checks. A channel narrowed to some apps lists these
+            widgets beside them. Set the <strong>Site address</strong> under
+            General and such an alert links to the widget&apos;s board.
+          </P>
+          <P>
             A webhook or email set up before channels existed (2.12 and
             earlier) became a regular channel in the list when you upgraded
             to 3.0, sending as before.
