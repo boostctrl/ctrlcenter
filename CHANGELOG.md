@@ -12,6 +12,20 @@ here.
 
 ## [Unreleased]
 
+### Added
+
+- **The generic webhook says what an alert is about.** Its JSON gains
+  `kind` (`app` for now) and `id`, the app's id, which stays the same when
+  the app is renamed. Every field it sent before is unchanged. (#559)
+
+### Fixed
+
+- **A restart no longer announces an open warning again.** An app still
+  warning, such as a certificate near expiry, was announced once more every
+  time CtrlCenter restarted or was upgraded, and its daily reminder started
+  over. Open warnings are now kept in `alert-state.json` beside the config.
+  (#559)
+
 ## [3.3.1] - 2026-11-16
 
 ### Security

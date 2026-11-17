@@ -1,7 +1,13 @@
+import fs from "node:fs";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
+import os from "node:os";
+import path from "node:path";
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { alertStateSaved, resetAlertState } from "./alert-state";
 import {
+  dispatchAlerts,
+  WARNING_REMIND_MS,
   evaluateTransitions,
   buildAlertRequest,
   buildNotificationRequest,
@@ -163,7 +169,7 @@ describe("evaluateWarnings", () => {
 });
 
 describe("describeAlert", () => {
-  const app = { name: "Plex", url: "" };
+  const app = { kind: "app" as const, id: "plex", name: "Plex", url: "" };
   it("words each event", () => {
     expect(describeAlert({ id: "a", type: "down" }, app).title).toBe("Plex is down");
     expect(describeAlert({ id: "a", type: "up" }, app).title).toBe("Plex recovered");
@@ -189,7 +195,7 @@ describe("describeAlert", () => {
 });
 
 describe("buildAlertRequest", () => {
-  const app = { name: "Jellyfin", url: "https://jelly.example.com" };
+  const app = { kind: "app" as const, id: "jellyfin", name: "Jellyfin", url: "https://jelly.example.com" };
   const down: AlertEvent = { id: "a", type: "down" };
   const up: AlertEvent = { id: "a", type: "up" };
   const at = Date.parse("2026-06-30T12:00:00Z");
@@ -206,6 +212,27 @@ describe("buildAlertRequest", () => {
       at: "2026-06-30T12:00:00.000Z",
     });
     expect(body.message).toContain("Jellyfin is down");
+  });
+
+  // People's own handlers read the generic envelope, so it only gains
+  // fields: what the alert is about, by an id a rename leaves alone (#559).
+  it("generic keeps every field it had and adds the subject's kind and id", () => {
+    const body = JSON.parse(buildAlertRequest("generic", "https://hook", down, app, at).init.body as string);
+    expect(body).toEqual({
+      service: "Jellyfin",
+      url: app.url,
+      status: "down",
+      message: "🔴 Jellyfin is down",
+      at: "2026-06-30T12:00:00.000Z",
+      kind: "app",
+      id: "jellyfin",
+    });
+    const widget = { kind: "widget" as const, id: "w1", name: "Disk use on Home", url: "" };
+    expect(JSON.parse(buildAlertRequest("generic", "https://hook", down, widget, at).init.body as string)).toMatchObject({
+      service: "Disk use on Home",
+      kind: "widget",
+      id: "w1",
+    });
   });
 
   it("discord uses a content field", () => {
@@ -231,7 +258,7 @@ describe("buildAlertRequest", () => {
   });
 
   it("ntfy drops a non-ASCII Title (latin-1 header) but keeps it in the body", () => {
-    const unicode = { name: "Café 日本", url: "https://x.example" };
+    const unicode = { ...app, name: "Café 日本", url: "https://x.example" };
     const req = buildAlertRequest("ntfy", "https://ntfy.sh/topic", down, unicode, at);
     const headers = req.init.headers as Record<string, string>;
     expect(headers.Title).toBeUndefined();
@@ -243,7 +270,7 @@ describe("buildAlertRequest", () => {
   // named with an "@everyone" pages no one, and the content stays inside the
   // 2,000-character cap with the link whole.
   it("discord posts no mentions, so a service named with @everyone pages no one", () => {
-    const paged = { name: "@everyone Jellyfin", url: app.url };
+    const paged = { ...app, name: "@everyone Jellyfin" };
     const req = buildAlertRequest("discord", "https://discord", down, paged, at);
     expect(JSON.parse(req.init.body as string)).toEqual({
       content: `🔴 @everyone Jellyfin is down\n${app.url}`,
@@ -252,7 +279,7 @@ describe("buildAlertRequest", () => {
   });
 
   it("discord clips a long service name to the cap and keeps the link whole", () => {
-    const long = { name: "x".repeat(2500), url: app.url };
+    const long = { ...app, name: "x".repeat(2500) };
     const req = buildAlertRequest("discord", "https://discord", down, long, at);
     const { content, allowed_mentions } = JSON.parse(req.init.body as string);
     expect(allowed_mentions).toEqual({ parse: [] });
@@ -791,14 +818,34 @@ describe("processAlerts", () => {
   ];
   let fetchMock: ReturnType<typeof vi.fn>;
 
+  // The warnings are saved beside the config (#559): a scratch one per test.
+  let dir: string;
+  const stateFile = () => path.join(dir, "alert-state.json");
+
   beforeEach(() => {
-    const g = globalThis as { __ctrlcenterAlertState?: unknown; __ctrlcenterWarnState?: unknown };
-    delete g.__ctrlcenterAlertState;
-    delete g.__ctrlcenterWarnState;
+    delete (globalThis as { __ctrlcenterAlertState?: unknown }).__ctrlcenterAlertState;
+    resetAlertState();
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "ctrl-alerts-"));
+    vi.stubEnv("CONFIG_PATH", path.join(dir, "config.yaml"));
     fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
   });
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(async () => {
+    await alertStateSaved();
+    resetAlertState();
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  // A new process, as after an upgrade: what was in memory is gone, the
+  // files beside the config stay.
+  const restart = async () => {
+    await alertStateSaved();
+    delete (globalThis as { __ctrlcenterAlertState?: unknown }).__ctrlcenterAlertState;
+    resetAlertState();
+  };
 
   const hits = () => fetchMock.mock.calls.map((c) => c[0] as string);
   // Both apps' last check was good: no failed checks before this tick.
@@ -873,6 +920,102 @@ describe("processAlerts", () => {
     expect(fetchMock).not.toHaveBeenCalled();
     await processAlerts([{ id: "a", up: true }], apps, config, new Map());
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).status).toBe("up");
+  });
+
+  // A certificate near expiry was announced once more by every restart and
+  // upgrade, and its daily reminder started over (#559).
+  it("after a restart, keeps an open warning quiet until its daily reminder", async () => {
+    const config = alertsSchema.parse({ enabled: true, confirmations: 1, channels: [channel({ url: "https://w.test" })] });
+    const now = vi.spyOn(Date, "now");
+    const T0 = Date.parse("2026-11-16T09:00:00Z");
+    const warning = [{ id: "a", up: true, warning: "Certificate expires in 3 days" }];
+
+    now.mockReturnValue(T0);
+    await processAlerts(warning, apps, config, prior);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await alertStateSaved();
+    expect(JSON.parse(fs.readFileSync(stateFile(), "utf8"))).toEqual({
+      version: 1,
+      books: { warnings: { a: { lastSent: T0 } } },
+    });
+
+    await restart();
+    now.mockReturnValue(T0 + 60 * 60_000);
+    await processAlerts(warning, apps, config, prior);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    now.mockReturnValue(T0 + WARNING_REMIND_MS);
+    await processAlerts(warning, apps, config, prior);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body).status).toBe("warning");
+  });
+
+  it("after a restart, announces a warning that cleared while it was stopped", async () => {
+    const config = alertsSchema.parse({ enabled: true, confirmations: 1, channels: [channel({ url: "https://w.test" })] });
+    await processAlerts([{ id: "a", up: true, warning: "Certificate expires in 3 days" }], apps, config, prior);
+    await restart();
+    fetchMock.mockClear();
+    await processAlerts([{ id: "a", up: true }], apps, config, prior);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).status).toBe("cleared");
+    await alertStateSaved();
+    // Nothing left open, so nothing left on disk.
+    expect(fs.existsSync(stateFile())).toBe(false);
+  });
+
+  it("forgets the warning of an app that is no longer monitored", async () => {
+    const config = alertsSchema.parse({ enabled: true, confirmations: 1, channels: [channel({ url: "https://w.test" })] });
+    await processAlerts(
+      [
+        { id: "a", up: true, warning: "Certificate expires in 3 days" },
+        { id: "b", up: true, warning: "Certificate expires in 5 days" },
+      ],
+      apps,
+      config,
+      prior
+    );
+    // Only Beta is still monitored, and only Beta was due this tick.
+    await processAlerts([{ id: "b", up: true, warning: "Certificate expires in 5 days" }], [apps[1]], config, prior);
+    await alertStateSaved();
+    expect(Object.keys(JSON.parse(fs.readFileSync(stateFile(), "utf8")).books.warnings)).toEqual(["b"]);
+  });
+});
+
+describe("dispatchAlerts (#559)", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+  });
+  afterEach(() => vi.unstubAllGlobals());
+  const hits = () => fetchMock.mock.calls.map((c) => c[0] as string).sort();
+  const widget = { kind: "widget" as const, id: "w1", name: "Disk use on Home", url: "https://home.test/" };
+  const warn = { event: { id: "w1", type: "warning" as const, detail: "92 %" }, subject: widget };
+
+  it("filters any subject by the channels' switches and filters, and a filter of apps leaves it out", async () => {
+    const config = alertsSchema.parse({
+      enabled: true,
+      channels: [
+        channel({ id: "all", url: "https://all.test" }),
+        channel({ id: "apps", url: "https://apps.test", apps: ["a"] }),
+        channel({ id: "widget", url: "https://widget.test", apps: ["a", "widget:w1"] }),
+        channel({ id: "quiet", url: "https://quiet.test", onWarning: false }),
+      ],
+    });
+    await dispatchAlerts(config, [warn]);
+    expect(hits()).toEqual(["https://all.test", "https://widget.test"]);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      service: "Disk use on Home",
+      status: "warning",
+      detail: "92 %",
+      kind: "widget",
+      id: "w1",
+    });
+  });
+
+  it("sends nothing while alerts are off", async () => {
+    const config = alertsSchema.parse({ enabled: false, channels: [channel({ url: "https://all.test" })] });
+    await dispatchAlerts(config, [warn]);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

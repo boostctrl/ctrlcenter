@@ -45,12 +45,29 @@ export function activeChannels(config: AlertConfig): AlertChannel[] {
   return config.channels.filter((ch) => ch.enabled && channelReady(ch));
 }
 
-// Whether a channel takes an uptime event for this app. A cleared warning is
+// What an alert is about (#559): an app going down, recovering or warning;
+// next, a widget crossing its thresholds (#539) and an integration's health
+// (#540). `id` is the thing's own id, which a rename leaves alone: the
+// generic webhook sends it, and with `kind` it is what a channel's filter
+// names (subjectFilterKey). `name` and `url` are what the alert shows.
+export type AlertSubjectKind = "app" | "widget" | "integration";
+export type AlertSubject = { kind: AlertSubjectKind; id: string; name: string; url: string };
+
+// A subject as a channel's filter names it: an app by its id, as the filter
+// always has, and anything else by its kind and id ("widget:<id>"). App ids
+// are slugs, which never hold a colon, so the two can't meet; and a filter
+// someone narrowed to some apps names no widget or integration, so it never
+// starts taking the new kinds.
+export function subjectFilterKey(s: Pick<AlertSubject, "kind" | "id">): string {
+  return s.kind === "app" ? s.id : `${s.kind}:${s.id}`;
+}
+
+// Whether a channel takes this event about this subject. A cleared warning is
 // a recovery from a warning, so it needs both switches.
 export function wantsAlert(
   ch: AlertChannel,
   type: "down" | "up" | "warning" | "cleared",
-  appId: string
+  subject: Pick<AlertSubject, "kind" | "id">
 ): boolean {
   const wanted = {
     down: ch.onDown,
@@ -59,7 +76,7 @@ export function wantsAlert(
     cleared: ch.onWarning && ch.onRecovery,
   }[type];
   if (!wanted) return false;
-  return ch.apps.length === 0 || ch.apps.includes(appId);
+  return ch.apps.length === 0 || ch.apps.includes(subjectFilterKey(subject));
 }
 
 export function channelLabel(ch: AlertChannel): string {

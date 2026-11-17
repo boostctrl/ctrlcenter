@@ -60,7 +60,10 @@ export const alertChannelSchema = z.object({
   // throttle tripping, the second factor turned off, the password changed,
   // dashboard actions turned on.
   onSecurity: z.boolean().catch(true).default(true),
-  // Only alert for these app ids; empty means every monitored app.
+  // Only alert about these; empty means everything. An app is named by its
+  // id, anything else by its kind and id, "widget:<id>" (#559,
+  // subjectFilterKey in lib/alert-channels.ts). Still called `apps`, as
+  // every saved config has it.
   apps: z.array(z.string()).catch([]).default([]),
   // Webhook: which service's payload to send.
   format: z.enum(ALERT_TYPES).catch("generic").default("generic"),

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { channelReady, missingFields, uniqueChannelLabels, wantsAlert } from "./alert-channels";
+import { channelReady, missingFields, subjectFilterKey, uniqueChannelLabels, wantsAlert } from "./alert-channels";
 import { alertChannelSchema, alertsSchema } from "./schema";
 
 const channel = (over: Record<string, unknown>) =>
@@ -25,16 +25,37 @@ describe("missingFields / channelReady", () => {
 });
 
 describe("wantsAlert", () => {
+  const app = (id: string) => ({ kind: "app" as const, id });
+
   it("filters by event and by app", () => {
     const ch = channel({ onRecovery: false, apps: ["a"] });
-    expect(wantsAlert(ch, "down", "a")).toBe(true);
-    expect(wantsAlert(ch, "up", "a")).toBe(false);
-    expect(wantsAlert(ch, "down", "b")).toBe(false);
-    expect(wantsAlert(channel({}), "down", "anything")).toBe(true);
+    expect(wantsAlert(ch, "down", app("a"))).toBe(true);
+    expect(wantsAlert(ch, "up", app("a"))).toBe(false);
+    expect(wantsAlert(ch, "down", app("b"))).toBe(false);
+    expect(wantsAlert(channel({}), "down", app("anything"))).toBe(true);
     // A cleared warning needs both the warning and the recovery switch.
-    expect(wantsAlert(channel({}), "cleared", "a")).toBe(true);
-    expect(wantsAlert(channel({ onRecovery: false }), "cleared", "a")).toBe(false);
-    expect(wantsAlert(channel({ onWarning: false }), "warning", "a")).toBe(false);
+    expect(wantsAlert(channel({}), "cleared", app("a"))).toBe(true);
+    expect(wantsAlert(channel({ onRecovery: false }), "cleared", app("a"))).toBe(false);
+    expect(wantsAlert(channel({ onWarning: false }), "warning", app("a"))).toBe(false);
+  });
+
+  // A filter someone narrowed to some apps keeps meaning just those, so the
+  // kinds that come after apps (#559) reach it only when it names them.
+  it("takes another kind of subject only when the filter is empty or names it", () => {
+    const widget = { kind: "widget" as const, id: "a" };
+    expect(wantsAlert(channel({}), "warning", widget)).toBe(true);
+    expect(wantsAlert(channel({ apps: ["a"] }), "warning", widget)).toBe(false);
+    expect(wantsAlert(channel({ apps: ["widget:a"] }), "warning", widget)).toBe(true);
+    expect(wantsAlert(channel({ apps: ["widget:a"] }), "down", app("a"))).toBe(false);
+    expect(wantsAlert(channel({ apps: ["integration:t"] }), "warning", { kind: "integration", id: "t" })).toBe(true);
+  });
+});
+
+describe("subjectFilterKey", () => {
+  it("names an app by its id, as filters always have, and anything else by kind and id", () => {
+    expect(subjectFilterKey({ kind: "app", id: "plex" })).toBe("plex");
+    expect(subjectFilterKey({ kind: "widget", id: "w1" })).toBe("widget:w1");
+    expect(subjectFilterKey({ kind: "integration", id: "truenas" })).toBe("integration:truenas");
   });
 });
 

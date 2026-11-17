@@ -4,7 +4,9 @@ import {
   channelNamer,
   channelReady,
   wantsAlert,
+  type AlertSubject,
 } from "./alert-channels";
+import { loadAlertState, readBook, writeBook } from "./alert-state";
 import { log, hostOf, errorReason } from "./log";
 import { resolveSecret } from "./secrets";
 import { ServiceError, serviceFetch } from "./services/http";
@@ -19,14 +21,17 @@ import {
 } from "./webhook-markdown";
 import { sampleNotification, type SampleId } from "./notification-samples";
 
-// Outbound uptime alerting. The background poller (lib/status-poller.ts) feeds
+// Outbound alerting. The background poller (lib/status-poller.ts) feeds
 // each tick's results through here; we detect down/recovery transitions and
 // notify the configured channels (lib/alert-channels.ts). The transition logic
 // and payload shaping are pure (unit-tested); only the delivery functions at
-// the bottom do IO.
+// the bottom do IO. Every source of alerts sends through dispatchAlerts, each
+// event about its subject (#559).
 
 // "warning" and "cleared" are an up app entering and leaving the warning
 // state (#310), e.g. a certificate near expiry; `detail` carries the text.
+// `id` is the key the event's source keeps its state under: for an app,
+// its id.
 export type AlertEventType = "down" | "up" | "warning" | "cleared";
 export type AlertEvent = { id: string; type: AlertEventType; detail?: string };
 
@@ -147,7 +152,7 @@ export function buildAlertRequest(
   type: AlertType,
   webhookUrl: string,
   event: AlertEvent,
-  app: AlertApp,
+  app: AlertSubject,
   at: number
 ): AlertRequest {
   const { title, emoji } = describeAlert(event, app);
@@ -182,6 +187,9 @@ export function buildAlertRequest(
     }
     case "generic":
     default:
+      // A user's own handler reads these fields, so they only ever grow:
+      // `kind` and `id` (#559) say what the alert is about by an id a
+      // rename leaves alone, where `service` is the name it shows.
       return jsonReq(webhookUrl, {
         service: app.name,
         url: app.url,
@@ -189,6 +197,8 @@ export function buildAlertRequest(
         ...(event.detail ? { detail: event.detail } : {}),
         message: text,
         at: new Date(at).toISOString(),
+        kind: app.kind,
+        id: app.id,
       });
   }
 }
@@ -506,9 +516,10 @@ export function buildAppriseRequest(url: string, m: AppriseMessage): AlertReques
   return attach ? { ...jsonReq(url.trim(), { ...message, format: "markdown", attach }), unattached: bare } : bare;
 }
 
-// One thing to deliver: an uptime transition, or a relayed notification.
+// One thing to deliver: an alert about its subject, or a relayed
+// notification.
 type Outgoing =
-  | { kind: "alert"; event: AlertEvent; app: AlertApp; at: number }
+  | { kind: "alert"; event: AlertEvent; subject: AlertSubject; at: number }
   | { kind: "notification"; content: NotificationContent; ctx: NotificationContext };
 
 // The HTTP request for one channel and one message (every type but email,
@@ -518,14 +529,14 @@ function requestFor(ch: AlertChannel, out: Outgoing): AlertRequest {
     case "webhook": {
       const url = ch.url.trim();
       return out.kind === "alert"
-        ? buildAlertRequest(ch.format, url, out.event, out.app, out.at)
+        ? buildAlertRequest(ch.format, url, out.event, out.subject, out.at)
         : buildNotificationRequest(ch.format, url, out.content);
     }
     case "apprise":
       return buildAppriseRequest(
         ch.url,
         out.kind === "alert"
-          ? appriseAlert(out.event, out.app)
+          ? appriseAlert(out.event, out.subject)
           : appriseNotification(out.content, out.ctx, { tmdbLink: ch.tmdbLink })
       );
     case "telegram":
@@ -533,7 +544,7 @@ function requestFor(ch: AlertChannel, out: Outgoing): AlertRequest {
     case "pushover":
       return buildServiceRequest(
         { ...ch, type: ch.type },
-        out.kind === "alert" ? plainAlert(out.event, out.app) : plainNotification(out.content)
+        out.kind === "alert" ? plainAlert(out.event, out.subject) : plainNotification(out.content)
       );
     case "email":
       throw new Error("an email channel sends over SMTP");
@@ -609,7 +620,7 @@ async function runEmail(cfg: SmtpConfig, out: Outgoing): Promise<ChannelResult> 
     const transport = await makeTransport(cfg);
     const { subject, text, html } =
       out.kind === "alert"
-        ? buildEmailMessage(out.event, out.app, out.at, cfg.subject)
+        ? buildEmailMessage(out.event, out.subject, out.at, cfg.subject)
         : buildNotificationEmail(out.content, out.ctx);
     await transport.sendMail({ from: cfg.from, to: cfg.to, subject, text, html });
     return { ok: true, detail: "sent" };
@@ -662,12 +673,24 @@ export function anyChannelReady(config: AlertConfig): boolean {
   return activeChannels(config).some((ch) => ch.onWebhooks);
 }
 
-// Alert state is held on globalThis so the poller and any other module graph
-// share one instance (same reason as the status history store).
+// The apps' down/up state is held on globalThis so the poller and any other
+// module graph share one instance (same reason as the status history store).
+// Their warnings are kept in lib/alert-state.ts, which outlasts a restart.
 const g = globalThis as unknown as {
   __ctrlcenterAlertState?: Map<string, AppAlertState>;
-  __ctrlcenterWarnState?: Map<string, WarnState>;
 };
+
+// A warning entry as alert-state.json holds it.
+function isWarnState(v: unknown): v is WarnState {
+  const w = v as WarnState | null;
+  return (
+    !!w &&
+    typeof w === "object" &&
+    typeof w.lastSent === "number" &&
+    Number.isFinite(w.lastSent) &&
+    (w.failed === undefined || typeof w.failed === "boolean")
+  );
+}
 
 // The state to resume from after a restart, from each app's run of failed
 // checks before it (#391). A run shorter than `confirmations` is still
@@ -707,7 +730,7 @@ export async function sendTestAlert(
   const out: Outgoing = {
     kind: "alert",
     event: { id: "test", type: "down" },
-    app: { name: "CtrlCenter test alert", url: "" },
+    subject: { kind: "app", id: "test", name: "CtrlCenter test alert", url: "" },
     at: Date.now(),
   };
   const name = channelNamer(config.channels);
@@ -757,6 +780,34 @@ export async function sendSampleNotification(
   return { results };
 }
 
+// One event about its subject, as a source hands it to dispatchAlerts.
+export type SubjectAlert = { event: AlertEvent; subject: AlertSubject };
+
+// Send each event to every active channel whose event switches and filter
+// take its subject (#559): the one way out for every source of alerts, so
+// each is delivered, filtered and logged alike. A no-op while alerts are off.
+export async function dispatchAlerts(
+  config: AlertConfig,
+  alerts: SubjectAlert[],
+  at = Date.now()
+): Promise<void> {
+  if (!config.enabled || alerts.length === 0) return;
+  const channels = activeChannels(config);
+  const name = channelNamer(config.channels);
+  await Promise.all(
+    alerts.flatMap(({ event, subject }) => {
+      const targets = channels.filter((ch) => wantsAlert(ch, event.type, subject));
+      log.info("alert firing", {
+        [subject.kind]: subject.name,
+        event: event.type,
+        channels: targets.map(name).join(", ") || "none",
+      });
+      const out: Outgoing = { kind: "alert", event, subject, at };
+      return targets.map((ch) => deliverLogged(ch, name(ch), out));
+    })
+  );
+}
+
 // Called by the poller each tick. `priorStreaks` is each app's run of failed
 // checks from BEFORE this tick (from history), used once to seed the in-memory
 // state so a restart neither re-alerts an app that was already down nor loses
@@ -770,8 +821,7 @@ export async function processAlerts(
   priorStreaks: Map<string, number>
 ): Promise<void> {
   if (!config.enabled) return;
-  const channels = activeChannels(config);
-  if (channels.length === 0) return;
+  if (activeChannels(config).length === 0) return;
   g.__ctrlcenterAlertState ??= seedState(priorStreaks, config.confirmations);
   // Recoveries are always computed; each channel decides whether it wants them.
   const { next, events } = evaluateTransitions(g.__ctrlcenterAlertState, results, {
@@ -779,32 +829,23 @@ export async function processAlerts(
     notifyOnRecovery: true,
   });
   g.__ctrlcenterAlertState = next;
-  // Warnings keep their own state (#310). Not persisted: after a restart an
-  // app still warning is announced once more.
-  const warned = evaluateWarnings(g.__ctrlcenterWarnState ?? new Map(), results, Date.now());
-  g.__ctrlcenterWarnState = warned.next;
-  events.push(...warned.events);
-  if (events.length === 0) return;
-  const byId = new Map(apps.map((a) => [a.id, a]));
-  const name = channelNamer(config.channels);
+  // Warnings keep their own state (#310), saved beside the config (#559) so a
+  // restart neither announces an app still warning once more nor restarts
+  // its daily reminder. An app no longer monitored takes its warning along.
   const at = Date.now();
-  await Promise.all(
-    events.flatMap((e) => {
-      const found = byId.get(e.id);
-      if (!found) return [];
-      const targets = channels.filter((ch) => wantsAlert(ch, e.type, e.id));
-      log.info("alert firing", {
-        app: found.name,
-        event: e.type,
-        channels: targets.map(name).join(", ") || "none",
-      });
-      const out: Outgoing = {
-        kind: "alert",
-        event: e,
-        app: { name: found.name, url: found.url },
-        at,
-      };
-      return targets.map((ch) => deliverLogged(ch, name(ch), out));
-    })
+  await loadAlertState();
+  const warned = evaluateWarnings(readBook("warnings", isWarnState), results, at);
+  const monitored = new Set(apps.map((a) => a.id));
+  for (const id of warned.next.keys()) if (!monitored.has(id)) warned.next.delete(id);
+  writeBook("warnings", warned.next);
+  events.push(...warned.events);
+  const byId = new Map(apps.map((a) => [a.id, a]));
+  await dispatchAlerts(
+    config,
+    events.flatMap<SubjectAlert>((event) => {
+      const app = byId.get(event.id);
+      return app ? [{ event, subject: { kind: "app", id: app.id, name: app.name, url: app.url } }] : [];
+    }),
+    at
   );
 }
