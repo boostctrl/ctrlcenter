@@ -33,6 +33,9 @@ export type ServiceMeta = {
   placeholder: string;
   // Where to find the API key (API-key types).
   keyHint?: string;
+  // Shown beside an http:// address, when sending the credentials over
+  // plain http costs more than their privacy (TrueNAS, #560).
+  httpWarning?: string;
   // The pre-3.0 environment variable for its secret. It still applies to the
   // integration whose id is the type's (the one a 2.x config migrated to).
   legacyEnv: string;
@@ -157,8 +160,10 @@ export const SERVICE_META: Record<ServiceId, ServiceMeta> = {
     credentials: "apiKey",
     intro: "Pool health, capacity, and active alerts, read-only, on the Monitor page.",
     urlLabel: "URL",
-    placeholder: "http://192.168.1.10",
+    placeholder: "https://192.168.1.10",
     keyHint: "TrueNAS → Settings → API Keys → Add.",
+    httpWarning:
+      "Plain http: TrueNAS 25.04 and later revoke an API key the first time it arrives over http, and it stays unusable until you reset it in TrueNAS. Use the https address.",
     legacyEnv: "CTRLCENTER_TRUENAS_KEY",
     group: "Storage & Containers",
     tagline: "Storage",

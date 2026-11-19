@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { isPrivateIp, securityChecklist, type SecurityFacts } from "./security-checklist";
+import { describe, it, expect, vi } from "vitest";
+import { isPrivateIp, securityChecklist, truenasFacts, type SecurityFacts } from "./security-checklist";
+import { configSchema } from "./schema";
 
 // A deployment with nothing to fix, to vary one fact at a time.
 const GREEN: SecurityFacts = {
@@ -16,6 +17,7 @@ const GREEN: SecurityFacts = {
   credentials: { source: "file", encrypted: 3, plaintext: 0, unreadable: 0 },
   forwardAuth: { enabled: false, proxies: [] },
   provider: { enabled: false, http: false },
+  truenas: { enabled: false, http: [] },
 };
 
 const row = (facts: Partial<SecurityFacts>, id: string) => {
@@ -145,6 +147,39 @@ describe("securityChecklist (#367)", () => {
       level: "warn",
       detail: expect.stringContaining("plain http"),
     });
+  });
+
+  it("warns about a TrueNAS reached over plain http, only when one is set up (#560)", () => {
+    expect(securityChecklist(GREEN).some((r) => r.id === "truenas")).toBe(false);
+    expect(row({ truenas: { enabled: true, http: [] } }, "truenas")).toMatchObject({ level: "ok" });
+    expect(row({ truenas: { enabled: true, http: ["TrueNAS"] } }, "truenas")).toMatchObject({
+      level: "warn",
+      detail: expect.stringMatching(/^TrueNAS is reached over plain http.*revoke/),
+    });
+    expect(row({ truenas: { enabled: true, http: ["TrueNAS", "Backup"] } }, "truenas").detail).toMatch(
+      /^TrueNAS, Backup are reached/
+    );
+  });
+
+  it("finds the TrueNAS integrations on plain http, an address from the environment included (#560)", () => {
+    vi.stubEnv("NAS_URL", "http://nas.lan");
+    const integrations = (list: object[]) => configSchema.parse({ integrations: list }).integrations;
+    try {
+      expect(truenasFacts(integrations([]))).toEqual({ enabled: false, http: [] });
+      expect(
+        truenasFacts(
+          integrations([
+            { id: "truenas", type: "truenas", url: "https://nas.lan" },
+            { id: "b", type: "truenas", name: "Backup", url: "${NAS_URL}" },
+            { id: "c", type: "truenas", name: "Off", url: "http://old.lan", enabled: false },
+            { id: "d", type: "truenas", name: "Blank", url: "" },
+            { id: "s", type: "sonarr", url: "http://sonarr.lan" },
+          ])
+        )
+      ).toEqual({ enabled: true, http: ["Backup"] });
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("grades sign-in from proxy headers only when it's on (#504)", () => {

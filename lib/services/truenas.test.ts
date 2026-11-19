@@ -10,6 +10,7 @@ import {
   mapTruenasSystem,
   mapTruenasPoolDetail,
   mapTruenasDisks,
+  REVOKED_OVER_HTTP,
 } from "./truenas";
 
 const CFG = { url: "http://truenas.local/", apiKey: "1-abcdef" };
@@ -173,7 +174,15 @@ describe("getTruenasSnapshot", () => {
 
   it("maps a 401 on the pool list to an invalid-key message", async () => {
     stubApi({ fail: (url) => (url.includes("/api/v2.0/pool") ? 401 : null) });
-    await expect(getTruenasSnapshot(CFG)).rejects.toThrow("Invalid API key");
+    await expect(getTruenasSnapshot({ ...CFG, url: "https://truenas.local/" })).rejects.toThrow(/^Invalid API key$/);
+  });
+
+  it("says a key refused over plain http may have been revoked for it (#560)", async () => {
+    stubApi({ fail: (url) => (url.includes("/api/v2.0/pool") ? 401 : null) });
+    await expect(getTruenasSnapshot(CFG)).rejects.toThrow(REVOKED_OVER_HTTP);
+    stubApi({ fail: () => 403 });
+    expect(await probeTruenas(CFG)).toEqual({ ok: false, error: REVOKED_OVER_HTTP });
+    expect(await probeTruenas({ ...CFG, url: "https://truenas.local" })).toEqual({ ok: false, error: "Invalid API key" });
   });
 });
 

@@ -16,6 +16,7 @@ import {
   runProbe,
   type ProbeResult,
 } from "./http";
+import { isPlainHttp } from "../urls";
 
 export type TruenasConfig = { url: string; apiKey: string };
 
@@ -218,6 +219,12 @@ async function truenasJson<T>(
   return truenasCall<T>(cfg, path, {}, maxBytes);
 }
 
+// TrueNAS 25.04 and later revoke an API key the first time it arrives over
+// plain http (#560), and then answer like any wrong key: over http, a
+// refused key says it may be that.
+export const REVOKED_OVER_HTTP =
+  "Invalid API key. TrueNAS 25.04 and later revoke a key sent over plain http: reset it in TrueNAS and use the https address.";
+
 async function truenasCall<T>(
   cfg: TruenasConfig,
   path: string,
@@ -230,7 +237,8 @@ async function truenasCall<T>(
     { ...init, headers: { ...(init.headers as Record<string, string> | undefined), Authorization: `Bearer ${cfg.apiKey}` } },
     maxBytes
   );
-  throwForStatus(res, { 401: "Invalid API key", 403: "Invalid API key" });
+  const refused = isPlainHttp(base) ? REVOKED_OVER_HTTP : "Invalid API key";
+  throwForStatus(res, { 401: refused, 403: refused });
   return parseJson<T>(text);
 }
 

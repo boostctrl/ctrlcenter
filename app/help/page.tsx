@@ -618,6 +618,12 @@ export default async function HelpPage() {
             arrow keys, to read any moment.
           </P>
           <P>
+            Give TrueNAS its https address: TrueNAS 25.04 and later revoke an
+            API key the first time it arrives over plain http, and it stays
+            unusable until you reset it in TrueNAS. The card warns when the
+            address is http.
+          </P>
+          <P>
             Everything about it is admin-only: the page, the data it polls,
             and the stored credentials all sit behind your sign-in, and
             nothing from an integration ever appears on the public dashboard.
@@ -1207,7 +1213,8 @@ export default async function HelpPage() {
             what the app can see of your deployment — the second factor,
             where the password comes from, whether sign-ins arrive over
             HTTPS and through the proxy you configured, the session secret,
-            the stored credentials, dashboard actions and the idle timeout —
+            the stored credentials, dashboard actions, the idle timeout, and a
+            sign-in provider or TrueNAS reached over plain http —
             each green, amber or red with the fix. Clear the red rows before
             putting the portal on a public port; they are also logged when the
             server starts.

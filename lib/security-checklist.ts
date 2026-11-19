@@ -16,6 +16,8 @@ import { TRUSTED_PROXY_HOPS, productionEntry } from "./rate-limit";
 import { NO_PASSWORD_MESSAGE } from "./auth";
 import { credentialStatus, type CredentialStatus } from "./config-crypto";
 import { readConfigOnDisk } from "./config";
+import { expandEnvRefs } from "./secrets";
+import { isPlainHttp } from "./urls";
 
 export type ChecklistLevel = "ok" | "warn" | "bad";
 
@@ -57,6 +59,9 @@ export type SecurityFacts = {
   // Signing in through a provider (#504), and whether its address is plain
   // http (#558).
   provider: { enabled: boolean; http: boolean };
+  // Whether any TrueNAS integration is set up, and the labels of those
+  // reached over plain http (#560).
+  truenas: { enabled: boolean; http: string[] };
 };
 
 // A loopback or private-range address — one a plain-HTTP sign-in from is a
@@ -292,6 +297,21 @@ export function securityChecklist(f: SecurityFacts): ChecklistRow[] {
           }
   );
 
+  // Only with a TrueNAS integration: whether its key goes over https (#560).
+  // TrueNAS 25.04 and later revoke a key the first time it arrives over http.
+  if (f.truenas.enabled) {
+    rows.push(
+      f.truenas.http.length > 0
+        ? {
+            id: "truenas",
+            level: "warn",
+            title: "TrueNAS",
+            detail: `${list(f.truenas.http)} ${f.truenas.http.length === 1 ? "is" : "are"} reached over plain http, so the API key crosses the network readable, and TrueNAS 25.04 and later revoke it on arrival. Use the https address.`,
+          }
+        : { id: "truenas", level: "ok", title: "TrueNAS", detail: "Reached over https." }
+    );
+  }
+
   rows.push(
     f.idleHours <= 24
       ? {
@@ -309,6 +329,17 @@ export function securityChecklist(f: SecurityFacts): ChecklistRow[] {
   );
 
   return rows;
+}
+
+// The TrueNAS integrations that are on and have an address, and those of
+// them on plain http, by their labels; a `${NAME}` address as it's used.
+export function truenasFacts(integrations: Config["integrations"]): SecurityFacts["truenas"] {
+  const labels = integrationLabels(integrations);
+  const on = integrations.filter((i) => i.type === "truenas" && i.enabled && i.url.trim() !== "");
+  return {
+    enabled: on.length > 0,
+    http: on.filter((i) => isPlainHttp(expandEnvRefs(i.url))).map((i) => labels[i.id]),
+  };
 }
 
 // Gather the facts from the config, the environment and (unless `sessions`
@@ -346,5 +377,6 @@ export async function collectSecurityFacts(
       enabled: config.settings.signIn.oidc.enabled,
       http: /^http:\/\//i.test(config.settings.signIn.oidc.issuer.trim()),
     },
+    truenas: truenasFacts(config.integrations),
   };
 }

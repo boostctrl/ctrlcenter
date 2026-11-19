@@ -19,6 +19,13 @@ export function siteLink(siteUrl: string, path: string): string {
   return `${base}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
+// Whether an address is plain http, so whatever is sent to it crosses the
+// network readable: a TrueNAS API key, which TrueNAS 25.04 and later revoke
+// on arrival over http (#560).
+export function isPlainHttp(url: string): boolean {
+  return /^http:\/\//i.test(url.trim());
+}
+
 // Ports whose service doesn't speak HTTP, so a bare "host:port" on one of them
 // is better watched by opening a TCP connection than by an HTTP request.
 const TCP_PORTS = new Set([

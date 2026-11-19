@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { integrationLabels, SERVICE_IDS, SERVICE_META, type ServiceId } from "@/lib/services/ids";
+import { isPlainHttp } from "@/lib/urls";
 import { Button, Card, Hint, MoveButtons, RemoveButton, TextField, ToggleRow, controlClasses } from "../ui";
 import IntegrationTest from "../IntegrationTest";
 import type { SettingsDraft } from "./useSettingsDraft";
@@ -94,6 +95,11 @@ export default function IntegrationsSection({
                   <TextField
                     label={meta.urlLabel}
                     placeholder={meta.placeholder}
+                    hint={
+                      meta.httpWarning && isPlainHttp(i.url) ? (
+                        <span className="text-status-warning">{meta.httpWarning}</span>
+                      ) : undefined
+                    }
                     value={i.url}
                     onChange={(e) => update({ url: e.target.value })}
                   />

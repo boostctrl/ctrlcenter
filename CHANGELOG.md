@@ -38,6 +38,15 @@ here.
   over. Open warnings are now kept in `alert-state.json` beside the config.
   (#559)
 
+### Security
+
+- **A warning for TrueNAS on plain http.** TrueNAS 25.04 and later revoke an
+  API key the first time it arrives over plain http, and it stays unusable
+  until it's reset in TrueNAS. The TrueNAS card now warns when its address
+  is `http://`, a refused key on such an address says it may be why, and
+  the security checklist has a row for it. The address still works as
+  before, so a TrueNAS older than 25.04 on http keeps working. (#560)
+
 ## [3.3.1] - 2026-11-16
 
 ### Security

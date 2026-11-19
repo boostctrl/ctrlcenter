@@ -433,6 +433,8 @@ integrations:               # the private Monitor page's connections, any number
       apiKey: "${SONARR_4K_KEY}" }   # ${NAME}: read from the environment
   - { id: portainer, type: portainer, url: "https://portainer:9443",
       apiKey: "${PORTAINER_TOKEN}", allowActions: true }
+  - { id: truenas, type: truenas, url: "https://truenas.lan",  # https: TrueNAS 25.04
+      apiKey: "${TRUENAS_KEY}" }   # and later revoke a key sent over plain http
 
 groups:                     # what apps and bookmarks are sorted into, in order
   - { id: media, name: Media, icon: jellyfin, color: violet }  # icon and color

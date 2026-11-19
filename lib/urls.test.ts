@@ -1,5 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { guessCheckType, safeNextPath, siteLink, withHttpScheme } from "./urls";
+import { guessCheckType, isPlainHttp, safeNextPath, siteLink, withHttpScheme } from "./urls";
+
+describe("isPlainHttp (#560)", () => {
+  it("tells a plain http address from anything else", () => {
+    expect(isPlainHttp("http://truenas.lan")).toBe(true);
+    expect(isPlainHttp("  HTTP://192.168.1.10/ ")).toBe(true);
+    for (const no of ["https://truenas.lan", "", "truenas.lan", "${TRUENAS_URL}", "httpx://a"]) {
+      expect(isPlainHttp(no)).toBe(false);
+    }
+  });
+});
 
 describe("withHttpScheme (#277)", () => {
   it("prefixes bare hosts with http://", () => {
