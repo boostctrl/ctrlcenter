@@ -25,7 +25,7 @@ const snapshot = [
     data: {
       pools: [{ name: "tank", healthy: false, usedRatio: 0.91, free: 2 * 1024 ** 4 }],
       apps: [],
-      alerts: [{ level: "critical", message: "Pool tank is DEGRADED" }],
+      alerts: [{ id: "a1", level: "critical", message: "Pool tank is DEGRADED" }],
     },
   },
 ] as MonitorEntry[] as MonitorSnapshot;

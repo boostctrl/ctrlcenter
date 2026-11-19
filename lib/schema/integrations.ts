@@ -36,6 +36,10 @@ export const integrationSchema = z.object({
   // integration stays read-only until the admin turns it on. Only the
   // action-capable types expose the toggle and honor it.
   allowActions: z.boolean().catch(false).default(false),
+  // The health conditions that send alerts (#540), by the ids its type
+  // lists (SERVICE_META's alertConditions): `alertOn: [pool, app]`. Each is
+  // off until listed. Optional, so a list saved without it still saves.
+  alertOn: z.array(z.string().max(32)).max(16).optional().catch(undefined),
 });
 export type Integration = z.infer<typeof integrationSchema>;
 

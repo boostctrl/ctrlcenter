@@ -35,8 +35,8 @@ const POOLS = [
 ];
 
 const ALERTS = [
-  { level: "CRITICAL", formatted: "Pool backup is DEGRADED", dismissed: false },
-  { level: "WARNING", formatted: "SMART: disk sda has 1 bad sector", dismissed: false },
+  { uuid: "a1b2", level: "CRITICAL", formatted: "Pool backup is DEGRADED", dismissed: false },
+  { id: 7, level: "WARNING", formatted: "SMART: disk sda has 1 bad sector", dismissed: false },
   { level: "INFO", formatted: "Scrub finished", dismissed: false },
   { level: "CRITICAL", formatted: "Old dismissed alert", dismissed: true },
 ];
@@ -101,10 +101,12 @@ describe("getTruenasSnapshot", () => {
       { name: "tank", status: "ONLINE", healthy: true, usedRatio: 0.25, free: 6000000000000 },
       { name: "backup", status: "DEGRADED", healthy: false, usedRatio: 0.95, free: 200000000000 },
     ]);
+    // Each by TrueNAS's own id: its uuid, else its id (#540).
     expect(snap.alerts).toEqual([
-      { level: "critical", message: "Pool backup is DEGRADED" },
-      { level: "warning", message: "SMART: disk sda has 1 bad sector" },
+      { id: "a1b2", level: "critical", message: "Pool backup is DEGRADED" },
+      { id: "7", level: "warning", message: "SMART: disk sda has 1 bad sector" },
     ]);
+    expect(snap.unread).toBeUndefined();
     // The API key rides a Bearer header.
     const headers = (fetchMock.mock.calls[0][1] as RequestInit).headers as Record<
       string,
@@ -118,6 +120,8 @@ describe("getTruenasSnapshot", () => {
     const snap = await getTruenasSnapshot(CFG);
     expect(snap.pools).toHaveLength(2);
     expect(snap.alerts).toEqual([]);
+    // An empty list that wasn't read isn't every alert resolved (#540).
+    expect(snap.unread).toEqual(["alerts"]);
   });
 
   it("maps apps with not-running ones first", async () => {
@@ -170,6 +174,7 @@ describe("getTruenasSnapshot", () => {
     const snap = await getTruenasSnapshot(CFG);
     expect(snap.pools).toHaveLength(2);
     expect(snap.apps).toEqual([]);
+    expect(snap.unread).toEqual(["apps"]);
   });
 
   it("maps a 401 on the pool list to an invalid-key message", async () => {
@@ -244,11 +249,13 @@ describe("mapTruenasApps", () => {
 
 describe("mapTruenasAlerts", () => {
   it("drops dismissed/INFO and caps the list", () => {
-    const many = Array.from({ length: 10 }, (_, i) => ({
+    const many = Array.from({ length: TRUENAS_ALERT_CAP + 5 }, (_, i) => ({
       level: "WARNING",
       formatted: `w${i}`,
     }));
     expect(mapTruenasAlerts(many)).toHaveLength(TRUENAS_ALERT_CAP);
+    // Without an id of its own, an alert goes by its message.
+    expect(mapTruenasAlerts(many)[3].id).toBe("w3");
     expect(mapTruenasAlerts([{ level: "INFO", formatted: "x" }])).toEqual([]);
   });
 });

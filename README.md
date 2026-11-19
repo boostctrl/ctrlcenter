@@ -62,7 +62,9 @@ Built with Next.js 16, React 19, and Tailwind v4.
   (generic JSON, Discord, Slack, or ntfy), **email** over SMTP (works with
   SMTP2GO, Gmail, Fastmail, any relay), **Telegram**, **Gotify**, **Pushover**,
   or an **Apprise** API server. An **API widget** can alert too, when its
-  number crosses its warn or critical threshold. Each channel picks its
+  number crosses its warn or critical threshold, and so can **TrueNAS**, when
+  a pool isn't healthy, it raises an alert of its own, or an app stops.
+  Each channel picks its
   events and what it hears about, and flap-dampening confirmations keep a
   single blip quiet. **Inbound
   webhooks** let **Sonarr, Radarr and Seerr** push their own events — a
@@ -321,11 +323,13 @@ settings:
     longitude: -77.0369
     units: imperial         # imperial | metric
     ipLocation: true        # first visit: the browser asks ipwho.is for a rough location from its IP
-  alerts:                   # notify when a service goes down / recovers, or an
-                            # API widget with alerts: true crosses its thresholds
+  alerts:                   # notify when a service goes down / recovers, an API
+                            # widget with alerts: true crosses its thresholds, or
+                            # an integration's alertOn condition is met
     enabled: false
     confirmations: 2        # consecutive failed checks (or readings past a
-                            # widget's threshold) before alerting (flap dampening)
+                            # widget's threshold, or with an integration's
+                            # problem) before alerting (flap dampening)
     channels:               # any number; each type reads only its own fields
       - id: discord
         type: webhook       # webhook | email | telegram | gotify | pushover | apprise
@@ -336,7 +340,8 @@ settings:
         token: ""           # from @BotFather
         chatId: ""
         onRecovery: false   # also onDown, onWarning, onWebhooks (inbound events); all default true
-        apps: [plex, "widget:nas"]  # only these app ids and widget:<id>s; leave out for all
+        apps: [plex, "widget:nas", "integration:truenas"]  # only these apps (by id),
+                            # widget:<id>s and integration:<id>s; leave out for all
       - id: mail
         type: email
         smtp:
@@ -434,7 +439,9 @@ integrations:               # the private Monitor page's connections, any number
   - { id: portainer, type: portainer, url: "https://portainer:9443",
       apiKey: "${PORTAINER_TOKEN}", allowActions: true }
   - { id: truenas, type: truenas, url: "https://truenas.lan",  # https: TrueNAS 25.04
-      apiKey: "${TRUENAS_KEY}" }   # and later revoke a key sent over plain http
+      apiKey: "${TRUENAS_KEY}",    # and later revoke a key sent over plain http
+      alertOn: [pool, alert, app] }  # alert when a pool isn't healthy, TrueNAS
+                                     # raises an alert, or an app stops
 
 groups:                     # what apps and bookmarks are sorted into, in order
   - { id: media, name: Media, icon: jellyfin, color: violet }  # icon and color

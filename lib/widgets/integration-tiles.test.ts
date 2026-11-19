@@ -64,7 +64,7 @@ const SNAPSHOTS: Record<ServiceId, unknown> = {
   truenas: {
     pools: [{ name: L("pool"), status: "ONLINE", healthy: true, usedRatio: 0.5, free: 1e12 }],
     apps: [{ name: L("app"), running: true, upgradeAvailable: false, containers: 2 }],
-    alerts: [{ level: "critical", message: L("alert") }],
+    alerts: [{ id: "a1", level: "critical", message: L("alert") }],
   },
   unifi: {
     internet: { up: true, isp: L("isp"), wanIp: L("wan-ip"), latencyMs: 12 },

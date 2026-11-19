@@ -695,6 +695,18 @@ export default async function HelpPage() {
             General and such an alert links to the widget&apos;s board.
           </P>
           <P>
+            <strong>TrueNAS</strong> can alert on its health: under its
+            integration in Settings → Integrations, turn on{" "}
+            <strong>Send alerts when</strong> a pool isn&apos;t healthy,
+            TrueNAS raises an alert of its own, or an app stops or crashes.
+            Each problem sends a warning, and a cleared warning when it&apos;s
+            over, read from the Monitor once a minute, so it adds no requests
+            to TrueNAS. It too takes as many readings in a row as an outage
+            takes failed checks. While TrueNAS can&apos;t be reached these send
+            nothing; its app&apos;s uptime check covers that. A channel narrowed
+            to some apps lists the integrations with a switch on.
+          </P>
+          <P>
             A webhook or email set up before channels existed (2.12 and
             earlier) became a regular channel in the list when you upgraded
             to 3.0, sending as before.

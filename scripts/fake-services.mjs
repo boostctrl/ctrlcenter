@@ -433,10 +433,10 @@ function truenas(path) {
   }
   if (path === "/api/v2.0/alert/list") {
     return [
-      { level: "CRITICAL", formatted: "Pool backup state is DEGRADED: One or more devices has been removed by the administrator.", dismissed: false },
-      { level: "WARNING", formatted: "Space usage for pool backup is 91%. Optimal pool performance requires used space remain below 80%.", dismissed: false },
-      { level: "INFO", formatted: "Update to TrueNAS 25.04.2 is available.", dismissed: false },
-      { level: "WARNING", formatted: "A dismissed alert that should not show.", dismissed: true },
+      { uuid: "7c1e2a90-0d4b-4f1e-9a51-3b8f6d2c4e10", level: "CRITICAL", formatted: "Pool backup state is DEGRADED: One or more devices has been removed by the administrator.", dismissed: false },
+      { uuid: "2f9d6b31-8e7a-4c05-b6d2-91a0e4f3c758", level: "WARNING", formatted: "Space usage for pool backup is 91%. Optimal pool performance requires used space remain below 80%.", dismissed: false },
+      { uuid: "c45a0e17-3b29-4d8f-a1e6-5f7b2d9c0a83", level: "INFO", formatted: "Update to TrueNAS 25.04.2 is available.", dismissed: false },
+      { uuid: "e8b3f5d2-6a14-4c97-8e0b-2d4a7f1c9b66", level: "WARNING", formatted: "A dismissed alert that should not show.", dismissed: true },
     ];
   }
   if (path === "/api/v2.0/disk/temperatures") {

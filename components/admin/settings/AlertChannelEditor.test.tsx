@@ -79,10 +79,14 @@ describe("AlertChannelEditor's Send test (#350)", () => {
   });
 });
 
-// A channel's filter offers the API widgets that send alerts beside the
-// apps, each named by its kind and id (#539).
+// A channel's filter offers the API widgets (#539) and integrations (#540)
+// that send alerts beside the apps, each named by its kind and id.
 describe("AlertChannelEditor's filter", () => {
-  const filter = (channel: AlertChannel, widgets?: { id: string; name: string }[]) => {
+  const filter = (
+    channel: AlertChannel,
+    widgets?: { id: string; name: string }[],
+    integrations?: { id: string; name: string }[]
+  ) => {
     const onChange = vi.fn();
     render(
       <AlertChannelEditor
@@ -90,6 +94,7 @@ describe("AlertChannelEditor's filter", () => {
         channels={channels}
         apps={[{ id: "plex", name: "Plex" }]}
         widgets={widgets}
+        integrations={integrations}
         saving={false}
         formatLabel={formatLabel}
         urlPlaceholder={urlPlaceholder}
@@ -111,5 +116,17 @@ describe("AlertChannelEditor's filter", () => {
     expect(screen.getByText("Apps & widgets")).toBeTruthy();
     await userEvent.setup().click(screen.getByRole("button", { name: "Pool used" }));
     expect(onChange).toHaveBeenLastCalledWith({ apps: ["plex", "widget:pool"] });
+  });
+
+  it("offers the integrations that send alerts, as integration:<id>", async () => {
+    const onChange = filter({ ...chat, apps: ["plex"] }, undefined, [{ id: "nas", name: "NAS" }]);
+    expect(screen.getByText("Apps & integrations")).toBeTruthy();
+    await userEvent.setup().click(screen.getByRole("button", { name: "NAS" }));
+    expect(onChange).toHaveBeenLastCalledWith({ apps: ["plex", "integration:nas"] });
+  });
+
+  it("names all three when widgets and integrations send alerts", () => {
+    filter({ ...chat, apps: [] }, [{ id: "pool", name: "Pool used" }], [{ id: "nas", name: "NAS" }]);
+    expect(screen.getByText("Apps, widgets & integrations")).toBeTruthy();
   });
 });

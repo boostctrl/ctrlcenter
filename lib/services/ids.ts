@@ -23,6 +23,10 @@ export const SERVICE_IDS = [
 ] as const;
 export type ServiceId = (typeof SERVICE_IDS)[number];
 
+// A health condition an integration can send alerts about (#540): its id in
+// the integration's `alertOn` list, and the switch's words.
+export type AlertCondition = { id: string; label: string; hint: string };
+
 export type ServiceMeta = {
   label: string;
   // Which credentials it signs in with: a WebUI login, or an API key.
@@ -52,6 +56,9 @@ export type ServiceMeta = {
   // How often the Monitor refreshes it while a page is open (#531): about as
   // often as its numbers move, and no more than it can comfortably answer.
   liveMs: number;
+  // What it can send alerts about (#540), each a switch on the integration,
+  // off until it's turned on. Read on the server by lib/integration-alerts.ts.
+  alertConditions?: AlertCondition[];
 };
 
 // The Monitor face's clusters, in order: the infrastructure leads, media
@@ -169,6 +176,23 @@ export const SERVICE_META: Record<ServiceId, ServiceMeta> = {
     tagline: "Storage",
     icon: "truenas",
     liveMs: 30_000,
+    alertConditions: [
+      {
+        id: "pool",
+        label: "A pool isn't healthy",
+        hint: "Degraded, faulted or offline. Cleared when it's healthy again.",
+      },
+      {
+        id: "alert",
+        label: "TrueNAS raises an alert",
+        hint: "Its own alerts at warning or above, such as a failing disk or a degraded pool. Cleared when TrueNAS clears it.",
+      },
+      {
+        id: "app",
+        label: "An app stops or crashes",
+        hint: "Cleared when it's running again.",
+      },
+    ],
   },
   unifi: {
     label: "UniFi",
@@ -185,6 +209,19 @@ export const SERVICE_META: Record<ServiceId, ServiceMeta> = {
     liveMs: 10_000,
   },
 };
+
+// The conditions an integration sends alerts about: those its `alertOn`
+// names that its type has, in the type's order. None while it's off or has
+// no address, as the Monitor then reads nothing from it.
+export function alertConditionsOn(i: {
+  type: ServiceId;
+  enabled: boolean;
+  url: string;
+  alertOn?: readonly string[];
+}): string[] {
+  if (!i.enabled || i.url.trim() === "" || !i.alertOn?.length) return [];
+  return (SERVICE_META[i.type].alertConditions ?? []).map((c) => c.id).filter((id) => i.alertOn?.includes(id));
+}
 
 export const SERVICE_LABELS = Object.fromEntries(
   SERVICE_IDS.map((id) => [id, SERVICE_META[id].label])

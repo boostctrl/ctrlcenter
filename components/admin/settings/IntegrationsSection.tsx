@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { integrationLabels, SERVICE_IDS, SERVICE_META, type ServiceId } from "@/lib/services/ids";
 import { isPlainHttp } from "@/lib/urls";
-import { Button, Card, Hint, MoveButtons, RemoveButton, TextField, ToggleRow, controlClasses } from "../ui";
+import { Button, Card, Hint, MoveButtons, RemoveButton, TextField, ToggleRow, controlClasses, fieldLabelClasses } from "../ui";
 import IntegrationTest from "../IntegrationTest";
 import type { SettingsDraft } from "./useSettingsDraft";
 
@@ -150,6 +150,31 @@ export default function IntegrationsSection({
                     disabled={!twoFactorEnabled}
                     onChange={(allowActions) => update({ allowActions })}
                   />
+                )}
+                {meta.alertConditions && (
+                  <div role="group" aria-labelledby={`alert-on-${i.id}`} className="flex flex-col gap-2">
+                    <span id={`alert-on-${i.id}`} className={fieldLabelClasses}>
+                      Send alerts when
+                    </span>
+                    {meta.alertConditions.map((c) => (
+                      <ToggleRow
+                        key={c.id}
+                        label={c.label}
+                        hint={c.hint}
+                        checked={i.alertOn?.includes(c.id) ?? false}
+                        onChange={(on) => {
+                          const rest = (i.alertOn ?? []).filter((id) => id !== c.id);
+                          const alertOn = on ? [...rest, c.id] : rest;
+                          update({ alertOn: alertOn.length > 0 ? alertOn : undefined });
+                        }}
+                      />
+                    ))}
+                    <Hint>
+                      A warning, then a cleared warning when it&apos;s over, through the channels in Monitoring →
+                      Alerts. Read from the Monitor once a minute; while the service can&apos;t be reached these send
+                      nothing, as its app&apos;s uptime check covers that.
+                    </Hint>
+                  </div>
                 )}
                 <IntegrationTest
                   service={i.type}

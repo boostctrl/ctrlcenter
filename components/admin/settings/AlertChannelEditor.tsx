@@ -28,6 +28,21 @@ const EVENTS: { value: Event; label: string }[] = [
   { value: "onSecurity", label: "Security" },
 ];
 
+// What the filter row is called, by what it can list.
+function filterWords(widgets: boolean, integrations: boolean): { label: string; hint: string } {
+  if (widgets && integrations) {
+    return {
+      label: "Apps, widgets & integrations",
+      hint: "Which apps' outages, widgets' thresholds and integrations' health reach this channel.",
+    };
+  }
+  if (widgets) return { label: "Apps & widgets", hint: "Which apps' outages and widgets' thresholds reach this channel." };
+  if (integrations) {
+    return { label: "Apps & integrations", hint: "Which apps' outages and integrations' health reach this channel." };
+  }
+  return { label: "Apps", hint: "Which apps' outages reach this channel." };
+}
+
 // One entry of the alert channel list (#291): its type, the fields that type
 // needs, which events and apps it takes, and its own Send test, named for the
 // channel so two of them never sound alike to a screen reader (#350) — a
@@ -37,6 +52,7 @@ export function AlertChannelEditor({
   channels,
   apps,
   widgets = [],
+  integrations = [],
   saving,
   formatLabel,
   urlPlaceholder,
@@ -46,10 +62,11 @@ export function AlertChannelEditor({
   channel: AlertChannel;
   // The whole list, for a name that tells this channel from a namesake.
   channels: AlertChannel[];
-  // The monitored apps, and the API widgets that send alerts (#539), for
-  // the filter.
+  // The monitored apps, the API widgets that send alerts (#539) and the
+  // integrations that do (#540), for the filter.
   apps: { id: string; name: string }[];
   widgets?: { id: string; name: string }[];
+  integrations?: { id: string; name: string }[];
   saving: boolean;
   formatLabel: Record<AlertType, string>;
   urlPlaceholder: Record<AlertType, string>;
@@ -65,11 +82,14 @@ export function AlertChannelEditor({
   // An app filter naming apps that no longer exist (deleted since) still
   // counts as "only some", so the chips show and the stale ids can be cleared.
   const someApps = ch.apps.length > 0;
-  // A widget is named in the filter by its kind and id (subjectFilterKey).
+  // A widget or an integration is named in the filter by its kind and id
+  // (subjectFilterKey).
   const subjects = [
     ...apps.map((a) => ({ value: a.id, label: a.name })),
     ...widgets.map((w) => ({ value: subjectFilterKey({ kind: "widget", id: w.id }), label: w.name })),
+    ...integrations.map((i) => ({ value: subjectFilterKey({ kind: "integration", id: i.id }), label: i.name })),
   ];
+  const filter = filterWords(widgets.length > 0, integrations.length > 0);
 
   return (
     <div className={`${subCardClasses} flex flex-col gap-3 p-3`}>
@@ -128,12 +148,8 @@ export function AlertChannelEditor({
       </div>
 
       <ControlRow
-        label={widgets.length > 0 ? "Apps & widgets" : "Apps"}
-        hint={
-          widgets.length > 0
-            ? "Which apps' outages and widgets' thresholds reach this channel."
-            : "Which apps' outages reach this channel."
-        }
+        label={filter.label}
+        hint={filter.hint}
       >
         <ChipGroup
           label={`${name}: apps`}

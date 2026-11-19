@@ -4,6 +4,7 @@ import { WEBHOOK_SERVICES } from "@/lib/schema";
 import { activeChannels, alertingWidgets, channelNamer, widgetAlertName } from "@/lib/alert-channels";
 import { STATUS_RANGES } from "@/lib/status";
 import { withHttpScheme } from "@/lib/urls";
+import { alertConditionsOn, integrationLabels } from "@/lib/services/ids";
 import {
   AddButton,
   Card,
@@ -47,9 +48,15 @@ export default function MonitoringSection({
     alertUrlPlaceholder,
     widgets,
     widgetLabels,
+    integrations,
   } = d;
-  // The API widgets that send alerts (#539), for the channels' filters.
+  // The API widgets (#539) and integrations (#540) that send alerts, for the
+  // channels' filters.
   const alertWidgets = alertingWidgets(widgets).map((w) => ({ id: w.id, name: widgetAlertName(w, widgetLabels) }));
+  const labels = integrationLabels(integrations);
+  const alertIntegrations = integrations
+    .filter((i) => alertConditionsOn(i).length > 0)
+    .map((i) => ({ id: i.id, name: labels[i.id] }));
   // A Send test waits out a pending autosave so it never tests old values.
   const saving = status === "saving";
   return (
@@ -108,7 +115,7 @@ export default function MonitoringSection({
 
       <Card
         title="Alerts"
-        intro="Notify you when an app goes down or recovers, or an API widget crosses its thresholds, through as many channels as you like. An app's alerts need the status checks on."
+        intro="Notify you when an app goes down or recovers, an API widget crosses its thresholds, or an integration reports a problem, through as many channels as you like. An app's alerts need the status checks on."
         toggle={{
           checked: alerts.enabled,
           onChange: (enabled) => updateAlerts({ enabled }),
@@ -118,7 +125,7 @@ export default function MonitoringSection({
           <>
             <NumberRow
               label="Confirmations before down"
-              hint="Consecutive failed checks required first, or readings past an API widget's threshold."
+              hint="Consecutive failed checks required first, or readings past an API widget's threshold or with an integration's problem."
               min={1}
               max={10}
               value={alerts.confirmations}
@@ -141,6 +148,7 @@ export default function MonitoringSection({
                   channels={alerts.channels}
                   apps={apps}
                   widgets={alertWidgets}
+                  integrations={alertIntegrations}
                   saving={saving}
                   formatLabel={alertTypeLabel}
                   urlPlaceholder={alertUrlPlaceholder}

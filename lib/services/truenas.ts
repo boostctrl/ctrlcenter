@@ -31,7 +31,10 @@ export type TruenasPool = {
   free: number | null;
 };
 
-export type TruenasAlert = { level: "warning" | "critical"; message: string };
+// `id` is TrueNAS's own for the alert (its uuid), the same for as long as
+// the alert stays active, so an alert about it pairs with its recovery
+// (#540).
+export type TruenasAlert = { id: string; level: "warning" | "critical"; message: string };
 
 // One container (workload) an app runs, from active_workloads.container_details:
 // its service/name, verbatim state ("running" / "exited" / …), and image.
@@ -60,13 +63,19 @@ export type TruenasSnapshot = {
   pools: TruenasPool[];
   apps: TruenasApp[];
   alerts: TruenasAlert[];
+  // The lists that couldn't be read this time and came back empty, so an
+  // empty list there isn't news: the alerts hold until they're read (#540).
+  unread?: ("apps" | "alerts")[];
 };
 
 export const TRUENAS_POOL_CAP = 8;
 // The detail page lists every app, so the cap is generous — high enough that a
 // typical homelab's full app roster shows, still bounded against a runaway list.
 export const TRUENAS_APP_CAP = 60;
-export const TRUENAS_ALERT_CAP = 6;
+// Every active alert, near enough: the alerts (#540) need each one, so one
+// past the cap isn't missed and a new one can't push an old one out of the
+// list and look resolved. The Monitor's summary keeps to its own few.
+export const TRUENAS_ALERT_CAP = 50;
 
 // Each TrueNAS app object is large (it carries the app's full config and catalog
 // metadata), so a host with dozens of apps returns a body far past the default
@@ -94,6 +103,8 @@ type RawPool = {
   topology?: Record<string, unknown>;
 };
 type RawAlert = {
+  uuid?: string;
+  id?: string | number;
   level?: string;
   formatted?: string | null;
   text?: string | null;
@@ -173,7 +184,9 @@ export function mapTruenasAlerts(raw: unknown): TruenasAlert[] {
     if (level === "" || level === "INFO" || level === "NOTICE") continue;
     const message = (a.formatted ?? a.text ?? "").trim();
     if (message === "") continue;
+    const id = typeof a.uuid === "string" && a.uuid ? a.uuid : a.id !== undefined && a.id !== "" ? String(a.id) : message;
     out.push({
+      id: id.slice(0, 200),
       level: CRITICAL_LEVELS.has(level) ? "critical" : "warning",
       message,
     });
@@ -260,10 +273,15 @@ export async function getTruenasSnapshot(
   // alert list alone (an older SCALE without /app, or a key-scope quirk)
   // shouldn't blank the pools; those sections just come back empty.
   if (poolsR.status === "rejected") throw poolsR.reason;
+  const unread = [
+    ...(appsR.status === "rejected" ? (["apps"] as const) : []),
+    ...(alertsR.status === "rejected" ? (["alerts"] as const) : []),
+  ];
   return {
     pools: mapTruenasPools(poolsR.value),
     apps: appsR.status === "fulfilled" ? mapTruenasApps(appsR.value) : [],
     alerts: alertsR.status === "fulfilled" ? mapTruenasAlerts(alertsR.value) : [],
+    ...(unread.length > 0 ? { unread } : {}),
   };
 }
 

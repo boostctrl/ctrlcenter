@@ -26,9 +26,22 @@ here.
 - **A site address in Settings → General.** Where you open CtrlCenter,
   such as `https://home.example.com`. An alert about a widget links to its
   board there; left blank, it carries no link. (#539)
+- **TrueNAS alerts.** Under the TrueNAS integration in Settings →
+  Integrations, **Send alerts when** a pool isn't healthy, TrueNAS raises an
+  alert of its own (a failing disk, say), or an app stops or crashes. Each
+  sends a warning, and a cleared warning when it's over, through your alert
+  channels. They're read from the Monitor's once-a-minute snapshot, so they
+  add no requests to TrueNAS. While TrueNAS can't be reached they send nothing:
+  its app's uptime check covers that. A channel narrowed to some apps lists
+  these integrations beside them. Each switch is off by default. (#540)
 - **The generic webhook says what an alert is about.** Its JSON gains
   `kind` (`app` for now) and `id`, the app's id, which stays the same when
   the app is renamed. Every field it sent before is unchanged. (#559)
+
+### Changed
+
+- **The TrueNAS page lists every active alert,** up to 50, where it stopped
+  at six, and the Monitor counts them all. (#540)
 
 ### Fixed
 
